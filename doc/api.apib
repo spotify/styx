@@ -1,0 +1,184 @@
+# Styx Api specification
+
+This document is written using [api-blueprint]
+
+## usage
+
+1. install [dredd]: `npm install -g dredd`
+1. package project: `mvn package`
+1. run tests: `styx-api-service/bin/api-test.sh`
+
+To generate an html version of this spec, use [aglio]
+```
+aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables streak
+```
+
+[api-blueprint]: https://apiblueprint.org/
+[dredd]: https://github.com/apiaryio/dredd
+[aglio]: https://github.com/danielgtaylor/aglio
+
+
+# Group Workflows
+
+## Workflow [/v1/workflows/{component}/{endpoint}]
+
++ Parameters
+    + component: `styx-canary` (string) - Workflow Component
+    + endpoint: `LuigiCanary` (string) - Workflow Endpoint
+
+### Get Workflow [GET]
+
++ Response 200 (application/json)
+
+        {
+            "component_id": "styx-canary",
+            "endpoint_id": "LuigiCanary",
+            "component_uri": "file:///etc/styx/schedule.yaml",
+            "schedule": {
+                "partitioning": "hourly",
+                "docker_args": [
+                  "luigi",
+                  "--module",
+                  "canary_job",
+                  "CanaryJob",
+                  "--local-scheduler"
+                ]
+            }
+        }
+
+## Workflow Instances [/v1/workflows/{component}/{endpoint}/instances]
+
++ Parameters
+    + component: `styx-canary` (string) - Workflow Component
+    + endpoint: `LuigiCanary` (string) - Workflow Endpoint
+
+### Get Workflow Instances [GET]
+
++ Response 200 (application/json)
+
+        [{
+            "workflow_instance": {
+              "workflow_id": {
+                "component_id": "styx-canary",
+                "endpoint_id": "LuigiCanary"
+              },
+              "parameter": "2016-07-13T08"
+            },
+            "triggers": [{
+                "trigger_id": "UNKNOWN",
+                "timestamp": "2016-07-13T09:00:23.941Z",
+                "complete": true,
+                "executions": [{
+                    "execution_id": "styx-run-qcp3r",
+                    "docker_image": "UNKNOWN",
+                    "statuses": [
+                      {
+                        "timestamp": "2016-07-13T09:00:45.882Z",
+                        "status": "SUBMITTED"
+                      },
+                      {
+                        "timestamp": "2016-07-13T09:00:49.076Z",
+                        "status": "STARTED"
+                      },
+                      {
+                        "timestamp": "2016-07-13T09:00:49.313Z",
+                        "status": "SUCCESS"
+                      }
+                    ]
+                }]
+            }]
+        }]
+
+## Workflow Instance [/v1/workflows/{component}/{endpoint}/instances/{instance}]
+
++ Parameters
+    + component: `styx-canary` (string) - Workflow Component
+    + endpoint: `LuigiCanary` (string) - Workflow Endpoint
+    + instance: `2016-07-13T08` (string) - Worfklow Instance parameter
+
+### Get Workflow Instance [GET]
+
++ Response 200 (application/json)
+
+        {
+            "workflow_instance": {
+              "workflow_id": {
+                "component_id": "styx-canary",
+                "endpoint_id": "LuigiCanary"
+              },
+              "parameter": "2016-07-13T08"
+            },
+            "triggers": [{
+                "trigger_id": "UNKNOWN",
+                "timestamp": "2016-07-13T09:00:23.941Z",
+                "complete": true,
+                "executions": [{
+                    "execution_id": "styx-run-qcp3r",
+                    "docker_image": "UNKNOWN",
+                    "statuses": [
+                      {
+                        "timestamp": "2016-07-13T09:00:45.882Z",
+                        "status": "SUBMITTED"
+                      },
+                      {
+                        "timestamp": "2016-07-13T09:00:49.076Z",
+                        "status": "STARTED"
+                      },
+                      {
+                        "timestamp": "2016-07-13T09:00:49.313Z",
+                        "status": "SUCCESS"
+                      }
+                    ]
+                }]
+            }]
+        }
+
+## Workflow state [/v1/workflows/{component}/{endpoint}/state]
+
++ Parameters
+    + component: `styx-canary` (string) - Workflow Component
+    + endpoint: `LuigiCanary` (string) - Workflow Endpoint
+
+### Get Workflow state [GET]
+
++ Response 200 (application/json)
+
+        {
+            "enabled": "true",
+            "docker_image": "busybox:latest"
+        }
+
+### Set Workflow state [PATCH]
+
++ Request (application/json)
+
+        {
+            "enabled": "false",
+            "docker_image": "busybox:latest"
+        }
+
++ Response 200 (application/json)
+
+        {
+            "enabled": "false",
+            "docker_image": "busybox:latest"
+        }
+
+## Component state [/v1/workflows/{component}/state]
+
++ Parameters
+    + component: `styx-canary` (string) - Workflow Component
+
+### Set Component state [PATCH]
+
++ Request (application/json)
+
+        {
+            "docker_image": "busybox:latest"
+        }
+
++ Response 200 (application/json)
+
+        {
+            "docker_image": "busybox:latest"
+        }
