@@ -1,0 +1,13 @@
+<configuration>
+  <root level="info">
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+      <name>STDOUT</name>
+      <encoder>
+        <!--<pattern>%gray(%d{HH:mm:ss.SSS}) %highlight(| %-5level| %-10logger{0}) %green(|>) %msg%n</pattern>-->
+        <pattern>%msg%n</pattern>
+      </encoder>
+    </appender>
+  </root>
+
+  <logger name="com.spotify.apollo" level="warn"/>
+</configuration>

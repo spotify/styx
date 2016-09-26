@@ -1,0 +1,26 @@
+## Artifacts
+*.class
+
+## Package Files
+*.jar
+*.war
+*.ear
+target
+
+## IntelliJ
+.idea
+*.iml
+
+## Logs
+*.log
+
+## Temp
+*~
+.#*
+
+dependency-reduced-pom.xml
+.helios/helios-job-ids
+created_job_ids
+
+## Project Files
+*-user.conf

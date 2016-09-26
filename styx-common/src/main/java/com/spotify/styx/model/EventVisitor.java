@@ -1,0 +1,49 @@
+/*
+ * -\-\-
+ * Spotify Styx Common
+ * --
+ * Copyright (C) 2016 Spotify AB
+ * --
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * -/-/-
+ */
+package com.spotify.styx.model;
+
+import com.github.sviperll.adt4j.GenerateValueClassForVisitor;
+import com.github.sviperll.adt4j.Getter;
+import com.github.sviperll.adt4j.Visitor;
+
+/**
+ * Generated {@link Event} ADT for all events that can be received by RunState
+ */
+@GenerateValueClassForVisitor(isPublic = true)
+@Visitor(resultVariableName = "R")
+public interface EventVisitor<R> {
+  R triggerExecution(@Getter WorkflowInstance workflowInstance, String triggerId);
+  R submit(@Getter WorkflowInstance workflowInstance, ExecutionDescription executionDescription);
+  R submitted(@Getter WorkflowInstance workflowInstance, String executionId);
+  R started(@Getter WorkflowInstance workflowInstance);
+  R terminate(@Getter WorkflowInstance workflowInstance, int exitCode);
+  R runError(@Getter WorkflowInstance workflowInstance, String message);
+  R success(@Getter WorkflowInstance workflowInstance);
+  R retryAfter(@Getter WorkflowInstance workflowInstance, long delayMillis);
+  R retry(@Getter WorkflowInstance workflowInstance);
+  R stop(@Getter WorkflowInstance workflowInstance);
+  R timeout(@Getter WorkflowInstance workflowInstance);
+  R halt(@Getter WorkflowInstance workflowInstance);
+
+  @Deprecated
+  R timeTrigger(@Getter WorkflowInstance workflowInstance);
+  @Deprecated
+  R created(@Getter WorkflowInstance workflowInstance, String executionId, String dockerImage);
+}

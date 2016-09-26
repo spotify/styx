@@ -1,0 +1,103 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.spotify</groupId>
+    <artifactId>styx</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <name>Spotify Styx Scheduler Service</name>
+  <artifactId>styx-scheduler-service</artifactId>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>styx-common</artifactId>
+      <version>0.1.0-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>styx-schedule-source</artifactId>
+      <version>0.1.0-SNAPSHOT</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>apollo-entity</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>apollo-metrics</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.google.auto.value</groupId>
+      <artifactId>auto-value</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>com.github.sviperll</groupId>
+      <artifactId>adt4j</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>completable-futures</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.javaslang</groupId>
+      <artifactId>javaslang</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>docker-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.fabric8</groupId>
+      <artifactId>kubernetes-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.apis</groupId>
+      <artifactId>google-api-services-container</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>styx-test</artifactId>
+      <version>0.1.0-SNAPSHOT</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.hamcrest</groupId>
+      <artifactId>hamcrest-all</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.github.npathai</groupId>
+      <artifactId>hamcrest-optional</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jmock</groupId>
+      <artifactId>jmock</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>apollo-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
