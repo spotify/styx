@@ -19,6 +19,8 @@
  */
 package com.spotify.styx;
 
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.common.io.Closer;
 
 import com.spotify.styx.model.Workflow;
@@ -39,7 +41,9 @@ import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -51,9 +55,16 @@ import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
 import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
+import static java.util.Collections.emptySet;
 
 /**
+ * A {@link ScheduleSource} that monitors a local directory for yaml files.
  *
+ * The contents of the files are parsed into a {@link YamlScheduleDefinition} and
+ * {@link Workflow} objects.
+ *
+ * todo
+ * - handle if watch dir is deleted (warn, try to re-watch until dir appears again)
  */
 class LocalFileScheduleSource implements ScheduleSource {
 
@@ -68,6 +79,7 @@ class LocalFileScheduleSource implements ScheduleSource {
   private final Consumer<Workflow> changeListener;
   private final Consumer<Workflow> removeListener;
 
+  private final Map<String, Set<Workflow>> workflows = Maps.newHashMap();
   private volatile boolean running;
 
   LocalFileScheduleSource(
@@ -118,37 +130,41 @@ class LocalFileScheduleSource implements ScheduleSource {
 
     try {
       while (running) {
-        WatchKey key = watchService.poll(POLL_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+        final WatchKey key = watchService.poll(POLL_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
         if (key == null) {
           continue;
         }
 
         for (WatchEvent<?> event : key.pollEvents()) {
-          WatchEvent.Kind<?> kind = event.kind();
+          final WatchEvent.Kind<?> kind = event.kind();
 
           if (kind == OVERFLOW) {
             continue;
           }
 
-          WatchEvent<Path> pathEvent = cast(event);
-          Path filename = pathEvent.context();
-          Path file = watchPath.resolve(filename);
+          final WatchEvent<Path> pathEvent = cast(event);
+          final Path filename = pathEvent.context();
+          final Path file = watchPath.resolve(filename);
+          final String componentId = componentId(file);
 
-          System.out.println("kind = " + kind);
-          System.out.println("event.count() = " + event.count());
-          System.out.println("filename = " + filename);
-          System.out.println("file = " + file);
+          LOG.debug("{} event for component {}, from file {}", kind, componentId, file);
 
           if (kind == ENTRY_CREATE || kind == ENTRY_MODIFY) {
             try {
-              readWorkflows(file).forEach(changeListener);
+              for (Workflow workflow : readWorkflows(file)) {
+                workflows.computeIfAbsent(workflow.componentId(), (k) -> Sets.newHashSet())
+                    .add(workflow);
+                changeListener.accept(workflow);
+              }
             } catch (IOException e) {
               LOG.warn("Failed to read schedule definition {}", filename, e);
             }
           }
 
           if (kind == ENTRY_DELETE) {
-            removeListener.accept(null);
+            final Set<Workflow> deleted = workflows.getOrDefault(componentId, emptySet());
+            deleted.forEach(removeListener);
+            deleted.clear();
           }
         }
 
@@ -169,16 +185,20 @@ class LocalFileScheduleSource implements ScheduleSource {
 
   private List<Workflow> readWorkflows(Path path) throws IOException {
     final byte[] bytes = Files.readAllBytes(path);
+    LOG.debug("Read yaml file \n{}", ByteString.of(bytes).utf8());
 
-    System.out.println("bytes = " + ByteString.of(bytes).utf8());
     final YamlScheduleDefinition definitions = Yaml.parseScheduleDefinition(bytes);
-    System.out.println("definitions = " + definitions);
+    LOG.debug("Parsed schedule definitions: {}", definitions);
 
-    final String componentId = path.getFileName().toString();
+    final String componentId = componentId(path);
     final URI componentUri = path.toUri();
     return definitions.schedules().stream()
         .map(schedule -> Workflow.create(componentId, componentUri, schedule))
         .collect(Collectors.toList());
+  }
+
+  private String componentId(Path path) {
+    return path.getFileName().toString();
   }
 
   @SuppressWarnings("unchecked")
