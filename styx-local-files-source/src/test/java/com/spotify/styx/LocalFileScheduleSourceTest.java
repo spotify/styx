@@ -51,17 +51,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+import static org.hamcrest.Matchers.hasEntry;
+import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.instanceOf;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
-/**
- * todo
- *
- * - handle create/modify and delete events
- * - handle if watch dir is deleted (warn, try to re-watch until dir appears again)
- */
 public class LocalFileScheduleSourceTest {
 
   @Rule
@@ -138,8 +136,8 @@ public class LocalFileScheduleSourceTest {
             Optional.empty(),
             Optional.of(Arrays.asList("baz", "bax")),
             Optional.empty()));
-    assertThat(workflows.get("foo"), is(foo));
-    assertThat(workflows.get("bar"), is(bar));
+    assertThat(workflows, hasEntry("foo", foo));
+    assertThat(workflows, hasEntry("bar", bar));
   }
 
   @Test
@@ -156,10 +154,30 @@ public class LocalFileScheduleSourceTest {
     expectChangeEvents(1);
     Files.write(testPath, readResource("simple-def.yaml"));
     awaitEvents(changeEvents);
+    final Workflow foo1 = Workflow.create(
+        "test-file",
+        testPath.toUri(),
+        DataEndpoint.create(
+            "foo",
+            Partitioning.HOURS,
+            Optional.empty(),
+            Optional.of(emptyList()),
+            Optional.empty()));
+    assertThat(workflows, hasEntry("foo", foo1));
 
     expectChangeEvents(1);
     Files.write(testPath, readResource("different-def.yaml"));
     awaitEvents(changeEvents);
+    final Workflow foo2 = Workflow.create(
+        "test-file",
+        testPath.toUri(),
+        DataEndpoint.create(
+            "foo",
+            Partitioning.DAYS,
+            Optional.empty(),
+            Optional.of(singletonList("foo")),
+            Optional.empty()));
+    assertThat(workflows, hasEntry("foo", foo2));
   }
 
   @Test
@@ -170,14 +188,18 @@ public class LocalFileScheduleSourceTest {
         "styx.source.local.dir", tmp.toString()
     ));
 
-    Files.createFile(testPath);
-
     ScheduleSource source = createSource(config);
     source.start();
+
+    expectChangeEvents(1);
+    Files.write(testPath, readResource("simple-def.yaml"));
+    awaitEvents(changeEvents);
+    assertThat(workflows, hasKey("foo"));
 
     expectRemoveEvents(1);
     Files.delete(testPath);
     awaitEvents(removeEvents);
+    assertThat(workflows, not(hasKey("foo")));
   }
 
   private ScheduleSource createSource(Config config) {
@@ -191,7 +213,7 @@ public class LocalFileScheduleSourceTest {
   }
 
   private void removeListener(Workflow workflow) {
-//    workflows.remove(workflow.endpointId());
+    workflows.remove(workflow.endpointId());
     removeEvents.countDown();
   }
 
