@@ -20,8 +20,12 @@
 package com.spotify.styx;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import com.google.common.io.Closer;
+import com.google.common.io.Resources;
 
+import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.schedule.ScheduleSource;
 import com.typesafe.config.Config;
@@ -32,18 +36,24 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-import java.io.File;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static com.google.common.io.Files.write;
-import static okio.ByteString.encodeUtf8;
 import static org.hamcrest.Matchers.instanceOf;
+import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
 /**
@@ -60,6 +70,7 @@ public class LocalFileScheduleSourceTest {
   private Closer closer = Closer.create();
   private ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
+  private Map<String, Workflow> workflows = Maps.newHashMap();
   private CountDownLatch changeEvents = new CountDownLatch(0);
   private CountDownLatch removeEvents = new CountDownLatch(0);
 
@@ -96,7 +107,7 @@ public class LocalFileScheduleSourceTest {
   }
 
   @Test
-  public void shouldTriggerChangeOnNewFiles() throws Exception {
+  public void shouldReadYamlFiles() throws Exception {
     Path tmp = Files.createTempDirectory("styx");
     Path testPath = tmp.resolve("test-file");
     Config config = ConfigFactory.parseMap(ImmutableMap.of(
@@ -105,9 +116,30 @@ public class LocalFileScheduleSourceTest {
     ScheduleSource source = createSource(config);
     source.start();
 
-    expectChangeEvents(1);
-    Files.createFile(testPath).toFile();
+    expectChangeEvents(2);
+    Files.write(testPath, readResource("example-defs.yaml"));
     awaitEvents(changeEvents);
+
+    final Workflow foo = Workflow.create(
+        "test-file",
+        testPath.toUri(),
+        DataEndpoint.create(
+            "foo",
+            Partitioning.HOURS,
+            Optional.empty(),
+            Optional.of(Arrays.asList("foo", "bar")),
+            Optional.empty()));
+    final Workflow bar = Workflow.create(
+        "test-file",
+        testPath.toUri(),
+        DataEndpoint.create(
+            "bar",
+            Partitioning.DAYS,
+            Optional.empty(),
+            Optional.of(Arrays.asList("baz", "bax")),
+            Optional.empty()));
+    assertThat(workflows.get("foo"), is(foo));
+    assertThat(workflows.get("bar"), is(bar));
   }
 
   @Test
@@ -122,11 +154,11 @@ public class LocalFileScheduleSourceTest {
     source.start();
 
     expectChangeEvents(1);
-    File newFile = Files.createFile(testPath).toFile();
+    Files.write(testPath, readResource("simple-def.yaml"));
     awaitEvents(changeEvents);
 
     expectChangeEvents(1);
-    write(encodeUtf8("test").toByteArray(), newFile);
+    Files.write(testPath, readResource("different-def.yaml"));
     awaitEvents(changeEvents);
   }
 
@@ -138,7 +170,7 @@ public class LocalFileScheduleSourceTest {
         "styx.source.local.dir", tmp.toString()
     ));
 
-    Files.createFile(testPath).toFile();
+    Files.createFile(testPath);
 
     ScheduleSource source = createSource(config);
     source.start();
@@ -151,6 +183,16 @@ public class LocalFileScheduleSourceTest {
   private ScheduleSource createSource(Config config) {
     return new LocalFileScheduleSource(
         config, closer, executor, this::changeListener, this::removeListener);
+  }
+
+  private void changeListener(Workflow workflow) {
+    workflows.put(workflow.endpointId(), workflow);
+    changeEvents.countDown();
+  }
+
+  private void removeListener(Workflow workflow) {
+//    workflows.remove(workflow.endpointId());
+    removeEvents.countDown();
   }
 
   private void expectChangeEvents(int count) {
@@ -167,11 +209,8 @@ public class LocalFileScheduleSourceTest {
     }
   }
 
-  private void changeListener(Workflow workflow) {
-    changeEvents.countDown();
-  }
-
-  private void removeListener(Workflow workflow) {
-    removeEvents.countDown();
+  private byte[] readResource(String filename) throws IOException, URISyntaxException {
+    URL resource = Resources.getResource(filename);
+    return Files.readAllBytes(Paths.get(resource.toURI()));
   }
 }

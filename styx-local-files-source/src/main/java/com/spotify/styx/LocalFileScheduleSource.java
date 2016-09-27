@@ -29,17 +29,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.FileSystems;
+import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+
+import okio.ByteString;
 
 import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
@@ -126,13 +132,19 @@ class LocalFileScheduleSource implements ScheduleSource {
 
           WatchEvent<Path> pathEvent = cast(event);
           Path filename = pathEvent.context();
+          Path file = watchPath.resolve(filename);
 
           System.out.println("kind = " + kind);
           System.out.println("event.count() = " + event.count());
           System.out.println("filename = " + filename);
+          System.out.println("file = " + file);
 
           if (kind == ENTRY_CREATE || kind == ENTRY_MODIFY) {
-            changeListener.accept(null);
+            try {
+              readWorkflows(file).forEach(changeListener);
+            } catch (IOException e) {
+              LOG.warn("Failed to read schedule definition {}", filename, e);
+            }
           }
 
           if (kind == ENTRY_DELETE) {
@@ -153,6 +165,20 @@ class LocalFileScheduleSource implements ScheduleSource {
     }
 
     LOG.info("Stopped watching {}", watchPath);
+  }
+
+  private List<Workflow> readWorkflows(Path path) throws IOException {
+    final byte[] bytes = Files.readAllBytes(path);
+
+    System.out.println("bytes = " + ByteString.of(bytes).utf8());
+    final YamlScheduleDefinition definitions = Yaml.parseScheduleDefinition(bytes);
+    System.out.println("definitions = " + definitions);
+
+    final String componentId = path.getFileName().toString();
+    final URI componentUri = path.toUri();
+    return definitions.schedules().stream()
+        .map(schedule -> Workflow.create(componentId, componentUri, schedule))
+        .collect(Collectors.toList());
   }
 
   @SuppressWarnings("unchecked")
