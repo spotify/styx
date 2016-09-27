@@ -1,3 +1,8 @@
 machine:
   java:
     version: oraclejdk8
+
+dependencies:
+  # compile, since dependency:resolve fails for multi-module builds
+  override:
+    - mvn dependency:go-offline compile
