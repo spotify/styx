@@ -267,7 +267,6 @@ public class StyxSchedulerServiceFixture {
       new BigtableMocker(bigtable)
           .setNumFailures(numFailures)
           .setupTable(BigtableStorage.EVENTS_TABLE_NAME)
-          .setupTable(BigtableStorage.ACTIVE_STATES_TABLE_NAME)
           .setupTable(BigtableStorage.EXECUTION_INFO_TABLE_NAME)
           .finalizeMocking();
     } catch (IOException e) {

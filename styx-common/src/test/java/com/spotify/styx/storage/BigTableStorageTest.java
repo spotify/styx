@@ -84,7 +84,6 @@ public class BigTableStorageTest {
     new BigtableMocker(bigtable)
         .setNumFailures(numFailures)
         .setupTable(BigtableStorage.EVENTS_TABLE_NAME)
-        .setupTable(BigtableStorage.ACTIVE_STATES_TABLE_NAME)
         .setupTable(BigtableStorage.EXECUTION_INFO_TABLE_NAME)
         .finalizeMocking();
     return bigtable;
@@ -202,31 +201,14 @@ public class BigTableStorageTest {
     thrown.expect(IOException.class);
     thrown.expectMessage(containsString("Something went wrong in performing put operation"));
 
-    storage.writeActiveState(WFI1, 1);
+    storage.writeEvent(SequenceEvent.create(Event.success(WFI1), 1, 0));
   }
 
   @Test
   public void shouldNotProduceIOExceptionIfPutRetrySucceeds() throws Exception {
     setUp(BigtableStorage.MAX_BIGTABLE_RETRIES - 1);
 
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, ""), 1, 0));
-  }
-
-  @Test
-  public void shouldProduceIOExceptionIfTooManyDeleteRetries() throws Exception {
-    setUp(BigtableStorage.MAX_BIGTABLE_RETRIES);
-
-    thrown.expect(IOException.class);
-    thrown.expectMessage(containsString("Something went wrong in performing delete operation"));
-
-    storage.deleteActiveState(WFI1);
-  }
-
-  @Test
-  public void shouldNotProduceIOExceptionIfDeleteRetrySucceeds() throws Exception {
-    setUp(BigtableStorage.MAX_BIGTABLE_RETRIES - 1);
-
-    storage.deleteActiveState(WFI1);
+    storage.writeEvent(SequenceEvent.create(Event.success(WFI1), 1, 0));
   }
 
   private void assertExecutionsAreSorted(List<WorkflowExecutionInfo> executionInfo) {
