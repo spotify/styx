@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <parent>
+    <artifactId>styx</artifactId>
+    <groupId>com.spotify</groupId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+  <modelVersion>4.0.0</modelVersion>
+
+  <name>Spotify Styx Standalone Service</name>
+  <artifactId>styx-standalone-service</artifactId>
+
+  <properties>
+    <service.mainClass>com.spotify.styx.StyxService</service.mainClass>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>styx-api-service</artifactId>
+      <version>0.1.0-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>styx-scheduler-service</artifactId>
+      <version>0.1.0-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>styx-local-files-source</artifactId>
+      <version>0.1.0-SNAPSHOT</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>apollo-http-service</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>${project.artifactId}</finalName>
+    <plugins>
+      <plugin>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>copy-dependencies</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <useBaseVersion>false</useBaseVersion>
+          <overWriteReleases>false</overWriteReleases>
+          <overWriteSnapshots>true</overWriteSnapshots>
+          <includeScope>runtime</includeScope>
+          <outputDirectory>${project.build.directory}/lib</outputDirectory>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>default-jar</id>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <archive>
+            <addMavenDescriptor>true</addMavenDescriptor>
+            <manifest>
+              <addClasspath>true</addClasspath>
+              <classpathPrefix>lib/</classpathPrefix>
+              <mainClass>${service.mainClass}</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
