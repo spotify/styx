@@ -8,7 +8,7 @@
   </parent>
 
   <name>Spotify Styx Local Files Schedule Source</name>
-  <artifactId>styx-local-file-source</artifactId>
+  <artifactId>styx-local-files-source</artifactId>
 
   <dependencies>
     <dependency>
