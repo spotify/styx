@@ -107,7 +107,7 @@ public class LocalFileScheduleSourceTest {
   @Test
   public void shouldReadYamlFiles() throws Exception {
     Path tmp = Files.createTempDirectory("styx");
-    Path testPath = tmp.resolve("test-file");
+    Path testPath = tmp.resolve("test-file.yaml");
     Config config = ConfigFactory.parseMap(ImmutableMap.of(
         "styx.source.local.dir", tmp.toString()
     ));
@@ -119,7 +119,7 @@ public class LocalFileScheduleSourceTest {
     awaitEvents(changeEvents);
 
     final Workflow foo = Workflow.create(
-        "test-file",
+        "test-file.yaml",
         testPath.toUri(),
         DataEndpoint.create(
             "foo",
@@ -128,7 +128,7 @@ public class LocalFileScheduleSourceTest {
             Optional.of(Arrays.asList("foo", "bar")),
             Optional.empty()));
     final Workflow bar = Workflow.create(
-        "test-file",
+        "test-file.yaml",
         testPath.toUri(),
         DataEndpoint.create(
             "bar",
@@ -143,7 +143,7 @@ public class LocalFileScheduleSourceTest {
   @Test
   public void shouldTriggerChangeOnChangedFiles() throws Exception {
     Path tmp = Files.createTempDirectory("styx");
-    Path testPath = tmp.resolve("test-file");
+    Path testPath = tmp.resolve("test-file.yaml");
     Config config = ConfigFactory.parseMap(ImmutableMap.of(
         "styx.source.local.dir", tmp.toString()
     ));
@@ -155,7 +155,7 @@ public class LocalFileScheduleSourceTest {
     Files.write(testPath, readResource("simple-def.yaml"));
     awaitEvents(changeEvents);
     final Workflow foo1 = Workflow.create(
-        "test-file",
+        "test-file.yaml",
         testPath.toUri(),
         DataEndpoint.create(
             "foo",
@@ -169,7 +169,7 @@ public class LocalFileScheduleSourceTest {
     Files.write(testPath, readResource("different-def.yaml"));
     awaitEvents(changeEvents);
     final Workflow foo2 = Workflow.create(
-        "test-file",
+        "test-file.yaml",
         testPath.toUri(),
         DataEndpoint.create(
             "foo",
@@ -183,7 +183,7 @@ public class LocalFileScheduleSourceTest {
   @Test
   public void shouldTriggerRemoveOnDeletedFiles() throws Exception {
     Path tmp = Files.createTempDirectory("styx");
-    Path testPath = tmp.resolve("test-file");
+    Path testPath = tmp.resolve("test-file.yaml");
     Config config = ConfigFactory.parseMap(ImmutableMap.of(
         "styx.source.local.dir", tmp.toString()
     ));
