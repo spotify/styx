@@ -143,22 +143,16 @@ class LocalFileScheduleSource implements ScheduleSource {
           }
 
           final WatchEvent<Path> pathEvent = cast(event);
-          final Path filename = pathEvent.context();
-          final Path file = watchPath.resolve(filename);
-          final String componentId = componentId(file);
+          final Path file = watchPath.resolve(pathEvent.context());
+          if (!isYamlFile(file)) {
+            continue;
+          }
 
+          final String componentId = componentId(file);
           LOG.debug("{} event for component {}, from file {}", kind, componentId, file);
 
           if (kind == ENTRY_CREATE || kind == ENTRY_MODIFY) {
-            try {
-              for (Workflow workflow : readWorkflows(file)) {
-                workflows.computeIfAbsent(workflow.componentId(), (k) -> Sets.newHashSet())
-                    .add(workflow);
-                changeListener.accept(workflow);
-              }
-            } catch (IOException e) {
-              LOG.warn("Failed to read schedule definition {}", filename, e);
-            }
+            readFile(file);
           }
 
           if (kind == ENTRY_DELETE) {
@@ -181,6 +175,23 @@ class LocalFileScheduleSource implements ScheduleSource {
     }
 
     LOG.info("Stopped watching {}", watchPath);
+  }
+
+  private boolean isYamlFile(Path file) {
+    final String fileName = file.getFileName().toString();
+    return fileName.endsWith(".yaml") || fileName.endsWith(".yml");
+  }
+
+  private void readFile(Path file) {
+    try {
+      for (Workflow workflow : readWorkflows(file)) {
+        workflows.computeIfAbsent(workflow.componentId(), (k) -> Sets.newHashSet())
+            .add(workflow);
+        changeListener.accept(workflow);
+      }
+    } catch (IOException e) {
+      LOG.warn("Failed to read schedule definition {}", file, e);
+    }
   }
 
   private List<Workflow> readWorkflows(Path path) throws IOException {
