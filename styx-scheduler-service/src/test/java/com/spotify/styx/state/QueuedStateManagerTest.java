@@ -252,6 +252,7 @@ public class QueuedStateManagerTest {
     stateManager.receive(Event.timeTrigger(INSTANCE));
     stateManager.close();
 
+    assertTrue(stateManager.awaitIdle(1000));
     assertThat(transitions, hasSize(1));
     assertThat(transitions.pop().state(), is(RunState.State.SUBMITTED));
   }
