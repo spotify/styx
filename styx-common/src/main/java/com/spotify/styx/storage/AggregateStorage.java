@@ -20,7 +20,6 @@
 package com.spotify.styx.storage;
 
 import com.google.cloud.datastore.Datastore;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
@@ -39,20 +38,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 
 /**
  * A {@link Storage} implementation backed by Datastore and Bigtable
  */
 public class AggregateStorage implements Storage, EventStorage {
-
-  private final ThreadFactory threadFactory = new ThreadFactoryBuilder()
-      .setNameFormat("storage-darkload-%d")
-      .setDaemon(true)
-      .build();
-  private final ExecutorService darkloadExecutor = Executors.newSingleThreadExecutor(threadFactory);
 
   private final BigtableStorage bigtableStorage;
   private final DatastoreStorage datastoreStorage;
@@ -69,7 +59,7 @@ public class AggregateStorage implements Storage, EventStorage {
 
   @Override
   public Map<WorkflowInstance, Long> readActiveWorkflowInstances() throws IOException {
-    return bigtableStorage.readActiveWorkflowInstances();
+    return datastoreStorage.allActiveStates();
   }
 
   @Override
@@ -79,24 +69,12 @@ public class AggregateStorage implements Storage, EventStorage {
 
   @Override
   public void writeActiveState(WorkflowInstance workflowInstance, long counter) throws IOException {
-    darkloadExecutor.submit(() -> {
-      try {
-        datastoreStorage.writeActiveState(workflowInstance, counter);
-      } catch (IOException ignore) {
-      }
-    });
-    bigtableStorage.writeActiveState(workflowInstance, counter);
+    datastoreStorage.writeActiveState(workflowInstance, counter);
   }
 
   @Override
   public void deleteActiveState(WorkflowInstance workflowInstance) throws IOException {
-    darkloadExecutor.submit(() -> {
-      try {
-        datastoreStorage.deleteActiveState(workflowInstance);
-      } catch (IOException ignore) {
-      }
-    });
-    bigtableStorage.deleteActiveState(workflowInstance);
+    datastoreStorage.deleteActiveState(workflowInstance);
   }
 
   @Override
