@@ -123,11 +123,9 @@ public class StyxScheduler implements AppInit {
   public static final String GKE_CLUSTER_ZONE = "styx.gke.cluster-zone";
   public static final String GKE_CLUSTER_ID = "styx.gke.cluster-id";
   public static final String BIGTABLE_PROJECT_ID = "styx.bigtable.project-id";
-  public static final String BIGTABLE_CLUSTER_ID = "styx.bigtable.cluster-id";
+  public static final String BIGTABLE_INSTANCE_ID = "styx.bigtable.instance-id";
   public static final String DATASTORE_PROJECT = "styx.datastore.project-id";
   public static final String DATASTORE_NAMESPACE = "styx.datastore.namespace";
-  public static final String PUBSUB_PROJECT_ID = "styx.pubsub.project-id";
-  public static final String PUBSUB_AUDIT_DEPLOY_TOPIC = "styx.pubsub.audit.deploy-topic";
 
   public static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
   public static final String STYX_MODE = "styx.mode";
@@ -231,6 +229,10 @@ public class StyxScheduler implements AppInit {
 
   public static Builder newBuilder() {
     return new Builder();
+  }
+
+  public static StyxScheduler createDefault() {
+    return newBuilder().build();
   }
 
   // ==============================================================================================
@@ -520,12 +522,12 @@ public class StyxScheduler implements AppInit {
 
   private static Connection createBigTableConnection(Config config) {
     final String projectId = config.getString(BIGTABLE_PROJECT_ID);
-    final String clusterId = config.getString(BIGTABLE_CLUSTER_ID);
+    final String instanceId = config.getString(BIGTABLE_INSTANCE_ID);
 
-    LOG.info("Creating Bigtable connection for project:{}, cluster:{}",
-             projectId, clusterId);
+    LOG.info("Creating Bigtable connection for project:{}, instance:{}",
+             projectId, instanceId);
 
-    return BigtableConfiguration.connect(projectId, clusterId);
+    return BigtableConfiguration.connect(projectId, instanceId);
   }
 
   static Datastore createDatastore(Config config) {
