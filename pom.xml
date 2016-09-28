@@ -2,7 +2,13 @@
   <modelVersion>4.0.0</modelVersion>
 
   <name>Spotify Styx</name>
-  <groupId>com.spotify</groupId>
+
+  <parent>
+    <groupId>com.spotify</groupId>
+    <artifactId>foss-root</artifactId>
+    <version>2</version>
+  </parent>
+
   <artifactId>styx</artifactId>
   <packaging>pom</packaging>
   <version>0.1.0-SNAPSHOT</version>
@@ -23,6 +29,22 @@
     <module>styx-common</module>
     <module>styx-test</module>
   </modules>
+
+  <licenses>
+    <license>
+      <name>The Apache Software License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <id>rouz</id>
+      <email>rouz@spotify.com</email>
+      <name>Rouzbeh Delavari</name>
+    </developer>
+  </developers>
 
   <scm>
     <url>https://github.com/spotify/dataproc-java-submitter</url>
@@ -269,17 +291,6 @@
       </extension>
     </extensions>
 
-    <pluginManagement>
-      <plugins>
-        <plugin>
-          <artifactId>maven-javadoc-plugin</artifactId>
-          <configuration>
-            <failOnError>false</failOnError>
-          </configuration>
-        </plugin>
-      </plugins>
-    </pluginManagement>
-
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -304,109 +315,12 @@
       </plugin>
 
       <plugin>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.1</version>
-        <configuration>
-          <source>1.8</source>
-          <target>1.8</target>
-          <compilerArgs>
-            <compilerArg>-Xlint:all</compilerArg>
-          </compilerArgs>
-        </configuration>
-      </plugin>
-
-      <plugin>
         <artifactId>maven-enforcer-plugin</artifactId>
-        <version>1.4.1</version>
-        <executions>
-          <execution>
-            <id>enforce</id>
-            <configuration>
-              <rules>
-                <requireUpperBoundDeps />
-              </rules>
-            </configuration>
-            <goals>
-              <goal>enforce</goal>
-            </goals>
-          </execution>
-        </executions>
       </plugin>
 
       <plugin>
         <artifactId>maven-failsafe-plugin</artifactId>
-        <version>2.16</version>
-        <executions>
-          <execution>
-            <goals>
-              <goal>integration-test</goal>
-              <goal>verify</goal>
-            </goals>
-          </execution>
-        </executions>
-        <configuration>
-          <includes>
-            <include>**/*IT.java</include>
-          </includes>
-        </configuration>
-      </plugin>
-
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>license-maven-plugin</artifactId>
-        <version>1.8</version>
-        <configuration>
-          <addJavaLicenseAfterPackage>false</addJavaLicenseAfterPackage>
-          <licenseName>apache_v2</licenseName>
-          <organizationName>Spotify AB</organizationName>
-          <inceptionYear>2016</inceptionYear>
-          <encoding>UTF-8</encoding>
-          <failOnMissingHeader>true</failOnMissingHeader>
-          <failOnNotUptodateHeader>true</failOnNotUptodateHeader>
-          <processStartTag>-\-\-</processStartTag>
-          <processEndTag>-/-/-</processEndTag>
-          <roots>
-            <root>src/main/java</root>
-            <root>src/test/java</root>
-          </roots>
-          <sectionDelimiter>--</sectionDelimiter>
-        </configuration>
-        <executions>
-          <execution>
-            <id>check-file-header</id>
-            <goals>
-              <goal>check-file-header</goal>
-            </goals>
-            <phase>process-sources</phase>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>
-
-  <developers>
-    <developer>
-      <id>rouzwawi</id>
-      <email>rouz@spotify.com</email>
-      <name>Rouzbeh Delavari</name>
-    </developer>
-  </developers>
-  <licenses>
-    <license>
-      <name>The Apache Software License, Version 2.0</name>
-      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
-      <distribution>repo</distribution>
-    </license>
-  </licenses>
-  <distributionManagement>
-    <snapshotRepository>
-      <id>ossrh</id>
-      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-    </snapshotRepository>
-    <site>
-      <id>spotify.github.io</id>
-      <url>file:./website/maven/</url>
-    </site>
-  </distributionManagement>
-
 </project>
