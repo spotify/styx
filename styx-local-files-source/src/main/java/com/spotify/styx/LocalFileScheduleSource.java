@@ -48,6 +48,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import okio.ByteString;
 
@@ -107,16 +108,25 @@ class LocalFileScheduleSource implements ScheduleSource {
     try {
       path = Paths.get(sourceDir);
     } catch (InvalidPathException e) {
-      LOG.error("Invalid path: {}", sourceDir);
-      throw new RuntimeException("Can't load local file schedule source: invalid path");
+      LOG.error("Invalid path: {}", sourceDir, e);
+      throw new RuntimeException("Can't load local file schedule source: invalid path", e);
     }
+
+    final Stream<Path> list;
+    try {
+      list = Files.list(path);
+    } catch (IOException e) {
+      LOG.error("Failed to List: {}", sourceDir, e);
+      throw new RuntimeException("Can't load local file schedule source: initial listing failed", e);
+    }
+    list.filter(this::isYamlFile).forEach(this::readFile);
 
     WatchService watcher;
     try {
       watcher = FileSystems.getDefault().newWatchService();
       path.register(watcher, ENTRY_CREATE, ENTRY_MODIFY, ENTRY_DELETE);
     } catch (IOException e) {
-      LOG.error("Could not watch: {}", path);
+      LOG.error("Could not watch: {}", path, e);
       throw new RuntimeException("Can't load local file schedule source", e);
     }
 

@@ -98,10 +98,28 @@ public class LocalFileScheduleSourceTest {
     ScheduleSource source = createSource(config);
 
     exception.expect(RuntimeException.class);
-    exception.expectMessage("Can't load local file schedule source");
+    exception.expectMessage("Can't load local file schedule source:");
     exception.expectCause(instanceOf(NoSuchFileException.class));
 
     source.start();
+  }
+
+  @Test
+  public void shouldReadExistingFilesOnStartup() throws Exception {
+    Path tmp = Files.createTempDirectory("styx");
+    Path testPath = tmp.resolve("test-file.yaml");
+    Config config = ConfigFactory.parseMap(ImmutableMap.of(
+        "styx.source.local.dir", tmp.toString()
+    ));
+
+    Files.write(testPath, readResource("simple-def.yaml"));
+    ScheduleSource source = createSource(config);
+
+    expectChangeEvents(1);
+    source.start();
+    awaitEvents(changeEvents);
+
+    assertThat(workflows, hasEntry("foo", simpleDef(testPath)));
   }
 
   @Test
@@ -118,26 +136,8 @@ public class LocalFileScheduleSourceTest {
     Files.write(testPath, readResource("example-defs.yaml"));
     awaitEvents(changeEvents);
 
-    final Workflow foo = Workflow.create(
-        "test-file.yaml",
-        testPath.toUri(),
-        DataEndpoint.create(
-            "foo",
-            Partitioning.HOURS,
-            Optional.empty(),
-            Optional.of(Arrays.asList("foo", "bar")),
-            Optional.empty()));
-    final Workflow bar = Workflow.create(
-        "test-file.yaml",
-        testPath.toUri(),
-        DataEndpoint.create(
-            "bar",
-            Partitioning.DAYS,
-            Optional.empty(),
-            Optional.of(Arrays.asList("baz", "bax")),
-            Optional.empty()));
-    assertThat(workflows, hasEntry("foo", foo));
-    assertThat(workflows, hasEntry("bar", bar));
+    assertThat(workflows, hasEntry("foo", example1(testPath)));
+    assertThat(workflows, hasEntry("bar", example2(testPath)));
   }
 
   @Test
@@ -154,30 +154,12 @@ public class LocalFileScheduleSourceTest {
     expectChangeEvents(1);
     Files.write(testPath, readResource("simple-def.yaml"));
     awaitEvents(changeEvents);
-    final Workflow foo1 = Workflow.create(
-        "test-file.yaml",
-        testPath.toUri(),
-        DataEndpoint.create(
-            "foo",
-            Partitioning.HOURS,
-            Optional.empty(),
-            Optional.of(emptyList()),
-            Optional.empty()));
-    assertThat(workflows, hasEntry("foo", foo1));
+    assertThat(workflows, hasEntry("foo", simpleDef(testPath)));
 
     expectChangeEvents(1);
     Files.write(testPath, readResource("different-def.yaml"));
     awaitEvents(changeEvents);
-    final Workflow foo2 = Workflow.create(
-        "test-file.yaml",
-        testPath.toUri(),
-        DataEndpoint.create(
-            "foo",
-            Partitioning.DAYS,
-            Optional.empty(),
-            Optional.of(singletonList("foo")),
-            Optional.empty()));
-    assertThat(workflows, hasEntry("foo", foo2));
+    assertThat(workflows, hasEntry("foo", differentDef(testPath)));
   }
 
   @Test
@@ -234,5 +216,57 @@ public class LocalFileScheduleSourceTest {
   private byte[] readResource(String filename) throws IOException, URISyntaxException {
     URL resource = Resources.getResource(filename);
     return Files.readAllBytes(Paths.get(resource.toURI()));
+  }
+
+  // matching simple-def.yaml
+  private Workflow simpleDef(Path testPath) {
+    return Workflow.create(
+        "test-file.yaml",
+        testPath.toUri(),
+        DataEndpoint.create(
+            "foo",
+            Partitioning.HOURS,
+            Optional.empty(),
+            Optional.of(emptyList()),
+            Optional.empty()));
+  }
+
+  // matching different-def.yaml
+  private Workflow differentDef(Path testPath) {
+    return Workflow.create(
+        "test-file.yaml",
+        testPath.toUri(),
+        DataEndpoint.create(
+            "foo",
+            Partitioning.DAYS,
+            Optional.empty(),
+            Optional.of(singletonList("foo")),
+            Optional.empty()));
+  }
+
+  // matching first def from example-defs.yaml
+  private Workflow example1(Path testPath) {
+    return Workflow.create(
+        "test-file.yaml",
+        testPath.toUri(),
+        DataEndpoint.create(
+            "foo",
+            Partitioning.HOURS,
+            Optional.empty(),
+            Optional.of(Arrays.asList("foo", "bar")),
+            Optional.empty()));
+  }
+
+  // matching second def from example-defs.yaml
+  private Workflow example2(Path testPath) {
+    return Workflow.create(
+        "test-file.yaml",
+        testPath.toUri(),
+        DataEndpoint.create(
+            "bar",
+            Partitioning.DAYS,
+            Optional.empty(),
+            Optional.of(Arrays.asList("baz", "bax")),
+            Optional.empty()));
   }
 }
