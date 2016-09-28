@@ -1,0 +1,4 @@
+schedules:
+  - id: foo
+    partitioning: days
+    docker_args: [foo]
