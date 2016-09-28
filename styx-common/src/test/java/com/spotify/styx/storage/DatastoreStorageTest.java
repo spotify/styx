@@ -47,6 +47,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
@@ -58,6 +59,7 @@ import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertFalse;
@@ -406,6 +408,17 @@ public class DatastoreStorageTest {
 
     storage.deleteActiveState(WORKFLOW_INSTANCE1);
     assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE), hasSize(1));
+  }
+
+  @Test
+  public void shouldReturnAllActiveStates() throws Exception {
+    storage.writeActiveState(WORKFLOW_INSTANCE1, 42L);
+    storage.writeActiveState(WORKFLOW_INSTANCE2, 84L);
+
+    Map<WorkflowInstance, Long> activeStates = storage.allActiveStates();
+    assertThat(activeStates.entrySet(), hasSize(2));
+    assertThat(activeStates, hasEntry(WORKFLOW_INSTANCE1, 42L));
+    assertThat(activeStates, hasEntry(WORKFLOW_INSTANCE2, 84L));
   }
 
   @Test

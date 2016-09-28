@@ -27,8 +27,10 @@ import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.KeyFactory;
 import com.google.cloud.datastore.PathElement;
+import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 
 import com.spotify.styx.model.Workflow;
@@ -44,6 +46,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -172,6 +175,25 @@ class DatastoreStorage {
           }
           return null;
         });
+  }
+
+  Map<WorkflowInstance, Long> allActiveStates() throws IOException {
+    final EntityQuery activeStatesQuery = Query.entityQueryBuilder()
+        .kind(KIND_ACTIVE_STATE)
+        .build();
+
+    final ImmutableMap.Builder<WorkflowInstance, Long> mapBuilder = ImmutableMap.builder();
+
+    final QueryResults<Entity> results = datastore.run(activeStatesQuery);
+    while (results.hasNext()) {
+      final Entity activeState = results.next();
+      final WorkflowInstance instance = parseWorkflowInstance(activeState);
+      final long counter = activeState.getLong(PROPERTY_ACTIVE_STATE_COUNTER);
+
+      mapBuilder.put(instance, counter);
+    }
+
+    return mapBuilder.build();
   }
 
   void writeActiveState(WorkflowInstance workflowInstance, long counter) throws IOException {
@@ -307,6 +329,14 @@ class DatastoreStorage {
             PathElement.of(KIND_WORKFLOW, workflowId.endpointId()))
         .kind(KIND_ACTIVE_STATE)
         .newKey(workflowInstance.parameter());
+  }
+
+  private WorkflowInstance parseWorkflowInstance(Entity activeState) {
+    final String componentId = activeState.key().ancestors().get(0).name();
+    final String endpointId = activeState.key().ancestors().get(1).name();
+    final String parameter = activeState.key().name();
+
+    return WorkflowInstance.create(WorkflowId.create(componentId, endpointId), parameter);
   }
 
   private WorkflowId parseWorkflowId(Entity workflow) {
