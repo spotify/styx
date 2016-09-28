@@ -21,7 +21,6 @@ package com.spotify.styx.storage;
 
 import com.google.cloud.datastore.DatastoreException;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -38,7 +37,6 @@ import com.spotify.styx.util.RunnableWithException;
 
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
-import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
@@ -72,14 +70,11 @@ public class BigtableStorage {
   public static final TableName EXECUTION_INFO_TABLE_NAME = TableName.valueOf("execution_info");
 
   public static final TableName EVENTS_TABLE_NAME = TableName.valueOf("styx_events");
-  public static final TableName ACTIVE_STATES_TABLE_NAME = TableName.valueOf("active_states");
 
   public static final byte[] INFO_CF = Bytes.toBytes("info");
   public static final byte[] STATUS_QUALIFIER = Bytes.toBytes("status");
   public static final byte[] PODNAME_QUALIFIER = Bytes.toBytes("pod_name"); // for backwards compatibility
   public static final byte[] EXECUTION_ID_QUALIFIER = Bytes.toBytes("execution_id");
-  public static final byte[] STATE_CF = Bytes.toBytes("state");
-  public static final byte[] STATE_QUALIFIER = Bytes.toBytes("state");
   public static final byte[] EVENT_CF = Bytes.toBytes("event");
   public static final byte[] EVENT_QUALIFIER = Bytes.toBytes("event");
 
@@ -109,21 +104,6 @@ public class BigtableStorage {
     return set;
   }
 
-  Map<WorkflowInstance, Long> readActiveWorkflowInstances() throws IOException {
-    final Table activeStatesTable = connection.getTable(ACTIVE_STATES_TABLE_NAME);
-    final ImmutableMap.Builder<WorkflowInstance, Long> map = ImmutableMap.builder();
-
-    for (Result result : activeStatesTable.getScanner(STATE_CF, STATE_QUALIFIER)) {
-      final WorkflowInstance workflowInstance =
-          WorkflowInstance.parseKey(Bytes.toString(result.getRow()));
-      final long counter = Long.parseLong(Bytes.toString(result.value()));
-
-      map.put(workflowInstance, counter);
-    }
-
-    return map.build();
-  }
-
   void writeEvent(SequenceEvent sequenceEvent) throws IOException {
     storeWithRetries(() -> {
       final Table eventsTable = connection.getTable(EVENTS_TABLE_NAME);
@@ -138,30 +118,6 @@ public class BigtableStorage {
       final byte[] eventBytes = eventSerializer.convert(sequenceEvent.event()).toByteArray();
       put.addColumn(EVENT_CF, EVENT_QUALIFIER, eventBytes);
       eventsTable.put(put);
-    });
-  }
-
-
-  void writeActiveState(WorkflowInstance workflowInstance, long counter) throws IOException {
-    storeWithRetries(() -> {
-      final Table activeStatesTable = connection.getTable(ACTIVE_STATES_TABLE_NAME);
-
-      final byte[] counterValue = Bytes.toBytes(Long.toString(counter));
-      final byte[] key = Bytes.toBytes(workflowInstance.toKey());
-      final Put put = new Put(key)
-          .addColumn(STATE_CF, STATE_QUALIFIER, counterValue);
-
-      activeStatesTable.put(put);
-    });
-  }
-
-  void deleteActiveState(WorkflowInstance workflowInstance) throws IOException {
-    storeWithRetries(() -> {
-      final Table activeStatesTable = connection.getTable(ACTIVE_STATES_TABLE_NAME);
-      final byte[] key = Bytes.toBytes(workflowInstance.toKey());
-      final Delete delete = new Delete(key);
-
-      activeStatesTable.delete(delete);
     });
   }
 
