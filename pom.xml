@@ -18,6 +18,7 @@
     <module>styx-api-service</module>
     <module>styx-scheduler-service</module>
     <module>styx-schedule-source</module>
+    <module>styx-local-files-source</module>
     <module>styx-cli</module>
     <module>styx-common</module>
     <module>styx-test</module>
@@ -79,6 +80,11 @@
       <dependency>
         <groupId>com.fasterxml.jackson.datatype</groupId>
         <artifactId>jackson-datatype-jdk8</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.dataformat</groupId>
+        <artifactId>jackson-dataformat-yaml</artifactId>
         <version>${jackson.version}</version>
       </dependency>
       <dependency>
