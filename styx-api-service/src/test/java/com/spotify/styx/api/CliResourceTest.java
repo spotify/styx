@@ -55,6 +55,7 @@ import static org.junit.Assert.assertThat;
 @RunWith(Parameterized.class)
 public class CliResourceTest {
 
+  private static final String SCHEDULER_BASE = "http://localhost:8080";
   private static final String COMPONENT_ID = "styx";
   private static final String ENDPOINT_ID = "test";
   private static final String PARAMETER = "1234";
@@ -81,7 +82,7 @@ public class CliResourceTest {
   }
 
   private void init(Environment environment) {
-    final CliResource cliResource = new CliResource(eventStorage);
+    final CliResource cliResource = new CliResource(SCHEDULER_BASE, eventStorage);
 
     environment.routingEngine()
         .registerRoutes(cliResource.routes());
@@ -91,7 +92,7 @@ public class CliResourceTest {
   public void testEventInjectionProxy() throws Exception {
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.ACCEPTED))
-        .to("hm://styx-scheduler/api/v0/events");
+        .to(SCHEDULER_BASE + "/api/v0/events");
 
     CompletionStage<Response<ByteString>> post =
         serviceHelper.request("POST", path("/events"));
@@ -104,7 +105,7 @@ public class CliResourceTest {
   public void testTriggerWorkflowInstanceProxy() throws Exception {
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.ACCEPTED))
-        .to("hm://styx-scheduler/api/v0/trigger");
+        .to(SCHEDULER_BASE + "/api/v0/trigger");
 
     CompletionStage<Response<ByteString>> post =
         serviceHelper.request("POST", path("/trigger"));
