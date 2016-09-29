@@ -67,13 +67,15 @@ import static com.spotify.styx.util.StreamUtil.cat;
 public class CliResource {
 
   public static final String BASE = "/cli";
-  public static final String SCHEDULER_SERVICE_BASE = "hm://styx-scheduler/api/v0";
+  public static final String SCHEDULER_BASE_PATH = "/api/v0";
 
+  private final String schedulerServiceBaseUrl;
   private final EventStorage eventStorage;
 
   private final EventVisitor<Boolean> lastExecutionEventVisitor = new CliResource.LastExecutionEventVisitor();
 
-  public CliResource(EventStorage eventStorage) {
+  public CliResource(String schedulerServiceBaseUrl, EventStorage eventStorage) {
+    this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
     this.eventStorage = Objects.requireNonNull(eventStorage);
   }
 
@@ -177,7 +179,7 @@ public class CliResource {
   private CompletionStage<Response<ByteString>> injectEventProxy(RequestContext requestContext) {
     final Client client = requestContext.requestScopedClient();
     final Request proxyRequest = requestContext.request()
-        .withUri(SCHEDULER_SERVICE_BASE + "/events");
+        .withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + "/events");
 
     return client.send(proxyRequest);
   }
@@ -185,7 +187,7 @@ public class CliResource {
   private CompletionStage<Response<ByteString>> triggerWorkflowInstanceProxy(RequestContext requestContext) {
     final Client client = requestContext.requestScopedClient();
     final Request proxyRequest = requestContext.request()
-        .withUri(SCHEDULER_SERVICE_BASE + "/trigger");
+        .withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + "/trigger");
 
     return client.send(proxyRequest);
   }
