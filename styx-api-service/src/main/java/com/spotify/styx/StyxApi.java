@@ -53,7 +53,8 @@ public class StyxApi implements AppInit {
 
   public static final String SERVICE_NAME = "styx-api";
 
-  public static final String SCHEDULER_SERVICE_BASE_URL = "hm://styx-scheduler";
+  public static final String SCHEDULER_SERVICE_BASE_URL = "styx.scheduler.base-url";
+  public static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
   public static final String BIGTABLE_PROJECT_ID = "styx.bigtable.project-id";
   public static final String BIGTABLE_INSTANCE_ID = "styx.bigtable.instance-id";
@@ -103,12 +104,17 @@ public class StyxApi implements AppInit {
 
   @Override
   public void create(Environment environment) {
+    final Config config = environment.config();
+    final String schedulerServiceBaseUrl = config.hasPath(SCHEDULER_SERVICE_BASE_URL)
+        ? config.getString(SCHEDULER_SERVICE_BASE_URL)
+        : DEFAULT_SCHEDULER_SERVICE_BASE_URL;
+
     final Storage storage = storageFactory.apply(environment);
     final EventStorage eventStorage = eventStorageFactory.apply(environment);
 
     final WorkflowResource workflowResource = new WorkflowResource(storage);
     final StyxConfigResource styxConfigResource = new StyxConfigResource(storage);
-    final CliResource cliResource = new CliResource(SCHEDULER_SERVICE_BASE_URL, eventStorage);
+    final CliResource cliResource = new CliResource(schedulerServiceBaseUrl, eventStorage);
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
