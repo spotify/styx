@@ -35,6 +35,7 @@ import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 public class PublisherHandlerTest {
@@ -63,6 +64,17 @@ public class PublisherHandlerTest {
   }
 
   @Test
+  public void testPublishesRollingOutStateOnSubmittedNoSha() throws Exception {
+    RunState runState = RunState.newSubmitted(
+        WORKFLOW_INSTANCE,
+        "exec1",
+        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), empty(), empty()));
+    outputHandler.transitionInto(runState);
+
+    verify(publisher, never()).deploying(WORKFLOW_INSTANCE, DOCKER_IMAGE, COMMIT_SHA);
+  }
+
+  @Test
   public void testPublishesDoneStateOnRunning() throws Exception {
     RunState runState = RunState.newRunning(
         WORKFLOW_INSTANCE,
@@ -71,6 +83,17 @@ public class PublisherHandlerTest {
     outputHandler.transitionInto(runState);
 
     verify(publisher).deployed(WORKFLOW_INSTANCE, DOCKER_IMAGE, COMMIT_SHA);
+  }
+
+  @Test
+  public void testPublishesDoneStateOnRunningNoSha() throws Exception {
+    RunState runState = RunState.newRunning(
+        WORKFLOW_INSTANCE,
+        "exec1",
+        ExecutionDescription.create("busybox:1.1", emptyList(), empty(),empty()));
+    outputHandler.transitionInto(runState);
+
+    verify(publisher, never()).deployed(WORKFLOW_INSTANCE, DOCKER_IMAGE, COMMIT_SHA);
   }
 
   @Test

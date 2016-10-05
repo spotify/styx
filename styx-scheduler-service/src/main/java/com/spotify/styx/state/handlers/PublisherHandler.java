@@ -60,9 +60,14 @@ public class PublisherHandler implements OutputHandler {
       case SUBMITTED:
         try {
           Preconditions.checkArgument(state.executionDescription().isPresent());
-          final String dockerImage = state.executionDescription().get().dockerImage();
-          final String sha = state.executionDescription().get().commitSha().orElse("unknown");
-          RETRIER.runWithRetries(() -> publisher.deploying(workflowInstance, dockerImage, sha));
+          if (state.executionDescription().get().commitSha().isPresent()) {
+            final String dockerImage = state.executionDescription().get().dockerImage();
+            final String sha = state.executionDescription().get().commitSha().get();
+            RETRIER.runWithRetries(() -> publisher.deploying(workflowInstance, dockerImage, sha));
+          } else {
+            LOG.debug("Deploying event for execution {} not sent "
+                      + "because missing SHA information.", state.executionId());
+          }
         } catch (Exception e) {
           LOG.error("Failed to publish event for PREPARE state", e);
         }
@@ -71,9 +76,14 @@ public class PublisherHandler implements OutputHandler {
       case RUNNING:
         try {
           Preconditions.checkArgument(state.executionDescription().isPresent());
-          final String dockerImage = state.executionDescription().get().dockerImage();
-          final String sha = state.executionDescription().get().commitSha().orElse("unknown");
-          RETRIER.runWithRetries(() -> publisher.deployed(workflowInstance, dockerImage, sha));
+          if (state.executionDescription().get().commitSha().isPresent()) {
+            final String dockerImage = state.executionDescription().get().dockerImage();
+            final String sha = state.executionDescription().get().commitSha().get();
+            RETRIER.runWithRetries(() -> publisher.deployed(workflowInstance, dockerImage, sha));
+          } else {
+            LOG.debug("Deployed event for execution {} not sent "
+                      + "because missing SHA information.", state.executionId());
+          }
         } catch (Exception e) {
           LOG.error("Failed to publish event for RUNNING state", e);
         }
