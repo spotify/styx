@@ -19,6 +19,7 @@
  */
 package com.spotify.styx.publisher;
 
+import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
 
 import java.io.IOException;
@@ -26,10 +27,14 @@ import java.io.IOException;
 class NoopPublisher implements Publisher {
 
   @Override
-  public void deploying(WorkflowInstance workflowInstance, String image, String sha) throws IOException {
+  public void deploying(
+      WorkflowInstance workflowInstance, ExecutionDescription executionDescription)
+      throws IOException {
   }
 
   @Override
-  public void deployed(WorkflowInstance workflowInstance, String image, String sha) throws IOException {
+  public void deployed(
+      WorkflowInstance workflowInstance, ExecutionDescription executionDescription)
+      throws IOException {
   }
 }

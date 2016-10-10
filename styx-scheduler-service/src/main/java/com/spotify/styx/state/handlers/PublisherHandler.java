@@ -21,6 +21,7 @@ package com.spotify.styx.state.handlers;
 
 import com.google.common.base.Preconditions;
 
+import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.publisher.Publisher;
 import com.spotify.styx.state.OutputHandler;
@@ -60,14 +61,8 @@ public class PublisherHandler implements OutputHandler {
       case SUBMITTED:
         try {
           Preconditions.checkArgument(state.executionDescription().isPresent());
-          if (state.executionDescription().get().commitSha().isPresent()) {
-            final String dockerImage = state.executionDescription().get().dockerImage();
-            final String sha = state.executionDescription().get().commitSha().get();
-            RETRIER.runWithRetries(() -> publisher.deploying(workflowInstance, dockerImage, sha));
-          } else {
-            LOG.debug("Deploying event for execution {} not sent "
-                      + "because missing SHA information.", state.executionId());
-          }
+          final ExecutionDescription executionDescription = state.executionDescription().get();
+          RETRIER.runWithRetries(() -> publisher.deploying(workflowInstance, executionDescription));
         } catch (Exception e) {
           LOG.error("Failed to publish event for PREPARE state", e);
         }
@@ -76,14 +71,8 @@ public class PublisherHandler implements OutputHandler {
       case RUNNING:
         try {
           Preconditions.checkArgument(state.executionDescription().isPresent());
-          if (state.executionDescription().get().commitSha().isPresent()) {
-            final String dockerImage = state.executionDescription().get().dockerImage();
-            final String sha = state.executionDescription().get().commitSha().get();
-            RETRIER.runWithRetries(() -> publisher.deployed(workflowInstance, dockerImage, sha));
-          } else {
-            LOG.debug("Deployed event for execution {} not sent "
-                      + "because missing SHA information.", state.executionId());
-          }
+          final ExecutionDescription executionDescription = state.executionDescription().get();
+          RETRIER.runWithRetries(() -> publisher.deployed(workflowInstance, executionDescription));
         } catch (Exception e) {
           LOG.error("Failed to publish event for RUNNING state", e);
         }
