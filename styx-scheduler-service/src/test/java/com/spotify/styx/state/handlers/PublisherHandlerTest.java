@@ -35,7 +35,6 @@ import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 public class PublisherHandlerTest {
@@ -54,72 +53,58 @@ public class PublisherHandlerTest {
 
   @Test
   public void testPublishesRollingOutStateOnSubmitted() throws Exception {
+    ExecutionDescription executionDescription =
+        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), empty(), Optional.of(COMMIT_SHA));
     RunState runState = RunState.newSubmitted(
         WORKFLOW_INSTANCE,
         "exec1",
-        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), empty(), Optional.of(COMMIT_SHA)));
+        executionDescription);
     outputHandler.transitionInto(runState);
 
-    verify(publisher).deploying(WORKFLOW_INSTANCE, DOCKER_IMAGE, COMMIT_SHA);
-  }
-
-  @Test
-  public void testPublishesRollingOutStateOnSubmittedNoSha() throws Exception {
-    RunState runState = RunState.newSubmitted(
-        WORKFLOW_INSTANCE,
-        "exec1",
-        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), empty(), empty()));
-    outputHandler.transitionInto(runState);
-
-    verify(publisher, never()).deploying(WORKFLOW_INSTANCE, DOCKER_IMAGE, COMMIT_SHA);
+    verify(publisher).deploying(WORKFLOW_INSTANCE, executionDescription);
   }
 
   @Test
   public void testPublishesDoneStateOnRunning() throws Exception {
+    ExecutionDescription executionDescription =
+        ExecutionDescription.create("busybox:1.1", emptyList(), empty(), Optional.of(COMMIT_SHA));
     RunState runState = RunState.newRunning(
         WORKFLOW_INSTANCE,
         "exec1",
-        ExecutionDescription.create("busybox:1.1", emptyList(), empty(), Optional.of(COMMIT_SHA)));
+        executionDescription);
     outputHandler.transitionInto(runState);
 
-    verify(publisher).deployed(WORKFLOW_INSTANCE, DOCKER_IMAGE, COMMIT_SHA);
-  }
-
-  @Test
-  public void testPublishesDoneStateOnRunningNoSha() throws Exception {
-    RunState runState = RunState.newRunning(
-        WORKFLOW_INSTANCE,
-        "exec1",
-        ExecutionDescription.create("busybox:1.1", emptyList(), empty(),empty()));
-    outputHandler.transitionInto(runState);
-
-    verify(publisher, never()).deployed(WORKFLOW_INSTANCE, DOCKER_IMAGE, COMMIT_SHA);
+    verify(publisher).deployed(WORKFLOW_INSTANCE, executionDescription);
   }
 
   @Test
   public void shouldRetryPublishesOnSubmitted() throws Exception {
     outputHandler = new PublisherHandler(new FailingPublisher(publisher, 2));
 
+    ExecutionDescription executionDescription =
+        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), empty(), Optional.of(COMMIT_SHA));
     RunState runState = RunState.newSubmitted(
         WORKFLOW_INSTANCE,
         "exec1",
-        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), empty(), Optional.of(COMMIT_SHA)));
+        executionDescription);
     outputHandler.transitionInto(runState);
 
-    verify(publisher).deploying(WORKFLOW_INSTANCE, DOCKER_IMAGE, COMMIT_SHA);
+    verify(publisher).deploying(WORKFLOW_INSTANCE, executionDescription);
   }
 
   @Test
   public void shouldRetryPublishesOnRunning() throws Exception {
     outputHandler = new PublisherHandler(new FailingPublisher(publisher, 2));
 
+    ExecutionDescription executionDescription =
+        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), empty(), Optional.of(COMMIT_SHA));
     RunState runState = RunState.newRunning(
         WORKFLOW_INSTANCE,
         "exec1",
-        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), empty(), Optional.of(COMMIT_SHA)));
+        executionDescription);
     outputHandler.transitionInto(runState);
 
-    verify(publisher).deployed(WORKFLOW_INSTANCE, DOCKER_IMAGE, COMMIT_SHA);
+    verify(publisher).deployed(WORKFLOW_INSTANCE, executionDescription);
   }
 
   private class FailingPublisher implements Publisher {
@@ -135,19 +120,19 @@ public class PublisherHandlerTest {
     }
 
     @Override
-    public void deploying(WorkflowInstance workflowInstance, String image, String sha) throws IOException {
+    public void deploying(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) throws IOException {
       if (fails++ < maxFails) {
         throw new IOException("failed " + fails);
       }
-      delegate.deploying(workflowInstance, image, sha);
+      delegate.deploying(workflowInstance, executionDescription);
     }
 
     @Override
-    public void deployed(WorkflowInstance workflowInstance, String image, String sha) throws IOException {
+    public void deployed(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) throws IOException {
       if (fails++ < maxFails) {
         throw new IOException("failed " + fails);
       }
-      delegate.deployed(workflowInstance, image, sha);
+      delegate.deployed(workflowInstance, executionDescription);
     }
   }
 }

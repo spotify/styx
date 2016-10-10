@@ -19,6 +19,7 @@
  */
 package com.spotify.styx.publisher;
 
+import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
 
 import java.io.IOException;
@@ -28,9 +29,9 @@ import java.io.IOException;
  */
 public interface Publisher {
 
-  void deploying(WorkflowInstance workflowInstance, String image, String sha) throws IOException;
+  void deploying(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) throws IOException;
 
-  void deployed(WorkflowInstance workflowInstance, String image, String sha) throws IOException;
+  void deployed(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) throws IOException;
 
   Publisher NOOP = new NoopPublisher();
 }
