@@ -34,6 +34,8 @@ import com.spotify.apollo.environment.ApolloEnvironmentModule;
 import com.spotify.apollo.http.client.HttpClientModule;
 import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.api.cli.EventsPayload;
+import com.spotify.styx.model.Event;
+import com.spotify.styx.model.EventSerializer;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 
@@ -57,7 +59,7 @@ import okio.ByteString;
 public final class Main {
 
   private static final String ENV_VAR_PREFIX = "STYX_CLI";
-  private static final String STYX_CLI_API = "http://styx.example.com/api/v0/cli";
+  private static final String STYX_CLI_API = "http://styx.example.com/api/v1/cli";
   public static final int TTL_REQUEST = 30;
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
@@ -82,6 +84,7 @@ public final class Main {
         .metavar(" ");
 
     Command.ACTIVE_STATES.parser(subCommands);
+
     Subparser events = Command.EVENTS.parser(subCommands);
     Argument eventsCid = events.addArgument("component")
         .help("Component id.");
@@ -89,12 +92,21 @@ public final class Main {
         .help("Endpoint id.");
     Argument eventsIid = events.addArgument("parameter")
         .help("Parameter identifying the endpoint partition, e.g. '2016-09-14' or '2016-09-14T17'.");
+
     Subparser trigger = Command.TRIGGER.parser(subCommands);
     Argument triggerCid = trigger.addArgument("component")
         .help("Component id.");
     Argument triggerEid = trigger.addArgument("endpoint")
         .help("Endpoint id.");
     Argument triggerIid = trigger.addArgument("parameter")
+        .help("Parameter identifying the endpoint partition, e.g. '2016-09-14' or '2016-09-14T17'.");
+
+    Subparser retry = Command.RETRY.parser(subCommands);
+    Argument retryCid = retry.addArgument("component")
+        .help("Component id.");
+    Argument retryEid = retry.addArgument("endpoint")
+        .help("Endpoint id.");
+    Argument retryIid = retry.addArgument("parameter")
         .help("Parameter identifying the endpoint partition, e.g. '2016-09-14' or '2016-09-14T17'.");
 
     final Argument plain = parser.addArgument("-p", "--plain")
@@ -138,6 +150,13 @@ public final class Main {
           String teid = namespace.getString(triggerEid.getDest());
           String tiid = namespace.getString(triggerIid.getDest());
           triggerWorkflowInstance(client, cli, signaller, tcid, teid, tiid);
+          break;
+
+        case RETRY:
+          String rcid = namespace.getString(retryCid.getDest());
+          String reid = namespace.getString(retryEid.getDest());
+          String riid = namespace.getString(retryIid.getDest());
+          retryWorkflowInstance(client, cli, signaller, rcid, reid, riid);
           break;
 
         default:
@@ -230,6 +249,35 @@ public final class Main {
     }
   }
 
+  private static void retryWorkflowInstance(
+      Client client,
+      CliOutput cliOutput,
+      Service.Signaller signaller,
+      String cid,
+      String eid,
+      String iid) {
+
+    WorkflowInstance workflowInstance = WorkflowInstance.create(WorkflowId.create(cid, eid), iid);
+    Event retry = Event.retry(workflowInstance);
+    EventSerializer.PersistentEvent persistentEvent =
+        EventSerializer.convertEventToPersistentEvent(retry);
+    try {
+      final ByteString payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(persistentEvent));
+      String uri = String.format("%s/events/", STYX_CLI_API);
+      final Request request = Request.forUri(uri, "POST").withPayload(payload);
+      client.send(request).whenComplete((response, t) -> {
+        cliOutput.printResponse(response);
+        signaller.signalShutdown();
+      }).exceptionally(e -> {
+        cliOutput.apiError(e);
+        signaller.signalShutdown();
+        return null;
+      });
+    } catch (JsonProcessingException e) {
+      throw Throwables.propagate(e);
+    }
+  }
+
   private static Client getClient(Service.Instance i) {
     final ApolloEnvironment environment = ApolloEnvironmentModule.environment(i);
     return environment.environment().client();
@@ -238,7 +286,8 @@ public final class Main {
   enum Command {
     ACTIVE_STATES("List active states", "ls"),
     EVENTS("events", "e"),
-    TRIGGER("trigger", "t");
+    TRIGGER("trigger", "t"),
+    RETRY("retry", "r");
 
     static final String DEST = "command";
 
