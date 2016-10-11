@@ -50,13 +50,16 @@ import okio.ByteString;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
+import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
+import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
+import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
+import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-
 
 /**
  * API endpoints for interacting directly with the scheduler
@@ -115,7 +118,6 @@ public class SchedulerResourceTest {
     return post.toCompletableFuture().get();
   }
 
-
   @Test
   public void testInjectEvent() throws Exception {
     RunState initialState = RunState.create(WFI, RunState.State.RUNNING);
@@ -130,6 +132,20 @@ public class SchedulerResourceTest {
 
     RunState finalState = stateManager.get(WFI);
     assertThat(finalState.state(), is(RunState.State.FAILED));
+  }
+
+  @Test
+  public void testRejectUnknownWorkflowInstance() throws Exception {
+    Event injectedEvent = Event.timeout(WFI);
+    ByteString eventPayload = eventSerializer.convert(injectedEvent);
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/events", eventPayload);
+
+    final Response<ByteString> response =
+        post.toCompletableFuture().get();// block until done
+
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
+    assertThat(response, hasStatus(withReasonPhrase(containsString("not found"))));
   }
 
   @Test
