@@ -64,6 +64,11 @@ public class SyncStateManager implements StateManager {
   }
 
   @Override
+  public long getQueuedEventsCount() {
+    return 0; // synchronous event handling, no queue
+  }
+
+  @Override
   public long getActiveStatesCount(WorkflowId workflowId) {
     return states
         .keySet()

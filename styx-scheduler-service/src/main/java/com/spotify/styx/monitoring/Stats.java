@@ -33,6 +33,8 @@ public interface Stats {
 
   void submitToRunningTime(long durationSeconds);
 
+  void registerQueuedEvents(Gauge<Long> queuedEventsCount);
+
   void registerActiveStates(Gauge<Long> activeStatesCount);
 
   void registerActiveStates(WorkflowId workflowId, Gauge<Long> activeStatesCount);

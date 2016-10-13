@@ -139,6 +139,11 @@ public class QueuedStateManager implements StateManager, StaleStateReaper, State
   }
 
   @Override
+  public long getQueuedEventsCount() {
+    return eventQueue.size();
+  }
+
+  @Override
   public long getActiveStatesCount(WorkflowId workflowId) {
     return activeStates
         .keySet()
