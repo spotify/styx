@@ -64,6 +64,12 @@ public interface StateManager extends Closeable {
   long getActiveStatesCount();
 
   /**
+   * Returns the number of queued, unprocessed events. These are events that are sent to
+   * {@link #receive(Event)} or {@link #receiveIgnoreClosed(Event)}, and are pending.
+   */
+  long getQueuedEventsCount();
+
+  /**
    * Returns the number of current active {@link RunState} for a specific {@link WorkflowId}.
    */
   long getActiveStatesCount(WorkflowId workflowId);

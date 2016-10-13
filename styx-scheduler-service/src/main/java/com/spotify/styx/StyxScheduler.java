@@ -418,6 +418,7 @@ public class StyxScheduler implements AppInit {
       Storage storage,
       Stats stats) {
 
+    final Gauge<Long> queuedEventsCount = stateManager::getQueuedEventsCount;
     final Gauge<Long> activeStatesCount = stateManager::getActiveStatesCount;
     final Gauge<Long> allWorkflowsCount = () -> workflowCache.all().stream().count();
     final Gauge<Long> configuredWorkflowsCount = () -> workflowCache.all().stream()
@@ -436,6 +437,7 @@ public class StyxScheduler implements AppInit {
       }
     };
 
+    stats.registerQueuedEvents(queuedEventsCount);
     stats.registerActiveStates(activeStatesCount);
     stats.registerWorkflowCount("all", allWorkflowsCount);
     stats.registerWorkflowCount("configured", configuredWorkflowsCount);
