@@ -37,6 +37,10 @@ public final class MetricsStats implements Stats {
   private static final String UNIT_FREQUENCY = "Hz";
   private static final MetricId BASE = MetricId.build("styx");
 
+  private static final MetricId QUEUED_EVENTS = BASE
+      .tagged("what", "queued-events-count")
+      .tagged("unit", "events");
+
   private static final MetricId ACTIVE_STATES = BASE
       .tagged("what", "active-states-count")
       .tagged("unit", "state");
@@ -110,6 +114,11 @@ public final class MetricsStats implements Stats {
   @Override
   public void submitToRunningTime(long durationSeconds) {
     submitToRunning.update(durationSeconds);
+  }
+
+  @Override
+  public void registerQueuedEvents(Gauge<Long> queuedEventsCount) {
+    registry.register(QUEUED_EVENTS, queuedEventsCount);
   }
 
   @Override

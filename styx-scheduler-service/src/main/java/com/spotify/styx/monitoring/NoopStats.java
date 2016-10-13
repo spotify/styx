@@ -37,6 +37,10 @@ final class NoopStats implements Stats {
   }
 
   @Override
+  public void registerQueuedEvents(Gauge<Long> queuedEventsCount) {
+  }
+
+  @Override
   public void registerActiveStates(Gauge<Long> activeStatesCount) {
   }
 
@@ -50,6 +54,5 @@ final class NoopStats implements Stats {
 
   @Override
   public void pullImageError() {
-
   }
 }
