@@ -11,7 +11,7 @@
 
   <artifactId>styx</artifactId>
   <packaging>pom</packaging>
-  <version>0.1.2</version>
+  <version>0.1.3-SNAPSHOT</version>
 
   <properties>
     <apollo.version>1.2.5</apollo.version>
@@ -51,7 +51,7 @@
     <url>https://github.com/spotify/dataproc-java-submitter</url>
     <connection>scm:git:git@github.com:spotify/styx.git</connection>
     <developerConnection>scm:git:git@github.com:spotify/styx.git</developerConnection>
-    <tag>v0.1.2</tag>
+    <tag>HEAD</tag>
   </scm>
 
   <dependencyManagement>
