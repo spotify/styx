@@ -79,6 +79,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
   @Test
   public void retriesUseLatestWorkflowSpecification() throws Exception {
+    // todo: fix flakiness
     givenTheTimeIs("2016-03-14T15:59:00Z");
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
