@@ -52,12 +52,15 @@ import net.sourceforge.argparse4j.internal.HelpScreenException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.time.Duration;
 
 import okio.ByteString;
 
 public final class Main {
 
+  private static final String UTF_8 = "UTF-8";
   private static final String ENV_VAR_PREFIX = "STYX_CLI";
   private static final String STYX_CLI_API = "http://styx.example.com/api/v1/cli";
   private static final int TTL_REQUEST = 30;
@@ -88,18 +91,20 @@ public final class Main {
         .title("commands")
         .metavar(" ");
 
-    Subparser ls = Command.ACTIVE_STATES.parser(subCommands)
-        .description("List all active workflow instances");
+    final Subparser ls = Command.ACTIVE_STATES.parser(subCommands)
+        .description("List active workflow instances");
+    final Argument lsComponent = ls.addArgument("-c", "--component")
+        .help("only show instances for COMPONENT");
 
-    Subparser events = Command.EVENTS.parser(subCommands)
+    final Subparser events = Command.EVENTS.parser(subCommands)
         .description("List all events for a workflow instance");
     addWorkflowInstanceArguments(events);
 
-    Subparser trigger = Command.TRIGGER.parser(subCommands)
+    final Subparser trigger = Command.TRIGGER.parser(subCommands)
         .description("Trigger a completed workflow instance");
     addWorkflowInstanceArguments(trigger);
 
-    Subparser retry = Command.RETRY.parser(subCommands)
+    final Subparser retry = Command.RETRY.parser(subCommands)
         .description("Retry a workflow instance that is in a waiting state");
     addWorkflowInstanceArguments(retry);
 
@@ -129,7 +134,7 @@ public final class Main {
 
       switch (command) {
         case ACTIVE_STATES:
-          activeStates(client, cli, signaller);
+          activeStates(lsComponent, client, cli, signaller, namespace);
           break;
 
         case EVENTS:
@@ -160,8 +165,20 @@ public final class Main {
     }
   }
 
-  private static void activeStates(Client client, CliOutput cliOutput, Service.Signaller signaller) {
-    final Request request = Request.forUri(STYX_CLI_API + "/activeStates");
+  private static void activeStates(
+      Argument lsComponent,
+      Client client,
+      CliOutput cliOutput,
+      Service.Signaller signaller,
+      Namespace namespace) throws UnsupportedEncodingException {
+
+    String uri = STYX_CLI_API + "/activeStates";
+    if (namespace.getAttrs().containsKey(lsComponent.getDest())) {
+      final String component = namespace.getString(lsComponent.getDest());
+      uri += "?component=" + URLEncoder.encode(component, UTF_8);
+    }
+
+    final Request request = Request.forUri(uri);
     client.send(request.withTtl(Duration.ofSeconds(TTL_REQUEST))).whenComplete((response, t) -> {
       byte[] bytes = response.payload().get().toByteArray();
       try {
