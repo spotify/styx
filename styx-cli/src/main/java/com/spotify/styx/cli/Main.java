@@ -62,6 +62,7 @@ public final class Main {
   private static final String STYX_CLI_API = "http://styx.example.com/api/v1/cli";
   private static final int TTL_REQUEST = 30;
 
+  private static final String COMMAND_DEST = "command";
   private static final String COMPONENT_DEST = "component";
   private static final String WORKFLOW_DEST = "workflow";
   private static final String PARAMETER_DEST = "parameter";
@@ -87,15 +88,19 @@ public final class Main {
         .title("commands")
         .metavar(" ");
 
-    Command.ACTIVE_STATES.parser(subCommands);
+    Subparser ls = Command.ACTIVE_STATES.parser(subCommands)
+        .description("List all active workflow instances");
 
-    Subparser events = Command.EVENTS.parser(subCommands);
+    Subparser events = Command.EVENTS.parser(subCommands)
+        .description("List all events for a workflow instance");
     addWorkflowInstanceArguments(events);
 
-    Subparser trigger = Command.TRIGGER.parser(subCommands);
+    Subparser trigger = Command.TRIGGER.parser(subCommands)
+        .description("Trigger a completed workflow instance");
     addWorkflowInstanceArguments(trigger);
 
-    Subparser retry = Command.RETRY.parser(subCommands);
+    Subparser retry = Command.RETRY.parser(subCommands)
+        .description("Retry a workflow instance that is in a waiting state");
     addWorkflowInstanceArguments(retry);
 
     final Argument plain = parser.addArgument("-p", "--plain")
@@ -112,7 +117,7 @@ public final class Main {
       final Namespace namespace = parser.parseArgs(args);
       final int level = namespace.getInt(verbose.getDest());
       final boolean plainOutput = namespace.getBoolean(plain.getDest());
-      final Command command = namespace.get(Command.DEST);
+      final Command command = namespace.get(COMMAND_DEST);
       final CliOutput cli = plainOutput
           ? new PlainCliOutput()
           : new PrettyCliOutput(level);
@@ -285,8 +290,6 @@ public final class Main {
     TRIGGER("trigger", "t"),
     RETRY("retry", "r");
 
-    static final String DEST = "command";
-
     private final String help;
     private final String[] aliases;
 
@@ -299,7 +302,7 @@ public final class Main {
       return subCommands
           .addParser(name().toLowerCase())
           .aliases(aliases)
-          .setDefault(DEST, this)
+          .setDefault(COMMAND_DEST, this)
           .help(help);
     }
   }
