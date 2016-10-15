@@ -51,6 +51,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.google.cloud.datastore.StructuredQuery.PropertyFilter.hasAncestor;
+
 /**
  * A backend for {@link AggregateStorage} backed by Google Datastore
  */
@@ -178,12 +180,24 @@ class DatastoreStorage {
   }
 
   Map<WorkflowInstance, Long> allActiveStates() throws IOException {
-    final EntityQuery activeStatesQuery = Query.entityQueryBuilder()
+    final EntityQuery query = Query.entityQueryBuilder()
         .kind(KIND_ACTIVE_STATE)
         .build();
 
-    final ImmutableMap.Builder<WorkflowInstance, Long> mapBuilder = ImmutableMap.builder();
+    return queryActiveStates(query);
+  }
 
+  Map<WorkflowInstance, Long> activeStates(String componentId) {
+    final EntityQuery query = Query.entityQueryBuilder()
+        .kind(KIND_ACTIVE_STATE)
+        .filter(hasAncestor(componentKeyFactory.newKey(componentId)))
+        .build();
+
+    return queryActiveStates(query);
+  }
+
+  private Map<WorkflowInstance, Long> queryActiveStates(EntityQuery activeStatesQuery) {
+    final ImmutableMap.Builder<WorkflowInstance, Long> mapBuilder = ImmutableMap.builder();
     final QueryResults<Entity> results = datastore.run(activeStatesQuery);
     while (results.hasNext()) {
       final Entity activeState = results.next();

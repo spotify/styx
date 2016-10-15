@@ -48,14 +48,15 @@ public final class ReplayEvents {
   private ReplayEvents() {
   }
 
-  public static Map<RunState, Long> replayActiveStates(EventStorage eventStorage, boolean printLogs)
-      throws IOException {
+  public static Map<RunState, Long> replayActiveStates(
+      Map<WorkflowInstance, Long> instances,
+      EventStorage eventStorage,
+      boolean printLogs) throws IOException {
     LOG.info("Replaying active states");
 
     final OutputHandler replayLogger = printLogs ? transitionLogger("  ") : OutputHandler.NOOP;
-    final Map<WorkflowInstance, Long> activeInstances = eventStorage.readActiveWorkflowInstances();
 
-    return activeInstances.entrySet().parallelStream().map(entry -> {
+    return instances.entrySet().parallelStream().map(entry -> {
       final WorkflowInstance workflowInstance = entry.getKey();
       final long lastConsumedEvent = entry.getValue();
       final SettableTime time = new SettableTime();

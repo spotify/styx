@@ -74,6 +74,7 @@ public class DatastoreStorageTest {
 
   private static final WorkflowInstance WORKFLOW_INSTANCE1 = WorkflowInstance.create(WORKFLOW_ID1, "2016-09-01");
   private static final WorkflowInstance WORKFLOW_INSTANCE2 = WorkflowInstance.create(WORKFLOW_ID2, "2016-09-01");
+  private static final WorkflowInstance WORKFLOW_INSTANCE3 = WorkflowInstance.create(WORKFLOW_ID3, "2016-09-01");
   private static final WorkflowId WORKFLOW_ID_NO_DOCKER_IMG = WorkflowId.create("noDockerComp", "NoDockerEndpoint");
   private static final WorkflowId WORKFLOW_ID_NO_STATE = WorkflowId.create("noStateComp", "NoStateEndpoint");
   private static final WorkflowId WORKFLOW_ID_WITH_DOCKER_IMG = WorkflowId.create("dockerComp", "dockerEndpoint");
@@ -419,6 +420,16 @@ public class DatastoreStorageTest {
     assertThat(activeStates.entrySet(), hasSize(2));
     assertThat(activeStates, hasEntry(WORKFLOW_INSTANCE1, 42L));
     assertThat(activeStates, hasEntry(WORKFLOW_INSTANCE2, 84L));
+  }
+
+  @Test
+  public void shouldReturnAllActiveStatesForAComponent() throws Exception {
+    storage.writeActiveState(WORKFLOW_INSTANCE2, 42L);
+    storage.writeActiveState(WORKFLOW_INSTANCE3, 84L);
+
+    Map<WorkflowInstance, Long> activeStates = storage.activeStates(WORKFLOW_ID1.componentId());
+    assertThat(activeStates.entrySet(), hasSize(1));
+    assertThat(activeStates, hasEntry(WORKFLOW_INSTANCE2, 42L));
   }
 
   @Test
