@@ -59,4 +59,9 @@ public class NoopEventStorage implements EventStorage {
   public Map<WorkflowInstance, Long> readActiveWorkflowInstances() throws IOException {
     return ImmutableMap.of();
   }
+
+  @Override
+  public Map<WorkflowInstance, Long> readActiveWorkflowInstances(String componentId) throws IOException {
+    return ImmutableMap.of();
+  }
 }
