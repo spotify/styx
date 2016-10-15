@@ -60,7 +60,11 @@ public final class Main {
 
   private static final String ENV_VAR_PREFIX = "STYX_CLI";
   private static final String STYX_CLI_API = "http://styx.example.com/api/v1/cli";
-  public static final int TTL_REQUEST = 30;
+  private static final int TTL_REQUEST = 30;
+
+  private static final String COMPONENT_DEST = "component";
+  private static final String WORKFLOW_DEST = "workflow";
+  private static final String PARAMETER_DEST = "parameter";
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
       .setPropertyNamingStrategy(PropertyNamingStrategy.SNAKE_CASE)
@@ -86,28 +90,13 @@ public final class Main {
     Command.ACTIVE_STATES.parser(subCommands);
 
     Subparser events = Command.EVENTS.parser(subCommands);
-    Argument eventsCid = events.addArgument("component")
-        .help("Component id.");
-    Argument eventsEid = events.addArgument("endpoint")
-        .help("Endpoint id.");
-    Argument eventsIid = events.addArgument("parameter")
-        .help("Parameter identifying the endpoint partition, e.g. '2016-09-14' or '2016-09-14T17'.");
+    addWorkflowInstanceArguments(events);
 
     Subparser trigger = Command.TRIGGER.parser(subCommands);
-    Argument triggerCid = trigger.addArgument("component")
-        .help("Component id.");
-    Argument triggerEid = trigger.addArgument("endpoint")
-        .help("Endpoint id.");
-    Argument triggerIid = trigger.addArgument("parameter")
-        .help("Parameter identifying the endpoint partition, e.g. '2016-09-14' or '2016-09-14T17'.");
+    addWorkflowInstanceArguments(trigger);
 
     Subparser retry = Command.RETRY.parser(subCommands);
-    Argument retryCid = retry.addArgument("component")
-        .help("Component id.");
-    Argument retryEid = retry.addArgument("endpoint")
-        .help("Endpoint id.");
-    Argument retryIid = retry.addArgument("parameter")
-        .help("Parameter identifying the endpoint partition, e.g. '2016-09-14' or '2016-09-14T17'.");
+    addWorkflowInstanceArguments(retry);
 
     final Argument plain = parser.addArgument("-p", "--plain")
         .help("plain output")
@@ -139,24 +128,15 @@ public final class Main {
           break;
 
         case EVENTS:
-          String ecid = namespace.getString(eventsCid.getDest());
-          String eeid = namespace.getString(eventsEid.getDest());
-          String eiid = namespace.getString(eventsIid.getDest());
-          eventsForWorkflowInstance(client, cli, signaller, ecid, eeid, eiid);
+          eventsForWorkflowInstance(client, cli, signaller, namespace);
           break;
 
         case TRIGGER:
-          String tcid = namespace.getString(triggerCid.getDest());
-          String teid = namespace.getString(triggerEid.getDest());
-          String tiid = namespace.getString(triggerIid.getDest());
-          triggerWorkflowInstance(client, cli, signaller, tcid, teid, tiid);
+          triggerWorkflowInstance(client, cli, signaller, namespace);
           break;
 
         case RETRY:
-          String rcid = namespace.getString(retryCid.getDest());
-          String reid = namespace.getString(retryEid.getDest());
-          String riid = namespace.getString(retryIid.getDest());
-          retryWorkflowInstance(client, cli, signaller, rcid, reid, riid);
+          retryWorkflowInstance(client, cli, signaller, namespace);
           break;
 
         default:
@@ -198,11 +178,12 @@ public final class Main {
       Client client,
       CliOutput cliOutput,
       Service.Signaller signaller,
-      String cid,
-      String eid,
-      String iid) {
+      Namespace namespace) {
 
-    String uri = String.format("%s/events/%s/%s/%s", STYX_CLI_API, cid, eid, iid);
+    String component = namespace.getString(COMPONENT_DEST);
+    String workflow = namespace.getString(WORKFLOW_DEST);
+    String parameter = namespace.getString(PARAMETER_DEST);
+    String uri = String.format("%s/events/%s/%s/%s", STYX_CLI_API, component, workflow, parameter);
     final Request request = Request.forUri(uri);
     client.send(request).whenComplete((response, t) -> {
 
@@ -227,11 +208,14 @@ public final class Main {
       Client client,
       CliOutput cliOutput,
       Service.Signaller signaller,
-      String cid,
-      String eid,
-      String iid) {
+      Namespace namespace) {
 
-    WorkflowInstance workflowInstance = WorkflowInstance.create(WorkflowId.create(cid, eid), iid);
+    String component = namespace.getString(COMPONENT_DEST);
+    String workflow = namespace.getString(WORKFLOW_DEST);
+    String parameter = namespace.getString(PARAMETER_DEST);
+    WorkflowInstance workflowInstance = WorkflowInstance.create(
+        WorkflowId.create(component, workflow), parameter);
+
     try {
       final ByteString payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(workflowInstance));
       String uri = String.format("%s/trigger/", STYX_CLI_API);
@@ -253,11 +237,14 @@ public final class Main {
       Client client,
       CliOutput cliOutput,
       Service.Signaller signaller,
-      String cid,
-      String eid,
-      String iid) {
+      Namespace namespace) {
 
-    WorkflowInstance workflowInstance = WorkflowInstance.create(WorkflowId.create(cid, eid), iid);
+    String component = namespace.getString(COMPONENT_DEST);
+    String workflow = namespace.getString(WORKFLOW_DEST);
+    String parameter = namespace.getString(PARAMETER_DEST);
+    WorkflowInstance workflowInstance = WorkflowInstance.create(
+        WorkflowId.create(component, workflow), parameter);
+
     Event retry = Event.retry(workflowInstance);
     EventSerializer.PersistentEvent persistentEvent =
         EventSerializer.convertEventToPersistentEvent(retry);
@@ -281,6 +268,15 @@ public final class Main {
   private static Client getClient(Service.Instance i) {
     final ApolloEnvironment environment = ApolloEnvironmentModule.environment(i);
     return environment.environment().client();
+  }
+
+  private static void addWorkflowInstanceArguments(Subparser events) {
+    events.addArgument(COMPONENT_DEST)
+        .help("Component id");
+    events.addArgument(WORKFLOW_DEST)
+        .help("Workflow id (legacy Endpoint)");
+    events.addArgument(PARAMETER_DEST)
+        .help("Parameter identifying the workflow instance, e.g. '2016-09-14' or '2016-09-14T17'");
   }
 
   enum Command {
