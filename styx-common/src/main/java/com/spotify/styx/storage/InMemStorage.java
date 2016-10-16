@@ -31,13 +31,10 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowInstanceExecutionData;
 import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.WorkflowStateUtil;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -52,16 +49,6 @@ import java.util.stream.Collectors;
  */
 public class InMemStorage implements Storage, EventStorage {
 
-  private static class WhenComparator implements Comparator<WorkflowExecutionInfo> {
-    @Override
-    public int compare(WorkflowExecutionInfo o1, WorkflowExecutionInfo o2) {
-      return o1.when().compareTo(o2.when());
-    }
-  }
-  private static final WhenComparator WHEN_COMPARATOR = new WhenComparator();
-
-  private final RandomGenerator randomGenerator = RandomGenerator.DEFAULT;
-
   private boolean globalEnabled = true;
   private final Set<WorkflowId> enabledWorkflows = Sets.newConcurrentHashSet();
   private final Set<String> components = Sets.newConcurrentHashSet();
@@ -72,7 +59,7 @@ public class InMemStorage implements Storage, EventStorage {
   private final ConcurrentMap<String, String> dockerImagesPerComponent = Maps.newConcurrentMap();
   private final ConcurrentMap<WorkflowId, WorkflowState> workflowStatePerWorkflowId = Maps.newConcurrentMap();
 
-  public final List<SequenceEvent> writtenEvents = new ArrayList<>();
+  public final List<SequenceEvent> writtenEvents = Lists.newCopyOnWriteArrayList();
   public final Map<WorkflowInstance, Long> activeStatesMap = Maps.newHashMap();
 
   public final CountDownLatch countDown;
@@ -247,19 +234,18 @@ public class InMemStorage implements Storage, EventStorage {
   @Override
   public void writeEvent(SequenceEvent sequenceEvent) {
     writtenEvents.add(sequenceEvent);
-    activeStatesMap.computeIfPresent(sequenceEvent.event().workflowInstance(), (k, v) ->
-        activeStatesMap.get(k) + 1);
+    activeStatesMap.computeIfPresent(sequenceEvent.event().workflowInstance(), (k, v) -> v + 1);
   }
 
   @Override
   public Optional<Long> getLatestStoredCounter(WorkflowInstance workflowInstance)
       throws IOException {
-    final Set<SequenceEvent> storedEvents = readEvents(workflowInstance);
-    final Optional<SequenceEvent> lastStoredEvent = storedEvents.stream().reduce((a, b) -> b);
-    if (lastStoredEvent.isPresent()) {
-      return Optional.of(lastStoredEvent.get().counter());
-    } else {
+    final SortedSet<SequenceEvent> storedEvents = readEvents(workflowInstance);
+    if (storedEvents.isEmpty()) {
       return Optional.empty();
+    } else {
+      final SequenceEvent lastStoredEvent = storedEvents.last();
+      return Optional.of(lastStoredEvent.counter());
     }
   }
 
