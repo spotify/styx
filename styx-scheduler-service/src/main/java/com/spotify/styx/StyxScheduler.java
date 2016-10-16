@@ -288,7 +288,7 @@ public class StyxScheduler implements AppInit {
         .build();
 
     final ScheduledExecutorService scheduler = executorFactory.create(3, schedulerTf);
-    final ExecutorService eventWorker = Executors.newFixedThreadPool(2, eventTf);
+    final ExecutorService eventWorker = Executors.newFixedThreadPool(16, eventTf);
     closer.register(executorCloser("scheduler", scheduler));
     closer.register(executorCloser("event-worker", eventWorker));
 
