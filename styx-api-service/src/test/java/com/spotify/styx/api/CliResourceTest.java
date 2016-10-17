@@ -23,6 +23,7 @@ import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.test.ServiceHelper;
+import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.api.cli.EventsPayload;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
@@ -39,6 +40,9 @@ import org.junit.runners.Parameterized;
 
 import java.util.Collection;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -50,6 +54,7 @@ import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.styx.api.ApiVersionTestUtils.ALL_VERSIONS;
 import static org.hamcrest.Matchers.any;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
 @RunWith(Parameterized.class)
@@ -60,8 +65,11 @@ public class CliResourceTest {
   private static final String ENDPOINT_ID = "test";
   private static final String PARAMETER = "1234";
   private static final String TRIGGER = "foobar";
+  private static final String OTHER_COMPONENT_ID = "styx-other";
   private static final WorkflowInstance WFI =
       WorkflowInstance.create(WorkflowId.create(COMPONENT_ID, ENDPOINT_ID), PARAMETER);
+  private static final WorkflowInstance OTHER_WFI =
+      WorkflowInstance.create(WorkflowId.create(OTHER_COMPONENT_ID, ENDPOINT_ID), PARAMETER);
 
   @Parameterized.Parameters(name = "{0}")
   public static Collection<Object[]> versions() {
@@ -94,10 +102,9 @@ public class CliResourceTest {
         .respond(Response.forStatus(Status.ACCEPTED))
         .to(SCHEDULER_BASE + "/api/v0/events");
 
-    CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", path("/events"));
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path("/events")));
 
-    Response<ByteString> response = post.toCompletableFuture().get();
     assertThat(response, hasStatus(withCode(Status.ACCEPTED)));
   }
 
@@ -107,10 +114,9 @@ public class CliResourceTest {
         .respond(Response.forStatus(Status.ACCEPTED))
         .to(SCHEDULER_BASE + "/api/v0/trigger");
 
-    CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", path("/trigger"));
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path("/trigger")));
 
-    Response<ByteString> response = post.toCompletableFuture().get();
     assertThat(response, hasStatus(withCode(Status.ACCEPTED)));
   }
 
@@ -120,20 +126,58 @@ public class CliResourceTest {
     eventStorage.writeEvent(SequenceEvent.create(Event.created(WFI, "exec0", "img0"), 1L, 1L));
     eventStorage.writeEvent(SequenceEvent.create(Event.started(WFI), 2L, 2L));
 
-    CompletionStage<Response<ByteString>> get =
-        serviceHelper.request("GET", path("/events/styx/test/1234"));
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/events/styx/test/1234")));
 
-    Response<ByteString> response = get.toCompletableFuture().get();
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasPayload(any(ByteString.class)));
 
-    final String json = response.payload().get().utf8();
+    String json = response.payload().get().utf8();
     EventsPayload parsed = Json.OBJECT_MAPPER.readValue(json, EventsPayload.class);
 
     assertThat(parsed.events(), hasSize(3));
   }
 
+  @Test
+  public void testGetAllActiveStates() throws Exception {
+    eventStorage.writeActiveState(WFI, 42L);
+    eventStorage.writeActiveState(OTHER_WFI, 84L);
+    assertThat(eventStorage.readActiveWorkflowInstances().entrySet(), hasSize(2));
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/activeStates")));
+
+    String json = response.payload().get().utf8();
+    ActiveStatesPayload parsed = Json.OBJECT_MAPPER.readValue(json, ActiveStatesPayload.class);
+
+    assertThat(parsed.activeStates(), hasSize(2));
+  }
+
+  @Test
+  public void testFilterActiveStatesOnComponent() throws Exception {
+    WorkflowInstance OTHER_WFI =
+        WorkflowInstance.create(WorkflowId.create(COMPONENT_ID + "-other", ENDPOINT_ID), PARAMETER);
+
+    eventStorage.writeActiveState(WFI, 42L);
+    eventStorage.writeActiveState(OTHER_WFI, 84L);
+    assertThat(eventStorage.readActiveWorkflowInstances().entrySet(), hasSize(2));
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/activeStates?component=" + COMPONENT_ID)));
+
+    String json = response.payload().get().utf8();
+    ActiveStatesPayload parsed = Json.OBJECT_MAPPER.readValue(json, ActiveStatesPayload.class);
+
+    assertThat(parsed.activeStates(), hasSize(1));
+    assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().componentId(), is(COMPONENT_ID));
+  }
+
   private String path(String path) {
     return version.prefix() + CliResource.BASE + path;
+  }
+
+  private Response<ByteString> awaitResponse(CompletionStage<Response<ByteString>> completionStage)
+      throws InterruptedException, ExecutionException, TimeoutException {
+    return completionStage.toCompletableFuture().get(5, TimeUnit.SECONDS);
   }
 }

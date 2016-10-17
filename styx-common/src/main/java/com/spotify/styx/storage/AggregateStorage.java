@@ -63,6 +63,11 @@ public class AggregateStorage implements Storage, EventStorage {
   }
 
   @Override
+  public Map<WorkflowInstance, Long> readActiveWorkflowInstances(String componentId) throws IOException {
+    return datastoreStorage.activeStates(componentId);
+  }
+
+  @Override
   public void writeEvent(SequenceEvent sequenceEvent) throws IOException {
     bigtableStorage.writeEvent(sequenceEvent);
   }

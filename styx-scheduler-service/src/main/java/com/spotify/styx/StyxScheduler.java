@@ -356,7 +356,10 @@ public class StyxScheduler implements AppInit {
       OutputHandler[] outputHandlers,
       StateManager stateManager) {
     try {
-      replayActiveStates(eventStorage, true)
+      final Map<WorkflowInstance, Long> activeInstances =
+          eventStorage.readActiveWorkflowInstances();
+
+      replayActiveStates(activeInstances, eventStorage, true)
           .entrySet().stream()
           .collect(toMap(
               e -> e.getKey()
