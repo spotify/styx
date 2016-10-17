@@ -11,8 +11,6 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
-import static java.lang.System.currentTimeMillis;
-
 /**
  * A decorator for a supplier function that will cache the returned value during some
  * configurable time.
@@ -27,7 +25,7 @@ public class CachedSupplier<T> implements Supplier<T> {
   private final long timeoutMillis;
 
   private final AtomicReference<T> cachedValue = new AtomicReference<>();
-  private volatile long cacheTime = currentTimeMillis();
+  private volatile long cacheTime;
 
   public CachedSupplier(ThrowingSupplier<T, Exception> delegate, Time time) {
     this(delegate, time, DEFAULT_TIMEOUT_MILLIS);
@@ -56,7 +54,7 @@ public class CachedSupplier<T> implements Supplier<T> {
         if (value == null) {
           throw Throwables.propagate(e);
         } else {
-          LOG.warn("Failed to update docker runner id, using old value");
+          LOG.warn("Failed to update from delegate supplier, using old value");
         }
       }
     }
