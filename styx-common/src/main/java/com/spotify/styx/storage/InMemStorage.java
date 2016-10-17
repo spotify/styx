@@ -273,6 +273,13 @@ public class InMemStorage implements Storage, EventStorage {
     return activeStatesMap;
   }
 
+  @Override
+  public Map<WorkflowInstance, Long> readActiveWorkflowInstances(String componentId) throws IOException {
+    return activeStatesMap.entrySet().stream()
+        .filter((entry) -> componentId.equals(entry.getKey().workflowId().componentId()))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
   public Optional<Long> getCounterFromActiveStates(WorkflowInstance workflowInstance) throws IOException {
     return Optional.ofNullable(activeStatesMap.get(workflowInstance));
   }

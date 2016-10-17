@@ -87,7 +87,7 @@ public class CliResource {
         Route.with(
             em.serializerDirect(ActiveStatesPayload.class),
             "GET", BASE + "/activeStates",
-            rc -> activeStates()),
+            this::activeStates),
         Route.with(
             em.serializerDirect(EventsPayload.class),
             "GET", BASE + "/events/<cid>/<eid>/<iid>",
@@ -116,11 +116,17 @@ public class CliResource {
     return rc.pathArgs().get(name);
   }
 
-  private ActiveStatesPayload activeStates() {
-    final List<ActiveStatesPayload.ActiveState> runStates = Lists.newArrayList();
+  private ActiveStatesPayload activeStates(RequestContext requestContext) {
+    final Optional<String> componentOpt = requestContext.request().parameter("component");
 
+    final List<ActiveStatesPayload.ActiveState> runStates = Lists.newArrayList();
     try {
-      final Map<RunState, Long> map = replayActiveStates(eventStorage, false);
+
+      final Map<WorkflowInstance, Long> activeStates = componentOpt.isPresent()
+          ? eventStorage.readActiveWorkflowInstances(componentOpt.get())
+          : eventStorage.readActiveWorkflowInstances();
+
+      final Map<RunState, Long> map = replayActiveStates(activeStates, eventStorage, false);
       runStates.addAll(
           map.keySet().stream().map(this::runStateToActiveState).collect(Collectors.toList()));
     } catch (IOException e) {

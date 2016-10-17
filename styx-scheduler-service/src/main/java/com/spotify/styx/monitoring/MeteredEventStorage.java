@@ -67,6 +67,11 @@ public final class MeteredEventStorage extends MeteredBase implements EventStora
 
   @Override
   public Map<WorkflowInstance, Long> readActiveWorkflowInstances() throws IOException {
-    return timedStorage("readActiveWorkflowInstances", delegate::readActiveWorkflowInstances);
+    return timedStorage("readActiveWorkflowInstances", () -> delegate.readActiveWorkflowInstances());
+  }
+
+  @Override
+  public Map<WorkflowInstance, Long> readActiveWorkflowInstances(String componentId) throws IOException {
+    return timedStorage("readActiveWorkflowInstances", () -> delegate.readActiveWorkflowInstances(componentId));
   }
 }
