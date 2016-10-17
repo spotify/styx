@@ -13,6 +13,10 @@ import java.util.function.Supplier;
 
 import static java.lang.System.currentTimeMillis;
 
+/**
+ * A decorator for a supplier function that will cache the returned value during some
+ * configurable time.
+ */
 public class CachedSupplier<T> implements Supplier<T> {
 
   private static final Logger LOG = LoggerFactory.getLogger(CachedSupplier.class);
@@ -46,6 +50,7 @@ public class CachedSupplier<T> implements Supplier<T> {
       try {
         final T newValue = delegate.get();
         cachedValue.set(newValue);
+        cacheTime = time.get().toEpochMilli();
         value = newValue;
       } catch (Throwable e) {
         if (value == null) {
@@ -60,7 +65,7 @@ public class CachedSupplier<T> implements Supplier<T> {
   }
 
   private boolean timedOut() {
-    return cacheTime - time.get().toEpochMilli() > timeoutMillis;
+    return time.get().toEpochMilli() - cacheTime > timeoutMillis;
   }
 
   @FunctionalInterface
