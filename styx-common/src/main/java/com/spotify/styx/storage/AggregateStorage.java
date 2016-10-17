@@ -93,6 +93,11 @@ public class AggregateStorage implements Storage, EventStorage {
   }
 
   @Override
+  public String globalDockerRunnerId() throws IOException {
+    return datastoreStorage.globalDockerRunnerId();
+  }
+
+  @Override
   public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId)
       throws IOException {
     return bigtableStorage.executionData(workflowId);

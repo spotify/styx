@@ -55,6 +55,11 @@ public final class MeteredStorage extends MeteredBase implements Storage {
   }
 
   @Override
+  public String globalDockerRunnerId() throws IOException {
+    return timedStorage("globalDockerRunnerId", delegate::globalDockerRunnerId);
+  }
+
+  @Override
   public void store(Workflow workflow) throws IOException {
     timedStorage("storeWorkflow", () -> delegate.store(workflow));
   }

@@ -464,6 +464,21 @@ public class DatastoreStorageTest {
     assertThat(retrieved, is(Optional.of(state)));
   }
 
+  @Test
+  public void defaultGlobalDockerRunnerId() throws Exception {
+    assertThat(storage.globalDockerRunnerId(), is("default"));
+  }
+
+  @Test
+  public void getsGlobalDockerRunnerId() throws Exception {
+    Entity config = Entity.builder(storage.globalConfigKey)
+        .set(DatastoreStorage.PROPERTY_CONFIG_DOCKER_RUNNER_ID, "foobar")
+        .build();
+    helper.options().service().put(config);
+
+    assertThat(storage.globalDockerRunnerId(), is("foobar"));
+  }
+
   private Workflow workflow(WorkflowId workflowId) {
     return Workflow.create(
         workflowId.componentId(),

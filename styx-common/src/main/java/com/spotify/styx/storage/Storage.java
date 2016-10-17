@@ -51,6 +51,11 @@ public interface Storage {
   boolean setGlobalEnabled(boolean enabled) throws IOException;
 
   /**
+   * Get the id of the current docker runner id
+   */
+  String globalDockerRunnerId() throws IOException;
+
+  /**
    * Stores a Workflow definition.
    *
    * @param workflow the workflow to store
