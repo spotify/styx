@@ -27,7 +27,6 @@ import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.collect.Lists;
 
-import com.spotify.apollo.metrics.MetricsModule;
 import com.spotify.apollo.test.ServiceHelper;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
@@ -118,12 +117,13 @@ public class StyxSchedulerServiceFixture {
   public void setUp() throws Exception {
     StorageFactory storageFactory = (env) -> storage;
     EventStorageFactory eventStorageFactory = (env) -> storage;
-    StyxScheduler.DockerRunnerFactory dockerRunnerFactory = (env, states, exec, stats) -> fakeDockerRunner();
+    Time time = () -> now;
     StyxScheduler.ScheduleSources scheduleSources = () -> singletonList(fakeScheduleSource());
     StyxScheduler.StatsFactory statsFactory = (env) -> Stats.NOOP;
     StyxScheduler.ExecutorFactory executorFactory = (ts, tf) -> executor;
     StyxScheduler.PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
-    Time time = () -> now;
+    StyxScheduler.DockerRunnerFactory dockerRunnerFactory =
+        (id, env, states, exec, stats) -> fakeDockerRunner();
 
     styxScheduler = StyxScheduler.newBuilder()
         .setTime(time)

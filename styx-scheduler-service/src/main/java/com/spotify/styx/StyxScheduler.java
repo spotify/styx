@@ -119,9 +119,10 @@ public class StyxScheduler implements AppInit {
 
   public static final String SERVICE_NAME = "styx-scheduler";
 
-  public static final String GKE_CLUSTER_PROJECT_ID = "styx.gke.project-id";
-  public static final String GKE_CLUSTER_ZONE = "styx.gke.cluster-zone";
-  public static final String GKE_CLUSTER_ID = "styx.gke.cluster-id";
+  public static final String GKE_CLUSTER_PREFIX = "styx.gke.";
+  public static final String GKE_CLUSTER_PROJECT_ID = ".project-id";
+  public static final String GKE_CLUSTER_ZONE = ".cluster-zone";
+  public static final String GKE_CLUSTER_ID = ".cluster-id";
   public static final String BIGTABLE_PROJECT_ID = "styx.bigtable.project-id";
   public static final String BIGTABLE_INSTANCE_ID = "styx.bigtable.instance-id";
   public static final String DATASTORE_PROJECT = "styx.datastore.project-id";
@@ -148,6 +149,7 @@ public class StyxScheduler implements AppInit {
   @FunctionalInterface
   interface DockerRunnerFactory {
     DockerRunner create(
+        String id,
         Environment environment,
         StateManager stateManager,
         ScheduledExecutorService scheduler,
@@ -299,9 +301,11 @@ public class StyxScheduler implements AppInit {
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
     final QueuedStateManager stateManager = closer.register(new QueuedStateManager(
         timeoutConfig, time, eventWorker, eventStorage));
-    final DockerRunner dockerRunner =
-        new MeteredDockerRunner(dockerRunnerFactory.create(environment, stateManager, scheduler, stats),
-                                stats, time);
+
+
+    final DockerRunner routingDockerRunner = DockerRunner.routing(
+        id -> dockerRunnerFactory.create(id, environment, stateManager, scheduler, stats));
+    final DockerRunner dockerRunner = new MeteredDockerRunner(routingDockerRunner, stats, time);
     final Publisher publisher = publisherFactory.apply(environment);
 
     final OutputHandler[] outputHandlers = new OutputHandler[] {
@@ -547,6 +551,7 @@ public class StyxScheduler implements AppInit {
   }
 
   private static DockerRunner createDockerRunner(
+      String id,
       Environment environment,
       StateManager stateManager,
       ScheduledExecutorService scheduler,
@@ -558,12 +563,12 @@ public class StyxScheduler implements AppInit {
       LOG.info("Creating LocalDockerRunner");
       return closer.register(DockerRunner.local(scheduler, stateManager));
     } else {
-      final KubernetesClient kubernetes = closer.register(getKubernetesClient(config));
+      final KubernetesClient kubernetes = closer.register(getKubernetesClient(config, id));
       return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats));
     }
   }
 
-  private static KubernetesClient getKubernetesClient(Config config) {
+  private static KubernetesClient getKubernetesClient(Config config, String id) {
     try {
       final HttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
       final JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
@@ -574,10 +579,14 @@ public class StyxScheduler implements AppInit {
           .setApplicationName(SERVICE_NAME)
           .build();
 
+      final String projectKey = GKE_CLUSTER_PREFIX + id + GKE_CLUSTER_PROJECT_ID;
+      final String zoneKey = GKE_CLUSTER_PREFIX + id + GKE_CLUSTER_ZONE;
+      final String clusterIdKey = GKE_CLUSTER_PREFIX + id + GKE_CLUSTER_ID;
+
       final Cluster cluster = gke.projects().zones().clusters()
-          .get(config.getString(GKE_CLUSTER_PROJECT_ID),
-               config.getString(GKE_CLUSTER_ZONE),
-               config.getString(GKE_CLUSTER_ID)).execute();
+          .get(config.getString(projectKey),
+               config.getString(zoneKey),
+               config.getString(clusterIdKey)).execute();
 
       final io.fabric8.kubernetes.client.Config kubeConfig = new ConfigBuilder()
           .withMasterUrl("https://" + cluster.getEndpoint())
