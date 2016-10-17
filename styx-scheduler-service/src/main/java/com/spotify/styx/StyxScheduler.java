@@ -302,9 +302,10 @@ public class StyxScheduler implements AppInit {
     final QueuedStateManager stateManager = closer.register(new QueuedStateManager(
         timeoutConfig, time, eventWorker, eventStorage));
 
-
+    final Supplier<String> dockerId = new CachedSupplier<>(storage::globalDockerRunnerId, time);
     final DockerRunner routingDockerRunner = DockerRunner.routing(
-        id -> dockerRunnerFactory.create(id, environment, stateManager, scheduler, stats));
+        id -> dockerRunnerFactory.create(id, environment, stateManager, scheduler, stats),
+        dockerId);
     final DockerRunner dockerRunner = new MeteredDockerRunner(routingDockerRunner, stats, time);
     final Publisher publisher = publisherFactory.apply(environment);
 

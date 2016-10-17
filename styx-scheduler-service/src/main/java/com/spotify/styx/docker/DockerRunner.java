@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import io.fabric8.kubernetes.client.KubernetesClient;
 
@@ -112,9 +113,11 @@ public interface DockerRunner extends Closeable {
   /**
    * Creates a {@link DockerRunner} that will dynamically create and route to other docker runner
    * instances using the given factory.
+   *
+   * The active docker runner id will be read from dockerId supplier on each routing decision.
    */
-  static DockerRunner routing(DockerRunnerFactory dockerRunnerFactory) {
-    return new RoutingDockerRunner(dockerRunnerFactory);
+  static DockerRunner routing(DockerRunnerFactory dockerRunnerFactory, Supplier<String> dockerId) {
+    return new RoutingDockerRunner(dockerRunnerFactory, dockerId);
   }
 
   /**
