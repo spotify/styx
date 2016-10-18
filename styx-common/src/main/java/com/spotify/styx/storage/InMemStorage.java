@@ -98,6 +98,11 @@ public class InMemStorage implements Storage, EventStorage {
   }
 
   @Override
+  public String globalDockerRunnerId() throws IOException {
+    return "default";
+  }
+
+  @Override
   public void store(Workflow workflow) throws IOException {
     workflowStore.put(workflow.id(), workflow);
     components.add(workflow.id().componentId());
