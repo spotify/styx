@@ -173,8 +173,8 @@ public final class Main {
       Namespace namespace) throws UnsupportedEncodingException {
 
     String uri = STYX_CLI_API + "/activeStates";
-    if (namespace.getAttrs().containsKey(lsComponent.getDest())) {
-      final String component = namespace.getString(lsComponent.getDest());
+    String component = namespace.getString(lsComponent.getDest());
+    if (component != null) {
       uri += "?component=" + URLEncoder.encode(component, UTF_8);
     }
 
