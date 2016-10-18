@@ -29,6 +29,7 @@ import com.google.cloud.datastore.KeyFactory;
 import com.google.cloud.datastore.PathElement;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
@@ -66,6 +67,7 @@ class DatastoreStorage {
   public static final String KIND_ACTIVE_STATE = "ActiveState";
 
   public static final String PROPERTY_CONFIG_ENABLED = "enabled";
+  public static final String PROPERTY_CONFIG_DOCKER_RUNNER_ID = "dockerRunnerId";
   public static final String PROPERTY_WORKFLOW_JSON = "json";
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
   public static final String PROPERTY_DOCKER_IMAGE = "dockerImage";
@@ -75,6 +77,7 @@ class DatastoreStorage {
   public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
 
   public static final boolean DEFAULT_CONFIG_ENABLED = true;
+  public static final String DEFAULT_CONFIG_DOCKER_RUNNER_ID = "default";
   public static final boolean DEFAULT_WORKFLOW_ENABLED = false;
 
   public static final int MAX_RETRIES = 100;
@@ -82,7 +85,9 @@ class DatastoreStorage {
   private final Datastore datastore;
   private final Duration retryBaseDelay;
   private final KeyFactory componentKeyFactory;
-  private final Key globalConfigKey;
+
+  @VisibleForTesting
+  final Key globalConfigKey;
 
   DatastoreStorage(Datastore datastore, Duration retryBaseDelay) {
     this.datastore = Objects.requireNonNull(datastore);
@@ -97,6 +102,13 @@ class DatastoreStorage {
         .filter(w -> w.contains(PROPERTY_CONFIG_ENABLED))
         .map(config -> config.getBoolean(PROPERTY_CONFIG_ENABLED))
         .orElse(DEFAULT_CONFIG_ENABLED);
+  }
+
+  public String globalDockerRunnerId() {
+    return getOpt(datastore, globalConfigKey)
+        .filter(w -> w.contains(PROPERTY_CONFIG_DOCKER_RUNNER_ID))
+        .map(config -> config.getString(PROPERTY_CONFIG_DOCKER_RUNNER_ID))
+        .orElse(DEFAULT_CONFIG_DOCKER_RUNNER_ID);
   }
 
   boolean setGlobalEnabled(boolean globalEnabled) throws IOException {
