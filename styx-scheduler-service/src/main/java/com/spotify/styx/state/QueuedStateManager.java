@@ -392,9 +392,9 @@ public class QueuedStateManager implements StateManager, StaleStateReaper, State
     }
 
     void enqueue(Runnable transition) {
-      activeEvents.incrementAndGet();
-      if (!queue.offer(transition)) {
-        activeEvents.decrementAndGet();
+      if (queue.offer(transition)) {
+        activeEvents.incrementAndGet();
+      } else {
         throw new RuntimeException("Transition queue for " + workflowInstance.toKey() + " is full");
       }
     }
