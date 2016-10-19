@@ -19,23 +19,36 @@
  */
 package com.spotify.styx.state;
 
+import com.spotify.styx.RepeatRule;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.testdata.TestData;
 
+import org.junit.After;
+import org.junit.Rule;
 import org.junit.Test;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.Optional;
-import java.util.Set;
+import java.util.SortedSet;
 import java.util.Stack;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.function.IntFunction;
 
+import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
+import static com.spotify.styx.state.QueuedStateManager.NO_EVENTS_PROCESSED;
 import static com.spotify.styx.state.TimeoutConfig.createWithDefaultTtl;
 import static java.time.Duration.ofMillis;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.ForkJoinPool.commonPool;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
@@ -48,33 +61,42 @@ public class QueuedStateManagerTest {
 
   private static final WorkflowInstance INSTANCE = WorkflowInstance.create(
       TestData.WORKFLOW_ID, "2016-05-01");
-  private static final String STARTING_CLOCK_TIME = "2015-12-31T23:59:10.000Z";
+
   private final static String TEST_EXECUTION_ID_1 = "execution_1";
   private final static String DOCKER_IMAGE = "busybox:1.1";
-  private Instant i;
+
+  private static final ExecutorService POOL = Executors.newFixedThreadPool(16);
 
   QueuedStateManager stateManager;
   InMemStorage storage = new InMemStorage();
 
   Stack<RunState> transitions = new Stack<>();
 
+  @Rule
+  public RepeatRule repeatRule = new RepeatRule();
+
   private void setUp(long timeoutMillis) throws Exception {
-    setUp(timeoutMillis, RunState.fresh(
-        INSTANCE,
-        () -> Instant.parse(STARTING_CLOCK_TIME),
-        transitions::push));
+    setUp(timeoutMillis, RunState.fresh(INSTANCE, transitions::push));
   }
 
   private void setUp(long timeoutMillis, RunState initial) throws Exception {
     TimeoutConfig timeoutConfig = createWithDefaultTtl(ofMillis(timeoutMillis));
-    i = Instant.parse(STARTING_CLOCK_TIME);
-    stateManager = new QueuedStateManager(timeoutConfig,
-                                          () -> i,
-                                          newSingleThreadExecutor(),
-                                          storage);
+    if (stateManager != null) {
+      stateManager.close();
+    }
+
+    storage = new InMemStorage();
+    stateManager = new QueuedStateManager(timeoutConfig, Instant::now, POOL, storage);
 
     stateManager.initialize(initial);
     assertTrue(stateManager.awaitIdle(1000));
+  }
+
+  @After
+  public void tearDown() throws Exception {
+    if (stateManager != null) {
+      stateManager.close();
+    }
   }
 
   @Test
@@ -83,14 +105,13 @@ public class QueuedStateManagerTest {
 
     stateManager.receive(Event.triggerExecution(INSTANCE, "trig"));
     stateManager.receive(Event.halt(INSTANCE));
-    Thread.sleep(1000);
 
-    Set<SequenceEvent> storedEvents = storage.readEvents(INSTANCE);
-    Optional<SequenceEvent> lastStoredEvent = storedEvents.stream().reduce((a, b) -> b);
-    assertThat(lastStoredEvent.isPresent(), is(true));
-    assertThat(lastStoredEvent.get().event(), is(Event.halt(INSTANCE)));
-    assertThat(storage.getLatestStoredCounter(INSTANCE).isPresent(), is(true));
-    assertThat(storage.getLatestStoredCounter(INSTANCE).get(), is(1L));
+    assertTrue(stateManager.awaitIdle(1000));
+
+    SortedSet<SequenceEvent> storedEvents = storage.readEvents(INSTANCE);
+    SequenceEvent lastStoredEvent = storedEvents.last();
+    assertThat(lastStoredEvent.event(), is(Event.halt(INSTANCE)));
+    assertThat(storage.getLatestStoredCounter(INSTANCE), hasValue(1L));
     assertThat(storage.getCounterFromActiveStates(INSTANCE).isPresent(), is(false));
   }
 
@@ -100,101 +121,31 @@ public class QueuedStateManagerTest {
 
     stateManager.receive(Event.triggerExecution(INSTANCE, "trig1"));
     stateManager.receive(Event.halt(INSTANCE));
-    stateManager.initialize(RunState.fresh(
-        INSTANCE,
-        () -> Instant.parse(STARTING_CLOCK_TIME),
-        transitions::push));
+    assertTrue(stateManager.awaitIdle(1000));
+
+    stateManager.initialize(RunState.fresh(INSTANCE));
     stateManager.receive(Event.triggerExecution(INSTANCE, "trig2"));
     stateManager.receive(Event.created(INSTANCE, TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     stateManager.receive(Event.started(INSTANCE));
     stateManager.receive(Event.halt(INSTANCE));
-    stateManager.initialize(RunState.fresh(
-        INSTANCE,
-        () -> Instant.parse(STARTING_CLOCK_TIME),
-        transitions::push));
-    stateManager.receive(Event.triggerExecution(INSTANCE, "trig3"));
-    Thread.sleep(1000);
+    assertTrue(stateManager.awaitIdle(1000));
 
-    Set<SequenceEvent> storedEvents = storage.readEvents(INSTANCE);
-    Optional<SequenceEvent> lastStoredEvent = storedEvents.stream().reduce((a, b) -> b);
-    assertThat(lastStoredEvent.isPresent(), is(true));
-    assertThat(lastStoredEvent.get().event(), is(Event.triggerExecution(INSTANCE, "trig3")));
-    assertThat(storage.getLatestStoredCounter(INSTANCE).isPresent(), is(true));
-    assertThat(storage.getLatestStoredCounter(INSTANCE).get(), is(6L));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).isPresent(), is(true));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).get(), is(6L));
+    stateManager.initialize(RunState.fresh(INSTANCE));
+    stateManager.receive(Event.triggerExecution(INSTANCE, "trig3"));
+    assertTrue(stateManager.awaitIdle(1000));
+
+    SortedSet<SequenceEvent> storedEvents = storage.readEvents(INSTANCE);
+    SequenceEvent lastStoredEvent = storedEvents.last();
+    assertThat(lastStoredEvent.event(), is(Event.triggerExecution(INSTANCE, "trig3")));
+    assertThat(storage.getLatestStoredCounter(INSTANCE), hasValue(6L));
+    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(6L));
   }
 
-  @Test
+  @Test(expected = RuntimeException.class)
   public void shouldFailInitializeWFIfAlreadyActive() throws Exception {
     setUp(0);
 
-    stateManager.receive(Event.triggerExecution(INSTANCE, "trig1"));
-    stateManager.initialize(RunState.fresh(
-        INSTANCE,
-        () -> Instant.parse(STARTING_CLOCK_TIME),
-        transitions::push));
-    stateManager.receive(Event.triggerExecution(INSTANCE, "trig2"));
-    stateManager.receive(Event.created(INSTANCE, TEST_EXECUTION_ID_1, DOCKER_IMAGE));
-    stateManager.initialize(RunState.fresh(
-        INSTANCE,
-        () -> Instant.parse(STARTING_CLOCK_TIME),
-        transitions::push));
-    stateManager.receive(Event.triggerExecution(INSTANCE, "trig3"));
-    Thread.sleep(1000);
-
-    Set<SequenceEvent> storedEvents = storage.readEvents(INSTANCE);
-    Optional<SequenceEvent> lastStoredEvent = storedEvents.stream().reduce((a, b) -> b);
-    assertThat(lastStoredEvent.isPresent(), is(true));
-    assertThat(lastStoredEvent.get().event(), is(Event.created(INSTANCE, TEST_EXECUTION_ID_1, DOCKER_IMAGE)));
-    assertThat(storage.getLatestStoredCounter(INSTANCE).isPresent(), is(true));
-    assertThat(storage.getLatestStoredCounter(INSTANCE).get(), is(1L));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).isPresent(), is(true));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).get(), is(1L));
-  }
-
-  @Test
-  public void shouldHandleSimultaneousTriggers1() throws Exception {
-    setUp(0);
-
-    stateManager.initialize(RunState.fresh(
-        INSTANCE,
-        () -> Instant.parse(STARTING_CLOCK_TIME),
-        transitions::push));
-    stateManager.receive(Event.triggerExecution(INSTANCE, "trig1"));
-    stateManager.receive(Event.triggerExecution(INSTANCE, "trig2"));
-    Thread.sleep(1000);
-
-    Set<SequenceEvent> storedEvents = storage.readEvents(INSTANCE);
-    Optional<SequenceEvent> lastStoredEvent = storedEvents.stream().reduce((a, b) -> b);
-    assertThat(lastStoredEvent.isPresent(), is(true));
-    assertThat(lastStoredEvent.get().event(), is(Event.triggerExecution(INSTANCE, "trig1")));
-    assertThat(storage.getLatestStoredCounter(INSTANCE).isPresent(), is(true));
-    assertThat(storage.getLatestStoredCounter(INSTANCE).get(), is(0L));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).isPresent(), is(true));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).get(), is(0L));
-  }
-
-  @Test
-  public void shouldHandleSimultaneousTriggers2() throws Exception {
-    setUp(0);
-
-    stateManager.receive(Event.triggerExecution(INSTANCE, "trig1"));
-    stateManager.initialize(RunState.fresh(
-        INSTANCE,
-        () -> Instant.parse(STARTING_CLOCK_TIME),
-        transitions::push));
-    stateManager.receive(Event.triggerExecution(INSTANCE, "trig2"));
-    Thread.sleep(1000);
-
-    Set<SequenceEvent> storedEvents = storage.readEvents(INSTANCE);
-    Optional<SequenceEvent> lastStoredEvent = storedEvents.stream().reduce((a, b) -> b);
-    assertThat(lastStoredEvent.isPresent(), is(true));
-    assertThat(lastStoredEvent.get().event(), is(Event.triggerExecution(INSTANCE, "trig1")));
-    assertThat(storage.getLatestStoredCounter(INSTANCE).isPresent(), is(true));
-    assertThat(storage.getLatestStoredCounter(INSTANCE).get(), is(0L));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).isPresent(), is(true));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).get(), is(0L));
+    stateManager.initialize(RunState.fresh(INSTANCE));
   }
 
   @Test
@@ -262,45 +213,26 @@ public class QueuedStateManagerTest {
     setUp(0);
 
     stateManager.receive(Event.timeTrigger(INSTANCE));
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
+    assertTrue(stateManager.awaitIdle(1000));
 
-    i = i.plus(1, ChronoUnit.SECONDS);
     stateManager.receive(Event.started(INSTANCE));
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
+    assertTrue(stateManager.awaitIdle(1000));
 
-    i = i.plus(1, ChronoUnit.SECONDS);
     stateManager.receive(Event.timeout(INSTANCE));
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
+    assertTrue(stateManager.awaitIdle(1000));
 
-    i = i.plus(100, ChronoUnit.SECONDS);
     stateManager.receive(Event.retry(INSTANCE));
-
     assertTrue(stateManager.awaitIdle(1000));
     assertThat(storage.writtenEvents, hasSize(4));
 
-    assertThat(storage.writtenEvents.get(0),
-               is(SequenceEvent.create(
-                   Event.timeTrigger(INSTANCE),
-                   0L,
-                   Instant.parse(STARTING_CLOCK_TIME).toEpochMilli())));
-    assertThat(storage.writtenEvents.get(1),
-               is(SequenceEvent.create(
-                   Event.started(INSTANCE),
-                   1L,
-                   Instant.parse(STARTING_CLOCK_TIME).plus(1, ChronoUnit.SECONDS).toEpochMilli())));
-    assertThat(storage.writtenEvents.get(2),
-               is(SequenceEvent.create(
-                   Event.timeout(INSTANCE),
-                   2L,
-                   Instant.parse(STARTING_CLOCK_TIME).plus(2, ChronoUnit.SECONDS).toEpochMilli())));
-    assertThat(storage.writtenEvents.get(3),
-               is(SequenceEvent.create(
-                   Event.retry(INSTANCE),
-                   3L,
-                   Instant.parse(STARTING_CLOCK_TIME).plus(102, ChronoUnit.SECONDS).toEpochMilli())));
+    assertThat(storage.writtenEvents.get(0).counter(), is(0L));
+    assertThat(storage.writtenEvents.get(0).event(), is(Event.timeTrigger(INSTANCE)));
+    assertThat(storage.writtenEvents.get(1).counter(), is(1L));
+    assertThat(storage.writtenEvents.get(1).event(), is(Event.started(INSTANCE)));
+    assertThat(storage.writtenEvents.get(2).counter(), is(2L));
+    assertThat(storage.writtenEvents.get(2).event(), is(Event.timeout(INSTANCE)));
+    assertThat(storage.writtenEvents.get(3).counter(), is(3L));
+    assertThat(storage.writtenEvents.get(3).event(), is(Event.retry(INSTANCE)));
   }
 
   @Test
@@ -321,19 +253,15 @@ public class QueuedStateManagerTest {
     setUp(0);
 
     assertThat(storage.activeStatesMap, hasKey(INSTANCE));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).isPresent(), is(true));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).get(),
-               is(QueuedStateManager.NO_EVENTS_PROCESSED));
+    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(NO_EVENTS_PROCESSED));
 
     stateManager.receive(Event.timeTrigger(INSTANCE));          // 0
     stateManager.receive(Event.started(INSTANCE));              // 1
     stateManager.receive(Event.terminate(INSTANCE, 0));         // 2
 
     assertTrue(stateManager.awaitIdle(1000));
-    assertThat(storage.getLatestStoredCounter(INSTANCE).isPresent(), is(true));
-    assertThat(storage.getLatestStoredCounter(INSTANCE).get(), is(2L));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).isPresent(), is(true));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).get(), is(2L));
+    assertThat(storage.getLatestStoredCounter(INSTANCE), hasValue(2L));
+    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(2L));
 
     stateManager.receive(Event.success(INSTANCE));
 
@@ -346,34 +274,22 @@ public class QueuedStateManagerTest {
     setUp(0);
 
     stateManager.receive(Event.timeTrigger(INSTANCE));
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
+    assertTrue(stateManager.awaitIdle(1000));
 
-    i = i.plus(1, ChronoUnit.SECONDS);
     stateManager.receive(Event.started(INSTANCE));
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
+    assertTrue(stateManager.awaitIdle(1000));
 
-    i = i.plus(1, ChronoUnit.SECONDS);
     stateManager.receive(Event.started(INSTANCE)); // causes illegal transition
 
     assertTrue(stateManager.awaitIdle(1000));
-    assertThat(storage.getLatestStoredCounter(INSTANCE).isPresent(), is(true));
-    assertThat(storage.getLatestStoredCounter(INSTANCE).get(), is(1L));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).isPresent(), is(true));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).get(), is(1L));
+    assertThat(storage.getLatestStoredCounter(INSTANCE), hasValue(1L));
+    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(1L));
     assertThat(storage.writtenEvents, hasSize(2));
 
-    assertThat(storage.writtenEvents.get(0),
-               is(SequenceEvent.create(
-                   Event.timeTrigger(INSTANCE),
-                   0L,
-                   Instant.parse(STARTING_CLOCK_TIME).toEpochMilli())));
-    assertThat(storage.writtenEvents.get(1),
-               is(SequenceEvent.create(
-                   Event.started(INSTANCE),
-                   1L,
-                   Instant.parse(STARTING_CLOCK_TIME).plus(1, ChronoUnit.SECONDS).toEpochMilli())));
+    assertThat(storage.writtenEvents.get(0).counter(), is(0L));
+    assertThat(storage.writtenEvents.get(0).event(), is(Event.timeTrigger(INSTANCE)));
+    assertThat(storage.writtenEvents.get(1).counter(), is(1L));
+    assertThat(storage.writtenEvents.get(1).event(), is(Event.started(INSTANCE)));
   }
 
   @Test
@@ -387,10 +303,8 @@ public class QueuedStateManagerTest {
 
     assertTrue(stateManager.awaitIdle(1000));
     assertThat(storage.activeStatesMap, hasKey(INSTANCE));
-    assertThat(storage.getLatestStoredCounter(INSTANCE).isPresent(), is(true));
-    assertThat(storage.getLatestStoredCounter(INSTANCE).get(), is(8L));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).isPresent(), is(true));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).get(), is(8L));
+    assertThat(storage.getLatestStoredCounter(INSTANCE), hasValue(8L));
+    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(8L));
   }
 
   @Test
@@ -403,7 +317,7 @@ public class QueuedStateManagerTest {
       throw new RuntimeException();
     };
 
-    stateManager.initialize(RunState.fresh(INSTANCE, Instant::now, throwing));
+    stateManager.initialize(RunState.fresh(INSTANCE, throwing));
     stateManager.receive(Event.triggerExecution(INSTANCE, "trig"));
 
     assertTrue(stateManager.awaitIdle(5000));
@@ -412,18 +326,83 @@ public class QueuedStateManagerTest {
   @Test
   public void testGetActiveWorkflowInstance() throws Exception {
     stateManager = new QueuedStateManager(
-        createWithDefaultTtl(ofMillis(0)), Instant::now, newSingleThreadExecutor(),
-        storage);
+        createWithDefaultTtl(ofMillis(0)), Instant::now, newSingleThreadExecutor(), storage);
 
     assertThat(stateManager.isActiveWorkflowInstance(INSTANCE), is(false));
 
-    stateManager.initialize(RunState.fresh(
-        INSTANCE,
-        () -> Instant.parse(STARTING_CLOCK_TIME),
-        transitions::push));
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
+    stateManager.initialize(RunState.fresh(INSTANCE, transitions::push));
 
+    assertTrue(stateManager.awaitIdle(1000));
     assertThat(stateManager.isActiveWorkflowInstance(INSTANCE), is(true));
+  }
+
+  /**
+   * Repeated many times as we're doing some sort of concurrency test. It's hard to guarantee
+   * correctness, but repetition should increase our confidence.
+   */
+  @Test
+  @RepeatRule.Repeat(times = 50)
+  public void testConcurrentEvents() throws Exception {
+    setUp(0);
+
+    IntFunction<WorkflowInstance > wfi =
+        j -> WorkflowInstance.create(TestData.WORKFLOW_ID, "id-" + j);
+
+    Consumer<WorkflowInstance> sendEvents = instance -> {
+      try {
+        stateManager.receive(Event.submit(instance, ExecutionDescription.create(
+            "", Collections.emptyList(), Optional.empty(), Optional.empty())));
+        stateManager.receive(Event.submitted(instance, "id"));
+        stateManager.receive(Event.started(instance));
+        stateManager.receive(Event.terminate(instance, 20));
+        stateManager.receive(Event.retryAfter(instance, 300));
+        stateManager.receive(Event.retry(instance));
+      } catch (StateManager.IsClosed ignored) {
+      }
+    };
+
+    int states = 50;
+    CountDownLatch initLatch = new CountDownLatch(states);
+    CountDownLatch eventsLatch = new CountDownLatch(states);
+
+    for (int j = 0; j < states; j++) {
+      int jj = j;
+      commonPool().execute(() -> {
+        WorkflowInstance instance = wfi.apply(jj);
+
+        try {
+          stateManager.initialize(RunState.fresh(instance));
+          stateManager.receive(Event.triggerExecution(instance, "trig"));
+        } catch (StateManager.IsClosed ignored) {
+        }
+
+        initLatch.countDown();
+      });
+    }
+
+    assertTrue(initLatch.await(1000, TimeUnit.SECONDS));
+
+    for (int j = 0; j < states; j++) {
+      WorkflowInstance instance = wfi.apply(j);
+
+      commonPool().execute(() -> {
+        for (int k = 0; k < 100; k++) {
+          sendEvents.accept(instance);
+        }
+        eventsLatch.countDown();
+      });
+    }
+
+    assertTrue(eventsLatch.await(1000, TimeUnit.SECONDS));
+    assertTrue(stateManager.awaitIdle(5000));
+
+    for (int j = 0; j < states; j++) {
+      assertThat(stateManager.getQueuedEventsCount(), is(0L));
+
+      WorkflowInstance instance = wfi.apply(j);
+      RunState runState = stateManager.get(instance);
+      assertThat(instance.toKey(), runState.state(), is(RunState.State.PREPARE));
+      assertThat(instance.toKey(), runState.tries(), is(100));
+    }
   }
 }
