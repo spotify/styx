@@ -65,13 +65,17 @@ class DatastoreStorage {
   public static final String KIND_COMPONENT = "Component";
   public static final String KIND_WORKFLOW = "Workflow";
   public static final String KIND_ACTIVE_STATE = "ActiveState";
+  public static final String KIND_ACTIVE_WORKFLOW_INSTANCE = "ActiveWorkflowInstance";
 
   public static final String PROPERTY_CONFIG_ENABLED = "enabled";
   public static final String PROPERTY_CONFIG_DOCKER_RUNNER_ID = "dockerRunnerId";
   public static final String PROPERTY_WORKFLOW_JSON = "json";
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
   public static final String PROPERTY_DOCKER_IMAGE = "dockerImage";
-  public static final String PROPERTY_ACTIVE_STATE_COUNTER = "counter";
+  public static final String PROPERTY_COUNTER = "counter";
+  public static final String PROPERTY_COMPONENT = "component";
+  public static final String PROPERTY_WORKFLOW = "workflow";
+  public static final String PROPERTY_PARAMETER = "parameter";
   public static final String PROPERTY_COMMIT_SHA = "commitSha";
 
   public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
@@ -214,7 +218,7 @@ class DatastoreStorage {
     while (results.hasNext()) {
       final Entity activeState = results.next();
       final WorkflowInstance instance = parseWorkflowInstance(activeState);
-      final long counter = activeState.getLong(PROPERTY_ACTIVE_STATE_COUNTER);
+      final long counter = activeState.getLong(PROPERTY_COUNTER);
 
       mapBuilder.put(instance, counter);
     }
@@ -226,17 +230,36 @@ class DatastoreStorage {
     storeWithRetries(() -> datastore.runInTransaction(transaction -> {
       final Key activeStateKey = activeStateKey(workflowInstance);
       final Entity activeState = asBuilderOrNew(getOpt(transaction, activeStateKey), activeStateKey)
-          .set(PROPERTY_ACTIVE_STATE_COUNTER, counter)
+          .set(PROPERTY_COUNTER, counter)
           .build();
 
       return transaction.put(activeState);
     }));
+
+    // darkload workflow instance kind
+    storeWithRetries(() -> {
+      final Key key = activeWorkflowInstanceKey(workflowInstance);
+      final Entity entity = Entity.builder(key)
+          .set(PROPERTY_COMPONENT, workflowInstance.workflowId().componentId())
+          .set(PROPERTY_WORKFLOW, workflowInstance.workflowId().endpointId())
+          .set(PROPERTY_PARAMETER, workflowInstance.parameter())
+          .set(PROPERTY_COUNTER, counter)
+          .build();
+
+      return datastore.put(entity);
+    });
   }
 
   void deleteActiveState(WorkflowInstance workflowInstance) throws IOException {
     storeWithRetries(() -> {
       final Key activeStateKey = activeStateKey(workflowInstance);
       datastore.delete(activeStateKey);
+      return null;
+    });
+
+    // darkload workflow instance kind
+    storeWithRetries(() -> {
+      datastore.delete(activeWorkflowInstanceKey(workflowInstance));
       return null;
     });
   }
@@ -355,6 +378,12 @@ class DatastoreStorage {
             PathElement.of(KIND_WORKFLOW, workflowId.endpointId()))
         .kind(KIND_ACTIVE_STATE)
         .newKey(workflowInstance.parameter());
+  }
+
+  private Key activeWorkflowInstanceKey(WorkflowInstance workflowInstance) {
+    return datastore.newKeyFactory()
+        .kind(KIND_ACTIVE_WORKFLOW_INSTANCE)
+        .newKey(workflowInstance.toKey());
   }
 
   private WorkflowInstance parseWorkflowInstance(Entity activeState) {
