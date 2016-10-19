@@ -397,7 +397,21 @@ public class DatastoreStorageTest {
     assertThat(activeStates, hasSize(1));
 
     Entity state = activeStates.get(0);
-    assertThat(state.getLong(DatastoreStorage.PROPERTY_ACTIVE_STATE_COUNTER), is(42L));
+    assertThat(state.getLong(DatastoreStorage.PROPERTY_COUNTER), is(42L));
+  }
+
+  @Test
+  public void shouldWriteActiveWorkflowInstance() throws Exception {
+    storage.writeActiveState(WORKFLOW_INSTANCE, 42L);
+
+    List<Entity> activeInstances = entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE);
+    assertThat(activeInstances, hasSize(1));
+
+    Entity instance = activeInstances.get(0);
+    assertThat(instance.getLong(DatastoreStorage.PROPERTY_COUNTER), is(42L));
+    assertThat(instance.getString(DatastoreStorage.PROPERTY_COMPONENT), is(WORKFLOW_INSTANCE.workflowId().componentId()));
+    assertThat(instance.getString(DatastoreStorage.PROPERTY_WORKFLOW), is(WORKFLOW_INSTANCE.workflowId().endpointId()));
+    assertThat(instance.getString(DatastoreStorage.PROPERTY_PARAMETER), is(WORKFLOW_INSTANCE.parameter()));
   }
 
   @Test
@@ -409,6 +423,17 @@ public class DatastoreStorageTest {
 
     storage.deleteActiveState(WORKFLOW_INSTANCE1);
     assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE), hasSize(1));
+  }
+
+  @Test
+  public void shouldDeleteActiveWorkflowInstance() throws Exception {
+    storage.writeActiveState(WORKFLOW_INSTANCE1, 42L);
+    storage.writeActiveState(WORKFLOW_INSTANCE2, 84L);
+
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
+
+    storage.deleteActiveState(WORKFLOW_INSTANCE1);
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(1));
   }
 
   @Test
