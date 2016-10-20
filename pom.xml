@@ -48,7 +48,7 @@
   </developers>
 
   <scm>
-    <url>https://github.com/spotify/dataproc-java-submitter</url>
+    <url>https://github.com/spotify/styx</url>
     <connection>scm:git:git@github.com:spotify/styx.git</connection>
     <developerConnection>scm:git:git@github.com:spotify/styx.git</developerConnection>
     <tag>HEAD</tag>
