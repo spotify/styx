@@ -415,6 +415,15 @@ public class DatastoreStorageTest {
   }
 
   @Test
+  public void shouldOnlyWriteNewActiveStatesWhenConfigured() throws Exception {
+    setConfigBoolean(DatastoreStorage.PROPERTY_CONFIG_USE_NEW_STATE, true);
+    storage.writeActiveState(WORKFLOW_INSTANCE, 42L);
+
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE), hasSize(0));
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(1));
+  }
+
+  @Test
   public void shouldDeleteActiveState() throws Exception {
     storage.writeActiveState(WORKFLOW_INSTANCE1, 42L);
     storage.writeActiveState(WORKFLOW_INSTANCE2, 84L);
@@ -437,9 +446,40 @@ public class DatastoreStorageTest {
   }
 
   @Test
+  public void shouldOnlyDeleteNewActiveStateWhenConfigured() throws Exception {
+    storage.writeActiveState(WORKFLOW_INSTANCE1, 42L);
+    storage.writeActiveState(WORKFLOW_INSTANCE2, 84L);
+
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE), hasSize(2));
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
+
+    setConfigBoolean(DatastoreStorage.PROPERTY_CONFIG_USE_NEW_STATE, true);
+
+    storage.deleteActiveState(WORKFLOW_INSTANCE1);
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE), hasSize(2));
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(1));
+  }
+
+  @Test
   public void shouldReturnAllActiveStates() throws Exception {
     storage.writeActiveState(WORKFLOW_INSTANCE1, 42L);
     storage.writeActiveState(WORKFLOW_INSTANCE2, 84L);
+
+    Map<WorkflowInstance, Long> activeStates = storage.allActiveStates();
+    assertThat(activeStates.entrySet(), hasSize(2));
+    assertThat(activeStates, hasEntry(WORKFLOW_INSTANCE1, 42L));
+    assertThat(activeStates, hasEntry(WORKFLOW_INSTANCE2, 84L));
+  }
+
+  @Test
+  public void shouldReturnAllActiveStatesFromWorkflowInstancesWhenConfigured() throws Exception {
+    setConfigBoolean(DatastoreStorage.PROPERTY_CONFIG_USE_NEW_STATE, true);
+
+    storage.writeActiveState(WORKFLOW_INSTANCE1, 42L);
+    storage.writeActiveState(WORKFLOW_INSTANCE2, 84L);
+
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE), hasSize(0));
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
 
     Map<WorkflowInstance, Long> activeStates = storage.allActiveStates();
     assertThat(activeStates.entrySet(), hasSize(2));
@@ -458,11 +498,27 @@ public class DatastoreStorageTest {
   }
 
   @Test
+  public void shouldReturnAllActiveStatesForAComponentFromWorkflowInstanceWhenConfigured() throws Exception {
+    setConfigBoolean(DatastoreStorage.PROPERTY_CONFIG_USE_NEW_STATE, true);
+
+    storage.writeActiveState(WORKFLOW_INSTANCE2, 42L);
+    storage.writeActiveState(WORKFLOW_INSTANCE3, 84L);
+
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE), hasSize(0));
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
+
+    Map<WorkflowInstance, Long> activeStates = storage.activeStates(WORKFLOW_ID1.componentId());
+    assertThat(activeStates.entrySet(), hasSize(1));
+    assertThat(activeStates, hasEntry(WORKFLOW_INSTANCE2, 42L));
+  }
+
+  @Test
   public void shouldWriteActiveStatesWithSamePartitionAsSeparateEntities() throws Exception {
     storage.writeActiveState(WORKFLOW_INSTANCE1, 42L);
     storage.writeActiveState(WORKFLOW_INSTANCE2, 84L);
 
     assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE), hasSize(2));
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
   }
 
   private List<Entity> entitiesOfKind(String kind) {
@@ -509,5 +565,12 @@ public class DatastoreStorageTest {
         workflowId.componentId(),
         URI.create("http://foo"),
         DataEndpoint.create(workflowId.endpointId(), HOURS, empty(), empty(), empty()));
+  }
+
+  private void setConfigBoolean(String property, boolean value) {
+    Entity config = Entity.builder(storage.globalConfigKey)
+        .set(property, value)
+        .build();
+    helper.options().service().put(config);
   }
 }
