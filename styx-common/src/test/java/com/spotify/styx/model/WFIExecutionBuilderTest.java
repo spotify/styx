@@ -34,6 +34,7 @@ import java.util.Optional;
 
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 
 public class WFIExecutionBuilderTest {
 
@@ -45,6 +46,32 @@ public class WFIExecutionBuilderTest {
   private ExecutionDescription desc(String dockerImage) {
     return ExecutionDescription.create(
         dockerImage, Collections.emptyList(), Optional.empty(), Optional.empty());
+  }
+
+  @Test
+  public void testHaltEventDoesNotRequireExecutionAndGoesStraightToComplete() throws Exception {
+    long c = 0L;
+    List<SequenceEvent> events = Arrays.asList(
+        SequenceEvent.create(E.triggerExecution("trig-0"), c++, ts("07:55")),
+        SequenceEvent.create(E.halt(), c++, ts("07:55"))
+    );
+    assertValidTransitionSequence(events);
+    WorkflowInstanceExecutionData workflowInstanceExecutionData =
+    new WFIExecutionBuilder().executionInfo(events);
+    WorkflowInstanceExecutionData expected =
+        WorkflowInstanceExecutionData.create(
+            WORKFLOW_INSTANCE,
+            Collections.singletonList(
+                Trigger.create(
+                    "trig-0",
+                    time("07:55"),
+                    true,
+                    Collections.emptyList()
+                )
+            )
+        );
+
+    assertThat(workflowInstanceExecutionData, is(expected));
   }
 
   @Test
@@ -308,6 +335,10 @@ public class WFIExecutionBuilderTest {
 
   private void assertValidTransitionSequence(List<SequenceEvent> events) {
     RunState runState = RunState.fresh(WORKFLOW_INSTANCE, (Time) Instant::now);
+
+    if (!EventUtil.name(events.get(0).event()).equals("triggerExecution")) {
+      fail("first event must be triggerExecution");
+    }
 
     for(SequenceEvent event : events) {
       if ("triggerExecution".equals(EventUtil.name(event.event()))
