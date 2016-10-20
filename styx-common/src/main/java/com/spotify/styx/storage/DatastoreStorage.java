@@ -29,6 +29,7 @@ import com.google.cloud.datastore.KeyFactory;
 import com.google.cloud.datastore.PathElement;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
+import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
@@ -65,16 +66,23 @@ class DatastoreStorage {
   public static final String KIND_COMPONENT = "Component";
   public static final String KIND_WORKFLOW = "Workflow";
   public static final String KIND_ACTIVE_STATE = "ActiveState";
+  public static final String KIND_ACTIVE_WORKFLOW_INSTANCE = "ActiveWorkflowInstance";
 
   public static final String PROPERTY_CONFIG_ENABLED = "enabled";
   public static final String PROPERTY_CONFIG_DOCKER_RUNNER_ID = "dockerRunnerId";
   public static final String PROPERTY_WORKFLOW_JSON = "json";
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
   public static final String PROPERTY_DOCKER_IMAGE = "dockerImage";
-  public static final String PROPERTY_ACTIVE_STATE_COUNTER = "counter";
+  public static final String PROPERTY_COUNTER = "counter";
+  public static final String PROPERTY_COMPONENT = "component";
+  public static final String PROPERTY_WORKFLOW = "workflow";
+  public static final String PROPERTY_PARAMETER = "parameter";
   public static final String PROPERTY_COMMIT_SHA = "commitSha";
 
   public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
+
+  // temporary migration config
+  public static final String PROPERTY_CONFIG_USE_NEW_STATE = "useNewInstanceState";
 
   public static final boolean DEFAULT_CONFIG_ENABLED = true;
   public static final String DEFAULT_CONFIG_DOCKER_RUNNER_ID = "default";
@@ -97,18 +105,30 @@ class DatastoreStorage {
     this.globalConfigKey = datastore.newKeyFactory().kind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
   }
 
-  boolean globalEnabled() throws IOException {
+  private String readConfigString(String property, String defaultValue) {
     return getOpt(datastore, globalConfigKey)
-        .filter(w -> w.contains(PROPERTY_CONFIG_ENABLED))
-        .map(config -> config.getBoolean(PROPERTY_CONFIG_ENABLED))
-        .orElse(DEFAULT_CONFIG_ENABLED);
+        .filter(w -> w.contains(property))
+        .map(config -> config.getString(property))
+        .orElse(defaultValue);
+  }
+
+  private boolean readConfigBoolean(String property, boolean defaultValue) {
+    return getOpt(datastore, globalConfigKey)
+        .filter(w -> w.contains(property))
+        .map(config -> config.getBoolean(property))
+        .orElse(defaultValue);
+  }
+
+  boolean useNewWorkflowInstanceState() throws IOException {
+    return readConfigBoolean(PROPERTY_CONFIG_USE_NEW_STATE, false);
+  }
+
+  boolean globalEnabled() throws IOException {
+    return readConfigBoolean(PROPERTY_CONFIG_ENABLED, DEFAULT_CONFIG_ENABLED);
   }
 
   public String globalDockerRunnerId() {
-    return getOpt(datastore, globalConfigKey)
-        .filter(w -> w.contains(PROPERTY_CONFIG_DOCKER_RUNNER_ID))
-        .map(config -> config.getString(PROPERTY_CONFIG_DOCKER_RUNNER_ID))
-        .orElse(DEFAULT_CONFIG_DOCKER_RUNNER_ID);
+    return readConfigString(PROPERTY_CONFIG_DOCKER_RUNNER_ID, DEFAULT_CONFIG_DOCKER_RUNNER_ID);
   }
 
   boolean setGlobalEnabled(boolean globalEnabled) throws IOException {
@@ -192,29 +212,38 @@ class DatastoreStorage {
   }
 
   Map<WorkflowInstance, Long> allActiveStates() throws IOException {
-    final EntityQuery query = Query.entityQueryBuilder()
-        .kind(KIND_ACTIVE_STATE)
-        .build();
+    final boolean useNew = useNewWorkflowInstanceState();
+    final EntityQuery query = useNew
+        ? Query.entityQueryBuilder().kind(KIND_ACTIVE_WORKFLOW_INSTANCE).build()
+        : Query.entityQueryBuilder().kind(KIND_ACTIVE_STATE).build();
 
-    return queryActiveStates(query);
+    return queryActiveStates(query, useNew);
   }
 
-  Map<WorkflowInstance, Long> activeStates(String componentId) {
-    final EntityQuery query = Query.entityQueryBuilder()
-        .kind(KIND_ACTIVE_STATE)
-        .filter(hasAncestor(componentKeyFactory.newKey(componentId)))
-        .build();
+  Map<WorkflowInstance, Long> activeStates(String componentId) throws IOException {
+    final boolean useNew = useNewWorkflowInstanceState();
+    final EntityQuery query = useNew
+        ? Query.entityQueryBuilder().kind(KIND_ACTIVE_WORKFLOW_INSTANCE)
+            .filter(PropertyFilter.eq(PROPERTY_COMPONENT, componentId))
+            .build()
+        : Query.entityQueryBuilder().kind(KIND_ACTIVE_STATE)
+            .filter(hasAncestor(componentKeyFactory.newKey(componentId)))
+            .build();
 
-    return queryActiveStates(query);
+    return queryActiveStates(query, useNew);
   }
 
-  private Map<WorkflowInstance, Long> queryActiveStates(EntityQuery activeStatesQuery) {
+  private Map<WorkflowInstance, Long> queryActiveStates(
+      EntityQuery activeStatesQuery,
+      boolean useNew) throws IOException {
     final ImmutableMap.Builder<WorkflowInstance, Long> mapBuilder = ImmutableMap.builder();
     final QueryResults<Entity> results = datastore.run(activeStatesQuery);
     while (results.hasNext()) {
-      final Entity activeState = results.next();
-      final WorkflowInstance instance = parseWorkflowInstance(activeState);
-      final long counter = activeState.getLong(PROPERTY_ACTIVE_STATE_COUNTER);
+      final Entity entity = results.next();
+      final long counter = entity.getLong(PROPERTY_COUNTER);
+      final WorkflowInstance instance = useNew
+          ? parseWorkflowInstanceNew(entity)
+          : parseWorkflowInstance(entity);
 
       mapBuilder.put(instance, counter);
     }
@@ -223,20 +252,46 @@ class DatastoreStorage {
   }
 
   void writeActiveState(WorkflowInstance workflowInstance, long counter) throws IOException {
-    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
-      final Key activeStateKey = activeStateKey(workflowInstance);
-      final Entity activeState = asBuilderOrNew(getOpt(transaction, activeStateKey), activeStateKey)
-          .set(PROPERTY_ACTIVE_STATE_COUNTER, counter)
+    // stop writing old state if using new
+    if (!useNewWorkflowInstanceState()) {
+      storeWithRetries(() -> datastore.runInTransaction(transaction -> {
+        final Key activeStateKey = activeStateKey(workflowInstance);
+        final Entity activeState =
+            asBuilderOrNew(getOpt(transaction, activeStateKey), activeStateKey)
+                .set(PROPERTY_COUNTER, counter)
+                .build();
+
+        return transaction.put(activeState);
+      }));
+    }
+
+    // darkload workflow instance kind
+    storeWithRetries(() -> {
+      final Key key = activeWorkflowInstanceKey(workflowInstance);
+      final Entity entity = Entity.builder(key)
+          .set(PROPERTY_COMPONENT, workflowInstance.workflowId().componentId())
+          .set(PROPERTY_WORKFLOW, workflowInstance.workflowId().endpointId())
+          .set(PROPERTY_PARAMETER, workflowInstance.parameter())
+          .set(PROPERTY_COUNTER, counter)
           .build();
 
-      return transaction.put(activeState);
-    }));
+      return datastore.put(entity);
+    });
   }
 
   void deleteActiveState(WorkflowInstance workflowInstance) throws IOException {
+    // stop writing old state if using new
+    if (!useNewWorkflowInstanceState()) {
+      storeWithRetries(() -> {
+        final Key activeStateKey = activeStateKey(workflowInstance);
+        datastore.delete(activeStateKey);
+        return null;
+      });
+    }
+
+    // darkload workflow instance kind
     storeWithRetries(() -> {
-      final Key activeStateKey = activeStateKey(workflowInstance);
-      datastore.delete(activeStateKey);
+      datastore.delete(activeWorkflowInstanceKey(workflowInstance));
       return null;
     });
   }
@@ -357,12 +412,26 @@ class DatastoreStorage {
         .newKey(workflowInstance.parameter());
   }
 
+  private Key activeWorkflowInstanceKey(WorkflowInstance workflowInstance) {
+    return datastore.newKeyFactory()
+        .kind(KIND_ACTIVE_WORKFLOW_INSTANCE)
+        .newKey(workflowInstance.toKey());
+  }
+
   private WorkflowInstance parseWorkflowInstance(Entity activeState) {
     final String componentId = activeState.key().ancestors().get(0).name();
     final String endpointId = activeState.key().ancestors().get(1).name();
     final String parameter = activeState.key().name();
 
     return WorkflowInstance.create(WorkflowId.create(componentId, endpointId), parameter);
+  }
+
+  private WorkflowInstance parseWorkflowInstanceNew(Entity activeWorkflowInstance) {
+    final String componentId = activeWorkflowInstance.getString(PROPERTY_COMPONENT);
+    final String workflowId = activeWorkflowInstance.getString(PROPERTY_WORKFLOW);
+    final String parameter = activeWorkflowInstance.getString(PROPERTY_PARAMETER);
+
+    return WorkflowInstance.create(WorkflowId.create(componentId, workflowId), parameter);
   }
 
   private WorkflowId parseWorkflowId(Entity workflow) {
