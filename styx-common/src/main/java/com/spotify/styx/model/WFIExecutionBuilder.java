@@ -42,10 +42,14 @@ class WFIExecutionBuilder {
   private Instant eventTs;
 
   private void closeExecution() {
-    Execution execution = Execution.create(currExecutionId, currDockerImg, executionStatusList);
+    if (currExecutionId != null && currDockerImg != null) {
+      Execution execution = Execution.create(currExecutionId, currDockerImg, executionStatusList);
+      executionList.add(execution);
+    }
 
-    executionList.add(execution);
     executionStatusList = new ArrayList<>();
+    currExecutionId = null;
+    currDockerImg = null;
   }
 
   private void closeTrigger() {
