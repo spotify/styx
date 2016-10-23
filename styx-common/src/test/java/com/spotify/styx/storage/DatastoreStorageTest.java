@@ -390,17 +390,6 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldWriteActiveStateWithCounter() throws Exception {
-    storage.writeActiveState(WORKFLOW_INSTANCE, 42L);
-
-    List<Entity> activeStates = entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE);
-    assertThat(activeStates, hasSize(1));
-
-    Entity state = activeStates.get(0);
-    assertThat(state.getLong(DatastoreStorage.PROPERTY_COUNTER), is(42L));
-  }
-
-  @Test
   public void shouldWriteActiveWorkflowInstance() throws Exception {
     storage.writeActiveState(WORKFLOW_INSTANCE, 42L);
 
@@ -415,26 +404,6 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldOnlyWriteNewActiveStatesWhenConfigured() throws Exception {
-    setConfigBoolean(DatastoreStorage.PROPERTY_CONFIG_USE_NEW_STATE, true);
-    storage.writeActiveState(WORKFLOW_INSTANCE, 42L);
-
-    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE), hasSize(0));
-    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(1));
-  }
-
-  @Test
-  public void shouldDeleteActiveState() throws Exception {
-    storage.writeActiveState(WORKFLOW_INSTANCE1, 42L);
-    storage.writeActiveState(WORKFLOW_INSTANCE2, 84L);
-
-    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE), hasSize(2));
-
-    storage.deleteActiveState(WORKFLOW_INSTANCE1);
-    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE), hasSize(1));
-  }
-
-  @Test
   public void shouldDeleteActiveWorkflowInstance() throws Exception {
     storage.writeActiveState(WORKFLOW_INSTANCE1, 42L);
     storage.writeActiveState(WORKFLOW_INSTANCE2, 84L);
@@ -442,21 +411,6 @@ public class DatastoreStorageTest {
     assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
 
     storage.deleteActiveState(WORKFLOW_INSTANCE1);
-    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(1));
-  }
-
-  @Test
-  public void shouldOnlyDeleteNewActiveStateWhenConfigured() throws Exception {
-    storage.writeActiveState(WORKFLOW_INSTANCE1, 42L);
-    storage.writeActiveState(WORKFLOW_INSTANCE2, 84L);
-
-    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE), hasSize(2));
-    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
-
-    setConfigBoolean(DatastoreStorage.PROPERTY_CONFIG_USE_NEW_STATE, true);
-
-    storage.deleteActiveState(WORKFLOW_INSTANCE1);
-    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE), hasSize(2));
     assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(1));
   }
 
@@ -472,39 +426,10 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldReturnAllActiveStatesFromWorkflowInstancesWhenConfigured() throws Exception {
-    setConfigBoolean(DatastoreStorage.PROPERTY_CONFIG_USE_NEW_STATE, true);
-
-    storage.writeActiveState(WORKFLOW_INSTANCE1, 42L);
-    storage.writeActiveState(WORKFLOW_INSTANCE2, 84L);
-
-    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE), hasSize(0));
-    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
-
-    Map<WorkflowInstance, Long> activeStates = storage.allActiveStates();
-    assertThat(activeStates.entrySet(), hasSize(2));
-    assertThat(activeStates, hasEntry(WORKFLOW_INSTANCE1, 42L));
-    assertThat(activeStates, hasEntry(WORKFLOW_INSTANCE2, 84L));
-  }
-
-  @Test
   public void shouldReturnAllActiveStatesForAComponent() throws Exception {
     storage.writeActiveState(WORKFLOW_INSTANCE2, 42L);
     storage.writeActiveState(WORKFLOW_INSTANCE3, 84L);
 
-    Map<WorkflowInstance, Long> activeStates = storage.activeStates(WORKFLOW_ID1.componentId());
-    assertThat(activeStates.entrySet(), hasSize(1));
-    assertThat(activeStates, hasEntry(WORKFLOW_INSTANCE2, 42L));
-  }
-
-  @Test
-  public void shouldReturnAllActiveStatesForAComponentFromWorkflowInstanceWhenConfigured() throws Exception {
-    setConfigBoolean(DatastoreStorage.PROPERTY_CONFIG_USE_NEW_STATE, true);
-
-    storage.writeActiveState(WORKFLOW_INSTANCE2, 42L);
-    storage.writeActiveState(WORKFLOW_INSTANCE3, 84L);
-
-    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE), hasSize(0));
     assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
 
     Map<WorkflowInstance, Long> activeStates = storage.activeStates(WORKFLOW_ID1.componentId());
@@ -517,7 +442,6 @@ public class DatastoreStorageTest {
     storage.writeActiveState(WORKFLOW_INSTANCE1, 42L);
     storage.writeActiveState(WORKFLOW_INSTANCE2, 84L);
 
-    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_STATE), hasSize(2));
     assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
   }
 
@@ -565,12 +489,5 @@ public class DatastoreStorageTest {
         workflowId.componentId(),
         URI.create("http://foo"),
         DataEndpoint.create(workflowId.endpointId(), HOURS, empty(), empty(), empty()));
-  }
-
-  private void setConfigBoolean(String property, boolean value) {
-    Entity config = Entity.builder(storage.globalConfigKey)
-        .set(property, value)
-        .build();
-    helper.options().service().put(config);
   }
 }
