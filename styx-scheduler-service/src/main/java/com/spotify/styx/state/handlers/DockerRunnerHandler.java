@@ -28,6 +28,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.util.ResourceNotFoundException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,9 +71,16 @@ public class DockerRunnerHandler implements OutputHandler {
           } catch (StateManager.IsClosed isClosed) {
             LOG.warn("Could not send 'created' event", isClosed);
           }
-        } catch (Exception e) {
-          LOG.warn("Failed the docker starting procedure for " + state.workflowInstance().toKey(), e);
+        } catch (ResourceNotFoundException e) {
+          LOG.error("Unable to start docker procedure.", e);
           stateManager.receiveIgnoreClosed(Event.halt(state.workflowInstance()));
+        } catch (IOException e) {
+          try {
+            LOG.error("Failed the docker starting procedure for " + state.workflowInstance().toKey(), e);
+            stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()));
+          } catch (StateManager.IsClosed isClosed) {
+            LOG.warn("Failed to send 'runError' event", isClosed);
+          }
         }
         break;
 
@@ -92,12 +100,13 @@ public class DockerRunnerHandler implements OutputHandler {
     }
   }
 
-  private String dockerRunnerStart(RunState state) throws Exception {
+  private String dockerRunnerStart(RunState state) throws ResourceNotFoundException, IOException {
     final WorkflowInstance workflowInstance = state.workflowInstance();
     final Optional<ExecutionDescription> executionDescriptionOpt = state.executionDescription();
 
     final ExecutionDescription executionDescription = executionDescriptionOpt.orElseThrow(
-        () -> new Exception("Missing execution description"));
+        () -> new ResourceNotFoundException("Missing execution description for "
+                                            + state.workflowInstance().toKey()));
 
     final String dockerImage = executionDescription.dockerImage();
     final List<String> dockerArgs = executionDescription.dockerArgs();
@@ -111,16 +120,7 @@ public class DockerRunnerHandler implements OutputHandler {
     LOG.info("running:{} image:{} args:{}", workflowInstance.toKey(), runSpec.imageName(),
              runSpec.args());
 
-    try {
       return dockerRunner.start(workflowInstance, runSpec);
-    } catch (IOException e) {
-      try {
-        stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()));
-      } catch (StateManager.IsClosed isClosed) {
-        LOG.warn("Failed to send 'runError' event", isClosed);
-      }
-      throw e;
-    }
   }
 
   private static List<String> argsReplace(List<String> template, String parameter) {
