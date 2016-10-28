@@ -108,11 +108,6 @@ public class ExecutionDescriptionHandler implements OutputHandler {
                                    workflowId, workflowInstance));
     }
 
-    if (!dockerImageOpt.isPresent()) {
-      throw new IOException(format("%s has no docker image, halting %s",
-                                   workflowId, workflowInstance));
-    }
-
     return ExecutionDescription.create(
         dockerImageOpt.get(),
         dockerArgsOpt.get(),
