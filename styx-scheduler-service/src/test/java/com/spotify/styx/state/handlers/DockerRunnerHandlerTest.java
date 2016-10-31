@@ -88,6 +88,33 @@ public class DockerRunnerHandlerTest {
   }
 
   @Test
+  public void shouldFailIfDockerRunnerRaisesException() throws Exception {
+    DockerRunnerHandler dockerRunnerHandler =
+        new DockerRunnerHandler(new ExceptionalDockerRunner(), stateManager);
+
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint());
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
+    RunState runState = RunState.newSubmitting(workflowInstance, EXECUTION_DESCRIPTION);
+
+    stateManager.initialize(runState);
+    dockerRunnerHandler.transitionInto(runState);
+
+    assertThat(stateManager.get(workflowInstance).state(), is(RunState.State.FAILED));
+  }
+
+  @Test
+  public void shouldHaltIfMissingExecutionDescription() throws Exception {
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint());
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
+    RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING);
+
+    stateManager.initialize(runState);
+    dockerRunnerHandler.transitionInto(runState);
+
+    assertThat(stateManager.get(workflowInstance).state(), is(RunState.State.ERROR));
+  }
+
+  @Test
   public void shouldPerformCleanupOnFailed() throws Exception {
     DataEndpoint endpoint = dataEndpoint("--date", "{}", "--bar");
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
@@ -132,6 +159,23 @@ public class DockerRunnerHandlerTest {
       startImageName = runSpec.imageName();
       startArgs = runSpec.args();
       return TEST_EXECUTION_ID;
+    }
+
+    @Override
+    public void cleanup(String executionId) {
+      cleanupExecutionId = executionId;
+    }
+
+    @Override
+    public void close() throws IOException {
+    }
+  }
+
+  private class ExceptionalDockerRunner implements DockerRunner {
+
+    @Override
+    public String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
+      throw new IOException("Testing exception.");
     }
 
     @Override

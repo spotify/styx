@@ -29,6 +29,7 @@ import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.ResourceNotFoundException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,10 +69,17 @@ public class ExecutionDescriptionHandler implements OutputHandler {
           } catch (StateManager.IsClosed isClosed) {
             LOG.warn("Could not send 'created' event", isClosed);
           }
-        } catch (Exception e) {
-          LOG.warn("Failed to prepare execution description for "
+        } catch (ResourceNotFoundException e) {
+          LOG.error("Failed to prepare execution description for "
                    + state.workflowInstance().toKey(), e);
           stateManager.receiveIgnoreClosed(Event.halt(workflowInstance));
+        } catch (IOException e) {
+          try {
+            LOG.error("Failed to retrieve execution description for " + state.workflowInstance().toKey(), e);
+            stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()));
+          } catch (StateManager.IsClosed isClosed) {
+            LOG.warn("Failed to send 'runError' event", isClosed);
+          }
         }
         break;
 
@@ -80,23 +88,24 @@ public class ExecutionDescriptionHandler implements OutputHandler {
     }
   }
 
-  private ExecutionDescription getExecDescription(WorkflowInstance workflowInstance) throws Exception {
+  private ExecutionDescription getExecDescription(WorkflowInstance workflowInstance)
+      throws ResourceNotFoundException, IOException {
     final WorkflowId workflowId = workflowInstance.workflowId();
 
     final Optional<Workflow> workflowOpt = storage.workflow(workflowId);
     final Workflow workflow = workflowOpt.orElseThrow(
-        () -> new Exception(format("Missing %s, halting %s", workflowId, workflowInstance)));
+        () -> new ResourceNotFoundException(format("Missing %s, halting %s", workflowId, workflowInstance)));
 
     final Optional<List<String>> dockerArgsOpt = workflow.schedule().dockerArgs();
     if (!dockerArgsOpt.isPresent()) {
-      throw new IOException(format("%s has no docker args, halting %s",
+      throw new ResourceNotFoundException(format("%s has no docker args, halting %s",
                                    workflowId, workflowInstance));
     }
 
     final Optional<WorkflowState> workflowStateOpt = storage.workflowState(workflow.id());
 
     final WorkflowState workflowState = workflowStateOpt.orElseThrow(
-        () -> new Exception(format("Missing state for %s, halting %s",
+        () -> new ResourceNotFoundException(format("Missing state for %s, halting %s",
                                    workflowId, workflowInstance)));
 
     final Optional<String> dockerImageOpt = workflowState.dockerImage().isPresent()
@@ -104,12 +113,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         : workflow.schedule().dockerImage(); // backwards compatibility
 
     if (!dockerImageOpt.isPresent()) {
-      throw new IOException(format("%s has no docker image, halting %s",
-                                   workflowId, workflowInstance));
-    }
-
-    if (!dockerImageOpt.isPresent()) {
-      throw new IOException(format("%s has no docker image, halting %s",
+      throw new ResourceNotFoundException(format("%s has no docker image, halting %s",
                                    workflowId, workflowInstance));
     }
 
