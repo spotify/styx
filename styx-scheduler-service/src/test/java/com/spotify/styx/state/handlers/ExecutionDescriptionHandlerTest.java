@@ -35,8 +35,11 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
 
 import org.hamcrest.Matchers;
+import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 
+import java.io.IOException;
 import java.util.Optional;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
@@ -53,11 +56,16 @@ public class ExecutionDescriptionHandlerTest {
   private static final String DOCKER_IMAGE = "my_docker_image";
   private static final String COMMIT_SHA = "71d70fca99e29812e81d1ed0a5c9d3559f4118e9";
 
-  private Storage storage = new InMemStorage();
-  private StateManager stateManager = new SyncStateManager();
+  private Storage storage;
+  private StateManager stateManager;
+  private ExecutionDescriptionHandler toTest;
 
-  private ExecutionDescriptionHandler toTest =
-      new ExecutionDescriptionHandler(storage, stateManager);
+  @Before
+  public void setUp() throws Exception {
+    storage = new InMemStorage();
+    stateManager = new SyncStateManager();
+    toTest = new ExecutionDescriptionHandler(storage, stateManager);
+  }
 
   @Test
   public void shouldTransitionIntoSubmitting() throws Exception {
@@ -79,6 +87,30 @@ public class ExecutionDescriptionHandlerTest {
     assertThat(currentState.executionDescription().get().dockerImage(), is(DOCKER_IMAGE));
     assertThat(currentState.executionDescription().get().dockerArgs(), contains("--date", "{}", "--bar"));
     assertThat(currentState.executionDescription().get().commitSha(), hasValue(COMMIT_SHA));
+  }
+
+  @Test
+  public void shouldTransitionIntoFailedIfStorageError() throws Exception {
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint("--date", "{}", "--bar"));
+    WorkflowState workflowState = WorkflowState.create(
+        Optional.of(true), Optional.of(DOCKER_IMAGE), Optional.of(COMMIT_SHA));
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+
+    Storage storageSpy = Mockito.spy(storage);
+    Mockito.when(storageSpy.workflowState(workflowInstance.workflowId()))
+        .thenThrow(new IOException("TEST"));
+    storageSpy.store(workflow);
+    storageSpy.patchState(workflow.id(), workflowState);
+
+    toTest = new ExecutionDescriptionHandler(storageSpy, stateManager);
+
+    RunState runState = RunState.fresh(workflowInstance, toTest);
+
+    stateManager.initialize(runState);
+    stateManager.receive(Event.triggerExecution(workflowInstance, "trig"));
+
+    RunState failed = stateManager.get(workflowInstance);
+    assertThat(failed.state(), Matchers.is(RunState.State.FAILED));
   }
 
   @Test

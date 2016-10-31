@@ -260,6 +260,7 @@ public abstract class RunState {
     @Override
     public RunState runError(WorkflowInstance workflowInstance, String message) {
       switch (state()) {
+        case SUBMITTING:
         case SUBMITTED:
         case RUNNING:
         case PREPARE:
