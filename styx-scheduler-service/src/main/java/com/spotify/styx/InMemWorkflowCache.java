@@ -21,15 +21,12 @@ package com.spotify.styx;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
-
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Optional;
 import java.util.concurrent.ConcurrentMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Simple in memory implementation of {@link WorkflowCache}.

@@ -19,13 +19,6 @@
  */
 package com.spotify.styx.testdata;
 
-import com.spotify.styx.model.DataEndpoint;
-import com.spotify.styx.model.DataEndpoint.Secret;
-import com.spotify.styx.model.WorkflowId;
-import com.spotify.styx.model.WorkflowInstance;
-
-import java.net.URI;
-
 import static com.spotify.styx.model.Partitioning.DAYS;
 import static com.spotify.styx.model.Partitioning.HOURS;
 import static com.spotify.styx.model.Partitioning.MONTHS;
@@ -33,6 +26,12 @@ import static com.spotify.styx.model.Partitioning.WEEKS;
 import static java.util.Arrays.asList;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
+
+import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.DataEndpoint.Secret;
+import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowInstance;
+import java.net.URI;
 
 public final class TestData {
 

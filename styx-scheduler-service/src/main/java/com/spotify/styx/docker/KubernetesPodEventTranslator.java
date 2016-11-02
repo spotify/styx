@@ -19,24 +19,21 @@
  */
 package com.spotify.styx.docker;
 
-import com.google.common.collect.Lists;
+import static java.util.Collections.emptyList;
 
+import com.google.common.collect.Lists;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
-
-import java.util.List;
-import java.util.Optional;
-import java.util.function.Predicate;
-
 import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
 import io.fabric8.kubernetes.api.model.ContainerStateWaiting;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodStatus;
 import io.fabric8.kubernetes.client.Watcher;
-
-import static java.util.Collections.emptyList;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Predicate;
 
 public final class KubernetesPodEventTranslator {
 

@@ -19,9 +19,12 @@
  */
 package com.spotify.styx.api;
 
+import static com.spotify.styx.model.EventSerializer.convertEventToPersistentEvent;
+import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
+import static com.spotify.styx.util.StreamUtil.cat;
+
 import com.google.api.client.util.Lists;
 import com.google.common.base.Throwables;
-
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -42,7 +45,6 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.storage.EventStorage;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -54,12 +56,7 @@ import java.util.SortedSet;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
 import okio.ByteString;
-
-import static com.spotify.styx.model.EventSerializer.convertEventToPersistentEvent;
-import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
-import static com.spotify.styx.util.StreamUtil.cat;
 
 /**
  * API endpoints for the cli

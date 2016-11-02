@@ -21,7 +21,6 @@ package com.spotify.styx.util;
 
 import com.spotify.apollo.Environment;
 import com.spotify.styx.storage.Storage;
-
 import java.util.function.Function;
 
 public interface StorageFactory extends Function<Environment, Storage> {

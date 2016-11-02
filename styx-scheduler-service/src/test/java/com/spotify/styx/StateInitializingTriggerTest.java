@@ -19,25 +19,6 @@
  */
 package com.spotify.styx;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
-
-import com.spotify.styx.model.DataEndpoint;
-import com.spotify.styx.model.Partitioning;
-import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.state.RunState;
-import com.spotify.styx.state.SyncStateManager;
-import com.spotify.styx.storage.InMemStorage;
-import com.spotify.styx.testdata.TestData;
-
-import org.junit.Test;
-
-import java.time.Instant;
-import java.util.Map;
-import java.util.Optional;
-
 import static com.spotify.styx.model.Partitioning.DAYS;
 import static com.spotify.styx.model.Partitioning.HOURS;
 import static com.spotify.styx.model.Partitioning.MONTHS;
@@ -46,6 +27,22 @@ import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertThat;
+
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Partitioning;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.SyncStateManager;
+import com.spotify.styx.storage.InMemStorage;
+import com.spotify.styx.testdata.TestData;
+import java.time.Instant;
+import java.util.Map;
+import java.util.Optional;
+import org.junit.Test;
 
 public class StateInitializingTriggerTest {
 

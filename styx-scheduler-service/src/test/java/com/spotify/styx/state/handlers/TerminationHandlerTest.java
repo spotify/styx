@@ -19,22 +19,6 @@
  */
 package com.spotify.styx.state.handlers;
 
-import com.google.common.collect.Lists;
-
-import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.state.OutputHandler;
-import com.spotify.styx.state.RunState;
-import com.spotify.styx.state.StateManager;
-import com.spotify.styx.state.SyncStateManager;
-import com.spotify.styx.testdata.TestData;
-
-import org.junit.Before;
-import org.junit.Test;
-
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-
 import static com.spotify.styx.state.RunState.State.AWAITING_RETRY;
 import static com.spotify.styx.state.RunState.State.DONE;
 import static com.spotify.styx.state.RunState.State.ERROR;
@@ -44,6 +28,19 @@ import static com.spotify.styx.state.handlers.TerminationHandler.MAX_RETRY_COST;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThan;
 import static org.junit.Assert.assertThat;
+
+import com.google.common.collect.Lists;
+import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.OutputHandler;
+import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.SyncStateManager;
+import com.spotify.styx.testdata.TestData;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.Before;
+import org.junit.Test;
 
 public class TerminationHandlerTest {
 

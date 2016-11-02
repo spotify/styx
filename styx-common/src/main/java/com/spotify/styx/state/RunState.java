@@ -19,17 +19,6 @@
  */
 package com.spotify.styx.state;
 
-import com.google.auto.value.AutoValue;
-
-import com.spotify.styx.model.Event;
-import com.spotify.styx.model.EventVisitor;
-import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.util.Time;
-
-import java.time.Instant;
-import java.util.Optional;
-
 import static com.spotify.styx.state.OutputHandler.fanOutput;
 import static com.spotify.styx.state.RunState.State.AWAITING_RETRY;
 import static com.spotify.styx.state.RunState.State.DONE;
@@ -43,6 +32,15 @@ import static com.spotify.styx.state.RunState.State.TERMINATED;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
+
+import com.google.auto.value.AutoValue;
+import com.spotify.styx.model.Event;
+import com.spotify.styx.model.EventVisitor;
+import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.util.Time;
+import java.time.Instant;
+import java.util.Optional;
 
 /**
  * State machine for run states.

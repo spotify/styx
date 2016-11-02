@@ -19,6 +19,19 @@
  */
 package com.spotify.styx.api;
 
+import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
+import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
+import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
+import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
+import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.startsWith;
+import static org.junit.Assert.assertThat;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
@@ -37,29 +50,13 @@ import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
-
-import org.junit.Rule;
-import org.junit.Test;
-
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
-
 import okio.ByteString;
-
-import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
-import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
-import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
-import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
-import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.startsWith;
-import static org.junit.Assert.assertThat;
-import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import org.junit.Rule;
+import org.junit.Test;
 
 /**
  * API endpoints for interacting directly with the scheduler

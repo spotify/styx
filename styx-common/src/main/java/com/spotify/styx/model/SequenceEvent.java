@@ -20,7 +20,6 @@
 package com.spotify.styx.model;
 
 import com.google.auto.value.AutoValue;
-
 import java.util.Comparator;
 
 @AutoValue

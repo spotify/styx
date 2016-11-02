@@ -21,10 +21,8 @@ package com.spotify.styx.storage;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedSet;
-
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
-
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;

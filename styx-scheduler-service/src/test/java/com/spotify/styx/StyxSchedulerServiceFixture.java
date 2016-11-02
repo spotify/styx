@@ -19,6 +19,11 @@
  */
 package com.spotify.styx;
 
+import static com.spotify.styx.model.WorkflowState.patchEnabled;
+import static java.util.Collections.singletonList;
+import static org.mockito.Mockito.mock;
+
+import autovalue.shaded.com.google.common.common.base.Throwables;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.KeyQuery;
@@ -26,7 +31,6 @@ import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.collect.Lists;
-
 import com.spotify.apollo.test.ServiceHelper;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
@@ -44,7 +48,14 @@ import com.spotify.styx.storage.BigtableStorage;
 import com.spotify.styx.util.EventStorageFactory;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
-
+import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import javaslang.Tuple;
+import javaslang.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
 import org.jmock.lib.concurrent.DeterministicScheduler;
 import org.junit.After;
@@ -53,21 +64,6 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
-
-import autovalue.shaded.com.google.common.common.base.Throwables;
-import javaslang.Tuple;
-import javaslang.Tuple2;
-
-import static com.spotify.styx.model.WorkflowState.patchEnabled;
-import static java.util.Collections.singletonList;
-import static org.mockito.Mockito.mock;
 
 /**
  * A test fixture for system tests that exercise all of Styx in isolation from external systems.

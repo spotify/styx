@@ -22,7 +22,6 @@ package com.spotify.styx.monitoring;
 import com.spotify.styx.util.FnWithException;
 import com.spotify.styx.util.RunnableWithException;
 import com.spotify.styx.util.Time;
-
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

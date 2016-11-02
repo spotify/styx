@@ -21,7 +21,6 @@ package com.spotify.styx.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
-
 import java.util.Locale;
 
 public enum Partitioning {

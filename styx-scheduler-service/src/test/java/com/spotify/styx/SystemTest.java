@@ -19,20 +19,6 @@
  */
 package com.spotify.styx;
 
-import com.spotify.styx.docker.DockerRunner.RunSpec;
-import com.spotify.styx.model.DataEndpoint;
-import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Partitioning;
-import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.state.RunState;
-import com.spotify.styx.state.handlers.TerminationHandler;
-import com.spotify.styx.testdata.TestData;
-
-import org.junit.Test;
-
-import java.time.Instant;
-
 import static com.spotify.styx.model.WorkflowInstance.create;
 import static java.util.Arrays.asList;
 import static java.util.Optional.empty;
@@ -43,6 +29,18 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+
+import com.spotify.styx.docker.DockerRunner.RunSpec;
+import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Partitioning;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.handlers.TerminationHandler;
+import com.spotify.styx.testdata.TestData;
+import java.time.Instant;
+import org.junit.Test;
 
 public class SystemTest extends StyxSchedulerServiceFixture {
 

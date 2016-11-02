@@ -19,19 +19,18 @@
  */
 package com.spotify.styx.docker;
 
+import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
+import static java.util.Collections.emptyList;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.empty;
+import static org.junit.Assert.assertThat;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.testdata.TestData;
-
-import org.junit.Test;
-
-import java.util.List;
-import java.util.Optional;
-
 import io.fabric8.kubernetes.api.model.ContainerState;
 import io.fabric8.kubernetes.api.model.ContainerStateRunning;
 import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
@@ -40,12 +39,9 @@ import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodStatus;
 import io.fabric8.kubernetes.client.Watcher;
-
-import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
-import static java.util.Collections.emptyList;
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.empty;
-import static org.junit.Assert.assertThat;
+import java.util.List;
+import java.util.Optional;
+import org.junit.Test;
 
 public class KubernetesPodEventTranslatorTest {
 

@@ -19,25 +19,6 @@
  */
 package com.spotify.styx.storage;
 
-import com.spotify.styx.model.DataEndpoint;
-import com.spotify.styx.model.ExecutionStatus;
-import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowExecutionInfo;
-import com.spotify.styx.model.WorkflowId;
-import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.testdata.TestData;
-
-import org.junit.Test;
-
-import java.io.IOException;
-import java.net.URI;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
 import static com.spotify.styx.model.Partitioning.HOURS;
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
 import static java.util.Optional.empty;
@@ -46,6 +27,23 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+
+import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.ExecutionStatus;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowExecutionInfo;
+import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.testdata.TestData;
+import java.io.IOException;
+import java.net.URI;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.junit.Test;
 
 /**
  * Tests the InMemoryStorage that is used for testing.

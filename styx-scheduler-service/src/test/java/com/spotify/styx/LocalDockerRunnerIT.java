@@ -19,8 +19,15 @@
  */
 package com.spotify.styx;
 
-import com.google.common.collect.ImmutableList;
+import static com.spotify.styx.model.ExecutionStatus.FAILED;
+import static com.spotify.styx.model.ExecutionStatus.MISSING_DEPS;
+import static com.spotify.styx.model.ExecutionStatus.STARTED;
+import static com.spotify.styx.model.ExecutionStatus.SUCCEEDED;
+import static java.util.Optional.empty;
+import static org.hamcrest.Matchers.contains;
+import static org.junit.Assert.assertThat;
 
+import com.google.common.collect.ImmutableList;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.ExecutionStatus;
@@ -36,9 +43,6 @@ import com.spotify.styx.state.handlers.StorageHandler;
 import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.workflow.ParameterUtil;
-
-import org.junit.Test;
-
 import java.io.IOException;
 import java.net.URI;
 import java.time.Clock;
@@ -50,14 +54,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
-import static com.spotify.styx.model.ExecutionStatus.FAILED;
-import static com.spotify.styx.model.ExecutionStatus.MISSING_DEPS;
-import static com.spotify.styx.model.ExecutionStatus.STARTED;
-import static com.spotify.styx.model.ExecutionStatus.SUCCEEDED;
-import static java.util.Optional.empty;
-import static org.hamcrest.Matchers.contains;
-import static org.junit.Assert.assertThat;
+import org.junit.Test;
 
 /**
  * Depends on Docker running locally.

@@ -27,7 +27,6 @@ import com.spotify.styx.model.WorkflowInstanceExecutionData;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
-
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;

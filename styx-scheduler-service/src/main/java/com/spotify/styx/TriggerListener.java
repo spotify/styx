@@ -20,7 +20,6 @@
 package com.spotify.styx;
 
 import com.spotify.styx.model.Workflow;
-
 import java.time.Instant;
 
 /**

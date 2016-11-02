@@ -19,18 +19,16 @@
  */
 package com.spotify.styx.api;
 
-import com.spotify.apollo.Response;
-
-import org.hamcrest.Description;
-import org.hamcrest.Matcher;
-import org.hamcrest.TypeSafeMatcher;
-
-import okio.ByteString;
-
 import static com.jayway.jsonpath.matchers.JsonPathMatchers.hasJsonPath;
 import static com.jayway.jsonpath.matchers.JsonPathMatchers.hasNoJsonPath;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasPayload;
 import static org.junit.Assert.assertThat;
+
+import com.spotify.apollo.Response;
+import okio.ByteString;
+import org.hamcrest.Description;
+import org.hamcrest.Matcher;
+import org.hamcrest.TypeSafeMatcher;
 
 class JsonMatchers {
 

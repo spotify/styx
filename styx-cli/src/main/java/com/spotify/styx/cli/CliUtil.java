@@ -19,18 +19,16 @@
  */
 package com.spotify.styx.cli;
 
+import static org.fusesource.jansi.Ansi.ansi;
+
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-
 import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-
-import org.fusesource.jansi.Ansi;
-
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -40,8 +38,7 @@ import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
-
-import static org.fusesource.jansi.Ansi.ansi;
+import org.fusesource.jansi.Ansi;
 
 class CliUtil {
 

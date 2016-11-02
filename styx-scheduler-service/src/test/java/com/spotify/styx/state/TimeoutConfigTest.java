@@ -19,16 +19,14 @@
  */
 package com.spotify.styx.state;
 
+import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThat;
+
 import com.spotify.styx.StyxScheduler;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
-
-import org.junit.Test;
-
 import java.time.Duration;
-
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import org.junit.Test;
 
 public class TimeoutConfigTest {
 

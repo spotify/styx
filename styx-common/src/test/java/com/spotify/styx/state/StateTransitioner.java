@@ -20,10 +20,8 @@
 package com.spotify.styx.state;
 
 import com.google.common.collect.Maps;
-
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
-
 import java.util.Map;
 
 /**

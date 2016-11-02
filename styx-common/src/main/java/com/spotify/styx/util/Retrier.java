@@ -20,11 +20,9 @@
 package com.spotify.styx.util;
 
 import com.google.common.base.Throwables;
-
+import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.time.Duration;
 
 /**
  * A simple utility for running a function with retries.

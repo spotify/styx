@@ -19,6 +19,8 @@
  */
 package com.spotify.styx.state.handlers;
 
+import static org.mockito.Mockito.verify;
+
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.MonitoringHandler;
@@ -29,15 +31,11 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Time;
-
+import java.time.Instant;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Matchers;
 import org.mockito.Mockito;
-
-import java.time.Instant;
-
-import static org.mockito.Mockito.verify;
 
 public class MonitoringHandlerTest {
 

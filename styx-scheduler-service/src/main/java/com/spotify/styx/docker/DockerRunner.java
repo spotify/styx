@@ -19,27 +19,23 @@
  */
 package com.spotify.styx.docker;
 
+import static java.util.Optional.empty;
+
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
-
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.StateManager;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import io.fabric8.kubernetes.client.KubernetesClient;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
 import java.util.function.Supplier;
-
-import io.fabric8.kubernetes.client.KubernetesClient;
-
-import static java.util.Optional.empty;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Defines an interface to the Docker execution environment

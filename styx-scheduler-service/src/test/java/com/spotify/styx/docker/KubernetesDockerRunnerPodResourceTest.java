@@ -19,29 +19,25 @@
  */
 package com.spotify.styx.docker;
 
-import com.google.common.collect.ImmutableList;
-
-import com.spotify.styx.model.DataEndpoint;
-import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.testdata.TestData;
-
-import org.junit.Test;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
-import io.fabric8.kubernetes.api.model.Container;
-import io.fabric8.kubernetes.api.model.Pod;
-import io.fabric8.kubernetes.api.model.Volume;
-import io.fabric8.kubernetes.api.model.VolumeMount;
-
 import static com.spotify.styx.docker.KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+
+import com.google.common.collect.ImmutableList;
+import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.testdata.TestData;
+import io.fabric8.kubernetes.api.model.Container;
+import io.fabric8.kubernetes.api.model.Pod;
+import io.fabric8.kubernetes.api.model.Volume;
+import io.fabric8.kubernetes.api.model.VolumeMount;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.junit.Test;
 
 public class KubernetesDockerRunnerPodResourceTest {
 
