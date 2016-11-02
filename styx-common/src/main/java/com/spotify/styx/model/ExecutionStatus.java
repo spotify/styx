@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Common
  * --
@@ -17,12 +17,12 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx.model;
 
 /**
  * The possible statuses of an execution.
  */
-public enum
-ExecutionStatus {
+public enum ExecutionStatus {
   STARTED, SUCCEEDED, FAILED, MISSING_DEPS, FATAL
 }

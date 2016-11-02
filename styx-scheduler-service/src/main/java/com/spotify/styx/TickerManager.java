@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Scheduler Service
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx;
 
 import static java.util.Objects.requireNonNull;
@@ -68,7 +69,7 @@ class TickerManager {
   private void close(TickTock existing) {
     try {
       existing.close();
-    } catch (IOException ignore) {
+    } catch (IOException ignored) {
     }
   }
 }

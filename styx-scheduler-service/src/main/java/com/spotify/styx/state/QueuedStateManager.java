@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Scheduler Service
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx.state;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -45,11 +46,11 @@ import org.slf4j.LoggerFactory;
  * An implementation of {@link StateManager} that has an internal queue for all the incoming
  * {@link Event}s that are sent to {@link #receive(Event)}.
  *
- * The events are all processed on an injected {@link Executor}, but sequentially per
+ * <p>The events are all processed on an injected {@link Executor}, but sequentially per
  * {@link WorkflowInstance}. This allows event processing to scale across many separate workflow
  * instances while guaranteeing that each state machine progresses sequentially.
  *
- * All {@link RunState#outputHandler()} transitions are also executed on the injected
+ * <p>All {@link RunState#outputHandler()} transitions are also executed on the injected
  * {@link Executor}.
  */
 public class QueuedStateManager implements StateManager, StaleStateReaper, StateRetrier {
@@ -238,8 +239,8 @@ public class QueuedStateManager implements StateManager, StaleStateReaper, State
    * Dispatch loop, continuously running on {@link #dispatcherThread}. Mainly calling
    * {@link InstanceState#mutexPoll()} on all active states.
    *
-   * The dispatch loop will make a call to {@link #waitForSignal()} between each loop. It does so
-   * to prevent a busy spin that would hog up a full core. The signalling on the other hand
+   * <p>The dispatch loop will make a call to {@link #waitForSignal()} between each loop. It does
+   * so to prevent a busy spin that would hog up a full core. The signalling on the other hand
    * eliminates a systematic latency in event processing.
    */
   private void dispatch() {
@@ -256,7 +257,7 @@ public class QueuedStateManager implements StateManager, StaleStateReaper, State
    * method is not crucial for the dispatcher thread to do its work, but will unblock it in case
    * it's waiting.
    *
-   * This should be called from all methods that receive a new event.
+   * <p>This should be called from all methods that receive a new event.
    */
   private void signalDispatcher() {
     synchronized (signal) {
@@ -271,7 +272,7 @@ public class QueuedStateManager implements StateManager, StaleStateReaper, State
     synchronized (signal) {
       try {
         signal.wait(POLL_TIMEOUT_MILLIS);
-      } catch (InterruptedException ignore) {
+      } catch (InterruptedException ignored) {
       }
     }
   }
@@ -285,8 +286,8 @@ public class QueuedStateManager implements StateManager, StaleStateReaper, State
   /**
    * Transition a state with the given event.
    *
-   * This method is only called from within a {@link InstanceState#enqueue(Runnable)} block which
-   * means there will only be at most one concurrent call for each {@link InstanceState}.
+   * <p>This method is only called from within a {@link InstanceState#enqueue(Runnable)} block
+   * which means there will only be at most one concurrent call for each {@link InstanceState}.
    *
    * @param state  The state to transition
    * @param event  The event to transition the state with
@@ -400,11 +401,11 @@ public class QueuedStateManager implements StateManager, StaleStateReaper, State
      * Poll the next {@link Runnable} off the {@link #queue} and invoke it on the
      * {@link #workerPool}, or do nothing if the queue is empty.
      *
-     * The whole operation is guarded with a mutex, so concurrent calls are safe. Only one queued
-     * {@link Runnable} will be invoked at any point time, effectively making the queue
+     * <p>The whole operation is guarded with a mutex, so concurrent calls are safe. Only one
+     * queued {@link Runnable} will be invoked at any point time, effectively making the queue
      * consumed in a synchronized fashion.
      *
-     * After each invocation has completed, the task on the {@link #workerPool} will call
+     * <p>After each invocation has completed, the task on the {@link #workerPool} will call
      * {@code mutexPoll()} again to ensure immediate consequent consumption of the queue.
      */
     void mutexPoll() {

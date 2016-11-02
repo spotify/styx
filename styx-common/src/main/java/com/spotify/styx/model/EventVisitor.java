@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Common
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx.model;
 
 import com.github.sviperll.adt4j.GenerateValueClassForVisitor;
@@ -29,6 +30,7 @@ import com.github.sviperll.adt4j.Visitor;
 @GenerateValueClassForVisitor(isPublic = true)
 @Visitor(resultVariableName = "R")
 public interface EventVisitor<R> {
+
   R triggerExecution(@Getter WorkflowInstance workflowInstance, String triggerId);
   R submit(@Getter WorkflowInstance workflowInstance, ExecutionDescription executionDescription);
   R submitted(@Getter WorkflowInstance workflowInstance, String executionId);

@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Local Files Schedule Source
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx;
 
 import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
@@ -57,10 +58,10 @@ import org.slf4j.LoggerFactory;
 /**
  * A {@link ScheduleSource} that monitors a local directory for yaml files.
  *
- * The contents of the files are parsed into a {@link YamlScheduleDefinition} and
+ * <p>The contents of the files are parsed into a {@link YamlScheduleDefinition} and
  * {@link Workflow} objects.
  *
- * todo
+ * <p>todo
  * - handle if watch dir is deleted (warn, try to re-watch until dir appears again)
  */
 class LocalFileScheduleSource implements ScheduleSource {
