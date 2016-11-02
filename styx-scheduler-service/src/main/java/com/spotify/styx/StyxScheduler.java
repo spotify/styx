@@ -82,6 +82,7 @@ import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.typesafe.config.Config;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Connection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -537,7 +538,12 @@ public class StyxScheduler implements AppInit {
     LOG.info("Creating Bigtable connection for project:{}, instance:{}",
              projectId, instanceId);
 
-    return BigtableConfiguration.connect(projectId, instanceId);
+    final Configuration bigtableConfiguration = new Configuration();
+    bigtableConfiguration.set("google.bigtable.project.id", projectId);
+    bigtableConfiguration.set("google.bigtable.instance.id", instanceId);
+    bigtableConfiguration.setBoolean("google.bigtable.rpc.use.timeouts", true);
+
+    return BigtableConfiguration.connect(bigtableConfiguration);
   }
 
   static Datastore createDatastore(Config config) {
