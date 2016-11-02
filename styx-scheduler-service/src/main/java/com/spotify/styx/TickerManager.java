@@ -69,7 +69,7 @@ class TickerManager {
   private void close(TickTock existing) {
     try {
       existing.close();
-    } catch (IOException ignore) {
+    } catch (IOException ignored) {
     }
   }
 }

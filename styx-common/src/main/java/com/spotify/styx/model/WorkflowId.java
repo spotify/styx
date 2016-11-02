@@ -28,7 +28,7 @@ import java.util.Comparator;
 /**
  * A value for identifying a {@link Workflow}.
  *
- * This should be used instead of instances of {@link Workflow} in order to make references
+ * <p>This should be used instead of instances of {@link Workflow} in order to make references
  * independent of the current configuration of a {@link Workflow}.
  */
 @AutoValue

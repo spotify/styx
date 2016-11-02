@@ -32,7 +32,7 @@ import java.util.function.Supplier;
  * A {@link DockerRunner} that routes to several underlying instances that are created using the
  * injected {@link com.spotify.styx.docker.DockerRunner.DockerRunnerFactory}.
  *
- * Current implementation only creates one runner with the default id.
+ * <p>Current implementation only creates one runner with the default id.
  */
 class RoutingDockerRunner implements DockerRunner {
 

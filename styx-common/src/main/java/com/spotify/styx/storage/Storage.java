@@ -125,7 +125,7 @@ public interface Storage {
   /**
    * Patches the workflow state used by all its {@link Workflow}s.
    *
-   * All the present fields in {@link WorkflowState} will be modified atomically.
+   * <p>All the present fields in {@link WorkflowState} will be modified atomically.
    *
    * @param workflowId  The workflow to set the flag for
    * @param state       The state object with optional fields to patch
@@ -135,9 +135,9 @@ public interface Storage {
   /**
    * Patches the component state used by all its {@link Workflow}s.
    *
-   * All the present fields in {@link WorkflowState} will be modified atomically.
+   * <p>All the present fields in {@link WorkflowState} will be modified atomically.
    *
-   * That this method will ignore the {@link WorkflowState#enabled()} field since enable/disable
+   * <p>That this method will ignore the {@link WorkflowState#enabled()} field since enable/disable
    * is only supported on the workflow level. See {@link #patchState(WorkflowId, WorkflowState)}.
    *
    * @param componentId  The component to patch the state for

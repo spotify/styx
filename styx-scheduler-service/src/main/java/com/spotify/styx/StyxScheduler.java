@@ -576,7 +576,7 @@ public class StyxScheduler implements AppInit {
       executor.shutdown();
       try {
         executor.awaitTermination(1, SECONDS);
-      } catch (InterruptedException ignore) {
+      } catch (InterruptedException ignored) {
       }
       final List<Runnable> runnables = executor.shutdownNow();
       if (!runnables.isEmpty()) {

@@ -32,7 +32,7 @@ import java.util.function.Consumer;
  * After the initial bootstrap, making all data available, changeListener gets called for updated
  * or added Workflows, and removeListener gets called whenever a Workflow is removed.
  *
- * This interface is intended to be used as an Service Provider Interface. Styx will discover
+ * <p>This interface is intended to be used as an Service Provider Interface. Styx will discover
  * implementations on the classpath using {@link java.util.ServiceLoader}.
  */
 public interface ScheduleSourceFactory {
