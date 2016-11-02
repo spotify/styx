@@ -31,9 +31,7 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.services.container.Container;
 import com.google.api.services.container.ContainerScopes;
 import com.google.api.services.container.model.Cluster;
-import com.google.cloud.bigtable.hbase.BigtableConfiguration;
 import com.google.cloud.datastore.Datastore;
-import com.google.cloud.datastore.DatastoreOptions;
 import com.google.common.base.Throwables;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -109,6 +107,8 @@ import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClient;
 
+import static com.spotify.styx.util.Connections.createBigTableConnection;
+import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static com.spotify.styx.util.ReplayEvents.transitionLogger;
 import static java.util.Objects.requireNonNull;
@@ -123,10 +123,6 @@ public class StyxScheduler implements AppInit {
   public static final String GKE_CLUSTER_PROJECT_ID = ".project-id";
   public static final String GKE_CLUSTER_ZONE = ".cluster-zone";
   public static final String GKE_CLUSTER_ID = ".cluster-id";
-  public static final String BIGTABLE_PROJECT_ID = "styx.bigtable.project-id";
-  public static final String BIGTABLE_INSTANCE_ID = "styx.bigtable.instance-id";
-  public static final String DATASTORE_PROJECT = "styx.datastore.project-id";
-  public static final String DATASTORE_NAMESPACE = "styx.datastore.namespace";
 
   public static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
   public static final String STYX_MODE = "styx.mode";
@@ -528,27 +524,6 @@ public class StyxScheduler implements AppInit {
     final Connection bigTable = closer.register(createBigTableConnection(config));
     final Datastore datastore = createDatastore(config);
     return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
-  }
-
-  private static Connection createBigTableConnection(Config config) {
-    final String projectId = config.getString(BIGTABLE_PROJECT_ID);
-    final String instanceId = config.getString(BIGTABLE_INSTANCE_ID);
-
-    LOG.info("Creating Bigtable connection for project:{}, instance:{}",
-             projectId, instanceId);
-
-    return BigtableConfiguration.connect(projectId, instanceId);
-  }
-
-  static Datastore createDatastore(Config config) {
-    final String projectId = config.getString(DATASTORE_PROJECT);
-    final String namespace = config.getString(DATASTORE_NAMESPACE);
-
-    return DatastoreOptions.builder()
-        .namespace(namespace)
-        .projectId(projectId)
-        .build()
-        .service();
   }
 
   private static DockerRunner createDockerRunner(

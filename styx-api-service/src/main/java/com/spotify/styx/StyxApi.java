@@ -19,9 +19,7 @@
  */
 package com.spotify.styx;
 
-import com.google.cloud.bigtable.hbase.BigtableConfiguration;
 import com.google.cloud.datastore.Datastore;
-import com.google.cloud.datastore.DatastoreOptions;
 import com.google.common.io.Closer;
 
 import com.spotify.apollo.AppInit;
@@ -44,6 +42,8 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 
+import static com.spotify.styx.util.Connections.createBigTableConnection;
+import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -56,10 +56,6 @@ public class StyxApi implements AppInit {
   public static final String SCHEDULER_SERVICE_BASE_URL = "styx.scheduler.base-url";
   public static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
-  public static final String BIGTABLE_PROJECT_ID = "styx.bigtable.project-id";
-  public static final String BIGTABLE_INSTANCE_ID = "styx.bigtable.instance-id";
-  public static final String DATASTORE_PROJECT = "styx.datastore.project-id";
-  public static final String DATASTORE_NAMESPACE = "styx.datastore.namespace";
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxApi.class);
@@ -130,29 +126,5 @@ public class StyxApi implements AppInit {
     final Connection bigTable = closer.register(createBigTableConnection(config));
     final Datastore datastore = createDatastore(config);
     return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
-  }
-
-  private static Connection createBigTableConnection(Config config) {
-    final String projectId = config.getString(BIGTABLE_PROJECT_ID);
-    final String instanceId = config.getString(BIGTABLE_INSTANCE_ID);
-
-    LOG.info("Creating Bigtable connection for project:{}, instance:{}",
-             projectId, instanceId);
-
-    return BigtableConfiguration.connect(projectId, instanceId);
-  }
-
-  static Datastore createDatastore(Config config) {
-    final String projectId = config.getString(DATASTORE_PROJECT);
-    final String namespace = config.getString(DATASTORE_NAMESPACE);
-
-    LOG.info("Creating Datastore connection for project:{}, namespace:{}",
-             projectId, namespace);
-
-    return DatastoreOptions.builder()
-        .namespace(namespace)
-        .projectId(projectId)
-        .build()
-        .service();
   }
 }
