@@ -98,7 +98,7 @@ public class DockerRunnerHandler implements OutputHandler {
     }
   }
 
-  private String dockerRunnerStart(RunState state) throws ResourceNotFoundException, IOException {
+  private String dockerRunnerStart(RunState state) throws IOException {
     final WorkflowInstance workflowInstance = state.workflowInstance();
     final Optional<ExecutionDescription> executionDescriptionOpt = state.executionDescription();
 
@@ -118,7 +118,7 @@ public class DockerRunnerHandler implements OutputHandler {
     LOG.info("running:{} image:{} args:{}", workflowInstance.toKey(), runSpec.imageName(),
              runSpec.args());
 
-      return dockerRunner.start(workflowInstance, runSpec);
+    return dockerRunner.start(workflowInstance, runSpec);
   }
 
   private static List<String> argsReplace(List<String> template, String parameter) {

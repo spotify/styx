@@ -28,7 +28,7 @@ import java.util.function.Function;
 /**
  * A wrapper for a provider function which ensures the provider is only invoked once.
  *
- * This class is not thread safe and should only be used from one thread.
+ * <p>This class is not thread safe and should only be used from one thread.
  */
 public final class Singleton<T> implements Function<Environment, T> {
 

@@ -74,9 +74,9 @@ public class BigtableMocker {
   }
 
   public void removeRowsFromTable(TableName tableName, List<Cell> removeCells) throws IOException {
-    tableCells.computeIfPresent(tableName, (k, v) -> {
+    tableCells.computeIfPresent(tableName, (key, value) -> {
       List<Cell> newCells = Lists.newArrayList();
-      v.removeAll(removeCells);
+      value.removeAll(removeCells);
       return newCells;
     });
 
@@ -145,11 +145,11 @@ public class BigtableMocker {
   }
 
   private Cell getCell(Cell kv) {
-    byte[] rowArray;
-    byte[] familyArray;
-    byte[] qualifierArray;
-    long timestamp;
-    byte[] valueArray;
+    final byte[] rowArray;
+    final byte[] familyArray;
+    final byte[] qualifierArray;
+    final long timestamp;
+    final byte[] valueArray;
 
     rowArray = Arrays.copyOfRange(
         kv.getRowArray(),

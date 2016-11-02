@@ -73,7 +73,7 @@ public interface EventStorage {
   /**
    * Return a map of all active {@link WorkflowInstance}s to their last consumed sequence count.
    *
-   * A {@link WorkflowInstance} is active if there has been at least one call to
+   * <p>A {@link WorkflowInstance} is active if there has been at least one call to
    *
    * {@link #writeActiveState(WorkflowInstance, long)} and no calls to
    * {@link #deleteActiveState(WorkflowInstance)}.
@@ -86,7 +86,7 @@ public interface EventStorage {
    * Return a map of all active {@link WorkflowInstance}s to their last consumed sequence count,
    * for workflows that belong to a given component id.
    *
-   * A {@link WorkflowInstance} is active if there has been at least one call to
+   * <p>A {@link WorkflowInstance} is active if there has been at least one call to
    *
    * {@link #writeActiveState(WorkflowInstance, long)} and no calls to
    * {@link #deleteActiveState(WorkflowInstance)}.

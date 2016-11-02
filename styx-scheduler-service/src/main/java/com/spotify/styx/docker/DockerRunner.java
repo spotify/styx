@@ -62,19 +62,10 @@ public interface DockerRunner extends Closeable {
   @AutoValue
   abstract class RunSpec {
 
-    /**
-     * @return the docker image to run
-     */
     public abstract String imageName();
 
-    /**
-     * @return a list of arguments to pass to the image entrypoint
-     */
     public abstract ImmutableList<String> args();
 
-    /**
-     * @return an optional reference to a secrets mount
-     */
     public abstract Optional<DataEndpoint.Secret> secret();
 
     public static RunSpec create(
@@ -111,7 +102,7 @@ public interface DockerRunner extends Closeable {
    * Creates a {@link DockerRunner} that will dynamically create and route to other docker runner
    * instances using the given factory.
    *
-   * The active docker runner id will be read from dockerId supplier on each routing decision.
+   * <p>The active docker runner id will be read from dockerId supplier on each routing decision.
    */
   static DockerRunner routing(DockerRunnerFactory dockerRunnerFactory, Supplier<String> dockerId) {
     return new RoutingDockerRunner(dockerRunnerFactory, dockerId);

@@ -49,7 +49,7 @@ public class Retrier {
    * @param <T>        The return type of the operation function
    * @return the value returned from the operation
    * @throws Exception if the retry limit is reached. The thrown exception will be the last
-   * exception thrown by the operation function.
+   *     exception thrown by the operation function.
    */
   public <T> T runWithRetries(FnWithException<T, ? extends Exception> operation) throws Exception {
     int retries = 0;
@@ -79,7 +79,7 @@ public class Retrier {
    *
    * @param operation  The operation function to run
    * @throws Exception if the retry limit is reached. The thrown exception will be the last
-   * exception thrown by the operation function.
+   *     exception thrown by the operation function.
    */
   public void runWithRetries(RunnableWithException<? extends Exception> operation) throws Exception {
     runWithRetries((FnWithException<Void, Exception>) () -> {
