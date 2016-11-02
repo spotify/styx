@@ -19,10 +19,11 @@
  */
 package com.spotify.styx.docker;
 
+import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
@@ -31,27 +32,26 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
-
-import java.io.IOException;
-import java.net.ProtocolException;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
+import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.PodFluent;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.PodSpecFluent;
+import io.fabric8.kubernetes.api.model.VolumeMount;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
-
-import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
+import java.io.IOException;
+import java.net.ProtocolException;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
@@ -61,6 +61,10 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String NAMESPACE = "default";
   static final String STYX_RUN = "styx-run";
   static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
+  static final String COMPONENT_ID = "STYX_COMPONENT_ID";
+  static final String ENDPOINT_ID = "STYX_ENDPOINT_ID";
+  static final String PARAMETER = "STYX_PARAMETER";
+  static final String EXECUTION_ID = "STYX_EXECUTION_ID";
   static final int POLL_PODS_INTERVAL_SECONDS = 60;
 
   private static final ScheduledExecutorService EXECUTOR =
@@ -98,42 +102,49 @@ class KubernetesDockerRunner implements DockerRunner {
         ? runSpec.imageName()
         : runSpec.imageName() + ":latest";
 
-    PodFluent.SpecNested<PodBuilder> spec = new PodBuilder()
+    PodBuilder podBuilder = new PodBuilder()
         .withNewMetadata()
-            .withGenerateName(STYX_RUN + "-")
+            .withName(STYX_RUN + "-" + UUID.randomUUID().toString())
             .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
-        .endMetadata()
-        .withNewSpec()
-            .withRestartPolicy("Never");
+        .endMetadata();
+    PodFluent.SpecNested<PodBuilder> spec = podBuilder.withNewSpec()
+        .withRestartPolicy("Never");
 
-    final PodSpecFluent.ContainersNested<PodFluent.SpecNested<PodBuilder>> container = spec
+    // inject environment variables
+    EnvVar envVarComponent = new EnvVar();
+    envVarComponent.setName(COMPONENT_ID);
+    envVarComponent.setValue(workflowInstance.workflowId().componentId());
+    EnvVar envVarEndpoint = new EnvVar();
+    envVarEndpoint.setName(ENDPOINT_ID);
+    envVarEndpoint.setValue(workflowInstance.workflowId().endpointId());
+    EnvVar envVarParameter = new EnvVar();
+    envVarParameter.setName(PARAMETER);
+    envVarParameter.setValue(workflowInstance.parameter());
+    EnvVar envVarExecution = new EnvVar();
+    envVarExecution.setName(EXECUTION_ID);
+    envVarExecution.setValue(podBuilder.getMetadata().getName());
+
+    PodSpecFluent.ContainersNested<PodFluent.SpecNested<PodBuilder>> container = spec
         .addNewContainer()
             .withName(STYX_RUN)
             .withImage(imageWithTag)
-            .withArgs(runSpec.args());
+            .withArgs(runSpec.args())
+            .withEnv(envVarComponent, envVarEndpoint, envVarParameter, envVarExecution);
 
     if (runSpec.secret().isPresent()) {
       final DataEndpoint.Secret secret = runSpec.secret().get();
-      spec = container
-          .addNewVolumeMount()
-              .withName(secret.name())
-              .withMountPath(secret.mountPath())
-              .withReadOnly(true)
-          .endVolumeMount()
-          .endContainer()
-          .addNewVolume()
-              .withName(secret.name())
-              .withNewSecret()
-                  .withSecretName(secret.name())
-              .endSecret()
+      spec = spec.addNewVolume()
+          .withName(secret.name())
+          .withNewSecret()
+          .withSecretName(secret.name())
+          .endSecret()
           .endVolume();
-    } else {
-      spec = container.endContainer();
+      container =
+          container.addToVolumeMounts(new VolumeMount(secret.mountPath(), secret.name(), true));
     }
+    container.endContainer();
 
-    return spec
-        .endSpec()
-        .build();
+    return spec.endSpec().build();
   }
 
   @Override
