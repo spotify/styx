@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Common
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -158,7 +159,7 @@ public final class EventSerializer {
       @JsonSubTypes.Type(value = PersistentEvent.class, name = "halt"),
       @JsonSubTypes.Type(value = Submit.class, name = "submit"),
       @JsonSubTypes.Type(value = Submitted.class, name = "submitted")
-  })
+      })
   @JsonInclude(Include.NON_ABSENT)
   public static class PersistentEvent {
 

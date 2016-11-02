@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx API Service
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx.api;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -42,12 +43,12 @@ public final class Middlewares {
   }
 
   public static Middleware<SyncHandler<? extends Response<?>>, AsyncHandler<Response<ByteString>>>
-  json() {
+      json() {
     return innerHandler -> jsonAsync().apply(Middleware.syncToAsync(innerHandler));
   }
 
   public static Middleware<AsyncHandler<? extends Response<?>>, AsyncHandler<Response<ByteString>>>
-  jsonAsync() {
+      jsonAsync() {
     return innerHandler -> innerHandler.map(response -> {
       if (!response.payload().isPresent()) {
         //noinspection unchecked

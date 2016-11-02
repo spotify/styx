@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Common
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx.state;
 
 import static com.spotify.styx.state.OutputHandler.fanOutput;
@@ -45,7 +46,7 @@ import java.util.Optional;
 /**
  * State machine for run states.
  *
- * This implements the following Finite State Transducer (Mealy machine) where the inputs are
+ * <p>This implements the following Finite State Transducer (Mealy machine) where the inputs are
  * defined by the {@link Event} enum and outputs defined by the methods of {@link OutputHandler}.
  */
 @AutoValue

@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Common
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -27,7 +28,7 @@ import java.util.Comparator;
 /**
  * A value for identifying a {@link Workflow}.
  *
- * This should be used instead of instances of {@link Workflow} in order to make references
+ * <p>This should be used instead of instances of {@link Workflow} in order to make references
  * independent of the current configuration of a {@link Workflow}.
  */
 @AutoValue

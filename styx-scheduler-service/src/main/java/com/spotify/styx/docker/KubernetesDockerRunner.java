@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Scheduler Service
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx.docker;
 
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
@@ -102,13 +103,7 @@ class KubernetesDockerRunner implements DockerRunner {
         ? runSpec.imageName()
         : runSpec.imageName() + ":latest";
 
-    PodBuilder podBuilder = new PodBuilder()
-        .withNewMetadata()
-            .withName(STYX_RUN + "-" + UUID.randomUUID().toString())
-            .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
-        .endMetadata();
-    PodFluent.SpecNested<PodBuilder> spec = podBuilder.withNewSpec()
-        .withRestartPolicy("Never");
+    final String podName = STYX_RUN + "-" + UUID.randomUUID().toString();
 
     // inject environment variables
     EnvVar envVarComponent = new EnvVar();
@@ -122,8 +117,15 @@ class KubernetesDockerRunner implements DockerRunner {
     envVarParameter.setValue(workflowInstance.parameter());
     EnvVar envVarExecution = new EnvVar();
     envVarExecution.setName(EXECUTION_ID);
-    envVarExecution.setValue(podBuilder.getMetadata().getName());
+    envVarExecution.setValue(podName);
 
+    PodBuilder podBuilder = new PodBuilder()
+        .withNewMetadata()
+        .withName(podName)
+        .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
+        .endMetadata();
+    PodFluent.SpecNested<PodBuilder> spec = podBuilder.withNewSpec()
+        .withRestartPolicy("Never");
     PodSpecFluent.ContainersNested<PodFluent.SpecNested<PodBuilder>> container = spec
         .addNewContainer()
             .withName(STYX_RUN)

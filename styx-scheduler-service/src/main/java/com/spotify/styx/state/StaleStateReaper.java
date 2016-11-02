@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Scheduler Service
  * --
@@ -17,12 +17,14 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx.state;
 
 /**
  * An interface for triggering timeouts on stale {@link RunState}s.
  *
- * Whether a state is stale or not is determined by a set of TTL values corresponding to each state.
+ * <p>Whether a state is stale or not is determined by a set of TTL values corresponding to each
+ * state.
  */
 public interface StaleStateReaper {
 
@@ -31,7 +33,7 @@ public interface StaleStateReaper {
    * {@link com.spotify.styx.model.Event#timeout(com.spotify.styx.model.WorkflowInstance)} event
    * on states that are stale.
    *
-   * If the underlying state store is closed, this method will have no effect.
+   * <p>If the underlying state store is closed, this method will have no effect.
    */
   void triggerTimeouts();
 }

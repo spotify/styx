@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Scheduler Service
  * --
@@ -16,9 +16,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  * -/-/-
- */
-/**
- * Copyright (C) 2015 Spotify AB
  */
 
 package com.spotify.styx;
@@ -579,7 +576,7 @@ public class StyxScheduler implements AppInit {
       executor.shutdown();
       try {
         executor.awaitTermination(1, SECONDS);
-      } catch (InterruptedException ignore) {
+      } catch (InterruptedException ignored) {
       }
       final List<Runnable> runnables = executor.shutdownNow();
       if (!runnables.isEmpty()) {
