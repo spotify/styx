@@ -22,7 +22,6 @@ package com.spotify.styx.monitoring;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.util.Time;
-
 import java.io.IOException;
 import java.util.Objects;
 

@@ -22,11 +22,9 @@ package com.spotify.styx.state;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-
+import java.io.Closeable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.Closeable;
 
 /**
  * Interface for driving active {@link RunState} instances by sending them {@link Event}s.

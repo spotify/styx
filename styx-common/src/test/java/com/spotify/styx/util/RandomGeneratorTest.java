@@ -19,13 +19,12 @@
  */
 package com.spotify.styx.util;
 
-import org.junit.Test;
-
-import java.time.Instant;
-
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThat;
+
+import java.time.Instant;
+import org.junit.Test;
 
 public class RandomGeneratorTest {
 

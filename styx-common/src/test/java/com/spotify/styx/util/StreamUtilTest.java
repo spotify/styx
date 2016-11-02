@@ -19,14 +19,13 @@
  */
 package com.spotify.styx.util;
 
-import org.junit.Test;
+import static org.hamcrest.Matchers.contains;
+import static org.junit.Assert.assertThat;
 
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static org.hamcrest.Matchers.contains;
-import static org.junit.Assert.assertThat;
+import org.junit.Test;
 
 public class StreamUtilTest {
 

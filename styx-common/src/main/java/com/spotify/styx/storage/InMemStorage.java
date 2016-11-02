@@ -22,7 +22,6 @@ package com.spotify.styx.storage;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-
 import com.spotify.styx.model.ExecutionStatus;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
@@ -33,7 +32,6 @@ import com.spotify.styx.model.WorkflowInstanceExecutionData;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.WorkflowStateUtil;
-
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;

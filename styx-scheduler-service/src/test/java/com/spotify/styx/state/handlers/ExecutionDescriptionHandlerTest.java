@@ -19,8 +19,16 @@
  */
 package com.spotify.styx.state.handlers;
 
-import com.google.common.collect.Lists;
+import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
+import static com.spotify.styx.model.Partitioning.HOURS;
+import static com.spotify.styx.state.RunState.State.SUBMITTING;
+import static java.util.Optional.empty;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.assertTrue;
 
+import com.google.common.collect.Lists;
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
@@ -33,23 +41,12 @@ import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
-
+import java.io.IOException;
+import java.util.Optional;
 import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
-
-import java.io.IOException;
-import java.util.Optional;
-
-import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
-import static com.spotify.styx.model.Partitioning.HOURS;
-import static com.spotify.styx.state.RunState.State.SUBMITTING;
-import static java.util.Optional.empty;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.assertTrue;
 
 public class ExecutionDescriptionHandlerTest {
 

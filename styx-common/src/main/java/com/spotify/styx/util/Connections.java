@@ -3,9 +3,7 @@ package com.spotify.styx.util;
 import com.google.cloud.bigtable.hbase.BigtableConfiguration;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreOptions;
-
 import com.typesafe.config.Config;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Connection;
 import org.slf4j.Logger;

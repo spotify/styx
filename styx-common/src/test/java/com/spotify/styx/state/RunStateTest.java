@@ -19,28 +19,25 @@
  */
 package com.spotify.styx.state;
 
-import com.spotify.styx.WorkflowInstanceEventFactory;
-import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.testdata.TestData;
-
-import org.junit.Test;
-
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Optional;
-
-import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.state.RunState.State.AWAITING_RETRY;
-import static com.spotify.styx.state.RunState.State.PREPARE;
 import static com.spotify.styx.state.RunState.State.DONE;
 import static com.spotify.styx.state.RunState.State.ERROR;
 import static com.spotify.styx.state.RunState.State.FAILED;
+import static com.spotify.styx.state.RunState.State.PREPARE;
 import static com.spotify.styx.state.RunState.State.RUNNING;
 import static com.spotify.styx.state.RunState.State.SUBMITTED;
 import static com.spotify.styx.state.RunState.State.TERMINATED;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertThat;
+
+import com.spotify.styx.WorkflowInstanceEventFactory;
+import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.testdata.TestData;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+import org.junit.Test;
 
 public class RunStateTest {
 

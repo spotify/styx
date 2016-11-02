@@ -21,7 +21,6 @@ package com.spotify.styx.util;
 
 import com.spotify.apollo.Environment;
 import com.spotify.styx.storage.EventStorage;
-
 import java.util.function.Function;
 
 public interface EventStorageFactory extends Function<Environment, EventStorage> {

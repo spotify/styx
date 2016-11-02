@@ -19,28 +19,25 @@
  */
 package com.spotify.styx.api;
 
-import com.google.auto.value.AutoValue;
-import com.google.common.base.Throwables;
+import static com.spotify.styx.api.Middlewares.json;
+import static com.spotify.styx.util.StreamUtil.cat;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.auto.value.AutoValue;
+import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.storage.Storage;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
-
 import okio.ByteString;
-
-import static com.spotify.styx.api.Middlewares.json;
-import static com.spotify.styx.util.StreamUtil.cat;
 
 public class StyxConfigResource {
 

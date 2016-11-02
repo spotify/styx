@@ -19,11 +19,12 @@
  */
 package com.spotify.styx;
 
+import static java.util.stream.Collectors.toList;
+
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
-
 import java.util.Collection;
 import java.util.List;
 import java.util.Stack;
@@ -34,8 +35,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import static java.util.stream.Collectors.toList;
 
 public class FakeScheduledExecutorService implements ScheduledExecutorService {
 

@@ -27,7 +27,6 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.SyncHandler;
 import com.spotify.styx.util.Json;
-
 import okio.ByteString;
 
 /**

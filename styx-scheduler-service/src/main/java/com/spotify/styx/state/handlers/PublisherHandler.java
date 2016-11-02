@@ -20,19 +20,16 @@
 package com.spotify.styx.state.handlers;
 
 import com.google.common.base.Preconditions;
-
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.publisher.Publisher;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.Retrier;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.time.Duration;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * An {@link OutputHandler} that integrates {@link RunState.State} values with a {@link Publisher}.

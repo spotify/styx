@@ -19,11 +19,10 @@
  */
 package com.spotify.styx;
 
-import org.jmock.lib.concurrent.DeterministicScheduler;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.jmock.lib.concurrent.DeterministicScheduler;
 
 /**
  * Overrides some of the methods that throw {@link UnsupportedOperationException}.

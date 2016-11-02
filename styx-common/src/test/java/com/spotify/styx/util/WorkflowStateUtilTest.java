@@ -19,14 +19,12 @@
  */
 package com.spotify.styx.util;
 
-import com.spotify.styx.model.WorkflowState;
-
-import org.junit.Test;
-
-import java.util.Optional;
-
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.IsEqual.equalTo;
+
+import com.spotify.styx.model.WorkflowState;
+import java.util.Optional;
+import org.junit.Test;
 
 public class WorkflowStateUtilTest {
 

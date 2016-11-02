@@ -19,6 +19,9 @@
  */
 package com.spotify.styx.state.handlers;
 
+import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
+
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Workflow;
@@ -30,16 +33,11 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.ResourceNotFoundException;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-
-import static java.lang.String.format;
-import static java.util.Objects.requireNonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ExecutionDescriptionHandler implements OutputHandler {
 

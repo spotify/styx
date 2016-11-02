@@ -20,10 +20,8 @@
 package com.spotify.styx;
 
 import com.google.common.collect.ImmutableSet;
-
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
-
 import java.util.Optional;
 
 /**
