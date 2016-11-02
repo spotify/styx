@@ -1,15 +1,12 @@
 package com.spotify.styx;
 
 import com.google.common.base.Throwables;
-
 import com.spotify.styx.util.Time;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A decorator for a supplier function that will cache the returned value during some

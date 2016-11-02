@@ -19,6 +19,8 @@
  */
 package com.spotify.styx.cli;
 
+import static com.spotify.styx.cli.CliUtil.formatTimestamp;
+
 import com.spotify.apollo.Response;
 import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.api.cli.EventsPayload;
@@ -26,19 +28,13 @@ import com.spotify.styx.api.cli.EventsPayload.TimestampedPersistentEvent;
 import com.spotify.styx.model.EventSerializer;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.util.EventUtil;
-
-import net.sourceforge.argparse4j.inf.ArgumentParserException;
-import net.sourceforge.argparse4j.inf.Namespace;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.SortedMap;
 import java.util.SortedSet;
-
+import net.sourceforge.argparse4j.inf.ArgumentParserException;
+import net.sourceforge.argparse4j.inf.Namespace;
 import okio.ByteString;
-
-import static com.spotify.styx.cli.CliUtil.formatTimestamp;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Cli output printer that prints more unix tool friendly output

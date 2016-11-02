@@ -21,7 +21,6 @@ package com.spotify.styx.schedule;
 
 import com.spotify.apollo.Environment;
 import com.spotify.styx.model.Workflow;
-
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Consumer;
 

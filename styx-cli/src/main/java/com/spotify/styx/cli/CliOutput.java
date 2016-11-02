@@ -22,10 +22,8 @@ package com.spotify.styx.cli;
 import com.spotify.apollo.Response;
 import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.api.cli.EventsPayload;
-
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
-
 import okio.ByteString;
 
 /**

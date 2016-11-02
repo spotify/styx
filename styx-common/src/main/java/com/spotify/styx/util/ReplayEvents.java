@@ -19,27 +19,23 @@
  */
 package com.spotify.styx.util;
 
-import com.google.common.base.Throwables;
+import static java.lang.String.format;
 
+import com.google.common.base.Throwables;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.storage.EventStorage;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.stream.Collectors;
-
 import javaslang.Tuple;
 import javaslang.Tuple2;
-
-import static java.lang.String.format;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class ReplayEvents {
 

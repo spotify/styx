@@ -20,9 +20,7 @@
 package com.spotify.styx.state;
 
 import com.google.common.collect.ImmutableMap;
-
 import com.typesafe.config.Config;
-
 import java.time.Duration;
 import java.util.Objects;
 

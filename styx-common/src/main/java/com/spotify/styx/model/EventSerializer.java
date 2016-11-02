@@ -19,8 +19,6 @@
  */
 package com.spotify.styx.model;
 
-import com.google.common.base.Throwables;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
@@ -33,10 +31,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
-
+import com.google.common.base.Throwables;
 import java.io.IOException;
 import java.util.Optional;
-
 import okio.ByteString;
 
 public final class EventSerializer {

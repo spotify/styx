@@ -19,18 +19,6 @@
  */
 package com.spotify.styx;
 
-import com.spotify.styx.FakeScheduledExecutorService.DelayedTask;
-import com.spotify.styx.model.DataEndpoint;
-import com.spotify.styx.model.Workflow;
-import com.spotify.styx.testdata.TestData;
-
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.net.URI;
-import java.time.Instant;
-
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -39,6 +27,16 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
+
+import com.spotify.styx.FakeScheduledExecutorService.DelayedTask;
+import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.testdata.TestData;
+import java.net.URI;
+import java.time.Instant;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TickTockTest {
 

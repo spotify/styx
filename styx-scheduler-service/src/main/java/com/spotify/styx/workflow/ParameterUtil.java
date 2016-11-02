@@ -19,9 +19,11 @@
  */
 package com.spotify.styx.workflow;
 
+import static java.time.temporal.ChronoField.MONTH_OF_YEAR;
+import static java.time.temporal.ChronoField.YEAR;
+
 import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.WorkflowInstance;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -32,11 +34,7 @@ import java.time.format.DateTimeParseException;
 import java.time.format.SignStyle;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
-
 import javaslang.control.Either;
-
-import static java.time.temporal.ChronoField.MONTH_OF_YEAR;
-import static java.time.temporal.ChronoField.YEAR;
 
 /**
  * Helpers for working with {@link com.spotify.styx.model.Workflow} parameter handling.

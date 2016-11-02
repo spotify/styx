@@ -19,17 +19,15 @@
  */
 package com.spotify.styx.api.cli;
 
-import com.google.auto.value.AutoValue;
+import static com.spotify.styx.model.EventSerializer.PersistentEvent;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.auto.value.AutoValue;
 import com.spotify.styx.model.WorkflowInstance;
-
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-
-import static com.spotify.styx.model.EventSerializer.PersistentEvent;
 
 /**
  * Value type for all current active states

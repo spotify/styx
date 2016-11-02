@@ -19,8 +19,10 @@
  */
 package com.spotify.styx;
 
-import com.google.common.collect.ImmutableMap;
+import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThat;
 
+import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.ExecutionStatus;
 import com.spotify.styx.model.Partitioning;
@@ -29,18 +31,13 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Json;
-
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
-
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Tests serializing an object to java and back.

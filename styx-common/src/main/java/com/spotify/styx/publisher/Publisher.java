@@ -21,7 +21,6 @@ package com.spotify.styx.publisher;
 
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
-
 import java.io.IOException;
 
 /**

@@ -20,7 +20,6 @@
 package com.spotify.styx.model;
 
 import com.spotify.styx.state.RunState;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;

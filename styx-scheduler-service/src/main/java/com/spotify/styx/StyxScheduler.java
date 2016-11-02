@@ -23,6 +23,15 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.util.Connections.createBigTableConnection;
+import static com.spotify.styx.util.Connections.createDatastore;
+import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
+import static com.spotify.styx.util.ReplayEvents.transitionLogger;
+import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.Collectors.toMap;
+
+import com.codahale.metrics.Gauge;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.util.Utils;
@@ -35,8 +44,6 @@ import com.google.cloud.datastore.Datastore;
 import com.google.common.base.Throwables;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
-import com.codahale.metrics.Gauge;
 import com.spotify.apollo.AppInit;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.route.Route;
@@ -79,11 +86,9 @@ import com.spotify.styx.util.Singleton;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.typesafe.config.Config;
-
-import org.apache.hadoop.hbase.client.Connection;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import io.fabric8.kubernetes.client.ConfigBuilder;
+import io.fabric8.kubernetes.client.DefaultKubernetesClient;
+import io.fabric8.kubernetes.client.KubernetesClient;
 import java.io.Closeable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -102,18 +107,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
-
-import io.fabric8.kubernetes.client.ConfigBuilder;
-import io.fabric8.kubernetes.client.DefaultKubernetesClient;
-import io.fabric8.kubernetes.client.KubernetesClient;
-
-import static com.spotify.styx.util.Connections.createBigTableConnection;
-import static com.spotify.styx.util.Connections.createDatastore;
-import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
-import static com.spotify.styx.util.ReplayEvents.transitionLogger;
-import static java.util.Objects.requireNonNull;
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.stream.Collectors.toMap;
+import org.apache.hadoop.hbase.client.Connection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class StyxScheduler implements AppInit {
 

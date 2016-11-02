@@ -19,12 +19,10 @@
  */
 package com.spotify.styx.api.cli;
 
-import com.google.auto.value.AutoValue;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.auto.value.AutoValue;
 import com.spotify.styx.model.EventSerializer.PersistentEvent;
-
 import java.util.List;
 
 /**
