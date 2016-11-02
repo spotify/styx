@@ -19,17 +19,15 @@
  */
 package com.spotify.styx.model;
 
-import com.google.auto.value.AutoValue;
+import static java.util.Collections.emptyList;
+import static java.util.Optional.empty;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
+import com.google.auto.value.AutoValue;
 import java.util.List;
 import java.util.Optional;
-
-import static java.util.Collections.emptyList;
-import static java.util.Optional.empty;
 
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)

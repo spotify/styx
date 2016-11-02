@@ -19,14 +19,13 @@
  */
 package com.spotify.styx.model;
 
-import org.junit.Test;
-
-import java.time.Instant;
-import java.util.Arrays;
-
 import static com.spotify.styx.util.Json.OBJECT_MAPPER;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+
+import java.time.Instant;
+import java.util.Arrays;
+import org.junit.Test;
 
 public class WorkflowInstanceExecutionDataTest {
 

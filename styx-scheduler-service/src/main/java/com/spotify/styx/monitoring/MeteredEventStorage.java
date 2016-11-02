@@ -23,7 +23,6 @@ import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.storage.EventStorage;
 import com.spotify.styx.util.Time;
-
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;

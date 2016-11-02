@@ -1,21 +1,5 @@
 package com.spotify.styx.docker;
 
-import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Maps;
-
-import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.testdata.TestData;
-
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.Mockito;
-
-import java.io.IOException;
-import java.util.Map;
-import java.util.Optional;
-import java.util.function.Supplier;
-
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
@@ -23,6 +7,19 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
+import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.testdata.TestData;
+import java.io.IOException;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Supplier;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.Mockito;
 
 public class RoutingDockerRunnerTest {
 

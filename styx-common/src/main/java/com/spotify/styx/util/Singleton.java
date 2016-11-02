@@ -19,11 +19,10 @@
  */
 package com.spotify.styx.util;
 
-import com.spotify.apollo.Environment;
-
-import java.util.function.Function;
-
 import static java.util.Objects.requireNonNull;
+
+import com.spotify.apollo.Environment;
+import java.util.function.Function;
 
 /**
  * A wrapper for a provider function which ensures the provider is only invoked once.

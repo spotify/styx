@@ -19,30 +19,6 @@
  */
 package com.spotify.styx.state;
 
-import com.spotify.styx.RepeatRule;
-import com.spotify.styx.model.Event;
-import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.SequenceEvent;
-import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.storage.InMemStorage;
-import com.spotify.styx.testdata.TestData;
-
-import org.junit.After;
-import org.junit.Rule;
-import org.junit.Test;
-
-import java.time.Instant;
-import java.util.Collections;
-import java.util.Optional;
-import java.util.SortedSet;
-import java.util.Stack;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
-import java.util.function.IntFunction;
-
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.state.QueuedStateManager.NO_EVENTS_PROCESSED;
 import static com.spotify.styx.state.TimeoutConfig.createWithDefaultTtl;
@@ -56,6 +32,28 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+
+import com.spotify.styx.RepeatRule;
+import com.spotify.styx.model.Event;
+import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.storage.InMemStorage;
+import com.spotify.styx.testdata.TestData;
+import java.time.Instant;
+import java.util.Collections;
+import java.util.Optional;
+import java.util.SortedSet;
+import java.util.Stack;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.function.IntFunction;
+import org.junit.After;
+import org.junit.Rule;
+import org.junit.Test;
 
 public class QueuedStateManagerTest {
 

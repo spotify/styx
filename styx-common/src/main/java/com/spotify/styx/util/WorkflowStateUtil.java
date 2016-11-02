@@ -20,7 +20,6 @@
 package com.spotify.styx.util;
 
 import com.spotify.styx.model.WorkflowState;
-
 import java.util.Optional;
 
 public final class WorkflowStateUtil {

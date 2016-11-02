@@ -19,37 +19,6 @@
  */
 package com.spotify.styx.storage;
 
-import com.google.cloud.datastore.Datastore;
-import com.google.cloud.datastore.Entity;
-import com.google.cloud.datastore.EntityQuery;
-import com.google.cloud.datastore.Key;
-import com.google.cloud.datastore.KeyQuery;
-import com.google.cloud.datastore.Query;
-import com.google.cloud.datastore.QueryResults;
-import com.google.cloud.datastore.testing.LocalDatastoreHelper;
-
-import com.spotify.styx.model.DataEndpoint;
-import com.spotify.styx.model.Partitioning;
-import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowId;
-import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.util.ResourceNotFoundException;
-
-import org.hamcrest.Matchers;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
-
-import java.net.URI;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Partitioning.DAYS;
 import static com.spotify.styx.model.Partitioning.HOURS;
@@ -65,6 +34,34 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+
+import com.google.cloud.datastore.Datastore;
+import com.google.cloud.datastore.Entity;
+import com.google.cloud.datastore.EntityQuery;
+import com.google.cloud.datastore.Key;
+import com.google.cloud.datastore.KeyQuery;
+import com.google.cloud.datastore.Query;
+import com.google.cloud.datastore.QueryResults;
+import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Partitioning;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.util.ResourceNotFoundException;
+import java.net.URI;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.hamcrest.Matchers;
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 public class DatastoreStorageTest {
 

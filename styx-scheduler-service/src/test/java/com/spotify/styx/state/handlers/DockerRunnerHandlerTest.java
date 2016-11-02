@@ -19,8 +19,13 @@
  */
 package com.spotify.styx.state.handlers;
 
-import com.google.common.collect.Lists;
+import static com.spotify.styx.model.Partitioning.HOURS;
+import static java.util.Optional.empty;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThat;
 
+import com.google.common.collect.Lists;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.Event;
@@ -31,19 +36,11 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.testdata.TestData;
-
-import org.junit.Test;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-
-import static com.spotify.styx.model.Partitioning.HOURS;
-import static java.util.Optional.empty;
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import org.junit.Test;
 
 public class DockerRunnerHandlerTest {
 

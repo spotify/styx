@@ -20,12 +20,10 @@
 package com.spotify.styx;
 
 import com.google.auto.service.AutoService;
-
 import com.spotify.apollo.Environment;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.schedule.ScheduleSource;
 import com.spotify.styx.schedule.ScheduleSourceFactory;
-
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Consumer;
 

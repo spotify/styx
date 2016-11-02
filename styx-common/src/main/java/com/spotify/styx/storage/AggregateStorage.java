@@ -20,7 +20,6 @@
 package com.spotify.styx.storage;
 
 import com.google.cloud.datastore.Datastore;
-
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowExecutionInfo;
@@ -28,9 +27,6 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowInstanceExecutionData;
 import com.spotify.styx.model.WorkflowState;
-
-import org.apache.hadoop.hbase.client.Connection;
-
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
@@ -38,6 +34,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
+import org.apache.hadoop.hbase.client.Connection;
 
 /**
  * A {@link Storage} implementation backed by Datastore and Bigtable

@@ -19,16 +19,14 @@
  */
 package com.spotify.styx.model;
 
-import org.junit.Assert;
-import org.junit.Test;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
 
 import java.util.Arrays;
 import java.util.Optional;
-
 import okio.ByteString;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
+import org.junit.Assert;
+import org.junit.Test;
 
 public class EventSerializerTest {
 

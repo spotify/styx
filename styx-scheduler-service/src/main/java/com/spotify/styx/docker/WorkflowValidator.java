@@ -20,10 +20,8 @@
 package com.spotify.styx.docker;
 
 import com.google.common.base.Throwables;
-
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.storage.Storage;
-
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;

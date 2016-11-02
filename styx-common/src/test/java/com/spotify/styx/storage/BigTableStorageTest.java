@@ -19,29 +19,6 @@
  */
 package com.spotify.styx.storage;
 
-import com.google.common.collect.Lists;
-
-import com.spotify.styx.model.Event;
-import com.spotify.styx.model.ExecStatus;
-import com.spotify.styx.model.SequenceEvent;
-import com.spotify.styx.model.WorkflowExecutionInfo;
-import com.spotify.styx.model.WorkflowId;
-import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.model.WorkflowInstanceExecutionData;
-
-import org.apache.hadoop.hbase.client.Connection;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-
-import java.io.IOException;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
 import static com.spotify.styx.model.ExecutionStatus.FAILED;
 import static com.spotify.styx.model.ExecutionStatus.STARTED;
 import static org.hamcrest.Matchers.contains;
@@ -49,6 +26,26 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
+
+import com.google.common.collect.Lists;
+import com.spotify.styx.model.Event;
+import com.spotify.styx.model.ExecStatus;
+import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.WorkflowExecutionInfo;
+import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.model.WorkflowInstanceExecutionData;
+import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.apache.hadoop.hbase.client.Connection;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 public class BigTableStorageTest {
 

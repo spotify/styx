@@ -19,16 +19,6 @@
  */
 package com.spotify.styx;
 
-import com.google.common.collect.Lists;
-
-import com.spotify.styx.model.Workflow;
-import com.spotify.styx.testdata.TestData;
-
-import org.junit.Test;
-
-import java.net.URI;
-import java.util.List;
-
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
@@ -36,6 +26,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import com.google.common.collect.Lists;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.testdata.TestData;
+import java.net.URI;
+import java.util.List;
+import org.junit.Test;
 
 public class TickerManagerTest {
 

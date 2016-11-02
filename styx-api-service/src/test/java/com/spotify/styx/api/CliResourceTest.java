@@ -19,6 +19,15 @@
  */
 package com.spotify.styx.api;
 
+import static com.spotify.apollo.test.unit.ResponseMatchers.hasPayload;
+import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
+import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
+import static com.spotify.styx.api.ApiVersionTestUtils.ALL_VERSIONS;
+import static org.hamcrest.Matchers.any;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThat;
+
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
@@ -32,12 +41,6 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.storage.EventStorage;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.util.Json;
-
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-
 import java.util.Collection;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
@@ -45,17 +48,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
 import okio.ByteString;
-
-import static com.spotify.apollo.test.unit.ResponseMatchers.hasPayload;
-import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
-import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
-import static com.spotify.styx.api.ApiVersionTestUtils.ALL_VERSIONS;
-import static org.hamcrest.Matchers.any;
-import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 @RunWith(Parameterized.class)
 public class CliResourceTest {

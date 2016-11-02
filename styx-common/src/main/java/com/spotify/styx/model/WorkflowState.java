@@ -19,15 +19,13 @@
  */
 package com.spotify.styx.model;
 
-import com.google.auto.value.AutoValue;
+import static java.util.Optional.of;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
+import com.google.auto.value.AutoValue;
 import java.util.Optional;
-
-import static java.util.Optional.of;
 
 /**
  * A data object containing the state of a {@link com.spotify.styx.model.Workflow}

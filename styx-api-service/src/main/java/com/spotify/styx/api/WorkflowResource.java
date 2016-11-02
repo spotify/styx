@@ -19,13 +19,15 @@
  */
 package com.spotify.styx.api;
 
-import com.google.auto.value.AutoValue;
-import com.google.common.base.Throwables;
+import static com.spotify.styx.api.Middlewares.json;
+import static com.spotify.styx.util.StreamUtil.cat;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.google.auto.value.AutoValue;
+import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
@@ -42,7 +44,6 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Json;
 import com.spotify.styx.util.ResourceNotFoundException;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -51,11 +52,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
 import okio.ByteString;
-
-import static com.spotify.styx.api.Middlewares.json;
-import static com.spotify.styx.util.StreamUtil.cat;
 
 public final class WorkflowResource {
 

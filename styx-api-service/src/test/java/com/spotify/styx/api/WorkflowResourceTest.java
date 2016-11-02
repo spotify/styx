@@ -19,37 +19,6 @@
  */
 package com.spotify.styx.api;
 
-import com.spotify.apollo.Environment;
-import com.spotify.apollo.Response;
-import com.spotify.apollo.Status;
-import com.spotify.apollo.test.ServiceHelper;
-import com.spotify.styx.model.DataEndpoint;
-import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Partitioning;
-import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.storage.InMemStorage;
-
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.experimental.theories.Theory;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-
-import java.net.URI;
-import java.time.Instant;
-import java.util.Collection;
-import java.util.Optional;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import okio.ByteString;
-
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasHeader;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasNoPayload;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
@@ -67,6 +36,34 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assume.assumeThat;
+
+import com.spotify.apollo.Environment;
+import com.spotify.apollo.Response;
+import com.spotify.apollo.Status;
+import com.spotify.apollo.test.ServiceHelper;
+import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Partitioning;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.storage.InMemStorage;
+import java.net.URI;
+import java.time.Instant;
+import java.util.Collection;
+import java.util.Optional;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import okio.ByteString;
+import org.junit.Before;
+import org.junit.Ignore;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.experimental.theories.Theory;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 @RunWith(Parameterized.class)
 public class WorkflowResourceTest {

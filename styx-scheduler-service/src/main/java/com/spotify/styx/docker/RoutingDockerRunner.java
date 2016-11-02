@@ -2,9 +2,7 @@ package com.spotify.styx.docker;
 
 import com.google.common.collect.Maps;
 import com.google.common.io.Closer;
-
 import com.spotify.styx.model.WorkflowInstance;
-
 import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;

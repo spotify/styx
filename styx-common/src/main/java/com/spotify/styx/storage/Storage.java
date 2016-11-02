@@ -25,7 +25,6 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowInstanceExecutionData;
 import com.spotify.styx.model.WorkflowState;
-
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;

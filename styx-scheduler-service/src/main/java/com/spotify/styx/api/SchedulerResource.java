@@ -19,6 +19,10 @@
  */
 package com.spotify.styx.api;
 
+import static com.spotify.apollo.Status.BAD_REQUEST;
+import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
+import static com.spotify.styx.workflow.ParameterUtil.instantFromWorkflowInstance;
+
 import com.spotify.apollo.Response;
 import com.spotify.apollo.entity.EntityMiddleware;
 import com.spotify.apollo.entity.JacksonEntityCodec;
@@ -35,19 +39,13 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Json;
 import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.Time;
-
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
-
 import javaslang.control.Either;
 import okio.ByteString;
-
-import static com.spotify.apollo.Status.BAD_REQUEST;
-import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
-import static com.spotify.styx.workflow.ParameterUtil.instantFromWorkflowInstance;
 
 public class SchedulerResource {
 

@@ -19,12 +19,11 @@
  */
 package com.spotify.styx.workflow;
 
-import org.junit.Test;
-
-import java.time.Instant;
-
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+
+import java.time.Instant;
+import org.junit.Test;
 
 public class ParameterUtilTest {
 

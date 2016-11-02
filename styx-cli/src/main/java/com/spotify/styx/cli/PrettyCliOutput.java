@@ -19,6 +19,21 @@
  */
 package com.spotify.styx.cli;
 
+import static com.spotify.apollo.Status.OK;
+import static com.spotify.styx.cli.CliUtil.colored;
+import static com.spotify.styx.cli.CliUtil.formatTimestamp;
+import static com.spotify.styx.model.EventSerializer.PersistentEvent;
+import static org.fusesource.jansi.Ansi.Color.CYAN;
+import static org.fusesource.jansi.Ansi.Color.GREEN;
+import static org.fusesource.jansi.Ansi.Color.MAGENTA;
+import static org.fusesource.jansi.Ansi.Color.WHITE;
+import static org.fusesource.jansi.Ansi.Color.YELLOW;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.ConsoleAppender;
 import com.spotify.apollo.Response;
 import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.api.cli.ActiveStatesPayload.ActiveState;
@@ -29,33 +44,14 @@ import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.util.EventUtil;
-
+import java.util.SortedMap;
+import java.util.SortedSet;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
-
+import okio.ByteString;
 import org.fusesource.jansi.Ansi;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.SortedMap;
-import java.util.SortedSet;
-
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.ConsoleAppender;
-import okio.ByteString;
-
-import static com.spotify.apollo.Status.OK;
-import static com.spotify.styx.cli.CliUtil.colored;
-import static com.spotify.styx.cli.CliUtil.formatTimestamp;
-import static com.spotify.styx.model.EventSerializer.PersistentEvent;
-import static org.fusesource.jansi.Ansi.Color.CYAN;
-import static org.fusesource.jansi.Ansi.Color.GREEN;
-import static org.fusesource.jansi.Ansi.Color.MAGENTA;
-import static org.fusesource.jansi.Ansi.Color.WHITE;
-import static org.fusesource.jansi.Ansi.Color.YELLOW;
 
 final class PrettyCliOutput implements CliOutput {
 

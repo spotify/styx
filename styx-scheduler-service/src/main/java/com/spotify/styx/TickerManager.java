@@ -19,16 +19,14 @@
  */
 package com.spotify.styx;
 
-import com.google.common.collect.Maps;
+import static java.util.Objects.requireNonNull;
 
+import com.google.common.collect.Maps;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
-
 import java.io.IOException;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
-
-import static java.util.Objects.requireNonNull;
 
 /**
  * Manages {@link com.spotify.styx.model.DataEndpoint} and {@link TickTock} instances that

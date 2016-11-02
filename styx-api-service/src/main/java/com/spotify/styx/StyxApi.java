@@ -19,9 +19,12 @@
  */
 package com.spotify.styx;
 
+import static com.spotify.styx.util.Connections.createBigTableConnection;
+import static com.spotify.styx.util.Connections.createDatastore;
+import static java.util.Objects.requireNonNull;
+
 import com.google.cloud.datastore.Datastore;
 import com.google.common.io.Closer;
-
 import com.spotify.apollo.AppInit;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.route.Route;
@@ -35,16 +38,10 @@ import com.spotify.styx.util.EventStorageFactory;
 import com.spotify.styx.util.Singleton;
 import com.spotify.styx.util.StorageFactory;
 import com.typesafe.config.Config;
-
+import java.time.Duration;
 import org.apache.hadoop.hbase.client.Connection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.time.Duration;
-
-import static com.spotify.styx.util.Connections.createBigTableConnection;
-import static com.spotify.styx.util.Connections.createDatastore;
-import static java.util.Objects.requireNonNull;
 
 /**
  * Main entrypoint for Styx API Service
