@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Scheduler Service
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx.state;
 
 import com.google.common.annotations.VisibleForTesting;

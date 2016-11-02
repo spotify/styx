@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Testing Utilities
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx.storage;
 
 import static java.util.stream.Collectors.toList;

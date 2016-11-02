@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Scheduler Service
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx.state.handlers;
 
 import static org.mockito.Mockito.verify;

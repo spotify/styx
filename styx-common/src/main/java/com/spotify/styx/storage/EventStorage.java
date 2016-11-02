@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Common
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx.storage;
 
 import com.spotify.styx.model.SequenceEvent;
