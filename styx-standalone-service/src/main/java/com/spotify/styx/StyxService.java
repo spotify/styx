@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Standalone Service
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx;
 
 import com.spotify.apollo.AppInit;

@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Schedule Source API
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx.schedule.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;

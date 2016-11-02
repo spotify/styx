@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx CLI
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx.cli;
 
 import static com.spotify.apollo.Status.OK;

@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Local Files Schedule Source
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx;
 
 import static java.util.Collections.emptyList;

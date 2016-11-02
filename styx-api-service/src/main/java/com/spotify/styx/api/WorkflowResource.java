@@ -1,4 +1,4 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx API Service
  * --
@@ -17,6 +17,7 @@
  * limitations under the License.
  * -/-/-
  */
+
 package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Middlewares.json;
