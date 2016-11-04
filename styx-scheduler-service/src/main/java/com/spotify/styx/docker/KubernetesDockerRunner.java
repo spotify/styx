@@ -59,7 +59,6 @@ import java.util.concurrent.TimeUnit;
  */
 class KubernetesDockerRunner implements DockerRunner {
 
-  static final String NAMESPACE = "default";
   static final String STYX_RUN = "styx-run";
   static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
   static final String COMPONENT_ID = "STYX_COMPONENT_ID";
@@ -83,7 +82,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
   KubernetesDockerRunner(KubernetesClient client, StateManager stateManager, Stats stats) {
     this.stateManager = Objects.requireNonNull(stateManager);
-    this.client = Objects.requireNonNull(client).inNamespace(NAMESPACE);
+    this.client = Objects.requireNonNull(client);
     this.stats = Objects.requireNonNull(stats);
   }
 
@@ -106,20 +105,20 @@ class KubernetesDockerRunner implements DockerRunner {
     final String podName = STYX_RUN + "-" + UUID.randomUUID().toString();
 
     // inject environment variables
-    EnvVar envVarComponent = new EnvVar();
+    final EnvVar envVarComponent = new EnvVar();
     envVarComponent.setName(COMPONENT_ID);
     envVarComponent.setValue(workflowInstance.workflowId().componentId());
-    EnvVar envVarEndpoint = new EnvVar();
+    final EnvVar envVarEndpoint = new EnvVar();
     envVarEndpoint.setName(ENDPOINT_ID);
     envVarEndpoint.setValue(workflowInstance.workflowId().endpointId());
-    EnvVar envVarParameter = new EnvVar();
+    final EnvVar envVarParameter = new EnvVar();
     envVarParameter.setName(PARAMETER);
     envVarParameter.setValue(workflowInstance.parameter());
-    EnvVar envVarExecution = new EnvVar();
+    final EnvVar envVarExecution = new EnvVar();
     envVarExecution.setName(EXECUTION_ID);
     envVarExecution.setValue(podName);
 
-    PodBuilder podBuilder = new PodBuilder()
+    final PodBuilder podBuilder = new PodBuilder()
         .withNewMetadata()
         .withName(podName)
         .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
@@ -141,8 +140,12 @@ class KubernetesDockerRunner implements DockerRunner {
           .withSecretName(secret.name())
           .endSecret()
           .endVolume();
-      container =
-          container.addToVolumeMounts(new VolumeMount(secret.mountPath(), secret.name(), true));
+
+      final VolumeMount volumeMount = new VolumeMount();
+      volumeMount.setName(secret.name());
+      volumeMount.setMountPath(secret.mountPath());
+      volumeMount.setReadOnly(true);
+      container = container.addToVolumeMounts(volumeMount);
     }
     container.endContainer();
 
