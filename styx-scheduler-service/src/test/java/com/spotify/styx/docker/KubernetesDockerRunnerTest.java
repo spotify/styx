@@ -101,7 +101,6 @@ public class KubernetesDockerRunnerTest {
 
   @Before
   public void setUp() throws Exception {
-    when(k8sClient.inNamespace(any(String.class))).thenReturn(k8sClient);
     when(k8sClient.pods()).thenReturn(pods);
 
     // pods().list().getMetadata().getResourceVersion()
