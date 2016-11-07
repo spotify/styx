@@ -29,7 +29,6 @@ import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.core.Service;
 import com.spotify.apollo.core.Services;
-import com.spotify.apollo.environment.ApolloEnvironment;
 import com.spotify.apollo.environment.ApolloEnvironmentModule;
 import com.spotify.apollo.http.client.HttpClientModule;
 import com.spotify.styx.api.cli.ActiveStatesPayload;
@@ -101,6 +100,10 @@ public final class Main {
         .description("Trigger a completed workflow instance");
     addWorkflowInstanceArguments(trigger);
 
+    final Subparser halt = Command.HALT.parser(subCommands)
+        .description("Halt a workflow instance");
+    addWorkflowInstanceArguments(halt);
+
     final Subparser retry = Command.RETRY.parser(subCommands)
         .description("Retry a workflow instance that is in a waiting state");
     addWorkflowInstanceArguments(retry);
@@ -127,7 +130,7 @@ public final class Main {
       cli.parsed(namespace);
       cli.header(command);
 
-      final Client client = getClient(i);
+      final Client client = ApolloEnvironmentModule.environment(i).environment().client();
 
       switch (command) {
         case ACTIVE_STATES:
@@ -140,6 +143,10 @@ public final class Main {
 
         case TRIGGER:
           triggerWorkflowInstance(client, cli, signaller, namespace);
+          break;
+
+        case HALT:
+          haltWorkflowInstance(client, cli, signaller, namespace);
           break;
 
         case RETRY:
@@ -229,15 +236,38 @@ public final class Main {
       Service.Signaller signaller,
       Namespace namespace) {
 
-    String component = namespace.getString(COMPONENT_DEST);
-    String workflow = namespace.getString(WORKFLOW_DEST);
-    String parameter = namespace.getString(PARAMETER_DEST);
-    WorkflowInstance workflowInstance = WorkflowInstance.create(
-        WorkflowId.create(component, workflow), parameter);
+    WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
 
     try {
       final ByteString payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(workflowInstance));
       String uri = String.format("%s/trigger/", STYX_CLI_API);
+      final Request request = Request.forUri(uri, "POST").withPayload(payload);
+      client.send(request).whenComplete((response, t) -> {
+        cliOutput.printResponse(response);
+        signaller.signalShutdown();
+      }).exceptionally(e -> {
+        cliOutput.apiError(e);
+        signaller.signalShutdown();
+        return null;
+      });
+    } catch (JsonProcessingException e) {
+      throw Throwables.propagate(e);
+    }
+  }
+
+  private static void haltWorkflowInstance(Client client,
+      CliOutput cliOutput,
+      Service.Signaller signaller,
+      Namespace namespace) {
+
+    WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
+
+    Event halt = Event.halt(workflowInstance);
+    EventSerializer.PersistentEvent persistentEvent =
+        EventSerializer.convertEventToPersistentEvent(halt);
+    try {
+      final ByteString payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(persistentEvent));
+      String uri = String.format("%s/events/", STYX_CLI_API);
       final Request request = Request.forUri(uri, "POST").withPayload(payload);
       client.send(request).whenComplete((response, t) -> {
         cliOutput.printResponse(response);
@@ -258,11 +288,7 @@ public final class Main {
       Service.Signaller signaller,
       Namespace namespace) {
 
-    String component = namespace.getString(COMPONENT_DEST);
-    String workflow = namespace.getString(WORKFLOW_DEST);
-    String parameter = namespace.getString(PARAMETER_DEST);
-    WorkflowInstance workflowInstance = WorkflowInstance.create(
-        WorkflowId.create(component, workflow), parameter);
+    WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
 
     Event retry = Event.retry(workflowInstance);
     EventSerializer.PersistentEvent persistentEvent =
@@ -284,9 +310,12 @@ public final class Main {
     }
   }
 
-  private static Client getClient(Service.Instance i) {
-    final ApolloEnvironment environment = ApolloEnvironmentModule.environment(i);
-    return environment.environment().client();
+  private static WorkflowInstance getWorkflowInstance(Namespace namespace) {
+    return WorkflowInstance.create(
+        WorkflowId.create(
+            namespace.getString(COMPONENT_DEST),
+            namespace.getString(WORKFLOW_DEST)),
+        namespace.getString(PARAMETER_DEST));
   }
 
   private static void addWorkflowInstanceArguments(Subparser events) {
@@ -301,6 +330,7 @@ public final class Main {
   enum Command {
     ACTIVE_STATES("List active states", "ls"),
     EVENTS("events", "e"),
+    HALT("halt", ""),
     TRIGGER("trigger", "t"),
     RETRY("retry", "r");
 
