@@ -23,6 +23,7 @@ package com.spotify.styx.storage;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.DatastoreReader;
+import com.google.cloud.datastore.DateTime;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
@@ -34,6 +35,7 @@ import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
@@ -44,6 +46,8 @@ import com.spotify.styx.util.Json;
 import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -67,6 +71,7 @@ class DatastoreStorage {
   public static final String PROPERTY_CONFIG_DOCKER_RUNNER_ID = "dockerRunnerId";
   public static final String PROPERTY_WORKFLOW_JSON = "json";
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
+  public static final String PROPERTY_NEXT_EXECUTION = "nextNaturalTrigger";
   public static final String PROPERTY_DOCKER_IMAGE = "dockerImage";
   public static final String PROPERTY_COUNTER = "counter";
   public static final String PROPERTY_COMPONENT = "component";
@@ -199,6 +204,54 @@ class DatastoreStorage {
         });
   }
 
+  void delete(WorkflowId workflowId) throws IOException {
+    storeWithRetries(() -> {
+      datastore.delete(workflowKey(workflowId));
+      return null;
+    });
+  }
+
+  public void updateNextNaturalTrigger(WorkflowId workflowId, Instant nextNaturalTrigger) throws IOException {
+    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
+      final Key workflowKey = workflowKey(workflowId);
+      final Optional<Entity> workflowOpt = getOpt(transaction, workflowKey);
+      if (!workflowOpt.isPresent()) {
+        throw new ResourceNotFoundException(
+            String.format("%s:%s doesn't exist.", workflowId.componentId(), workflowId.endpointId()));
+      }
+
+      final Entity.Builder builder = Entity
+          .builder(workflowOpt.get())
+          .set(PROPERTY_NEXT_EXECUTION, instantToDatetime(nextNaturalTrigger));
+      return transaction.put(builder.build());
+    }));
+  }
+
+  public Map<Workflow, Optional<Instant>> workflowsWithNextNaturalTrigger()
+      throws IOException {
+    Map<Workflow, Optional<Instant>> map = Maps.newHashMap();
+    final EntityQuery query =
+        Query.entityQueryBuilder().kind(KIND_WORKFLOW).build();
+    final QueryResults<Entity> result = datastore.run(query);
+
+    while (result.hasNext()) {
+      final Entity entity = result.next();
+      Workflow workflow;
+      try {
+        workflow =
+            Json.OBJECT_MAPPER.readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
+      } catch (IOException e) {
+        LOG.warn("Failed to read workflow {}.", entity.key());
+        continue;
+      }
+      map.put(workflow,
+          entity.contains(PROPERTY_NEXT_EXECUTION)
+          ? Optional.of(datetimeToInstant(entity.getDateTime(PROPERTY_NEXT_EXECUTION)))
+          : Optional.empty());
+    }
+    return map;
+  }
+
   Map<WorkflowInstance, Long> allActiveStates() throws IOException {
     final EntityQuery query =
         Query.entityQueryBuilder().kind(KIND_ACTIVE_WORKFLOW_INSTANCE).build();
@@ -286,13 +339,13 @@ class DatastoreStorage {
 
   Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
     final Key workflowKey = workflowKey(workflowId);
-    Optional<String> dockerImage = getOptProperty(datastore, workflowKey, PROPERTY_DOCKER_IMAGE);
+    Optional<String> dockerImage = getOptStringProperty(datastore, workflowKey, PROPERTY_DOCKER_IMAGE);
     if (dockerImage.isPresent()) {
       return dockerImage;
     }
 
     final Key componentKey = componentKeyFactory.newKey(workflowId.componentId());
-    dockerImage = getOptProperty(datastore, componentKey, PROPERTY_DOCKER_IMAGE);
+    dockerImage = getOptStringProperty(datastore, componentKey, PROPERTY_DOCKER_IMAGE);
     if (dockerImage.isPresent()) {
       return dockerImage;
     }
@@ -310,13 +363,13 @@ class DatastoreStorage {
 
   private Optional<String> getCommitSha(WorkflowId workflowId) {
     final Key workflowKey = workflowKey(workflowId);
-    Optional<String> commitSha = getOptProperty(datastore, workflowKey, PROPERTY_COMMIT_SHA);
+    Optional<String> commitSha = getOptStringProperty(datastore, workflowKey, PROPERTY_COMMIT_SHA);
     if (commitSha.isPresent()) {
       return commitSha;
     }
 
     final Key componentKey = componentKeyFactory.newKey(workflowId.componentId());
-    return getOptProperty(datastore, componentKey, PROPERTY_COMMIT_SHA);
+    return getOptStringProperty(datastore, componentKey, PROPERTY_COMMIT_SHA);
   }
 
   private <T> T storeWithRetries(FnWithException<T, IOException> storingOperation) throws IOException {
@@ -393,7 +446,8 @@ class DatastoreStorage {
    *
    * @return an optional containing the property value if it existed, empty otherwise.
    */
-  private Optional<String> getOptProperty(DatastoreReader datastoreReader, Key key, String property) {
+  private Optional<String> getOptStringProperty(DatastoreReader datastoreReader, Key key,
+                                                String property) {
     return getOpt(datastoreReader, key)
         .filter(e -> e.contains(property))
         .map(e -> e.getString(property));
@@ -414,5 +468,13 @@ class DatastoreStorage {
 
   void setEnabled(WorkflowId workflowId1, boolean enabled) throws IOException {
     patchState(workflowId1, WorkflowState.patchEnabled(enabled));
+  }
+
+  private static DateTime instantToDatetime(Instant instant) {
+    return DateTime.copyFrom(Date.from(instant));
+  }
+
+  private static Instant datetimeToInstant(DateTime dateTime) {
+    return dateTime.toDate().toInstant();
   }
 }

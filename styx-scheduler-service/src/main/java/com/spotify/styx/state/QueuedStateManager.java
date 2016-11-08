@@ -28,6 +28,7 @@ import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.storage.EventStorage;
+import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
 import java.util.Objects;
@@ -97,8 +98,8 @@ public class QueuedStateManager implements StateManager, StaleStateReaper, State
 
     final WorkflowInstance workflowInstance = runState.workflowInstance();
     if (states.containsKey(workflowInstance)) {
-      throw new RuntimeException("RunState initialization called on active instance "
-                                 + workflowInstance.toKey());
+      throw new AlreadyInitializedException("RunState initialization called on active instance "
+                                            + workflowInstance.toKey());
     }
 
     final long counter;
