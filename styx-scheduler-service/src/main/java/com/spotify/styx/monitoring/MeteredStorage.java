@@ -29,6 +29,7 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -67,6 +68,24 @@ public final class MeteredStorage extends MeteredBase implements Storage {
   @Override
   public Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
     return timedStorage("workflow", () -> delegate.workflow(workflowId));
+  }
+
+  @Override
+  public void delete(WorkflowId workflowId) throws IOException {
+    timedStorage("delete", () -> delegate.delete(workflowId));
+  }
+
+  @Override
+  public void updateNextNaturalTrigger(WorkflowId workflowId, Instant nextNaturalTrigger) throws IOException {
+    timedStorage("updateNextNaturalTrigger",
+        () -> delegate.updateNextNaturalTrigger(workflowId, nextNaturalTrigger));
+  }
+
+  @Override
+  public Map<Workflow, Optional<Instant>> workflowsWithNextNaturalTrigger()
+      throws IOException {
+    return timedStorage("workflowsWithNextNaturalTrigger",
+        () -> delegate.workflowsWithNextNaturalTrigger());
   }
 
   @Override

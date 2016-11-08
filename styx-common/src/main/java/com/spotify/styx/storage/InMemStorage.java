@@ -34,6 +34,7 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.WorkflowStateUtil;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -97,6 +98,22 @@ public class InMemStorage implements Storage, EventStorage {
   @Override
   public Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
     return Optional.ofNullable(workflowStore.get(workflowId));
+  }
+
+  @Override
+  public void delete(WorkflowId workflowId) throws IOException {
+    throw new UnsupportedOperationException("Unsupported Operation!");
+  }
+
+  @Override
+  public void updateNextNaturalTrigger(WorkflowId workflowId, Instant nextNaturalTrigger) throws IOException {
+    throw new UnsupportedOperationException("Unsupported Operation!");
+  }
+
+  @Override
+  public Map<Workflow, Optional<Instant>> workflowsWithNextNaturalTrigger()
+      throws IOException {
+    throw new UnsupportedOperationException("Unsupported Operation!");
   }
 
   @Override

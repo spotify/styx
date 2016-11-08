@@ -50,18 +50,85 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       empty());
   private final static String TEST_EXECUTION_ID_1 = "execution_1";
   private final static String TEST_DOCKER_IMAGE = "busybox:1.1";
-
   private static final Workflow HOURLY_WORKFLOW = Workflow.create(
       "styx",
       TestData.WORKFLOW_URI,
       DATA_ENDPOINT);
+  private final Instant NEXT_EXECUTION = Instant.parse("2016-03-14T16:00:00Z");
 
+
+  @Test
+  public void shouldCatchUpWithNaturalTriggers() throws Exception {
+    givenTheTimeIs("2016-03-14T15:30:00Z");
+    givenTheGlobalEnableFlagIs(true);
+    givenWorkflow(HOURLY_WORKFLOW);
+    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
+    final Instant nextExecution = Instant.parse("2016-03-14T13:00:00Z");
+    givenNextNaturalTrigger(HOURLY_WORKFLOW.id(), nextExecution);
+
+    styxStarts();
+    timePasses(1, SECONDS);
+    // todo: add semantic wait utility
+    Thread.sleep(1000);
+    assertThat(dockerRuns, hasSize(1));
+    WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
+    RunSpec runSpec = dockerRuns.get(0)._2;
+    assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
+    assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T12")));
+
+    timePasses(1, SECONDS);
+    // todo: add semantic wait utility
+    Thread.sleep(1000);
+    assertThat(dockerRuns, hasSize(2));
+    workflowInstance = dockerRuns.get(1)._1;
+    runSpec = dockerRuns.get(1)._2;
+    assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
+    assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T13")));
+
+    timePasses(1, SECONDS);
+    // todo: add semantic wait utility
+    Thread.sleep(1000);
+    assertThat(dockerRuns, hasSize(3));
+    workflowInstance = dockerRuns.get(2)._1;
+    runSpec = dockerRuns.get(2)._2;
+    assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
+    assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T14")));
+  }
+
+  @Test
+  public void removedEnabledWorkflowWontGetScheduled() throws Exception {
+    givenTheTimeIs("2016-03-14T15:30:00Z");
+    givenTheGlobalEnableFlagIs(true);
+    givenWorkflow(HOURLY_WORKFLOW);
+    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
+    final Instant nextExecution = Instant.parse("2016-03-14T14:00:00Z");
+    givenNextNaturalTrigger(HOURLY_WORKFLOW.id(), nextExecution);
+
+    styxStarts();
+    timePasses(1, SECONDS);
+    // todo: add semantic wait utility
+    Thread.sleep(1000);
+    assertThat(dockerRuns, hasSize(1));
+    WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
+    RunSpec runSpec = dockerRuns.get(0)._2;
+    assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
+    assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T13")));
+
+    workflowDeleted(HOURLY_WORKFLOW);
+
+    timePasses(1, SECONDS);
+    // todo: add semantic wait utility
+    Thread.sleep(1000);
+    assertThat(dockerRuns, hasSize(1));
+  }
+  
   @Test
   public void runsDockerImageWithArgsTemplate() throws Exception {
     givenTheTimeIs("2016-03-14T15:59:00Z");
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW.id(), NEXT_EXECUTION);
 
     styxStarts();
     timePasses(1, MINUTES);
@@ -82,6 +149,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW.id(), NEXT_EXECUTION);
 
     styxStarts();
     timePasses(1, MINUTES);
@@ -133,6 +201,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW.id(), NEXT_EXECUTION);
 
     styxStarts();
     timePasses(1, MINUTES);
@@ -158,6 +227,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW.id(), NEXT_EXECUTION);
 
     styxStarts();
     timePasses(1, MINUTES);
@@ -183,6 +253,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheTimeIs("2016-03-14T15:17:45Z");
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW.id(), NEXT_EXECUTION);
 
     givenStoredEventAtTime(Event.timeTrigger(workflowInstance),       0L, timeOffsetSeconds(1));
     givenStoredEventAtTime(Event.started(workflowInstance),           1L, timeOffsetSeconds(2));
