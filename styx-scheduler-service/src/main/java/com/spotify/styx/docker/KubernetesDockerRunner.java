@@ -63,6 +63,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
   static final String COMPONENT_ID = "STYX_COMPONENT_ID";
   static final String ENDPOINT_ID = "STYX_ENDPOINT_ID";
+  static final String WORKFLOW_ID = "STYX_WORKFLOW_ID";
   static final String PARAMETER = "STYX_PARAMETER";
   static final String EXECUTION_ID = "STYX_EXECUTION_ID";
   static final int POLL_PODS_INTERVAL_SECONDS = 60;
@@ -111,6 +112,9 @@ class KubernetesDockerRunner implements DockerRunner {
     final EnvVar envVarEndpoint = new EnvVar();
     envVarEndpoint.setName(ENDPOINT_ID);
     envVarEndpoint.setValue(workflowInstance.workflowId().endpointId());
+    final EnvVar envVarWorkflow = new EnvVar();
+    envVarWorkflow.setName(WORKFLOW_ID);
+    envVarWorkflow.setValue(workflowInstance.workflowId().endpointId());
     final EnvVar envVarParameter = new EnvVar();
     envVarParameter.setName(PARAMETER);
     envVarParameter.setValue(workflowInstance.parameter());
@@ -130,7 +134,8 @@ class KubernetesDockerRunner implements DockerRunner {
             .withName(STYX_RUN)
             .withImage(imageWithTag)
             .withArgs(runSpec.args())
-            .withEnv(envVarComponent, envVarEndpoint, envVarParameter, envVarExecution);
+            .withEnv(envVarComponent, envVarEndpoint, envVarWorkflow, envVarParameter,
+                envVarExecution);
 
     if (runSpec.secret().isPresent()) {
       final DataEndpoint.Secret secret = runSpec.secret().get();
