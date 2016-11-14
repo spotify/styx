@@ -141,16 +141,20 @@ public class KubernetesDockerRunnerTest {
     EnvVar endpoint = new EnvVar();
     endpoint.setName(KubernetesDockerRunner.ENDPOINT_ID);
     endpoint.setValue(WORKFLOW_INSTANCE.workflowId().endpointId());
+    EnvVar workflow = new EnvVar();
+    workflow.setName(KubernetesDockerRunner.WORKFLOW_ID);
+    workflow.setValue(WORKFLOW_INSTANCE.workflowId().endpointId());
     EnvVar component = new EnvVar();
     component.setName(KubernetesDockerRunner.COMPONENT_ID);
     component.setValue(WORKFLOW_INSTANCE.workflowId().componentId());
     EnvVar parameter = new EnvVar();
     parameter.setName(KubernetesDockerRunner.PARAMETER);
     parameter.setValue(WORKFLOW_INSTANCE.parameter());
-    EnvVar execution = envVars.get(3);
+    EnvVar execution = envVars.get(4);
 
-    assertThat(envVars.size(), is(4));
+    assertThat(envVars.size(), is(5));
     assertThat(envVars, hasItem(component));
+    assertThat(envVars, hasItem(workflow));
     assertThat(envVars, hasItem(endpoint));
     assertThat(envVars, hasItem(parameter));
     assertThat(execution.getName(),is(KubernetesDockerRunner.EXECUTION_ID));
