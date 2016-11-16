@@ -30,6 +30,7 @@ import com.spotify.styx.model.WorkflowInstanceExecutionData;
 import com.spotify.styx.model.WorkflowState;
 import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -147,6 +148,22 @@ public class AggregateStorage implements Storage, EventStorage {
   @Override
   public Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
     return datastoreStorage.workflow(workflowId);
+  }
+
+  @Override
+  public void delete(WorkflowId workflowId) throws IOException {
+    datastoreStorage.delete(workflowId);
+  }
+
+  @Override
+  public void updateNextNaturalTrigger(WorkflowId workflowId, Instant nextNaturalTrigger) throws IOException {
+    datastoreStorage.updateNextNaturalTrigger(workflowId, nextNaturalTrigger);
+  }
+
+  @Override
+  public Map<Workflow, Optional<Instant>> workflowsWithNextNaturalTrigger()
+      throws IOException {
+    return datastoreStorage.workflowsWithNextNaturalTrigger();
   }
 
   @Override

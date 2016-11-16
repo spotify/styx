@@ -27,6 +27,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowInstanceExecutionData;
 import com.spotify.styx.model.WorkflowState;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -69,6 +70,28 @@ public interface Storage {
    * @return Optionally a workflow, if one was found for te given id
    */
   Optional<Workflow> workflow(WorkflowId workflowId) throws IOException;
+
+  /**
+   * Removes a workflow definition.
+   *
+   * @param workflowId The workflowid to remove.
+   */
+  void delete(WorkflowId workflowId) throws IOException;
+
+  /**
+   * Updates the next natural trigger for a {@link Workflow}.
+   *
+   * @param workflowId The {@link WorkflowId} to update the next natural trigger for.
+   * @param nextNaturalTrigger The next natural trigger instant at which the {@link Workflow}
+   *                           should be instantiated.
+   */
+  void updateNextNaturalTrigger(WorkflowId workflowId, Instant nextNaturalTrigger) throws IOException;
+
+  /**
+   * Get all {@link Workflow}s with their respective nextNaturalTrigger,
+   * which is empty if it hasn't been initialized before.
+   */
+  Map<Workflow, Optional<Instant>> workflowsWithNextNaturalTrigger() throws IOException;
 
   /**
    * Get execution information for a {@link WorkflowInstance}.

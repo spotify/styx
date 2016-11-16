@@ -277,9 +277,9 @@ public class StyxScheduler implements AppInit {
         .setUncaughtExceptionHandler(uncaughtExceptionHandler)
         .build();
 
-    final ScheduledExecutorService scheduler = executorFactory.create(3, schedulerTf);
+    final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
     final ExecutorService eventWorker = Executors.newFixedThreadPool(16, eventTf);
-    closer.register(executorCloser("scheduler", scheduler));
+    closer.register(executorCloser("scheduler", executor));
     closer.register(executorCloser("event-worker", eventWorker));
 
     final Stats stats = statsFactory.apply(environment);
@@ -294,7 +294,7 @@ public class StyxScheduler implements AppInit {
 
     final Supplier<String> dockerId = new CachedSupplier<>(storage::globalDockerRunnerId, time);
     final DockerRunner routingDockerRunner = DockerRunner.routing(
-        id -> dockerRunnerFactory.create(id, environment, stateManager, scheduler, stats),
+        id -> dockerRunnerFactory.create(id, environment, stateManager, executor, stats),
         dockerId);
     final DockerRunner dockerRunner = new MeteredDockerRunner(routingDockerRunner, stats, time);
     final Publisher publisher = publisherFactory.apply(environment);
@@ -315,18 +315,18 @@ public class StyxScheduler implements AppInit {
         (workflowInstance) -> RunState.fresh(workflowInstance, time, outputHandlers);
 
     final TriggerListener trigger = trigger(storage, stateFactory, stateManager);
-    final TickerManager tickerManager = new TickerManager(
-        (workflow) -> new TickTock(workflow, trigger, time, scheduler));
+    final TriggerManager triggerManager = new TriggerManager(executor, trigger, time, storage);
 
     final WorkflowCache cache = new InMemWorkflowCache();
-    final Consumer<Workflow> workflowChangeListener = workflowChanged(cache, storage, tickerManager,
+    final Consumer<Workflow> workflowChangeListener = workflowChanged(cache, storage,
                                                                       stats, stateManager);
-    final Consumer<Workflow> workflowRemoveListener = tickerManager::removeWorkflow;
+    final Consumer<Workflow> workflowRemoveListener = workflowRemoved(storage);
 
     restoreState(eventStorage, outputHandlers, stateManager);
-    startScheduleSources(environment, scheduler, workflowChangeListener, workflowRemoveListener);
-    startRetryChecker(stateManager, scheduler);
-    startStateReaper(stateManager, scheduler);
+    triggerManager.start();
+    startScheduleSources(environment, executor, workflowChangeListener, workflowRemoveListener);
+    startRetryChecker(stateManager, executor);
+    startStateReaper(stateManager, executor);
     setupMetrics(stateManager, cache, storage, stats);
 
     final SchedulerResource schedulerResource = new SchedulerResource(stateManager, trigger, storage, time);
@@ -400,7 +400,7 @@ public class StyxScheduler implements AppInit {
         TimeUnit.SECONDS);
   }
 
-  private static Runnable guard(Runnable delegate) {
+  static Runnable guard(Runnable delegate) {
     return () -> {
       try {
         delegate.run();
@@ -466,7 +466,6 @@ public class StyxScheduler implements AppInit {
   private static Consumer<Workflow> workflowChanged(
       WorkflowCache cache,
       Storage storage,
-      TickerManager tickerManager,
       Stats stats,
       StateManager stateManager) {
 
@@ -475,12 +474,21 @@ public class StyxScheduler implements AppInit {
           workflow.id(),
           () -> stateManager.getActiveStatesCount(workflow.id()));
 
-      tickerManager.updateWorkflow(workflow);
       cache.store(workflow);
       try {
         storage.store(workflow);
       } catch (IOException e) {
         LOG.warn("Failed to store workflow " + workflow, e);
+      }
+    };
+  }
+
+  private static Consumer<Workflow> workflowRemoved(Storage storage) {
+    return workflow -> {
+      try {
+        storage.delete(workflow.id());
+      } catch (IOException e) {
+        LOG.warn("Couldn't remove workflow {}. ", workflow.id());
       }
     };
   }
