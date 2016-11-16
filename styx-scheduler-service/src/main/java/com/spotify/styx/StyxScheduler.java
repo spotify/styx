@@ -83,8 +83,8 @@ import com.spotify.styx.util.Singleton;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.typesafe.config.Config;
-import io.fabric8.kubernetes.client.AutoAdaptableKubernetesClient;
 import io.fabric8.kubernetes.client.ConfigBuilder;
+import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import java.io.Closeable;
 import java.io.IOException;
@@ -120,7 +120,6 @@ public class StyxScheduler implements AppInit {
   public static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
   public static final String STYX_MODE = "styx.mode";
   public static final String STYX_MODE_DEVELOPMENT = "development";
-  public static final String KUBERNETES_NAMESPACE = "default";
 
   public static final int STATE_REAP_INTERVAL_SECONDS = 30;
   public static final int STATE_RETRY_CHECK_INTERVAL_SECONDS = 2;
@@ -573,7 +572,7 @@ public class StyxScheduler implements AppInit {
           .withClientKeyData(cluster.getMasterAuth().getClientKey())
           .build();
 
-      return new AutoAdaptableKubernetesClient(kubeConfig).inNamespace(KUBERNETES_NAMESPACE);
+      return new DefaultKubernetesClient(kubeConfig);
     } catch (GeneralSecurityException | IOException e) {
       throw Throwables.propagate(e);
     }

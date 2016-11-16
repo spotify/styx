@@ -59,6 +59,7 @@ import java.util.concurrent.TimeUnit;
  */
 class KubernetesDockerRunner implements DockerRunner {
 
+  static final String NAMESPACE = "default";
   static final String STYX_RUN = "styx-run";
   static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
   static final String COMPONENT_ID = "STYX_COMPONENT_ID";
@@ -83,7 +84,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
   KubernetesDockerRunner(KubernetesClient client, StateManager stateManager, Stats stats) {
     this.stateManager = Objects.requireNonNull(stateManager);
-    this.client = Objects.requireNonNull(client);
+    this.client = Objects.requireNonNull(client).inNamespace(NAMESPACE);
     this.stats = Objects.requireNonNull(stats);
   }
 
@@ -106,23 +107,23 @@ class KubernetesDockerRunner implements DockerRunner {
     final String podName = STYX_RUN + "-" + UUID.randomUUID().toString();
 
     // inject environment variables
-    final EnvVar envVarComponent = new EnvVar();
+    EnvVar envVarComponent = new EnvVar();
     envVarComponent.setName(COMPONENT_ID);
     envVarComponent.setValue(workflowInstance.workflowId().componentId());
-    final EnvVar envVarEndpoint = new EnvVar();
+    EnvVar envVarEndpoint = new EnvVar();
     envVarEndpoint.setName(ENDPOINT_ID);
     envVarEndpoint.setValue(workflowInstance.workflowId().endpointId());
-    final EnvVar envVarWorkflow = new EnvVar();
+    EnvVar envVarWorkflow = new EnvVar();
     envVarWorkflow.setName(WORKFLOW_ID);
     envVarWorkflow.setValue(workflowInstance.workflowId().endpointId());
-    final EnvVar envVarParameter = new EnvVar();
+    EnvVar envVarParameter = new EnvVar();
     envVarParameter.setName(PARAMETER);
     envVarParameter.setValue(workflowInstance.parameter());
-    final EnvVar envVarExecution = new EnvVar();
+    EnvVar envVarExecution = new EnvVar();
     envVarExecution.setName(EXECUTION_ID);
     envVarExecution.setValue(podName);
 
-    final PodBuilder podBuilder = new PodBuilder()
+    PodBuilder podBuilder = new PodBuilder()
         .withNewMetadata()
         .withName(podName)
         .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
@@ -145,12 +146,8 @@ class KubernetesDockerRunner implements DockerRunner {
           .withSecretName(secret.name())
           .endSecret()
           .endVolume();
-
-      final VolumeMount volumeMount = new VolumeMount();
-      volumeMount.setName(secret.name());
-      volumeMount.setMountPath(secret.mountPath());
-      volumeMount.setReadOnly(true);
-      container = container.addToVolumeMounts(volumeMount);
+      container =
+          container.addToVolumeMounts(new VolumeMount(secret.mountPath(), secret.name(), true));
     }
     container.endContainer();
 
