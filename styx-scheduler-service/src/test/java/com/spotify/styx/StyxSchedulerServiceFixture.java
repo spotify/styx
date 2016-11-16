@@ -37,6 +37,7 @@ import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
@@ -84,6 +85,7 @@ public class StyxSchedulerServiceFixture {
   private AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
   private DeterministicScheduler executor = new QuietDeterministicScheduler();
   private Consumer<Workflow> workflowChangeListener;
+  private Consumer<Workflow> workflowRemoveListener;
 
   // circumstantial fields, set by test cases
   private Instant now = Instant.parse("1970-01-01T00:00:00Z");
@@ -167,8 +169,16 @@ public class StyxSchedulerServiceFixture {
     storage.store(workflow);
   }
 
+  void givenNextNaturalTrigger(WorkflowId workflowId, Instant nextNaturalTrigger) throws IOException {
+    storage.updateNextNaturalTrigger(workflowId, nextNaturalTrigger);
+  }
+
   void workflowChanges(Workflow workflow) {
     workflowChangeListener.accept(workflow);
+  }
+
+  void workflowDeleted(Workflow workflow) {
+    workflowRemoveListener.accept(workflow);
   }
 
   void timePasses(int n, TimeUnit unit) {
@@ -236,6 +246,7 @@ public class StyxSchedulerServiceFixture {
         /* start */ () -> {
       workflowChangeListener = changeListener;
       workflows.forEach(changeListener);
+      workflowRemoveListener = removeListener;
     };
   }
 
