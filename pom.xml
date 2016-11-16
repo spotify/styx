@@ -45,6 +45,21 @@
       <email>rouz@spotify.com</email>
       <name>Rouzbeh Delavari</name>
     </developer>
+    <developer>
+      <id>ranic</id>
+      <email>ranic@spotify.com</email>
+      <name>Tina Ranic</name>
+    </developer>
+    <developer>
+      <id>fdema</id>
+      <email>fdema@spotify.com</email>
+      <name>Fabrizio Demaria</name>
+    </developer>
+    <developer>
+      <id>jocke</id>
+      <email>jocke@spotify.com</email>
+      <name>Joakim Bergman</name>
+    </developer>
   </developers>
 
   <scm>
