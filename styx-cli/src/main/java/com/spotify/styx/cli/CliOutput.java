@@ -20,29 +20,15 @@
 
 package com.spotify.styx.cli;
 
-import com.spotify.apollo.Response;
 import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.api.cli.EventsPayload;
-import net.sourceforge.argparse4j.inf.ArgumentParserException;
-import net.sourceforge.argparse4j.inf.Namespace;
-import okio.ByteString;
 
 /**
  * Cli printing interface
  */
-public interface CliOutput {
-
-  void parsed(Namespace namespace);
-
-  void parseError(ArgumentParserException e, String help);
-
-  void apiError(Throwable throwable);
-
-  void header(Main.Command command);
+interface CliOutput {
 
   void printActiveStates(ActiveStatesPayload activeStatesPayload);
 
   void printEvents(EventsPayload eventsPayload);
-
-  void printResponse(Response<ByteString> response);
 }
