@@ -92,6 +92,7 @@ import java.security.GeneralSecurityException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
@@ -320,10 +321,12 @@ public class StyxScheduler implements AppInit {
     final Consumer<Workflow> workflowChangeListener = workflowChanged(cache, storage,
                                                                       stats, stateManager);
     final Consumer<Workflow> workflowRemoveListener = workflowRemoved(storage);
+    final Consumer<Collection<Workflow>> workflowSyncListener = workflowSync(storage);
 
     restoreState(eventStorage, outputHandlers, stateManager);
     triggerManager.start();
-    startScheduleSources(environment, executor, workflowChangeListener, workflowRemoveListener);
+    startScheduleSources(environment, executor, workflowChangeListener, workflowRemoveListener,
+                         workflowSyncListener);
     startRetryChecker(stateManager, executor);
     startStateReaper(stateManager, executor);
     setupMetrics(stateManager, cache, storage, stats);
@@ -370,12 +373,14 @@ public class StyxScheduler implements AppInit {
       Environment environment,
       ScheduledExecutorService scheduler,
       Consumer<Workflow> workflowChangeListener,
-      Consumer<Workflow> workflowRemoveListener) {
+      Consumer<Workflow> workflowRemoveListener,
+      Consumer<Collection<Workflow>> workflowSyncListener) {
     for (ScheduleSourceFactory sourceFactory : scheduleSources.get()) {
       try {
         LOG.info("Loading auto-discovered ScheduleSource from {}", sourceFactory);
         final ScheduleSource scheduleSource = sourceFactory.create(
-            workflowChangeListener, workflowRemoveListener, environment, scheduler);
+            workflowChangeListener, workflowRemoveListener, workflowSyncListener, environment,
+            scheduler);
         scheduleSource.start();
       } catch (Throwable t) {
         LOG.warn("ScheduleSourceFactory {} threw", sourceFactory, t);
@@ -478,6 +483,16 @@ public class StyxScheduler implements AppInit {
         storage.store(workflow);
       } catch (IOException e) {
         LOG.warn("Failed to store workflow " + workflow, e);
+      }
+    };
+  }
+
+  private static Consumer<Collection<Workflow>> workflowSync(Storage storage) {
+    return workflows -> {
+      try {
+        storage.initialize(workflows);
+      } catch (IOException e) {
+        LOG.warn("Couldn't sync workflows.", e);
       }
     };
   }
