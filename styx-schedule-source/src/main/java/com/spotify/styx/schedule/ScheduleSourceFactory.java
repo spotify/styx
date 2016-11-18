@@ -22,6 +22,7 @@ package com.spotify.styx.schedule;
 
 import com.spotify.apollo.Environment;
 import com.spotify.styx.model.Workflow;
+import java.util.Collection;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Consumer;
 
@@ -51,6 +52,7 @@ public interface ScheduleSourceFactory {
   ScheduleSource create(
       Consumer<Workflow> changeListener,
       Consumer<Workflow> removeListener,
+      Consumer<Collection<Workflow>> syncListener,
       Environment environment,
       ScheduledExecutorService exec);
 }

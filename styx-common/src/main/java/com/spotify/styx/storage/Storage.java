@@ -28,6 +28,7 @@ import com.spotify.styx.model.WorkflowInstanceExecutionData;
 import com.spotify.styx.model.WorkflowState;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -185,4 +186,10 @@ public interface Storage {
    * @return workflow state.
    */
   Optional<WorkflowState> workflowState(WorkflowId workflowId) throws IOException;
+
+  /**
+   * Store these workflows and nothing else in storage.
+   * @param workflows
+   */
+  void initialize(Collection<Workflow> workflows) throws IOException;
 }

@@ -20,6 +20,7 @@
 
 package com.spotify.styx.storage;
 
+import com.google.bigtable.repackaged.com.google.common.collect.ImmutableSet;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.DatastoreReader;
@@ -47,11 +48,14 @@ import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,30 +66,30 @@ class DatastoreStorage {
 
   private static final Logger LOG = LoggerFactory.getLogger(DatastoreStorage.class);
 
-  public static final String KIND_STYX_CONFIG = "StyxConfig";
-  public static final String KIND_COMPONENT = "Component";
-  public static final String KIND_WORKFLOW = "Workflow";
-  public static final String KIND_ACTIVE_WORKFLOW_INSTANCE = "ActiveWorkflowInstance";
+  static final String KIND_STYX_CONFIG = "StyxConfig";
+  static final String KIND_COMPONENT = "Component";
+  static final String KIND_WORKFLOW = "Workflow";
+  static final String KIND_ACTIVE_WORKFLOW_INSTANCE = "ActiveWorkflowInstance";
 
-  public static final String PROPERTY_CONFIG_ENABLED = "enabled";
-  public static final String PROPERTY_CONFIG_DOCKER_RUNNER_ID = "dockerRunnerId";
-  public static final String PROPERTY_WORKFLOW_JSON = "json";
-  public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
-  public static final String PROPERTY_NEXT_EXECUTION = "nextNaturalTrigger";
-  public static final String PROPERTY_DOCKER_IMAGE = "dockerImage";
-  public static final String PROPERTY_COUNTER = "counter";
-  public static final String PROPERTY_COMPONENT = "component";
-  public static final String PROPERTY_WORKFLOW = "workflow";
-  public static final String PROPERTY_PARAMETER = "parameter";
-  public static final String PROPERTY_COMMIT_SHA = "commitSha";
+  static final String PROPERTY_CONFIG_ENABLED = "enabled";
+  static final String PROPERTY_CONFIG_DOCKER_RUNNER_ID = "dockerRunnerId";
+  static final String PROPERTY_WORKFLOW_JSON = "json";
+  static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
+  static final String PROPERTY_NEXT_EXECUTION = "nextNaturalTrigger";
+  static final String PROPERTY_DOCKER_IMAGE = "dockerImage";
+  static final String PROPERTY_COUNTER = "counter";
+  static final String PROPERTY_COMPONENT = "component";
+  static final String PROPERTY_WORKFLOW = "workflow";
+  static final String PROPERTY_PARAMETER = "parameter";
+  static final String PROPERTY_COMMIT_SHA = "commitSha";
 
-  public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
+  static final String KEY_GLOBAL_CONFIG = "styxGlobal";
 
-  public static final boolean DEFAULT_CONFIG_ENABLED = true;
-  public static final String DEFAULT_CONFIG_DOCKER_RUNNER_ID = "default";
-  public static final boolean DEFAULT_WORKFLOW_ENABLED = false;
+  static final boolean DEFAULT_CONFIG_ENABLED = true;
+  static final String DEFAULT_CONFIG_DOCKER_RUNNER_ID = "default";
+  static final boolean DEFAULT_WORKFLOW_ENABLED = false;
 
-  public static final int MAX_RETRIES = 100;
+  static final int MAX_RETRIES = 100;
 
   private final Datastore datastore;
   private final Duration retryBaseDelay;
@@ -120,7 +124,7 @@ class DatastoreStorage {
     return readConfigBoolean(PROPERTY_CONFIG_ENABLED, DEFAULT_CONFIG_ENABLED);
   }
 
-  public String globalDockerRunnerId() {
+  String globalDockerRunnerId() {
     return readConfigString(PROPERTY_CONFIG_DOCKER_RUNNER_ID, DEFAULT_CONFIG_DOCKER_RUNNER_ID);
   }
 
@@ -204,6 +208,13 @@ class DatastoreStorage {
         });
   }
 
+  void delete(Collection<WorkflowId> workflowIds) throws IOException {
+    storeWithRetries(() -> {
+      datastore.delete((workflowIds).stream().map(this::workflowKey).toArray(Key[]::new));
+      return null;
+    });
+  }
+
   void delete(WorkflowId workflowId) throws IOException {
     storeWithRetries(() -> {
       datastore.delete(workflowKey(workflowId));
@@ -211,7 +222,7 @@ class DatastoreStorage {
     });
   }
 
-  public void updateNextNaturalTrigger(WorkflowId workflowId, Instant nextNaturalTrigger) throws IOException {
+  void updateNextNaturalTrigger(WorkflowId workflowId, Instant nextNaturalTrigger) throws IOException {
     storeWithRetries(() -> datastore.runInTransaction(transaction -> {
       final Key workflowKey = workflowKey(workflowId);
       final Optional<Entity> workflowOpt = getOpt(transaction, workflowKey);
@@ -227,7 +238,28 @@ class DatastoreStorage {
     }));
   }
 
-  public Map<Workflow, Optional<Instant>> workflowsWithNextNaturalTrigger()
+  Collection<Workflow> workflows() throws IOException {
+    final EntityQuery query =
+        Query.entityQueryBuilder().kind(KIND_WORKFLOW).build();
+    final QueryResults<Entity> result = datastore.run(query);
+
+    Collection<Workflow> workflows = new ArrayList<>();
+    while (result.hasNext()) {
+      final Entity entity = result.next();
+      Workflow workflow;
+      try {
+        workflow =
+            Json.OBJECT_MAPPER.readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
+      } catch (IOException e) {
+        LOG.warn("Failed to read workflow {}.", entity.key());
+        continue;
+      }
+      workflows.add(workflow);
+    }
+    return workflows;
+  }
+
+  Map<Workflow, Optional<Instant>> workflowsWithNextNaturalTrigger()
       throws IOException {
     Map<Workflow, Optional<Instant>> map = Maps.newHashMap();
     final EntityQuery query =
@@ -266,6 +298,23 @@ class DatastoreStorage {
             .build();
 
     return queryActiveStates(query);
+  }
+
+  void deleteAllButThese(Collection<Workflow> workflows) throws IOException {
+    Map<WorkflowId, Workflow> workflowsInDatastore = workflows().stream()
+        .collect(Collectors.toMap(Workflow::id, w -> w));
+
+    for (Workflow workflow : workflows) {
+      Workflow workflowInDatastore = workflowsInDatastore.get(workflow.id());
+      if (workflowInDatastore == null || !workflow.equals(workflowInDatastore)) {
+        store(workflow);
+      }
+    }
+
+    Sets.SetView<WorkflowId> onlyInDataStore =
+        Sets.difference(workflowsInDatastore.keySet(), ImmutableSet.copyOf(workflows));
+
+    delete(onlyInDataStore);
   }
 
   private Map<WorkflowInstance, Long> queryActiveStates(EntityQuery activeStatesQuery) throws IOException {
