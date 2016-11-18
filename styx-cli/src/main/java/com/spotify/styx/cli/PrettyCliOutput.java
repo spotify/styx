@@ -20,169 +20,74 @@
 
 package com.spotify.styx.cli;
 
-import static com.spotify.apollo.Status.OK;
 import static com.spotify.styx.cli.CliUtil.colored;
 import static com.spotify.styx.cli.CliUtil.formatTimestamp;
-import static com.spotify.styx.model.EventSerializer.PersistentEvent;
+import static org.fusesource.jansi.Ansi.Color.BLUE;
 import static org.fusesource.jansi.Ansi.Color.CYAN;
+import static org.fusesource.jansi.Ansi.Color.DEFAULT;
 import static org.fusesource.jansi.Ansi.Color.GREEN;
 import static org.fusesource.jansi.Ansi.Color.MAGENTA;
 import static org.fusesource.jansi.Ansi.Color.WHITE;
 import static org.fusesource.jansi.Ansi.Color.YELLOW;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.ConsoleAppender;
-import com.spotify.apollo.Response;
 import com.spotify.styx.api.cli.ActiveStatesPayload;
-import com.spotify.styx.api.cli.ActiveStatesPayload.ActiveState;
 import com.spotify.styx.api.cli.EventsPayload;
-import com.spotify.styx.api.cli.EventsPayload.TimestampedPersistentEvent;
+import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.util.EventUtil;
-import java.util.SortedMap;
-import java.util.SortedSet;
-import net.sourceforge.argparse4j.inf.ArgumentParserException;
-import net.sourceforge.argparse4j.inf.Namespace;
-import okio.ByteString;
 import org.fusesource.jansi.Ansi;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-final class PrettyCliOutput implements CliOutput {
-
-  private static final Logger LOG = LoggerFactory.getLogger(PrettyCliOutput.class);
-
-  PrettyCliOutput(int level) {
-    init(level);
-  }
-
-  @Override
-  public void parsed(Namespace namespace) {
-    LOG.debug("Parsed namespace {}", namespace);
-  }
-
-  @Override
-  public void parseError(ArgumentParserException e, String help) {
-    LOG.warn(e.getMessage());
-    LOG.info(help);
-  }
-
-  @Override
-  public void apiError(Throwable throwable) {
-    LOG.warn("An API error occurred", throwable);
-  }
-
-  @Override
-  public void header(Main.Command command) {
-    LOG.info("{}", colored(MAGENTA, "      _                   "));
-    LOG.info("{}", colored(MAGENTA, "   __| |_ _  ___ __       "));
-    LOG.info("{}", colored(MAGENTA, "  (_-<  _| || \\ \\ /     "));
-    LOG.info("{}", colored(MAGENTA, "  /__/\\__|\\_, /_\\_\\   "));
-    LOG.info("{}", colored(MAGENTA, "          |__/            "));
-    LOG.info("");
-    LOG.info("> {}", colored(CYAN, command));
-    LOG.info("");
-  }
+class PrettyCliOutput implements CliOutput {
 
   @Override
   public void printActiveStates(ActiveStatesPayload activeStatesPayload) {
-    SortedMap<WorkflowId, SortedSet<ActiveState>> groupedActiveStates =
-        CliUtil.groupActiveStates(activeStatesPayload.activeStates());
-
-    LOG.info(String.format("%-30.30s %-30.30s %-30.30s %-30.30s",
-                             "WORKFLOW INSTANCE",
-                             "STATE",
-                             "LAST EXECUTION ID",
-                             "PREVIOUS EXECUTION INFO"));
-    LOG.info(String.format("%-30.30s %-30.30s %-30.30s %-30.30s",
-                           "-----------------------",
-                           "-----------------------",
-                           "-----------------------",
-                           "-----------------------"));
-    for (WorkflowId workflowId : groupedActiveStates.keySet()) {
-      LOG.info("{} <> {}",
-               colored(CYAN, workflowId.componentId()),
-               colored(CYAN, workflowId.endpointId()));
-      for (ActiveState activeState : groupedActiveStates.get(workflowId)) {
+    final String format = "  %-20s %-16s %-47s %s";
+    System.out.println(String.format(format,
+                                     "WORKFLOW INSTANCE",
+                                     "STATE",
+                                     "LAST EXECUTION ID",
+                                     "PREVIOUS EXECUTION INFO"));
+    CliUtil.groupActiveStates(activeStatesPayload.activeStates()).entrySet().forEach(entry -> {
+      System.out.println();
+      System.out.println(String.format("%s %s",
+                                       colored(CYAN, entry.getKey().componentId()),
+                                       colored(BLUE, entry.getKey().endpointId())));
+      entry.getValue().forEach(activeState -> {
         final Ansi previousExecutionInfo;
         if (activeState.previousExecutionLastEvent().isPresent()) {
-          final PersistentEvent persistentEvent = activeState.previousExecutionLastEvent().get();
-          final String message = CliUtil.lastExecutionMessage(persistentEvent.toEvent());
-          final Ansi.Color messageColor = persistentEvent.toEvent().accept(LastExecutionColor.LAST_EXECUTION_COLOR);
+          final Event event = activeState.previousExecutionLastEvent().get().toEvent();
+          final String message = CliUtil.lastExecutionMessage(event);
+          final Ansi.Color messageColor = event.accept(LastExecutionColor.LAST_EXECUTION_COLOR);
           previousExecutionInfo = colored(messageColor, message);
         } else {
-          previousExecutionInfo = colored(WHITE, "No data found");
+          previousExecutionInfo = colored(DEFAULT, "No data found");
         }
-        LOG.info(String.format("%s %-27.30s %-30.30s %-30.30s %s",
-                               colored(CYAN, "\\_"),
-                               activeState.workflowInstance().parameter(),
-                               activeState.state(),
-                               activeState.lastExecutionId(),
-                               previousExecutionInfo));
-      }
-    }
+        System.out.println(String.format(format,
+                                         activeState.workflowInstance().parameter(),
+                                         activeState.state(),
+                                         activeState.lastExecutionId(),
+                                         previousExecutionInfo)
+                               .trim());
+      });
+    });
   }
 
   @Override
   public void printEvents(EventsPayload eventsPayload) {
-    LOG.info(String.format("%-25.25s %-25.25s %-25.25s",
-                           "TIME",
-                           "EVENT",
-                           "DATA"));
-    LOG.info(String.format("%-25.25s %-25.25s %-25.25s",
-                           "-------------------",
-                           "-------------------",
-                           "-------------------"));
-    for (TimestampedPersistentEvent timestampedEvent : eventsPayload.events()) {
-      LOG.info(String.format("%-25.25s %-25.25s %s",
-                             formatTimestamp(timestampedEvent.timestamp()),
-                             EventUtil.name(timestampedEvent.event().toEvent()),
-                             CliUtil.data(timestampedEvent.event().toEvent())));
-    }
-  }
-
-  @Override
-  public void printResponse(Response<ByteString> response) {
-    if (OK.equals(response.status())) {
-      LOG.info(String.valueOf(colored(GREEN, "Success")));
-    } else {
-      LOG.info(String.valueOf(colored(MAGENTA, "Code: " + response.status().code())));
-      LOG.info(String.valueOf(colored(MAGENTA, response.status().reasonPhrase())));
-    }
-  }
-
-  private void init(int level) {
-    final ch.qos.logback.classic.Logger
-        logger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger("com.spotify.styx.cli");
-
-    if (level > 1) {
-      logger.setLevel(Level.TRACE);
-    } else if (level > 0) {
-      logger.setLevel(Level.DEBUG);
-    }
-
-    if (level > 0) {
-      final LoggerContext lc = (LoggerContext) LoggerFactory.getILoggerFactory();
-      final ch.qos.logback.classic.Logger
-          rootLogger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(
-          ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
-      final ConsoleAppender<ILoggingEvent> stdout =
-          (ConsoleAppender<ILoggingEvent>) rootLogger.getAppender("STDOUT");
-      final PatternLayoutEncoder layout = new PatternLayoutEncoder();
-      layout.setPattern("%gray(%d{HH:mm:ss.SSS}) %highlight(| %-5level| %-10logger{0}) "
-                        + "%green(|>) %msg%n");
-      layout.setContext(lc);
-      layout.start();
-
-      stdout.setEncoder(layout);
-      stdout.start();
-    }
+    final String format = "%-25s %-25s %s";
+    System.out.println(String.format(format,
+                                     "TIME",
+                                     "EVENT",
+                                     "DATA"));
+    eventsPayload.events().forEach(
+        timestampedEvent ->
+            System.out.println(String.format(format,
+                                             formatTimestamp(timestampedEvent.timestamp()),
+                                             EventUtil.name(timestampedEvent.event().toEvent()),
+                                             CliUtil.data(timestampedEvent.event().toEvent()))
+                                   .trim()));
   }
 
   private enum LastExecutionColor implements EventVisitor<Ansi.Color> {
@@ -216,7 +121,8 @@ final class PrettyCliOutput implements CliOutput {
     }
 
     @Override
-    public Ansi.Color created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
+    public Ansi.Color created(WorkflowInstance workflowInstance, String executionId,
+                              String dockerImage) {
       return WHITE;
     }
 
@@ -256,7 +162,8 @@ final class PrettyCliOutput implements CliOutput {
     }
 
     @Override
-    public Ansi.Color submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) {
+    public Ansi.Color submit(WorkflowInstance workflowInstance,
+                             ExecutionDescription executionDescription) {
       return WHITE;
     }
 

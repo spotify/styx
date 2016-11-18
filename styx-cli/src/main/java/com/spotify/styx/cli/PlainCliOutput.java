@@ -22,58 +22,27 @@ package com.spotify.styx.cli;
 
 import static com.spotify.styx.cli.CliUtil.formatTimestamp;
 
-import com.spotify.apollo.Response;
 import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.api.cli.EventsPayload;
-import com.spotify.styx.api.cli.EventsPayload.TimestampedPersistentEvent;
 import com.spotify.styx.model.EventSerializer;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.util.EventUtil;
 import java.util.SortedMap;
 import java.util.SortedSet;
-import net.sourceforge.argparse4j.inf.ArgumentParserException;
-import net.sourceforge.argparse4j.inf.Namespace;
-import okio.ByteString;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Cli output printer that prints more unix tool friendly output
  */
-public class PlainCliOutput implements CliOutput {
-
-  private static final Logger LOG = LoggerFactory.getLogger(PlainCliOutput.class);
-
-  @Override
-  public void parsed(Namespace namespace) {
-    // noop
-  }
-
-  @Override
-  public void parseError(ArgumentParserException e, String help) {
-    LOG.warn(e.getMessage());
-    LOG.info(help);
-  }
-
-  @Override
-  public void apiError(Throwable throwable) {
-    LOG.warn("An API error occurred", throwable);
-  }
-
-  @Override
-  public void header(Main.Command command) {
-    // noop
-  }
+class PlainCliOutput implements CliOutput {
 
   @Override
   public void printActiveStates(ActiveStatesPayload activeStatesPayload) {
-    LOG.info("COMPONENT WORKFLOW INSTANCE STATE LAST_EXECUTION_ID PREVIOUS_EXECUTION_INFO");
-
     SortedMap<WorkflowId, SortedSet<ActiveStatesPayload.ActiveState>> groupedActiveStates =
         CliUtil.groupActiveStates(activeStatesPayload.activeStates());
 
-    for (WorkflowId workflowId : groupedActiveStates.keySet()) {
-      for (ActiveStatesPayload.ActiveState activeState : groupedActiveStates.get(workflowId)) {
+    groupedActiveStates.entrySet().forEach(entry -> {
+      WorkflowId workflowId = entry.getKey();
+      entry.getValue().forEach(activeState -> {
         final String previousExecutionInfo;
         if (activeState.previousExecutionLastEvent().isPresent()) {
           final EventSerializer.PersistentEvent
@@ -82,31 +51,25 @@ public class PlainCliOutput implements CliOutput {
         } else {
           previousExecutionInfo = "No data found";
         }
-        LOG.info(String.format("%s %s %s %s %s %s",
-                               workflowId.componentId(),
-                               workflowId.endpointId(),
-                               activeState.workflowInstance().parameter(),
-                               activeState.state(),
-                               activeState.lastExecutionId(),
-                               previousExecutionInfo));
-      }
-    }
+        System.out.println(String.format("%s %s %s %s %s %s",
+                                         workflowId.componentId(),
+                                         workflowId.endpointId(),
+                                         activeState.workflowInstance().parameter(),
+                                         activeState.state(),
+                                         activeState.lastExecutionId(),
+                                         previousExecutionInfo).trim());
+      });
+    });
   }
 
   @Override
   public void printEvents(EventsPayload eventsPayload) {
-    LOG.info("TIME EVENT DATA");
-
-    for (TimestampedPersistentEvent timestampedEvent : eventsPayload.events()) {
-      LOG.info(String.format("%s %s %s",
-                             formatTimestamp(timestampedEvent.timestamp()),
-                             EventUtil.name(timestampedEvent.event().toEvent()),
-                             CliUtil.data(timestampedEvent.event().toEvent())));
-    }
-  }
-
-  @Override
-  public void printResponse(Response<ByteString> response) {
-    LOG.info(response.status().toString());
+    eventsPayload.events().forEach(
+        timestampedEvent ->
+            System.out.println(String.format("%s %s %s",
+                                             formatTimestamp(timestampedEvent.timestamp()),
+                                             EventUtil.name(timestampedEvent.event().toEvent()),
+                                             CliUtil.data(timestampedEvent.event().toEvent())).trim())
+    );
   }
 }
