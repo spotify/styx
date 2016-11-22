@@ -26,9 +26,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventSerializer;
-import com.spotify.styx.model.ExecutionStatus;
 import com.spotify.styx.model.SequenceEvent;
-import com.spotify.styx.model.WorkflowExecutionInfo;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowInstanceExecutionData;
@@ -36,9 +34,7 @@ import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.RunnableWithException;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -63,15 +59,8 @@ public class BigtableStorage {
 
   private static final Logger LOG = LoggerFactory.getLogger(BigtableStorage.class);
 
-  // todo: remove when not used from API
-  public static final TableName EXECUTION_INFO_TABLE_NAME = TableName.valueOf("execution_info");
-
   public static final TableName EVENTS_TABLE_NAME = TableName.valueOf("styx_events");
 
-  public static final byte[] INFO_CF = Bytes.toBytes("info");
-  public static final byte[] STATUS_QUALIFIER = Bytes.toBytes("status");
-  public static final byte[] PODNAME_QUALIFIER = Bytes.toBytes("pod_name"); // for backwards compatibility
-  public static final byte[] EXECUTION_ID_QUALIFIER = Bytes.toBytes("execution_id");
   public static final byte[] EVENT_CF = Bytes.toBytes("event");
   public static final byte[] EVENT_QUALIFIER = Bytes.toBytes("event");
 
@@ -161,84 +150,6 @@ public class BigtableStorage {
     }
 
     return WorkflowInstanceExecutionData.fromEvents(events);
-  }
-
-  void store(WorkflowExecutionInfo workflowExecutionInfo) throws IOException {
-    final Table execInfo = connection.getTable(EXECUTION_INFO_TABLE_NAME);
-
-    final byte[] key = Bytes.toBytes(workflowExecutionInfo.toKey());
-    final Put put = new Put(key);
-    put.addColumn(INFO_CF, STATUS_QUALIFIER, Bytes.toBytes(workflowExecutionInfo.executionStatus().toString()));
-    if (workflowExecutionInfo.executionId().isPresent()) {
-      put.addColumn(INFO_CF, EXECUTION_ID_QUALIFIER, Bytes.toBytes(workflowExecutionInfo.executionId().get()));
-    }
-    execInfo.put(put);
-  }
-
-  Map<WorkflowInstance, List<WorkflowExecutionInfo>> getExecutionInfo(WorkflowId workflowId) throws
-                                                                                          IOException {
-    final Table execInfo = connection.getTable(EXECUTION_INFO_TABLE_NAME);
-
-    final Scan scan = new Scan()
-        .setRowPrefixFilter(Bytes.toBytes(workflowId.toKey() + '#'));
-
-    final Map<WorkflowInstance, List<WorkflowExecutionInfo>> map = new HashMap<>();
-    for (Result r : execInfo.getScanner(scan)) {
-      final WorkflowExecutionInfo workflowExecutionInfo = parseExecutionInfoResult(r);
-      final WorkflowInstance workflowInstance = workflowExecutionInfo.workflowInstance();
-
-      map.computeIfAbsent(workflowInstance, (ignore) -> Lists.newArrayList())
-          .add(workflowExecutionInfo);
-    }
-
-    map.forEach((key, list) -> list.sort(WorkflowExecutionInfo.WHEN_COMPARATOR));
-
-    return map;
-  }
-
-  List<WorkflowExecutionInfo> getExecutionInfo(WorkflowInstance workflowInstance)
-      throws IOException {
-    final Table execInfo = connection.getTable(EXECUTION_INFO_TABLE_NAME);
-
-    final Scan scan = new Scan()
-        .setRowPrefixFilter(Bytes.toBytes(workflowInstance.toKey() + '#'));
-
-    final List<WorkflowExecutionInfo> executionInfos = Lists.newArrayList();
-    for (Result r : execInfo.getScanner(scan)) {
-      final WorkflowExecutionInfo workflowExecutionInfo = parseExecutionInfoResult(r);
-
-      executionInfos.add(workflowExecutionInfo);
-    }
-
-    executionInfos.sort(WorkflowExecutionInfo.WHEN_COMPARATOR);
-    return executionInfos;
-  }
-
-  private WorkflowExecutionInfo parseExecutionInfoResult(Result r) throws IOException {
-    final String key = new String(r.getRow());
-    final byte[] statusValue = r.getValue(INFO_CF, STATUS_QUALIFIER);
-    final byte[] executionIdValue = r.getValue(INFO_CF, EXECUTION_ID_QUALIFIER);
-    final byte[] podNameValue = r.getValue(INFO_CF, PODNAME_QUALIFIER); // for backwards compatibility
-    final String status = statusValue == null ? "" : new String(statusValue);
-
-    final String executionId;
-    if (executionIdValue != null) {
-      executionId = new String(executionIdValue);
-    } else if (podNameValue != null) {
-      executionId = new String(podNameValue);
-    } else {
-      executionId = "";
-    }
-
-    final ExecutionStatus executionStatus = ExecutionStatus.valueOf(status);
-    final WorkflowExecutionInfo workflowExecutionInfo;
-    try {
-      workflowExecutionInfo = WorkflowExecutionInfo.parseKey(key, executionStatus, executionId);
-    } catch (Throwable t) {
-      throw new IOException("Failed to parse execution info key: " + key + ". " + t.getMessage(), t);
-    }
-
-    return workflowExecutionInfo;
   }
 
   private SequenceEvent parseEventResult(Result r) throws IOException {

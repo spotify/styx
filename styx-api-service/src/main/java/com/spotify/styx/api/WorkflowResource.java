@@ -23,11 +23,7 @@ package com.spotify.styx.api;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.util.StreamUtil.cat;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.google.auto.value.AutoValue;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -35,9 +31,7 @@ import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
-import com.spotify.styx.model.ExecutionStatus;
 import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowExecutionInfo;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowInstanceExecutionData;
@@ -48,10 +42,8 @@ import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
 
@@ -73,10 +65,10 @@ public final class WorkflowResource {
             rc -> workflow(arg("cid", rc), arg("eid", rc))),
         Route.with(
             json(), "GET", BASE + "/<cid>/<eid>/instances",
-            rc -> instancesOld(arg("cid", rc), arg("eid", rc))),
+            rc -> Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Use v1 api"))),
         Route.with(
             json(), "GET", BASE + "/<cid>/<eid>/instances/<iid>",
-            rc -> instanceOld(arg("cid", rc), arg("eid", rc), arg("iid", rc))),
+            rc -> Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Use v1 api"))),
         Route.with(
             json(), "GET", BASE + "/<cid>/<eid>/state",
             rc -> state(arg("cid", rc), arg("eid", rc))),
@@ -205,44 +197,6 @@ public final class WorkflowResource {
     return Response.forPayload(workflowState);
   }
 
-  private Response<List<WorkflowInstanceJson>> instancesOld(
-      String componentId,
-      String endpointId) {
-
-    final WorkflowId workflowId = WorkflowId.create(componentId, endpointId);
-
-    final List<WorkflowInstanceJson> workflowInstances;
-    try {
-      final Map<WorkflowInstance, List<WorkflowExecutionInfo>> executionInfos =
-          storage.getExecutionInfo(workflowId);
-      workflowInstances = executionInfos.entrySet().stream()
-          .map(entry -> getWorkflowInstance(entry.getKey(), entry.getValue()))
-          .collect(Collectors.toList());
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
-
-    return Response.forPayload(workflowInstances);
-  }
-
-  private Response<WorkflowInstanceJson> instanceOld(
-      String componentId,
-      String endpointId,
-      String instanceId) {
-
-    final WorkflowId workflowId = WorkflowId.create(componentId, endpointId);
-    final WorkflowInstance workflowInstance = WorkflowInstance.create(workflowId, instanceId);
-
-    final WorkflowInstanceJson workflowInstanceJson;
-    try {
-      final List<WorkflowExecutionInfo> executionInfos = storage.getExecutionInfo(workflowInstance);
-      workflowInstanceJson = getWorkflowInstance(workflowInstance, executionInfos);
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
-    return Response.forPayload(workflowInstanceJson);
-  }
-
   private Response<List<WorkflowInstanceExecutionData>> instances(String componentId, String endpointId) {
     final WorkflowId workflowId = WorkflowId.create(componentId, endpointId);
     final List<WorkflowInstanceExecutionData> data;
@@ -274,79 +228,11 @@ public final class WorkflowResource {
     }
   }
 
-  private WorkflowInstanceJson getWorkflowInstance(
-      WorkflowInstance workflowInstance,
-      List<WorkflowExecutionInfo> execInfos) {
-
-    final List<WorkflowInstanceExecutionJson> executions = execInfos.stream()
-        .map(this::execJson)
-        .collect(Collectors.toList());
-
-    return WorkflowInstanceJson.create(
-        workflowInstance.workflowId(),
-        workflowInstance.parameter(),
-        JsonNodeFactory.instance.objectNode(),
-        executions);
-  }
-
-  private WorkflowInstanceExecutionJson execJson(WorkflowExecutionInfo execInfo) {
-    return WorkflowInstanceExecutionJson.create(
-        execInfo.when().toString(), execInfo.executionStatus(), execInfo.executionId());
-  }
-
   private static boolean isValidSHA1(String s) {
     return s.matches("[a-fA-F0-9]{40}");
   }
 
   private static String arg(String name, RequestContext rc) {
     return rc.pathArgs().get(name);
-  }
-
-  @AutoValue
-  abstract static class WorkflowInstanceJson {
-
-    @JsonProperty
-    public abstract WorkflowId workflowId();
-
-    @JsonProperty
-    public abstract String when();
-
-    @JsonProperty
-    public abstract JsonNode parameters();
-
-    @JsonProperty
-    public abstract List<WorkflowInstanceExecutionJson> executions();
-
-    static WorkflowInstanceJson create(
-        WorkflowId workflowId,
-        String when,
-        JsonNode parameters,
-        List<WorkflowInstanceExecutionJson> executions) {
-      return new AutoValue_WorkflowResource_WorkflowInstanceJson(
-          workflowId, when, parameters, executions);
-    }
-  }
-
-  @AutoValue
-  abstract static class WorkflowInstanceExecutionJson {
-
-    @JsonProperty
-    public abstract String when();
-
-    @JsonProperty
-    public abstract ExecutionStatus status();
-
-    @JsonProperty
-    public abstract Optional<String> executionId();
-
-    static WorkflowInstanceExecutionJson create(
-        String when,
-        ExecutionStatus status,
-        Optional<String> executionId) {
-      return new AutoValue_WorkflowResource_WorkflowInstanceExecutionJson(
-          when,
-          status,
-          executionId);
-    }
   }
 }

@@ -71,7 +71,6 @@ import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.state.handlers.DockerRunnerHandler;
 import com.spotify.styx.state.handlers.ExecutionDescriptionHandler;
 import com.spotify.styx.state.handlers.PublisherHandler;
-import com.spotify.styx.state.handlers.StorageHandler;
 import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.EventStorage;
@@ -89,7 +88,6 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 import java.io.Closeable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -301,7 +299,6 @@ public class StyxScheduler implements AppInit {
     final OutputHandler[] outputHandlers = new OutputHandler[] {
         transitionLogger(""),
         new DockerRunnerHandler(dockerRunner, stateManager),
-        new StorageHandler(storage, Clock.systemUTC()),
         new TerminationHandler(
             DEFAULT_RETRY_BASE_DELAY,
             DEFAULT_RETRY_MAX_EXPONENT,

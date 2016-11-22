@@ -23,10 +23,8 @@ package com.spotify.styx.storage;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.spotify.styx.model.ExecutionStatus;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowExecutionInfo;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowInstanceExecutionData;
@@ -53,8 +51,6 @@ public class InMemStorage implements Storage, EventStorage {
   private final Set<WorkflowId> enabledWorkflows = Sets.newConcurrentHashSet();
   private final Set<String> components = Sets.newConcurrentHashSet();
   private final ConcurrentMap<WorkflowId, Workflow> workflowStore = Maps.newConcurrentMap();
-  private final ConcurrentMap<WorkflowInstance, List<WorkflowExecutionInfo>> executionStore =
-      Maps.newConcurrentMap();
   private final ConcurrentMap<WorkflowId, String> dockerImagesPerWorkflowId = Maps.newConcurrentMap();
   private final ConcurrentMap<String, String> dockerImagesPerComponent = Maps.newConcurrentMap();
   private final ConcurrentMap<WorkflowId, WorkflowState> workflowStatePerWorkflowId = Maps.newConcurrentMap();
@@ -141,36 +137,6 @@ public class InMemStorage implements Storage, EventStorage {
     workflowInstanceDataList.sort(WorkflowInstanceExecutionData.COMPARATOR);
 
     return workflowInstanceDataList;
-  }
-
-  @Override
-  public void store(WorkflowExecutionInfo workflowExecutionInfo) {
-    WorkflowInstance key = workflowExecutionInfo.workflowInstance();
-    final List<WorkflowExecutionInfo> workflowExecutionInfos = executionStore
-        .computeIfAbsent(key, k -> Lists.newArrayList());
-
-    workflowExecutionInfos.add(workflowExecutionInfo);
-    workflowExecutionInfos.sort(WorkflowExecutionInfo.WHEN_COMPARATOR);
-
-    countDown.countDown();
-  }
-
-  public List<ExecutionStatus> getStoredStatuses(WorkflowInstance workflowInstance) throws IOException {
-    return getExecutionInfo(workflowInstance).stream()
-        .map(WorkflowExecutionInfo::executionStatus)
-        .collect(Collectors.toList());
-  }
-
-  @Override
-  public Map<WorkflowInstance, List<WorkflowExecutionInfo>> getExecutionInfo(WorkflowId workflowId) {
-    return executionStore.entrySet().stream()
-        .filter(entry -> entry.getKey().workflowId().equals(workflowId))
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-  }
-
-  @Override
-  public List<WorkflowExecutionInfo> getExecutionInfo(WorkflowInstance workflowInstance) {
-    return executionStore.get(workflowInstance);
   }
 
   @Override

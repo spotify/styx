@@ -21,7 +21,6 @@
 package com.spotify.styx.monitoring;
 
 import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowExecutionInfo;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowInstanceExecutionData;
@@ -97,23 +96,6 @@ public final class MeteredStorage extends MeteredBase implements Storage {
   public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId)
       throws IOException {
     return timedStorage("executionData", () -> delegate.executionData(workflowId));
-  }
-
-  @Override
-  public void store(WorkflowExecutionInfo workflowExecutionInfo) throws IOException {
-    timedStorage("store", () -> delegate.store(workflowExecutionInfo));
-  }
-
-  @Override
-  public Map<WorkflowInstance, List<WorkflowExecutionInfo>> getExecutionInfo(
-      WorkflowId workflowId) throws IOException {
-    return timedStorage("getExecutionInfo", () -> delegate.getExecutionInfo(workflowId));
-  }
-
-  @Override
-  public List<WorkflowExecutionInfo> getExecutionInfo(WorkflowInstance workflowInstance)
-      throws IOException {
-    return timedStorage("getExecutionInfo", () -> delegate.getExecutionInfo(workflowInstance));
   }
 
   @Override
