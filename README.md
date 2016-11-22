@@ -110,7 +110,12 @@ Styx does not have any assumptions about what is executed in the container, it o
 the exit code. Any execution returning a non-zero exit code will cause a re-try to be scheduled,
 with an exponential back-off between each try.
 
+---
+
+This project adheres to the [Open Code of Conduct][code-of-conduct]. By participating, you are
+expected to honor this code.
 
 [Kubernetes]: http://kubernetes.io/
 [Apollo]: https://spotify.github.io/apollo/
 [Luigi]: https://github.com/spotify/luigi
+[code-of-conduct]: https://github.com/spotify/code-of-conduct/blob/master/code-of-conduct.md
