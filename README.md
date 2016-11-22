@@ -12,28 +12,31 @@ information needed to schedule such invocations, is read from a set of files on 
 external service providing such information. The service takes responsibility for triggering
 and possibly also re-triggering invocations until a successful exit status has been emitted
 or some other limit has been reached. Styx is built using the [Apollo] framework and uses
-[Kubernetes] for container invocations.
+[Kubernetes] for container orchestration.
 
 Styx can optionally provide some dynamic arguments to container executions that indicates
 which time period a particular invocation belongs to. For example an hourly job for the first
-hour of 2016-01-01 might have the dynamic argument --datetime=2016-01-01T00 appended to the
-container invocation. At the time of writing, styx has no concept of checking whether an execution
-is needed for a particular time or not. It simply executes containers for the current time and
-continues until a particular workflow is disabled.
+hour of 2016-01-01 might have the dynamic argument `--datetime 2016-01-01T00` appended to the
+container invocation.
 
-The envisioned main use case for styx is to execute big data pipelines, possibly long running
+The envisioned main use case for Styx is to execute data processing job, possibly long running
 processes that transform data periodically. It's initial use case is to run jobs written using
-[luigi]
+[Luigi], but it does not have any hard ties to Luigi. Styx can just as well execute a container
+with some simple bash scripts.
+
+Styx was build to function smoothly on Google Cloud Platform, thus it makes use of Google products
+such as Google Cloud Datastore, Google Cloud Bigtable and Google Container Engine. However, the 
+integrations with these products are all done through clear interfaces and other backends can 
+easily be added.
 
 ## Key concepts
 
-The key type of information that styx concerns itself with is Workflows. A Workflow is either
-enabled or disabled and is associated with a ScheduleDefinition. ScheduleDefinition objects hold
-information used to figure out when a job needs to be executed and other things such as which
-docker image to use for execution. When it is time to run a specific Workflow, styx creates a
-WorkflowInstance that references a Workflow and also holds the concrete parameters that needs
-to be provided for a container invocation. Styx also keeps track of WorkflowInstance executions
-and provides information about them via the API.
+The key type of information that Styx concerns itself with are Workflows. A Workflow is either
+enabled or disabled and is has a Schedule. A Schedule specifies how often a Workflow should be 
+triggered, which docker image to run and which arguments to pass to it on each execution. Each time
+a Workflow is triggered, a Workflow Instance is created. The Workflow instance is tracked as 
+'active' until at least on execution of the docker image returns with a 0 exit code. Styx will keep
+track of Workflow Instance executions and provides information about them via the API.
 
 ### More docs
 
@@ -44,9 +47,70 @@ and provides information about them via the API.
 
 ## Usage
 
-TBA
+### Setup
+
+A fully functional Service can be found in [styx-standalone-service](./styx-standalone-service). 
+This packaging contains both the API and Scheduler service in one process. (more details to come)
+
+Set the following configuration key in `styx-standalone.conf` to set the service to monitor a local 
+directory for schedule definitions:
+
+```yaml
+styx.source.local.dir = "/etc/styx"
+```
+
+### Workflow schedule configuration
+
+To define a schedule, simply write a  yaml file to `/etc/styx` (given the above configuration)
+
+`/etc/styx/my-schedules.yaml`
+```yaml
+schedules:
+  - id: my-workflow
+    partitioning: hours
+    docker_image: my-workflow:0.1
+    docker_args: ['./run.sh', '{}']
+```
+
+- `schedules` **[schedule]**: The main key, containing a list of schedules
+
+- `schedule[].id` **string**: A unique identifier for the workflow (lower-case-hyphenated)
+ - This identifier is used to refer to the workflow through the API.
+
+- `schedule[].partitioning` **string**: How often the workflow should be triggered
+ - Allowed values are `hourly`, `daily`, `weekly`
+  - *todo: support more intervals*
+  - *todo: support cron syntax*
+
+- `schedule[].docker_image` **string**: The docker image that should be executed
+ - The docker image that contains the workflow
+
+- `schedule[].docker_args` **[string]**: The arguments passed to the docker image
+ - This list should only contain strings. These will be passed as the arguments to the docker
+container. Any occurrences of the `"{}"` placeholder argument will be replaced with the current
+partition date or datehour. Note that it must be quoted in the yaml file in order no to be
+interpreted as an object.
+
+Example arguments for the supported partitioning values:
+```
+- hourly - 2016-04-01T14, 2016-04-01T15, ... (UTC hours)
+- daily  - 2016-04-01,    2016-04-02,    ...
+- weekly - 2016-04-04,    2016-04-11,    ... (Mondays)
+```
+
+### Triggering and executions
+
+Each time a Workflow Schedule is triggered, Styx will treat that trigger as a first class
+entity. Each Trigger will have at least one Execution which can potentially take a long time
+to execute. If another Trigger happens during this time, both triggers will be active, each
+with one running container. Because Styx treats each Trigger individually, it can ensure that
+each one of them complete successfully.
+
+Styx does not have any assumptions about what is executed in the container, it only cares about
+the exit code. Any execution returning a non-zero exit code will cause a re-try to be scheduled,
+with an exponential back-off between each try.
 
 
 [Kubernetes]: http://kubernetes.io/
 [Apollo]: https://spotify.github.io/apollo/
-[luigi]: https://github.com/spotify/luigi
+[Luigi]: https://github.com/spotify/luigi
