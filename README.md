@@ -1,7 +1,7 @@
 # Styx
 
 [![CircleCI](https://circleci.com/gh/spotify/styx/tree/master.svg?style=shield)](https://circleci.com/gh/spotify/styx)
-[![License](https://img.shields.io/github/license/spotify/styx.svg)](LICENSE.txt)
+[![License](https://img.shields.io/github/license/spotify/styx.svg)](LICENSE)
 
 A data processing job scheduler for Kubernetes 
 
