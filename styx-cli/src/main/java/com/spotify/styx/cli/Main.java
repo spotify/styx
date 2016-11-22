@@ -59,7 +59,8 @@ public final class Main {
 
   private static final String UTF_8 = "UTF-8";
   private static final String ENV_VAR_PREFIX = "STYX_CLI";
-  private static final String STYX_CLI_API = "http://styx.example.com/api/v1/cli";
+  private static final String STYX_CLI_API_ENDPOINT = "/api/v1/cli";
+  private static String STYX_API_HOST;
   private static final int TTL_REQUEST = 90;
 
   private static final String COMMAND_DEST = "command";
@@ -106,6 +107,10 @@ public final class Main {
     final Subparser retry = Command.RETRY.parser(subCommands);
     addWorkflowInstanceArguments(retry);
 
+    final Argument host = parser.addArgument("-H", "--host")
+        .help("Styx API host (can also be set with environment variable " + ENV_VAR_PREFIX + "_HOST")
+        .action(Arguments.store());
+
     final Argument plain = parser.addArgument("-p", "--plain")
         .help("plain output")
         .setDefault(false)
@@ -114,6 +119,13 @@ public final class Main {
     Namespace namespace = null;
     try {
       namespace = parser.parseArgs(args);
+      STYX_API_HOST = namespace.getString(host.getDest());
+      if (STYX_API_HOST == null) {
+        STYX_API_HOST = System.getenv(ENV_VAR_PREFIX + "_HOST");
+      }
+      if (STYX_API_HOST == null) {
+        throw new ArgumentParserException("Styx API host not set", parser);
+      }
     } catch (HelpScreenException e) {
       System.exit(EXIT_CODE_SUCCESS);
     } catch (ArgumentParserException e) {
@@ -299,7 +311,7 @@ public final class Main {
   }
 
   private static String apiUri(String... parts) {
-    return STYX_CLI_API + "/" + String.join("/", parts);
+    return "http://" + STYX_API_HOST + STYX_CLI_API_ENDPOINT + "/" + String.join("/", parts);
   }
 
   private enum Command {
