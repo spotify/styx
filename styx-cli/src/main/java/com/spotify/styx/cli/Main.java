@@ -93,7 +93,8 @@ public final class Main {
         .metavar(" ");
 
     final Subparser list = Command.LIST.parser(subCommands);
-    list.addArgument(COMPONENT_DEST).help("Component id");
+    final Argument listComponent = list.addArgument("-c", "--component")
+        .help("only show instances for COMPONENT");
 
     final Subparser events = Command.EVENTS.parser(subCommands);
     addWorkflowInstanceArguments(events);
@@ -148,7 +149,7 @@ public final class Main {
 
       switch (command) {
         case LIST:
-          activeStates(client, namespace, cli);
+          activeStates(listComponent, client, namespace, cli);
           break;
 
         case EVENTS:
@@ -176,12 +177,13 @@ public final class Main {
     }
   }
 
-  private static void activeStates(BiConsumer<Request, Consumer<byte[]>> client,
+  private static void activeStates(Argument listComponent,
+                                   BiConsumer<Request, Consumer<byte[]>> client,
                                    Namespace namespace, CliOutput cliOutput)
       throws UnsupportedEncodingException {
 
     String uri = apiUri("activeStates");
-    String component = namespace.getString(COMPONENT_DEST);
+    String component = namespace.getString(listComponent.getDest());
     if (component != null) {
       uri += "?component=" + URLEncoder.encode(component, UTF_8);
     }
