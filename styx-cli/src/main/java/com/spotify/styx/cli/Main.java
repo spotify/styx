@@ -319,7 +319,7 @@ public final class Main {
   private enum Command {
     LIST("ls", "List active workflow instances"),
     EVENTS("e", "List events for a workflow instance"),
-    HALT("", "Halt a workflow instance"),
+    HALT("h", "Halt a workflow instance"),
     TRIGGER("t", "Trigger a completed workflow instance"),
     RETRY("r", "Retry a workflow instance that is in a waiting state");
 
