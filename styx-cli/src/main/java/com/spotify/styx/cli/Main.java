@@ -41,7 +41,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.time.Duration;
-import java.util.concurrent.CompletionStage;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import net.sourceforge.argparse4j.ArgumentParsers;
@@ -283,8 +282,8 @@ public final class Main {
 
   private static BiConsumer<Request, Consumer<byte[]>> errorHandlingClient(
       Client client, Service.Signaller signaller) {
-    return (request, consumer) -> {
-      CompletionStage<byte[]> completionStage = client.send(request)
+    return (request, consumer) ->
+      client.send(request)
           .handle((response, throwable) -> {
             if (throwable != null) {
               throw Throwables.propagate(throwable);
@@ -297,19 +296,16 @@ public final class Main {
                 throw new RuntimeException(
                     response.status().code() + " " + response.status().reasonPhrase());
             }
+          })
+          .thenAccept(consumer != null ? consumer : bytes -> {})
+          .whenComplete((ignored, throwable) -> {
+            if (throwable != null) {
+              System.err.println("An API error occurred: "
+                                 + Throwables.getRootCause(throwable).getMessage());
+              System.exit(EXIT_CODE_API_ERROR);
+            }
+            signaller.signalShutdown();
           });
-      if (consumer != null) {
-        completionStage.thenAccept(consumer);
-      }
-      completionStage.whenComplete((ignored, throwable) -> {
-        if (throwable != null) {
-          System.err.println("An API error occurred: "
-                             + Throwables.getRootCause(throwable).getMessage());
-          System.exit(EXIT_CODE_API_ERROR);
-        }
-        signaller.signalShutdown();
-      });
-    };
   }
 
   private static String apiUri(String... parts) {
