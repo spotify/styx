@@ -401,7 +401,7 @@ public class QueuedStateManagerTest {
       WorkflowInstance instance = wfi.apply(j);
       RunState runState = stateManager.get(instance);
       assertThat(instance.toKey(), runState.state(), is(RunState.State.PREPARE));
-      assertThat(instance.toKey(), runState.tries(), is(100));
+      assertThat(instance.toKey(), runState.data().tries(), is(100));
     }
   }
 }

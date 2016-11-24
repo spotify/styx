@@ -38,6 +38,7 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.testdata.TestData;
@@ -117,7 +118,8 @@ public class KubernetesDockerRunnerTest {
     createdPod.getMetadata().setName(POD_NAME);
     createdPod.getMetadata().setResourceVersion("1001");
 
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, POD_NAME, RunState.State.SUBMITTED));
+    StateData stateData = StateData.builder().executionId(POD_NAME).build();
+    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
 
     when(pods.create(any(Pod.class))).thenReturn(createdPod);
 
@@ -135,7 +137,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(terminated("Succeeded", 20));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
-    assertThat(stateManager.get(WORKFLOW_INSTANCE).lastExit(), is(20));
+    assertThat(stateManager.get(WORKFLOW_INSTANCE).data().lastExit(), is(20));
   }
 
   @Test
@@ -197,7 +199,9 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldGenerateStartedWhenContainerIsReady() throws Exception {
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, POD_NAME, RunState.State.SUBMITTED));
+    StateData stateData = StateData.builder().executionId(POD_NAME).build();
+    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
+
     createdPod.setStatus(running(/* ready= */ false));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
     assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.SUBMITTED));

@@ -113,18 +113,21 @@ public final class ReplayEvents {
       case PREPARE:
       case ERROR:
       case DONE:
-        return format("tries:%d", state.tries());
+        return format("tries:%d", state.data().tries());
 
       case SUBMITTED:
       case RUNNING:
       case FAILED:
-        return format("tries:%d execId:%s", state.tries(), state.executionId());
+        return format("tries:%d execId:%s",
+            state.data().tries(), state.data().executionId());
 
       case TERMINATED:
-        return format("tries:%d execId:%s exitCode:%d", state.tries(), state.executionId(), state.lastExit());
+        return format("tries:%d execId:%s exitCode:%d",
+            state.data().tries(), state.data().executionId(), state.data().lastExit());
 
       case AWAITING_RETRY:
-        return format("tries:%d delayMs:%d", state.tries(), state.retryDelayMillis());
+        return format("tries:%d delayMs:%d",
+            state.data().tries(), state.data().retryDelayMillis());
 
       default:
         return "";

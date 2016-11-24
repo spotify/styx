@@ -63,7 +63,7 @@ public class TerminationHandler implements OutputHandler {
   public void transitionInto(RunState state) {
     switch (state.state()) {
       case TERMINATED:
-        if (state.lastExit() == 0) {
+        if (state.data().lastExit() == 0) {
           stateManager.receiveIgnoreClosed(Event.success(state.workflowInstance()));
         } else {
           checkRetry(state);
@@ -82,9 +82,9 @@ public class TerminationHandler implements OutputHandler {
   private void checkRetry(RunState state) {
     final WorkflowInstance workflowInstance = state.workflowInstance();
 
-    if (state.retryCost() < MAX_RETRY_COST) {
+    if (state.data().retryCost() < MAX_RETRY_COST) {
       final long delayMillis;
-      if (state.lastExit() == MISSING_DEPS_EXIT_CODE) {
+      if (state.data().lastExit() == MISSING_DEPS_EXIT_CODE) {
         delayMillis = Duration.ofMinutes(MISSING_DEPS_RETRY_DELAY_MINUTES).toMillis();
       } else {
         delayMillis = calculateDelay(state).toMillis();
@@ -96,12 +96,12 @@ public class TerminationHandler implements OutputHandler {
   }
 
   private Duration calculateDelay(RunState state) {
-    final int tries = (state.tries() < maxExponent) ? state.tries() : maxExponent;
+    final int tries = (state.data().tries() < maxExponent) ? state.data().tries() : maxExponent;
     final int multiplier = Math.max(1, RANDOM.nextInt(1 << tries));
     final Duration delay = baseDelay.multipliedBy(multiplier);
 
     final String instanceKey = state.workflowInstance().toKey();
-    LOG.info("{} scheduling retry #{} in {}", instanceKey, state.tries(), delay);
+    LOG.info("{} scheduling retry #{} in {}", instanceKey, state.data().tries(), delay);
 
     return delay;
   }

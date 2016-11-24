@@ -227,7 +227,7 @@ public class QueuedStateManager implements StateManager, StaleStateReaper, State
           // check again from transition loop
           RunState currentState = states.get(key).runState;
           if (shouldRetry(currentState)) {
-            LOG.info("{} triggering retry #{}", key.toKey(), currentState.tries());
+            LOG.info("{} triggering retry #{}", key.toKey(), currentState.data().tries());
             try {
               receive(Event.retry(key));
             } catch (IsClosed ignored) {
@@ -360,7 +360,7 @@ public class QueuedStateManager implements StateManager, StaleStateReaper, State
     }
 
     final long ageMillis = time.get().toEpochMilli() - runState.timestamp();
-    final long retryDelayMillis = runState.retryDelayMillis();
+    final long retryDelayMillis = runState.data().retryDelayMillis();
 
     return ageMillis >= retryDelayMillis;
   }

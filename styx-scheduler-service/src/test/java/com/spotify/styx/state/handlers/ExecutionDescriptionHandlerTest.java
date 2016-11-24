@@ -37,6 +37,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.storage.InMemStorage;
@@ -79,12 +80,13 @@ public class ExecutionDescriptionHandlerTest {
     stateManager.receive(Event.triggerExecution(workflowInstance, "trig"));
 
     RunState currentState = stateManager.get(workflowInstance);
+    StateData data = currentState.data();
 
     assertThat(currentState.state(), is(SUBMITTING));
-    assertTrue(currentState.executionDescription().isPresent());
-    assertThat(currentState.executionDescription().get().dockerImage(), is(DOCKER_IMAGE));
-    assertThat(currentState.executionDescription().get().dockerArgs(), contains("--date", "{}", "--bar"));
-    assertThat(currentState.executionDescription().get().commitSha(), hasValue(COMMIT_SHA));
+    assertTrue(data.executionDescription().isPresent());
+    assertThat(data.executionDescription().get().dockerImage(), is(DOCKER_IMAGE));
+    assertThat(data.executionDescription().get().dockerArgs(), contains("--date", "{}", "--bar"));
+    assertThat(data.executionDescription().get().commitSha(), hasValue(COMMIT_SHA));
   }
 
   @Test
@@ -170,10 +172,11 @@ public class ExecutionDescriptionHandlerTest {
     toTest.transitionInto(runState);
 
     RunState currentState = stateManager.get(workflowInstance);
+    StateData data = currentState.data();
 
     assertThat(currentState.state(), is(SUBMITTING));
-    assertTrue(currentState.executionDescription().isPresent());
-    assertThat(currentState.executionDescription().get().dockerImage(), is("legacy-docker-image"));
+    assertTrue(data.executionDescription().isPresent());
+    assertThat(data.executionDescription().get().dockerImage(), is("legacy-docker-image"));
   }
 
   private DataEndpoint dataEndpoint(String... args) {

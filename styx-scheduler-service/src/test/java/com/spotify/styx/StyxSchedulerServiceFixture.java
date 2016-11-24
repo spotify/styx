@@ -25,13 +25,13 @@ import static java.util.Collections.singletonList;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 
-import autovalue.shaded.com.google.common.common.base.Throwables;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.KeyQuery;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.spotify.apollo.test.ServiceHelper;
 import com.spotify.styx.docker.DockerRunner;
