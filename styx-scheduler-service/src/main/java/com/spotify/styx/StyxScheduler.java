@@ -78,6 +78,7 @@ import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.NoopEventStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.EventStorageFactory;
+import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.Singleton;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
@@ -124,6 +125,8 @@ public class StyxScheduler implements AppInit {
   public static final Duration DEFAULT_RETRY_BASE_DELAY = Duration.ofMinutes(3);
   public static final int DEFAULT_RETRY_MAX_EXPONENT = 6;
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
+  public static final RetryUtil DEFAULT_RETRY_UTIL =
+      new RetryUtil(DEFAULT_RETRY_BASE_DELAY, DEFAULT_RETRY_MAX_EXPONENT);
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxScheduler.class);
 
@@ -162,6 +165,7 @@ public class StyxScheduler implements AppInit {
     private StatsFactory statsFactory = StyxScheduler::stats;
     private ExecutorFactory executorFactory = Executors::newScheduledThreadPool;
     private PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
+    private RetryUtil retryUtil = DEFAULT_RETRY_UTIL;
 
     public Builder setTime(Time time) {
       this.time = time;
@@ -212,7 +216,7 @@ public class StyxScheduler implements AppInit {
           scheduleSources,
           statsFactory,
           executorFactory,
-          publisherFactory);
+          publisherFactory, retryUtil);
     }
   }
 
@@ -234,6 +238,7 @@ public class StyxScheduler implements AppInit {
   private final StatsFactory statsFactory;
   private final ExecutorFactory executorFactory;
   private final PublisherFactory publisherFactory;
+  private final RetryUtil retryUtil;
 
   private StateManager stateManager;
 
@@ -245,7 +250,8 @@ public class StyxScheduler implements AppInit {
       ScheduleSources scheduleSources,
       StatsFactory statsFactory,
       ExecutorFactory executorFactory,
-      PublisherFactory publisherFactory) {
+      PublisherFactory publisherFactory,
+      RetryUtil retryUtil) {
     this.time = requireNonNull(time);
     this.storageFactory = requireNonNull(storageFactory);
     this.eventStorageFactory = requireNonNull(eventStorageFactory);
@@ -254,6 +260,7 @@ public class StyxScheduler implements AppInit {
     this.statsFactory = requireNonNull(statsFactory);
     this.executorFactory = requireNonNull(executorFactory);
     this.publisherFactory = requireNonNull(publisherFactory);
+    this.retryUtil = requireNonNull(retryUtil);
   }
 
   @Override
@@ -299,10 +306,7 @@ public class StyxScheduler implements AppInit {
     final OutputHandler[] outputHandlers = new OutputHandler[] {
         transitionLogger(""),
         new DockerRunnerHandler(dockerRunner, stateManager),
-        new TerminationHandler(
-            DEFAULT_RETRY_BASE_DELAY,
-            DEFAULT_RETRY_MAX_EXPONENT,
-            stateManager),
+        new TerminationHandler(retryUtil, stateManager),
         new MonitoringHandler(time, stats),
         new PublisherHandler(publisher),
         new ExecutionDescriptionHandler(storage, stateManager)

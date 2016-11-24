@@ -27,7 +27,6 @@ import static com.spotify.styx.state.RunState.State.QUEUED;
 import static com.spotify.styx.state.RunState.State.TERMINATED;
 import static com.spotify.styx.state.handlers.TerminationHandler.MAX_RETRY_COST;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.lessThan;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.Lists;
@@ -38,8 +37,8 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.RetryUtil;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
@@ -59,7 +58,8 @@ public class TerminationHandlerTest {
 
   @Before
   public void setUp() throws Exception {
-    outputHandler = new TerminationHandler(BASE_DELAY, MAX_EXPONENT, stateManager);
+    RetryUtil retryUtil = new RetryUtil(BASE_DELAY, MAX_EXPONENT);
+    outputHandler = new TerminationHandler(retryUtil, stateManager);
   }
 
   @Test
@@ -93,29 +93,6 @@ public class TerminationHandlerTest {
 
     RunState nextState = transitions.get(0);
     assertThat(nextState.state(), is(QUEUED));
-  }
-
-  @Test
-  public void shouldScheduleRetryWithBackoff() throws Exception {
-    List<Long> delays = new ArrayList<>();
-    int runs = 10000;
-    for (int i = 0; i < runs; i++) {
-      StateData data = data(MAX_EXPONENT, 1);
-      RunState tenthTry = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data);
-      stateManager.initialize(tenthTry);
-      outputHandler.transitionInto(tenthTry);
-      delays.add(stateManager.get(WORKFLOW_INSTANCE).data().retryDelayMillis());
-    }
-
-    double average = delays.stream()
-        .mapToLong(i -> i)
-        .average()
-        .getAsDouble();
-
-    double expected = BASE_DELAY.toMillis() * (1 << (MAX_EXPONENT - 1));
-    double diff = Math.abs(expected - average);
-
-    assertThat(diff, lessThan(expected * 0.05));
   }
 
   @Test
