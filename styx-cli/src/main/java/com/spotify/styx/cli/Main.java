@@ -41,8 +41,12 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.inf.Argument;
@@ -59,7 +63,6 @@ public final class Main {
   private static final String UTF_8 = "UTF-8";
   private static final String ENV_VAR_PREFIX = "STYX_CLI";
   private static final String STYX_CLI_API_ENDPOINT = "/api/v1/cli";
-  private static String STYX_API_HOST;
   private static final int TTL_REQUEST = 90;
 
   private static final String COMMAND_DEST = "command";
@@ -117,15 +120,20 @@ public final class Main {
         .action(Arguments.storeTrue());
 
     Namespace namespace = null;
+    Function<Collection<String>, String> apiUri = null;
     try {
       namespace = parser.parseArgs(args);
-      STYX_API_HOST = namespace.getString(host.getDest());
-      if (STYX_API_HOST == null) {
-        STYX_API_HOST = System.getenv(ENV_VAR_PREFIX + "_HOST");
-      }
-      if (STYX_API_HOST == null) {
+      final String apiHost;
+      String hostFromOptions = namespace.getString(host.getDest());
+      String hostFromEnv = System.getenv(ENV_VAR_PREFIX + "_HOST");
+      if (hostFromOptions != null) {
+        apiHost = hostFromOptions;
+      } else if (hostFromEnv != null) {
+        apiHost = hostFromEnv;
+      } else {
         throw new ArgumentParserException("Styx API host not set", parser);
       }
+      apiUri = (parts) -> "http://" + apiHost + STYX_CLI_API_ENDPOINT + "/" + String.join("/", parts);
     } catch (HelpScreenException e) {
       System.exit(EXIT_CODE_SUCCESS);
     } catch (ArgumentParserException e) {
@@ -148,23 +156,23 @@ public final class Main {
 
       switch (command) {
         case LIST:
-          activeStates(listComponent, client, namespace, cli);
+          activeStates(listComponent, apiUri, client, namespace, cli);
           break;
 
         case EVENTS:
-          eventsForWorkflowInstance(client, namespace, cli);
+          eventsForWorkflowInstance(apiUri, client, namespace, cli);
           break;
 
         case TRIGGER:
-          triggerWorkflowInstance(client, namespace);
+          triggerWorkflowInstance(apiUri, client, namespace);
           break;
 
         case HALT:
-          haltWorkflowInstance(client, namespace);
+          haltWorkflowInstance(apiUri, client, namespace);
           break;
 
         case RETRY:
-          retryWorkflowInstance(client, namespace);
+          retryWorkflowInstance(apiUri, client, namespace);
           break;
 
         default:
@@ -177,11 +185,12 @@ public final class Main {
   }
 
   private static void activeStates(Argument listComponent,
+                                   Function<Collection<String>, String> apiUri,
                                    BiConsumer<Request, Consumer<byte[]>> client,
                                    Namespace namespace, CliOutput cliOutput)
       throws UnsupportedEncodingException {
 
-    String uri = apiUri("activeStates");
+    String uri = apiUri.apply(Collections.singletonList("activeStates"));
     String component = namespace.getString(listComponent.getDest());
     if (component != null) {
       uri += "?component=" + URLEncoder.encode(component, UTF_8);
@@ -198,7 +207,8 @@ public final class Main {
         });
   }
 
-  private static void eventsForWorkflowInstance(BiConsumer<Request, Consumer<byte[]>> client,
+  private static void eventsForWorkflowInstance(Function<Collection<String>, String> apiUri,
+                                                BiConsumer<Request, Consumer<byte[]>> client,
                                                 Namespace namespace, CliOutput cliOutput) {
     WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
     String component = workflowInstance.workflowId().componentId();
@@ -206,7 +216,7 @@ public final class Main {
     String parameter = workflowInstance.parameter();
 
     client.accept(
-        Request.forUri(apiUri("events", component, workflow, parameter))
+        Request.forUri(apiUri.apply(Arrays.asList("events", component, workflow, parameter)))
             .withTtl(Duration.ofSeconds(TTL_REQUEST)),
         bytes -> {
           try {
@@ -217,7 +227,8 @@ public final class Main {
         });
   }
 
-  private static void triggerWorkflowInstance(BiConsumer<Request, Consumer<byte[]>> client,
+  private static void triggerWorkflowInstance(Function<Collection<String>, String> apiUri,
+                                              BiConsumer<Request, Consumer<byte[]>> client,
                                               Namespace namespace) {
     WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
 
@@ -227,10 +238,13 @@ public final class Main {
     } catch (JsonProcessingException e) {
       throw Throwables.propagate(e);
     }
-    client.accept(Request.forUri(apiUri("trigger"), "POST").withPayload(payload), null);
+    Request request = Request.forUri(apiUri.apply(Collections.singletonList("trigger")), "POST")
+        .withPayload(payload);
+    client.accept(request, null);
   }
 
-  private static void haltWorkflowInstance(BiConsumer<Request, Consumer<byte[]>> client,
+  private static void haltWorkflowInstance(Function<Collection<String>, String> apiUri,
+                                           BiConsumer<Request, Consumer<byte[]>> client,
                                            Namespace namespace) {
     WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
 
@@ -243,10 +257,13 @@ public final class Main {
     } catch (JsonProcessingException e) {
       throw Throwables.propagate(e);
     }
-    client.accept(Request.forUri(apiUri("events"), "POST").withPayload(payload), null);
+    Request request = Request.forUri(apiUri.apply(Collections.singletonList("events")), "POST")
+        .withPayload(payload);
+    client.accept(request, null);
   }
 
-  private static void retryWorkflowInstance(BiConsumer<Request, Consumer<byte[]>> client,
+  private static void retryWorkflowInstance(Function<Collection<String>, String> apiUri,
+                                            BiConsumer<Request, Consumer<byte[]>> client,
                                             Namespace namespace) {
 
     WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
@@ -260,7 +277,9 @@ public final class Main {
     } catch (JsonProcessingException e) {
       throw Throwables.propagate(e);
     }
-    client.accept(Request.forUri(apiUri("events"), "POST").withPayload(payload), null);
+    Request request = Request.forUri(apiUri.apply(Collections.singletonList("events")), "POST")
+        .withPayload(payload);
+    client.accept(request, null);
   }
 
   private static WorkflowInstance getWorkflowInstance(Namespace namespace) {
@@ -306,10 +325,6 @@ public final class Main {
             }
             signaller.signalShutdown();
           });
-  }
-
-  private static String apiUri(String... parts) {
-    return "http://" + STYX_API_HOST + STYX_CLI_API_ENDPOINT + "/" + String.join("/", parts);
   }
 
   private enum Command {
