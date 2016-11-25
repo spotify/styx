@@ -50,13 +50,47 @@ track of Workflow Instance executions and provides information about them via th
 ### Setup
 
 A fully functional Service can be found in [styx-standalone-service](./styx-standalone-service). 
-This packaging contains both the API and Scheduler service in one process. (more details to come)
+This packaging contains both the API and Scheduler service in one artifact. This is how you build
+and run it.
 
-Set the following configuration key in `styx-standalone.conf` to set the service to monitor a local 
-directory for schedule definitions:
+Some configuration keys in
+[`styx-standalone.conf`](./styx-standalone-service/src/main/resources/styx-standalone.conf) have
+to be specified for the service to work:
+
+Configure which Google services clusters/instances to use:
 
 ```yaml
+# gke cluster
+styx.gke.default.project-id = ""
+styx.gke.default.cluster-zone = ""
+styx.gke.default.cluster-id = ""
+
+# bigtable instance
+styx.bigtable.project-id = ""
+styx.bigtable.instance-id = ""
+
+# datastore config
+styx.datastore.project-id = ""
+styx.datastore.namespace = ""
+```
+
+To monitor a different local directory for schedule definitions, edit this line:
+
+```yaml
+# directory to monitor for schedule definitions
 styx.source.local.dir = "/etc/styx"
+```
+
+Build the project:
+
+```bash
+> mvn package
+```
+
+Run the service:
+
+```bash
+> java -jar styx-standalone-service/target/styx-standalone-service.jar
 ```
 
 ### Workflow schedule configuration
