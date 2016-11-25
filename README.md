@@ -3,7 +3,7 @@
 [![CircleCI](https://circleci.com/gh/spotify/styx/tree/master.svg?style=shield)](https://circleci.com/gh/spotify/styx)
 [![License](https://img.shields.io/github/license/spotify/styx.svg)](LICENSE)
 
-A data processing job scheduler for Kubernetes 
+A data processing job scheduler for Kubernetes
 
 ## Description
 
@@ -37,6 +37,13 @@ triggered, which docker image to run and which arguments to pass to it on each e
 a Workflow is triggered, a Workflow Instance is created. The Workflow instance is tracked as 
 'active' until at least on execution of the docker image returns with a 0 exit code. Styx will keep
 track of Workflow Instance executions and provides information about them via the API.
+
+## Development status
+Styx is in Alpha and is actively being developed. It is deployed internally at Spotify and is
+being used to run around 300 different production workflows. Because of how we build and integrate
+infrastructure components at Spotify, this repository does not contain a GUI at the time of 
+writing, while we do have one internally. The goal is to break out more of these components into
+open source projects that complement each other.
 
 ### More docs
 
