@@ -3,7 +3,7 @@
 [![CircleCI](https://circleci.com/gh/spotify/styx/tree/master.svg?style=shield)](https://circleci.com/gh/spotify/styx)
 [![License](https://img.shields.io/github/license/spotify/styx.svg)](LICENSE)
 
-A data processing job scheduler for Kubernetes 
+A data processing job scheduler for Kubernetes
 
 ## Description
 
@@ -38,6 +38,13 @@ a Workflow is triggered, a Workflow Instance is created. The Workflow instance i
 'active' until at least on execution of the docker image returns with a 0 exit code. Styx will keep
 track of Workflow Instance executions and provides information about them via the API.
 
+## Development status
+Styx is in Alpha and is actively being developed. It is deployed internally at Spotify and is
+being used to run around 300 different production workflows. Because of how we build and integrate
+infrastructure components at Spotify, this repository does not contain a GUI at the time of 
+writing, while we do have one internally. The goal is to break out more of these components into
+open source projects that complement each other.
+
 ### More docs
 
 * [Styx design](doc/design-overview.md)
@@ -50,13 +57,47 @@ track of Workflow Instance executions and provides information about them via th
 ### Setup
 
 A fully functional Service can be found in [styx-standalone-service](./styx-standalone-service). 
-This packaging contains both the API and Scheduler service in one process. (more details to come)
+This packaging contains both the API and Scheduler service in one artifact. This is how you build
+and run it.
 
-Set the following configuration key in `styx-standalone.conf` to set the service to monitor a local 
-directory for schedule definitions:
+Some configuration keys in
+[`styx-standalone.conf`](./styx-standalone-service/src/main/resources/styx-standalone.conf) have
+to be specified for the service to work:
+
+Configure which Google services clusters/instances to use:
 
 ```yaml
+# gke cluster
+styx.gke.default.project-id = ""
+styx.gke.default.cluster-zone = ""
+styx.gke.default.cluster-id = ""
+
+# bigtable instance
+styx.bigtable.project-id = ""
+styx.bigtable.instance-id = ""
+
+# datastore config
+styx.datastore.project-id = ""
+styx.datastore.namespace = ""
+```
+
+To monitor a different local directory for schedule definitions, edit this line:
+
+```yaml
+# directory to monitor for schedule definitions
 styx.source.local.dir = "/etc/styx"
+```
+
+Build the project:
+
+```bash
+> mvn package
+```
+
+Run the service:
+
+```bash
+> java -jar styx-standalone-service/target/styx-standalone-service.jar
 ```
 
 ### Workflow schedule configuration
