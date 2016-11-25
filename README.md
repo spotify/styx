@@ -151,6 +151,19 @@ Styx does not have any assumptions about what is executed in the container, it o
 the exit code. Any execution returning a non-zero exit code will cause a re-try to be scheduled,
 with an exponential back-off between each try.
 
+### Injected environment variables
+
+For each execution, Styx will inject a set of environment variables into the container.
+
+| Variable Name | Description |
+|---|---|
+| `STYX_COMPONENT_ID` | The component id of the workflow that is being executed. This will be the filename of the file which defines the workflow schedule. |
+| `STYX_WORKFLOW_ID` | The workflow id of the workflow that is being executed. This is the `id` field specified in the workflow schedule. |
+| `STYX_PARAMETER` | The parameter argument. See section about `docker_args` above. |
+| `STYX_TRIGGER_ID` | **to be implemented** - The trigger which is being executed. |
+| `STYX_EXECUTION_ID` | A unique identifier for the execution. This is the execution id used to identify execution attempts of a trigger. |
+| `STYX_EXECUTION_COUNTER` | **to be implemented** - A counter indicating which execution this is. Goes from 0..N per trigger. |
+
 ---
 
 This project adheres to the [Open Code of Conduct][code-of-conduct]. By participating, you are
