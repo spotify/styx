@@ -21,7 +21,6 @@
 package com.spotify.styx.storage;
 
 import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowExecutionInfo;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowInstanceExecutionData;
@@ -108,25 +107,6 @@ public interface Storage {
    * @return A {@link WorkflowInstanceExecutionData} of all the instances
    */
   List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId) throws IOException;
-
-  /**
-   * Stores a WorkflowExecutionInfo instance for later retrieval.
-   *
-   * @param workflowExecutionInfo the info to store
-   */
-  void store(WorkflowExecutionInfo workflowExecutionInfo) throws IOException;
-
-  /**
-   * Returns all statuses.
-   */
-  Map<WorkflowInstance, List<WorkflowExecutionInfo>> getExecutionInfo(WorkflowId workflowId)
-      throws IOException;
-
-  /**
-   * Returns all statuses in time order from earliest to latest.
-   */
-  List<WorkflowExecutionInfo> getExecutionInfo(WorkflowInstance workflowInstance)
-      throws IOException;
 
   /**
    * Use workflowState instead.

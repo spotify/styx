@@ -23,78 +23,22 @@ package com.spotify.styx.storage;
 import static com.spotify.styx.model.Partitioning.HOURS;
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
 import static java.util.Optional.empty;
-import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.model.DataEndpoint;
-import com.spotify.styx.model.ExecutionStatus;
 import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowExecutionInfo;
 import com.spotify.styx.model.WorkflowId;
-import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.testdata.TestData;
 import java.io.IOException;
 import java.net.URI;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import org.junit.Test;
 
 /**
  * Tests the InMemoryStorage that is used for testing.
  */
 public class InMemoryStorageTest {
-
-  @Test
-  public void testGetExecutionInfo() throws Exception {
-    Storage storage = new InMemStorage();
-
-    Instant instant = Instant.now().truncatedTo(ChronoUnit.HOURS);
-    WorkflowInstance wfi = WorkflowInstance.create(TestData.WORKFLOW_ID, instant.toString());
-    WorkflowExecutionInfo first = WorkflowExecutionInfo.create(
-        wfi, Instant.now(), ExecutionStatus.STARTED, Optional.empty());
-    WorkflowExecutionInfo second = WorkflowExecutionInfo.create(
-        wfi, Instant.MAX, ExecutionStatus.SUCCEEDED, Optional.empty());
-
-    storage.store(second);
-    storage.store(first);
-
-    List<WorkflowExecutionInfo> workflows = storage.getExecutionInfo(wfi);
-    assertThat(workflows, contains(first, second));
-  }
-
-  @Test
-  public void testGetExecutionInfoWithoutParam() throws IOException {
-    Storage storage = new InMemStorage();
-
-    Instant instant1 = Instant.now();
-    Instant instant2 = instant1.plus(1, ChronoUnit.HOURS);
-    WorkflowInstance wfi1 = WorkflowInstance.create(TestData.WORKFLOW_ID, instant1.toString());
-    WorkflowInstance wfi2 = WorkflowInstance.create(TestData.WORKFLOW_ID, instant2.toString());
-    WorkflowExecutionInfo first = WorkflowExecutionInfo.create(
-        wfi1, instant1, ExecutionStatus.STARTED, Optional.empty());
-    WorkflowExecutionInfo second = WorkflowExecutionInfo.create(
-        wfi1, instant2, ExecutionStatus.SUCCEEDED, Optional.empty());
-    WorkflowExecutionInfo third = WorkflowExecutionInfo.create(
-        wfi2, instant1, ExecutionStatus.STARTED, Optional.empty());
-    storage.store(second);
-    storage.store(first);
-    storage.store(third);
-
-    Map<WorkflowInstance, List<WorkflowExecutionInfo>> allExecutions =
-        storage.getExecutionInfo(TestData.WORKFLOW_ID);
-    assertThat(allExecutions.keySet(), hasItem(wfi1));
-    assertThat(allExecutions.keySet(), hasItem(wfi2));
-
-    assertThat(allExecutions.get(wfi1), contains(first, second));
-    assertThat(allExecutions.get(wfi2), contains(third));
-  }
 
   @Test
   public void testEnableWorkflow() throws IOException {

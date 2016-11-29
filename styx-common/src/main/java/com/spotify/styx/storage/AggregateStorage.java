@@ -23,7 +23,6 @@ package com.spotify.styx.storage;
 import com.google.cloud.datastore.Datastore;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowExecutionInfo;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowInstanceExecutionData;
@@ -100,23 +99,6 @@ public class AggregateStorage implements Storage, EventStorage {
   public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId)
       throws IOException {
     return bigtableStorage.executionData(workflowId);
-  }
-
-  @Override
-  public void store(WorkflowExecutionInfo workflowExecutionInfo) throws IOException {
-    bigtableStorage.store(workflowExecutionInfo);
-  }
-
-  @Override
-  public Map<WorkflowInstance, List<WorkflowExecutionInfo>> getExecutionInfo(WorkflowId workflowId)
-      throws IOException {
-    return bigtableStorage.getExecutionInfo(workflowId);
-  }
-
-  @Override
-  public List<WorkflowExecutionInfo> getExecutionInfo(WorkflowInstance workflowInstance)
-      throws IOException {
-    return bigtableStorage.getExecutionInfo(workflowInstance);
   }
 
   @Override

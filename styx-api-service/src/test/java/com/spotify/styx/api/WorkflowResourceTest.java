@@ -62,7 +62,6 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.experimental.theories.Theory;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -277,8 +276,8 @@ public class WorkflowResourceTest {
   public void shouldReturnBadRequestOnImageWhenComponentNotFound() throws Exception {
   }
 
-  @Theory
-  public void shouldReturnBadRequestWhenMalformedStatePayloadIsSent(Api.Version version) throws Exception {
+  @Test
+  public void shouldReturnBadRequestWhenMalformedStatePayloadIsSent() throws Exception {
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
                                             STATEPAYLOAD_BAD));

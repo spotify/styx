@@ -25,17 +25,11 @@ import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.DataEndpoint;
-import com.spotify.styx.model.ExecutionStatus;
 import com.spotify.styx.model.Partitioning;
-import com.spotify.styx.model.WorkflowExecutionInfo;
-import com.spotify.styx.model.WorkflowId;
-import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Json;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,17 +40,6 @@ import org.slf4j.LoggerFactory;
 public class JsonRoundtripTest {
 
   private static final Logger LOG = LoggerFactory.getLogger(JsonRoundtripTest.class);
-
-  @Test
-  public void testRoundtripExecutionInfo() throws Exception {
-    WorkflowExecutionInfo before = WorkflowExecutionInfo.create(
-        WorkflowInstance.create(WorkflowId.create("some_component_id", "some_endpoint_id")
-            , "-Pdatehour=2016-01-01T01"),
-        Instant.now(), ExecutionStatus.STARTED, Optional.empty());
-
-    WorkflowExecutionInfo after = roundtrip(before, WorkflowExecutionInfo.class);
-    assertThat(after, is(before));
-  }
 
   @Test
   public void testRoundtripDataEndpoint() throws Exception {
