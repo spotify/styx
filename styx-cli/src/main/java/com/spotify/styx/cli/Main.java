@@ -38,11 +38,12 @@ import com.spotify.styx.model.EventSerializer;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.time.Duration;
+import java.util.Objects;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.inf.Argument;
@@ -58,8 +59,8 @@ public final class Main {
 
   private static final String UTF_8 = "UTF-8";
   private static final String ENV_VAR_PREFIX = "STYX_CLI";
-  private static final String STYX_CLI_API = "http://styx.example.com/api/v1/cli";
-  private static final int TTL_REQUEST = 30;
+  private static final String STYX_CLI_API_ENDPOINT = "/api/v1/cli";
+  private static final int TTL_REQUEST = 90;
 
   private static final String COMMAND_DEST = "command";
   private static final String COMPONENT_DEST = "component";
@@ -70,244 +71,190 @@ public final class Main {
       .setPropertyNamingStrategy(PropertyNamingStrategy.SNAKE_CASE)
       .registerModule(new Jdk8Module());
 
-  private Main() {
+  private static final int EXIT_CODE_SUCCESS = 0;
+  private static final int EXIT_CODE_API_ERROR = 1;
+  private static final int EXIT_CODE_ARGUMENT_ERROR = 2;
+
+  private final StyxCliParser parser;
+  private final Namespace namespace;
+  private final String apiHost;
+  private final Service cliService;
+  private final CliOutput cliOutput;
+
+  private BiConsumer<Request, Consumer<byte[]>> client;
+
+  private Main(
+      StyxCliParser parser,
+      Namespace namespace,
+      String apiHost,
+      Service cliService,
+      CliOutput cliOutput) {
+    this.parser = Objects.requireNonNull(parser);
+    this.namespace = Objects.requireNonNull(namespace);
+    this.apiHost = Objects.requireNonNull(apiHost);
+    this.cliService = Objects.requireNonNull(cliService);
+    this.cliOutput = Objects.requireNonNull(cliOutput);
   }
 
   public static void main(String[] args) throws IOException, InterruptedException {
+    final StyxCliParser parser = new StyxCliParser();
+    final Namespace namespace;
+    final String apiHost;
+
+    try {
+      namespace = parser.parser.parseArgs(args);
+      apiHost = namespace.getString(parser.host.getDest());
+      if (apiHost == null) {
+        throw new ArgumentParserException("Styx API host not set", parser.parser);
+      }
+    } catch (HelpScreenException e) {
+      System.exit(EXIT_CODE_SUCCESS);
+      return;
+    } catch (ArgumentParserException e) {
+      parser.parser.handleError(e);
+      System.exit(EXIT_CODE_ARGUMENT_ERROR);
+      return;
+    }
+
     final Service cliService = Services.usingName("styx-cli")
         .withEnvVarPrefix(ENV_VAR_PREFIX)
         .withModule(ApolloEnvironmentModule.create())
         .withModule(HttpClientModule.create())
         .build();
 
-    final ArgumentParser parser = ArgumentParsers.newArgumentParser("styx")
-        .description("Styx CLI");
+    final boolean plainOutput = namespace.getBoolean(parser.plain.getDest());
+    final CliOutput cliOutput = plainOutput ? new PlainCliOutput() : new PrettyCliOutput();
 
-    final Subparsers subCommands = parser.addSubparsers()
-        .title("commands")
-        .metavar(" ");
+    new Main(parser, namespace, apiHost, cliService, cliOutput).run();
+  }
 
-    final Subparser ls = Command.ACTIVE_STATES.parser(subCommands)
-        .description("List active workflow instances");
-    final Argument lsComponent = ls.addArgument("-c", "--component")
-        .help("only show instances for COMPONENT");
+  private void run() throws IOException, InterruptedException {
+    final Command command = namespace.get(COMMAND_DEST);
 
-    final Subparser events = Command.EVENTS.parser(subCommands)
-        .description("List all events for a workflow instance");
-    addWorkflowInstanceArguments(events);
+    try (Service.Instance instance = cliService.start()) {
+      final Service.Signaller signaller = instance.getSignaller();
 
-    final Subparser trigger = Command.TRIGGER.parser(subCommands)
-        .description("Trigger a completed workflow instance");
-    addWorkflowInstanceArguments(trigger);
-
-    final Subparser halt = Command.HALT.parser(subCommands)
-        .description("Halt a workflow instance");
-    addWorkflowInstanceArguments(halt);
-
-    final Subparser retry = Command.RETRY.parser(subCommands)
-        .description("Retry a workflow instance that is in a waiting state");
-    addWorkflowInstanceArguments(retry);
-
-    final Argument plain = parser.addArgument("-p", "--plain")
-        .help("plain output")
-        .setDefault(false)
-        .action(Arguments.storeTrue());
-
-    final Argument verbose = parser.addArgument("-v", "--verbose")
-        .help("increase verbosity")
-        .action(Arguments.count());
-
-    try (Service.Instance i = cliService.start()) {
-      final Service.Signaller signaller = i.getSignaller();
-      final Namespace namespace = parser.parseArgs(args);
-      final int level = namespace.getInt(verbose.getDest());
-      final boolean plainOutput = namespace.getBoolean(plain.getDest());
-      final Command command = namespace.get(COMMAND_DEST);
-      final CliOutput cli = plainOutput
-          ? new PlainCliOutput()
-          : new PrettyCliOutput(level);
-
-      cli.parsed(namespace);
-      cli.header(command);
-
-      final Client client = ApolloEnvironmentModule.environment(i).environment().client();
+      client = errorHandlingClient(
+          ApolloEnvironmentModule.environment(instance).environment().client(), signaller);
 
       switch (command) {
-        case ACTIVE_STATES:
-          activeStates(lsComponent, client, cli, signaller, namespace);
+        case LIST:
+          activeStates();
           break;
 
         case EVENTS:
-          eventsForWorkflowInstance(client, cli, signaller, namespace);
+          eventsForWorkflowInstance();
           break;
 
         case TRIGGER:
-          triggerWorkflowInstance(client, cli, signaller, namespace);
+          triggerWorkflowInstance();
           break;
 
         case HALT:
-          haltWorkflowInstance(client, cli, signaller, namespace);
+          haltWorkflowInstance();
           break;
 
         case RETRY:
-          retryWorkflowInstance(client, cli, signaller, namespace);
+          retryWorkflowInstance();
           break;
 
         default:
+          // parsing unknown command will fail so this should never happen...
           throw new RuntimeException("Unrecognized command: " + command);
       }
 
-      i.waitForShutdown();
-    } catch (HelpScreenException h) {
-      System.exit(1);
-    } catch (ArgumentParserException e) {
-      final StringWriter sw = new StringWriter();
-      final PrintWriter pw = new PrintWriter(sw);
-      parser.printHelp(pw);
-      new PrettyCliOutput(0).parseError(e, sw.toString());
-      System.exit(2);
+      instance.waitForShutdown();
     }
   }
 
-  private static void activeStates(
-      Argument lsComponent,
-      Client client,
-      CliOutput cliOutput,
-      Service.Signaller signaller,
-      Namespace namespace) throws UnsupportedEncodingException {
+  private String apiUrl(CharSequence... parts) {
+    return "http://" + apiHost + STYX_CLI_API_ENDPOINT + "/" + String.join("/", parts);
+  }
 
-    String uri = STYX_CLI_API + "/activeStates";
-    String component = namespace.getString(lsComponent.getDest());
+  private void activeStates()
+      throws UnsupportedEncodingException {
+
+    String uri = apiUrl("activeStates");
+    String component = namespace.getString(parser.listComponent.getDest());
     if (component != null) {
       uri += "?component=" + URLEncoder.encode(component, UTF_8);
     }
 
-    final Request request = Request.forUri(uri);
-    client.send(request.withTtl(Duration.ofSeconds(TTL_REQUEST))).whenComplete((response, t) -> {
-      byte[] bytes = response.payload().get().toByteArray();
-      try {
-        ActiveStatesPayload activeStatePayload = OBJECT_MAPPER.readValue(
-            bytes, ActiveStatesPayload.class);
-        cliOutput.printActiveStates(activeStatePayload);
-      } catch (IOException e) {
-        cliOutput.apiError(e);
-      }
-      signaller.signalShutdown();
-    }).exceptionally(e -> {
-      cliOutput.apiError(e);
-      signaller.signalShutdown();
-      return null;
-    });
+    client.accept(
+        Request.forUri(uri).withTtl(Duration.ofSeconds(TTL_REQUEST)),
+        bytes -> {
+          try {
+            cliOutput.printActiveStates(OBJECT_MAPPER.readValue(bytes, ActiveStatesPayload.class));
+          } catch (IOException e) {
+            throw Throwables.propagate(e);
+          }
+        });
   }
 
-  private static void eventsForWorkflowInstance(
-      Client client,
-      CliOutput cliOutput,
-      Service.Signaller signaller,
-      Namespace namespace) {
+  private void eventsForWorkflowInstance() {
+    WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
+    String component = workflowInstance.workflowId().componentId();
+    String workflow = workflowInstance.workflowId().endpointId();
+    String parameter = workflowInstance.parameter();
 
-    String component = namespace.getString(COMPONENT_DEST);
-    String workflow = namespace.getString(WORKFLOW_DEST);
-    String parameter = namespace.getString(PARAMETER_DEST);
-    String uri = String.format("%s/events/%s/%s/%s", STYX_CLI_API, component, workflow, parameter);
-    final Request request = Request.forUri(uri);
-    client.send(request).whenComplete((response, t) -> {
-
-      byte[] bytes = response.payload().get().toByteArray();
-
-      try {
-        final EventsPayload eventsPayload = OBJECT_MAPPER.readValue(bytes, EventsPayload.class);
-        cliOutput.printEvents(eventsPayload);
-      } catch (IOException e) {
-        cliOutput.apiError(e);
-      }
-
-      signaller.signalShutdown();
-    }).exceptionally(e -> {
-      cliOutput.apiError(e);
-      signaller.signalShutdown();
-      return null;
-    });
+    client.accept(
+        Request.forUri(apiUrl("events", component, workflow, parameter))
+            .withTtl(Duration.ofSeconds(TTL_REQUEST)),
+        bytes -> {
+          try {
+            cliOutput.printEvents(OBJECT_MAPPER.readValue(bytes, EventsPayload.class));
+          } catch (IOException e) {
+            throw Throwables.propagate(e);
+          }
+        });
   }
 
-  private static void triggerWorkflowInstance(
-      Client client,
-      CliOutput cliOutput,
-      Service.Signaller signaller,
-      Namespace namespace) {
-
+  private void triggerWorkflowInstance() {
     WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
 
+    final ByteString payload;
     try {
-      final ByteString payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(workflowInstance));
-      String uri = String.format("%s/trigger/", STYX_CLI_API);
-      final Request request = Request.forUri(uri, "POST").withPayload(payload);
-      client.send(request).whenComplete((response, t) -> {
-        cliOutput.printResponse(response);
-        signaller.signalShutdown();
-      }).exceptionally(e -> {
-        cliOutput.apiError(e);
-        signaller.signalShutdown();
-        return null;
-      });
+      payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(workflowInstance));
     } catch (JsonProcessingException e) {
       throw Throwables.propagate(e);
     }
+    Request request = Request.forUri(apiUrl("trigger"), "POST")
+        .withPayload(payload);
+    client.accept(request, null);
   }
 
-  private static void haltWorkflowInstance(Client client,
-      CliOutput cliOutput,
-      Service.Signaller signaller,
-      Namespace namespace) {
-
+  private void haltWorkflowInstance() {
     WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
 
     Event halt = Event.halt(workflowInstance);
     EventSerializer.PersistentEvent persistentEvent =
         EventSerializer.convertEventToPersistentEvent(halt);
+    final ByteString payload;
     try {
-      final ByteString payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(persistentEvent));
-      String uri = String.format("%s/events/", STYX_CLI_API);
-      final Request request = Request.forUri(uri, "POST").withPayload(payload);
-      client.send(request).whenComplete((response, t) -> {
-        cliOutput.printResponse(response);
-        signaller.signalShutdown();
-      }).exceptionally(e -> {
-        cliOutput.apiError(e);
-        signaller.signalShutdown();
-        return null;
-      });
+      payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(persistentEvent));
     } catch (JsonProcessingException e) {
       throw Throwables.propagate(e);
     }
+    Request request = Request.forUri(apiUrl("events"), "POST")
+        .withPayload(payload);
+    client.accept(request, null);
   }
 
-  private static void retryWorkflowInstance(
-      Client client,
-      CliOutput cliOutput,
-      Service.Signaller signaller,
-      Namespace namespace) {
-
+  private void retryWorkflowInstance() {
     WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
 
     Event retry = Event.retry(workflowInstance);
     EventSerializer.PersistentEvent persistentEvent =
         EventSerializer.convertEventToPersistentEvent(retry);
+    final ByteString payload;
     try {
-      final ByteString payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(persistentEvent));
-      String uri = String.format("%s/events/", STYX_CLI_API);
-      final Request request = Request.forUri(uri, "POST").withPayload(payload);
-      client.send(request).whenComplete((response, t) -> {
-        cliOutput.printResponse(response);
-        signaller.signalShutdown();
-      }).exceptionally(e -> {
-        cliOutput.apiError(e);
-        signaller.signalShutdown();
-        return null;
-      });
+      payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(persistentEvent));
     } catch (JsonProcessingException e) {
       throw Throwables.propagate(e);
     }
+    Request request = Request.forUri(apiUrl("events"), "POST")
+        .withPayload(payload);
+    client.accept(request, null);
   }
 
   private static WorkflowInstance getWorkflowInstance(Namespace namespace) {
@@ -318,36 +265,95 @@ public final class Main {
         namespace.getString(PARAMETER_DEST));
   }
 
-  private static void addWorkflowInstanceArguments(Subparser events) {
-    events.addArgument(COMPONENT_DEST)
-        .help("Component id");
-    events.addArgument(WORKFLOW_DEST)
-        .help("Workflow id (legacy Endpoint)");
-    events.addArgument(PARAMETER_DEST)
-        .help("Parameter identifying the workflow instance, e.g. '2016-09-14' or '2016-09-14T17'");
+  private static BiConsumer<Request, Consumer<byte[]>> errorHandlingClient(
+      Client client, Service.Signaller signaller) {
+    return (request, consumer) ->
+      client.send(request)
+          .handle((response, throwable) -> {
+            if (throwable != null) {
+              throw Throwables.propagate(throwable);
+            }
+            switch (response.status().family()) {
+              case SUCCESSFUL:
+              case REDIRECTION:
+                return response.payload().orElse(ByteString.EMPTY).toByteArray();
+              default:
+                throw new RuntimeException(
+                    response.status().code() + " " + response.status().reasonPhrase());
+            }
+          })
+          .thenAccept(consumer != null ? consumer : bytes -> { })
+          .whenComplete((ignored, throwable) -> {
+            if (throwable != null) {
+              System.err.println("An API error occurred: "
+                                 + Throwables.getRootCause(throwable).getMessage());
+              System.exit(EXIT_CODE_API_ERROR);
+            }
+            signaller.signalShutdown();
+          });
   }
 
-  enum Command {
-    ACTIVE_STATES("List active states", "ls"),
-    EVENTS("events", "e"),
-    HALT("halt", ""),
-    TRIGGER("trigger", "t"),
-    RETRY("retry", "r");
+  private static class StyxCliParser {
 
-    private final String help;
-    private final String[] aliases;
+    final ArgumentParser parser = ArgumentParsers.newArgumentParser("styx")
+        .description("Styx CLI");
 
-    Command(String help, String ... aliases) {
-      this.help = help;
-      this.aliases = aliases;
+    final Subparsers subCommands = parser.addSubparsers()
+        .title("commands")
+        .metavar(" ");
+
+    final Subparser list = Command.LIST.parser(subCommands);
+    final Argument listComponent = list.addArgument("-c", "--component")
+        .help("only show instances for COMPONENT");
+
+    final Subparser events = addWorkflowInstanceArguments(Command.EVENTS.parser(subCommands));
+    final Subparser trigger = addWorkflowInstanceArguments(Command.TRIGGER.parser(subCommands));
+    final Subparser halt = addWorkflowInstanceArguments(Command.HALT.parser(subCommands));
+    final Subparser retry = addWorkflowInstanceArguments(Command.RETRY.parser(subCommands));
+
+    final Argument host = parser.addArgument("-H", "--host")
+        .help("Styx API host (can also be set with environment variable " + ENV_VAR_PREFIX + "_HOST)")
+        .setDefault(System.getenv(ENV_VAR_PREFIX + "_HOST"))
+        .action(Arguments.store());
+
+    final Argument plain = parser.addArgument("-p", "--plain")
+        .help("plain output")
+        .setDefault(false)
+        .action(Arguments.storeTrue());
+
+    private static Subparser addWorkflowInstanceArguments(Subparser subparser) {
+      subparser.addArgument(COMPONENT_DEST)
+          .help("Component id");
+      subparser.addArgument(WORKFLOW_DEST)
+          .help("Workflow id (legacy Endpoint)");
+      subparser.addArgument(PARAMETER_DEST)
+          .help("Parameter identifying the workflow instance, e.g. '2016-09-14' or '2016-09-14T17'");
+      return subparser;
+    }
+  }
+
+  private enum Command {
+    LIST("ls", "List active workflow instances"),
+    EVENTS("e", "List events for a workflow instance"),
+    HALT("h", "Halt a workflow instance"),
+    TRIGGER("t", "Trigger a completed workflow instance"),
+    RETRY("r", "Retry a workflow instance that is in a waiting state");
+
+    private final String alias;
+    private final String description;
+
+    Command(String alias, String description) {
+      this.alias = alias;
+      this.description = description;
     }
 
     public Subparser parser(Subparsers subCommands) {
       return subCommands
           .addParser(name().toLowerCase())
-          .aliases(aliases)
+          .aliases(alias)
           .setDefault(COMMAND_DEST, this)
-          .help(help);
+          .description(description)
+          .help(description);
     }
   }
 }
