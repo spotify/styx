@@ -124,7 +124,7 @@ public final class MeteredStorage extends MeteredBase implements Storage {
   }
 
   @Override
-  public Optional<WorkflowState> workflowState(WorkflowId workflowId) throws IOException {
+  public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
     return timedStorage("workflowState", () -> delegate.workflowState(workflowId));
   }
 }

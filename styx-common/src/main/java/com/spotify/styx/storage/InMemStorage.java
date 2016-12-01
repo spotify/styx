@@ -196,11 +196,11 @@ public class InMemStorage implements Storage, EventStorage {
   }
 
   @Override
-  public Optional<WorkflowState> workflowState(WorkflowId workflowId) throws IOException {
-    return Optional.of(
+  public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
+    return
         workflowStatePerWorkflowId.getOrDefault(
             workflowId,
-            WorkflowState.create(Optional.of(false), Optional.empty(), Optional.empty())));
+            WorkflowState.create(Optional.of(false), Optional.empty(), Optional.empty()));
   }
 
   @Override

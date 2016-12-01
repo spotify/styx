@@ -214,9 +214,9 @@ public class DatastoreStorageTest {
 
     storage.store(Workflow.create(WORKFLOW_ID1.componentId(), URI.create("http://foo"), DATA_ENDPOINT_EMPTY_CONF));
     storage.patchState(WORKFLOW_ID1.componentId(), state);
-    Optional<WorkflowState> retrieved = storage.workflowState(WORKFLOW_ID1);
+    WorkflowState retrieved = storage.workflowState(WORKFLOW_ID1);
 
-    assertThat(retrieved.get().commitSha(), is(Optional.of(COMMIT_SHA)));
+    assertThat(retrieved.commitSha(), is(Optional.of(COMMIT_SHA)));
   }
 
   @Test
@@ -236,9 +236,9 @@ public class DatastoreStorageTest {
         .create(WORKFLOW_ID1.endpointId(), Partitioning.DAYS, Optional.empty(), Optional.empty(),
                 Optional.empty())));
     storage.patchState(WORKFLOW_ID1, WorkflowState.create(empty(), empty(), of(COMMIT_SHA)));
-    Optional<WorkflowState> retrieved = storage.workflowState(WORKFLOW_ID1);
+    WorkflowState retrieved = storage.workflowState(WORKFLOW_ID1);
 
-    assertThat(retrieved.get().commitSha(), is(Optional.of(COMMIT_SHA)));
+    assertThat(retrieved.commitSha(), is(Optional.of(COMMIT_SHA)));
   }
 
 
@@ -252,8 +252,8 @@ public class DatastoreStorageTest {
   @Test
   public void shouldReturnEmptyWorkflowStateExceptEnabledWhenWorkflowStateDoesNotExist() throws Exception {
     storage.store(WORKFLOW_NO_STATE);
-    Optional<WorkflowState> retrieved = storage.workflowState(WORKFLOW_ID_NO_STATE);
-    assertThat(retrieved.get(), is(WorkflowState.create(Optional.of(false),Optional.empty(), Optional.empty())));
+    WorkflowState retrieved = storage.workflowState(WORKFLOW_ID_NO_STATE);
+    assertThat(retrieved, is(WorkflowState.create(Optional.of(false),Optional.empty(), Optional.empty())));
   }
 
   @Test
@@ -488,9 +488,9 @@ public class DatastoreStorageTest {
     WorkflowState state = WorkflowState.all(true, DOCKER_IMAGE.get() , COMMIT_SHA);
     storage.patchState(WORKFLOW_ID1, state);
 
-    Optional<WorkflowState> retrieved = storage.workflowState(WORKFLOW_ID1);
+    WorkflowState retrieved = storage.workflowState(WORKFLOW_ID1);
 
-    assertThat(retrieved, is(Optional.of(state)));
+    assertThat(retrieved, is(state));
   }
 
   @Test

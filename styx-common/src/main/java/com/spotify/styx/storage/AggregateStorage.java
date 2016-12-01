@@ -164,7 +164,7 @@ public class AggregateStorage implements Storage, EventStorage {
   }
 
   @Override
-  public Optional<WorkflowState> workflowState(WorkflowId workflowId) throws IOException {
+  public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
     return datastoreStorage.workflowState(workflowId);
   }
 }

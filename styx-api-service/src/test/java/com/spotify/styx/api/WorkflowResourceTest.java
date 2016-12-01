@@ -149,8 +149,8 @@ public class WorkflowResourceTest {
     assertJson(response, "commit_sha", equalTo(VALID_SHA));
 
     assertThat(storage.enabled(WORKFLOW.id()), is(true));
-    assertThat(storage.workflowState(WORKFLOW.id()).get().dockerImage().get(), is("cherry:image"));
-    assertThat(storage.workflowState(WORKFLOW.id()).get().commitSha().get(), is(VALID_SHA));
+    assertThat(storage.workflowState(WORKFLOW.id()).dockerImage().get(), is("cherry:image"));
+    assertThat(storage.workflowState(WORKFLOW.id()).commitSha().get(), is(VALID_SHA));
   }
 
   @Test
@@ -245,7 +245,7 @@ public class WorkflowResourceTest {
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "commit_sha", equalTo(VALID_SHA));
 
-    assertThat(storage.workflowState(WORKFLOW.id()).get().commitSha().get(),
+    assertThat(storage.workflowState(WORKFLOW.id()).commitSha().get(),
                is(VALID_SHA));
   }
 
@@ -258,7 +258,7 @@ public class WorkflowResourceTest {
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasStatus(withReasonPhrase(equalTo("Invalid SHA-1."))));
 
-    assertThat(storage.workflowState(WORKFLOW.id()).get().commitSha().isPresent(),
+    assertThat(storage.workflowState(WORKFLOW.id()).commitSha().isPresent(),
                is(false));
   }
 

@@ -88,7 +88,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
   }
 
   private ExecutionDescription getExecDescription(WorkflowInstance workflowInstance)
-      throws ResourceNotFoundException, IOException {
+      throws IOException {
     final WorkflowId workflowId = workflowInstance.workflowId();
 
     final Optional<Workflow> workflowOpt = storage.workflow(workflowId);
@@ -101,11 +101,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
                                    workflowId, workflowInstance));
     }
 
-    final Optional<WorkflowState> workflowStateOpt = storage.workflowState(workflow.id());
-
-    final WorkflowState workflowState = workflowStateOpt.orElseThrow(
-        () -> new ResourceNotFoundException(format("Missing state for %s, halting %s",
-                                   workflowId, workflowInstance)));
+    final WorkflowState workflowState = storage.workflowState(workflow.id());
 
     final Optional<String> dockerImageOpt = workflowState.dockerImage().isPresent()
         ? workflowState.dockerImage()

@@ -50,15 +50,15 @@ public class InMemoryStorageTest {
     storage.store(workflow(id1));
     storage.store(workflow(id2));
 
-    WorkflowState workflowState = storage.workflowState(id1).get();
+    WorkflowState workflowState = storage.workflowState(id1);
     assertThat(workflowState.enabled().get(), is(false));
     storage.patchState(id1, patchEnabled(true));
-    workflowState = storage.workflowState(id1).get();
+    workflowState = storage.workflowState(id1);
     assertThat(workflowState.enabled().get(), is(true));
     storage.patchState(id2, patchEnabled(true));
     assertThat(storage.enabled(), containsInAnyOrder(id1, id2));
     storage.patchState(id1, patchEnabled(false));
-    workflowState = storage.workflowState(id1).get();
+    workflowState = storage.workflowState(id1);
     assertThat(workflowState.enabled().get(), is(false));
   }
 

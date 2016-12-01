@@ -164,5 +164,5 @@ public interface Storage {
    * @param workflowId The workflow to get the repository for
    * @return workflow state.
    */
-  Optional<WorkflowState> workflowState(WorkflowId workflowId) throws IOException;
+  WorkflowState workflowState(WorkflowId workflowId) throws IOException;
 }
