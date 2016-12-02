@@ -22,9 +22,6 @@ package com.spotify.styx.state;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.state.QueuedStateManager.NO_EVENTS_PROCESSED;
-import static com.spotify.styx.state.TimeoutConfig.createWithDefaultTtl;
-import static java.time.Duration.ofMillis;
-import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.ForkJoinPool.commonPool;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasKey;
@@ -74,18 +71,17 @@ public class QueuedStateManagerTest {
   @Rule
   public RepeatRule repeatRule = new RepeatRule();
 
-  private void setUp(long timeoutMillis) throws Exception {
-    setUp(timeoutMillis, RunState.fresh(INSTANCE, transitions::push));
+  private void setUp() throws Exception {
+    setUp(RunState.fresh(INSTANCE, transitions::push));
   }
 
-  private void setUp(long timeoutMillis, RunState initial) throws Exception {
-    TimeoutConfig timeoutConfig = createWithDefaultTtl(ofMillis(timeoutMillis));
+  private void setUp(RunState initial) throws Exception {
     if (stateManager != null) {
       stateManager.close();
     }
 
     storage = new InMemStorage();
-    stateManager = new QueuedStateManager(timeoutConfig, Instant::now, POOL, storage);
+    stateManager = new QueuedStateManager(Instant::now, POOL, storage);
 
     stateManager.initialize(initial);
     assertTrue(stateManager.awaitIdle(1000));
@@ -100,7 +96,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldNotBeActiveAfterHalt() throws Exception {
-    setUp(0);
+    setUp();
 
     stateManager.receive(Event.triggerExecution(INSTANCE, "trig"));
     stateManager.receive(Event.halt(INSTANCE));
@@ -116,7 +112,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldInitializeWFInstanceFromNextCounter() throws Exception {
-    setUp(0);
+    setUp();
 
     stateManager.receive(Event.triggerExecution(INSTANCE, "trig1"));
     stateManager.receive(Event.halt(INSTANCE));
@@ -142,46 +138,14 @@ public class QueuedStateManagerTest {
 
   @Test(expected = RuntimeException.class)
   public void shouldFailInitializeWFIfAlreadyActive() throws Exception {
-    setUp(0);
+    setUp();
 
     stateManager.initialize(RunState.fresh(INSTANCE));
   }
 
-  @Test
-  public void shouldTimeoutActiveState() throws Exception {
-    setUp(0);
-
-    stateManager.triggerTimeouts();
-
-    assertTrue(stateManager.awaitIdle(1000));
-    assertThat(transitions, hasSize(1));
-    assertThat(transitions.pop().state(), is(RunState.State.FAILED));
-  }
-
-  @Test
-  public void shouldNotTimeoutTerminalState() throws Exception {
-    setUp(0, RunState.create(INSTANCE, RunState.State.DONE));
-
-    stateManager.triggerTimeouts();
-
-    assertTrue(stateManager.awaitIdle(1000));
-    assertThat(transitions, hasSize(0));
-    assertThat(stateManager.get(INSTANCE).state(), is(RunState.State.DONE));
-  }
-
-  @Test
-  public void shouldNotTransitionIfNotTimedOut() throws Exception {
-    setUp(20_000);
-
-    stateManager.triggerTimeouts();
-
-    assertTrue(stateManager.awaitIdle(1000));
-    assertThat(transitions, hasSize(0));
-  }
-
   @Test(expected = StateManager.IsClosed.class)
   public void shouldRejectInitializeIfClosed() throws Exception {
-    setUp(0);
+    setUp();
 
     stateManager.close();
     stateManager.initialize(RunState.fresh(INSTANCE));
@@ -189,7 +153,7 @@ public class QueuedStateManagerTest {
 
   @Test(expected = StateManager.IsClosed.class)
   public void shouldRejectEventIfClosed() throws Exception {
-    setUp(0);
+    setUp();
 
     stateManager.close();
     stateManager.receive(Event.timeTrigger(INSTANCE));
@@ -197,7 +161,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldCloseGracefully() throws Exception {
-    setUp(0);
+    setUp();
 
     stateManager.receive(Event.timeTrigger(INSTANCE));
     stateManager.close();
@@ -209,7 +173,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldWriteEvents() throws Exception {
-    setUp(0);
+    setUp();
 
     stateManager.receive(Event.timeTrigger(INSTANCE));
     assertTrue(stateManager.awaitIdle(1000));
@@ -236,7 +200,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldRemoveStateIfTerminal() throws Exception {
-    setUp(0);
+    setUp();
 
     stateManager.receive(Event.timeTrigger(INSTANCE));
     stateManager.receive(Event.started(INSTANCE));
@@ -249,7 +213,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldActivateStateOnInitialize() throws Exception {
-    setUp(0);
+    setUp();
 
     assertThat(storage.activeStatesMap, hasKey(INSTANCE));
     assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(NO_EVENTS_PROCESSED));
@@ -270,7 +234,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldNotStoreEventOnIllegalStateTransition() throws Exception {
-    setUp(0);
+    setUp();
 
     stateManager.receive(Event.timeTrigger(INSTANCE));
     assertTrue(stateManager.awaitIdle(1000));
@@ -293,9 +257,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldRestoreStateAtCount() throws Exception {
-    stateManager = new QueuedStateManager(
-        createWithDefaultTtl(ofMillis(0)), Instant::now, newSingleThreadExecutor(),
-        storage);
+    stateManager = new QueuedStateManager(Instant::now, POOL, storage);
 
     stateManager.restore(RunState.fresh(INSTANCE), 7L);
     stateManager.receive(Event.timeTrigger(INSTANCE));  // 8
@@ -308,9 +270,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldHandleThrowingOutputHandler() throws Exception {
-    stateManager = new QueuedStateManager(
-        createWithDefaultTtl(ofMillis(0)), Instant::now, newSingleThreadExecutor(),
-        storage);
+    stateManager = new QueuedStateManager(Instant::now, POOL, storage);
 
     OutputHandler throwing = (state) -> {
       throw new RuntimeException();
@@ -324,8 +284,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void testGetActiveWorkflowInstance() throws Exception {
-    stateManager = new QueuedStateManager(
-        createWithDefaultTtl(ofMillis(0)), Instant::now, newSingleThreadExecutor(), storage);
+    stateManager = new QueuedStateManager(Instant::now, POOL, storage);
 
     assertThat(stateManager.isActiveWorkflowInstance(INSTANCE), is(false));
 
@@ -342,7 +301,7 @@ public class QueuedStateManagerTest {
   @Test
   @RepeatRule.Repeat(times = 50)
   public void testConcurrentEvents() throws Exception {
-    setUp(0);
+    setUp();
 
     IntFunction<WorkflowInstance > wfi =
         j -> WorkflowInstance.create(TestData.WORKFLOW_ID, "id-" + j);

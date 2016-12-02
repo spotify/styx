@@ -38,7 +38,6 @@ import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
@@ -168,8 +167,8 @@ public class StyxSchedulerServiceFixture {
     storage.store(workflow);
   }
 
-  void givenNextNaturalTrigger(WorkflowId workflowId, Instant nextNaturalTrigger) throws IOException {
-    storage.updateNextNaturalTrigger(workflowId, nextNaturalTrigger);
+  void givenNextNaturalTrigger(Workflow workflow, String nextNaturalTrigger) throws IOException {
+    storage.updateNextNaturalTrigger(workflow.id(), Instant.parse(nextNaturalTrigger));
   }
 
   void workflowChanges(Workflow workflow) {
@@ -213,7 +212,7 @@ public class StyxSchedulerServiceFixture {
 
   void givenStoredEvent(Event event, long count) {
     try {
-      storage.writeEvent(SequenceEvent.create(event, count, 1L));
+      storage.writeEvent(SequenceEvent.create(event, count, now.toEpochMilli()));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }

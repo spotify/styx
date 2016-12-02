@@ -22,6 +22,7 @@ package com.spotify.styx.state;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
@@ -31,6 +32,7 @@ import com.spotify.styx.storage.EventStorage;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentMap;
@@ -54,7 +56,7 @@ import org.slf4j.LoggerFactory;
  * <p>All {@link RunState#outputHandler()} transitions are also executed on the injected
  * {@link Executor}.
  */
-public class QueuedStateManager implements StateManager, StaleStateReaper, StateRetrier {
+public class QueuedStateManager implements StateManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(QueuedStateManager.class);
 
@@ -64,7 +66,6 @@ public class QueuedStateManager implements StateManager, StaleStateReaper, State
   static final int SHUTDOWN_GRACE_PERIOD_SECONDS = 5;
   static final long NO_EVENTS_PROCESSED = -1L;
 
-  private final TimeoutConfig ttls;
   private final Time time;
   private final Executor workerPool;
   private final EventStorage storage;
@@ -77,12 +78,7 @@ public class QueuedStateManager implements StateManager, StaleStateReaper, State
   private AtomicInteger activeEvents = new AtomicInteger(0);
   private volatile boolean running = true;
 
-  public QueuedStateManager(
-      TimeoutConfig ttls,
-      Time time,
-      Executor workerPool,
-      EventStorage storage) {
-    this.ttls = Objects.requireNonNull(ttls);
+  public QueuedStateManager(Time time, Executor workerPool, EventStorage storage) {
     this.time = Objects.requireNonNull(time);
     this.workerPool = Objects.requireNonNull(workerPool);
     this.storage = Objects.requireNonNull(storage);
@@ -139,6 +135,13 @@ public class QueuedStateManager implements StateManager, StaleStateReaper, State
   }
 
   @Override
+  public Map<WorkflowInstance, RunState> activeStates() {
+    final ImmutableMap.Builder<WorkflowInstance, RunState> builder = ImmutableMap.builder();
+    states.entrySet().forEach(entry -> builder.put(entry.getKey(), entry.getValue().runState));
+    return builder.build();
+  }
+
+  @Override
   public long getActiveStatesCount() {
     return states.size();
   }
@@ -191,49 +194,6 @@ public class QueuedStateManager implements StateManager, StaleStateReaper, State
     }
 
     LOG.info("Shutdown was clean, {} events left in queue", getQueuedEventsCount());
-  }
-
-  @Override
-  public void triggerTimeouts() {
-    if (!running) {
-      return;
-    }
-
-    states.entrySet().stream()
-        .filter(entry -> hasTimedOut(entry.getValue().runState))
-        .forEach(entry -> entry.getValue().enqueue(() -> {
-          // check again from transition loop
-          RunState currentState = states.get(entry.getKey()).runState;
-          if (hasTimedOut(currentState)) {
-            LOG.info("Found stale state, triggering timeout for {}", currentState);
-            try {
-              receive(Event.timeout(entry.getKey()));
-            } catch (IsClosed ignored) {
-            }
-          }
-        }));
-  }
-
-  @Override
-  public void triggerRetries() {
-    if (!running) {
-      return;
-    }
-
-    states.entrySet().stream()
-        .filter(entry -> shouldRetry(entry.getValue().runState))
-        .forEach(entry -> entry.getValue().enqueue(() -> {
-          final WorkflowInstance key = entry.getKey();
-          // check again from transition loop
-          RunState currentState = states.get(key).runState;
-          if (shouldRetry(currentState)) {
-            LOG.info("{} triggering retry #{}", key.toKey(), currentState.data().tries());
-            try {
-              receive(Event.retry(key));
-            } catch (IsClosed ignored) {
-            }
-          }
-        }));
   }
 
   /**
@@ -342,27 +302,6 @@ public class QueuedStateManager implements StateManager, StaleStateReaper, State
 
   private void storeDeactivation(WorkflowInstance workflowInstance) throws IOException {
     storage.deleteActiveState(workflowInstance);
-  }
-
-  private boolean hasTimedOut(RunState runState) {
-    if (runState.state().isTerminal()) {
-      return false;
-    }
-
-    final long ageMillis = time.get().toEpochMilli() - runState.timestamp();
-    final long ttlMillis = ttls.ttlOf(runState.state()).toMillis();
-    return ageMillis >= ttlMillis;
-  }
-
-  private boolean shouldRetry(RunState runState) {
-    if (runState.state() != RunState.State.QUEUED) {
-      return false;
-    }
-
-    final long ageMillis = time.get().toEpochMilli() - runState.timestamp();
-    final long retryDelayMillis = runState.data().retryDelayMillis();
-
-    return ageMillis >= retryDelayMillis;
   }
 
   @VisibleForTesting
