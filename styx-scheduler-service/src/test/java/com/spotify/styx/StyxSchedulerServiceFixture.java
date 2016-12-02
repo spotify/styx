@@ -22,6 +22,7 @@ package com.spotify.styx;
 
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
 import static java.util.Collections.singletonList;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 
 import autovalue.shaded.com.google.common.common.base.Throwables;
@@ -69,8 +70,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A test fixture for system tests that exercise all of Styx in isolation from external systems.
- *
- * todo: generate events so we can drive state transitions
  */
 public class StyxSchedulerServiceFixture {
 
@@ -235,6 +234,17 @@ public class StyxSchedulerServiceFixture {
 
   long timeOffsetSeconds(int secondsOffset) {
     return now.plusSeconds(secondsOffset).toEpochMilli();
+  }
+
+  void awaitNumberOfDockerRuns(int n) {
+    await().until(() -> dockerRuns.size() == n);
+  }
+
+  void awaitWorkflowInstanceState(WorkflowInstance instance, RunState.State state) {
+    await().until(() -> {
+      final RunState runState = getState(instance);
+      return runState != null && runState.state() == state;
+    });
   }
 
   private void printTime() {
