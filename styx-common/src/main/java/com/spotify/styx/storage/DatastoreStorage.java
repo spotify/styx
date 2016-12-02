@@ -353,12 +353,12 @@ class DatastoreStorage {
     return workflow(workflowId).flatMap(wf -> wf.schedule().dockerImage());
   }
 
-  public Optional<WorkflowState> workflowState(WorkflowId workflowId) throws IOException {
-    return Optional.of(
+  public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
+    return
         WorkflowState.create(
             Optional.of(enabled(workflowId)),
             getDockerImage(workflowId),
-            getCommitSha(workflowId)));
+            getCommitSha(workflowId));
   }
 
   private Optional<String> getCommitSha(WorkflowId workflowId) {

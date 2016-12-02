@@ -188,8 +188,7 @@ public final class WorkflowResource {
     final WorkflowId workflowId = WorkflowId.create(componentId, endpointId);
     WorkflowState workflowState;
     try {
-      workflowState = storage.workflowState(workflowId)
-          .orElseGet(() -> WorkflowState.create(Optional.of(false), Optional.empty(), Optional.empty()));
+      workflowState = storage.workflowState(workflowId);
     } catch (IOException e) {
       return Response
           .forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch state."));
