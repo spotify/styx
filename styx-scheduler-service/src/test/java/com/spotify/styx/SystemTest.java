@@ -27,8 +27,8 @@ import static java.util.Optional.of;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.docker.DockerRunner.RunSpec;
@@ -48,14 +48,13 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   private static final DataEndpoint DATA_ENDPOINT = DataEndpoint.create(
       "styx.TestEndpoint", Partitioning.HOURS, of("busybox"), of(asList("--hour", "{}")),
       empty());
-  private final static String TEST_EXECUTION_ID_1 = "execution_1";
-  private final static String TEST_DOCKER_IMAGE = "busybox:1.1";
+  private static final String TEST_EXECUTION_ID_1 = "execution_1";
+  private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
   private static final Workflow HOURLY_WORKFLOW = Workflow.create(
       "styx",
       TestData.WORKFLOW_URI,
       DATA_ENDPOINT);
-  private final Instant NEXT_EXECUTION = Instant.parse("2016-03-14T16:00:00Z");
-
+  private static final Instant NEXT_EXECUTION = Instant.parse("2016-03-14T16:00:00Z");
 
   @Test
   public void shouldCatchUpWithNaturalTriggers() throws Exception {
@@ -68,27 +67,26 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     styxStarts();
     timePasses(1, SECONDS);
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
-    assertThat(dockerRuns, hasSize(1));
+
+    awaitNumberOfDockerRuns(1);
+
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T12")));
 
     timePasses(1, SECONDS);
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
-    assertThat(dockerRuns, hasSize(2));
+
+    awaitNumberOfDockerRuns(2);
+
     workflowInstance = dockerRuns.get(1)._1;
     runSpec = dockerRuns.get(1)._2;
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T13")));
 
     timePasses(1, SECONDS);
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
-    assertThat(dockerRuns, hasSize(3));
+    awaitNumberOfDockerRuns(3);
+
     workflowInstance = dockerRuns.get(2)._1;
     runSpec = dockerRuns.get(2)._2;
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
@@ -101,27 +99,26 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
+
     final Instant nextExecution = Instant.parse("2016-03-14T14:00:00Z");
     givenNextNaturalTrigger(HOURLY_WORKFLOW.id(), nextExecution);
 
+    WorkflowInstance instance1 = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T13");
+    WorkflowInstance instance2 = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
+
     styxStarts();
     timePasses(1, SECONDS);
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
-    assertThat(dockerRuns, hasSize(1));
-    WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
-    RunSpec runSpec = dockerRuns.get(0)._2;
-    assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
-    assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T13")));
+    awaitNumberOfDockerRuns(1);
+
+    assertThat(dockerRuns.get(0)._1, is(instance1));
 
     workflowDeleted(HOURLY_WORKFLOW);
 
     timePasses(1, SECONDS);
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
-    assertThat(dockerRuns, hasSize(1));
+
+    assertThat(getState(instance2), is(nullValue()));
   }
-  
+
   @Test
   public void runsDockerImageWithArgsTemplate() throws Exception {
     givenTheTimeIs("2016-03-14T15:59:00Z");
@@ -132,11 +129,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     styxStarts();
     timePasses(1, MINUTES);
+    awaitNumberOfDockerRuns(1);
 
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
-
-    assertThat(dockerRuns, hasSize(1));
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
@@ -153,11 +147,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     styxStarts();
     timePasses(1, MINUTES);
+    awaitNumberOfDockerRuns(1);
 
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
-
-    assertThat(dockerRuns, hasSize(1));
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
@@ -165,9 +156,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     injectEvent(Event.started(workflowInstance));
     injectEvent(Event.terminate(workflowInstance, 20));
-
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
+    awaitWorkflowInstanceState(workflowInstance, RunState.State.AWAITING_RETRY);
 
     DataEndpoint changedDataEndpoint = DataEndpoint.create(
         DATA_ENDPOINT.id(), Partitioning.HOURS, of("busybox:v777"), of(asList("other", "args")),
@@ -185,10 +174,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     timePasses(59, SECONDS);
     timePasses(StyxScheduler.STATE_RETRY_CHECK_INTERVAL_SECONDS, SECONDS);
 
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
+    awaitNumberOfDockerRuns(2);
 
-    assertThat(dockerRuns, hasSize(2));
     WorkflowInstance workflowInstance2 = dockerRuns.get(1)._1;
     RunSpec runSpec2 = dockerRuns.get(1)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
@@ -205,18 +192,13 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     styxStarts();
     timePasses(1, MINUTES);
+    awaitNumberOfDockerRuns(1);
 
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
-
-    assertThat(dockerRuns, hasSize(1));
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
 
     injectEvent(Event.started(workflowInstance));
     injectEvent(Event.terminate(workflowInstance, 20));
-
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
+    awaitWorkflowInstanceState(workflowInstance, RunState.State.AWAITING_RETRY);
 
     assertThat(dockerCleans, contains(TEST_EXECUTION_ID));
   }
@@ -231,17 +213,12 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     styxStarts();
     timePasses(1, MINUTES);
+    awaitNumberOfDockerRuns(1);
 
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
-
-    assertThat(dockerRuns, hasSize(1));
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
 
     injectEvent(Event.runError(workflowInstance, "Something failed"));
-
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
+    awaitWorkflowInstanceState(workflowInstance, RunState.State.AWAITING_RETRY);
 
     assertThat(dockerCleans, contains(TEST_EXECUTION_ID));
   }
@@ -289,15 +266,9 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     styxStarts();
 
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
-
     timePasses(1, MINUTES);
+    awaitNumberOfDockerRuns(1);
 
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
-
-    assertThat(dockerRuns, hasSize(1));
     WorkflowInstance workflowInstance2 = dockerRuns.get(0)._1;
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
@@ -330,56 +301,12 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     styxStarts();
 
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
-
     timePasses(1, MINUTES);
+    awaitNumberOfDockerRuns(1);
 
-    // todo: add semantic wait utility
-    Thread.sleep(1000);
-
-    assertThat(dockerRuns, hasSize(1));
     WorkflowInstance workflowInstance2 = dockerRuns.get(0)._1;
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T14")));
   }
-
-//  @Test
-//  public void publishesMessagesToPubSub() throws Exception {
-//    givenTheTimeIs("2016-03-14T15:59:00Z");
-//    givenTheGlobalEnableFlagIs(true);
-//    givenWorkflow(HOURLY_WORKFLOW);
-//    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-//
-//    styxStarts();
-//    timePasses(1, MINUTES);
-//
-//    // todo: add semantic wait utility
-//    Thread.sleep(1000);
-//
-//    assertThat(pubSubMessages, hasSize(1));
-//    Message message = pubSubMessages.get(0);
-//    assertThat(message.payloadAsString(), containsString(HOURLY_WORKFLOW.componentId()));
-//    assertThat(message.payloadAsString(), containsString(HOURLY_WORKFLOW.endpointId()));
-//    assertThat(message.payloadAsString(), containsString("ROLLING_OUT"));
-//    assertThat(message.payloadAsString(), containsString("busybox"));
-//
-//    // fake that the docker image started
-//    assertThat(dockerRuns, hasSize(1));
-//    WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
-//    injectEvent(Event.started(workflowInstance));
-//
-//    // todo: add semantic wait utility
-//    Thread.sleep(1000);
-//
-//    assertThat(pubSubMessages, hasSize(2));
-//    Message message2 = pubSubMessages.get(1);
-//    assertThat(message2.payloadAsString(), containsString(HOURLY_WORKFLOW.componentId()));
-//    assertThat(message2.payloadAsString(), containsString(HOURLY_WORKFLOW.endpointId()));
-//    assertThat(message2.payloadAsString(), containsString("DONE"));
-//    assertThat(message2.payloadAsString(), containsString("busybox"));
-//  }
-
-  // todo: semantic waits
 }
