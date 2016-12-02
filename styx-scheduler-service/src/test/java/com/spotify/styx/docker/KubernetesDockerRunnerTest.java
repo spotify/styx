@@ -117,7 +117,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.getMetadata().setName(POD_NAME);
     createdPod.getMetadata().setResourceVersion("1001");
 
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED));
+    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, POD_NAME, RunState.State.SUBMITTED));
 
     when(pods.create(any(Pod.class))).thenReturn(createdPod);
 
@@ -197,13 +197,24 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldGenerateStartedWhenContainerIsReady() throws Exception {
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED));
+    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, POD_NAME, RunState.State.SUBMITTED));
     createdPod.setStatus(running(/* ready= */ false));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
     assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.SUBMITTED));
 
     createdPod.setStatus(running(/* ready= */ true));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
+    assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.RUNNING));
+  }
+
+  @Test
+  public void shouldDiscardChangesForOldExecutions() throws Exception {
+    // simulate event from different pod, but still with the same workflow instance annotation
+    createdPod.getMetadata().setName(POD_NAME + "-other");
+    createdPod.setStatus(terminated("Succeeded", 20));
+
+    podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
+
     assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.RUNNING));
   }
 }

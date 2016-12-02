@@ -49,6 +49,7 @@ import java.net.ProtocolException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -192,8 +193,9 @@ class KubernetesDockerRunner implements DockerRunner {
 
   private void inspectPod(Watcher.Action action, Pod pod) {
     final Map<String, String> annotations = pod.getMetadata().getAnnotations();
+    final String podName = pod.getMetadata().getName();
     if (!annotations.containsKey(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION)) {
-      LOG.warn("Got pod without workflow instance annotation {}", pod.getMetadata().getName());
+      LOG.warn("Got pod without workflow instance annotation {}", podName);
       return;
     }
 
@@ -203,6 +205,19 @@ class KubernetesDockerRunner implements DockerRunner {
     final RunState runState = stateManager.get(workflowInstance);
     if (runState == null) {
       LOG.warn("Pod event for unknown or inactive workflow instance {}", workflowInstance);
+      return;
+    }
+
+    final Optional<String> executionIdOpt = runState.executionId();
+    if (!executionIdOpt.isPresent()) {
+      LOG.warn("Pod event for state with no current executionId: {}", podName);
+      return;
+    }
+
+    final String executionId = executionIdOpt.get();
+    if (!podName.equals(executionId)) {
+      LOG.warn("Pod event not matching current exec id, current:{} != pod:{}",
+          executionId, podName);
       return;
     }
 
