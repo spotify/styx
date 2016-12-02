@@ -20,7 +20,6 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.StyxScheduler.guard;
 import static com.spotify.styx.workflow.ParameterUtil.decrementInstant;
 import static com.spotify.styx.workflow.ParameterUtil.incrementInstant;
 import static com.spotify.styx.workflow.ParameterUtil.truncateInstant;
@@ -38,8 +37,6 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,30 +48,17 @@ public class TriggerManager {
   private static final Logger LOG = LoggerFactory.getLogger(TriggerManager.class);
 
   private static final String NATURAL_TRIGGER = "natural-trigger";
-  private static final int INITIAL_DELAY_SECONDS = 1;
-  private static final int TICK_INTERVAL_SECONDS = 1;
 
-  private final ScheduledExecutorService executor;
   private final TriggerListener triggerListener;
   private final Time time;
   private final Storage storage;
 
-  public TriggerManager(ScheduledExecutorService exec,
-                        TriggerListener triggerListener,
+  public TriggerManager(TriggerListener triggerListener,
                         Time time,
                         Storage storage) {
-    this.executor = requireNonNull(exec);
     this.triggerListener = requireNonNull(triggerListener);
     this.time = requireNonNull(time);
     this.storage = requireNonNull(storage);
-  }
-
-  public void start() {
-    executor.scheduleAtFixedRate(
-        guard(this::tick),
-        INITIAL_DELAY_SECONDS,
-        TICK_INTERVAL_SECONDS,
-        TimeUnit.SECONDS);
   }
 
   void tick() {

@@ -122,6 +122,7 @@ public class StyxScheduler implements AppInit {
 
   public static final int STATE_REAP_INTERVAL_SECONDS = 30;
   public static final int STATE_RETRY_CHECK_INTERVAL_SECONDS = 2;
+  public static final int TRIGGER_MANAGER_TICK_INTERVAL_SECONDS = 1;
   public static final Duration DEFAULT_RETRY_BASE_DELAY = Duration.ofMinutes(3);
   public static final int DEFAULT_RETRY_MAX_EXPONENT = 6;
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
@@ -315,7 +316,7 @@ public class StyxScheduler implements AppInit {
         (workflowInstance) -> RunState.fresh(workflowInstance, time, outputHandlers);
 
     final TriggerListener trigger = trigger(storage, stateFactory, stateManager);
-    final TriggerManager triggerManager = new TriggerManager(executor, trigger, time, storage);
+    final TriggerManager triggerManager = new TriggerManager(trigger, time, storage);
 
     final WorkflowCache cache = new InMemWorkflowCache();
     final Consumer<Workflow> workflowChangeListener = workflowChanged(cache, storage,
@@ -323,7 +324,7 @@ public class StyxScheduler implements AppInit {
     final Consumer<Workflow> workflowRemoveListener = workflowRemoved(storage);
 
     restoreState(eventStorage, outputHandlers, stateManager);
-    triggerManager.start();
+    startTriggerManager(triggerManager, executor);
     startScheduleSources(environment, executor, workflowChangeListener, workflowRemoveListener);
     startRetryChecker(stateManager, executor);
     startStateReaper(stateManager, executor);
@@ -384,6 +385,14 @@ public class StyxScheduler implements AppInit {
     }
   }
 
+  private static void startTriggerManager(TriggerManager triggerManager, ScheduledExecutorService exec) {
+    exec.scheduleAtFixedRate(
+        guard(triggerManager::tick),
+        TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
+        TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
+        TimeUnit.SECONDS);
+  }
+
   private static void startRetryChecker(StateRetrier retrier, ScheduledExecutorService exec) {
     exec.scheduleWithFixedDelay(
         guard(retrier::triggerRetries),
@@ -400,7 +409,7 @@ public class StyxScheduler implements AppInit {
         TimeUnit.SECONDS);
   }
 
-  static Runnable guard(Runnable delegate) {
+  private static Runnable guard(Runnable delegate) {
     return () -> {
       try {
         delegate.run();

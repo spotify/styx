@@ -67,7 +67,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     styxStarts();
     timePasses(1, SECONDS);
-
     awaitNumberOfDockerRuns(1);
 
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
@@ -76,7 +75,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T12")));
 
     timePasses(1, SECONDS);
-
     awaitNumberOfDockerRuns(2);
 
     workflowInstance = dockerRuns.get(1)._1;
