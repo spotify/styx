@@ -128,8 +128,19 @@ public class AggregateStorage implements Storage, EventStorage {
   }
 
   @Override
+  public void store(WorkflowInstance workflowInstance) throws IOException {
+    datastoreStorage.store(workflowInstance);
+  }
+
+  @Override
   public Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
     return datastoreStorage.workflow(workflowId);
+  }
+
+  @Override
+  public List<WorkflowInstance> workflowInstances(WorkflowId workflowId, String offset, int limit)
+      throws IOException {
+    return datastoreStorage.workflowInstances(workflowId, offset, limit);
   }
 
   @Override

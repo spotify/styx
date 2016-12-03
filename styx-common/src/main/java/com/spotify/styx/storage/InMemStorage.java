@@ -97,7 +97,18 @@ public class InMemStorage implements Storage, EventStorage {
   }
 
   @Override
+  public List<WorkflowInstance> workflowInstances(WorkflowId workflowId, String offset, int limit)
+      throws IOException {
+    throw new UnsupportedOperationException("Unsupported Operation!");
+  }
+
+  @Override
   public void delete(WorkflowId workflowId) throws IOException {
+    throw new UnsupportedOperationException("Unsupported Operation!");
+  }
+
+  @Override
+  public void store(WorkflowInstance workflowInstance) throws IOException {
     throw new UnsupportedOperationException("Unsupported Operation!");
   }
 
