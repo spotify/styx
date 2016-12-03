@@ -31,6 +31,7 @@ import com.google.common.collect.Sets;
 import com.google.common.io.Closer;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.schedule.ScheduleSource;
+import com.sun.nio.file.SensitivityWatchEventModifier;
 import com.typesafe.config.Config;
 import java.io.IOException;
 import java.net.URI;
@@ -65,6 +66,8 @@ import org.slf4j.LoggerFactory;
  * - handle if watch dir is deleted (warn, try to re-watch until dir appears again)
  */
 class LocalFileScheduleSource implements ScheduleSource {
+
+  private static final WatchEvent.Kind<?>[] EVENTS = { ENTRY_CREATE, ENTRY_MODIFY, ENTRY_DELETE };
 
   private static final String LOCAL_DIR_CONFIG_KEY = "styx.source.local.dir";
   private static final long POLL_TIMEOUT_MILLIS = 100;
@@ -121,7 +124,7 @@ class LocalFileScheduleSource implements ScheduleSource {
     WatchService watcher;
     try {
       watcher = FileSystems.getDefault().newWatchService();
-      path.register(watcher, ENTRY_CREATE, ENTRY_MODIFY, ENTRY_DELETE);
+      path.register(watcher, EVENTS, SensitivityWatchEventModifier.HIGH);
     } catch (IOException e) {
       LOG.error("Could not watch: {}", path, e);
       throw new RuntimeException("Can't load local file schedule source", e);
