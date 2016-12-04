@@ -22,19 +22,16 @@ package com.spotify.styx.storage;
 
 import com.google.cloud.datastore.DatastoreException;
 import com.google.common.base.Throwables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventSerializer;
 import com.spotify.styx.model.SequenceEvent;
-import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowInstanceExecutionData;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.RunnableWithException;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -47,7 +44,6 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
-import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,33 +103,7 @@ public class BigtableStorage {
     });
   }
 
-  List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId)
-      throws IOException {
-    final Table eventsTable = connection.getTable(EVENTS_TABLE_NAME);
-
-    final Scan scan = new Scan()
-        .setRowPrefixFilter(Bytes.toBytes(workflowId.toKey() + '#'))
-        .setFilter(new FirstKeyOnlyFilter());
-
-    final Set<WorkflowInstance> workflowInstancesSet = Sets.newHashSet();
-    for (Result result : eventsTable.getScanner(scan)) {
-      final String key = new String(result.getRow());
-      final int lastHash = key.lastIndexOf('#');
-      final WorkflowInstance wfi = WorkflowInstance.parseKey(key.substring(0, lastHash));
-      workflowInstancesSet.add(wfi);
-    }
-
-    final List<WorkflowInstanceExecutionData> workflowInstanceDataList = Lists.newArrayList();
-    for (WorkflowInstance workflowInstance : workflowInstancesSet) {
-      workflowInstanceDataList.add(executionData(workflowInstance));
-    }
-    workflowInstanceDataList.sort(WorkflowInstanceExecutionData.COMPARATOR);
-
-    return workflowInstanceDataList;
-  }
-
-  Optional<Long> getLatestStoredCounter(WorkflowInstance workflowInstance)
-      throws IOException {
+  Optional<Long> getLatestStoredCounter(WorkflowInstance workflowInstance) throws IOException {
     final Set<SequenceEvent> storedEvents = readEvents(workflowInstance);
     final Optional<SequenceEvent> lastStoredEvent = storedEvents.stream().reduce((a, b) -> b);
     if (lastStoredEvent.isPresent()) {

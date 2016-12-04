@@ -105,12 +105,6 @@ public final class MeteredStorage extends MeteredBase implements Storage {
   }
 
   @Override
-  public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId)
-      throws IOException {
-    return timedStorage("executionData", () -> delegate.executionData(workflowId));
-  }
-
-  @Override
   public boolean enabled(WorkflowId workflowId) throws IOException {
     return timedStorage("enabled", () -> delegate.enabled(workflowId));
   }

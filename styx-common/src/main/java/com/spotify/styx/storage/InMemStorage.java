@@ -134,23 +134,6 @@ public class InMemStorage implements Storage, EventStorage {
   }
 
   @Override
-  public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId)
-      throws IOException {
-    final Set<WorkflowInstance> workflowInstances = writtenEvents.stream()
-        .map(e -> e.event().workflowInstance())
-        .filter(wfi -> wfi.workflowId().equals(workflowId))
-        .collect(Collectors.toSet());
-
-    final List<WorkflowInstanceExecutionData> workflowInstanceDataList = Lists.newArrayList();
-    for (WorkflowInstance workflowInstance : workflowInstances) {
-      workflowInstanceDataList.add(executionData(workflowInstance));
-    }
-    workflowInstanceDataList.sort(WorkflowInstanceExecutionData.COMPARATOR);
-
-    return workflowInstanceDataList;
-  }
-
-  @Override
   public boolean enabled(WorkflowId workflowId) {
     return enabledWorkflows.contains(workflowId);
   }

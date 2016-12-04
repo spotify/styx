@@ -120,14 +120,6 @@ public interface Storage {
   WorkflowInstanceExecutionData executionData(WorkflowInstance workflowInstance) throws IOException;
 
   /**
-   * Get execution information for all the {@link WorkflowInstance} of the specified {@link WorkflowId}.
-   *
-   * @param workflowId  The workflowId to get execution information for
-   * @return A {@link WorkflowInstanceExecutionData} of all the instances
-   */
-  List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId) throws IOException;
-
-  /**
    * Use workflowState instead.
    * Get enabled flag for a {@link Workflow}.
    *

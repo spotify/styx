@@ -96,12 +96,6 @@ public class AggregateStorage implements Storage, EventStorage {
   }
 
   @Override
-  public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId)
-      throws IOException {
-    return bigtableStorage.executionData(workflowId);
-  }
-
-  @Override
   public boolean enabled(WorkflowId workflowId) throws IOException {
     return datastoreStorage.enabled(workflowId);
   }
