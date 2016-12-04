@@ -50,6 +50,7 @@ public class TriggerManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(TriggerManager.class);
 
+  private static final String NATURAL_TRIGGER = "natural-trigger";
   private static final int INITIAL_DELAY_SECONDS = 1;
   private static final int TICK_INTERVAL_SECONDS = 1;
 
@@ -77,8 +78,8 @@ public class TriggerManager {
   }
 
   void tick() {
-    Map<Workflow, Optional<Instant>> map;
-    Set<WorkflowId> enabled;
+    final Map<Workflow, Optional<Instant>> map;
+    final Set<WorkflowId> enabled;
     try {
       map = storage.workflowsWithNextNaturalTrigger();
       enabled = storage.enabled();
@@ -87,28 +88,28 @@ public class TriggerManager {
       return;
     }
 
-    Instant now = time.get();
+    final Instant now = time.get();
     map.entrySet().forEach(entry -> {
-      Workflow workflow = entry.getKey();
-      Partitioning partitioning = workflow.schedule().partitioning();
-      Instant naturalTrigger = entry.getValue().orElse(truncateInstant(now, partitioning));
+      final Workflow workflow = entry.getKey();
+      final Partitioning partitioning = workflow.schedule().partitioning();
+      final Instant next = entry.getValue().orElse(truncateInstant(now, partitioning));
 
-      if (naturalTrigger.isAfter(now)) {
+      if (next.isAfter(now)) {
         return;
       }
 
       if (enabled.contains(workflow.id())) {
         try {
-          triggerListener.event(
-              workflow,
-              "natural-trigger",
-              decrementInstant(naturalTrigger, partitioning));
+          triggerListener.event(workflow, NATURAL_TRIGGER, decrementInstant(next, partitioning));
         } catch (AlreadyInitializedException e) {
           LOG.warn("{}", e.getMessage());
+        } catch (Throwable e) {
+          LOG.warn("Triggering {} threw exception", workflow.id(), e);
+          return; // so we don't update the trigger time
         }
       }
 
-      Instant nextNaturalTrigger = incrementInstant(naturalTrigger, partitioning);
+      Instant nextNaturalTrigger = incrementInstant(next, partitioning);
       try {
         storage.updateNextNaturalTrigger(workflow.id(), nextNaturalTrigger);
       } catch (IOException e) {

@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import com.google.common.base.Throwables;
 import com.spotify.styx.StyxScheduler.StateFactory;
 import com.spotify.styx.docker.WorkflowValidator;
 import com.spotify.styx.model.Event;
@@ -30,6 +31,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.workflow.ParameterUtil;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Objects;
 import org.slf4j.Logger;
@@ -62,6 +64,13 @@ final class StateInitializingTrigger implements TriggerListener {
     final String parameter = toParameter(workflow.schedule().partitioning(), instant);
     final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), parameter);
     final RunState initialState = stateFactory.apply(workflowInstance);
+
+    try {
+      storage.store(workflowInstance);
+    } catch (IOException e) {
+      LOG.warn("Could not persist workflow instance", e);
+      throw Throwables.propagate(e);
+    }
 
     try {
       stateManager.initialize(initialState);
