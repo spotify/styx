@@ -20,10 +20,12 @@
 
 package com.spotify.styx.docker;
 
+import static com.jcabi.matchers.RegexMatchers.matchesPattern;
 import static com.spotify.styx.docker.KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasEntry;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
@@ -32,6 +34,7 @@ import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.testdata.TestData;
 import io.fabric8.kubernetes.api.model.Container;
+import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.Volume;
 import io.fabric8.kubernetes.api.model.VolumeMount;
@@ -41,6 +44,9 @@ import java.util.Optional;
 import org.junit.Test;
 
 public class KubernetesDockerRunnerPodResourceTest {
+
+  private static final String UUID_REGEX =
+      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
   private static final WorkflowInstance WORKFLOW_INSTANCE =
       WorkflowInstance.create(TestData.WORKFLOW_ID, "2016-04-04");
@@ -154,5 +160,36 @@ public class KubernetesDockerRunnerPodResourceTest {
     assertThat(volumeMount.getName(), is("my-secret"));
     assertThat(volumeMount.getMountPath(), is("/etc/secrets"));
     assertThat(volumeMount.getReadOnly(), is(true));
+  }
+
+  @Test
+  public void shouldConfigureEnvironmentVariables() throws Exception {
+    Pod pod = KubernetesDockerRunner.createPod(
+        WORKFLOW_INSTANCE,
+        DockerRunner.RunSpec.create("busybox", ImmutableList.of(), Optional.empty()));
+    List<EnvVar> envVars = pod.getSpec().getContainers().get(0).getEnv();
+
+    EnvVar endpoint = new EnvVar();
+    endpoint.setName(KubernetesDockerRunner.ENDPOINT_ID);
+    endpoint.setValue(WORKFLOW_INSTANCE.workflowId().endpointId());
+    EnvVar workflow = new EnvVar();
+    workflow.setName(KubernetesDockerRunner.WORKFLOW_ID);
+    workflow.setValue(WORKFLOW_INSTANCE.workflowId().endpointId());
+    EnvVar component = new EnvVar();
+    component.setName(KubernetesDockerRunner.COMPONENT_ID);
+    component.setValue(WORKFLOW_INSTANCE.workflowId().componentId());
+    EnvVar parameter = new EnvVar();
+    parameter.setName(KubernetesDockerRunner.PARAMETER);
+    parameter.setValue(WORKFLOW_INSTANCE.parameter());
+    EnvVar execution = envVars.get(4);
+
+    assertThat(envVars.size(), is(5));
+    assertThat(envVars, hasItem(component));
+    assertThat(envVars, hasItem(workflow));
+    assertThat(envVars, hasItem(endpoint));
+    assertThat(envVars, hasItem(parameter));
+    assertThat(execution.getName(),is(KubernetesDockerRunner.EXECUTION_ID));
+    assertThat(execution.getValue(),
+        matchesPattern(KubernetesDockerRunner.STYX_RUN + "-" + UUID_REGEX));
   }
 }

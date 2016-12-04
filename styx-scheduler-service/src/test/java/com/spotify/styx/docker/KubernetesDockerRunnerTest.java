@@ -20,12 +20,10 @@
 
 package com.spotify.styx.docker;
 
-import static com.jcabi.matchers.RegexMatchers.matchesPattern;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.podStatusNoContainer;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.running;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminated;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.waiting;
-import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
@@ -44,7 +42,6 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.testdata.TestData;
 import io.fabric8.kubernetes.api.model.DoneablePod;
-import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.ListMeta;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodList;
@@ -55,7 +52,6 @@ import io.fabric8.kubernetes.client.dsl.ClientMixedOperation;
 import io.fabric8.kubernetes.client.dsl.ClientPodResource;
 import io.fabric8.kubernetes.client.dsl.Watchable;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.After;
@@ -73,8 +69,6 @@ import org.mockito.runners.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class KubernetesDockerRunnerTest {
 
-  private static final String UUID_REGEX =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   private static final String POD_NAME = "test-pod-1";
   private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(TestData.WORKFLOW_ID, "foo");
   private static final RunSpec RUN_SPEC = RunSpec.create("busybox", ImmutableList.of(), Optional.empty());
@@ -123,7 +117,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.getMetadata().setName(POD_NAME);
     createdPod.getMetadata().setResourceVersion("1001");
 
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED));
+    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, POD_NAME, RunState.State.SUBMITTED));
 
     when(pods.create(any(Pod.class))).thenReturn(createdPod);
 
@@ -134,33 +128,6 @@ public class KubernetesDockerRunnerTest {
   @After
   public void tearDown() throws Exception {
     kdr.close();
-  }
-
-  @Test
-  public void shouldReturnEnvironmentVariablesForCreatedPod() throws Exception {
-    List<EnvVar> envVars = createdPod.getSpec().getContainers().get(0).getEnv();
-    EnvVar endpoint = new EnvVar();
-    endpoint.setName(KubernetesDockerRunner.ENDPOINT_ID);
-    endpoint.setValue(WORKFLOW_INSTANCE.workflowId().endpointId());
-    EnvVar workflow = new EnvVar();
-    workflow.setName(KubernetesDockerRunner.WORKFLOW_ID);
-    workflow.setValue(WORKFLOW_INSTANCE.workflowId().endpointId());
-    EnvVar component = new EnvVar();
-    component.setName(KubernetesDockerRunner.COMPONENT_ID);
-    component.setValue(WORKFLOW_INSTANCE.workflowId().componentId());
-    EnvVar parameter = new EnvVar();
-    parameter.setName(KubernetesDockerRunner.PARAMETER);
-    parameter.setValue(WORKFLOW_INSTANCE.parameter());
-    EnvVar execution = envVars.get(4);
-
-    assertThat(envVars.size(), is(5));
-    assertThat(envVars, hasItem(component));
-    assertThat(envVars, hasItem(workflow));
-    assertThat(envVars, hasItem(endpoint));
-    assertThat(envVars, hasItem(parameter));
-    assertThat(execution.getName(),is(KubernetesDockerRunner.EXECUTION_ID));
-    assertThat(execution.getValue(),
-        matchesPattern(KubernetesDockerRunner.STYX_RUN + "-" + UUID_REGEX));
   }
 
   @Test
@@ -230,13 +197,24 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldGenerateStartedWhenContainerIsReady() throws Exception {
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED));
+    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, POD_NAME, RunState.State.SUBMITTED));
     createdPod.setStatus(running(/* ready= */ false));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
     assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.SUBMITTED));
 
     createdPod.setStatus(running(/* ready= */ true));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
+    assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.RUNNING));
+  }
+
+  @Test
+  public void shouldDiscardChangesForOldExecutions() throws Exception {
+    // simulate event from different pod, but still with the same workflow instance annotation
+    createdPod.getMetadata().setName(POD_NAME + "-other");
+    createdPod.setStatus(terminated("Succeeded", 20));
+
+    podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
+
     assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.RUNNING));
   }
 }
