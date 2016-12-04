@@ -21,8 +21,8 @@
 package com.spotify.styx.storage;
 
 import com.google.cloud.datastore.DatastoreException;
+import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventSerializer;
@@ -40,11 +40,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import okio.ByteString;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
@@ -107,7 +109,7 @@ public class BigtableStorage {
     });
   }
 
-  List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId)
+  List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String offset, int limit)
       throws IOException {
     final Table eventsTable = connection.getTable(EVENTS_TABLE_NAME);
 
@@ -115,21 +117,38 @@ public class BigtableStorage {
         .setRowPrefixFilter(Bytes.toBytes(workflowId.toKey() + '#'))
         .setFilter(new FirstKeyOnlyFilter());
 
+    if (!Strings.isNullOrEmpty(offset)) {
+      final WorkflowInstance offsetInstance = WorkflowInstance.create(workflowId, offset);
+      scan.setStartRow(Bytes.toBytes(offsetInstance.toKey() + '#'));
+    }
+
     final Set<WorkflowInstance> workflowInstancesSet = Sets.newHashSet();
-    for (Result result : eventsTable.getScanner(scan)) {
-      final String key = new String(result.getRow());
-      final int lastHash = key.lastIndexOf('#');
-      final WorkflowInstance wfi = WorkflowInstance.parseKey(key.substring(0, lastHash));
-      workflowInstancesSet.add(wfi);
+    try (ResultScanner scanner = eventsTable.getScanner(scan)) {
+      Result result = scanner.next();
+      while (result != null) {
+        final String key = new String(result.getRow());
+        final int lastHash = key.lastIndexOf('#');
+
+        final WorkflowInstance wfi = WorkflowInstance.parseKey(key.substring(0, lastHash));
+        workflowInstancesSet.add(wfi);
+        if (workflowInstancesSet.size() == limit) {
+          break;
+        }
+
+        result = scanner.next();
+      }
     }
 
-    final List<WorkflowInstanceExecutionData> workflowInstanceDataList = Lists.newArrayList();
-    for (WorkflowInstance workflowInstance : workflowInstancesSet) {
-      workflowInstanceDataList.add(executionData(workflowInstance));
-    }
-    workflowInstanceDataList.sort(WorkflowInstanceExecutionData.COMPARATOR);
-
-    return workflowInstanceDataList;
+    return workflowInstancesSet.parallelStream()
+        .map(workflowInstance -> {
+          try {
+            return executionData(workflowInstance);
+          } catch (IOException e) {
+            throw Throwables.propagate(e);
+          }
+        })
+        .sorted(WorkflowInstanceExecutionData.COMPARATOR)
+        .collect(Collectors.toList());
   }
 
   Optional<Long> getLatestStoredCounter(WorkflowInstance workflowInstance)

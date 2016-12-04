@@ -73,7 +73,7 @@ public interface Storage {
   /**
    * Removes a workflow definition.
    *
-   * @param workflowId The workflowid to remove.
+   * @param workflowId The workflow id to remove.
    */
   void delete(WorkflowId workflowId) throws IOException;
 
@@ -103,10 +103,15 @@ public interface Storage {
   /**
    * Get execution information for all the {@link WorkflowInstance} of the specified {@link WorkflowId}.
    *
+   * <p>Results can be paginated based on a offset {@link WorkflowInstance#parameter()} and a limit.
+   *
    * @param workflowId  The workflowId to get execution information for
+   * @param offset      The offset parameter
+   * @param limit       Maximum number of results to return
    * @return A {@link WorkflowInstanceExecutionData} of all the instances
    */
-  List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId) throws IOException;
+  List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String offset, int limit)
+      throws IOException;
 
   /**
    * Use workflowState instead.

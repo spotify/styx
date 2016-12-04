@@ -44,10 +44,13 @@ public class BigTableStorageTest {
 
   private static final String PARAMETER1 = "2016-01-01";
   private static final String PARAMETER2 = "2016-01-02";
+  private static final String PARAMETER3 = "2016-01-03";
 
   private static final WorkflowId WORKFLOW_ID1 = WorkflowId.create("component", "endpoint1");
+  private static final WorkflowId WORKFLOW_ID2 = WorkflowId.create("component", "endpoint2");
   private static final WorkflowInstance WFI1 = WorkflowInstance.create(WORKFLOW_ID1, PARAMETER1);
   private static final WorkflowInstance WFI2 = WorkflowInstance.create(WORKFLOW_ID1, PARAMETER2);
+  private static final WorkflowInstance WFI3 = WorkflowInstance.create(WORKFLOW_ID2, PARAMETER1);
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -96,7 +99,9 @@ public class BigTableStorageTest {
     storage.writeEvent(SequenceEvent.create(Event.created(WFI2, "execId2", "img2"), 1L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI2), 2L, 5L));
 
-    List<WorkflowInstanceExecutionData> workflowInstanceExecutionData = storage.executionData(WORKFLOW_ID1);
+    List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =
+        storage.executionData(WORKFLOW_ID1, "", 100);
+
     assertThat(workflowInstanceExecutionData.size(), is(2));
 
     assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).triggerId(), is("triggerId1"));
@@ -113,7 +118,34 @@ public class BigTableStorageTest {
                    .get(0), is(ExecStatus.create(Instant.ofEpochMilli(4L), "SUBMITTED")));
     assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).executions().get(0).statuses()
                    .get(1), is(ExecStatus.create(Instant.ofEpochMilli(5L), "STARTED")));
+  }
 
+  @Test
+  public void shouldPaginateExecutionDataForWorkflow() throws Exception {
+    setUp(0);
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, "triggerId1"), 0L, 0L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, "triggerId2"), 0L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI3, "triggerId3"), 0L, 3L));
+
+    List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =
+        storage.executionData(WORKFLOW_ID1, WFI2.parameter(), 100);
+
+    assertThat(workflowInstanceExecutionData.size(), is(1));
+    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).triggerId(), is("triggerId2"));
+  }
+
+  @Test
+  public void shouldLimitExecutionDataForWorkflow() throws Exception {
+    setUp(0);
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, "triggerId1"), 0L, 0L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, "triggerId2"), 0L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI3, "triggerId3"), 0L, 3L));
+
+    List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =
+        storage.executionData(WORKFLOW_ID1, WFI1.parameter(), 1);
+
+    assertThat(workflowInstanceExecutionData.size(), is(1));
+    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).triggerId(), is("triggerId1"));
   }
 
   @Test

@@ -114,29 +114,13 @@ public class InMemStorage implements Storage, EventStorage {
 
   @Override
   public WorkflowInstanceExecutionData executionData(WorkflowInstance workflowInstance) throws IOException {
-    SortedSet<SequenceEvent> events = readEvents(workflowInstance);
-    if (events.isEmpty()) {
-      throw new IOException("Workflow instance not found");
-    }
-
-    return WorkflowInstanceExecutionData.fromEvents(events);
+    throw new UnsupportedOperationException("Unsupported Operation!");
   }
 
   @Override
-  public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId)
-      throws IOException {
-    final Set<WorkflowInstance> workflowInstances = writtenEvents.stream()
-        .map(e -> e.event().workflowInstance())
-        .filter(wfi -> wfi.workflowId().equals(workflowId))
-        .collect(Collectors.toSet());
-
-    final List<WorkflowInstanceExecutionData> workflowInstanceDataList = Lists.newArrayList();
-    for (WorkflowInstance workflowInstance : workflowInstances) {
-      workflowInstanceDataList.add(executionData(workflowInstance));
-    }
-    workflowInstanceDataList.sort(WorkflowInstanceExecutionData.COMPARATOR);
-
-    return workflowInstanceDataList;
+  public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String offset,
+                                                           int limit) throws IOException {
+    throw new UnsupportedOperationException("Unsupported Operation!");
   }
 
   @Override

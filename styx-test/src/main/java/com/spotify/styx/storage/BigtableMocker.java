@@ -181,7 +181,7 @@ public class BigtableMocker {
         .orElseGet(() -> Result.create(Collections.emptyList()));
   }
 
-  private ResultScanner resultOfScan(List<Cell> cells, Scan scan) {
+  private ResultScanner resultOfScan(List<Cell> cells, Scan scan) throws IOException {
     byte[] startRow = scan.getStartRow();
     byte[] stopRow = scan.getStopRow();
 
@@ -193,6 +193,14 @@ public class BigtableMocker {
 
     ResultScanner resultScanner = mock(ResultScanner.class);
     when(resultScanner.iterator()).thenReturn(inRangeResults.iterator());
+
+    if (!inRangeResults.isEmpty()) {
+      Result first = inRangeResults.get(0);
+      Result[] rest = inRangeResults.subList(1, inRangeResults.size())
+          .toArray(new Result[inRangeResults.size()]);
+      rest[rest.length - 1] = null; // signal end of scanner
+      when(resultScanner.next()).thenReturn(first, rest);
+    }
 
     return resultScanner;
   }
