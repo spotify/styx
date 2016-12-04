@@ -65,8 +65,20 @@ public final class MeteredStorage extends MeteredBase implements Storage {
   }
 
   @Override
+  public void store(WorkflowInstance workflowInstance) throws IOException {
+    timedStorage("storeWorkflowInstance", () -> delegate.store(workflowInstance));
+  }
+
+  @Override
   public Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
     return timedStorage("workflow", () -> delegate.workflow(workflowId));
+  }
+
+  @Override
+  public List<WorkflowInstance> workflowInstances(WorkflowId workflowId, String offset,
+                                                  int limit) throws IOException {
+    return timedStorage("workflowInstances",
+        () -> delegate.workflowInstances(workflowId, offset, limit));
   }
 
   @Override
@@ -90,12 +102,6 @@ public final class MeteredStorage extends MeteredBase implements Storage {
   @Override
   public WorkflowInstanceExecutionData executionData(WorkflowInstance workflowInstance) throws IOException {
     return timedStorage("executionData", () -> delegate.executionData(workflowInstance));
-  }
-
-  @Override
-  public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId)
-      throws IOException {
-    return timedStorage("executionData", () -> delegate.executionData(workflowId));
   }
 
   @Override

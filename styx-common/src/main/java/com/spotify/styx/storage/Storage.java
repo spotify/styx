@@ -63,6 +63,13 @@ public interface Storage {
   void store(Workflow workflow) throws IOException;
 
   /**
+   * Stores a Workflow Instance
+   *
+   * @param workflowInstance the workflow instance to store
+   */
+  void store(WorkflowInstance workflowInstance) throws IOException;
+
+  /**
    * Get a {@link Workflow} definition.
    *
    * @param workflowId  The workflow to get
@@ -71,9 +78,21 @@ public interface Storage {
   Optional<Workflow> workflow(WorkflowId workflowId) throws IOException;
 
   /**
+   * Gets a list of {@link WorkflowInstance} that have a parameter strictly greater than a given
+   * offset.
+   *
+   * @param workflowId  The workflow for which to get instances
+   * @param offset      The offset parameter
+   * @param limit       Maximum number of results to return
+   * @return A list of workflow instances
+   */
+  List<WorkflowInstance> workflowInstances(WorkflowId workflowId, String offset, int limit)
+      throws IOException;
+
+  /**
    * Removes a workflow definition.
    *
-   * @param workflowId The workflowid to remove.
+   * @param workflowId The workflow id to remove.
    */
   void delete(WorkflowId workflowId) throws IOException;
 
@@ -99,14 +118,6 @@ public interface Storage {
    * @return the {@link WorkflowInstanceExecutionData} with execution information
    */
   WorkflowInstanceExecutionData executionData(WorkflowInstance workflowInstance) throws IOException;
-
-  /**
-   * Get execution information for all the {@link WorkflowInstance} of the specified {@link WorkflowId}.
-   *
-   * @param workflowId  The workflowId to get execution information for
-   * @return A {@link WorkflowInstanceExecutionData} of all the instances
-   */
-  List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId) throws IOException;
 
   /**
    * Use workflowState instead.

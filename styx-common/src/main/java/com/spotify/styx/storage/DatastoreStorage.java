@@ -28,13 +28,18 @@ import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.KeyFactory;
+import com.google.cloud.datastore.KeyQuery;
 import com.google.cloud.datastore.PathElement;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
+import com.google.cloud.datastore.StructuredQuery;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.spotify.styx.model.Workflow;
@@ -48,6 +53,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -65,6 +71,7 @@ class DatastoreStorage {
   public static final String KIND_STYX_CONFIG = "StyxConfig";
   public static final String KIND_COMPONENT = "Component";
   public static final String KIND_WORKFLOW = "Workflow";
+  public static final String KIND_INSTANCE = "Instance";
   public static final String KIND_ACTIVE_WORKFLOW_INSTANCE = "ActiveWorkflowInstance";
 
   public static final String PROPERTY_CONFIG_ENABLED = "enabled";
@@ -202,6 +209,47 @@ class DatastoreStorage {
           }
           return null;
         });
+  }
+
+  void store(WorkflowInstance workflowInstance) throws IOException {
+    storeWithRetries(() -> {
+      final Key instanceKey = instanceKey(workflowInstance);
+      final Entity instanceEntity = Entity.builder(instanceKey).build();
+
+      return datastore.put(instanceEntity);
+    });
+  }
+
+  List<WorkflowInstance> workflowInstances(WorkflowId workflowId, String offset, int limit) throws IOException {
+    final List<StructuredQuery.Filter> moreFilters = Lists.newArrayList();
+
+    if (!Strings.isNullOrEmpty(offset)) {
+      final Key offsetKey = instanceKey(WorkflowInstance.create(workflowId, offset));
+      moreFilters.add(StructuredQuery.PropertyFilter.ge("__key__", offsetKey));
+    }
+
+    final Key workflowKey = workflowKey(workflowId);
+    final KeyQuery query = Query.keyQueryBuilder()
+        .kind(KIND_INSTANCE)
+        .filter(
+            StructuredQuery.CompositeFilter.and(
+                StructuredQuery.PropertyFilter.hasAncestor(workflowKey),
+                moreFilters.toArray(new StructuredQuery.Filter[moreFilters.size()])
+            )
+        )
+        .limit(limit)
+        .build();
+
+    return storeWithRetries(() -> {
+      final ImmutableList.Builder<WorkflowInstance> results = ImmutableList.builder();
+      final QueryResults<Key> queryResults = datastore.run(query);
+      while (queryResults.hasNext()) {
+        final Key key = queryResults.next();
+        results.add(WorkflowInstance.create(workflowId, key.name()));
+      }
+
+      return results.build();
+    });
   }
 
   void delete(WorkflowId workflowId) throws IOException {
@@ -407,6 +455,17 @@ class DatastoreStorage {
         .ancestors(PathElement.of(KIND_COMPONENT, workflowId.componentId()))
         .kind(KIND_WORKFLOW)
         .newKey(workflowId.endpointId());
+  }
+
+  private Key instanceKey(WorkflowInstance workflowInstance) {
+    final WorkflowId workflowId = workflowInstance.workflowId();
+    return datastore.newKeyFactory()
+        .ancestors(
+            PathElement.of(KIND_COMPONENT, workflowId.componentId()),
+            PathElement.of(KIND_WORKFLOW, workflowId.endpointId())
+        )
+        .kind(KIND_INSTANCE)
+        .newKey(workflowInstance.parameter());
   }
 
   private Key activeWorkflowInstanceKey(WorkflowInstance workflowInstance) {

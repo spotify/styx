@@ -37,7 +37,15 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assume.assumeThat;
+import static org.mockito.Mockito.mock;
 
+import com.google.cloud.datastore.Datastore;
+import com.google.cloud.datastore.Key;
+import com.google.cloud.datastore.KeyQuery;
+import com.google.cloud.datastore.Query;
+import com.google.cloud.datastore.QueryResults;
+import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.google.common.base.Throwables;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
@@ -48,8 +56,12 @@ import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.storage.InMemStorage;
+import com.spotify.styx.storage.AggregateStorage;
+import com.spotify.styx.storage.BigtableMocker;
+import com.spotify.styx.storage.BigtableStorage;
+import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Optional;
@@ -58,7 +70,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
+import org.apache.hadoop.hbase.client.Connection;
+import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
@@ -80,7 +96,11 @@ public class WorkflowResourceTest {
 
   private final Api.Version version;
 
-  private InMemStorage storage = new InMemStorage();
+  private static LocalDatastoreHelper localDatastore;
+
+  private Datastore datastore = localDatastore.options().service();
+  private Connection bigtable = setupBigTableMockTable();
+  private AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
 
   public WorkflowResourceTest(Api.Version version) {
     this.version = version;
@@ -123,9 +143,33 @@ public class WorkflowResourceTest {
     environment.routingEngine().registerRoutes(workflowResource.routes());
   }
 
+  @BeforeClass
+  public static void setUpClass() throws Exception {
+    localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
+    localDatastore.start();
+  }
+
+  @AfterClass
+  public static void tearDownClass() throws Exception {
+    if (localDatastore != null) {
+      localDatastore.stop();
+    }
+  }
+
   @Before
   public void setUp() throws Exception {
     storage.store(WORKFLOW);
+  }
+
+  @After
+  public void tearDown() throws Exception {
+    // clear datastore after each test
+    Datastore datastore = localDatastore.options().service();
+    KeyQuery query = Query.keyQueryBuilder().build();
+    final QueryResults<Key> keys = datastore.run(query);
+    while (keys.hasNext()) {
+      datastore.delete(keys.next());
+    }
   }
 
   @Test
@@ -327,6 +371,7 @@ public class WorkflowResourceTest {
     assumeThat(version, isAtLeast(Api.Version.V1));
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
+    storage.store(wfi);
     storage.writeEvent(create(Event.triggerExecution(wfi, "trig"), 0L, ms("07:00:00")));
     storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
     storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
@@ -382,6 +427,29 @@ public class WorkflowResourceTest {
     assertJson(response, "triggers.[0].executions.[0].statuses.[1].timestamp", is("2016-08-10T07:00:02Z"));
   }
 
+  @Test
+  public void shouldPaginateWorkflowInstancesData() throws Exception {
+    assumeThat(version, isAtLeast(Api.Version.V1));
+
+    WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-11");
+    WorkflowInstance wfi2 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-12");
+    WorkflowInstance wfi3 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-13");
+    storage.store(wfi1);
+    storage.store(wfi2);
+    storage.store(wfi3);
+    storage.writeEvent(create(Event.triggerExecution(wfi1, "trig"), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi2, "trig"), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi3, "trig"), 0L, ms("07:00:00")));
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("/foo/bar/instances?offset=2016-08-12&limit=1")));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+
+    assertJson(response, "[*]", hasSize(1));
+    assertJson(response, "[0].workflow_instance.parameter", is("2016-08-12"));
+  }
+
   private Response<ByteString> awaitResponse(CompletionStage<Response<ByteString>> completionStage)
       throws InterruptedException, java.util.concurrent.ExecutionException,
              java.util.concurrent.TimeoutException {
@@ -394,5 +462,18 @@ public class WorkflowResourceTest {
 
   private long ms(String time) {
     return Instant.parse("2016-08-10T" + time + "Z").toEpochMilli();
+  }
+
+  private Connection setupBigTableMockTable() {
+    Connection bigtable = mock(Connection.class);
+    try {
+      new BigtableMocker(bigtable)
+          .setNumFailures(0)
+          .setupTable(BigtableStorage.EVENTS_TABLE_NAME)
+          .finalizeMocking();
+    } catch (IOException e) {
+      throw Throwables.propagate(e);
+    }
+    return bigtable;
   }
 }

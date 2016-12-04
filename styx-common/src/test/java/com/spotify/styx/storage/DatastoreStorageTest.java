@@ -28,6 +28,7 @@ import static com.spotify.styx.testdata.TestData.FULL_DATA_ENDPOINT;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasSize;
@@ -154,6 +155,60 @@ public class DatastoreStorageTest {
 
     storage.delete(WORKFLOW_WITH_DOCKER_IMAGE.id());
     assertThat(entitiesOfKind(DatastoreStorage.KIND_WORKFLOW), hasSize(1));
+  }
+
+  @Test
+  public void shouldPersistWorkflowInstances() throws Exception {
+    WorkflowInstance instance1 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-01");
+    WorkflowInstance instance2 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02");
+
+    storage.store(instance1);
+    storage.store(instance2);
+
+    List<WorkflowInstance> workflowInstances = storage.workflowInstances(WORKFLOW_ID1, null, 10);
+    assertThat(workflowInstances, hasSize(2));
+    assertThat(workflowInstances, contains(instance1, instance2));
+  }
+
+  @Test
+  public void shouldPaginateWorkflowInstances() throws Exception {
+    WorkflowInstance instance1 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-01");
+    WorkflowInstance instance2 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02");
+    WorkflowInstance instance3 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-03");
+    WorkflowInstance instance4 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-04");
+
+    storage.store(instance1);
+    storage.store(instance2);
+    storage.store(instance3);
+    storage.store(instance4);
+
+    List<WorkflowInstance> workflowInstances1 =
+        storage.workflowInstances(WORKFLOW_ID1, instance1.parameter(), 2);
+    assertThat(workflowInstances1, hasSize(2));
+    assertThat(workflowInstances1, contains(instance1, instance2));
+
+    List<WorkflowInstance> workflowInstances2 =
+        storage.workflowInstances(WORKFLOW_ID1, instance3.parameter(), 2);
+    assertThat(workflowInstances2, hasSize(2));
+    assertThat(workflowInstances2, contains(instance3, instance4));
+  }
+
+  @Test
+  public void shouldOnlyReturnRequestedWorkflowInstances() throws Exception {
+    WorkflowInstance instance11 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-01");
+    WorkflowInstance instance12 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02");
+    WorkflowInstance instance21 = WorkflowInstance.create(WORKFLOW_ID2, "2016-12-01");
+    WorkflowInstance instance22 = WorkflowInstance.create(WORKFLOW_ID2, "2016-12-02");
+
+    storage.store(instance11);
+    storage.store(instance12);
+    storage.store(instance21);
+    storage.store(instance22);
+
+    List<WorkflowInstance> workflowInstances =
+        storage.workflowInstances(WORKFLOW_ID1, instance11.parameter(), 4);
+    assertThat(workflowInstances, hasSize(2));
+    assertThat(workflowInstances, contains(instance11, instance12));
   }
 
   @Test
