@@ -24,6 +24,7 @@ import static com.spotify.styx.testdata.TestData.FULL_DATA_ENDPOINT;
 import static java.time.temporal.ChronoUnit.DAYS;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -32,6 +33,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
 import java.net.URI;
@@ -112,6 +114,22 @@ public class TriggerManagerTest {
     triggerManager.tick();
     verify(triggerListener, never()).event(any(), any(), any());
     verify(storage, never()).updateNextNaturalTrigger(any(), any());
+  }
+
+  @Test
+  public void shouldNotUpdateNextNaturalTriggerIfTriggerListenerThrows() throws Exception {
+    setupWithNextNaturalTrigger(true, NEXT_EXECUTION);
+    doThrow(new RuntimeException()).when(triggerListener).event(any(), any(), any());
+    triggerManager.tick();
+    verify(storage, never()).updateNextNaturalTrigger(any(), any());
+  }
+
+  @Test
+  public void shouldUpdateNextNaturalTriggerIfAlreadyInitialized() throws Exception {
+    setupWithNextNaturalTrigger(true, NEXT_EXECUTION);
+    doThrow(new AlreadyInitializedException("")).when(triggerListener).event(any(), any(), any());
+    triggerManager.tick();
+    verify(storage).updateNextNaturalTrigger(WORKFLOW_DAILY.id(), NEXT_EXECUTION_PLUS_DAY);
   }
 
   private void setupWithNextNaturalTrigger(boolean enabled, Instant nextNaturalTrigger) throws IOException {
