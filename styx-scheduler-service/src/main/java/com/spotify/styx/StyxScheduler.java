@@ -214,7 +214,8 @@ public class StyxScheduler implements AppInit {
           scheduleSources,
           statsFactory,
           executorFactory,
-          publisherFactory, retryUtil);
+          publisherFactory,
+          retryUtil);
     }
   }
 

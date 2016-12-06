@@ -131,6 +131,7 @@ public abstract class RunState {
 
   private class TransitionVisitor implements EventVisitor<RunState> {
 
+    @Deprecated
     @Override
     public RunState timeTrigger(WorkflowInstance workflowInstance) {
       switch (state()) {
@@ -153,12 +154,13 @@ public abstract class RunState {
       }
     }
 
+    @Deprecated
     @Override
     public RunState created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
       switch (state()) {
         case PREPARE:
           return state(
-              SUBMITTED,
+              SUBMITTED, // for backwards compatibility
               data().toBuilder()
                   .executionId(executionId)
                   .executionDescription(ExecutionDescription.forImage(dockerImage))
