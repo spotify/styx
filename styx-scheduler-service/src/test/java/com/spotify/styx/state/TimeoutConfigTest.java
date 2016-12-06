@@ -41,7 +41,7 @@ public class TimeoutConfigTest {
     assertThat(timeouts.ttlOf(RunState.State.RUNNING), is(Duration.ofHours(24)));
     assertThat(timeouts.ttlOf(RunState.State.SUBMITTED), is(Duration.ofMinutes(5)));
     assertThat(timeouts.ttlOf(RunState.State.TERMINATED), is(Duration.ofDays(2)));
-    assertThat(timeouts.ttlOf(RunState.State.AWAITING_RETRY), is(Duration.ofHours(8)));
+    assertThat(timeouts.ttlOf(RunState.State.QUEUED), is(Duration.ofHours(8)));
     assertThat(timeouts.ttlOf(RunState.State.NEW), is(Duration.ofDays(2)));
   }
 }

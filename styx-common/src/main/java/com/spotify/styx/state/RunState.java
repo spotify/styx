@@ -21,11 +21,11 @@
 package com.spotify.styx.state;
 
 import static com.spotify.styx.state.OutputHandler.fanOutput;
-import static com.spotify.styx.state.RunState.State.AWAITING_RETRY;
 import static com.spotify.styx.state.RunState.State.DONE;
 import static com.spotify.styx.state.RunState.State.ERROR;
 import static com.spotify.styx.state.RunState.State.FAILED;
 import static com.spotify.styx.state.RunState.State.PREPARE;
+import static com.spotify.styx.state.RunState.State.QUEUED;
 import static com.spotify.styx.state.RunState.State.RUNNING;
 import static com.spotify.styx.state.RunState.State.SUBMITTED;
 import static com.spotify.styx.state.RunState.State.SUBMITTING;
@@ -58,13 +58,13 @@ public abstract class RunState {
 
   public enum State {
     NEW(false),
+    QUEUED(false),
     PREPARE(false),
     SUBMITTING(false),
     SUBMITTED(false),
     RUNNING(false),
     TERMINATED(false),
     FAILED(false),
-    AWAITING_RETRY(false),
     ERROR(true),
     DONE(true);
 
@@ -268,7 +268,7 @@ public abstract class RunState {
         case TERMINATED:
         case FAILED:
           return state(
-              AWAITING_RETRY,
+              QUEUED,
               data().toBuilder()
                   .retryDelayMillis(delayMillis)
                   .build());
@@ -283,7 +283,7 @@ public abstract class RunState {
       switch (state()) {
         case TERMINATED: // for backwards compatibility
         case FAILED:     // for backwards compatibility
-        case AWAITING_RETRY:
+        case QUEUED:
           return state(PREPARE);
 
         default:

@@ -125,7 +125,7 @@ public final class ReplayEvents {
         return format("tries:%d execId:%s exitCode:%d",
             state.data().tries(), state.data().executionId(), state.data().lastExit());
 
-      case AWAITING_RETRY:
+      case QUEUED:
         return format("tries:%d delayMs:%d",
             state.data().tries(), state.data().retryDelayMillis());
 

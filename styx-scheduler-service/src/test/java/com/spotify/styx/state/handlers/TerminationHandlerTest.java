@@ -20,10 +20,10 @@
 
 package com.spotify.styx.state.handlers;
 
-import static com.spotify.styx.state.RunState.State.AWAITING_RETRY;
 import static com.spotify.styx.state.RunState.State.DONE;
 import static com.spotify.styx.state.RunState.State.ERROR;
 import static com.spotify.styx.state.RunState.State.FAILED;
+import static com.spotify.styx.state.RunState.State.QUEUED;
 import static com.spotify.styx.state.RunState.State.TERMINATED;
 import static com.spotify.styx.state.handlers.TerminationHandler.MAX_RETRY_COST;
 import static org.hamcrest.Matchers.is;
@@ -81,7 +81,7 @@ public class TerminationHandlerTest {
     outputHandler.transitionInto(nonZeroTerm);
 
     RunState nextState = transitions.get(0);
-    assertThat(nextState.state(), is(AWAITING_RETRY));
+    assertThat(nextState.state(), is(QUEUED));
   }
 
   @Test
@@ -92,7 +92,7 @@ public class TerminationHandlerTest {
     outputHandler.transitionInto(failed);
 
     RunState nextState = transitions.get(0);
-    assertThat(nextState.state(), is(AWAITING_RETRY));
+    assertThat(nextState.state(), is(QUEUED));
   }
 
   @Test
@@ -149,7 +149,7 @@ public class TerminationHandlerTest {
 
     RunState nextState = transitions.get(0);
 
-    assertThat(nextState.state(), is(AWAITING_RETRY));
+    assertThat(nextState.state(), is(QUEUED));
     assertThat(nextState.data().retryDelayMillis(), is(Duration.ofMinutes(10).toMillis()));
   }
 

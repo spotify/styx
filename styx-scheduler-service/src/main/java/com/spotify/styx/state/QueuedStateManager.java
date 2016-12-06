@@ -355,7 +355,7 @@ public class QueuedStateManager implements StateManager, StaleStateReaper, State
   }
 
   private boolean shouldRetry(RunState runState) {
-    if (runState.state() != RunState.State.AWAITING_RETRY) {
+    if (runState.state() != RunState.State.QUEUED) {
       return false;
     }
 

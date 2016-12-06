@@ -156,7 +156,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     injectEvent(Event.started(workflowInstance));
     injectEvent(Event.terminate(workflowInstance, 20));
-    awaitWorkflowInstanceState(workflowInstance, RunState.State.AWAITING_RETRY);
+    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
     DataEndpoint changedDataEndpoint = DataEndpoint.create(
         DATA_ENDPOINT.id(), Partitioning.HOURS, of("busybox:v777"), of(asList("other", "args")),
@@ -198,7 +198,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     injectEvent(Event.started(workflowInstance));
     injectEvent(Event.terminate(workflowInstance, 20));
-    awaitWorkflowInstanceState(workflowInstance, RunState.State.AWAITING_RETRY);
+    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
     assertThat(dockerCleans, contains(TEST_EXECUTION_ID));
   }
@@ -218,7 +218,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
 
     injectEvent(Event.runError(workflowInstance, "Something failed"));
-    awaitWorkflowInstanceState(workflowInstance, RunState.State.AWAITING_RETRY);
+    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
     assertThat(dockerCleans, contains(TEST_EXECUTION_ID));
   }
