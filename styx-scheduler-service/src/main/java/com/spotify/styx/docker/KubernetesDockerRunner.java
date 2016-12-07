@@ -208,7 +208,7 @@ class KubernetesDockerRunner implements DockerRunner {
       return;
     }
 
-    final Optional<String> executionIdOpt = runState.executionId();
+    final Optional<String> executionIdOpt = runState.data().executionId();
     if (!executionIdOpt.isPresent()) {
       LOG.warn("Pod event for state with no current executionId: {}", podName);
       return;

@@ -20,6 +20,7 @@
 
 package com.spotify.styx.state;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowId;
@@ -55,6 +56,13 @@ public class SyncStateManager implements StateManager {
     states.put(key, nextState);
 
     nextState.outputHandler().transitionInto(nextState);
+  }
+
+  @Override
+  public Map<WorkflowInstance, RunState> activeStates() {
+    final ImmutableMap.Builder<WorkflowInstance, RunState> builder = ImmutableMap.builder();
+    states.entrySet().forEach(entry -> builder.put(entry.getKey(), entry.getValue()));
+    return builder.build();
   }
 
   @Override

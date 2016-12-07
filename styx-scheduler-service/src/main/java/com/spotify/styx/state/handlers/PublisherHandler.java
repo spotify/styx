@@ -58,8 +58,8 @@ public class PublisherHandler implements OutputHandler {
     switch (state.state()) {
       case SUBMITTED:
         try {
-          Preconditions.checkArgument(state.executionDescription().isPresent());
-          final ExecutionDescription executionDescription = state.executionDescription().get();
+          Preconditions.checkArgument(state.data().executionDescription().isPresent());
+          final ExecutionDescription executionDescription = state.data().executionDescription().get();
           RETRIER.runWithRetries(() -> publisher.deploying(workflowInstance, executionDescription));
         } catch (Exception e) {
           LOG.error("Failed to publish event for PREPARE state", e);
@@ -68,8 +68,8 @@ public class PublisherHandler implements OutputHandler {
 
       case RUNNING:
         try {
-          Preconditions.checkArgument(state.executionDescription().isPresent());
-          final ExecutionDescription executionDescription = state.executionDescription().get();
+          Preconditions.checkArgument(state.data().executionDescription().isPresent());
+          final ExecutionDescription executionDescription = state.data().executionDescription().get();
           RETRIER.runWithRetries(() -> publisher.deployed(workflowInstance, executionDescription));
         } catch (Exception e) {
           LOG.error("Failed to publish event for RUNNING state", e);

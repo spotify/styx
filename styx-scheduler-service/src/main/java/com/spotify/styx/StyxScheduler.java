@@ -64,9 +64,7 @@ import com.spotify.styx.schedule.ScheduleSourceFactory;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.QueuedStateManager;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.state.StaleStateReaper;
 import com.spotify.styx.state.StateManager;
-import com.spotify.styx.state.StateRetrier;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.state.handlers.DockerRunnerHandler;
 import com.spotify.styx.state.handlers.ExecutionDescriptionHandler;
@@ -78,6 +76,7 @@ import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.NoopEventStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.EventStorageFactory;
+import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.Singleton;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
@@ -119,11 +118,13 @@ public class StyxScheduler implements AppInit {
   public static final String STYX_MODE = "styx.mode";
   public static final String STYX_MODE_DEVELOPMENT = "development";
 
-  public static final int STATE_REAP_INTERVAL_SECONDS = 30;
-  public static final int STATE_RETRY_CHECK_INTERVAL_SECONDS = 2;
+  public static final int SCHEDULER_TICK_INTERVAL_SECONDS = 2;
+  public static final int TRIGGER_MANAGER_TICK_INTERVAL_SECONDS = 1;
   public static final Duration DEFAULT_RETRY_BASE_DELAY = Duration.ofMinutes(3);
   public static final int DEFAULT_RETRY_MAX_EXPONENT = 6;
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
+  public static final RetryUtil DEFAULT_RETRY_UTIL =
+      new RetryUtil(DEFAULT_RETRY_BASE_DELAY, DEFAULT_RETRY_MAX_EXPONENT);
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxScheduler.class);
 
@@ -162,6 +163,7 @@ public class StyxScheduler implements AppInit {
     private StatsFactory statsFactory = StyxScheduler::stats;
     private ExecutorFactory executorFactory = Executors::newScheduledThreadPool;
     private PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
+    private RetryUtil retryUtil = DEFAULT_RETRY_UTIL;
 
     public Builder setTime(Time time) {
       this.time = time;
@@ -212,7 +214,8 @@ public class StyxScheduler implements AppInit {
           scheduleSources,
           statsFactory,
           executorFactory,
-          publisherFactory);
+          publisherFactory,
+          retryUtil);
     }
   }
 
@@ -234,6 +237,7 @@ public class StyxScheduler implements AppInit {
   private final StatsFactory statsFactory;
   private final ExecutorFactory executorFactory;
   private final PublisherFactory publisherFactory;
+  private final RetryUtil retryUtil;
 
   private StateManager stateManager;
 
@@ -245,7 +249,8 @@ public class StyxScheduler implements AppInit {
       ScheduleSources scheduleSources,
       StatsFactory statsFactory,
       ExecutorFactory executorFactory,
-      PublisherFactory publisherFactory) {
+      PublisherFactory publisherFactory,
+      RetryUtil retryUtil) {
     this.time = requireNonNull(time);
     this.storageFactory = requireNonNull(storageFactory);
     this.eventStorageFactory = requireNonNull(eventStorageFactory);
@@ -254,6 +259,7 @@ public class StyxScheduler implements AppInit {
     this.statsFactory = requireNonNull(statsFactory);
     this.executorFactory = requireNonNull(executorFactory);
     this.publisherFactory = requireNonNull(publisherFactory);
+    this.retryUtil = requireNonNull(retryUtil);
   }
 
   @Override
@@ -284,10 +290,12 @@ public class StyxScheduler implements AppInit {
     final EventStorage eventStorage = new MeteredEventStorage(eventStorageFactory.apply(environment),
                                                               stats, time);
 
+    final QueuedStateManager stateManager = closer.register(
+        new QueuedStateManager(time, eventWorker, eventStorage));
+
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
-    final QueuedStateManager stateManager = closer.register(new QueuedStateManager(
-        timeoutConfig, time, eventWorker, eventStorage));
+    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager);
 
     final Supplier<String> dockerId = new CachedSupplier<>(storage::globalDockerRunnerId, time);
     final DockerRunner routingDockerRunner = DockerRunner.routing(
@@ -299,10 +307,7 @@ public class StyxScheduler implements AppInit {
     final OutputHandler[] outputHandlers = new OutputHandler[] {
         transitionLogger(""),
         new DockerRunnerHandler(dockerRunner, stateManager),
-        new TerminationHandler(
-            DEFAULT_RETRY_BASE_DELAY,
-            DEFAULT_RETRY_MAX_EXPONENT,
-            stateManager),
+        new TerminationHandler(retryUtil, stateManager),
         new MonitoringHandler(time, stats),
         new PublisherHandler(publisher),
         new ExecutionDescriptionHandler(storage, stateManager)
@@ -311,7 +316,7 @@ public class StyxScheduler implements AppInit {
         (workflowInstance) -> RunState.fresh(workflowInstance, time, outputHandlers);
 
     final TriggerListener trigger = trigger(storage, stateFactory, stateManager);
-    final TriggerManager triggerManager = new TriggerManager(executor, trigger, time, storage);
+    final TriggerManager triggerManager = new TriggerManager(trigger, time, storage);
 
     final WorkflowCache cache = new InMemWorkflowCache();
     final Consumer<Workflow> workflowChangeListener = workflowChanged(cache, storage,
@@ -319,10 +324,9 @@ public class StyxScheduler implements AppInit {
     final Consumer<Workflow> workflowRemoveListener = workflowRemoved(storage);
 
     restoreState(eventStorage, outputHandlers, stateManager);
-    triggerManager.start();
+    startTriggerManager(triggerManager, executor);
     startScheduleSources(environment, executor, workflowChangeListener, workflowRemoveListener);
-    startRetryChecker(stateManager, executor);
-    startStateReaper(stateManager, executor);
+    startScheduler(scheduler, executor);
     setupMetrics(stateManager, cache, storage, stats);
 
     final SchedulerResource schedulerResource = new SchedulerResource(stateManager, trigger, storage, time);
@@ -380,23 +384,23 @@ public class StyxScheduler implements AppInit {
     }
   }
 
-  private static void startRetryChecker(StateRetrier retrier, ScheduledExecutorService exec) {
-    exec.scheduleWithFixedDelay(
-        guard(retrier::triggerRetries),
-        STATE_RETRY_CHECK_INTERVAL_SECONDS,
-        STATE_RETRY_CHECK_INTERVAL_SECONDS,
+  private static void startTriggerManager(TriggerManager triggerManager, ScheduledExecutorService exec) {
+    exec.scheduleAtFixedRate(
+        guard(triggerManager::tick),
+        TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
+        TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
         TimeUnit.SECONDS);
   }
 
-  private static void startStateReaper(StaleStateReaper reaper, ScheduledExecutorService exec) {
-    exec.scheduleWithFixedDelay(
-        guard(reaper::triggerTimeouts),
-        STATE_REAP_INTERVAL_SECONDS,
-        STATE_REAP_INTERVAL_SECONDS,
+  private static void startScheduler(Scheduler scheduler, ScheduledExecutorService exec) {
+    exec.scheduleAtFixedRate(
+        guard(scheduler::tick),
+        SCHEDULER_TICK_INTERVAL_SECONDS,
+        SCHEDULER_TICK_INTERVAL_SECONDS,
         TimeUnit.SECONDS);
   }
 
-  static Runnable guard(Runnable delegate) {
+  private static Runnable guard(Runnable delegate) {
     return () -> {
       try {
         delegate.run();

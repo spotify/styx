@@ -63,9 +63,9 @@ class WFIExecutionBuilder {
     executionList = new ArrayList<>();
   }
 
-  private final EventVisitor visitor = new MyVisitor();
+  private final EventVisitor visitor = new Reducer();
 
-  private class MyVisitor implements EventVisitor<Void> {
+  private class Reducer implements EventVisitor<Void> {
 
     @Override
     public Void timeTrigger(WorkflowInstance workflowInstance) {

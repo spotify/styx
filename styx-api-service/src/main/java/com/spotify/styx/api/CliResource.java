@@ -138,7 +138,7 @@ public class CliResource {
     return ActiveStatesPayload.ActiveState.create(
         state.workflowInstance(),
         state.state().toString(),
-        state.executionId().orElse("<no execution id>"),
+        state.data().executionId().orElse("<no execution id>"),
         getPreviousExecutionLastEvent(state)
     );
   }

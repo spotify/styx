@@ -85,8 +85,8 @@ public class DockerRunnerHandler implements OutputHandler {
       case TERMINATED:
       case FAILED:
       case ERROR:
-        if (state.executionId().isPresent()) {
-          final String executionId = state.executionId().get();
+        if (state.data().executionId().isPresent()) {
+          final String executionId = state.data().executionId().get();
           LOG.info("Cleaning up {} pod: {}", state.workflowInstance().toKey(), executionId);
 
           dockerRunner.cleanup(executionId);
@@ -100,7 +100,7 @@ public class DockerRunnerHandler implements OutputHandler {
 
   private String dockerRunnerStart(RunState state) throws IOException {
     final WorkflowInstance workflowInstance = state.workflowInstance();
-    final Optional<ExecutionDescription> executionDescriptionOpt = state.executionDescription();
+    final Optional<ExecutionDescription> executionDescriptionOpt = state.data().executionDescription();
 
     final ExecutionDescription executionDescription = executionDescriptionOpt.orElseThrow(
         () -> new ResourceNotFoundException("Missing execution description for "

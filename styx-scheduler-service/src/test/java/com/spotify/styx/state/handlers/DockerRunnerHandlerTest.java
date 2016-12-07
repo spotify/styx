@@ -34,6 +34,7 @@ import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.testdata.TestData;
@@ -64,7 +65,8 @@ public class DockerRunnerHandlerTest {
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
     ExecutionDescription desc = ExecutionDescription.forImage(TEST_DOCKER_IMAGE);
-    RunState runState = RunState.newSubmitting(workflowInstance, desc);
+    RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
+        StateData.builder().executionDescription(desc).build());
 
     stateManager.initialize(runState);
     dockerRunnerHandler.transitionInto(runState);
@@ -77,7 +79,8 @@ public class DockerRunnerHandlerTest {
   public void shouldInterpolatePartitioningArgument() throws Exception {
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.newSubmitting(workflowInstance, EXECUTION_DESCRIPTION);
+    RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
+        StateData.builder().executionDescription(EXECUTION_DESCRIPTION).build());
 
     stateManager.initialize(runState);
     dockerRunnerHandler.transitionInto(runState);
@@ -92,7 +95,8 @@ public class DockerRunnerHandlerTest {
 
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.newSubmitting(workflowInstance, EXECUTION_DESCRIPTION);
+    RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
+        StateData.builder().executionDescription(EXECUTION_DESCRIPTION).build());
 
     stateManager.initialize(runState);
     dockerRunnerHandler.transitionInto(runState);
@@ -117,7 +121,8 @@ public class DockerRunnerHandlerTest {
     DataEndpoint endpoint = dataEndpoint("--date", "{}", "--bar");
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, TEST_EXECUTION_ID, RunState.State.FAILED);
+    RunState runState = RunState.create(workflowInstance, RunState.State.FAILED,
+        StateData.builder().executionId(TEST_EXECUTION_ID).build());
 
     stateManager.initialize(runState);
     dockerRunnerHandler.transitionInto(runState);

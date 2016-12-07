@@ -54,7 +54,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       "styx",
       TestData.WORKFLOW_URI,
       DATA_ENDPOINT);
-  private static final Instant NEXT_EXECUTION = Instant.parse("2016-03-14T16:00:00Z");
 
   @Test
   public void shouldCatchUpWithNaturalTriggers() throws Exception {
@@ -62,12 +61,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-    final Instant nextExecution = Instant.parse("2016-03-14T13:00:00Z");
-    givenNextNaturalTrigger(HOURLY_WORKFLOW.id(), nextExecution);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T13:00:00Z");
 
     styxStarts();
     timePasses(1, SECONDS);
-
     awaitNumberOfDockerRuns(1);
 
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
@@ -76,7 +73,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T12")));
 
     timePasses(1, SECONDS);
-
     awaitNumberOfDockerRuns(2);
 
     workflowInstance = dockerRuns.get(1)._1;
@@ -99,9 +95,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-
-    final Instant nextExecution = Instant.parse("2016-03-14T14:00:00Z");
-    givenNextNaturalTrigger(HOURLY_WORKFLOW.id(), nextExecution);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T14:00:00Z");
 
     WorkflowInstance instance1 = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T13");
     WorkflowInstance instance2 = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
@@ -125,7 +119,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-    givenNextNaturalTrigger(HOURLY_WORKFLOW.id(), NEXT_EXECUTION);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
     styxStarts();
     timePasses(1, MINUTES);
@@ -143,7 +137,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-    givenNextNaturalTrigger(HOURLY_WORKFLOW.id(), NEXT_EXECUTION);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
     styxStarts();
     timePasses(1, MINUTES);
@@ -156,7 +150,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     injectEvent(Event.started(workflowInstance));
     injectEvent(Event.terminate(workflowInstance, 20));
-    awaitWorkflowInstanceState(workflowInstance, RunState.State.AWAITING_RETRY);
+    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
     DataEndpoint changedDataEndpoint = DataEndpoint.create(
         DATA_ENDPOINT.id(), Partitioning.HOURS, of("busybox:v777"), of(asList("other", "args")),
@@ -172,7 +166,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     // we must stagger the time progression here in order not to no trigger tons of retries
     timePasses(TerminationHandler.MISSING_DEPS_RETRY_DELAY_MINUTES - 1, MINUTES);
     timePasses(59, SECONDS);
-    timePasses(StyxScheduler.STATE_RETRY_CHECK_INTERVAL_SECONDS, SECONDS);
+    timePasses(StyxScheduler.SCHEDULER_TICK_INTERVAL_SECONDS, SECONDS);
 
     awaitNumberOfDockerRuns(2);
 
@@ -188,7 +182,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-    givenNextNaturalTrigger(HOURLY_WORKFLOW.id(), NEXT_EXECUTION);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
     styxStarts();
     timePasses(1, MINUTES);
@@ -198,7 +192,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     injectEvent(Event.started(workflowInstance));
     injectEvent(Event.terminate(workflowInstance, 20));
-    awaitWorkflowInstanceState(workflowInstance, RunState.State.AWAITING_RETRY);
+    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
     assertThat(dockerCleans, contains(TEST_EXECUTION_ID));
   }
@@ -209,7 +203,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-    givenNextNaturalTrigger(HOURLY_WORKFLOW.id(), NEXT_EXECUTION);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
     styxStarts();
     timePasses(1, MINUTES);
@@ -218,7 +212,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
 
     injectEvent(Event.runError(workflowInstance, "Something failed"));
-    awaitWorkflowInstanceState(workflowInstance, RunState.State.AWAITING_RETRY);
+    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
     assertThat(dockerCleans, contains(TEST_EXECUTION_ID));
   }
@@ -230,7 +224,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheTimeIs("2016-03-14T15:17:45Z");
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-    givenNextNaturalTrigger(HOURLY_WORKFLOW.id(), NEXT_EXECUTION);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
     givenStoredEventAtTime(Event.timeTrigger(workflowInstance),       0L, timeOffsetSeconds(1));
     givenStoredEventAtTime(Event.started(workflowInstance),           1L, timeOffsetSeconds(2));
@@ -254,6 +248,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheTimeIs("2016-03-14T15:17:45Z");
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
     givenStoredEvent(Event.timeTrigger(workflowInstance),       0L);
     givenStoredEvent(Event.started(workflowInstance),           1L);
@@ -282,6 +277,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheTimeIs("2016-03-14T15:17:45Z");
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
     givenStoredEvent(Event.triggerExecution(workflowInstance, "trig1"),                        0L);
     givenStoredEvent(Event.created(workflowInstance, TEST_EXECUTION_ID_1, TEST_DOCKER_IMAGE),  1L);

@@ -31,6 +31,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.publisher.Publisher;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.StateData;
 import java.io.IOException;
 import java.util.Optional;
 import org.junit.Before;
@@ -54,10 +55,13 @@ public class PublisherHandlerTest {
   public void testPublishesRollingOutStateOnSubmitted() throws Exception {
     ExecutionDescription executionDescription =
         ExecutionDescription.create(DOCKER_IMAGE, emptyList(), empty(), Optional.of(COMMIT_SHA));
-    RunState runState = RunState.newSubmitted(
+    RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
-        "exec1",
-        executionDescription);
+        RunState.State.SUBMITTED,
+        StateData.builder()
+            .executionId("exec1")
+            .executionDescription(executionDescription)
+            .build());
     outputHandler.transitionInto(runState);
 
     verify(publisher).deploying(WORKFLOW_INSTANCE, executionDescription);
@@ -67,10 +71,13 @@ public class PublisherHandlerTest {
   public void testPublishesDoneStateOnRunning() throws Exception {
     ExecutionDescription executionDescription =
         ExecutionDescription.create("busybox:1.1", emptyList(), empty(), Optional.of(COMMIT_SHA));
-    RunState runState = RunState.newRunning(
+    RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
-        "exec1",
-        executionDescription);
+        RunState.State.RUNNING,
+        StateData.builder()
+            .executionId("exec1")
+            .executionDescription(executionDescription)
+            .build());
     outputHandler.transitionInto(runState);
 
     verify(publisher).deployed(WORKFLOW_INSTANCE, executionDescription);
@@ -82,10 +89,13 @@ public class PublisherHandlerTest {
 
     ExecutionDescription executionDescription =
         ExecutionDescription.create(DOCKER_IMAGE, emptyList(), empty(), Optional.of(COMMIT_SHA));
-    RunState runState = RunState.newSubmitted(
+    RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
-        "exec1",
-        executionDescription);
+        RunState.State.SUBMITTED,
+        StateData.builder()
+            .executionId("exec1")
+            .executionDescription(executionDescription)
+            .build());
     outputHandler.transitionInto(runState);
 
     verify(publisher).deploying(WORKFLOW_INSTANCE, executionDescription);
@@ -97,10 +107,13 @@ public class PublisherHandlerTest {
 
     ExecutionDescription executionDescription =
         ExecutionDescription.create(DOCKER_IMAGE, emptyList(), empty(), Optional.of(COMMIT_SHA));
-    RunState runState = RunState.newRunning(
+    RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
-        "exec1",
-        executionDescription);
+        RunState.State.RUNNING,
+        StateData.builder()
+            .executionId("exec1")
+            .executionDescription(executionDescription)
+            .build());
     outputHandler.transitionInto(runState);
 
     verify(publisher).deployed(WORKFLOW_INSTANCE, executionDescription);

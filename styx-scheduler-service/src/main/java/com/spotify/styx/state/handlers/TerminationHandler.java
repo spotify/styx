@@ -25,11 +25,9 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.util.RetryUtil;
 import java.time.Duration;
 import java.util.Objects;
-import java.util.Random;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A {@link OutputHandler} that manages scheduling generation of {@link Event}s
@@ -37,25 +35,17 @@ import org.slf4j.LoggerFactory;
  */
 public class TerminationHandler implements OutputHandler {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TerminationHandler.class);
-  private static final Random RANDOM = new Random();
-
   // Retry cost is vaguely related to a max time period we're going to keep retrying a state.
   // See the different costs for failures and missing dependencies in RunState
   public static final double MAX_RETRY_COST = 50.0;
   public static final int MISSING_DEPS_EXIT_CODE = 20;
   public static final int MISSING_DEPS_RETRY_DELAY_MINUTES = 10;
 
-  private final Duration baseDelay;
-  private final int maxExponent;
+  private final RetryUtil retryUtil;
   private final StateManager stateManager;
 
-  public TerminationHandler(
-      Duration baseDelay,
-      int maxExponent,
-      StateManager stateManager) {
-    this.baseDelay = Objects.requireNonNull(baseDelay);
-    this.maxExponent = maxExponent;
+  public TerminationHandler(RetryUtil retryUtil, StateManager stateManager) {
+    this.retryUtil = Objects.requireNonNull(retryUtil);
     this.stateManager = Objects.requireNonNull(stateManager);
   }
 
@@ -63,7 +53,7 @@ public class TerminationHandler implements OutputHandler {
   public void transitionInto(RunState state) {
     switch (state.state()) {
       case TERMINATED:
-        if (state.lastExit() == 0) {
+        if (state.data().lastExit() == 0) {
           stateManager.receiveIgnoreClosed(Event.success(state.workflowInstance()));
         } else {
           checkRetry(state);
@@ -82,27 +72,16 @@ public class TerminationHandler implements OutputHandler {
   private void checkRetry(RunState state) {
     final WorkflowInstance workflowInstance = state.workflowInstance();
 
-    if (state.retryCost() < MAX_RETRY_COST) {
+    if (state.data().retryCost() < MAX_RETRY_COST) {
       final long delayMillis;
-      if (state.lastExit() == MISSING_DEPS_EXIT_CODE) {
+      if (state.data().lastExit() == MISSING_DEPS_EXIT_CODE) {
         delayMillis = Duration.ofMinutes(MISSING_DEPS_RETRY_DELAY_MINUTES).toMillis();
       } else {
-        delayMillis = calculateDelay(state).toMillis();
+        delayMillis = retryUtil.calculateDelay(state.data().tries()).toMillis();
       }
       stateManager.receiveIgnoreClosed(Event.retryAfter(workflowInstance, delayMillis));
     } else {
       stateManager.receiveIgnoreClosed(Event.stop(workflowInstance));
     }
-  }
-
-  private Duration calculateDelay(RunState state) {
-    final int tries = (state.tries() < maxExponent) ? state.tries() : maxExponent;
-    final int multiplier = Math.max(1, RANDOM.nextInt(1 << tries));
-    final Duration delay = baseDelay.multipliedBy(multiplier);
-
-    final String instanceKey = state.workflowInstance().toKey();
-    LOG.info("{} scheduling retry #{} in {}", instanceKey, state.tries(), delay);
-
-    return delay;
   }
 }

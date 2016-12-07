@@ -67,8 +67,8 @@ public class LocalFileScheduleSourceTest {
   private ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
   private Map<String, Workflow> workflows = Maps.newHashMap();
-  private CountDownLatch changeEvents = new CountDownLatch(0);
-  private CountDownLatch removeEvents = new CountDownLatch(0);
+  private volatile CountDownLatch changeEvents = new CountDownLatch(0);
+  private volatile CountDownLatch removeEvents = new CountDownLatch(0);
 
   @After
   public void tearDown() throws Exception {
