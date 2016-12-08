@@ -57,7 +57,7 @@ public class Scheduler {
     this.stateManager = Objects.requireNonNull(stateManager);
   }
 
-  public void tick() {
+  void tick() {
     for (Map.Entry<WorkflowInstance, RunState> entry : stateManager.activeStates().entrySet()) {
       final WorkflowInstance key = entry.getKey();
       final RunState state = entry.getValue();

@@ -24,6 +24,7 @@ import static com.spotify.styx.model.Partitioning.DAYS;
 import static com.spotify.styx.model.Partitioning.HOURS;
 import static com.spotify.styx.model.Partitioning.MONTHS;
 import static com.spotify.styx.model.Partitioning.WEEKS;
+import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -126,7 +127,8 @@ public class StateInitializingTriggerTest {
         partitioning,
         Optional.of("busybox"),
         Optional.of(Lists.newArrayList(args)),
-        empty());
+        empty(),
+        emptyList());
   }
 
   // todo: do not use deprecated getDockerImage method

@@ -20,6 +20,7 @@
 
 package com.spotify.styx.monitoring;
 
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -127,5 +128,25 @@ public final class MeteredStorage extends MeteredBase implements Storage {
   @Override
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
     return timedStorage("workflowState", () -> delegate.workflowState(workflowId));
+  }
+
+  @Override
+  public Optional<Resource> resource(String id) throws IOException {
+    return timedStorage("resource", () -> delegate.resource(id));
+  }
+
+  @Override
+  public void storeResource(Resource resource) throws IOException {
+    timedStorage("storeResource", () -> delegate.storeResource(resource));
+  }
+
+  @Override
+  public List<Resource> resources() throws IOException {
+    return timedStorage("resources", delegate::resources);
+  }
+
+  @Override
+  public void deleteResource(String id) throws IOException {
+    timedStorage("deleteResource", () -> delegate.deleteResource(id));
   }
 }

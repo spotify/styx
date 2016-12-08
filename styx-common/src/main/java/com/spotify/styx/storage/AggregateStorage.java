@@ -21,6 +21,7 @@
 package com.spotify.styx.storage;
 
 import com.google.cloud.datastore.Datastore;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
@@ -166,5 +167,25 @@ public class AggregateStorage implements Storage, EventStorage {
   @Override
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
     return datastoreStorage.workflowState(workflowId);
+  }
+
+  @Override
+  public Optional<Resource> resource(String id) throws IOException {
+    return datastoreStorage.getResource(id);
+  }
+
+  @Override
+  public void storeResource(Resource resource) throws IOException {
+    datastoreStorage.postResource(resource);
+  }
+
+  @Override
+  public List<Resource> resources() throws IOException {
+    return datastoreStorage.getResources();
+  }
+
+  @Override
+  public void deleteResource(String id) throws IOException {
+    datastoreStorage.deleteResource(id);
   }
 }

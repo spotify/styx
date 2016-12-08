@@ -31,6 +31,7 @@ import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.api.JsonMatchers.assertNoJson;
 import static com.spotify.styx.model.SequenceEvent.create;
 import static com.spotify.styx.model.WorkflowState.patchDockerImage;
+import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
@@ -107,7 +108,7 @@ public class WorkflowResourceTest {
   }
 
   private static final DataEndpoint DATA_ENDPOINT =
-      DataEndpoint.create("bar", Partitioning.DAYS, empty(), empty(), empty());
+      DataEndpoint.create("bar", Partitioning.DAYS, empty(), empty(), empty(), emptyList());
 
   private static final Workflow WORKFLOW =
       Workflow.create("foo", URI.create("/hejhej"), DATA_ENDPOINT);

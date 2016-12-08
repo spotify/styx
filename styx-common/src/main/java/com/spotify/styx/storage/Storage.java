@@ -20,6 +20,7 @@
 
 package com.spotify.styx.storage;
 
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -170,4 +171,12 @@ public interface Storage {
    * @return workflow state.
    */
   WorkflowState workflowState(WorkflowId workflowId) throws IOException;
+
+  Optional<Resource> resource(String id) throws IOException;
+
+  void storeResource(Resource resource) throws IOException;
+
+  List<Resource> resources() throws IOException;
+
+  void deleteResource(String id) throws IOException;
 }

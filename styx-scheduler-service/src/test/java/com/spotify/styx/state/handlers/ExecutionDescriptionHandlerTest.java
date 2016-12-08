@@ -23,6 +23,7 @@ package com.spotify.styx.state.handlers;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Partitioning.HOURS;
 import static com.spotify.styx.state.RunState.State.SUBMITTING;
+import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -164,7 +165,8 @@ public class ExecutionDescriptionHandlerTest {
         HOURS,
         Optional.of("legacy-docker-image"),
         Optional.of(Lists.newArrayList("foo", "bar")),
-        empty());
+        empty(),
+        emptyList());
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
@@ -187,6 +189,7 @@ public class ExecutionDescriptionHandlerTest {
         HOURS,
         Optional.empty(),
         Optional.of(Lists.newArrayList(args)),
-        empty());
+        empty(),
+        emptyList());
   }
 }
