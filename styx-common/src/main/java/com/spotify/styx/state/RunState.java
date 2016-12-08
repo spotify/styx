@@ -136,7 +136,11 @@ public abstract class RunState {
     public RunState timeTrigger(WorkflowInstance workflowInstance) {
       switch (state()) {
         case NEW:
-          return state(SUBMITTED); // for backwards compatibility
+          return state( // for backwards compatibility
+              SUBMITTED,
+              data().toBuilder()
+                  .triggerId("UNKNOWN")
+                  .build());
 
         default:
           throw illegalTransition("timeTrigger");
@@ -147,7 +151,11 @@ public abstract class RunState {
     public RunState triggerExecution(WorkflowInstance workflowInstance, String triggerId) {
       switch (state()) {
         case NEW:
-          return state(QUEUED);
+          return state(
+              QUEUED,
+              data().toBuilder()
+                  .triggerId(triggerId)
+                  .build());
 
         default:
           throw illegalTransition("triggerExecution");

@@ -20,6 +20,7 @@
 
 package com.spotify.styx.state;
 
+import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.state.RunState.State.DONE;
 import static com.spotify.styx.state.RunState.State.ERROR;
 import static com.spotify.styx.state.RunState.State.FAILED;
@@ -122,6 +123,14 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), equalTo(999L));
+  }
+
+  @Test
+  public void testSetTriggerId() throws Exception {
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.receive(eventFactory.triggerExecution("trig"));
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().triggerId(), hasValue("trig"));
   }
 
   @Test
