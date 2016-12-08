@@ -34,6 +34,7 @@ import static org.junit.Assert.assertThat;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
@@ -41,6 +42,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.testdata.TestData;
 import java.time.Instant;
+import java.util.Arrays;
 import org.junit.Test;
 
 public class SystemTest extends StyxSchedulerServiceFixture {
@@ -54,6 +56,9 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       "styx",
       TestData.WORKFLOW_URI,
       DATA_ENDPOINT);
+  private static final ExecutionDescription TEST_EXECUTION_DESCRIPTION =
+      ExecutionDescription.create(
+          TEST_DOCKER_IMAGE, Arrays.asList("--date", "{}", "--bar"), empty(), empty());
 
   @Test
   public void shouldCatchUpWithNaturalTriggers() throws Exception {
@@ -307,6 +312,49 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenStoredEvent(Event.terminate(workflowInstance, 30),                                   12L);
     givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                               13L);
     givenActiveStateAtSequenceCount(workflowInstance,                                         13L);
+
+    styxStarts();
+
+    timePasses(1, MINUTES);
+    awaitNumberOfDockerRuns(1);
+
+    WorkflowInstance workflowInstance2 = dockerRuns.get(0)._1;
+    RunSpec runSpec = dockerRuns.get(0)._2;
+    assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
+    assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T14")));
+  }
+
+  @Test
+  public void restoresActiveStatesFromBigtableRetriggered2() throws Exception {
+    WorkflowInstance workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
+
+    givenTheTimeIs("2016-03-14T15:17:45Z");
+    givenWorkflow(HOURLY_WORKFLOW);
+    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
+
+    givenStoredEvent(Event.triggerExecution(workflowInstance, "trig1"),           0L);
+    givenStoredEvent(Event.dequeue(workflowInstance),                             1L);
+    givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION),  2L);
+    givenStoredEvent(Event.submitted(workflowInstance, "exec1"),                  3L);
+    givenStoredEvent(Event.started(workflowInstance),                             4L);
+    givenStoredEvent(Event.terminate(workflowInstance, 30),                       5L);
+    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                   6L);
+    givenStoredEvent(Event.retry(workflowInstance),                               7L);
+    givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION),  8L);
+    givenStoredEvent(Event.submitted(workflowInstance, "exec2"),                  9L);
+    givenStoredEvent(Event.started(workflowInstance),                            10L);
+    givenStoredEvent(Event.terminate(workflowInstance, 30),                      11L);
+    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                  12L);
+    givenStoredEvent(Event.halt(workflowInstance),                               13L);
+    givenStoredEvent(Event.triggerExecution(workflowInstance, "trig2"),          14L);
+    givenStoredEvent(Event.dequeue(workflowInstance),                            15L);
+    givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION), 16L);
+    givenStoredEvent(Event.submitted(workflowInstance, "exec3"),                 17L);
+    givenStoredEvent(Event.started(workflowInstance),                            18L);
+    givenStoredEvent(Event.terminate(workflowInstance, 30),                      19L);
+    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                  20L);
+    givenActiveStateAtSequenceCount(workflowInstance,                            20L);
 
     styxStarts();
 
