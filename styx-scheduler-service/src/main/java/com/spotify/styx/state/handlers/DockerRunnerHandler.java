@@ -72,7 +72,7 @@ public class DockerRunnerHandler implements OutputHandler {
         } catch (ResourceNotFoundException e) {
           LOG.error("Unable to start docker procedure.", e);
           stateManager.receiveIgnoreClosed(Event.halt(state.workflowInstance()));
-        } catch (IOException e) {
+        } catch (Throwable e) {
           try {
             LOG.error("Failed the docker starting procedure for " + state.workflowInstance().toKey(), e);
             stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()));

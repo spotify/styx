@@ -39,6 +39,7 @@ import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.PodFluent;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.PodSpecFluent;
+import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.VolumeMount;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientException;
@@ -92,7 +93,15 @@ class KubernetesDockerRunner implements DockerRunner {
   @Override
   public String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
     try {
-      Pod pod = client.pods().create(createPod(workflowInstance, runSpec));
+      runSpec.secret().ifPresent(specSecret -> {
+        final Secret secret = client.secrets().withName(specSecret.name()).get();
+        if (secret == null) {
+          throw new InvalidExecutionException(
+              "Referenced secret '" + specSecret.name() + "' was not found");
+        }
+      });
+
+      final Pod pod = client.pods().create(createPod(workflowInstance, runSpec));
       return pod.getMetadata().getName();
     } catch (KubernetesClientException kce) {
       throw new IOException("Failed to create Kubernetes pod", kce);
