@@ -293,11 +293,12 @@ public abstract class RunState {
       }
     }
 
+    @Deprecated
     @Override
     public RunState retry(WorkflowInstance workflowInstance) {
       switch (state()) {
-        case TERMINATED: // for backwards compatibility
-        case FAILED:     // for backwards compatibility
+        case TERMINATED:
+        case FAILED:
         case QUEUED:
           return state(PREPARE);
 

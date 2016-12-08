@@ -40,7 +40,6 @@ public interface EventVisitor<R> {
   R runError(@Getter WorkflowInstance workflowInstance, String message);
   R success(@Getter WorkflowInstance workflowInstance);
   R retryAfter(@Getter WorkflowInstance workflowInstance, long delayMillis);
-  R retry(@Getter WorkflowInstance workflowInstance);
   R stop(@Getter WorkflowInstance workflowInstance);
   R timeout(@Getter WorkflowInstance workflowInstance);
   R halt(@Getter WorkflowInstance workflowInstance);
@@ -49,4 +48,6 @@ public interface EventVisitor<R> {
   R timeTrigger(@Getter WorkflowInstance workflowInstance);
   @Deprecated
   R created(@Getter WorkflowInstance workflowInstance, String executionId, String dockerImage);
+  @Deprecated
+  R retry(@Getter WorkflowInstance workflowInstance);
 }
