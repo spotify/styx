@@ -22,12 +22,11 @@ package com.spotify.styx;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.instanceOf;
-import static org.hamcrest.Matchers.not;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
+import static org.hamcrest.Matchers.is;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -49,7 +48,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -66,9 +65,15 @@ public class LocalFileScheduleSourceTest {
   private Closer closer = Closer.create();
   private ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
-  private Map<String, Workflow> workflows = Maps.newHashMap();
-  private volatile CountDownLatch changeEvents = new CountDownLatch(0);
-  private volatile CountDownLatch removeEvents = new CountDownLatch(0);
+  private Map<String, Workflow> workflows = Maps.newConcurrentMap();
+
+  private Callable<Map<String, Workflow>> workflows() {
+    return () -> workflows;
+  }
+
+  private Callable<Integer> workflowsSize() {
+    return () -> workflows.size();
+  }
 
   @After
   public void tearDown() throws Exception {
@@ -113,11 +118,9 @@ public class LocalFileScheduleSourceTest {
     Files.write(testPath, readResource("simple-def.yaml"));
     ScheduleSource source = createSource(config);
 
-    expectChangeEvents(1);
     source.start();
-    awaitEvents(changeEvents);
 
-    assertThat(workflows, hasEntry("foo", simpleDef(testPath)));
+    await().until(workflows(), hasEntry("foo", simpleDef(testPath)));
   }
 
   @Test
@@ -130,12 +133,10 @@ public class LocalFileScheduleSourceTest {
     ScheduleSource source = createSource(config);
     source.start();
 
-    expectChangeEvents(2);
     Files.write(testPath, readResource("example-defs.yaml"));
-    awaitEvents(changeEvents);
 
-    assertThat(workflows, hasEntry("foo", example1(testPath)));
-    assertThat(workflows, hasEntry("bar", example2(testPath)));
+    await().until(workflows(), hasEntry("foo", example1(testPath)));
+    await().until(workflows(), hasEntry("bar", example2(testPath)));
   }
 
   @Test
@@ -149,15 +150,11 @@ public class LocalFileScheduleSourceTest {
     ScheduleSource source = createSource(config);
     source.start();
 
-    expectChangeEvents(1);
     Files.write(testPath, readResource("simple-def.yaml"));
-    awaitEvents(changeEvents);
-    assertThat(workflows, hasEntry("foo", simpleDef(testPath)));
+    await().until(workflows(), hasEntry("foo", simpleDef(testPath)));
 
-    expectChangeEvents(1);
     Files.write(testPath, readResource("different-def.yaml"));
-    awaitEvents(changeEvents);
-    assertThat(workflows, hasEntry("foo", differentDef(testPath)));
+    await().until(workflows(), hasEntry("foo", differentDef(testPath)));
   }
 
   @Test
@@ -171,15 +168,11 @@ public class LocalFileScheduleSourceTest {
     ScheduleSource source = createSource(config);
     source.start();
 
-    expectChangeEvents(1);
     Files.write(testPath, readResource("simple-def.yaml"));
-    awaitEvents(changeEvents);
-    assertThat(workflows, hasKey("foo"));
+    await().until(workflows(), hasKey("foo"));
 
-    expectRemoveEvents(1);
     Files.delete(testPath);
-    awaitEvents(removeEvents);
-    assertThat(workflows, not(hasKey("foo")));
+    await().until(workflowsSize(), is(0));
   }
 
   private ScheduleSource createSource(Config config) {
@@ -189,26 +182,10 @@ public class LocalFileScheduleSourceTest {
 
   private void changeListener(Workflow workflow) {
     workflows.put(workflow.endpointId(), workflow);
-    changeEvents.countDown();
   }
 
   private void removeListener(Workflow workflow) {
     workflows.remove(workflow.endpointId());
-    removeEvents.countDown();
-  }
-
-  private void expectChangeEvents(int count) {
-    changeEvents = new CountDownLatch(count);
-  }
-
-  private void expectRemoveEvents(int count) {
-    removeEvents = new CountDownLatch(count);
-  }
-
-  private void awaitEvents(CountDownLatch latch) throws InterruptedException {
-    if (!latch.await(30, TimeUnit.SECONDS)) {
-      fail("Timed out while waiting for change events to happen");
-    }
   }
 
   private byte[] readResource(String filename) throws IOException, URISyntaxException {
