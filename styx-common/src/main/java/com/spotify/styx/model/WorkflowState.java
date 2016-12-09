@@ -70,10 +70,10 @@ public abstract class WorkflowState {
       @JsonProperty("commit_sha") Optional<String> commitSha,
       @JsonProperty("next_natural_trigger") Optional<Instant> nextNaturalTrigger) {
     Builder builder = builder();
-    enabled.ifPresent(e -> builder.enabled(e));
-    dockerImage.ifPresent(di -> builder.dockerImage(di));
-    commitSha.ifPresent(cs -> builder.commitSha(cs));
-    nextNaturalTrigger.ifPresent(nnt -> builder.nextNaturalTrigger(nnt));
+    enabled.ifPresent(builder::enabled);
+    dockerImage.ifPresent(builder::dockerImage);
+    commitSha.ifPresent(builder::commitSha);
+    nextNaturalTrigger.ifPresent(builder::nextNaturalTrigger);
     return builder.build();
   }
 

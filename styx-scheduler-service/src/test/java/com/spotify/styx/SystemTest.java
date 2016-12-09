@@ -25,6 +25,8 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
+import static java.util.concurrent.TimeUnit.DAYS;
+import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.contains;
@@ -44,22 +46,30 @@ import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.testdata.TestData;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Optional;
 import org.junit.Test;
 
 public class SystemTest extends StyxSchedulerServiceFixture {
 
-  private static final DataEndpoint DATA_ENDPOINT = DataEndpoint.create(
+  private static final DataEndpoint DATA_ENDPOINT_HOURLY = DataEndpoint.create(
       "styx.TestEndpoint", Partitioning.HOURS, of("busybox"), of(asList("--hour", "{}")),
+      empty(), emptyList());
+  private static final DataEndpoint DATA_ENDPOINT_DAILY = DataEndpoint.create(
+      "styx.TestEndpoint", Partitioning.DAYS, of("busybox"), of(asList("--hour", "{}")),
       empty(), emptyList());
   private static final String TEST_EXECUTION_ID_1 = "execution_1";
   private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
   private static final Workflow HOURLY_WORKFLOW = Workflow.create(
       "styx",
       TestData.WORKFLOW_URI,
-      DATA_ENDPOINT);
+      DATA_ENDPOINT_HOURLY);
   private static final ExecutionDescription TEST_EXECUTION_DESCRIPTION =
       ExecutionDescription.create(
           TEST_DOCKER_IMAGE, Arrays.asList("--date", "{}", "--bar"), empty(), empty());
+  private static final Workflow DAILY_WORKFLOW = Workflow.create(
+      "styx",
+      TestData.WORKFLOW_URI,
+      DATA_ENDPOINT_DAILY);
 
   @Test
   public void shouldCatchUpWithNaturalTriggers() throws Exception {
@@ -133,6 +143,110 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @Test
+  public void updatesNextNaturalTriggerWhenWFPartitioningChangesFromFinerToCoarser() throws Exception {
+    givenTheTimeIs("2016-03-14T15:30:00Z");
+    givenTheGlobalEnableFlagIs(true);
+    givenWorkflow(HOURLY_WORKFLOW);
+    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
+    WorkflowInstance workflowInstance =
+        WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
+
+    styxStarts();
+    timePasses(1, SECONDS);
+    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
+    timePasses(1, SECONDS);
+    awaitNumberOfDockerRuns(1);
+
+    workflowInstance = dockerRuns.get(0)._1;
+    RunSpec runSpec = dockerRuns.get(0)._2;
+    assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
+    assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T14")));
+
+    workflowInstance = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14");
+    // this should store a new value for nextNaturalTrigger, 2016-03-15.
+    workflowChanges(DAILY_WORKFLOW);
+    timeJumps(1, DAYS);
+    timePasses(1, SECONDS);
+    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
+    timePasses(1, SECONDS);
+    awaitNumberOfDockerRuns(2);
+
+    workflowInstance = dockerRuns.get(1)._1;
+    runSpec = dockerRuns.get(1)._2;
+    assertThat(workflowInstance.workflowId(), is(DAILY_WORKFLOW.id()));
+    assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14")));
+  }
+
+  @Test
+  public void updatesNextNaturalTriggerWhenWFPartitioningChangesFromCoarserToFiner() throws Exception {
+    givenTheTimeIs("2016-03-14T15:30:00Z");
+    givenTheGlobalEnableFlagIs(true);
+    givenWorkflow(DAILY_WORKFLOW);
+    givenWorkflowEnabledStateIs(DAILY_WORKFLOW, true);
+    WorkflowInstance workflowInstance = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2016-03-13");
+
+    styxStarts();
+    timePasses(1, SECONDS);
+    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
+    timePasses(1, SECONDS);
+    awaitNumberOfDockerRuns(1);
+
+    workflowInstance = dockerRuns.get(0)._1;
+    RunSpec runSpec = dockerRuns.get(0)._2;
+    assertThat(workflowInstance.workflowId(), is(DAILY_WORKFLOW.id()));
+    assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-13")));
+
+    workflowInstance = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T15");
+    // this should store a new value for nextNaturalTrigger, 2016-03-14T16.
+    workflowChanges(HOURLY_WORKFLOW);
+    timeJumps(1, HOURS);
+    timePasses(1, SECONDS);
+    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
+    timePasses(1, SECONDS);
+
+    awaitNumberOfDockerRuns(2);
+    workflowInstance = dockerRuns.get(1)._1;
+    runSpec = dockerRuns.get(1)._2;
+    assertThat(workflowInstance.workflowId(), is(DAILY_WORKFLOW.id()));
+    assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T15")));
+  }
+
+  @Test
+  public void doesntUpdateNextNaturalTriggerWhenPartitioningDoesntChange() throws Exception {
+    givenTheTimeIs("2016-03-14T15:30:00Z");
+    givenTheGlobalEnableFlagIs(true);
+    givenWorkflow(DAILY_WORKFLOW);
+    givenWorkflowEnabledStateIs(DAILY_WORKFLOW, true);
+    WorkflowInstance workflowInstance =
+        WorkflowInstance.create(DAILY_WORKFLOW.id(), "2016-03-13");
+
+    styxStarts();
+    timePasses(1, SECONDS);
+    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
+    timePasses(1, SECONDS);
+    awaitNumberOfDockerRuns(1);
+
+    workflowInstance = dockerRuns.get(0)._1;
+    RunSpec runSpec = dockerRuns.get(0)._2;
+    assertThat(workflowInstance.workflowId(), is(DAILY_WORKFLOW.id()));
+    assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-13")));
+
+    injectEvent(Event.started(workflowInstance));
+    injectEvent(Event.terminate(workflowInstance, 0));
+    awaitWorkflowInstanceCompletion(workflowInstance);
+
+    workflowChanges(Workflow.create(DAILY_WORKFLOW.componentId(),
+        DAILY_WORKFLOW.componentUri(),
+        DataEndpoint.create(DATA_ENDPOINT_DAILY.id(), DATA_ENDPOINT_DAILY.partitioning(),
+            Optional.of("freebox"), DATA_ENDPOINT_DAILY.dockerArgs(),
+            DATA_ENDPOINT_DAILY.secret(), emptyList())));
+    timePasses(StyxScheduler.SCHEDULER_TICK_INTERVAL_SECONDS, SECONDS);
+    awaitNumberOfDockerRunsWontChange(1);
+
+    assertThat(dockerRuns.size(), is(1));
+  }
+
+  @Test
   public void runsDockerImageWithArgsTemplate() throws Exception {
     givenTheTimeIs("2016-03-14T15:59:00Z");
     givenTheGlobalEnableFlagIs(true);
@@ -172,8 +286,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
     DataEndpoint changedDataEndpoint = DataEndpoint.create(
-        DATA_ENDPOINT.id(), Partitioning.HOURS, of("busybox:v777"), of(asList("other", "args")),
-        empty(), emptyList());
+        DATA_ENDPOINT_HOURLY.id(), Partitioning.HOURS, of("busybox:v777"),
+        of(asList("other", "args")), empty(), emptyList());
 
     Workflow changedWorkflow = Workflow.create(
         HOURLY_WORKFLOW.componentId(),
