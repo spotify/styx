@@ -87,7 +87,7 @@ public class StateInitializingTriggerTest {
     RunState state = stateManager.get(expectedInstance);
 
     // todo: assert trigger id
-    assertThat(state.state(), is(RunState.State.PREPARE));
+    assertThat(state.state(), is(RunState.State.QUEUED));
   }
 
   @Test

@@ -88,6 +88,12 @@ class WFIExecutionBuilder {
     }
 
     @Override
+    public Void dequeue(WorkflowInstance workflowInstance) {
+      currWorkflowInstance = workflowInstance;
+      return null;
+    }
+
+    @Override
     public Void created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
       currWorkflowInstance = workflowInstance;
       currExecutionId = executionId;

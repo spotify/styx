@@ -38,6 +38,7 @@ import com.google.api.services.container.Container;
 import com.google.api.services.container.ContainerScopes;
 import com.google.api.services.container.model.Cluster;
 import com.google.cloud.datastore.Datastore;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -240,6 +241,8 @@ public class StyxScheduler implements AppInit {
   private final RetryUtil retryUtil;
 
   private StateManager stateManager;
+  private Scheduler scheduler;
+  private TriggerManager triggerManager;
 
   private StyxScheduler(
       Time time,
@@ -336,14 +339,28 @@ public class StyxScheduler implements AppInit {
         .registerRoutes(schedulerResource.routes());
 
     this.stateManager = stateManager;
+    this.scheduler = scheduler;
+    this.triggerManager = triggerManager;
   }
 
+  @VisibleForTesting
   void receive(Event event) throws StateManager.IsClosed {
     stateManager.receive(event);
   }
 
+  @VisibleForTesting
   RunState getState(WorkflowInstance workflowInstance) {
     return stateManager.get(workflowInstance);
+  }
+
+  @VisibleForTesting
+  void tickScheduler() {
+    scheduler.tick();
+  }
+
+  @VisibleForTesting
+  void tickTriggerManager() {
+    triggerManager.tick();
   }
 
   private void restoreState(

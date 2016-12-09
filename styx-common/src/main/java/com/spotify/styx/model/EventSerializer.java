@@ -87,6 +87,11 @@ public final class EventSerializer {
     }
 
     @Override
+    public PersistentEvent dequeue(WorkflowInstance workflowInstance) {
+      return new PersistentEvent("dequeue", workflowInstance.toKey());
+    }
+
+    @Override
     public PersistentEvent submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) {
       return new Submit(workflowInstance.toKey(), executionDescription);
     }
@@ -148,6 +153,7 @@ public final class EventSerializer {
       @JsonSubTypes.Type(value = PersistentEvent.class, name = "timeTrigger"),
       @JsonSubTypes.Type(value = TriggerExecution.class, name = "triggerExecution"),
       @JsonSubTypes.Type(value = Created.class, name = "created"),
+      @JsonSubTypes.Type(value = PersistentEvent.class, name = "dequeue"),
       @JsonSubTypes.Type(value = Started.class, name = "started"),
       @JsonSubTypes.Type(value = Terminate.class, name = "terminate"),
       @JsonSubTypes.Type(value = RunError.class, name = "runError"),
@@ -181,6 +187,8 @@ public final class EventSerializer {
       switch (type) {
         case "timeTrigger":
           return Event.timeTrigger(workflowInstance);
+        case "dequeue":
+          return Event.dequeue(workflowInstance);
         case "success":
           return Event.success(workflowInstance);
         case "retry":

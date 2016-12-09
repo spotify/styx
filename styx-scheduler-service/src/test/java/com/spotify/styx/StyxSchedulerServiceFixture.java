@@ -157,6 +157,14 @@ public class StyxSchedulerServiceFixture {
     return styxScheduler.getState(workflowInstance);
   }
 
+  void tickScheduler() {
+    styxScheduler.tickScheduler();
+  }
+
+  void tickTriggerManager() {
+    styxScheduler.tickTriggerManager();
+  }
+
   void givenTheTimeIs(String time) {
     now = Instant.parse(time);
     printTime();

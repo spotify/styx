@@ -71,11 +71,17 @@ public class Scheduler {
         LOG.info("{} triggering retry #{}", key.toKey(), state.data().tries());
         stateManager.receiveIgnoreClosed(Event.retry(key));
       }
+
+      else if (shouldTrigger(state)) {
+        LOG.info("Triggering {}", key.toKey());
+        stateManager.receiveIgnoreClosed(Event.dequeue(key));
+      }
     }
   }
 
   private boolean shouldRetry(RunState runState) {
-    if (runState.state() != RunState.State.QUEUED) {
+    if (runState.state() != RunState.State.QUEUED
+        || runState.data().tries() == 0) {
       return false;
     }
 
@@ -98,5 +104,10 @@ public class Scheduler {
         .plus(ttls.ttlOf(runState.state()));
 
     return !deadline.isAfter(now);
+  }
+
+  private boolean shouldTrigger(RunState runState) {
+    return runState.state() == RunState.State.QUEUED
+           && runState.data().tries() == 0;
   }
 }

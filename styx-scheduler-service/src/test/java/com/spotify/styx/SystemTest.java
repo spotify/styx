@@ -64,7 +64,11 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T13:00:00Z");
 
     styxStarts();
-    timePasses(1, SECONDS);
+    tickTriggerManager();
+    awaitWorkflowInstanceState(
+        WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T12"),
+        RunState.State.QUEUED);
+    tickScheduler();
     awaitNumberOfDockerRuns(1);
 
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
@@ -72,7 +76,11 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T12")));
 
-    timePasses(1, SECONDS);
+    tickTriggerManager();
+    awaitWorkflowInstanceState(
+        WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T13"),
+        RunState.State.QUEUED);
+    tickScheduler();
     awaitNumberOfDockerRuns(2);
 
     workflowInstance = dockerRuns.get(1)._1;
@@ -80,7 +88,11 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T13")));
 
-    timePasses(1, SECONDS);
+    tickTriggerManager();
+    awaitWorkflowInstanceState(
+        WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T14"),
+        RunState.State.QUEUED);
+    tickScheduler();
     awaitNumberOfDockerRuns(3);
 
     workflowInstance = dockerRuns.get(2)._1;
@@ -101,14 +113,15 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance instance2 = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
 
     styxStarts();
-    timePasses(1, SECONDS);
+    tickTriggerManager();
+    awaitWorkflowInstanceState(instance1, RunState.State.QUEUED);
+    tickScheduler();
     awaitNumberOfDockerRuns(1);
 
     assertThat(dockerRuns.get(0)._1, is(instance1));
 
     workflowDeleted(HOURLY_WORKFLOW);
-
-    timePasses(1, SECONDS);
+    tickTriggerManager();
 
     assertThat(getState(instance2), is(nullValue()));
   }

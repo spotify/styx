@@ -54,6 +54,11 @@ public final class EventUtil {
     }
 
     @Override
+    public String dequeue(WorkflowInstance workflowInstance) {
+      return "dequeue";
+    }
+
+    @Override
     public String created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
       return "created";
     }

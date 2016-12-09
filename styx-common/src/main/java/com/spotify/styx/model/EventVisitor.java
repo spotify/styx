@@ -32,6 +32,7 @@ import com.github.sviperll.adt4j.Visitor;
 public interface EventVisitor<R> {
 
   R triggerExecution(@Getter WorkflowInstance workflowInstance, String triggerId);
+  R dequeue(@Getter WorkflowInstance workflowInstance);
   R submit(@Getter WorkflowInstance workflowInstance, ExecutionDescription executionDescription);
   R submitted(@Getter WorkflowInstance workflowInstance, String executionId);
   R started(@Getter WorkflowInstance workflowInstance);
