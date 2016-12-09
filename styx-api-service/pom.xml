@@ -20,6 +20,12 @@
       <artifactId>styx-common</artifactId>
       <version>0.1.13-SNAPSHOT</version>
     </dependency>
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>styx-test</artifactId>
+      <version>0.1.13-SNAPSHOT</version>
+      <scope>test</scope>
+    </dependency>
 
     <dependency>
       <groupId>com.spotify</groupId>

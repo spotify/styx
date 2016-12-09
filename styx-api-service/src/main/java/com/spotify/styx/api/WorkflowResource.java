@@ -50,6 +50,7 @@ import okio.ByteString;
 public final class WorkflowResource {
 
   public static final String BASE = "/workflows";
+  public static final int DEFAULT_PAGE_LIMIT = 24 * 7;
   public static final ObjectMapper OBJECT_MAPPER = Json.OBJECT_MAPPER;
 
   private final Storage storage;
@@ -83,7 +84,7 @@ public final class WorkflowResource {
     final List<Route<AsyncHandler<Response<ByteString>>>> v1 = Arrays.asList(
         Route.with(
             json(), "GET", BASE + "/<cid>/<eid>/instances",
-            rc -> instances(arg("cid", rc), arg("eid", rc))),
+            rc -> instances(rc.request(), arg("cid", rc), arg("eid", rc))),
         Route.with(
             json(), "GET", BASE + "/<cid>/<eid>/instances/<iid>",
             rc -> instance(arg("cid", rc), arg("eid", rc), arg("iid", rc)))
@@ -196,12 +197,18 @@ public final class WorkflowResource {
     return Response.forPayload(workflowState);
   }
 
-  private Response<List<WorkflowInstanceExecutionData>> instances(String componentId, String endpointId) {
-    final WorkflowId workflowId = WorkflowId.create(componentId, endpointId);
-    final List<WorkflowInstanceExecutionData> data;
+  private Response<List<WorkflowInstanceExecutionData>> instances(
+      Request request,
+      String componentId,
+      String endpointId) {
 
+    final WorkflowId workflowId = WorkflowId.create(componentId, endpointId);
+    final String offset = request.parameter("offset").orElse("");
+    final int limit = request.parameter("limit").map(Integer::parseInt).orElse(DEFAULT_PAGE_LIMIT);
+
+    final List<WorkflowInstanceExecutionData> data;
     try {
-      data = storage.executionData(workflowId);
+      data = storage.executionData(workflowId, offset, limit);
     } catch (IOException e) {
       return Response.forStatus(
           Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch execution info."));
