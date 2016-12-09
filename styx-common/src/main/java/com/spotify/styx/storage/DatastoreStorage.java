@@ -359,11 +359,10 @@ class DatastoreStorage {
   }
 
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
-    return
-        WorkflowState.create(
-            Optional.of(enabled(workflowId)),
-            getDockerImage(workflowId),
-            getCommitSha(workflowId));
+    WorkflowState.Builder builder = WorkflowState.builder().enabled(enabled(workflowId));
+    getDockerImage(workflowId).ifPresent(dockerImage -> builder.dockerImage(dockerImage));
+    getCommitSha(workflowId).ifPresent(commitSha -> builder.commitSha(commitSha));
+    return builder.build();
   }
 
   private Optional<String> getCommitSha(WorkflowId workflowId) {

@@ -70,8 +70,11 @@ public class ExecutionDescriptionHandlerTest {
   @Test
   public void shouldTransitionIntoSubmitting() throws Exception {
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint("--date", "{}", "--bar"));
-    WorkflowState workflowState = WorkflowState.create(
-        Optional.of(true), Optional.of(DOCKER_IMAGE), Optional.of(COMMIT_SHA));
+    WorkflowState workflowState = WorkflowState.builder()
+        .enabled(true)
+        .dockerImage(DOCKER_IMAGE)
+        .commitSha(COMMIT_SHA)
+        .build();
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
     RunState runState = RunState.fresh(workflowInstance, toTest);
 
@@ -94,8 +97,11 @@ public class ExecutionDescriptionHandlerTest {
   @Test
   public void shouldTransitionIntoFailedIfStorageError() throws Exception {
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint("--date", "{}", "--bar"));
-    WorkflowState workflowState = WorkflowState.create(
-        Optional.of(true), Optional.of(DOCKER_IMAGE), Optional.of(COMMIT_SHA));
+    WorkflowState workflowState = WorkflowState.builder()
+        .enabled(true)
+        .dockerImage(DOCKER_IMAGE)
+        .commitSha(COMMIT_SHA)
+        .build();
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
 
     Storage storageSpy = Mockito.spy(storage);

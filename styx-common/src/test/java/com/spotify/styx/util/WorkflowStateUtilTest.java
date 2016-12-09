@@ -50,7 +50,7 @@ public class WorkflowStateUtilTest {
 
   @Test
   public void patchEnabledFieldReturnsPatchedOriginal() {
-    WorkflowState patch = WorkflowState.create(Optional.of(false), Optional.empty(), Optional.empty());
+    WorkflowState patch = WorkflowState.builder().enabled(false).build();
     WorkflowState patchedState = WorkflowStateUtil.patchWorkflowState(
         Optional.of(FULLY_POPULATED_STATE),
         patch);
@@ -62,17 +62,17 @@ public class WorkflowStateUtilTest {
     WorkflowState patch = WorkflowState.empty();
     WorkflowState patchedState = WorkflowStateUtil.patchWorkflowState(
         Optional.of(
-            WorkflowState.create(
-                Optional.empty(),
-                Optional.of("original_docker_image"),
-                Optional.of(ORIGINAL_COMMIT_SHA))),
+            WorkflowState.builder()
+                .dockerImage("original_docker_image")
+                .commitSha(ORIGINAL_COMMIT_SHA)
+                .build()),
         patch);
     assertThat(patchedState, equalTo(WorkflowState.all(false, "original_docker_image", ORIGINAL_COMMIT_SHA)));
   }
 
   @Test
   public void patchDockerImageFieldReturnsPatchedOriginal() {
-    WorkflowState patch = WorkflowState.create(Optional.empty(), Optional.of("patched_docker_image"), Optional.empty());
+    WorkflowState patch = WorkflowState.builder().dockerImage("patched_docker_image").build();
     WorkflowState patchedState = WorkflowStateUtil.patchWorkflowState(
         Optional.of(FULLY_POPULATED_STATE),
         patch);
@@ -81,11 +81,13 @@ public class WorkflowStateUtilTest {
 
   @Test
   public void patchCommitShaFieldReturnsPatchedOriginal() {
-    WorkflowState patch = WorkflowState.create(Optional.empty(), Optional.empty(), Optional.of(PATCHED_COMMIT_SHA));
+    WorkflowState patch = WorkflowState.builder().commitSha(PATCHED_COMMIT_SHA).build();
     WorkflowState patchedState = WorkflowStateUtil.patchWorkflowState(
         Optional.of(FULLY_POPULATED_STATE),
         patch);
-    assertThat(patchedState, equalTo(WorkflowState.all(true, "original_docker_image", PATCHED_COMMIT_SHA)));
+    assertThat(patchedState, equalTo(
+        WorkflowState.builder().enabled(true).dockerImage("original_docker_image")
+            .commitSha(PATCHED_COMMIT_SHA).build()));
   }
 
 }

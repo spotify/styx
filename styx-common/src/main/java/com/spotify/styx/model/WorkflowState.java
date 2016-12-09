@@ -20,12 +20,11 @@
 
 package com.spotify.styx.model;
 
-import static java.util.Optional.of;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
+import java.time.Instant;
 import java.util.Optional;
 
 /**
@@ -44,27 +43,53 @@ public abstract class WorkflowState {
   @JsonProperty
   public abstract Optional<String> commitSha();
 
+  @JsonProperty
+  public abstract Optional<Instant> nextNaturalTrigger();
+
+  public abstract Builder toBuilder();
+
+  public static Builder builder() {
+    return new AutoValue_WorkflowState.Builder();
+  }
+
+  @AutoValue.Builder
+  public abstract static class Builder {
+
+    public abstract Builder enabled(boolean enabled);
+    public abstract Builder dockerImage(String dockerImage);
+    public abstract Builder commitSha(String commitSha);
+    public abstract Builder nextNaturalTrigger(Instant nextNaturalTrigger);
+
+    public abstract WorkflowState build();
+  }
+
   @JsonCreator
   public static WorkflowState create(
       @JsonProperty("enabled") Optional<Boolean> enabled,
       @JsonProperty("docker_image") Optional<String> dockerImage,
-      @JsonProperty("commit_sha") Optional<String> commitSha) {
-    return new AutoValue_WorkflowState(enabled, dockerImage, commitSha);
+      @JsonProperty("commit_sha") Optional<String> commitSha,
+      @JsonProperty("next_natural_trigger") Optional<Instant> nextNaturalTrigger) {
+    Builder builder = builder();
+    enabled.ifPresent(e -> builder.enabled(e));
+    dockerImage.ifPresent(di -> builder.dockerImage(di));
+    commitSha.ifPresent(cs -> builder.commitSha(cs));
+    nextNaturalTrigger.ifPresent(nnt -> builder.nextNaturalTrigger(nnt));
+    return builder.build();
   }
 
   public static WorkflowState all(boolean enabled, String dockerImage, String commitSha) {
-    return create(of(enabled), of(dockerImage), of(commitSha));
+    return builder().enabled(enabled).dockerImage(dockerImage).commitSha(commitSha).build();
   }
 
   public static WorkflowState empty() {
-    return create(Optional.empty(), Optional.empty(), Optional.empty());
+    return builder().build();
   }
 
   public static WorkflowState patchDockerImage(String dockerImage) {
-    return create(Optional.empty(), of(dockerImage), Optional.empty());
+    return builder().dockerImage(dockerImage).build();
   }
 
   public static WorkflowState patchEnabled(boolean enabled) {
-    return create(of(enabled), Optional.empty(), Optional.empty());
+    return builder().enabled(enabled).build();
   }
 }
