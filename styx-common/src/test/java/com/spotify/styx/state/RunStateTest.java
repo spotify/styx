@@ -97,7 +97,7 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), equalTo(777L));
 
-    transitioner.receive(eventFactory.retry());
+    transitioner.receive(eventFactory.dequeue());
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION));
     transitioner.receive(eventFactory.submitted("exec2"));
     transitioner.receive(eventFactory.started());

@@ -186,7 +186,7 @@ public class QueuedStateManagerTest {
     stateManager.receive(Event.timeout(INSTANCE));
     assertTrue(stateManager.awaitIdle(1000));
 
-    stateManager.receive(Event.retry(INSTANCE));
+    stateManager.receive(Event.retryAfter(INSTANCE, 10));
     assertTrue(stateManager.awaitIdle(1000));
     assertThat(storage.writtenEvents, hasSize(4));
 
@@ -197,7 +197,7 @@ public class QueuedStateManagerTest {
     assertThat(storage.writtenEvents.get(2).counter(), is(2L));
     assertThat(storage.writtenEvents.get(2).event(), is(Event.timeout(INSTANCE)));
     assertThat(storage.writtenEvents.get(3).counter(), is(3L));
-    assertThat(storage.writtenEvents.get(3).event(), is(Event.retry(INSTANCE)));
+    assertThat(storage.writtenEvents.get(3).event(), is(Event.retryAfter(INSTANCE, 10)));
   }
 
   @Test
@@ -316,7 +316,7 @@ public class QueuedStateManagerTest {
         stateManager.receive(Event.started(instance));
         stateManager.receive(Event.terminate(instance, 20));
         stateManager.receive(Event.retryAfter(instance, 300));
-        stateManager.receive(Event.retry(instance));
+        stateManager.receive(Event.dequeue(instance));
       } catch (StateManager.IsClosed ignored) {
       }
     };

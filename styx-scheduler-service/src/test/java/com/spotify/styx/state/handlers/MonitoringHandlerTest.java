@@ -80,7 +80,7 @@ public class MonitoringHandlerTest {
     stateManager.receive(Event.retryAfter(state.workflowInstance(), 0));
 
     i = Instant.parse("2015-12-31T23:59:15.000Z");
-    stateManager.receive(Event.retry(state.workflowInstance()));
+    stateManager.receive(Event.dequeue(state.workflowInstance()));
     stateManager.receive(Event.created(state.workflowInstance(), "test_execution_id", "img"));
 
     i = Instant.parse("2015-12-31T23:59:16.000Z");

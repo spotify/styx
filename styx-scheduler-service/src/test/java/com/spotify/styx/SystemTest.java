@@ -340,7 +340,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenStoredEvent(Event.started(workflowInstance),                             4L);
     givenStoredEvent(Event.terminate(workflowInstance, 30),                       5L);
     givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                   6L);
-    givenStoredEvent(Event.retry(workflowInstance),                               7L);
+    givenStoredEvent(Event.dequeue(workflowInstance),                             7L);
     givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION),  8L);
     givenStoredEvent(Event.submitted(workflowInstance, "exec2"),                  9L);
     givenStoredEvent(Event.started(workflowInstance),                            10L);
