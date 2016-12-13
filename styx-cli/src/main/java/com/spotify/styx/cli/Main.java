@@ -243,9 +243,9 @@ public final class Main {
   private void retryWorkflowInstance() {
     WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
 
-    Event retry = Event.retry(workflowInstance);
+    Event dequeue = Event.dequeue(workflowInstance);
     EventSerializer.PersistentEvent persistentEvent =
-        EventSerializer.convertEventToPersistentEvent(retry);
+        EventSerializer.convertEventToPersistentEvent(dequeue);
     final ByteString payload;
     try {
       payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(persistentEvent));

@@ -321,6 +321,11 @@ class KubernetesDockerRunner implements DockerRunner {
     }
 
     @Override
+    public Boolean dequeue(WorkflowInstance workflowInstance) {
+      return false;
+    }
+
+    @Override
     public Boolean created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
       return false;
     }

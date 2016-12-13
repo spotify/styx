@@ -139,6 +139,7 @@ public class DockerRunnerHandlerTest {
 
     stateManager.initialize(runState);
     stateManager.receive(Event.triggerExecution(workflowInstance, "trig"));
+    stateManager.receive(Event.dequeue(workflowInstance));
     stateManager.receive(Event.submit(workflowInstance, EXECUTION_DESCRIPTION));
     stateManager.receive(Event.runError(workflowInstance, ""));
 

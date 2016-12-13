@@ -214,6 +214,11 @@ public class CliResource {
     }
 
     @Override
+    public Boolean dequeue(WorkflowInstance workflowInstance) {
+      return Boolean.FALSE;
+    }
+
+    @Override
     public Boolean submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) {
       return Boolean.FALSE;
     }

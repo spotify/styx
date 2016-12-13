@@ -63,18 +63,22 @@ public class Scheduler {
       final RunState state = entry.getValue();
 
       if (hasTimedOut(state)) {
-        LOG.info("Found stale state, triggering timeout for {}", state);
+        LOG.info("Found stale state, issuing timeout for {}", state);
         stateManager.receiveIgnoreClosed(Event.timeout(key));
       }
 
-      else if (shouldRetry(state)) {
-        LOG.info("{} triggering retry #{}", key.toKey(), state.data().tries());
-        stateManager.receiveIgnoreClosed(Event.retry(key));
+      else if (shouldExecute(state)) {
+        if (state.data().tries() == 0) {
+          LOG.info("Triggering {}", key.toKey(), state.data().tries());
+        } else {
+          LOG.info("{} executing retry #{}", key.toKey(), state.data().tries());
+        }
+        stateManager.receiveIgnoreClosed(Event.dequeue(key));
       }
     }
   }
 
-  private boolean shouldRetry(RunState runState) {
+  private boolean shouldExecute(RunState runState) {
     if (runState.state() != RunState.State.QUEUED) {
       return false;
     }

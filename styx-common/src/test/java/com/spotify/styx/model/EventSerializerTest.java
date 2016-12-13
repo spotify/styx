@@ -51,6 +51,7 @@ public class EventSerializerTest {
     assertRoundtrip(Event.timeTrigger(INSTANCE1));
     assertRoundtrip(Event.triggerExecution(INSTANCE1, TRIGGER1));
     assertRoundtrip(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE));
+    assertRoundtrip(Event.dequeue(INSTANCE1));
     assertRoundtrip(Event.started(INSTANCE1));
     assertRoundtrip(Event.terminate(INSTANCE1, 20));
     assertRoundtrip(Event.runError(INSTANCE1, "ErrorMessage"));
@@ -67,6 +68,7 @@ public class EventSerializerTest {
   @Test
   public void testDeserializeFromJson() throws Exception {
     assertThat(eventSerializer.convert(json("timeTrigger")), is(Event.timeTrigger(INSTANCE1)));
+    assertThat(eventSerializer.convert(json("dequeue")), is(Event.dequeue(INSTANCE1)));
     assertThat(eventSerializer.convert(json("started")), is(Event.started(INSTANCE1)));
     assertThat(eventSerializer.convert(json("success")), is(Event.success(INSTANCE1)));
     assertThat(eventSerializer.convert(json("retry")), is(Event.retry(INSTANCE1)));

@@ -125,6 +125,11 @@ class PrettyCliOutput implements CliOutput {
     }
 
     @Override
+    public Ansi.Color dequeue(WorkflowInstance workflowInstance) {
+      return WHITE;
+    }
+
+    @Override
     public Ansi.Color started(WorkflowInstance workflowInstance) {
       return WHITE;
     }

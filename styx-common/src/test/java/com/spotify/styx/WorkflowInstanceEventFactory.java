@@ -44,6 +44,10 @@ public class WorkflowInstanceEventFactory {
     return Event.created(workflowInstance, executionId, dockerImage);
   }
 
+  public Event dequeue() {
+    return Event.dequeue(workflowInstance);
+  }
+
   public Event submit(ExecutionDescription executionDescription) {
     return Event.submit(workflowInstance, executionDescription);
   }

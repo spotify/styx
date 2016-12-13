@@ -78,6 +78,7 @@ public class ExecutionDescriptionHandlerTest {
     storage.patchState(workflow.id(), workflowState);
     stateManager.initialize(runState);
     stateManager.receive(Event.triggerExecution(workflowInstance, "trig"));
+    stateManager.receive(Event.dequeue(workflowInstance));
 
     RunState currentState = stateManager.get(workflowInstance);
     StateData data = currentState.data();
@@ -108,6 +109,7 @@ public class ExecutionDescriptionHandlerTest {
 
     stateManager.initialize(runState);
     stateManager.receive(Event.triggerExecution(workflowInstance, "trig"));
+    stateManager.receive(Event.dequeue(workflowInstance));
 
     RunState failed = stateManager.get(workflowInstance);
     assertThat(failed.state(), Matchers.is(RunState.State.FAILED));

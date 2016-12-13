@@ -115,11 +115,13 @@ public class QueuedStateManagerTest {
     setUp();
 
     stateManager.receive(Event.triggerExecution(INSTANCE, "trig1"));
+    stateManager.receive(Event.dequeue(INSTANCE));
     stateManager.receive(Event.halt(INSTANCE));
     assertTrue(stateManager.awaitIdle(1000));
 
     stateManager.initialize(RunState.fresh(INSTANCE));
     stateManager.receive(Event.triggerExecution(INSTANCE, "trig2"));
+    stateManager.receive(Event.dequeue(INSTANCE));
     stateManager.receive(Event.created(INSTANCE, TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     stateManager.receive(Event.started(INSTANCE));
     stateManager.receive(Event.halt(INSTANCE));
@@ -132,8 +134,8 @@ public class QueuedStateManagerTest {
     SortedSet<SequenceEvent> storedEvents = storage.readEvents(INSTANCE);
     SequenceEvent lastStoredEvent = storedEvents.last();
     assertThat(lastStoredEvent.event(), is(Event.triggerExecution(INSTANCE, "trig3")));
-    assertThat(storage.getLatestStoredCounter(INSTANCE), hasValue(6L));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(6L));
+    assertThat(storage.getLatestStoredCounter(INSTANCE), hasValue(8L));
+    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(8L));
   }
 
   @Test(expected = RuntimeException.class)
@@ -184,7 +186,7 @@ public class QueuedStateManagerTest {
     stateManager.receive(Event.timeout(INSTANCE));
     assertTrue(stateManager.awaitIdle(1000));
 
-    stateManager.receive(Event.retry(INSTANCE));
+    stateManager.receive(Event.retryAfter(INSTANCE, 10));
     assertTrue(stateManager.awaitIdle(1000));
     assertThat(storage.writtenEvents, hasSize(4));
 
@@ -195,7 +197,7 @@ public class QueuedStateManagerTest {
     assertThat(storage.writtenEvents.get(2).counter(), is(2L));
     assertThat(storage.writtenEvents.get(2).event(), is(Event.timeout(INSTANCE)));
     assertThat(storage.writtenEvents.get(3).counter(), is(3L));
-    assertThat(storage.writtenEvents.get(3).event(), is(Event.retry(INSTANCE)));
+    assertThat(storage.writtenEvents.get(3).event(), is(Event.retryAfter(INSTANCE, 10)));
   }
 
   @Test
@@ -314,7 +316,7 @@ public class QueuedStateManagerTest {
         stateManager.receive(Event.started(instance));
         stateManager.receive(Event.terminate(instance, 20));
         stateManager.receive(Event.retryAfter(instance, 300));
-        stateManager.receive(Event.retry(instance));
+        stateManager.receive(Event.dequeue(instance));
       } catch (StateManager.IsClosed ignored) {
       }
     };
@@ -331,6 +333,7 @@ public class QueuedStateManagerTest {
         try {
           stateManager.initialize(RunState.fresh(instance));
           stateManager.receive(Event.triggerExecution(instance, "trig"));
+          stateManager.receive(Event.dequeue(INSTANCE));
         } catch (StateManager.IsClosed ignored) {
         }
 

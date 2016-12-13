@@ -131,6 +131,11 @@ class CliUtil {
     }
 
     @Override
+    public String dequeue(WorkflowInstance workflowInstance) {
+      return "Unexpected data";
+    }
+
+    @Override
     public String started(WorkflowInstance workflowInstance) {
       return "Unexpected data";
     }
@@ -192,6 +197,11 @@ class CliUtil {
     @Override
     public String created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
       return String.format("Execution id: %s, Docker image: %s", executionId, dockerImage);
+    }
+
+    @Override
+    public String dequeue(WorkflowInstance workflowInstance) {
+      return "";
     }
 
     @Override

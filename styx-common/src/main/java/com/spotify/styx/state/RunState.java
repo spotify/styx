@@ -147,7 +147,7 @@ public abstract class RunState {
     public RunState triggerExecution(WorkflowInstance workflowInstance, String triggerId) {
       switch (state()) {
         case NEW:
-          return state(PREPARE);
+          return state(QUEUED);
 
         default:
           throw illegalTransition("triggerExecution");
@@ -159,6 +159,7 @@ public abstract class RunState {
     public RunState created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
       switch (state()) {
         case PREPARE:
+        case QUEUED:
           return state(
               SUBMITTED, // for backwards compatibility
               data().toBuilder()
@@ -172,8 +173,20 @@ public abstract class RunState {
     }
 
     @Override
+    public RunState dequeue(WorkflowInstance workflowInstance) {
+      switch (state()) {
+        case QUEUED:
+          return state(PREPARE);
+
+        default:
+          throw illegalTransition("dequeue");
+      }
+    }
+
+    @Override
     public RunState submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) {
       switch (state()) {
+        case QUEUED: // for backwards compatibility
         case PREPARE:
           return state(
               SUBMITTING,
@@ -280,11 +293,12 @@ public abstract class RunState {
       }
     }
 
+    @Deprecated
     @Override
     public RunState retry(WorkflowInstance workflowInstance) {
       switch (state()) {
-        case TERMINATED: // for backwards compatibility
-        case FAILED:     // for backwards compatibility
+        case TERMINATED:
+        case FAILED:
         case QUEUED:
           return state(PREPARE);
 

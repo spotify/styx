@@ -87,11 +87,21 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldTriggerRetryIfDelayHasPassed() throws Exception {
-    StateData stateData = StateData.builder().retryDelayMillis(15_000).build();
+  public void shouldExecuteRetryIfDelayHasPassed() throws Exception {
+    StateData stateData = StateData.builder().retryDelayMillis(15_000).tries(10).build();
     setUp(20, RunState.create(INSTANCE, State.QUEUED, stateData, time));
 
     now = now.plus(15, ChronoUnit.SECONDS);
+    scheduler.tick();
+
+    assertThat(stateManager.get(INSTANCE).state(), is(State.PREPARE));
+  }
+
+  @Test
+  public void shouldExecuteNewTriggers() throws Exception {
+    StateData stateData = StateData.builder().tries(0).build();
+    setUp(20, RunState.create(INSTANCE, State.QUEUED, stateData, time));
+
     scheduler.tick();
 
     assertThat(stateManager.get(INSTANCE).state(), is(State.PREPARE));

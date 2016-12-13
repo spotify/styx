@@ -28,13 +28,16 @@ import static com.spotify.styx.state.RunState.State.QUEUED;
 import static com.spotify.styx.state.RunState.State.RUNNING;
 import static com.spotify.styx.state.RunState.State.SUBMITTED;
 import static com.spotify.styx.state.RunState.State.TERMINATED;
+import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.WorkflowInstanceEventFactory;
+import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.testdata.TestData;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -50,6 +53,8 @@ public class RunStateTest {
   private static final String TEST_EXECUTION_ID_2 = "execution_2";
 
   private static final String DOCKER_IMAGE = "busybox:1.1";
+  private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.create(
+      DOCKER_IMAGE, Arrays.asList("--date", "{}", "--bar"), empty(), empty());
 
   private WorkflowInstanceEventFactory eventFactory =
       new WorkflowInstanceEventFactory(WORKFLOW_INSTANCE);
@@ -62,7 +67,7 @@ public class RunStateTest {
   }
 
   @Test // for backwards compatibility
-  public void testTimeTriggerAndRetryOLD() throws Exception {
+  public void testTimeTriggerAndRetry() throws Exception {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
     transitioner.receive(eventFactory.timeTrigger());
     transitioner.receive(eventFactory.started());
@@ -73,6 +78,28 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), equalTo(777L));
 
     transitioner.receive(eventFactory.retry());
+    transitioner.receive(eventFactory.started());
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(RUNNING));
+  }
+
+  @Test
+  public void testTimeTriggerAndRetry2() throws Exception {
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.receive(eventFactory.triggerExecution("trig1"));
+    transitioner.receive(eventFactory.dequeue());
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION));
+    transitioner.receive(eventFactory.submitted("exec1"));
+    transitioner.receive(eventFactory.started());
+    transitioner.receive(eventFactory.terminate(1));
+    transitioner.receive(eventFactory.retryAfter(777));
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), equalTo(777L));
+
+    transitioner.receive(eventFactory.dequeue());
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION));
+    transitioner.receive(eventFactory.submitted("exec2"));
     transitioner.receive(eventFactory.started());
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(RUNNING));
@@ -119,7 +146,7 @@ public class RunStateTest {
     assertThat(
         transitioner.get(WORKFLOW_INSTANCE).data().executionId(),
         equalTo(Optional.of(TEST_EXECUTION_ID_2)));
-    assertThat(outputs, contains(PREPARE, SUBMITTED, RUNNING, TERMINATED, QUEUED,
+    assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, TERMINATED, QUEUED,
                                  PREPARE, SUBMITTED, RUNNING));
   }
 
@@ -142,7 +169,7 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), equalTo(999L));
-    assertThat(outputs, contains(PREPARE, SUBMITTED, FAILED, QUEUED, PREPARE, SUBMITTED,
+    assertThat(outputs, contains(QUEUED, SUBMITTED, FAILED, QUEUED, PREPARE, SUBMITTED,
                                  RUNNING, TERMINATED, QUEUED));
   }
 
@@ -158,7 +185,7 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(SUBMITTED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(1));
-    assertThat(outputs, contains(PREPARE, SUBMITTED, FAILED, PREPARE, SUBMITTED));
+    assertThat(outputs, contains(QUEUED, SUBMITTED, FAILED, PREPARE, SUBMITTED));
   }
 
   @Test
@@ -175,7 +202,7 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(SUBMITTED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(2));
-    assertThat(outputs, contains(PREPARE, SUBMITTED, FAILED, PREPARE, SUBMITTED, FAILED, PREPARE,
+    assertThat(outputs, contains(QUEUED, SUBMITTED, FAILED, PREPARE, SUBMITTED, FAILED, PREPARE,
                                  SUBMITTED));
   }
 
@@ -194,7 +221,7 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(TERMINATED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryCost(), equalTo(0.2));
-    assertThat(outputs, contains(PREPARE, SUBMITTED, RUNNING, TERMINATED, QUEUED, PREPARE,
+    assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, TERMINATED, QUEUED, PREPARE,
                                  SUBMITTED, RUNNING, TERMINATED));
   }
 
@@ -213,7 +240,7 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(TERMINATED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(2));
-    assertThat(outputs, contains(PREPARE, SUBMITTED, RUNNING, TERMINATED, QUEUED, PREPARE,
+    assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, TERMINATED, QUEUED, PREPARE,
                                  SUBMITTED, RUNNING, TERMINATED));
   }
 
@@ -232,7 +259,7 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(TERMINATED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryCost(), equalTo(2.0));
-    assertThat(outputs, contains(PREPARE, SUBMITTED, RUNNING, TERMINATED, QUEUED, PREPARE,
+    assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, TERMINATED, QUEUED, PREPARE,
                                  SUBMITTED, RUNNING, TERMINATED));
   }
 
@@ -246,7 +273,7 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(RunState.State.ERROR));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(1));
-    assertThat(outputs, contains(PREPARE, SUBMITTED, FAILED, ERROR));
+    assertThat(outputs, contains(QUEUED, SUBMITTED, FAILED, ERROR));
   }
 
   @Test
@@ -261,7 +288,7 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(RunState.State.DONE));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(1));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().lastExit(), equalTo(0));
-    assertThat(outputs, contains(PREPARE, SUBMITTED, RUNNING, TERMINATED, DONE));
+    assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, TERMINATED, DONE));
   }
 
   @Test
@@ -277,7 +304,7 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(SUBMITTED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(1));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().lastExit(), equalTo(1));
-    assertThat(outputs, contains(PREPARE, SUBMITTED, RUNNING, TERMINATED, PREPARE, SUBMITTED));
+    assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, TERMINATED, PREPARE, SUBMITTED));
   }
 
   @Test
@@ -297,7 +324,7 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(SUBMITTED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(2));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().lastExit(), equalTo(7));
-    assertThat(outputs, contains(PREPARE, SUBMITTED, RUNNING, TERMINATED, PREPARE, SUBMITTED,
+    assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, TERMINATED, PREPARE, SUBMITTED,
                                  RUNNING, TERMINATED, PREPARE, SUBMITTED));
   }
 
@@ -313,7 +340,7 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(RunState.State.ERROR));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(1));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().lastExit(), equalTo(1));
-    assertThat(outputs, contains(PREPARE, SUBMITTED, RUNNING, TERMINATED, ERROR));
+    assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, TERMINATED, ERROR));
   }
 
   @Test
@@ -328,7 +355,7 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(SUBMITTED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(1));
-    assertThat(outputs, contains(PREPARE, SUBMITTED, RUNNING, FAILED, PREPARE, SUBMITTED));
+    assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, FAILED, PREPARE, SUBMITTED));
   }
 
   @Test
@@ -342,7 +369,7 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(RunState.State.ERROR));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(1));
-    assertThat(outputs, contains(PREPARE, SUBMITTED, RUNNING, FAILED, ERROR));
+    assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, FAILED, ERROR));
   }
 
   @Test
@@ -355,7 +382,7 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(RunState.State.FAILED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(1));
-    assertThat(outputs, contains(PREPARE, SUBMITTED, RUNNING, FAILED));
+    assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, FAILED));
   }
 
   @Test
@@ -373,8 +400,8 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(RunState.State.RUNNING));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(0));
-    assertThat(outputs, contains(PREPARE, SUBMITTED, RUNNING, FAILED, ERROR,
-                                 PREPARE, SUBMITTED, RUNNING));
+    assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, FAILED, ERROR,
+                                 QUEUED, SUBMITTED, RUNNING));
   }
 
   @Test
