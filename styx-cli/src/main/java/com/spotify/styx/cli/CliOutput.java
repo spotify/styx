@@ -20,8 +20,9 @@
 
 package com.spotify.styx.cli;
 
+import com.google.auto.value.AutoValue;
 import com.spotify.styx.api.cli.ActiveStatesPayload;
-import com.spotify.styx.api.cli.EventsPayload;
+import java.util.List;
 
 /**
  * Cli printing interface
@@ -30,5 +31,16 @@ interface CliOutput {
 
   void printActiveStates(ActiveStatesPayload activeStatesPayload);
 
-  void printEvents(EventsPayload eventsPayload);
+  void printEvents(List<EventInfo> eventInfos);
+
+  @AutoValue
+  abstract class EventInfo {
+    abstract long timestamp();
+    abstract String name();
+    abstract String info();
+
+    public static EventInfo create(long ts, String eventName, String eventInfo) {
+      return new AutoValue_CliOutput_EventInfo(ts, eventName, eventInfo);
+    }
+  }
 }

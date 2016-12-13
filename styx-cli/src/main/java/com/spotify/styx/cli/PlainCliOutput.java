@@ -23,10 +23,9 @@ package com.spotify.styx.cli;
 import static com.spotify.styx.cli.CliUtil.formatTimestamp;
 
 import com.spotify.styx.api.cli.ActiveStatesPayload;
-import com.spotify.styx.api.cli.EventsPayload;
 import com.spotify.styx.model.EventSerializer;
 import com.spotify.styx.model.WorkflowId;
-import com.spotify.styx.util.EventUtil;
+import java.util.List;
 import java.util.SortedMap;
 import java.util.SortedSet;
 
@@ -63,13 +62,13 @@ class PlainCliOutput implements CliOutput {
   }
 
   @Override
-  public void printEvents(EventsPayload eventsPayload) {
-    eventsPayload.events().forEach(
-        timestampedEvent ->
+  public void printEvents(List<EventInfo> eventInfos) {
+    eventInfos.forEach(
+        eventInfo ->
             System.out.println(String.format("%s %s %s",
-                                             formatTimestamp(timestampedEvent.timestamp()),
-                                             EventUtil.name(timestampedEvent.event().toEvent()),
-                                             CliUtil.data(timestampedEvent.event().toEvent())))
+                                             formatTimestamp(eventInfo.timestamp()),
+                                             eventInfo.name(),
+                                             eventInfo.info()))
     );
   }
 }
