@@ -21,6 +21,7 @@
 package com.spotify.styx.state.handlers;
 
 import static com.spotify.styx.model.Partitioning.HOURS;
+import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
@@ -152,7 +153,8 @@ public class DockerRunnerHandlerTest {
         HOURS,
         Optional.of(TEST_DOCKER_IMAGE),
         Optional.of(Lists.newArrayList(args)),
-        empty());
+        empty(),
+        emptyList());
   }
 
   private class FakeDockerRunner implements DockerRunner {

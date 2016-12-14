@@ -468,7 +468,8 @@ public class StyxScheduler implements AppInit {
 
     return (workflow, triggerId, instant) -> {
       try {
-        if (!storage.enabled(workflow.id()) || !storage.globalEnabled()) {
+        final boolean enabled = storage.workflowState(workflow.id()).enabled().orElse(false);
+        if (!enabled || !storage.globalEnabled()) {
           LOG.info("Triggered disabled workflow {}", workflow.endpointId());
           return;
         }

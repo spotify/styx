@@ -23,6 +23,7 @@ package com.spotify.styx;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.awaitility.Awaitility.await;
+import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.instanceOf;
@@ -201,9 +202,10 @@ public class LocalFileScheduleSourceTest {
         DataEndpoint.create(
             "foo",
             Partitioning.HOURS,
-            Optional.empty(),
+            empty(),
             Optional.of(emptyList()),
-            Optional.empty()));
+            empty(),
+            emptyList()));
   }
 
   // matching different-def.yaml
@@ -214,9 +216,10 @@ public class LocalFileScheduleSourceTest {
         DataEndpoint.create(
             "foo",
             Partitioning.DAYS,
-            Optional.empty(),
+            empty(),
             Optional.of(singletonList("foo")),
-            Optional.empty()));
+            empty(),
+            emptyList()));
   }
 
   // matching first def from example-defs.yaml
@@ -227,9 +230,10 @@ public class LocalFileScheduleSourceTest {
         DataEndpoint.create(
             "foo",
             Partitioning.HOURS,
-            Optional.empty(),
+            empty(),
             Optional.of(Arrays.asList("foo", "bar")),
-            Optional.empty()));
+            empty(),
+            emptyList()));
   }
 
   // matching second def from example-defs.yaml
@@ -240,8 +244,9 @@ public class LocalFileScheduleSourceTest {
         DataEndpoint.create(
             "bar",
             Partitioning.DAYS,
-            Optional.empty(),
+            empty(),
             Optional.of(Arrays.asList("baz", "bax")),
-            Optional.empty()));
+            empty(),
+            emptyList()));
   }
 }

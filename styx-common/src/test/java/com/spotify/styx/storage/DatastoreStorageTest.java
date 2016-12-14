@@ -26,6 +26,7 @@ import static com.spotify.styx.model.Partitioning.HOURS;
 import static com.spotify.styx.model.WorkflowState.patchDockerImage;
 import static com.spotify.styx.testdata.TestData.FULL_DATA_ENDPOINT;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
+import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -80,14 +81,14 @@ public class DatastoreStorageTest {
 
   private static final DataEndpoint DATA_ENDPOINT_EMPTY_CONF =
       DataEndpoint.create(
-          WORKFLOW_ID_NO_DOCKER_IMG.endpointId(), DAYS, empty(), empty(), empty());
+          WORKFLOW_ID_NO_DOCKER_IMG.endpointId(), DAYS, empty(), empty(), empty(), emptyList());
   private static final Optional<String> DOCKER_IMAGE = of("busybox");
   private static final String DOCKER_IMAGE_COMPONENT = "busybox:component";
   private static final String DOCKER_IMAGE_WORKFLOW = "busybox:workflow";
   private static final String COMMIT_SHA = "dcee675978b4d89e291bb695d0ca7deaf05d2a32";
   private static final DataEndpoint DATA_ENDPOINT_WITH_DOCKER_IMAGE =
       DataEndpoint.create(
-          WORKFLOW_ID_WITH_DOCKER_IMG.endpointId(), DAYS, DOCKER_IMAGE, empty(), empty());
+          WORKFLOW_ID_WITH_DOCKER_IMG.endpointId(), DAYS, DOCKER_IMAGE, empty(), empty(), emptyList());
   private static final Workflow
       WORKFLOW_NO_DOCKER_IMAGE =
       Workflow.create(WORKFLOW_ID_NO_DOCKER_IMG.componentId(), URI.create("http://foo"),
@@ -223,7 +224,7 @@ public class DatastoreStorageTest {
   public void shouldPersistDockerImagePerWorkflowId() throws Exception {
     storage.store(Workflow.create(WORKFLOW_ID1.componentId(), URI.create("http://foo"), DataEndpoint
         .create(WORKFLOW_ID1.endpointId(), Partitioning.DAYS, Optional.empty(), Optional.empty(),
-                Optional.empty())));
+                Optional.empty(), emptyList())));
     storage.patchState(WORKFLOW_ID1, patchDockerImage(DOCKER_IMAGE_WORKFLOW));
     Optional<String> retrieved = storage.getDockerImage(WORKFLOW_ID1);
 
@@ -234,7 +235,7 @@ public class DatastoreStorageTest {
   public void shouldPersistCommitShaPerWorkflowId() throws Exception {
     storage.store(Workflow.create(WORKFLOW_ID1.componentId(), URI.create("http://foo"), DataEndpoint
         .create(WORKFLOW_ID1.endpointId(), Partitioning.DAYS, Optional.empty(), Optional.empty(),
-                Optional.empty())));
+                Optional.empty(), emptyList())));
     storage.patchState(WORKFLOW_ID1, WorkflowState.create(empty(), empty(), of(COMMIT_SHA)));
     WorkflowState retrieved = storage.workflowState(WORKFLOW_ID1);
 
@@ -484,7 +485,7 @@ public class DatastoreStorageTest {
   public void allFieldsAreSetWhenRetrievingWorkflowState() throws Exception {
     storage.store(Workflow.create(WORKFLOW_ID1.componentId(), URI.create("http://not/important"), DataEndpoint
         .create(WORKFLOW_ID1.endpointId(), Partitioning.DAYS, Optional.empty(), Optional.empty(),
-                Optional.empty())));
+                Optional.empty(), emptyList())));
     WorkflowState state = WorkflowState.all(true, DOCKER_IMAGE.get() , COMMIT_SHA);
     storage.patchState(WORKFLOW_ID1, state);
 
@@ -512,6 +513,6 @@ public class DatastoreStorageTest {
     return Workflow.create(
         workflowId.componentId(),
         URI.create("http://foo"),
-        DataEndpoint.create(workflowId.endpointId(), HOURS, empty(), empty(), empty()));
+        DataEndpoint.create(workflowId.endpointId(), HOURS, empty(), empty(), empty(), emptyList()));
   }
 }

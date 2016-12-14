@@ -34,9 +34,11 @@ import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -48,6 +50,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -66,6 +69,7 @@ class DatastoreStorage {
   public static final String KIND_COMPONENT = "Component";
   public static final String KIND_WORKFLOW = "Workflow";
   public static final String KIND_ACTIVE_WORKFLOW_INSTANCE = "ActiveWorkflowInstance";
+  public static final String KIND_RESOURCE = "Resource";
 
   public static final String PROPERTY_CONFIG_ENABLED = "enabled";
   public static final String PROPERTY_CONFIG_DOCKER_RUNNER_ID = "dockerRunnerId";
@@ -78,6 +82,7 @@ class DatastoreStorage {
   public static final String PROPERTY_WORKFLOW = "workflow";
   public static final String PROPERTY_PARAMETER = "parameter";
   public static final String PROPERTY_COMMIT_SHA = "commitSha";
+  public static final String PROPERTY_CONCURRENCY = "concurrency";
 
   public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
 
@@ -476,5 +481,46 @@ class DatastoreStorage {
 
   private static Instant datetimeToInstant(DateTime dateTime) {
     return dateTime.toDate().toInstant();
+  }
+
+  Optional<Resource> getResource(String id) {
+    Entity entity = datastore.get(datastore.newKeyFactory().kind(KIND_RESOURCE).newKey(id));
+    if (entity == null) {
+      return Optional.empty();
+    }
+    return Optional.of(entityToResource(entity));
+  }
+
+  void postResource(Resource resource) throws IOException {
+    storeWithRetries(() -> datastore.put(resourceToEntity(resource)));
+  }
+
+  List<Resource> getResources() {
+    final EntityQuery query = Query.entityQueryBuilder().kind(KIND_RESOURCE).build();
+    final QueryResults<Entity> results = datastore.run(query);
+    final ImmutableList.Builder<Resource> resources = ImmutableList.builder();
+    while (results.hasNext()) {
+      resources.add(entityToResource(results.next()));
+    }
+    return resources.build();
+  }
+
+  private Resource entityToResource(Entity entity) {
+    return Resource.create(entity.key().name(), entity.getLong(PROPERTY_CONCURRENCY));
+  }
+
+  private Entity resourceToEntity(Resource resource) {
+    final Key key = datastore.newKeyFactory().kind(KIND_RESOURCE).newKey(resource.id());
+    return Entity.builder(key)
+        .set(PROPERTY_CONCURRENCY, resource.concurrency())
+        .build();
+  }
+
+  void deleteResource(String id) throws IOException {
+    final Key key = datastore.newKeyFactory().kind(KIND_RESOURCE).newKey(id);
+    storeWithRetries(() -> {
+      datastore.delete(key);
+      return null;
+    });
   }
 }

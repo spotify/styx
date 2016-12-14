@@ -22,6 +22,7 @@ package com.spotify.styx;
 
 import static com.spotify.styx.model.WorkflowInstance.create;
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -49,7 +50,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
   private static final DataEndpoint DATA_ENDPOINT = DataEndpoint.create(
       "styx.TestEndpoint", Partitioning.HOURS, of("busybox"), of(asList("--hour", "{}")),
-      empty());
+      empty(), emptyList());
   private static final String TEST_EXECUTION_ID_1 = "execution_1";
   private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
   private static final Workflow HOURLY_WORKFLOW = Workflow.create(
@@ -172,7 +173,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     DataEndpoint changedDataEndpoint = DataEndpoint.create(
         DATA_ENDPOINT.id(), Partitioning.HOURS, of("busybox:v777"), of(asList("other", "args")),
-        empty());
+        empty(), emptyList());
 
     Workflow changedWorkflow = Workflow.create(
         HOURLY_WORKFLOW.componentId(),

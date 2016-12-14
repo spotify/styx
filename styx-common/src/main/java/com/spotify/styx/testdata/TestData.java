@@ -25,6 +25,7 @@ import static com.spotify.styx.model.Partitioning.HOURS;
 import static com.spotify.styx.model.Partitioning.MONTHS;
 import static com.spotify.styx.model.Partitioning.WEEKS;
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
 
@@ -50,22 +51,22 @@ public final class TestData {
 
   public static final DataEndpoint HOURLY_DATA_ENDPOINT =
       DataEndpoint.create(
-          "styx.TestEndpoint", HOURS, empty(), empty(), empty());
+          "styx.TestEndpoint", HOURS, empty(), empty(), empty(), emptyList());
 
   public static final DataEndpoint DAILY_DATA_ENDPOINT =
       DataEndpoint.create(
-          "styx.TestEndpoint", DAYS, empty(), empty(), empty());
+          "styx.TestEndpoint", DAYS, empty(), empty(), empty(), emptyList());
 
   public static final DataEndpoint WEEKLY_DATA_ENDPOINT =
       DataEndpoint.create(
-          "styx.TestEndpoint", WEEKS, empty(), empty(), empty());
+          "styx.TestEndpoint", WEEKS, empty(), empty(), empty(), emptyList());
 
   public static final DataEndpoint MONTHLY_DATA_ENDPOINT =
       DataEndpoint.create(
-          "styx.TestEndpoint", MONTHS, empty(), empty(), empty());
+          "styx.TestEndpoint", MONTHS, empty(), empty(), empty(), emptyList());
 
   public static final DataEndpoint FULL_DATA_ENDPOINT =
       DataEndpoint.create(
           "styx.TestEndpoint", DAYS, of("busybox"), of(asList("x", "y")),
-          of(Secret.create("name", "/path")));
+          of(Secret.create("name", "/path")), emptyList());
 }

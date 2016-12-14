@@ -26,8 +26,6 @@ import static com.spotify.styx.util.StreamUtil.cat;
 
 import com.google.api.client.util.Lists;
 import com.google.common.base.Throwables;
-import com.spotify.apollo.Client;
-import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.entity.EntityMiddleware;
@@ -96,11 +94,21 @@ public class CliResource {
 
     final List<Route<AsyncHandler<Response<ByteString>>>> proxies = Arrays.asList(
         Route.async(
-            "POST", BASE + "/events",
-            this::injectEventProxy),
+            "GET", BASE + "/<endpoint:path>",
+            rc -> proxy("/" + arg("endpoint", rc), rc)),
         Route.async(
-            "POST", BASE + "/trigger",
-            this::triggerWorkflowInstanceProxy));
+            "POST", BASE + "/<endpoint:path>",
+            rc -> proxy("/" + arg("endpoint", rc), rc)),
+        Route.async(
+            "DELETE", BASE + "/<endpoint:path>",
+            rc -> proxy("/" + arg("endpoint", rc), rc)),
+        Route.async(
+            "PATCH", BASE + "/<endpoint:path>",
+            rc -> proxy("/" + arg("endpoint", rc), rc)),
+        Route.async(
+            "PUT", BASE + "/<endpoint:path>",
+            rc -> proxy("/" + arg("endpoint", rc), rc))
+    );
 
     return cat(
         routes.stream().map(r -> r.withPrefix(Api.Version.V0.prefix())),
@@ -108,6 +116,12 @@ public class CliResource {
         proxies.stream().map(r -> r.withPrefix(Api.Version.V0.prefix())),
         proxies.stream().map(r -> r.withPrefix(Api.Version.V1.prefix()))
     );
+  }
+
+  private CompletionStage<Response<ByteString>> proxy(String endpoint, RequestContext rc) {
+    return rc.requestScopedClient()
+        .send(rc.request()
+            .withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + endpoint));
   }
 
   private static String arg(String name, RequestContext rc) {
@@ -178,22 +192,6 @@ public class CliResource {
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
-  }
-
-  private CompletionStage<Response<ByteString>> injectEventProxy(RequestContext requestContext) {
-    final Client client = requestContext.requestScopedClient();
-    final Request proxyRequest = requestContext.request()
-        .withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + "/events");
-
-    return client.send(proxyRequest);
-  }
-
-  private CompletionStage<Response<ByteString>> triggerWorkflowInstanceProxy(RequestContext requestContext) {
-    final Client client = requestContext.requestScopedClient();
-    final Request proxyRequest = requestContext.request()
-        .withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + "/trigger");
-
-    return client.send(proxyRequest);
   }
 
   private class LastExecutionEventVisitor implements EventVisitor<Boolean> {

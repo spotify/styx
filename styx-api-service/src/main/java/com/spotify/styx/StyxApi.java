@@ -30,6 +30,7 @@ import com.spotify.apollo.AppInit;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.CliResource;
+import com.spotify.styx.api.ResourceResource;
 import com.spotify.styx.api.StyxConfigResource;
 import com.spotify.styx.api.WorkflowResource;
 import com.spotify.styx.storage.AggregateStorage;
@@ -107,12 +108,14 @@ public class StyxApi implements AppInit {
     final EventStorage eventStorage = eventStorageFactory.apply(environment);
 
     final WorkflowResource workflowResource = new WorkflowResource(storage);
+    final ResourceResource resourceResource = new ResourceResource(storage);
     final StyxConfigResource styxConfigResource = new StyxConfigResource(storage);
     final CliResource cliResource = new CliResource(schedulerServiceBaseUrl, eventStorage);
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
         .registerRoutes(workflowResource.routes())
+        .registerRoutes(resourceResource.routes())
         .registerRoutes(styxConfigResource.routes())
         .registerRoutes(cliResource.routes());
   }
