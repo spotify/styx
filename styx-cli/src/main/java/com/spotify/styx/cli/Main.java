@@ -21,10 +21,14 @@
 package com.spotify.styx.cli;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.core.Service;
@@ -32,11 +36,12 @@ import com.spotify.apollo.core.Services;
 import com.spotify.apollo.environment.ApolloEnvironmentModule;
 import com.spotify.apollo.http.client.HttpClientModule;
 import com.spotify.styx.api.cli.ActiveStatesPayload;
-import com.spotify.styx.api.cli.EventsPayload;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventSerializer;
+import com.spotify.styx.model.EventSerializer.PersistentEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.util.EventUtil;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -201,11 +206,40 @@ public final class Main {
         Request.forUri(apiUrl("events", component, workflow, parameter))
             .withTtl(Duration.ofSeconds(TTL_REQUEST)),
         bytes -> {
+          final JsonNode jsonNode;
           try {
-            cliOutput.printEvents(OBJECT_MAPPER.readValue(bytes, EventsPayload.class));
+            jsonNode = OBJECT_MAPPER.readTree(bytes);
           } catch (IOException e) {
             throw Throwables.propagate(e);
           }
+
+          if (!jsonNode.isObject()) {
+            throw new RuntimeException("Invalid json returned from API");
+          }
+
+          final ObjectNode json = (ObjectNode) jsonNode;
+          final ArrayNode events = json.withArray("events");
+          final ImmutableList.Builder<CliOutput.EventInfo> eventInfos = ImmutableList.builder();
+          for (JsonNode eventWithTimestamp : events) {
+            final long ts = eventWithTimestamp.get("timestamp").asLong();
+            final JsonNode event = eventWithTimestamp.get("event");
+
+            String eventName;
+            String eventInfo;
+            try {
+              Event typedEvent = OBJECT_MAPPER.convertValue(event, PersistentEvent.class).toEvent();
+              eventName = EventUtil.name(typedEvent);
+              eventInfo = CliUtil.data(typedEvent);
+            } catch (IllegalArgumentException e) {
+              // fall back to just inspecting the json
+              eventName = event.get("@type").asText();
+              eventInfo = "";
+            }
+
+            eventInfos.add(CliOutput.EventInfo.create(ts, eventName, eventInfo));
+          }
+
+          cliOutput.printEvents(eventInfos.build());
         });
   }
 
@@ -227,8 +261,7 @@ public final class Main {
     WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
 
     Event halt = Event.halt(workflowInstance);
-    EventSerializer.PersistentEvent persistentEvent =
-        EventSerializer.convertEventToPersistentEvent(halt);
+    PersistentEvent persistentEvent = EventSerializer.convertEventToPersistentEvent(halt);
     final ByteString payload;
     try {
       payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(persistentEvent));
@@ -244,8 +277,7 @@ public final class Main {
     WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
 
     Event dequeue = Event.dequeue(workflowInstance);
-    EventSerializer.PersistentEvent persistentEvent =
-        EventSerializer.convertEventToPersistentEvent(dequeue);
+    PersistentEvent persistentEvent = EventSerializer.convertEventToPersistentEvent(dequeue);
     final ByteString payload;
     try {
       payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(persistentEvent));

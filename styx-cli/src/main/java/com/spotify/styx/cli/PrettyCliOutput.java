@@ -31,12 +31,11 @@ import static org.fusesource.jansi.Ansi.Color.WHITE;
 import static org.fusesource.jansi.Ansi.Color.YELLOW;
 
 import com.spotify.styx.api.cli.ActiveStatesPayload;
-import com.spotify.styx.api.cli.EventsPayload;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.util.EventUtil;
+import java.util.List;
 import org.fusesource.jansi.Ansi;
 
 class PrettyCliOutput implements CliOutput {
@@ -74,18 +73,18 @@ class PrettyCliOutput implements CliOutput {
   }
 
   @Override
-  public void printEvents(EventsPayload eventsPayload) {
+  public void printEvents(List<EventInfo> eventInfos) {
     final String format = "%-25s %-25s %s";
     System.out.println(String.format(format,
                                      "TIME",
                                      "EVENT",
                                      "DATA"));
-    eventsPayload.events().forEach(
-        timestampedEvent ->
+    eventInfos.forEach(
+        eventInfo ->
             System.out.println(String.format(format,
-                                             formatTimestamp(timestampedEvent.timestamp()),
-                                             EventUtil.name(timestampedEvent.event().toEvent()),
-                                             CliUtil.data(timestampedEvent.event().toEvent()))));
+                                             formatTimestamp(eventInfo.timestamp()),
+                                             eventInfo.name(),
+                                             eventInfo.info())));
   }
 
   private enum LastExecutionColor implements EventVisitor<Ansi.Color> {
