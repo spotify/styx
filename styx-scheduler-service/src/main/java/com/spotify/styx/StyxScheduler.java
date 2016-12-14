@@ -294,6 +294,7 @@ public class StyxScheduler implements AppInit {
     closer.register(executorCloser("event-worker", eventWorker));
 
     final Stats stats = statsFactory.apply(environment);
+    final WorkflowCache cache = new InMemWorkflowCache();
     final Storage storage = new MeteredStorage(storageFactory.apply(environment), stats, time);
     final EventStorage eventStorage = new MeteredEventStorage(eventStorageFactory.apply(environment),
                                                               stats, time);
@@ -303,7 +304,7 @@ public class StyxScheduler implements AppInit {
 
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
-    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager);
+    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, cache, storage);
 
     final Supplier<String> dockerId = new CachedSupplier<>(storage::globalDockerRunnerId, time);
     final DockerRunner routingDockerRunner = DockerRunner.routing(
@@ -326,7 +327,6 @@ public class StyxScheduler implements AppInit {
     final TriggerListener trigger = trigger(storage, stateFactory, stateManager);
     final TriggerManager triggerManager = new TriggerManager(trigger, time, storage);
 
-    final WorkflowCache cache = new InMemWorkflowCache();
     final Consumer<Workflow> workflowChangeListener = workflowChanged(cache, storage,
                                                                       stats, stateManager, time);
     final Consumer<Workflow> workflowRemoveListener = workflowRemoved(storage);

@@ -333,7 +333,7 @@ public class QueuedStateManagerTest {
         try {
           stateManager.initialize(RunState.fresh(instance));
           stateManager.receive(Event.triggerExecution(instance, "trig"));
-          stateManager.receive(Event.dequeue(INSTANCE));
+          stateManager.receive(Event.dequeue(instance));
         } catch (StateManager.IsClosed ignored) {
         }
 

@@ -53,7 +53,12 @@ public class SyncStateManager implements StateManager {
     RunState currentState = states.get(key);
 
     RunState nextState = currentState.transition(event);
-    states.put(key, nextState);
+
+    if (nextState.state().isTerminal()) {
+      states.remove(key);
+    } else {
+      states.put(key, nextState);
+    }
 
     nextState.outputHandler().transitionInto(nextState);
   }
