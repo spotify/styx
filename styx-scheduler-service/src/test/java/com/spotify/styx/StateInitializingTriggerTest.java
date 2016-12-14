@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Partitioning.DAYS;
 import static com.spotify.styx.model.Partitioning.HOURS;
 import static com.spotify.styx.model.Partitioning.MONTHS;
@@ -86,8 +87,8 @@ public class StateInitializingTriggerTest {
     WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(), "2016-01-18T09");
     RunState state = stateManager.get(expectedInstance);
 
-    // todo: assert trigger id
     assertThat(state.state(), is(RunState.State.QUEUED));
+    assertThat(state.data().triggerId(), hasValue("trig"));
   }
 
   @Test

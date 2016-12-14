@@ -25,7 +25,7 @@ import com.spotify.styx.model.ExecutionDescription;
 import java.util.Optional;
 
 /**
- * TODO: document.
+ * A value type for holding data related to the various states of the {@link RunState}
  */
 @AutoValue
 public abstract class StateData {
@@ -39,6 +39,7 @@ public abstract class StateData {
   public abstract double retryCost();
   public abstract long retryDelayMillis();
   public abstract int lastExit();
+  public abstract Optional<String> triggerId();
   public abstract Optional<String> executionId();
   public abstract Optional<ExecutionDescription> executionDescription();
 
@@ -71,6 +72,7 @@ public abstract class StateData {
     public abstract Builder retryCost(double cost);
     public abstract Builder retryDelayMillis(long delayMillis);
     public abstract Builder lastExit(int exitCode);
+    public abstract Builder triggerId(String triggerId);
     public abstract Builder executionId(String executionId);
     public abstract Builder executionDescription(ExecutionDescription executionDescription);
     public abstract StateData build();
