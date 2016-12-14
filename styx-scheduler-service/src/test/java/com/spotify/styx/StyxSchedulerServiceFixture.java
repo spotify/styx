@@ -187,6 +187,18 @@ public class StyxSchedulerServiceFixture {
     workflowRemoveListener.accept(workflow);
   }
 
+  /**
+   * Fast forwards the time without any execution in-between.
+   */
+  void timeJumps(int n, TimeUnit unit) {
+    LOG.info("{} {} passes", n, unit);
+    now = now.plusMillis(unit.toMillis(n));
+    printTime();
+  }
+
+  /**
+   * Fast forwards the time by executing all tasks in-between according to the executor's delay.
+   */
   void timePasses(int n, TimeUnit unit) {
     LOG.info("{} {} passes", n, unit);
     now = now.plusMillis(unit.toMillis(n));
@@ -247,11 +259,21 @@ public class StyxSchedulerServiceFixture {
     await().until(() -> dockerRuns.size() == n);
   }
 
+  void awaitNumberOfDockerRunsWontChange(int n) {
+    await().pollDelay(1, TimeUnit.SECONDS).until(() -> {
+      return dockerRuns.size() == n;
+    });
+  }
+
   void awaitWorkflowInstanceState(WorkflowInstance instance, RunState.State state) {
     await().until(() -> {
       final RunState runState = getState(instance);
       return runState != null && runState.state() == state;
     });
+  }
+
+  void awaitWorkflowInstanceCompletion(WorkflowInstance workflowInstance) {
+    await().until(() -> getState(workflowInstance) == null);
   }
 
   private void printTime() {

@@ -75,7 +75,7 @@ class DatastoreStorage {
   public static final String PROPERTY_CONFIG_DOCKER_RUNNER_ID = "dockerRunnerId";
   public static final String PROPERTY_WORKFLOW_JSON = "json";
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
-  public static final String PROPERTY_NEXT_EXECUTION = "nextNaturalTrigger";
+  public static final String PROPERTY_NEXT_NATURAL_TRIGGER = "nextNaturalTrigger";
   public static final String PROPERTY_DOCKER_IMAGE = "dockerImage";
   public static final String PROPERTY_COUNTER = "counter";
   public static final String PROPERTY_COMPONENT = "component";
@@ -227,7 +227,7 @@ class DatastoreStorage {
 
       final Entity.Builder builder = Entity
           .builder(workflowOpt.get())
-          .set(PROPERTY_NEXT_EXECUTION, instantToDatetime(nextNaturalTrigger));
+          .set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToDatetime(nextNaturalTrigger));
       return transaction.put(builder.build());
     }));
   }
@@ -250,8 +250,8 @@ class DatastoreStorage {
         continue;
       }
       map.put(workflow,
-          entity.contains(PROPERTY_NEXT_EXECUTION)
-          ? Optional.of(datetimeToInstant(entity.getDateTime(PROPERTY_NEXT_EXECUTION)))
+          entity.contains(PROPERTY_NEXT_NATURAL_TRIGGER)
+          ? Optional.of(datetimeToInstant(entity.getDateTime(PROPERTY_NEXT_NATURAL_TRIGGER)))
           : Optional.empty());
     }
     return map;
@@ -321,7 +321,8 @@ class DatastoreStorage {
       state.enabled().ifPresent(x -> builder.set(PROPERTY_WORKFLOW_ENABLED, x));
       state.dockerImage().ifPresent(x -> builder.set(PROPERTY_DOCKER_IMAGE, x));
       state.commitSha().ifPresent(x -> builder.set(PROPERTY_COMMIT_SHA, x));
-
+      state.nextNaturalTrigger()
+          .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToDatetime(x)));
       return transaction.put(builder.build());
     }));
   }
@@ -359,11 +360,10 @@ class DatastoreStorage {
   }
 
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
-    return
-        WorkflowState.create(
-            Optional.of(enabled(workflowId)),
-            getDockerImage(workflowId),
-            getCommitSha(workflowId));
+    WorkflowState.Builder builder = WorkflowState.builder().enabled(enabled(workflowId));
+    getDockerImage(workflowId).ifPresent(builder::dockerImage);
+    getCommitSha(workflowId).ifPresent(builder::commitSha);
+    return builder.build();
   }
 
   private Optional<String> getCommitSha(WorkflowId workflowId) {

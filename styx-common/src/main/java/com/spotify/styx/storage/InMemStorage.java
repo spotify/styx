@@ -187,7 +187,7 @@ public class InMemStorage implements Storage, EventStorage {
     return
         workflowStatePerWorkflowId.getOrDefault(
             workflowId,
-            WorkflowState.create(Optional.of(false), Optional.empty(), Optional.empty()));
+            WorkflowState.patchEnabled(false));
   }
 
   @Override

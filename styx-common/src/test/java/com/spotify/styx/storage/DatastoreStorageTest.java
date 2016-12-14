@@ -211,7 +211,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldPersistCommitShaPerComponent() throws Exception {
-    WorkflowState state = WorkflowState.create(empty(), empty(), of(COMMIT_SHA));
+    WorkflowState state = WorkflowState.builder().commitSha(COMMIT_SHA).build();
 
     storage.store(Workflow.create(WORKFLOW_ID1.componentId(), URI.create("http://foo"), DATA_ENDPOINT_EMPTY_CONF));
     storage.patchState(WORKFLOW_ID1.componentId(), state);
@@ -236,7 +236,7 @@ public class DatastoreStorageTest {
     storage.store(Workflow.create(WORKFLOW_ID1.componentId(), URI.create("http://foo"), DataEndpoint
         .create(WORKFLOW_ID1.endpointId(), Partitioning.DAYS, Optional.empty(), Optional.empty(),
                 Optional.empty(), emptyList())));
-    storage.patchState(WORKFLOW_ID1, WorkflowState.create(empty(), empty(), of(COMMIT_SHA)));
+    storage.patchState(WORKFLOW_ID1, WorkflowState.builder().commitSha(COMMIT_SHA).build());
     WorkflowState retrieved = storage.workflowState(WORKFLOW_ID1);
 
     assertThat(retrieved.commitSha(), is(Optional.of(COMMIT_SHA)));
@@ -254,7 +254,7 @@ public class DatastoreStorageTest {
   public void shouldReturnEmptyWorkflowStateExceptEnabledWhenWorkflowStateDoesNotExist() throws Exception {
     storage.store(WORKFLOW_NO_STATE);
     WorkflowState retrieved = storage.workflowState(WORKFLOW_ID_NO_STATE);
-    assertThat(retrieved, is(WorkflowState.create(Optional.of(false),Optional.empty(), Optional.empty())));
+    assertThat(retrieved, is(WorkflowState.patchEnabled(false)));
   }
 
   @Test
@@ -486,7 +486,11 @@ public class DatastoreStorageTest {
     storage.store(Workflow.create(WORKFLOW_ID1.componentId(), URI.create("http://not/important"), DataEndpoint
         .create(WORKFLOW_ID1.endpointId(), Partitioning.DAYS, Optional.empty(), Optional.empty(),
                 Optional.empty(), emptyList())));
-    WorkflowState state = WorkflowState.all(true, DOCKER_IMAGE.get() , COMMIT_SHA);
+    WorkflowState state = WorkflowState.builder()
+        .enabled(true)
+        .dockerImage(DOCKER_IMAGE.get())
+        .commitSha(COMMIT_SHA)
+        .build();
     storage.patchState(WORKFLOW_ID1, state);
 
     WorkflowState retrieved = storage.workflowState(WORKFLOW_ID1);

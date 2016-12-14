@@ -24,6 +24,8 @@ import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static com.spotify.styx.util.ReplayEvents.transitionLogger;
+import static com.spotify.styx.workflow.ParameterUtil.incrementInstant;
+import static com.spotify.styx.workflow.ParameterUtil.truncateInstant;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toMap;
@@ -50,9 +52,11 @@ import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.WorkflowValidator;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.monitoring.MeteredDockerRunner;
 import com.spotify.styx.monitoring.MeteredEventStorage;
 import com.spotify.styx.monitoring.MeteredStorage;
@@ -92,6 +96,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -323,7 +328,7 @@ public class StyxScheduler implements AppInit {
 
     final WorkflowCache cache = new InMemWorkflowCache();
     final Consumer<Workflow> workflowChangeListener = workflowChanged(cache, storage,
-                                                                      stats, stateManager);
+                                                                      stats, stateManager, time);
     final Consumer<Workflow> workflowRemoveListener = workflowRemoved(storage);
 
     restoreState(eventStorage, outputHandlers, stateManager);
@@ -485,7 +490,8 @@ public class StyxScheduler implements AppInit {
       WorkflowCache cache,
       Storage storage,
       Stats stats,
-      StateManager stateManager) {
+      StateManager stateManager,
+      Time time) {
 
     return (workflow) -> {
       stats.registerActiveStates(
@@ -494,7 +500,21 @@ public class StyxScheduler implements AppInit {
 
       cache.store(workflow);
       try {
+        Optional<Workflow> optWorkflow = storage.workflow(workflow.id());
         storage.store(workflow);
+
+        // update nextNaturalTrigger only when partitioning specification changes.
+        final Partitioning partitioning = workflow.schedule().partitioning();
+        if (optWorkflow.isPresent() && !optWorkflow.get().schedule().partitioning()
+            .equals(partitioning)) {
+          final Instant nextNaturalTrigger =
+              incrementInstant(truncateInstant(time.get(), partitioning),
+                  partitioning);
+          storage.patchState(workflow.id(),
+              WorkflowState.builder()
+                  .nextNaturalTrigger(nextNaturalTrigger)
+                  .build());
+        }
       } catch (IOException e) {
         LOG.warn("Failed to store workflow " + workflow, e);
       }

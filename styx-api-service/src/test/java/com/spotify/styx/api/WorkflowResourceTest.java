@@ -270,7 +270,9 @@ public class WorkflowResourceTest {
     assertNoJson(response, "docker_image");
     assertNoJson(response, "commit_sha");
 
-    storage.patchState(WORKFLOW.id(), WorkflowState.all(true, "tina:ranic", "470a229b49a14e7682af2abfdac3b881a8aacdf9"));
+    storage.patchState(WORKFLOW.id(),
+        WorkflowState.builder().enabled(true).dockerImage("tina:ranic")
+            .commitSha("470a229b49a14e7682af2abfdac3b881a8aacdf9").build());
 
     response =
         awaitResponse(serviceHelper.request("GET", path("/foo/bar/state")));
