@@ -25,6 +25,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.Lists;
@@ -114,7 +115,7 @@ public class DockerRunnerHandlerTest {
     stateManager.initialize(runState);
     dockerRunnerHandler.transitionInto(runState);
 
-    assertThat(stateManager.get(workflowInstance).state(), is(RunState.State.ERROR));
+    assertThat(stateManager.get(workflowInstance), is(nullValue()));
   }
 
   @Test

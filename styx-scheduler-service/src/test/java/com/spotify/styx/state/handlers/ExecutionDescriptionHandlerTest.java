@@ -27,6 +27,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertTrue;
 
@@ -131,7 +132,7 @@ public class ExecutionDescriptionHandlerTest {
     toTest.transitionInto(runState);
 
     RunState halted = stateManager.get(workflowInstance);
-    assertThat(halted.state(), Matchers.is(RunState.State.ERROR));
+    assertThat(halted, Matchers.is(nullValue()));
   }
 
   @Test
@@ -146,7 +147,7 @@ public class ExecutionDescriptionHandlerTest {
     toTest.transitionInto(runState);
 
     RunState halted = stateManager.get(workflowInstance);
-    assertThat(halted.state(), Matchers.is(RunState.State.ERROR));
+    assertThat(halted, Matchers.is(nullValue()));
   }
 
   @Test
@@ -161,7 +162,7 @@ public class ExecutionDescriptionHandlerTest {
     toTest.transitionInto(runState);
 
     RunState halted = stateManager.get(workflowInstance);
-    assertThat(halted.state(), Matchers.is(RunState.State.ERROR));
+    assertThat(halted, Matchers.is(nullValue()));
   }
 
   @Test
