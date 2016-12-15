@@ -130,7 +130,7 @@ public class QueuedStateManager implements StateManager {
       return;
     }
 
-    state.enqueue(() -> transition(state, event));
+    state.transition(event);
     signalDispatcher();
   }
 
@@ -245,48 +245,45 @@ public class QueuedStateManager implements StateManager {
   }
 
   /**
-   * Transition a state with the given event.
+   * Process a state at a given counter position.
+   *
+   * <p>Processing a state mean that the event and counter positions that caused the transition
+   * will be persisted, and the {@link OutputHandler} of the state is called.
    *
    * <p>This method is only called from within a {@link InstanceState#enqueue(Runnable)} block
    * which means there will only be at most one concurrent call for each {@link InstanceState}.
    *
-   * @param state  The state to transition
-   * @param event  The event to transition the state with
+   * @param state            The current state that is being processed
+   * @param counterPosition  The counter position at which the state transitioned
+   * @param event            The event that transitioned the state
    */
-  private void transition(InstanceState state, Event event) {
-    LOG.debug("Event {} -> {}", event, state);
-    try {
-      final RunState nextState = state.runState.transition(event);
-      final WorkflowInstance key = state.workflowInstance;
+  private void process(RunState state, long counterPosition, Event event) {
+    final WorkflowInstance key = state.workflowInstance();
+    final SequenceEvent sequenceEvent = SequenceEvent.create(
+        event,
+        counterPosition,
+        time.get().toEpochMilli());
 
-      final long currentCount = state.counter;
-      final SequenceEvent sequenceEvent = SequenceEvent.create(
-          event,
-          currentCount,
-          time.get().toEpochMilli());
+    try {
       storeEvent(sequenceEvent);
 
-      if (nextState.state().isTerminal()) {
+      if (state.state().isTerminal()) {
         states.remove(key); // racy when states are re-initialized concurrent with termination
         storeDeactivation(key);
       } else {
-        state.runState = nextState;
-        state.counter++;
-        storeActivation(key, currentCount);
+        storeActivation(key, counterPosition);
       }
 
       activeEvents.incrementAndGet();
       workerPool.execute(() -> {
         try {
-          nextState.outputHandler().transitionInto(nextState);
+          state.outputHandler().transitionInto(state);
         } catch (Throwable e) {
           LOG.warn("Output handler threw", e);
         } finally {
           activeEvents.decrementAndGet();
         }
       });
-    } catch (IllegalStateException e) {
-      LOG.warn("Illegal state transition", e);
     } catch (IOException e) {
       LOG.error("Failed to read/write from/to Storage", e);
     }
@@ -327,6 +324,34 @@ public class QueuedStateManager implements StateManager {
       this.workflowInstance = workflowInstance;
       this.runState = runState;
       this.counter = counter;
+    }
+
+    /**
+     * Transition the state and counter with the given {@link Event}. Then {@link #enqueue(Runnable)}
+     * a call to {@link #process(RunState, long, Event)} for persisting and acting on the
+     * transitioned state.
+     *
+     * <p>This method is synchronized so it can make local field updates safely. It is only
+     * synchronized on the inner {@link InstanceState} object, so transitions for different
+     * {@link WorkflowInstance}s can run concurrently.
+     *
+     * @param event  The event to use in the transition
+     */
+    synchronized void transition(Event event) {
+      LOG.debug("Event {} -> {}", event, this);
+
+      final RunState nextState;
+      try {
+        nextState = runState.transition(event);
+      } catch (IllegalStateException e) {
+        LOG.warn("Illegal state transition", e);
+        return;
+      }
+
+      final long currentCount = counter++;
+      runState = nextState;
+
+      enqueue(() -> process(nextState, currentCount, event));
     }
 
     void enqueue(Runnable transition) {
