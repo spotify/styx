@@ -27,7 +27,7 @@ import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.storage.EventStorage;
+import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
@@ -47,7 +47,7 @@ public final class ReplayEvents {
 
   public static Map<RunState, Long> replayActiveStates(
       Map<WorkflowInstance, Long> instances,
-      EventStorage eventStorage,
+      Storage storage,
       boolean printLogs) throws IOException {
     LOG.info("Replaying active states");
 
@@ -63,7 +63,7 @@ public final class ReplayEvents {
 
       final SortedSet<SequenceEvent> sequenceEvents;
       try {
-        sequenceEvents = eventStorage.readEvents(workflowInstance);
+        sequenceEvents = storage.readEvents(workflowInstance);
       } catch (IOException e) {
         throw Throwables.propagate(e);
       }

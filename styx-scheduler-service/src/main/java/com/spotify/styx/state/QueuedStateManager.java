@@ -28,7 +28,7 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.storage.EventStorage;
+import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
@@ -68,7 +68,7 @@ public class QueuedStateManager implements StateManager {
 
   private final Time time;
   private final Executor workerPool;
-  private final EventStorage storage;
+  private final Storage storage;
 
   private final ConcurrentMap<WorkflowInstance, InstanceState> states = Maps.newConcurrentMap();
 
@@ -78,7 +78,7 @@ public class QueuedStateManager implements StateManager {
   private AtomicInteger activeEvents = new AtomicInteger(0);
   private volatile boolean running = true;
 
-  public QueuedStateManager(Time time, Executor workerPool, EventStorage storage) {
+  public QueuedStateManager(Time time, Executor workerPool, Storage storage) {
     this.time = Objects.requireNonNull(time);
     this.workerPool = Objects.requireNonNull(workerPool);
     this.storage = Objects.requireNonNull(storage);

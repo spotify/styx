@@ -47,7 +47,7 @@ import java.util.stream.Collectors;
 /**
  * A Storage implementation with state stored in memory. For testing.
  */
-public class InMemStorage implements Storage, EventStorage {
+public class InMemStorage implements Storage {
 
   private boolean globalEnabled = true;
   private final Set<WorkflowId> enabledWorkflows = Sets.newConcurrentHashSet();

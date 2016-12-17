@@ -43,7 +43,7 @@ import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.storage.EventStorage;
+import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -66,13 +66,13 @@ public class CliResource {
   public static final String SCHEDULER_BASE_PATH = "/api/v0";
 
   private final String schedulerServiceBaseUrl;
-  private final EventStorage eventStorage;
+  private final Storage storage;
 
   private final EventVisitor<Boolean> lastExecutionEventVisitor = new CliResource.LastExecutionEventVisitor();
 
-  public CliResource(String schedulerServiceBaseUrl, EventStorage eventStorage) {
+  public CliResource(String schedulerServiceBaseUrl, Storage storage) {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
-    this.eventStorage = Objects.requireNonNull(eventStorage);
+    this.storage = Objects.requireNonNull(storage);
   }
 
   public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
@@ -135,10 +135,10 @@ public class CliResource {
     try {
 
       final Map<WorkflowInstance, Long> activeStates = componentOpt.isPresent()
-          ? eventStorage.readActiveWorkflowInstances(componentOpt.get())
-          : eventStorage.readActiveWorkflowInstances();
+          ? storage.readActiveWorkflowInstances(componentOpt.get())
+          : storage.readActiveWorkflowInstances();
 
-      final Map<RunState, Long> map = replayActiveStates(activeStates, eventStorage, false);
+      final Map<RunState, Long> map = replayActiveStates(activeStates, storage, false);
       runStates.addAll(
           map.keySet().stream().map(this::runStateToActiveState).collect(Collectors.toList()));
     } catch (IOException e) {
@@ -160,7 +160,7 @@ public class CliResource {
   private Optional<PersistentEvent> getPreviousExecutionLastEvent(RunState state) {
     Optional<PersistentEvent> lastEvent;
     try {
-      final SortedSet<SequenceEvent> sequenceEvents = eventStorage.readEvents(state.workflowInstance());
+      final SortedSet<SequenceEvent> sequenceEvents = storage.readEvents(state.workflowInstance());
       final Optional<SequenceEvent> lastExecutionSequenceEvent = sequenceEvents
           .stream()
           .filter((sequenceEvent) -> sequenceEvent.event().accept(lastExecutionEventVisitor))
@@ -181,7 +181,7 @@ public class CliResource {
     final WorkflowInstance workflowInstance = WorkflowInstance.create(workflowId, iid);
 
     try {
-      final Set<SequenceEvent> sequenceEvents = eventStorage.readEvents(workflowInstance);
+      final Set<SequenceEvent> sequenceEvents = storage.readEvents(workflowInstance);
       final List<TimestampedPersistentEvent> timestampedPersistentEvents = sequenceEvents.stream()
           .map(sequenceEvent -> TimestampedPersistentEvent.create(
               convertEventToPersistentEvent(sequenceEvent.event()),

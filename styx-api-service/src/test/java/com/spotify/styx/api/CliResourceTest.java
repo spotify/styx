@@ -39,8 +39,8 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.storage.EventStorage;
 import com.spotify.styx.storage.InMemStorage;
+import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Json;
 import java.util.Collection;
 import java.util.concurrent.CompletionStage;
@@ -81,14 +81,14 @@ public class CliResourceTest {
 
   private final Api.Version version;
 
-  private EventStorage eventStorage = new InMemStorage();
+  private Storage storage = new InMemStorage();
 
   public CliResourceTest(Api.Version version) {
     this.version = version;
   }
 
   private void init(Environment environment) {
-    final CliResource cliResource = new CliResource(SCHEDULER_BASE, eventStorage);
+    final CliResource cliResource = new CliResource(SCHEDULER_BASE, storage);
 
     environment.routingEngine()
         .registerRoutes(cliResource.routes());
@@ -120,9 +120,9 @@ public class CliResourceTest {
 
   @Test
   public void testEventsRoundtrip() throws Exception {
-    eventStorage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI, TRIGGER), 0L, 0L));
-    eventStorage.writeEvent(SequenceEvent.create(Event.created(WFI, "exec0", "img0"), 1L, 1L));
-    eventStorage.writeEvent(SequenceEvent.create(Event.started(WFI), 2L, 2L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI, TRIGGER), 0L, 0L));
+    storage.writeEvent(SequenceEvent.create(Event.created(WFI, "exec0", "img0"), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.started(WFI), 2L, 2L));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/events/styx/test/1234")));
@@ -138,9 +138,9 @@ public class CliResourceTest {
 
   @Test
   public void testGetAllActiveStates() throws Exception {
-    eventStorage.writeActiveState(WFI, 42L);
-    eventStorage.writeActiveState(OTHER_WFI, 84L);
-    assertThat(eventStorage.readActiveWorkflowInstances().entrySet(), hasSize(2));
+    storage.writeActiveState(WFI, 42L);
+    storage.writeActiveState(OTHER_WFI, 84L);
+    assertThat(storage.readActiveWorkflowInstances().entrySet(), hasSize(2));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/activeStates")));
@@ -156,9 +156,9 @@ public class CliResourceTest {
     WorkflowInstance OTHER_WFI =
         WorkflowInstance.create(WorkflowId.create(COMPONENT_ID + "-other", ENDPOINT_ID), PARAMETER);
 
-    eventStorage.writeActiveState(WFI, 42L);
-    eventStorage.writeActiveState(OTHER_WFI, 84L);
-    assertThat(eventStorage.readActiveWorkflowInstances().entrySet(), hasSize(2));
+    storage.writeActiveState(WFI, 42L);
+    storage.writeActiveState(OTHER_WFI, 84L);
+    assertThat(storage.readActiveWorkflowInstances().entrySet(), hasSize(2));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/activeStates?component=" + COMPONENT_ID)));
