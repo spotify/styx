@@ -20,6 +20,7 @@
 
 package com.spotify.styx.state.handlers;
 
+import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.state.RunState.State.DONE;
 import static com.spotify.styx.state.RunState.State.ERROR;
 import static com.spotify.styx.state.RunState.State.FAILED;
@@ -127,20 +128,13 @@ public class TerminationHandlerTest {
     RunState nextState = transitions.get(0);
 
     assertThat(nextState.state(), is(QUEUED));
-    assertThat(nextState.data().retryDelayMillis(), is(Duration.ofMinutes(10).toMillis()));
+    assertThat(nextState.data().retryDelayMillis(), hasValue(Duration.ofMinutes(10).toMillis()));
   }
 
   private StateData data(int tries, double cost, int lastExit) {
-    return StateData.builder()
+    return StateData.newBuilder()
         .tries(tries)
         .retryCost(cost)
-        .lastExit(lastExit)
-        .build();
-  }
-
-  private StateData data(int tries, int lastExit) {
-    return StateData.builder()
-        .tries(tries)
         .lastExit(lastExit)
         .build();
   }

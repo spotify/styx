@@ -58,7 +58,7 @@ public class PublisherHandlerTest {
     RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.SUBMITTED,
-        StateData.builder()
+        StateData.newBuilder()
             .executionId("exec1")
             .executionDescription(executionDescription)
             .build());
@@ -74,7 +74,7 @@ public class PublisherHandlerTest {
     RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.RUNNING,
-        StateData.builder()
+        StateData.newBuilder()
             .executionId("exec1")
             .executionDescription(executionDescription)
             .build());
@@ -92,7 +92,7 @@ public class PublisherHandlerTest {
     RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.SUBMITTED,
-        StateData.builder()
+        StateData.newBuilder()
             .executionId("exec1")
             .executionDescription(executionDescription)
             .build());
@@ -110,7 +110,7 @@ public class PublisherHandlerTest {
     RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.RUNNING,
-        StateData.builder()
+        StateData.newBuilder()
             .executionId("exec1")
             .executionDescription(executionDescription)
             .build());

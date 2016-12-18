@@ -21,6 +21,12 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+      <groupId>io.norberg</groupId>
+      <artifactId>auto-matter</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
       <groupId>com.github.sviperll</groupId>
       <artifactId>adt4j</artifactId>
     </dependency>
@@ -95,6 +101,11 @@
     <dependency>
       <groupId>com.github.npathai</groupId>
       <artifactId>hamcrest-optional</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.jayway.jsonpath</groupId>
+      <artifactId>json-path-assert</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

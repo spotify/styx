@@ -197,7 +197,7 @@ public class Scheduler {
     final Instant now = time.get();
     final Instant deadline = Instant
         .ofEpochMilli(runState.timestamp())
-        .plusMillis(runState.data().retryDelayMillis());
+        .plusMillis(runState.data().retryDelayMillis().orElse(0L));
 
     return !deadline.isAfter(now);
   }

@@ -20,6 +20,8 @@
 
 package com.spotify.styx.state.handlers;
 
+import static com.google.common.base.Preconditions.checkState;
+
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
@@ -53,7 +55,9 @@ public class TerminationHandler implements OutputHandler {
   public void transitionInto(RunState state) {
     switch (state.state()) {
       case TERMINATED:
-        if (state.data().lastExit() == 0) {
+        checkState(state.data().lastExit().isPresent(), "Missing exit code");
+
+        if (state.data().lastExit().get() == 0) {
           stateManager.receiveIgnoreClosed(Event.success(state.workflowInstance()));
         } else {
           checkRetry(state);
@@ -74,7 +78,7 @@ public class TerminationHandler implements OutputHandler {
 
     if (state.data().retryCost() < MAX_RETRY_COST) {
       final long delayMillis;
-      if (state.data().lastExit() == MISSING_DEPS_EXIT_CODE) {
+      if (state.data().lastExit().map(c -> c == MISSING_DEPS_EXIT_CODE).orElse(false)) {
         delayMillis = Duration.ofMinutes(MISSING_DEPS_RETRY_DELAY_MINUTES).toMillis();
       } else {
         delayMillis = retryUtil.calculateDelay(state.data().tries()).toMillis();

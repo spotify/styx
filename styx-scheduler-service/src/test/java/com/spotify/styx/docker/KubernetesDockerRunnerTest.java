@@ -20,6 +20,7 @@
 
 package com.spotify.styx.docker;
 
+import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.podStatusNoContainer;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.running;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminated;
@@ -118,7 +119,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.getMetadata().setName(POD_NAME);
     createdPod.getMetadata().setResourceVersion("1001");
 
-    StateData stateData = StateData.builder().executionId(POD_NAME).build();
+    StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
     stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
 
     when(pods.create(any(Pod.class))).thenReturn(createdPod);
@@ -137,7 +138,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(terminated("Succeeded", 20));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
-    assertThat(stateManager.get(WORKFLOW_INSTANCE).data().lastExit(), is(20));
+    assertThat(stateManager.get(WORKFLOW_INSTANCE).data().lastExit(), hasValue(20));
   }
 
   @Test
@@ -199,7 +200,7 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldGenerateStartedWhenContainerIsReady() throws Exception {
-    StateData stateData = StateData.builder().executionId(POD_NAME).build();
+    StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
     stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
 
     createdPod.setStatus(running(/* ready= */ false));

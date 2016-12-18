@@ -20,61 +20,74 @@
 
 package com.spotify.styx.state;
 
-import com.google.auto.value.AutoValue;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.spotify.styx.model.ExecutionDescription;
+import io.norberg.automatter.AutoMatter;
+import java.util.List;
 import java.util.Optional;
 
 /**
- * A value type for holding data related to the various states of the {@link RunState}
+ * A value type for holding data related to the various states of the {@link RunState}.
+ *
+ * <p>Uses auto-matter over auto-value because we get a builder by default, which is also better
+ * suited for copy-modifying values. Another plus is the boilerplate-free Jackson integration.
  */
-@AutoValue
-public abstract class StateData {
+@AutoMatter
+@JsonIgnoreProperties(ignoreUnknown = true)
+public interface StateData {
 
-  public static final int DEFAULT_TRIES = 0;
-  public static final int DEFAULT_EXIT = -1;
-  public static final long DEFAULT_RETRY_MILLIS = 0L;
-  public static final double DEFAULT_RETRY_COST = 0.0;
+  int tries();
+  double retryCost();
+  Optional<Long> retryDelayMillis();
+  Optional<Integer> lastExit();
+  Optional<String> triggerId();
+  Optional<String> executionId();
+  Optional<ExecutionDescription> executionDescription();
+  List<Message> messages();
 
-  public abstract int tries();
-  public abstract double retryCost();
-  public abstract long retryDelayMillis();
-  public abstract int lastExit();
-  public abstract Optional<String> triggerId();
-  public abstract Optional<String> executionId();
-  public abstract Optional<ExecutionDescription> executionDescription();
+  StateDataBuilder builder();
 
-  public Builder toBuilder() {
-    return builder(this);
+  static StateDataBuilder newBuilder() {
+    return new StateDataBuilder();
   }
 
-  /**
-   * Returns the default value of a {@link StateData} (algebraic zero).
-   */
-  public static StateData zero() {
-    return builder().build();
+  static StateData zero() {
+    return newBuilder().build();
   }
 
-  public static Builder builder() {
-    return new AutoValue_StateData.Builder()
-        .tries(DEFAULT_TRIES)
-        .retryCost(DEFAULT_RETRY_COST)
-        .retryDelayMillis(DEFAULT_RETRY_MILLIS)
-        .lastExit(DEFAULT_EXIT);
+  @AutoMatter
+  interface Message {
+    MessageLevel level();
+    String line();
+
+    static Message create(MessageLevel level, String line) {
+      return new MessageBuilder().level(level).line(line).build();
+    }
+
+    static Message info(String line) {
+      return create(MessageLevel.INFO, line);
+    }
+
+    static Message warning(String line) {
+      return create(MessageLevel.WARNING, line);
+    }
+
+    static Message error(String line) {
+      return create(MessageLevel.ERROR, line);
+    }
   }
 
-  public static Builder builder(StateData stateData) {
-    return new AutoValue_StateData.Builder(stateData);
-  }
+  enum MessageLevel {
+    INFO, WARNING, ERROR, UNKNOWN;
 
-  @AutoValue.Builder
-  public abstract static class Builder {
-    public abstract Builder tries(int tries);
-    public abstract Builder retryCost(double cost);
-    public abstract Builder retryDelayMillis(long delayMillis);
-    public abstract Builder lastExit(int exitCode);
-    public abstract Builder triggerId(String triggerId);
-    public abstract Builder executionId(String executionId);
-    public abstract Builder executionDescription(ExecutionDescription executionDescription);
-    public abstract StateData build();
+    @JsonCreator
+    public static MessageLevel forValue(String value) {
+      try {
+        return valueOf(value);
+      } catch (IllegalArgumentException ignore) {
+        return UNKNOWN;
+      }
+    }
   }
 }

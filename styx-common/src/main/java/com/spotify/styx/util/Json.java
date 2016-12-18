@@ -40,7 +40,8 @@ public final class Json {
       .enable(ACCEPT_SINGLE_VALUE_AS_ARRAY)
       .disable(WRITE_DATES_AS_TIMESTAMPS)
       .registerModule(new JavaTimeModule())
-      .registerModule(new Jdk8Module());
+      .registerModule(new Jdk8Module())
+      .registerModule(new AutoMatterModule());
 
   public static final ObjectMapper PUBSUB_MAPPER = new ObjectMapper()
       .setPropertyNamingStrategy(LOWER_CAMEL_CASE)
