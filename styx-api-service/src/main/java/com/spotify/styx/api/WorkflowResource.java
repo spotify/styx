@@ -20,6 +20,8 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.styx.api.Api.Version.V0;
+import static com.spotify.styx.api.Api.Version.V1;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.util.StreamUtil.cat;
 
@@ -91,9 +93,8 @@ public final class WorkflowResource {
     );
 
     return cat(
-        v0.stream().map(r -> r.withPrefix(Api.Version.V0.prefix())),
-        v0.stream().map(r -> r.withPrefix(Api.Version.V1.prefix())),
-        v1.stream().map(r -> r.withPrefix(Api.Version.V1.prefix()))
+        Api.prefixRoutes(v0, V0, V1),
+        Api.prefixRoutes(v1, V1)
     );
   }
 

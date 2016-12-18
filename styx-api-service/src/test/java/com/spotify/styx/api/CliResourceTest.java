@@ -23,7 +23,6 @@ package com.spotify.styx.api;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasPayload;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
-import static com.spotify.styx.api.ApiVersionTestUtils.ALL_VERSIONS;
 import static org.hamcrest.Matchers.any;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
@@ -32,7 +31,6 @@ import static org.junit.Assert.assertThat;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
-import com.spotify.apollo.test.ServiceHelper;
 import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.api.cli.EventsPayload;
 import com.spotify.styx.model.Event;
@@ -42,21 +40,10 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Json;
-import java.util.Collection;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import okio.ByteString;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
-@RunWith(Parameterized.class)
-public class CliResourceTest {
+public class CliResourceTest extends VersionedApiTest {
 
   private static final String SCHEDULER_BASE = "http://localhost:8080";
   private static final String COMPONENT_ID = "styx";
@@ -69,25 +56,14 @@ public class CliResourceTest {
   private static final WorkflowInstance OTHER_WFI =
       WorkflowInstance.create(WorkflowId.create(OTHER_COMPONENT_ID, ENDPOINT_ID), PARAMETER);
 
-  @Parameterized.Parameters(name = "{0}")
-  public static Collection<Object[]> versions() {
-    return Stream.of(ALL_VERSIONS)
-        .map(v -> new Object[]{v})
-        .collect(Collectors.toList());
-  }
-
-  @Rule
-  public ServiceHelper serviceHelper = ServiceHelper.create(this::init, "styx");
-
-  private final Api.Version version;
-
   private Storage storage = new InMemStorage();
 
   public CliResourceTest(Api.Version version) {
-    this.version = version;
+    super(CliResource.BASE, version);
   }
 
-  private void init(Environment environment) {
+  @Override
+  void init(Environment environment) {
     final CliResource cliResource = new CliResource(SCHEDULER_BASE, storage);
 
     environment.routingEngine()
@@ -168,14 +144,5 @@ public class CliResourceTest {
 
     assertThat(parsed.activeStates(), hasSize(1));
     assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().componentId(), is(COMPONENT_ID));
-  }
-
-  private String path(String path) {
-    return version.prefix() + CliResource.BASE + path;
-  }
-
-  private Response<ByteString> awaitResponse(CompletionStage<Response<ByteString>> completionStage)
-      throws InterruptedException, ExecutionException, TimeoutException {
-    return completionStage.toCompletableFuture().get(5, TimeUnit.SECONDS);
   }
 }

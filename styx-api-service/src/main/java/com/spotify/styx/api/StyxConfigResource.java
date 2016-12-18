@@ -20,8 +20,9 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.styx.api.Api.Version.V0;
+import static com.spotify.styx.api.Api.Version.V1;
 import static com.spotify.styx.api.Middlewares.json;
-import static com.spotify.styx.util.StreamUtil.cat;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
@@ -60,10 +61,7 @@ public class StyxConfigResource {
             rc -> patchStyxConfig(rc.request()))
     );
 
-    return cat(
-        v0.stream().map(r -> r.withPrefix(Api.Version.V0.prefix())),
-        v0.stream().map(r -> r.withPrefix(Api.Version.V1.prefix()))
-    );
+    return Api.prefixRoutes(v0, V0, V1);
   }
 
   private Response<StyxConfig> styxConfig() {

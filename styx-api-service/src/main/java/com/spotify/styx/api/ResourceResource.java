@@ -20,6 +20,9 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.styx.api.Api.Version.V1;
+import static java.util.stream.Collectors.toList;
+
 import com.google.common.base.Throwables;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
@@ -32,6 +35,7 @@ import com.spotify.apollo.route.Route;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -51,7 +55,7 @@ public final class ResourceResource {
     final EntityMiddleware em =
         EntityMiddleware.forCodec(JacksonEntityCodec.forMapper(Middlewares.OBJECT_MAPPER));
 
-    return Stream.of(
+    final List<Route<AsyncHandler<Response<ByteString>>>> routes = Stream.of(
         Route.with(
             em.serializerDirect(ResourcesPayload.class),
             "GET", BASE,
@@ -74,7 +78,9 @@ public final class ResourceResource {
             rc -> payload -> updateResource(arg("rid", rc), payload))
     )
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
-        .map(r -> r.withPrefix(Api.Version.V1.prefix()));
+        .collect(toList());
+
+    return Api.prefixRoutes(routes, V1);
   }
 
   private ResourcesPayload getResources() {

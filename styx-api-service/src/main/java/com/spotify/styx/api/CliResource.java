@@ -20,9 +20,12 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.styx.api.Api.Version.V0;
+import static com.spotify.styx.api.Api.Version.V1;
 import static com.spotify.styx.model.EventSerializer.convertEventToPersistentEvent;
 import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static com.spotify.styx.util.StreamUtil.cat;
+import static java.util.stream.Collectors.toList;
 
 import com.google.api.client.util.Lists;
 import com.google.common.base.Throwables;
@@ -53,7 +56,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.concurrent.CompletionStage;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
 
@@ -90,7 +92,7 @@ public class CliResource {
             rc -> eventsForWorkflowInstance(arg("cid", rc), arg("eid", rc), arg("iid", rc))))
 
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
-        .collect(Collectors.toList());
+        .collect(toList());
 
     final List<Route<AsyncHandler<Response<ByteString>>>> proxies = Arrays.asList(
         Route.async(
@@ -111,10 +113,8 @@ public class CliResource {
     );
 
     return cat(
-        routes.stream().map(r -> r.withPrefix(Api.Version.V0.prefix())),
-        routes.stream().map(r -> r.withPrefix(Api.Version.V1.prefix())),
-        proxies.stream().map(r -> r.withPrefix(Api.Version.V0.prefix())),
-        proxies.stream().map(r -> r.withPrefix(Api.Version.V1.prefix()))
+        Api.prefixRoutes(routes, V0, V1),
+        Api.prefixRoutes(proxies, V0, V1)
     );
   }
 
@@ -140,7 +140,7 @@ public class CliResource {
 
       final Map<RunState, Long> map = replayActiveStates(activeStates, storage, false);
       runStates.addAll(
-          map.keySet().stream().map(this::runStateToActiveState).collect(Collectors.toList()));
+          map.keySet().stream().map(this::runStateToActiveState).collect(toList()));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
@@ -186,7 +186,7 @@ public class CliResource {
           .map(sequenceEvent -> TimestampedPersistentEvent.create(
               convertEventToPersistentEvent(sequenceEvent.event()),
               sequenceEvent.timestamp()))
-          .collect(Collectors.toList());
+          .collect(toList());
 
       return EventsPayload.create(timestampedPersistentEvents);
     } catch (IOException e) {

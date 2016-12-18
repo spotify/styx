@@ -20,6 +20,13 @@
 
 package com.spotify.styx.api;
 
+import com.spotify.apollo.Response;
+import com.spotify.apollo.route.AsyncHandler;
+import com.spotify.apollo.route.Route;
+import java.util.Collection;
+import java.util.stream.Stream;
+import okio.ByteString;
+
 final class Api {
 
   enum Version {
@@ -28,6 +35,13 @@ final class Api {
     public String prefix() {
       return "/api/v" + ordinal();
     }
+  }
+
+  static Stream<Route<AsyncHandler<Response<ByteString>>>> prefixRoutes(
+      Collection<Route<AsyncHandler<Response<ByteString>>>> routes,
+      Version... versions) {
+    return Stream.of(versions)
+        .flatMap(v -> routes.stream().map(route -> route.withPrefix(v.prefix())));
   }
 
   private Api() {

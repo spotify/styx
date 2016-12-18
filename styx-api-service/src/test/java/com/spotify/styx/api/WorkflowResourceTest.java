@@ -25,8 +25,6 @@ import static com.spotify.apollo.test.unit.ResponseMatchers.hasNoPayload;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
-import static com.spotify.styx.api.ApiVersionTestUtils.ALL_VERSIONS;
-import static com.spotify.styx.api.ApiVersionTestUtils.isAtLeast;
 import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.api.JsonMatchers.assertNoJson;
 import static com.spotify.styx.model.SequenceEvent.create;
@@ -37,7 +35,6 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assume.assumeThat;
 import static org.mockito.Mockito.mock;
 
 import com.google.cloud.datastore.Datastore;
@@ -50,7 +47,6 @@ import com.google.common.base.Throwables;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
-import com.spotify.apollo.test.ServiceHelper;
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Partitioning;
@@ -64,12 +60,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.Optional;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -77,25 +68,9 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
-@RunWith(Parameterized.class)
-public class WorkflowResourceTest {
-
-  @Parameterized.Parameters(name = "{0}")
-  public static Collection<Object[]> versions() {
-    return Stream.of(ALL_VERSIONS)
-        .map(v -> new Object[]{v})
-        .collect(Collectors.toList());
-  }
-
-  @Rule
-  public ServiceHelper serviceHelper = ServiceHelper.create(this::init, "workflow-test");
-
-  private final Api.Version version;
+public class WorkflowResourceTest extends VersionedApiTest {
 
   private static LocalDatastoreHelper localDatastore;
 
@@ -104,7 +79,7 @@ public class WorkflowResourceTest {
   private AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
 
   public WorkflowResourceTest(Api.Version version) {
-    this.version = version;
+    super(WorkflowResource.BASE, version, "workflow-test");
   }
 
   private static final DataEndpoint DATA_ENDPOINT =
@@ -138,7 +113,8 @@ public class WorkflowResourceTest {
   private static final ByteString STATEPAYLOAD_OTHER_FIELD =
       ByteString.encodeUtf8("{\"enabled\":\"true\",\"other_field\":\"ignored\"}");
 
-  private void init(Environment environment) {
+  @Override
+  void init(Environment environment) {
     WorkflowResource workflowResource = new WorkflowResource(storage);
 
     environment.routingEngine().registerRoutes(workflowResource.routes());
@@ -371,7 +347,7 @@ public class WorkflowResourceTest {
 
   @Test
   public void shouldReturnWorkflowInstancesData() throws Exception {
-    assumeThat(version, isAtLeast(Api.Version.V1));
+    sinceVersion(Api.Version.V1);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
     storage.writeEvent(create(Event.triggerExecution(wfi, "trig"), 0L, ms("07:00:00")));
@@ -400,7 +376,7 @@ public class WorkflowResourceTest {
 
   @Test
   public void shouldReturnWorkflowInstanceData() throws Exception {
-    assumeThat(version, isAtLeast(Api.Version.V1));
+    sinceVersion(Api.Version.V1);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
     storage.writeEvent(create(Event.triggerExecution(wfi, "trig"), 0L, ms("07:00:00")));
@@ -431,7 +407,7 @@ public class WorkflowResourceTest {
 
   @Test
   public void shouldPaginateWorkflowInstancesData() throws Exception {
-    assumeThat(version, isAtLeast(Api.Version.V1));
+    sinceVersion(Api.Version.V1);
 
     WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-11");
     WorkflowInstance wfi2 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-12");
@@ -447,16 +423,6 @@ public class WorkflowResourceTest {
 
     assertJson(response, "[*]", hasSize(1));
     assertJson(response, "[0].workflow_instance.parameter", is("2016-08-12"));
-  }
-
-  private Response<ByteString> awaitResponse(CompletionStage<Response<ByteString>> completionStage)
-      throws InterruptedException, java.util.concurrent.ExecutionException,
-             java.util.concurrent.TimeoutException {
-    return completionStage.toCompletableFuture().get(5, TimeUnit.SECONDS);
-  }
-
-  private String path(String path) {
-    return version.prefix() + WorkflowResource.BASE + path;
   }
 
   private long ms(String time) {
