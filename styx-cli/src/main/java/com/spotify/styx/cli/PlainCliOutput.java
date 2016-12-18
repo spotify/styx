@@ -23,8 +23,8 @@ package com.spotify.styx.cli;
 import static com.spotify.styx.cli.CliUtil.formatTimestamp;
 
 import com.spotify.styx.api.cli.ActiveStatesPayload;
-import com.spotify.styx.model.EventSerializer;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.state.StateData;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.SortedSet;
@@ -42,21 +42,25 @@ class PlainCliOutput implements CliOutput {
     groupedActiveStates.entrySet().forEach(entry -> {
       WorkflowId workflowId = entry.getKey();
       entry.getValue().forEach(activeState -> {
-        final String previousExecutionInfo;
-        if (activeState.previousExecutionLastEvent().isPresent()) {
-          final EventSerializer.PersistentEvent
-              persistentEvent = activeState.previousExecutionLastEvent().get();
-          previousExecutionInfo = CliUtil.lastExecutionMessage(persistentEvent.toEvent());
+        final StateData stateData = activeState.stateData();
+        final List<StateData.Message> messages = stateData.messages();
+
+        final String lastMessage;
+        if (messages.isEmpty()) {
+          lastMessage = "No info";
         } else {
-          previousExecutionInfo = "No data found";
+          final StateData.Message message = messages.get(messages.size() - 1);
+          lastMessage = message.line();
         }
-        System.out.println(String.format("%s %s %s %s %s %s",
-                                         workflowId.componentId(),
-                                         workflowId.endpointId(),
-                                         activeState.workflowInstance().parameter(),
-                                         activeState.state(),
-                                         activeState.lastExecutionId(),
-                                         previousExecutionInfo));
+
+        System.out.println(String.format(
+            "%s %s %s %s %s %s",
+            workflowId.componentId(),
+            workflowId.endpointId(),
+            activeState.workflowInstance().parameter(),
+            activeState.state(),
+            stateData.executionId().orElse("<no execution id>"),
+            lastMessage));
       });
     });
   }

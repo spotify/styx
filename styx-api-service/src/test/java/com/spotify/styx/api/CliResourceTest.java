@@ -121,6 +121,8 @@ public class CliResourceTest extends VersionedApiTest {
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/activeStates")));
 
+    assertThat(response, hasStatus(withCode(Status.OK)));
+
     String json = response.payload().get().utf8();
     ActiveStatesPayload parsed = Json.OBJECT_MAPPER.readValue(json, ActiveStatesPayload.class);
 
@@ -138,6 +140,8 @@ public class CliResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/activeStates?component=" + COMPONENT_ID)));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
 
     String json = response.payload().get().utf8();
     ActiveStatesPayload parsed = Json.OBJECT_MAPPER.readValue(json, ActiveStatesPayload.class);

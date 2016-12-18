@@ -21,20 +21,18 @@
 package com.spotify.styx.cli;
 
 import static com.spotify.styx.cli.CliUtil.colored;
+import static com.spotify.styx.cli.CliUtil.coloredBright;
 import static com.spotify.styx.cli.CliUtil.formatTimestamp;
+import static org.fusesource.jansi.Ansi.Color.BLACK;
 import static org.fusesource.jansi.Ansi.Color.BLUE;
 import static org.fusesource.jansi.Ansi.Color.CYAN;
 import static org.fusesource.jansi.Ansi.Color.DEFAULT;
 import static org.fusesource.jansi.Ansi.Color.GREEN;
-import static org.fusesource.jansi.Ansi.Color.MAGENTA;
-import static org.fusesource.jansi.Ansi.Color.WHITE;
+import static org.fusesource.jansi.Ansi.Color.RED;
 import static org.fusesource.jansi.Ansi.Color.YELLOW;
 
 import com.spotify.styx.api.cli.ActiveStatesPayload;
-import com.spotify.styx.model.Event;
-import com.spotify.styx.model.EventVisitor;
-import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.StateData;
 import java.util.List;
 import org.fusesource.jansi.Ansi;
 
@@ -42,34 +40,62 @@ class PrettyCliOutput implements CliOutput {
 
   @Override
   public void printActiveStates(ActiveStatesPayload activeStatesPayload) {
-    final String format = "  %-20s %-16s %-47s %s";
-    System.out.println(String.format(format,
-                                     "WORKFLOW INSTANCE",
-                                     "STATE",
-                                     "LAST EXECUTION ID",
-                                     "PREVIOUS EXECUTION INFO"));
+    System.out.println(String.format(
+        "  %-20s %-16s %-47s %s",
+        "WORKFLOW INSTANCE",
+        "STATE",
+        "LAST EXECUTION ID",
+        "PREVIOUS EXECUTION MESSAGE"));
+
     CliUtil.groupActiveStates(activeStatesPayload.activeStates()).entrySet().forEach(entry -> {
       System.out.println();
       System.out.println(String.format("%s %s",
                                        colored(CYAN, entry.getKey().componentId()),
                                        colored(BLUE, entry.getKey().endpointId())));
       entry.getValue().forEach(activeState -> {
-        final Ansi previousExecutionInfo;
-        if (activeState.previousExecutionLastEvent().isPresent()) {
-          final Event event = activeState.previousExecutionLastEvent().get().toEvent();
-          final String message = CliUtil.lastExecutionMessage(event);
-          final Ansi.Color messageColor = event.accept(LastExecutionColor.LAST_EXECUTION_COLOR);
-          previousExecutionInfo = colored(messageColor, message);
+        final StateData stateData = activeState.stateData();
+        final List<StateData.Message> messages = stateData.messages();
+
+        final Ansi lastMessage;
+        if (messages.isEmpty()) {
+          lastMessage = colored(DEFAULT, "No info");
         } else {
-          previousExecutionInfo = colored(DEFAULT, "No data found");
+          final StateData.Message message = messages.get(messages.size() - 1);
+          final Ansi.Color messageColor = messageColor(message.level());
+          lastMessage = colored(messageColor, message.line());
         }
-        System.out.println(String.format(format,
-                                         activeState.workflowInstance().parameter(),
-                                         activeState.state(),
-                                         activeState.lastExecutionId(),
-                                         previousExecutionInfo));
+
+        final Ansi state;
+        switch (activeState.state()) {
+          case "QUEUED":
+            state = coloredBright(BLACK, activeState.state());
+            break;
+
+          case "RUNNING":
+            state = coloredBright(GREEN, activeState.state());
+            break;
+
+          default:
+            state = colored(DEFAULT, activeState.state());
+        }
+
+        System.out.println(String.format(
+            "  %-20s %-24s %-47s %s",
+            activeState.workflowInstance().parameter(),
+            state,
+            stateData.executionId().orElse("<no execution id>"),
+            lastMessage));
       });
     });
+  }
+
+  private Ansi.Color messageColor(StateData.MessageLevel level) {
+    switch (level) {
+      case INFO:    return GREEN;
+      case WARNING: return YELLOW;
+      case ERROR:   return RED;
+      default:      return DEFAULT;
+    }
   }
 
   @Override
@@ -85,93 +111,5 @@ class PrettyCliOutput implements CliOutput {
                                              formatTimestamp(eventInfo.timestamp()),
                                              eventInfo.name(),
                                              eventInfo.info())));
-  }
-
-  private enum LastExecutionColor implements EventVisitor<Ansi.Color> {
-    LAST_EXECUTION_COLOR;
-
-    @Override
-    public Ansi.Color terminate(WorkflowInstance workflowInstance, int exitCode) {
-      switch (exitCode) {
-        case CliUtil.SUCCESS_EXIT_CODE:
-          return GREEN;
-        case CliUtil.MISSING_DEPENDENCIES_EXIT_CODE:
-          return YELLOW;
-        default:
-          return MAGENTA;
-      }
-    }
-
-    @Override
-    public Ansi.Color runError(WorkflowInstance workflowInstance, String message) {
-      return MAGENTA;
-    }
-
-    @Override
-    public Ansi.Color timeTrigger(WorkflowInstance workflowInstance) {
-      return WHITE;
-    }
-
-    @Override
-    public Ansi.Color triggerExecution(WorkflowInstance workflowInstance, String triggerId) {
-      return WHITE;
-    }
-
-    @Override
-    public Ansi.Color created(WorkflowInstance workflowInstance, String executionId,
-                              String dockerImage) {
-      return WHITE;
-    }
-
-    @Override
-    public Ansi.Color dequeue(WorkflowInstance workflowInstance) {
-      return WHITE;
-    }
-
-    @Override
-    public Ansi.Color started(WorkflowInstance workflowInstance) {
-      return WHITE;
-    }
-
-    @Override
-    public Ansi.Color success(WorkflowInstance workflowInstance) {
-      return WHITE;
-    }
-
-    @Override
-    public Ansi.Color retryAfter(WorkflowInstance workflowInstance, long delayMillis) {
-      return WHITE;
-    }
-
-    @Override
-    public Ansi.Color retry(WorkflowInstance workflowInstance) {
-      return WHITE;
-    }
-
-    @Override
-    public Ansi.Color stop(WorkflowInstance workflowInstance) {
-      return WHITE;
-    }
-
-    @Override
-    public Ansi.Color timeout(WorkflowInstance workflowInstance) {
-      return WHITE;
-    }
-
-    @Override
-    public Ansi.Color halt(WorkflowInstance workflowInstance) {
-      return WHITE;
-    }
-
-    @Override
-    public Ansi.Color submit(WorkflowInstance workflowInstance,
-                             ExecutionDescription executionDescription) {
-      return WHITE;
-    }
-
-    @Override
-    public Ansi.Color submitted(WorkflowInstance workflowInstance, String executionId) {
-      return WHITE;
-    }
   }
 }

@@ -21,6 +21,7 @@
 package com.spotify.styx.api.cli;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
 import com.spotify.styx.model.EventSerializer.PersistentEvent;
@@ -30,12 +31,14 @@ import java.util.List;
  * convert Event to EventsPayload (with associated timestamps)
  */
 @AutoValue
+@JsonIgnoreProperties(ignoreUnknown = true)
 public abstract class EventsPayload {
 
   @JsonProperty
   public abstract List<TimestampedPersistentEvent> events();
 
   @AutoValue
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public abstract static class TimestampedPersistentEvent {
 
     @JsonProperty

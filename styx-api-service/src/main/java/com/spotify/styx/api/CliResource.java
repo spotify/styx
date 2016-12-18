@@ -29,7 +29,6 @@ import static java.util.stream.Collectors.toList;
 
 import com.google.api.client.util.Lists;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableSet;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.entity.EntityMiddleware;
@@ -40,13 +39,11 @@ import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.api.cli.EventsPayload;
 import com.spotify.styx.api.cli.EventsPayload.TimestampedPersistentEvent;
-import com.spotify.styx.model.EventSerializer.PersistentEvent;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.EventUtil;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -65,9 +62,6 @@ public class CliResource {
 
   public static final String BASE = "/cli";
   public static final String SCHEDULER_BASE_PATH = "/api/v0";
-
-  private static final Set<String> lastExecutionEvents =
-      ImmutableSet.of("terminate", "runError");
 
   private final String schedulerServiceBaseUrl;
   private final Storage storage;
@@ -152,20 +146,8 @@ public class CliResource {
     return ActiveStatesPayload.ActiveState.create(
         state.workflowInstance(),
         state.state().toString(),
-        state.data().executionId().orElse("<no execution id>"),
-        getPreviousExecutionLastEvent(state)
+        state.data()
     );
-  }
-
-  private Optional<PersistentEvent> getPreviousExecutionLastEvent(RunState state) {
-    try {
-      return storage.readEvents(state.workflowInstance()).stream()
-          .filter(event -> lastExecutionEvents.contains(EventUtil.name(event.event())))
-          .reduce((a, b) -> b)
-          .map(event -> convertEventToPersistentEvent(event.event()));
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
   }
 
   private EventsPayload eventsForWorkflowInstance(String cid, String eid, String iid) {
