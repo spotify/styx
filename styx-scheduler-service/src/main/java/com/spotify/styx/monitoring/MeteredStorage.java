@@ -21,6 +21,7 @@
 package com.spotify.styx.monitoring;
 
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -35,6 +36,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.SortedSet;
 
 public final class MeteredStorage extends MeteredBase implements Storage {
 
@@ -43,6 +45,22 @@ public final class MeteredStorage extends MeteredBase implements Storage {
   public MeteredStorage(Storage delegate, Stats stats, Time time) {
     super(stats, time);
     this.delegate = Objects.requireNonNull(delegate);
+  }
+
+  @Override
+  public SortedSet<SequenceEvent> readEvents(WorkflowInstance workflowInstance) throws IOException {
+    return timedStorage("readEvents", () -> delegate.readEvents(workflowInstance));
+  }
+
+  @Override
+  public void writeEvent(SequenceEvent sequenceEvent) throws IOException {
+    timedStorage("writeEvent", () -> delegate.writeEvent(sequenceEvent));
+  }
+
+  @Override
+  public Optional<Long> getLatestStoredCounter(WorkflowInstance workflowInstance)
+      throws IOException {
+    return timedStorage("getLatestStoredCounter", () -> delegate.getLatestStoredCounter(workflowInstance));
   }
 
   @Override
@@ -86,6 +104,26 @@ public final class MeteredStorage extends MeteredBase implements Storage {
       throws IOException {
     return timedStorage("workflowsWithNextNaturalTrigger",
         () -> delegate.workflowsWithNextNaturalTrigger());
+  }
+
+  @Override
+  public void writeActiveState(WorkflowInstance workflowInstance, long counter) throws IOException {
+    timedStorage("writeActiveState", () -> delegate.writeActiveState(workflowInstance, counter));
+  }
+
+  @Override
+  public void deleteActiveState(WorkflowInstance workflowInstance) throws IOException {
+    timedStorage("deleteActiveState", () -> delegate.deleteActiveState(workflowInstance));
+  }
+
+  @Override
+  public Map<WorkflowInstance, Long> readActiveWorkflowInstances() throws IOException {
+    return timedStorage("readActiveWorkflowInstances", () -> delegate.readActiveWorkflowInstances());
+  }
+
+  @Override
+  public Map<WorkflowInstance, Long> readActiveWorkflowInstances(String componentId) throws IOException {
+    return timedStorage("readActiveWorkflowInstances", () -> delegate.readActiveWorkflowInstances(componentId));
   }
 
   @Override

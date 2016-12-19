@@ -20,12 +20,16 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.styx.api.Api.Version.V0;
+import static com.spotify.styx.api.Api.Version.V1;
 import static com.spotify.styx.model.EventSerializer.convertEventToPersistentEvent;
 import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static com.spotify.styx.util.StreamUtil.cat;
+import static java.util.stream.Collectors.toList;
 
 import com.google.api.client.util.Lists;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.entity.EntityMiddleware;
@@ -37,13 +41,12 @@ import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.api.cli.EventsPayload;
 import com.spotify.styx.api.cli.EventsPayload.TimestampedPersistentEvent;
 import com.spotify.styx.model.EventSerializer.PersistentEvent;
-import com.spotify.styx.model.EventVisitor;
-import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.storage.EventStorage;
+import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.EventUtil;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -51,9 +54,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.SortedSet;
 import java.util.concurrent.CompletionStage;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
 
@@ -65,14 +66,15 @@ public class CliResource {
   public static final String BASE = "/cli";
   public static final String SCHEDULER_BASE_PATH = "/api/v0";
 
+  private static final Set<String> lastExecutionEvents =
+      ImmutableSet.of("terminate", "runError");
+
   private final String schedulerServiceBaseUrl;
-  private final EventStorage eventStorage;
+  private final Storage storage;
 
-  private final EventVisitor<Boolean> lastExecutionEventVisitor = new CliResource.LastExecutionEventVisitor();
-
-  public CliResource(String schedulerServiceBaseUrl, EventStorage eventStorage) {
+  public CliResource(String schedulerServiceBaseUrl, Storage storage) {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
-    this.eventStorage = Objects.requireNonNull(eventStorage);
+    this.storage = Objects.requireNonNull(storage);
   }
 
   public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
@@ -90,7 +92,7 @@ public class CliResource {
             rc -> eventsForWorkflowInstance(arg("cid", rc), arg("eid", rc), arg("iid", rc))))
 
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
-        .collect(Collectors.toList());
+        .collect(toList());
 
     final List<Route<AsyncHandler<Response<ByteString>>>> proxies = Arrays.asList(
         Route.async(
@@ -111,10 +113,8 @@ public class CliResource {
     );
 
     return cat(
-        routes.stream().map(r -> r.withPrefix(Api.Version.V0.prefix())),
-        routes.stream().map(r -> r.withPrefix(Api.Version.V1.prefix())),
-        proxies.stream().map(r -> r.withPrefix(Api.Version.V0.prefix())),
-        proxies.stream().map(r -> r.withPrefix(Api.Version.V1.prefix()))
+        Api.prefixRoutes(routes, V0, V1),
+        Api.prefixRoutes(proxies, V0, V1)
     );
   }
 
@@ -135,12 +135,12 @@ public class CliResource {
     try {
 
       final Map<WorkflowInstance, Long> activeStates = componentOpt.isPresent()
-          ? eventStorage.readActiveWorkflowInstances(componentOpt.get())
-          : eventStorage.readActiveWorkflowInstances();
+          ? storage.readActiveWorkflowInstances(componentOpt.get())
+          : storage.readActiveWorkflowInstances();
 
-      final Map<RunState, Long> map = replayActiveStates(activeStates, eventStorage, false);
+      final Map<RunState, Long> map = replayActiveStates(activeStates, storage, false);
       runStates.addAll(
-          map.keySet().stream().map(this::runStateToActiveState).collect(Collectors.toList()));
+          map.keySet().stream().map(this::runStateToActiveState).collect(toList()));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
@@ -158,22 +158,14 @@ public class CliResource {
   }
 
   private Optional<PersistentEvent> getPreviousExecutionLastEvent(RunState state) {
-    Optional<PersistentEvent> lastEvent;
     try {
-      final SortedSet<SequenceEvent> sequenceEvents = eventStorage.readEvents(state.workflowInstance());
-      final Optional<SequenceEvent> lastExecutionSequenceEvent = sequenceEvents
-          .stream()
-          .filter((sequenceEvent) -> sequenceEvent.event().accept(lastExecutionEventVisitor))
-          .reduce((a, b) -> b);
-      if (lastExecutionSequenceEvent.isPresent()) {
-        lastEvent = Optional.of(convertEventToPersistentEvent(lastExecutionSequenceEvent.get().event()));
-      } else {
-        lastEvent = Optional.empty();
-      }
+      return storage.readEvents(state.workflowInstance()).stream()
+          .filter(event -> lastExecutionEvents.contains(EventUtil.name(event.event())))
+          .reduce((a, b) -> b)
+          .map(event -> convertEventToPersistentEvent(event.event()));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
-    return lastEvent;
   }
 
   private EventsPayload eventsForWorkflowInstance(String cid, String eid, String iid) {
@@ -181,94 +173,16 @@ public class CliResource {
     final WorkflowInstance workflowInstance = WorkflowInstance.create(workflowId, iid);
 
     try {
-      final Set<SequenceEvent> sequenceEvents = eventStorage.readEvents(workflowInstance);
+      final Set<SequenceEvent> sequenceEvents = storage.readEvents(workflowInstance);
       final List<TimestampedPersistentEvent> timestampedPersistentEvents = sequenceEvents.stream()
           .map(sequenceEvent -> TimestampedPersistentEvent.create(
               convertEventToPersistentEvent(sequenceEvent.event()),
               sequenceEvent.timestamp()))
-          .collect(Collectors.toList());
+          .collect(toList());
 
       return EventsPayload.create(timestampedPersistentEvents);
     } catch (IOException e) {
       throw Throwables.propagate(e);
-    }
-  }
-
-  private class LastExecutionEventVisitor implements EventVisitor<Boolean> {
-
-    @Override
-    public Boolean timeTrigger(WorkflowInstance workflowInstance) {
-      return Boolean.FALSE;
-    }
-
-    @Override
-    public Boolean triggerExecution(WorkflowInstance workflowInstance, String triggerId) {
-      return Boolean.FALSE;
-    }
-
-    @Override
-    public Boolean created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
-      return Boolean.FALSE;
-    }
-
-    @Override
-    public Boolean dequeue(WorkflowInstance workflowInstance) {
-      return Boolean.FALSE;
-    }
-
-    @Override
-    public Boolean submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) {
-      return Boolean.FALSE;
-    }
-
-    @Override
-    public Boolean submitted(WorkflowInstance workflowInstance, String executionId) {
-      return Boolean.FALSE;
-    }
-
-    @Override
-    public Boolean started(WorkflowInstance workflowInstance) {
-      return Boolean.FALSE;
-    }
-
-    @Override
-    public Boolean terminate(WorkflowInstance workflowInstance, int exitCode) {
-      return Boolean.TRUE;
-    }
-
-    @Override
-    public Boolean runError(WorkflowInstance workflowInstance, String message) {
-      return Boolean.TRUE;
-    }
-
-    @Override
-    public Boolean success(WorkflowInstance workflowInstance) {
-      return Boolean.FALSE;
-    }
-
-    @Override
-    public Boolean retryAfter(WorkflowInstance workflowInstance, long delayMillis) {
-      return Boolean.FALSE;
-    }
-
-    @Override
-    public Boolean retry(WorkflowInstance workflowInstance) {
-      return Boolean.FALSE;
-    }
-
-    @Override
-    public Boolean stop(WorkflowInstance workflowInstance) {
-      return Boolean.FALSE;
-    }
-
-    @Override
-    public Boolean timeout(WorkflowInstance workflowInstance) {
-      return Boolean.FALSE;
-    }
-
-    @Override
-    public Boolean halt(WorkflowInstance workflowInstance) {
-      return Boolean.FALSE;
     }
   }
 }

@@ -47,7 +47,6 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
-import com.spotify.styx.util.EventStorageFactory;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
@@ -113,7 +112,6 @@ public class StyxSchedulerServiceFixture {
   @Before
   public void setUp() throws Exception {
     StorageFactory storageFactory = (env) -> storage;
-    EventStorageFactory eventStorageFactory = (env) -> storage;
     Time time = () -> now;
     StyxScheduler.ScheduleSources scheduleSources = () -> singletonList(fakeScheduleSource());
     StyxScheduler.StatsFactory statsFactory = (env) -> Stats.NOOP;
@@ -125,7 +123,6 @@ public class StyxSchedulerServiceFixture {
     styxScheduler = StyxScheduler.newBuilder()
         .setTime(time)
         .setStorageFactory(storageFactory)
-        .setEventStorageFactory(eventStorageFactory)
         .setDockerRunnerFactory(dockerRunnerFactory)
         .setScheduleSources(scheduleSources)
         .setStatsFactory(statsFactory)

@@ -21,6 +21,7 @@
 package com.spotify.styx.storage;
 
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -32,11 +33,34 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.SortedSet;
 
 /**
  * The interface to the persistence layer.
  */
 public interface Storage {
+
+  /**
+   * Returns all {@link SequenceEvent} for a {@link WorkflowInstance} in time order.
+   *
+   * @param workflowInstance  The workflow instance to get the events for
+   */
+  SortedSet<SequenceEvent> readEvents(WorkflowInstance workflowInstance) throws IOException;
+
+  /**
+   * Stores an {@link com.spotify.styx.model.Event}.
+   *
+   * @param sequenceEvent  The event together with its sequence number to be stored
+   */
+  void writeEvent(SequenceEvent sequenceEvent) throws IOException;
+
+  /**
+   * Returns the latest counter from the events of a {@link WorkflowInstance}. The returned
+   * Optional is empty if no event is found for the {@link WorkflowInstance} specified.
+   *
+   * @param workflowInstance  The workflow instance to get the latest counter for
+   */
+  Optional<Long> getLatestStoredCounter(WorkflowInstance workflowInstance) throws IOException;
 
   /**
    * Get the global enabled flag for Styx.
@@ -92,6 +116,47 @@ public interface Storage {
    * which is empty if it hasn't been initialized before.
    */
   Map<Workflow, Optional<Instant>> workflowsWithNextNaturalTrigger() throws IOException;
+
+  /**
+   * Stores information about an active {@link WorkflowInstance} to be tracked.
+   *
+   * @param workflowInstance  The {@link WorkflowInstance} that entered an active state
+   * @param counter           The last processed event count for the {@link WorkflowInstance}
+   */
+  void writeActiveState(WorkflowInstance workflowInstance, long counter) throws IOException;
+
+  /**
+   * Removes a reference to active {@link WorkflowInstance}, to be called when the instance enters
+   * a final state in Styx and it shouldn't be tracked anymore.
+   *
+   * @param workflowInstance  The {@link WorkflowInstance} that entered a final state
+   */
+  void deleteActiveState(WorkflowInstance workflowInstance) throws IOException;
+
+  /**
+   * Return a map of all active {@link WorkflowInstance}s to their last consumed sequence count.
+   *
+   * <p>A {@link WorkflowInstance} is active if there has been at least one call to
+   *
+   * {@link #writeActiveState(WorkflowInstance, long)} and no calls to
+   * {@link #deleteActiveState(WorkflowInstance)}.
+   *
+   * @return The map of workflow instances to sequence counts
+   */
+  Map<WorkflowInstance, Long> readActiveWorkflowInstances() throws IOException;
+
+  /**
+   * Return a map of all active {@link WorkflowInstance}s to their last consumed sequence count,
+   * for workflows that belong to a given component id.
+   *
+   * <p>A {@link WorkflowInstance} is active if there has been at least one call to
+   *
+   * {@link #writeActiveState(WorkflowInstance, long)} and no calls to
+   * {@link #deleteActiveState(WorkflowInstance)}.
+   *
+   * @return The map of workflow instances to sequence counts
+   */
+  Map<WorkflowInstance, Long> readActiveWorkflowInstances(String componentId) throws IOException;
 
   /**
    * Get execution information for a {@link WorkflowInstance}.

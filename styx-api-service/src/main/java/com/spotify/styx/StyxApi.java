@@ -34,10 +34,7 @@ import com.spotify.styx.api.ResourceResource;
 import com.spotify.styx.api.StyxConfigResource;
 import com.spotify.styx.api.WorkflowResource;
 import com.spotify.styx.storage.AggregateStorage;
-import com.spotify.styx.storage.EventStorage;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.EventStorageFactory;
-import com.spotify.styx.util.Singleton;
 import com.spotify.styx.util.StorageFactory;
 import com.typesafe.config.Config;
 import java.time.Duration;
@@ -61,23 +58,15 @@ public class StyxApi implements AppInit {
 
   public static class Builder {
 
-    private final Singleton<AggregateStorage> storage = Singleton.create(StyxApi::storage);
-
-    private StorageFactory storageFactory = storage::apply;
-    private EventStorageFactory eventStorageFactory = storage::apply;
+    private StorageFactory storageFactory = StyxApi::storage;
 
     public Builder setStorageFactory(StorageFactory storageFactory) {
       this.storageFactory = storageFactory;
       return this;
     }
 
-    public Builder setEventStorageFactory(EventStorageFactory eventStorageFactory) {
-      this.eventStorageFactory = eventStorageFactory;
-      return this;
-    }
-
     public StyxApi build() {
-      return new StyxApi(storageFactory, eventStorageFactory);
+      return new StyxApi(storageFactory);
     }
   }
 
@@ -90,11 +79,9 @@ public class StyxApi implements AppInit {
   }
 
   private final StorageFactory storageFactory;
-  private final EventStorageFactory eventStorageFactory;
 
-  private StyxApi(StorageFactory storageFactory, EventStorageFactory eventStorageFactory) {
+  private StyxApi(StorageFactory storageFactory) {
     this.storageFactory = requireNonNull(storageFactory);
-    this.eventStorageFactory = requireNonNull(eventStorageFactory);
   }
 
   @Override
@@ -105,12 +92,11 @@ public class StyxApi implements AppInit {
         : DEFAULT_SCHEDULER_SERVICE_BASE_URL;
 
     final Storage storage = storageFactory.apply(environment);
-    final EventStorage eventStorage = eventStorageFactory.apply(environment);
 
     final WorkflowResource workflowResource = new WorkflowResource(storage);
     final ResourceResource resourceResource = new ResourceResource(storage);
     final StyxConfigResource styxConfigResource = new StyxConfigResource(storage);
-    final CliResource cliResource = new CliResource(schedulerServiceBaseUrl, eventStorage);
+    final CliResource cliResource = new CliResource(schedulerServiceBaseUrl, storage);
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))

@@ -22,8 +22,8 @@ package com.spotify.styx;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static org.awaitility.Awaitility.await;
 import static java.util.Optional.empty;
+import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.instanceOf;

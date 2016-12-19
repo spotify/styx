@@ -58,7 +58,6 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.monitoring.MeteredDockerRunner;
-import com.spotify.styx.monitoring.MeteredEventStorage;
 import com.spotify.styx.monitoring.MeteredStorage;
 import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.MonitoringHandler;
@@ -76,13 +75,9 @@ import com.spotify.styx.state.handlers.ExecutionDescriptionHandler;
 import com.spotify.styx.state.handlers.PublisherHandler;
 import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.storage.AggregateStorage;
-import com.spotify.styx.storage.EventStorage;
 import com.spotify.styx.storage.InMemStorage;
-import com.spotify.styx.storage.NoopEventStorage;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.EventStorageFactory;
 import com.spotify.styx.util.RetryUtil;
-import com.spotify.styx.util.Singleton;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.typesafe.config.Config;
@@ -159,11 +154,8 @@ public class StyxScheduler implements AppInit {
 
   public static class Builder {
 
-    private final Singleton<AggregateStorage> storage = Singleton.create(StyxScheduler::storage);
-
     private Time time = Instant::now;
-    private StorageFactory storageFactory = storage(storage);
-    private EventStorageFactory eventStorageFactory = eventStorage(storage);
+    private StorageFactory storageFactory = storage(StyxScheduler::storage);
     private DockerRunnerFactory dockerRunnerFactory = StyxScheduler::createDockerRunner;
     private ScheduleSources scheduleSources = () -> ServiceLoader.load(ScheduleSourceFactory.class);
     private StatsFactory statsFactory = StyxScheduler::stats;
@@ -178,11 +170,6 @@ public class StyxScheduler implements AppInit {
 
     public Builder setStorageFactory(StorageFactory storageFactory) {
       this.storageFactory = storageFactory;
-      return this;
-    }
-
-    public Builder setEventStorageFactory(EventStorageFactory eventStorageFactory) {
-      this.eventStorageFactory = eventStorageFactory;
       return this;
     }
 
@@ -215,7 +202,6 @@ public class StyxScheduler implements AppInit {
       return new StyxScheduler(
           time,
           storageFactory,
-          eventStorageFactory,
           dockerRunnerFactory,
           scheduleSources,
           statsFactory,
@@ -237,7 +223,6 @@ public class StyxScheduler implements AppInit {
 
   private final Time time;
   private final StorageFactory storageFactory;
-  private final EventStorageFactory eventStorageFactory;
   private final DockerRunnerFactory dockerRunnerFactory;
   private final ScheduleSources scheduleSources;
   private final StatsFactory statsFactory;
@@ -252,7 +237,6 @@ public class StyxScheduler implements AppInit {
   private StyxScheduler(
       Time time,
       StorageFactory storageFactory,
-      EventStorageFactory eventStorageFactory,
       DockerRunnerFactory dockerRunnerFactory,
       ScheduleSources scheduleSources,
       StatsFactory statsFactory,
@@ -261,7 +245,6 @@ public class StyxScheduler implements AppInit {
       RetryUtil retryUtil) {
     this.time = requireNonNull(time);
     this.storageFactory = requireNonNull(storageFactory);
-    this.eventStorageFactory = requireNonNull(eventStorageFactory);
     this.dockerRunnerFactory = requireNonNull(dockerRunnerFactory);
     this.scheduleSources = requireNonNull(scheduleSources);
     this.statsFactory = requireNonNull(statsFactory);
@@ -296,11 +279,9 @@ public class StyxScheduler implements AppInit {
     final Stats stats = statsFactory.apply(environment);
     final WorkflowCache cache = new InMemWorkflowCache();
     final Storage storage = new MeteredStorage(storageFactory.apply(environment), stats, time);
-    final EventStorage eventStorage = new MeteredEventStorage(eventStorageFactory.apply(environment),
-                                                              stats, time);
 
     final QueuedStateManager stateManager = closer.register(
-        new QueuedStateManager(time, eventWorker, eventStorage));
+        new QueuedStateManager(time, eventWorker, storage));
 
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
@@ -331,7 +312,7 @@ public class StyxScheduler implements AppInit {
                                                                       stats, stateManager, time);
     final Consumer<Workflow> workflowRemoveListener = workflowRemoved(storage);
 
-    restoreState(eventStorage, outputHandlers, stateManager);
+    restoreState(storage, outputHandlers, stateManager);
     startTriggerManager(triggerManager, executor);
     startScheduleSources(environment, executor, workflowChangeListener, workflowRemoveListener);
     startScheduler(scheduler, executor);
@@ -369,14 +350,14 @@ public class StyxScheduler implements AppInit {
   }
 
   private void restoreState(
-      EventStorage eventStorage,
+      Storage storage,
       OutputHandler[] outputHandlers,
       StateManager stateManager) {
     try {
       final Map<WorkflowInstance, Long> activeInstances =
-          eventStorage.readActiveWorkflowInstances();
+          storage.readActiveWorkflowInstances();
 
-      replayActiveStates(activeInstances, eventStorage, true)
+      replayActiveStates(activeInstances, storage, true)
           .entrySet().stream()
           .collect(toMap(
               e -> e.getKey()
@@ -535,22 +516,11 @@ public class StyxScheduler implements AppInit {
     return new MetricsStats(environment.resolve(SemanticMetricRegistry.class));
   }
 
-  private static StorageFactory storage(Singleton<AggregateStorage> storage) {
+  private static StorageFactory storage(StorageFactory storage) {
     return (environment) -> {
       if (isDevMode(environment.config())) {
         LOG.info("Running Styx in development mode, will use InMemStorage");
         return new InMemStorage();
-      } else {
-        return storage.apply(environment);
-      }
-    };
-  }
-
-  private static EventStorageFactory eventStorage(Singleton<AggregateStorage> storage) {
-    return environment -> {
-      if (isDevMode(environment.config())) {
-        LOG.info("Running Styx in development mode, will use NoopEventStorage");
-        return new NoopEventStorage();
       } else {
         return storage.apply(environment);
       }

@@ -20,11 +20,13 @@
 
 package com.spotify.styx.cli;
 
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.toCollection;
 import static org.fusesource.jansi.Ansi.ansi;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.spotify.styx.api.cli.ActiveStatesPayload;
+import com.spotify.styx.api.cli.ActiveStatesPayload.ActiveState;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
@@ -54,29 +56,20 @@ class CliUtil {
     return ansi().fg(color).a(obj).reset();
   }
 
-  static SortedMap<WorkflowId, SortedSet<ActiveStatesPayload.ActiveState>> groupActiveStates(
-      List<ActiveStatesPayload.ActiveState> activeStates) {
-
-    SortedMap<WorkflowId, SortedSet<ActiveStatesPayload.ActiveState>> groupedWorkflowInstances =
-        newSortedWorkflowIdSet();
-
-    for (ActiveStatesPayload.ActiveState activeState : activeStates) {
-      groupedWorkflowInstances.compute(activeState.workflowInstance().workflowId(), (k, v) -> {
-        if (v == null) {
-          v = newSortedActiveStateSet();
-        }
-        v.add(activeState);
-        return v;
-      });
-    }
-    return groupedWorkflowInstances;
+  static SortedMap<WorkflowId, SortedSet<ActiveState>> groupActiveStates(List<ActiveState> activeStates) {
+    return activeStates.stream()
+        .collect(groupingBy(
+            activeState -> activeState.workflowInstance().workflowId(),
+            CliUtil::newSortedWorkflowIdSet,
+            toCollection(CliUtil::newSortedActiveStateSet)
+        ));
   }
 
-  private static TreeSet<ActiveStatesPayload.ActiveState> newSortedActiveStateSet() {
-    return Sets.newTreeSet(ActiveStatesPayload.ActiveState.PARAMETER_COMPARATOR);
+  private static TreeSet<ActiveState> newSortedActiveStateSet() {
+    return Sets.newTreeSet(ActiveState.PARAMETER_COMPARATOR);
   }
 
-  private static TreeMap<WorkflowId, SortedSet<ActiveStatesPayload.ActiveState>> newSortedWorkflowIdSet() {
+  private static TreeMap<WorkflowId, SortedSet<ActiveState>> newSortedWorkflowIdSet() {
     return Maps.newTreeMap(WorkflowId.KEY_COMPARATOR);
   }
 

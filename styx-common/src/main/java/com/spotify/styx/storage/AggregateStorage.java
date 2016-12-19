@@ -41,7 +41,7 @@ import org.apache.hadoop.hbase.client.Connection;
 /**
  * A {@link Storage} implementation backed by Datastore and Bigtable
  */
-public class AggregateStorage implements Storage, EventStorage {
+public class AggregateStorage implements Storage {
 
   private final BigtableStorage bigtableStorage;
   private final DatastoreStorage datastoreStorage;
@@ -57,6 +57,17 @@ public class AggregateStorage implements Storage, EventStorage {
   }
 
   @Override
+  public void writeEvent(SequenceEvent sequenceEvent) throws IOException {
+    bigtableStorage.writeEvent(sequenceEvent);
+  }
+
+  @Override
+  public Optional<Long> getLatestStoredCounter(WorkflowInstance workflowInstance)
+      throws IOException {
+    return bigtableStorage.getLatestStoredCounter(workflowInstance);
+  }
+
+  @Override
   public Map<WorkflowInstance, Long> readActiveWorkflowInstances() throws IOException {
     return datastoreStorage.allActiveStates();
   }
@@ -64,11 +75,6 @@ public class AggregateStorage implements Storage, EventStorage {
   @Override
   public Map<WorkflowInstance, Long> readActiveWorkflowInstances(String componentId) throws IOException {
     return datastoreStorage.activeStates(componentId);
-  }
-
-  @Override
-  public void writeEvent(SequenceEvent sequenceEvent) throws IOException {
-    bigtableStorage.writeEvent(sequenceEvent);
   }
 
   @Override
@@ -104,12 +110,6 @@ public class AggregateStorage implements Storage, EventStorage {
   @Override
   public Set<WorkflowId> enabled() throws IOException {
     return datastoreStorage.enabled();
-  }
-
-  @Override
-  public Optional<Long> getLatestStoredCounter(WorkflowInstance workflowInstance)
-      throws IOException {
-    return bigtableStorage.getLatestStoredCounter(workflowInstance);
   }
 
   @Override
