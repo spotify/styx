@@ -41,10 +41,11 @@ class PrettyCliOutput implements CliOutput {
   @Override
   public void printActiveStates(ActiveStatesPayload activeStatesPayload) {
     System.out.println(String.format(
-        "  %-20s %-16s %-47s %s",
+        "  %-20s %-12s %-47s %-7s %s",
         "WORKFLOW INSTANCE",
         "STATE",
         "LAST EXECUTION ID",
+        "TRIES",
         "PREVIOUS EXECUTION MESSAGE"));
 
     CliUtil.groupActiveStates(activeStatesPayload.activeStates()).entrySet().forEach(entry -> {
@@ -80,11 +81,13 @@ class PrettyCliOutput implements CliOutput {
         }
 
         System.out.println(String.format(
-            "  %-20s %-24s %-47s %s",
+            "  %-20s %-20s %-47s %-7d %s",
             activeState.workflowInstance().parameter(),
             state,
-            stateData.executionId().orElse("<no execution id>"),
-            lastMessage));
+            stateData.executionId().orElse("<no-execution-id>"),
+            stateData.tries(),
+            lastMessage
+        ));
       });
     });
   }

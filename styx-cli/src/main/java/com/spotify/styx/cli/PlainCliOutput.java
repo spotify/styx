@@ -54,13 +54,15 @@ class PlainCliOutput implements CliOutput {
         }
 
         System.out.println(String.format(
-            "%s %s %s %s %s %s",
+            "%s %s %s %s %s %d %s",
             workflowId.componentId(),
             workflowId.endpointId(),
             activeState.workflowInstance().parameter(),
             activeState.state(),
-            stateData.executionId().orElse("<no execution id>"),
-            lastMessage));
+            stateData.executionId().orElse("<no-execution-id>"),
+            stateData.tries(),
+            lastMessage
+        ));
       });
     });
   }

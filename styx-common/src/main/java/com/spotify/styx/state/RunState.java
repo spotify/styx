@@ -175,6 +175,7 @@ public abstract class RunState {
               data().builder()
                   .executionId(executionId)
                   .executionDescription(ExecutionDescription.forImage(dockerImage))
+                  .tries(data().tries() + 1)
                   .build());
 
         default:
@@ -217,6 +218,7 @@ public abstract class RunState {
               SUBMITTED,
               data().builder()
                   .executionId(executionId)
+                  .tries(data().tries() + 1)
                   .build());
 
         default:
@@ -244,7 +246,6 @@ public abstract class RunState {
           final StateData.MessageLevel level = messageLevel(exitCode);
 
           final StateData newStateData = data().builder()
-              .tries(data().tries() + 1)
               .retryCost(data().retryCost() + cost)
               .lastExit(exitCode)
               .addMessage(StateData.Message.create(level, "Exit code: " + exitCode))
@@ -281,7 +282,6 @@ public abstract class RunState {
         case RUNNING:
         case PREPARE:
           final StateData newStateData = data().builder()
-              .tries(data().tries() + 1)
               .retryCost(data().retryCost() + FAILURE_COST)
               .lastExit(empty())
               .addMessage(StateData.Message.error(message))
@@ -349,11 +349,7 @@ public abstract class RunState {
 
     @Override
     public RunState timeout(WorkflowInstance workflowInstance) {
-      return state(
-          FAILED,
-          data().builder()
-              .tries(data().tries() + 1)
-              .build());
+      return state(FAILED);
     }
 
     @Override
