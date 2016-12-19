@@ -23,10 +23,8 @@ package com.spotify.styx.cli;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Client;
@@ -42,6 +40,7 @@ import com.spotify.styx.model.EventSerializer.PersistentEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.util.EventUtil;
+import com.spotify.styx.util.Json;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -72,9 +71,7 @@ public final class Main {
   private static final String WORKFLOW_DEST = "workflow";
   private static final String PARAMETER_DEST = "parameter";
 
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
-      .setPropertyNamingStrategy(PropertyNamingStrategy.SNAKE_CASE)
-      .registerModule(new Jdk8Module());
+  private static final ObjectMapper OBJECT_MAPPER = Json.OBJECT_MAPPER;
 
   private static final int EXIT_CODE_SUCCESS = 0;
   private static final int EXIT_CODE_API_ERROR = 1;
@@ -229,7 +226,7 @@ public final class Main {
             try {
               Event typedEvent = OBJECT_MAPPER.convertValue(event, PersistentEvent.class).toEvent();
               eventName = EventUtil.name(typedEvent);
-              eventInfo = CliUtil.data(typedEvent);
+              eventInfo = CliUtil.info(typedEvent);
             } catch (IllegalArgumentException e) {
               // fall back to just inspecting the json
               eventName = event.get("@type").asText();

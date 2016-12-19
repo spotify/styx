@@ -20,30 +20,31 @@
 
 package com.spotify.styx.api.cli;
 
-import static com.spotify.styx.model.EventSerializer.PersistentEvent;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.StateData;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Value type for all current active states
  */
 @AutoValue
+@JsonIgnoreProperties(ignoreUnknown = true)
 public abstract class ActiveStatesPayload {
 
   @JsonProperty
   public abstract List<ActiveState> activeStates();
 
   @AutoValue
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public abstract static class ActiveState {
 
     public static final Comparator<ActiveState> PARAMETER_COMPARATOR =
-        (a, b) -> a.workflowInstance().parameter().compareTo(b.workflowInstance().parameter());
+        Comparator.comparing(a -> a.workflowInstance().parameter());
 
     @JsonProperty
     public abstract WorkflowInstance workflowInstance();
@@ -52,22 +53,14 @@ public abstract class ActiveStatesPayload {
     public abstract String state();
 
     @JsonProperty
-    public abstract String lastExecutionId();
-
-    @JsonProperty
-    public abstract Optional<PersistentEvent> previousExecutionLastEvent();
+    public abstract StateData stateData();
 
     @JsonCreator
     public static ActiveState create(
         @JsonProperty("workflow_instance") WorkflowInstance workflowInstance,
         @JsonProperty("state") String state,
-        @JsonProperty("last_execution_id") String lastExecutionId,
-        @JsonProperty("previous_execution_last_event") Optional<PersistentEvent> previousExecutionLastEvent) {
-      return new AutoValue_ActiveStatesPayload_ActiveState(
-          workflowInstance,
-          state,
-          lastExecutionId,
-          previousExecutionLastEvent);
+        @JsonProperty("state_data") StateData stateData) {
+      return new AutoValue_ActiveStatesPayload_ActiveState(workflowInstance, state, stateData);
     }
   }
 

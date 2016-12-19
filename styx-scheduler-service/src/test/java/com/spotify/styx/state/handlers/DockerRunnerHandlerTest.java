@@ -68,7 +68,7 @@ public class DockerRunnerHandlerTest {
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
     ExecutionDescription desc = ExecutionDescription.forImage(TEST_DOCKER_IMAGE);
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
-        StateData.builder().executionDescription(desc).build());
+        StateData.newBuilder().executionDescription(desc).build());
 
     stateManager.initialize(runState);
     dockerRunnerHandler.transitionInto(runState);
@@ -82,7 +82,7 @@ public class DockerRunnerHandlerTest {
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
-        StateData.builder().executionDescription(EXECUTION_DESCRIPTION).build());
+        StateData.newBuilder().executionDescription(EXECUTION_DESCRIPTION).build());
 
     stateManager.initialize(runState);
     dockerRunnerHandler.transitionInto(runState);
@@ -98,7 +98,7 @@ public class DockerRunnerHandlerTest {
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
-        StateData.builder().executionDescription(EXECUTION_DESCRIPTION).build());
+        StateData.newBuilder().executionDescription(EXECUTION_DESCRIPTION).build());
 
     stateManager.initialize(runState);
     dockerRunnerHandler.transitionInto(runState);
@@ -124,7 +124,7 @@ public class DockerRunnerHandlerTest {
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.FAILED,
-        StateData.builder().executionId(TEST_EXECUTION_ID).build());
+        StateData.newBuilder().executionId(TEST_EXECUTION_ID).build());
 
     stateManager.initialize(runState);
     dockerRunnerHandler.transitionInto(runState);

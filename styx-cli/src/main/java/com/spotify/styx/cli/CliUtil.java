@@ -45,15 +45,16 @@ import org.fusesource.jansi.Ansi;
 
 class CliUtil {
 
-  public static final int SUCCESS_EXIT_CODE = 0;
-  public static final int MISSING_DEPENDENCIES_EXIT_CODE = 20;
-
   private CliUtil() {
     // no instantiation
   }
 
   static Ansi colored(Ansi.Color color, Object obj) {
     return ansi().fg(color).a(obj).reset();
+  }
+
+  static Ansi coloredBright(Ansi.Color color, Object obj) {
+    return ansi().fgBright(color).a(obj).reset();
   }
 
   static SortedMap<WorkflowId, SortedSet<ActiveState>> groupActiveStates(List<ActiveState> activeStates) {
@@ -81,100 +82,11 @@ class CliUtil {
         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
   }
 
-  public static String lastExecutionMessage(Event event) {
-    return event.accept(LastExecutionMessage.INSTANCE);
+  public static String info(Event event) {
+    return event.accept(EventInfoVisitor.INSTANCE);
   }
 
-  public static String data(Event event) {
-    return event.accept(EventDataVisitor.INSTANCE);
-  }
-
-  private enum LastExecutionMessage implements EventVisitor<String> {
-    INSTANCE;
-
-    @Override
-    public String terminate(WorkflowInstance workflowInstance, int exitCode) {
-      switch (exitCode) {
-        case SUCCESS_EXIT_CODE:
-        case MISSING_DEPENDENCIES_EXIT_CODE:
-          return "Exit code: " + exitCode;
-        default:
-          return "Exit code: " + exitCode;
-      }
-    }
-
-    @Override
-    public String runError(WorkflowInstance workflowInstance, String message) {
-      return "Error message: " + message;
-    }
-
-    @Override
-    public String timeTrigger(WorkflowInstance workflowInstance) {
-      return "Unexpected data";
-    }
-
-    @Override
-    public String triggerExecution(WorkflowInstance workflowInstance, String triggerId) {
-      return "Unexpected data";
-    }
-
-    @Override
-    public String created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
-      return "Unexpected data";
-    }
-
-    @Override
-    public String dequeue(WorkflowInstance workflowInstance) {
-      return "Unexpected data";
-    }
-
-    @Override
-    public String started(WorkflowInstance workflowInstance) {
-      return "Unexpected data";
-    }
-
-    @Override
-    public String success(WorkflowInstance workflowInstance) {
-      return "Unexpected data";
-    }
-
-    @Override
-    public String retryAfter(WorkflowInstance workflowInstance, long delayMillis) {
-      return "Unexpected data";
-    }
-
-    @Override
-    public String retry(WorkflowInstance workflowInstance) {
-      return "Unexpected data";
-    }
-
-    @Override
-    public String stop(WorkflowInstance workflowInstance) {
-      return "Unexpected data";
-    }
-
-    @Override
-    public String timeout(WorkflowInstance workflowInstance) {
-      return "Unexpected data";
-    }
-
-    @Override
-    public String halt(WorkflowInstance workflowInstance) {
-      return "Unexpected data";
-    }
-
-    @Override
-    public String submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) {
-      return "Unexpected data";
-    }
-
-    @Override
-    public String submitted(WorkflowInstance workflowInstance, String executionId) {
-      return "Unexpected data";
-    }
-  }
-
-  private enum EventDataVisitor implements EventVisitor<String> {
+  private enum EventInfoVisitor implements EventVisitor<String> {
     INSTANCE;
 
     @Override

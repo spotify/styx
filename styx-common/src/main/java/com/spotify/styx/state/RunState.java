@@ -31,6 +31,7 @@ import static com.spotify.styx.state.RunState.State.SUBMITTED;
 import static com.spotify.styx.state.RunState.State.SUBMITTING;
 import static com.spotify.styx.state.RunState.State.TERMINATED;
 import static java.lang.System.currentTimeMillis;
+import static java.util.Optional.empty;
 
 import com.google.auto.value.AutoValue;
 import com.spotify.styx.model.Event;
@@ -49,6 +50,7 @@ import java.time.Instant;
 @AutoValue
 public abstract class RunState {
 
+  public static final int SUCCESS_EXIT_CODE = 0;
   public static final int MISSING_DEPS_EXIT_CODE = 20;
 
   public static final double FAILURE_COST = 1.0;
@@ -138,7 +140,7 @@ public abstract class RunState {
         case NEW:
           return state( // for backwards compatibility
               SUBMITTED,
-              data().toBuilder()
+              data().builder()
                   .triggerId("UNKNOWN")
                   .build());
 
@@ -153,7 +155,7 @@ public abstract class RunState {
         case NEW:
           return state(
               QUEUED,
-              data().toBuilder()
+              data().builder()
                   .triggerId(triggerId)
                   .build());
 
@@ -170,7 +172,7 @@ public abstract class RunState {
         case QUEUED:
           return state(
               SUBMITTED, // for backwards compatibility
-              data().toBuilder()
+              data().builder()
                   .executionId(executionId)
                   .executionDescription(ExecutionDescription.forImage(dockerImage))
                   .build());
@@ -198,7 +200,7 @@ public abstract class RunState {
         case PREPARE:
           return state(
               SUBMITTING,
-              data().toBuilder()
+              data().builder()
                   .executionDescription(executionDescription)
                   .build());
 
@@ -213,7 +215,7 @@ public abstract class RunState {
         case SUBMITTING:
           return state(
               SUBMITTED,
-              data().toBuilder()
+              data().builder()
                   .executionId(executionId)
                   .build());
 
@@ -238,19 +240,36 @@ public abstract class RunState {
     public RunState terminate(WorkflowInstance workflowInstance, int exitCode) {
       switch (state()) {
         case RUNNING:
-          final double cost = (exitCode == MISSING_DEPS_EXIT_CODE)
-              ? MISSING_DEPS_COST : FAILURE_COST;
+          final double cost = exitCost(exitCode);
+          final StateData.MessageLevel level = messageLevel(exitCode);
 
-          final StateData newStateData = data().toBuilder()
+          final StateData newStateData = data().builder()
               .tries(data().tries() + 1)
               .retryCost(data().retryCost() + cost)
               .lastExit(exitCode)
+              .addMessage(StateData.Message.create(level, "Exit code: " + exitCode))
               .build();
 
           return state(TERMINATED, newStateData);
 
         default:
           throw illegalTransition("terminate");
+      }
+    }
+
+    double exitCost(int exitCode) {
+      switch (exitCode) {
+        case SUCCESS_EXIT_CODE:      return 0.0;
+        case MISSING_DEPS_EXIT_CODE: return MISSING_DEPS_COST;
+        default:                     return FAILURE_COST;
+      }
+    }
+
+    StateData.MessageLevel messageLevel(int exitCode) {
+      switch (exitCode) {
+        case SUCCESS_EXIT_CODE:      return StateData.MessageLevel.INFO;
+        case MISSING_DEPS_EXIT_CODE: return StateData.MessageLevel.WARNING;
+        default:                     return StateData.MessageLevel.ERROR;
       }
     }
 
@@ -261,10 +280,11 @@ public abstract class RunState {
         case SUBMITTED:
         case RUNNING:
         case PREPARE:
-          final StateData newStateData = data().toBuilder()
+          final StateData newStateData = data().builder()
               .tries(data().tries() + 1)
               .retryCost(data().retryCost() + FAILURE_COST)
-              .lastExit(StateData.DEFAULT_EXIT)
+              .lastExit(empty())
+              .addMessage(StateData.Message.error(message))
               .build();
 
           return state(FAILED, newStateData);
@@ -292,7 +312,7 @@ public abstract class RunState {
         case FAILED:
           return state(
               QUEUED,
-              data().toBuilder()
+              data().builder()
                   .retryDelayMillis(delayMillis)
                   .build());
 
@@ -331,7 +351,7 @@ public abstract class RunState {
     public RunState timeout(WorkflowInstance workflowInstance) {
       return state(
           FAILED,
-          data().toBuilder()
+          data().builder()
               .tries(data().tries() + 1)
               .build());
     }
