@@ -33,6 +33,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.google.common.base.Throwables;
+import com.spotify.styx.state.Message;
+import io.norberg.automatter.jackson.AutoMatterModule;
 import java.io.IOException;
 import java.util.Optional;
 import okio.ByteString;
@@ -40,31 +42,27 @@ import okio.ByteString;
 public final class EventSerializer {
 
   private static final SerializerVisitor SERIALIZER_VISITOR = new SerializerVisitor();
-  private static final ObjectMapper MAPPER = new ObjectMapper()
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
       .setPropertyNamingStrategy(PropertyNamingStrategy.SNAKE_CASE)
+      .registerModule(new AutoMatterModule())
       .registerModule(new Jdk8Module());
 
   public static PersistentEvent convertEventToPersistentEvent(Event event) {
     return event.accept(SERIALIZER_VISITOR);
   }
 
-  public ByteString convert(Event event) {
-    return serialize(convertEventToPersistentEvent(event));
-  }
-
-  public Event convert(ByteString event) {
+  public ByteString serialize(Event event) {
     try {
-      PersistentEvent persistentEvent = MAPPER.readValue(event.toByteArray(), PersistentEvent.class);
-      return persistentEvent.toEvent();
-    } catch (IOException e) {
+      return ByteString.of(OBJECT_MAPPER.writeValueAsBytes(convertEventToPersistentEvent(event)));
+    } catch (JsonProcessingException e) {
       throw Throwables.propagate(e);
     }
   }
 
-  private ByteString serialize(PersistentEvent persistentEvent) {
+  public Event deserialize(ByteString json) {
     try {
-      return ByteString.of(MAPPER.writeValueAsBytes(persistentEvent));
-    } catch (JsonProcessingException e) {
+      return OBJECT_MAPPER.readValue(json.toByteArray(), PersistentEvent.class).toEvent();
+    } catch (IOException e) {
       throw Throwables.propagate(e);
     }
   }
@@ -79,6 +77,11 @@ public final class EventSerializer {
     @Override
     public PersistentEvent triggerExecution(WorkflowInstance workflowInstance, String triggerId) {
       return new TriggerExecution(workflowInstance.toKey(), Optional.of(triggerId));
+    }
+
+    @Override
+    public PersistentEvent info(WorkflowInstance workflowInstance, Message message) {
+      return new Info(workflowInstance.toKey(), message);
     }
 
     @Override
@@ -152,6 +155,7 @@ public final class EventSerializer {
   @JsonSubTypes({
       @JsonSubTypes.Type(value = PersistentEvent.class, name = "timeTrigger"),
       @JsonSubTypes.Type(value = TriggerExecution.class, name = "triggerExecution"),
+      @JsonSubTypes.Type(value = Info.class, name = "info"),
       @JsonSubTypes.Type(value = Created.class, name = "created"),
       @JsonSubTypes.Type(value = PersistentEvent.class, name = "dequeue"),
       @JsonSubTypes.Type(value = Started.class, name = "started"),
@@ -221,6 +225,24 @@ public final class EventSerializer {
     @Override
     public Event toEvent() {
       return Event.triggerExecution(WorkflowInstance.parseKey(workflowInstance), triggerId);
+    }
+  }
+
+  public static class Info extends PersistentEvent {
+
+    public final Message message;
+
+    @JsonCreator
+    public Info(
+        @JsonProperty("workflow_instance") String workflowInstance,
+        @JsonProperty("message") Message message) {
+      super("info", workflowInstance);
+      this.message = message;
+    }
+
+    @Override
+    public Event toEvent() {
+      return Event.info(WorkflowInstance.parseKey(workflowInstance), message);
     }
   }
 

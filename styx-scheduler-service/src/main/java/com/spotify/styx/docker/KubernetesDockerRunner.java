@@ -31,6 +31,7 @@ import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
+import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import io.fabric8.kubernetes.api.model.EnvVar;
@@ -317,6 +318,11 @@ class KubernetesDockerRunner implements DockerRunner {
 
     @Override
     public Boolean triggerExecution(WorkflowInstance workflowInstance, String triggerId) {
+      return false;
+    }
+
+    @Override
+    public Boolean info(WorkflowInstance workflowInstance, Message message) {
       return false;
     }
 

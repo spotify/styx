@@ -20,6 +20,7 @@
 
 package com.spotify.styx.model;
 
+import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -84,6 +85,12 @@ class WFIExecutionBuilder {
 
       currTriggerId = triggerId;
       triggerTs = eventTs;
+      return null;
+    }
+
+    @Override
+    public Void info(WorkflowInstance workflowInstance, Message message) {
+      currWorkflowInstance = workflowInstance;
       return null;
     }
 

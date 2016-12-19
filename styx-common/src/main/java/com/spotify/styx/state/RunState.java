@@ -184,6 +184,21 @@ public abstract class RunState {
     }
 
     @Override
+    public RunState info(WorkflowInstance workflowInstance, Message message) {
+      switch (state()) {
+        case QUEUED:
+          return state(
+              QUEUED,
+              data().builder()
+                  .addMessage(message)
+                  .build());
+
+        default:
+          throw illegalTransition("info");
+      }
+    }
+
+    @Override
     public RunState dequeue(WorkflowInstance workflowInstance) {
       switch (state()) {
         case QUEUED:
@@ -243,12 +258,12 @@ public abstract class RunState {
       switch (state()) {
         case RUNNING:
           final double cost = exitCost(exitCode);
-          final StateData.MessageLevel level = messageLevel(exitCode);
+          final Message.MessageLevel level = messageLevel(exitCode);
 
           final StateData newStateData = data().builder()
               .retryCost(data().retryCost() + cost)
               .lastExit(exitCode)
-              .addMessage(StateData.Message.create(level, "Exit code: " + exitCode))
+              .addMessage(Message.create(level, "Exit code: " + exitCode))
               .build();
 
           return state(TERMINATED, newStateData);
@@ -266,17 +281,18 @@ public abstract class RunState {
       }
     }
 
-    StateData.MessageLevel messageLevel(int exitCode) {
+    Message.MessageLevel messageLevel(int exitCode) {
       switch (exitCode) {
-        case SUCCESS_EXIT_CODE:      return StateData.MessageLevel.INFO;
-        case MISSING_DEPS_EXIT_CODE: return StateData.MessageLevel.WARNING;
-        default:                     return StateData.MessageLevel.ERROR;
+        case SUCCESS_EXIT_CODE:      return Message.MessageLevel.INFO;
+        case MISSING_DEPS_EXIT_CODE: return Message.MessageLevel.WARNING;
+        default:                     return Message.MessageLevel.ERROR;
       }
     }
 
     @Override
     public RunState runError(WorkflowInstance workflowInstance, String message) {
       switch (state()) {
+        case QUEUED:
         case SUBMITTING:
         case SUBMITTED:
         case RUNNING:
@@ -284,7 +300,7 @@ public abstract class RunState {
           final StateData newStateData = data().builder()
               .retryCost(data().retryCost() + FAILURE_COST)
               .lastExit(empty())
-              .addMessage(StateData.Message.error(message))
+              .addMessage(Message.error(message))
               .build();
 
           return state(FAILED, newStateData);

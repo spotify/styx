@@ -23,6 +23,7 @@ package com.spotify.styx.model;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
+import com.spotify.styx.state.Message;
 import java.util.Arrays;
 import java.util.Optional;
 import okio.ByteString;
@@ -50,6 +51,7 @@ public class EventSerializerTest {
   public void testRoundtripAllEvents() {
     assertRoundtrip(Event.timeTrigger(INSTANCE1));
     assertRoundtrip(Event.triggerExecution(INSTANCE1, TRIGGER1));
+    assertRoundtrip(Event.info(INSTANCE1, Message.info("InfoMessage")));
     assertRoundtrip(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE));
     assertRoundtrip(Event.dequeue(INSTANCE1));
     assertRoundtrip(Event.started(INSTANCE1));
@@ -67,59 +69,64 @@ public class EventSerializerTest {
 
   @Test
   public void testDeserializeFromJson() throws Exception {
-    assertThat(eventSerializer.convert(json("timeTrigger")), is(Event.timeTrigger(INSTANCE1)));
-    assertThat(eventSerializer.convert(json("dequeue")), is(Event.dequeue(INSTANCE1)));
-    assertThat(eventSerializer.convert(json("started")), is(Event.started(INSTANCE1)));
-    assertThat(eventSerializer.convert(json("success")), is(Event.success(INSTANCE1)));
-    assertThat(eventSerializer.convert(json("retry")), is(Event.retry(INSTANCE1)));
-    assertThat(eventSerializer.convert(json("stop")), is(Event.stop(INSTANCE1)));
-    assertThat(eventSerializer.convert(json("timeout")), is(Event.timeout(INSTANCE1)));
-    assertThat(eventSerializer.convert(json("halt")), is(Event.halt(INSTANCE1)));
+    assertThat(eventSerializer.deserialize(json("timeTrigger")), is(Event.timeTrigger(INSTANCE1)));
+    assertThat(eventSerializer.deserialize(json("dequeue")), is(Event.dequeue(INSTANCE1)));
+    assertThat(eventSerializer.deserialize(json("started")), is(Event.started(INSTANCE1)));
+    assertThat(eventSerializer.deserialize(json("success")), is(Event.success(INSTANCE1)));
+    assertThat(eventSerializer.deserialize(json("retry")), is(Event.retry(INSTANCE1)));
+    assertThat(eventSerializer.deserialize(json("stop")), is(Event.stop(INSTANCE1)));
+    assertThat(eventSerializer.deserialize(json("timeout")), is(Event.timeout(INSTANCE1)));
+    assertThat(eventSerializer.deserialize(json("halt")), is(Event.halt(INSTANCE1)));
     assertThat(
-        eventSerializer.convert(json("submit", "\"execution_description\": { "
-                                               + "\"docker_image\":\"" + DOCKER_IMAGE + "\","
-                                               + "\"docker_args\":[\"foo\",\"bar\"],"
-                                               + "\"secret\":{\"name\":\"secret\",\"mount_path\":\"/dev/null\"},"
-                                               + "\"commit_sha\":\"" + COMMIT_SHA
-                                               + "\"}")),
+        eventSerializer.deserialize(json("submit", "\"execution_description\": { "
+                                                   + "\"docker_image\":\"" + DOCKER_IMAGE + "\","
+                                                   + "\"docker_args\":[\"foo\",\"bar\"],"
+                                                   + "\"secret\":{\"name\":\"secret\",\"mount_path\":\"/dev/null\"},"
+                                                   + "\"commit_sha\":\"" + COMMIT_SHA
+                                                   + "\"}")),
         is(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION)));
     assertThat(
-        eventSerializer.convert(json("submitted", "\"execution_id\":\"" + POD_NAME + "\"")),
+        eventSerializer.deserialize(json("info", "\"message\":{\"line\":\"InfoMessage\",\"level\":\"INFO\"}")),
+        is(Event.info(INSTANCE1, Message.info("InfoMessage"))));
+    assertThat(
+        eventSerializer.deserialize(json("submitted", "\"execution_id\":\"" + POD_NAME + "\"")),
         is(Event.submitted(INSTANCE1, POD_NAME)));
     assertThat(
-        eventSerializer.convert(json("created", "\"execution_id\":\"" + POD_NAME + "\",\"docker_image\":\"" + DOCKER_IMAGE + "\"")),
+        eventSerializer.deserialize(json("created", "\"execution_id\":\"" + POD_NAME + "\",\"docker_image\":\"" + DOCKER_IMAGE + "\"")),
         is(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE)));
     assertThat(
-        eventSerializer.convert(json("runError", "\"message\":\"ErrorMessage\"")),
+        eventSerializer.deserialize(json("runError", "\"message\":\"ErrorMessage\"")),
         is(Event.runError(INSTANCE1, "ErrorMessage")));
     assertThat(
-        eventSerializer.convert(json("retryAfter", "\"delay_millis\":12345")),
+        eventSerializer.deserialize(json("retryAfter", "\"delay_millis\":12345")),
         is(Event.retryAfter(INSTANCE1, 12345)));
     assertThat(
-        eventSerializer.convert(json("triggerExecution", "\"trigger_id\":\"trig\"")),
+        eventSerializer.deserialize(json("triggerExecution", "\"trigger_id\":\"trig\"")),
         is(Event.triggerExecution(INSTANCE1, "trig")));
     assertThat(
-        eventSerializer.convert(json("terminate", "\"exit_code\":20")),
+        eventSerializer.deserialize(json("terminate", "\"exit_code\":20")),
         is(Event.terminate(INSTANCE1, 20)));
   }
 
   @Test
   public void testDeserializeFromJsonWhenTransformationRequired() throws Exception {
     assertThat(
-        eventSerializer.convert(json("started", "\"pod_name\":\"" + POD_NAME + "\"")),
+        eventSerializer.deserialize(json("started", "\"pod_name\":\"" + POD_NAME + "\"")),
         is(Event.started(INSTANCE1))); // for backwards compatibility
     assertThat(
-        eventSerializer.convert(json("created", "\"execution_id\":\"" + POD_NAME + "\"")),
+        eventSerializer.deserialize(json("created", "\"execution_id\":\"" + POD_NAME + "\"")),
         is(Event.created(INSTANCE1, POD_NAME, "UNKNOWN")));
     assertThat(
-        eventSerializer.convert(json("triggerExecution")),
+        eventSerializer.deserialize(json("triggerExecution")),
         is(Event.triggerExecution(INSTANCE1, "UNKNOWN")));
   }
 
   private void assertRoundtrip(Event event) {
-    ByteString byteString = eventSerializer.convert(event);
-    Event deserializedEvent = eventSerializer.convert(byteString);
-    Assert.assertThat(deserializedEvent, is(event));
+    ByteString byteString = eventSerializer.serialize(event);
+    Event deserializedEvent = eventSerializer.deserialize(byteString);
+    Assert.assertThat(
+        "serialized event did not match actual event after deserialization: " + byteString.utf8(),
+        deserializedEvent, is(event));
   }
 
   private ByteString json(String eventType) {

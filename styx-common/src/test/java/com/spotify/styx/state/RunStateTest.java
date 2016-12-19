@@ -429,9 +429,45 @@ public class RunStateTest {
     assertThat(
         transitioner.get(WORKFLOW_INSTANCE).data().messages(),
         contains(
-            StateData.Message.create(StateData.MessageLevel.WARNING, "Exit code: 20"),
-            StateData.Message.create(StateData.MessageLevel.ERROR, "Error")
+            Message.create(Message.MessageLevel.WARNING, "Exit code: 20"),
+            Message.create(Message.MessageLevel.ERROR, "Error")
         ));
+  }
+
+  @Test
+  public void testAccumulatesMessagesWithInfo() throws Exception {
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
+    transitioner.receive(eventFactory.triggerExecution("trig"));
+    transitioner.receive(eventFactory.info(Message.info("info message")));
+    transitioner.receive(eventFactory.info(Message.warning("warning message")));
+
+    assertThat(
+        transitioner.get(WORKFLOW_INSTANCE).data().messages(),
+        contains(
+            Message.info("info message"),
+            Message.warning("warning message")));
+  }
+
+  @Test
+  public void testInfoTransitionsToSameState() throws Exception {
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.receive(eventFactory.triggerExecution("trig"));
+    transitioner.receive(eventFactory.info(Message.info("hello")));
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(0));
+    assertThat(outputs, contains(QUEUED, QUEUED));
+  }
+
+  @Test
+  public void testRunErrorFromQueuedState() throws Exception {
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.receive(eventFactory.triggerExecution("trig"));
+    transitioner.receive(eventFactory.runError("Unknown resources"));
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(FAILED));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(0));
+    assertThat(outputs, contains(QUEUED, FAILED));
   }
 
   @Test

@@ -100,7 +100,7 @@ public class BigtableStorage {
         final byte[] key = Bytes.toBytes(keyString);
         final Put put = new Put(key, sequenceEvent.timestamp());
 
-        final byte[] eventBytes = eventSerializer.convert(sequenceEvent.event()).toByteArray();
+        final byte[] eventBytes = eventSerializer.serialize(sequenceEvent.event()).toByteArray();
         put.addColumn(EVENT_CF, EVENT_QUALIFIER, eventBytes);
         eventsTable.put(put);
       }
@@ -173,7 +173,7 @@ public class BigtableStorage {
     final String key = new String(r.getRow());
     final long timestamp = r.getColumnLatestCell(EVENT_CF, EVENT_QUALIFIER).getTimestamp();
     final byte[] value = r.getValue(EVENT_CF, EVENT_QUALIFIER);
-    final Event event = eventSerializer.convert(ByteString.of(value));
+    final Event event = eventSerializer.deserialize(ByteString.of(value));
     return SequenceEvent.parseKey(key, event, timestamp);
   }
 
