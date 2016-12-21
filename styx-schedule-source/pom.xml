@@ -4,7 +4,7 @@
   <parent>
     <groupId>com.spotify</groupId>
     <artifactId>styx</artifactId>
-    <version>0.2.1-SNAPSHOT</version>
+    <version>0.2.1</version>
   </parent>
 
   <name>Spotify Styx Schedule Source API</name>
@@ -14,7 +14,7 @@
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-common</artifactId>
-      <version>0.2.1-SNAPSHOT</version>
+      <version>0.2.1</version>
     </dependency>
 
     <dependency>
