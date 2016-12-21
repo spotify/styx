@@ -24,6 +24,7 @@ import static com.spotify.styx.cli.CliUtil.formatTimestamp;
 
 import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
 import java.util.List;
 import java.util.SortedMap;
@@ -43,13 +44,13 @@ class PlainCliOutput implements CliOutput {
       WorkflowId workflowId = entry.getKey();
       entry.getValue().forEach(activeState -> {
         final StateData stateData = activeState.stateData();
-        final List<StateData.Message> messages = stateData.messages();
+        final List<Message> messages = stateData.messages();
 
         final String lastMessage;
         if (messages.isEmpty()) {
           lastMessage = "No info";
         } else {
-          final StateData.Message message = messages.get(messages.size() - 1);
+          final Message message = messages.get(messages.size() - 1);
           lastMessage = message.line();
         }
 

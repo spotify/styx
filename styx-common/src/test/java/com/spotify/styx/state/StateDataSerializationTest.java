@@ -79,8 +79,8 @@ public class StateDataSerializationTest {
               Optional.of("474339ec18d3d04d5d513856bc8ca1d4f1aed03f")
           )
       )
-      .addMessage(StateData.Message.info("Message 1"))
-      .addMessage(StateData.Message.warning("Message 2"))
+      .addMessage(Message.info("Message 1"))
+      .addMessage(Message.warning("Message 2"))
       .build();
 
   @Test
@@ -122,9 +122,9 @@ public class StateDataSerializationTest {
 
   @Test
   public void deserializesUnknownMessageLevels() throws Exception {
-    final StateData.MessageLevel level =
-        Json.OBJECT_MAPPER.readValue("\"FOOBAR\"", StateData.MessageLevel.class);
+    final Message.MessageLevel level =
+        Json.OBJECT_MAPPER.readValue("\"FOOBAR\"", Message.MessageLevel.class);
 
-    assertThat(level, equalTo(StateData.MessageLevel.UNKNOWN));
+    assertThat(level, equalTo(Message.MessageLevel.UNKNOWN));
   }
 }

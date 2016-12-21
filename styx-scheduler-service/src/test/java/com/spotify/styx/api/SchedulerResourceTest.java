@@ -122,7 +122,7 @@ public class SchedulerResourceTest {
     stateManager.initialize(initialState);
 
     Event injectedEvent = Event.timeout(WFI);
-    ByteString eventPayload = eventSerializer.convert(injectedEvent);
+    ByteString eventPayload = eventSerializer.serialize(injectedEvent);
     CompletionStage<Response<ByteString>> post =
         serviceHelper.request("POST", SchedulerResource.BASE + "/events", eventPayload);
 
@@ -135,7 +135,7 @@ public class SchedulerResourceTest {
   @Test
   public void testRejectUnknownWorkflowInstance() throws Exception {
     Event injectedEvent = Event.timeout(WFI);
-    ByteString eventPayload = eventSerializer.convert(injectedEvent);
+    ByteString eventPayload = eventSerializer.serialize(injectedEvent);
     CompletionStage<Response<ByteString>> post =
         serviceHelper.request("POST", SchedulerResource.BASE + "/events", eventPayload);
 

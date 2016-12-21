@@ -37,6 +37,7 @@ import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
@@ -141,30 +142,54 @@ public class Scheduler {
       if (resourceRefs.isEmpty()) {
         sendDequeue(instance);
       } else {
-        final boolean canRun = resourceRefs.stream()
-            .allMatch(resourceId -> {
-              if (!resources.containsKey(resourceId)) {
-                // todo: send info event, referencing unknown resource
-                return false;
-              }
-
-              final Resource resource = resources.get(resourceId);
-              final long usage = currentResourceUsage.getOrDefault(resourceId, 0L);
-              return usage < resource.concurrency();
-            });
-
-        if (canRun) {
-          resourceRefs.forEach(id -> currentResourceUsage.computeIfAbsent(id, id_ -> 0L));
-          resourceRefs.forEach(id -> currentResourceUsage.compute(id, (id_, l) -> l + 1));
-          sendDequeue(instance);
-        } else {
-          // todo: send info event, could not run because resource limit reached
-        }
+        evaluateResourcesForDequeue(resources, currentResourceUsage, instance, resourceRefs);
       }
     };
 
     timedOutInstances.forEach(this::sendTimeout);
     eligibleInstances.forEach(limitAndDequeue);
+  }
+
+  private void evaluateResourcesForDequeue(
+      Map<String, Resource> resources,
+      Map<String, Long> currentResourceUsage,
+      InstanceState instance,
+      Set<String> resourceRefs) {
+    final Set<String> unknownResources = resourceRefs.stream()
+        .filter(resourceRef -> !resources.containsKey(resourceRef))
+        .collect(toSet());
+
+    final Set<String> depletedResources = resourceRefs.stream()
+        .filter(resourceId -> {
+          if (!resources.containsKey(resourceId)) {
+            return false;
+          }
+
+          final Resource resource = resources.get(resourceId);
+          final long usage = currentResourceUsage.getOrDefault(resourceId, 0L);
+          return usage >= resource.concurrency();
+        })
+        .collect(toSet());
+
+    if (!unknownResources.isEmpty()) {
+      stateManager.receiveIgnoreClosed(Event.runError(
+          instance.workflowInstance(),
+          String.format("Referenced resources not found: %s", unknownResources)));
+    } else if (!depletedResources.isEmpty()) {
+      final Message message = Message.info(
+          String.format("Resource limit reached for: %s",
+              depletedResources.stream()
+                  .map(resources::get)
+                  .collect(toList())));
+      final List<Message> messages = instance.runState().data().messages();
+      if (messages.size() == 0 || !message.equals(messages.get(messages.size() - 1))) {
+        stateManager.receiveIgnoreClosed(Event.info(instance.workflowInstance(), message));
+      }
+    } else {
+      resourceRefs.forEach(id -> currentResourceUsage.computeIfAbsent(id, id_ -> 0L));
+      resourceRefs.forEach(id -> currentResourceUsage.compute(id, (id_, l) -> l + 1));
+      sendDequeue(instance);
+    }
   }
 
   private Stream<ResourceWithInstance> pairWithResources(InstanceState instanceState) {

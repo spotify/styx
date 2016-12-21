@@ -84,6 +84,7 @@ public class SchedulerTest {
   }
 
   private void setResourceLimit(String resourceId, long limit) {
+    resourceLimits.removeIf(r -> r.id().equals(resourceId));
     resourceLimits.add(Resource.create(resourceId, limit));
   }
 
@@ -166,15 +167,79 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldNotScheduleWhenUnknownResourceReference() throws Exception {
+  public void shouldFailWhenUnknownResourceReference() throws Exception {
     setUp(20);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "unknown"));
     init(RunState.create(INSTANCE, State.QUEUED, time));
 
     scheduler.tick();
 
-    // todo assert info message
+    assertThat(
+    stateManager.get(INSTANCE).data().messages().get(0).line(),
+        is("Referenced resources not found: [unknown]"));
+    assertThat(stateManager.get(INSTANCE).state(), is(State.FAILED));
+  }
+
+  @Test
+  public void shouldIssueInfoIfResourceDepleted() throws Exception {
+    setUp(20);
+    setResourceLimit("r1", 0);
+    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
+    init(RunState.create(INSTANCE, State.QUEUED, time));
+
+    scheduler.tick();
+
+    assertThat(
+        stateManager.get(INSTANCE).data().messages().get(0).line(),
+        is("Resource limit reached for: [Resource{id=r1, concurrency=0}]"));
     assertThat(stateManager.get(INSTANCE).state(), is(State.QUEUED));
+  }
+
+  @Test
+  public void shouldFailWhenUnknownAndDepletedResources() throws Exception {
+    setUp(20);
+    setResourceLimit("r1", 0);
+    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1", "r2", "r3"));
+
+    init(RunState.create(INSTANCE, State.QUEUED, time));
+
+    scheduler.tick();
+
+    assertThat(
+        stateManager.get(INSTANCE).data().messages().get(0).line(),
+        is("Referenced resources not found: [r2, r3]"));
+    assertThat(stateManager.get(INSTANCE).state(), is(State.FAILED));
+  }
+
+  @Test
+  public void shouldIssueInfoOnceIfRepeated() throws Exception {
+    setUp(20);
+    setResourceLimit("r1", 0);
+    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
+    init(RunState.create(INSTANCE, State.QUEUED, time));
+
+    scheduler.tick();
+    scheduler.tick();
+
+    assertThat(stateManager.get(INSTANCE).data().messages().size(), is(1));
+    assertThat(stateManager.get(INSTANCE).state(), is(State.QUEUED));
+  }
+
+  @Test
+  public void shouldDequeueIfResourceValueIsIncreased() throws Exception {
+    setUp(20);
+    setResourceLimit("r1", 0);
+    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
+    init(RunState.create(INSTANCE, State.QUEUED, time));
+
+    scheduler.tick();
+
+    assertThat(stateManager.get(INSTANCE).state(), is(State.QUEUED));
+
+    setResourceLimit("r1", 1);
+    scheduler.tick();
+
+    assertThat(stateManager.get(INSTANCE).state(), is(State.PREPARE));
   }
 
   @Test

@@ -32,6 +32,7 @@ import static org.fusesource.jansi.Ansi.Color.RED;
 import static org.fusesource.jansi.Ansi.Color.YELLOW;
 
 import com.spotify.styx.api.cli.ActiveStatesPayload;
+import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
 import java.util.List;
 import org.fusesource.jansi.Ansi;
@@ -55,13 +56,13 @@ class PrettyCliOutput implements CliOutput {
                                        colored(BLUE, entry.getKey().endpointId())));
       entry.getValue().forEach(activeState -> {
         final StateData stateData = activeState.stateData();
-        final List<StateData.Message> messages = stateData.messages();
+        final List<Message> messages = stateData.messages();
 
         final Ansi lastMessage;
         if (messages.isEmpty()) {
           lastMessage = colored(DEFAULT, "No info");
         } else {
-          final StateData.Message message = messages.get(messages.size() - 1);
+          final Message message = messages.get(messages.size() - 1);
           final Ansi.Color messageColor = messageColor(message.level());
           lastMessage = colored(messageColor, message.line());
         }
@@ -92,7 +93,7 @@ class PrettyCliOutput implements CliOutput {
     });
   }
 
-  private Ansi.Color messageColor(StateData.MessageLevel level) {
+  private Ansi.Color messageColor(Message.MessageLevel level) {
     switch (level) {
       case INFO:    return GREEN;
       case WARNING: return YELLOW;
