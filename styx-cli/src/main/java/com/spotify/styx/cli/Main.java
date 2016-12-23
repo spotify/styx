@@ -325,7 +325,8 @@ public final class Main {
   private static class StyxCliParser {
 
     final ArgumentParser parser = ArgumentParsers.newArgumentParser("styx")
-        .description("Styx CLI");
+        .description("Styx CLI")
+        .version("Styx CLI " + Main.class.getPackage().getImplementationVersion());
 
     final Subparsers subCommands = parser.addSubparsers()
         .title("commands")
@@ -349,6 +350,8 @@ public final class Main {
         .help("plain output")
         .setDefault(false)
         .action(Arguments.storeTrue());
+
+    final Argument version = parser.addArgument("--version").action(Arguments.version());
 
     private static Subparser addWorkflowInstanceArguments(Subparser subparser) {
       subparser.addArgument(COMPONENT_DEST)
