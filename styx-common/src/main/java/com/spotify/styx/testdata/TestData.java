@@ -46,6 +46,9 @@ public final class TestData {
   public static final WorkflowId WORKFLOW_ID =
       WorkflowId.create("styx", "styx.TestEndpoint");
 
+  public static final WorkflowId WORKFLOW_ID_2 =
+      WorkflowId.create("ranic", "ranic");
+
   public static final WorkflowInstance WORKFLOW_INSTANCE =
       WorkflowInstance.create(WORKFLOW_ID, "2016-09-01");
 

@@ -21,6 +21,8 @@
 package com.spotify.styx.docker;
 
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
+import static com.spotify.styx.state.RunState.State.RUNNING;
+import static java.util.stream.Collectors.toSet;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
@@ -52,6 +54,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -190,9 +193,31 @@ class KubernetesDockerRunner implements DockerRunner {
         .watch(new PodWatcher(Integer.parseInt(resourceVersion)));
   }
 
-  private void pollPods() {
+  void examineRunningWFISandAssociatedPods(PodList podList) {
+    final Set<WorkflowInstance> runningWorkflowInstances = stateManager.activeStates()
+        .values()
+        .stream()
+        .filter(runState -> runState.state().equals(RUNNING))
+        .map(RunState::workflowInstance)
+        .collect(toSet());
+
+    final Set<WorkflowInstance> workflowInstancesForPods = podList.getItems().stream()
+        .filter(pod -> pod.getMetadata().getAnnotations()
+            .containsKey(STYX_WORKFLOW_INSTANCE_ANNOTATION))
+        .map(pod -> WorkflowInstance
+            .parseKey(pod.getMetadata().getAnnotations().get(STYX_WORKFLOW_INSTANCE_ANNOTATION)))
+        .collect(toSet());
+
+    runningWorkflowInstances.removeAll(workflowInstancesForPods);
+    runningWorkflowInstances.forEach(workflowInstance -> stateManager.receiveIgnoreClosed(
+        Event.runError(workflowInstance, "No pod associated with this instance")));
+  }
+
+  @VisibleForTesting
+  void pollPods() {
     try {
       final PodList list = client.pods().list();
+      examineRunningWFISandAssociatedPods(list);
       for (Pod pod : list.getItems()) {
         inspectPod(Watcher.Action.MODIFIED, pod);
       }
