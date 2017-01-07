@@ -621,7 +621,7 @@ class DatastoreStorage {
         .workflowId(workflowId)
         .concurrency((int) entity.getLong(PROPERTY_CONCURRENCY))
         .nextTrigger(datetimeToInstant(entity.getDateTime(PROPERTY_NEXT_TRIGGER)))
-        .schedule(Schedule.valueOf(entity.getString(PROPERTY_SCHEDULE)))
+        .schedule(Schedule.parse(entity.getString(PROPERTY_SCHEDULE)))
         .allTriggered(entity.getBoolean(PROPERTY_ALL_TRIGGERED))
         .halted(entity.getBoolean(PROPERTY_HALTED))
         .build();
@@ -640,7 +640,7 @@ class DatastoreStorage {
         .set(PROPERTY_END, instantToDatetime(backfill.end()))
         .set(PROPERTY_COMPONENT, backfill.workflowId().componentId())
         .set(PROPERTY_WORKFLOW, backfill.workflowId().id())
-        .set(PROPERTY_SCHEDULE, backfill.schedule().name())
+        .set(PROPERTY_SCHEDULE, backfill.schedule().toString())
         .set(PROPERTY_NEXT_TRIGGER, instantToDatetime(backfill.nextTrigger()))
         .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())
         .set(PROPERTY_HALTED, backfill.halted());

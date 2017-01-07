@@ -42,6 +42,10 @@
       <groupId>com.javaslang</groupId>
       <artifactId>javaslang</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.cronutils</groupId>
+      <artifactId>cron-utils</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>

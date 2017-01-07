@@ -103,13 +103,13 @@ public final class ParameterUtil {
   }
 
   public static String toParameter(Schedule schedule, Instant instant) {
-    switch (schedule) {
-      case DAYS:
-      case WEEKS:
+    switch (schedule.wellKnown()) {
+      case DAILY:
+      case WEEKLY:
         return ParameterUtil.formatDate(instant);
-      case HOURS:
+      case HOURLY:
         return ParameterUtil.formatDateHour(instant);
-      case MONTHS:
+      case MONTHLY:
         return ParameterUtil.formatMonth(instant);
 
       default:
@@ -147,15 +147,16 @@ public final class ParameterUtil {
    * Converts {@link Schedule} to {@link ChronoUnit}.
    */
   public static TemporalUnit scheduleToTemporalUnit(Schedule schedule) {
-    switch (schedule) {
-      case HOURS:
+    switch (schedule.wellKnown()) {
+      case HOURLY:
         return ChronoUnit.HOURS;
-      case DAYS:
+      case DAILY:
         return ChronoUnit.DAYS;
-      case WEEKS:
+      case WEEKLY:
         return ChronoUnit.WEEKS;
-      case MONTHS:
+      case MONTHLY:
         return ChronoUnit.MONTHS;
+
       default:
         throw new IllegalArgumentException("Schedule not supported: " + schedule);
     }
@@ -166,20 +167,24 @@ public final class ParameterUtil {
    * the result would be '2016-10-10T15:00:000'.
    */
   public static Instant truncateInstant(Instant instant, Schedule schedule) {
-    switch (schedule) {
-      case HOURS:
+    switch (schedule.wellKnown()) {
+      case HOURLY:
         return instant.truncatedTo(ChronoUnit.HOURS);
-      case DAYS:
+
+      case DAILY:
         return instant.truncatedTo(ChronoUnit.DAYS);
-      case WEEKS:
+
+      case WEEKLY:
         LocalDateTime dateTime = LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
         int daysToSubtract = dateTime.getDayOfWeek().getValue();
         dateTime = dateTime.minusDays(daysToSubtract - 1);
         Instant resultInstant = dateTime.toInstant(ZoneOffset.UTC);
         return resultInstant.truncatedTo(ChronoUnit.DAYS);
-      case MONTHS:
+
+      case MONTHLY:
         ZonedDateTime truncatedToMonth = instant.atZone(ZoneOffset.UTC).truncatedTo(ChronoUnit.DAYS).withDayOfMonth(1);
         return truncatedToMonth.toInstant();
+
       default:
         throw new IllegalArgumentException("Schedule not supported: " + schedule);
     }
@@ -213,8 +218,8 @@ public final class ParameterUtil {
   public static Either<String, Instant> instantFromWorkflowInstance(
       WorkflowInstance workflowInstance,
       Schedule schedule) {
-    switch (schedule) {
-      case HOURS:
+    switch (schedule.wellKnown()) {
+      case HOURLY:
         try {
           final LocalDateTime localDateTime = LocalDateTime.parse(
               workflowInstance.parameter(),
@@ -223,8 +228,7 @@ public final class ParameterUtil {
         } catch (DateTimeParseException e) {
           return Either.left(parseErrorMessage(schedule, HOUR_PATTERN));
         }
-
-      case DAYS:
+      case DAILY:
         try {
           final LocalDate localDate = LocalDate.parse(
               workflowInstance.parameter(),
@@ -233,8 +237,7 @@ public final class ParameterUtil {
         } catch (DateTimeParseException e) {
           return Either.left(parseErrorMessage(schedule, DAY_PATTERN));
         }
-
-      case WEEKS:
+      case WEEKLY:
         try {
           LocalDate localDate = LocalDate.parse(
               workflowInstance.parameter(),
