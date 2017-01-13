@@ -22,8 +22,10 @@ package com.spotify.styx.docker;
 
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
 import static com.spotify.styx.state.RunState.State.RUNNING;
+import static com.spotify.styx.util.Json.OBJECT_MAPPER;
 import static java.util.stream.Collectors.toSet;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -291,6 +293,11 @@ class KubernetesDockerRunner implements DockerRunner {
       final String podName = pod.getMetadata().getName();
       LOG.info("Pod event for {} at resource version {}", podName, lastResourceVersion);
       LOG.info("Action: {}", action);
+      try {
+        LOG.info("Status: {}", OBJECT_MAPPER.writeValueAsString(pod.getStatus()));
+      } catch (JsonProcessingException e) {
+        LOG.info("Status: {}", pod.getStatus());
+      }
 
       try {
         inspectPod(action, pod);
