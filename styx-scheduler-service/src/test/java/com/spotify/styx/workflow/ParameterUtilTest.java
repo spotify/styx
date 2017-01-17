@@ -22,12 +22,15 @@ package com.spotify.styx.workflow;
 
 import static com.spotify.styx.workflow.ParameterUtil.decrementInstant;
 import static com.spotify.styx.workflow.ParameterUtil.incrementInstant;
+import static com.spotify.styx.workflow.ParameterUtil.rangeOfInstants;
 import static com.spotify.styx.workflow.ParameterUtil.truncateInstant;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.model.Partitioning;
 import java.time.Instant;
+import java.util.List;
 import org.junit.Test;
 
 public class ParameterUtilTest {
@@ -113,5 +116,73 @@ public class ParameterUtilTest {
 
     final Instant months = truncateInstant(TIME, Partitioning.MONTHS);
     assertThat(months, is(truncatedTimeMonths));
+  }
+
+  @Test
+  public void shouldRangeOfInstantsHours() throws Exception {
+    final Instant startInstant = Instant.parse("2016-12-31T23:00:00.00Z");
+    final Instant endInstant = Instant.parse("2017-01-01T01:00:00.01Z");
+
+    List<Instant> list = rangeOfInstants(startInstant, endInstant, Partitioning.HOURS);
+    assertThat(list, contains(
+        Instant.parse("2016-12-31T23:00:00.00Z"),
+        Instant.parse("2017-01-01T00:00:00.00Z"),
+        Instant.parse("2017-01-01T01:00:00.00Z"))
+    );
+  }
+
+  @Test
+  public void shouldRangeOfInstantsDays() throws Exception {
+    final Instant startInstant = Instant.parse("2016-12-31T00:00:00.00Z");
+    final Instant endInstant = Instant.parse("2017-01-02T00:00:00.01Z");
+
+    List<Instant> list = rangeOfInstants(startInstant, endInstant, Partitioning.DAYS);
+    assertThat(list, contains(
+        Instant.parse("2016-12-31T00:00:00.00Z"),
+        Instant.parse("2017-01-01T00:00:00.00Z"),
+        Instant.parse("2017-01-02T00:00:00.00Z"))
+    );
+  }
+
+  @Test
+  public void shouldRangeOfInstantsWeeks() throws Exception {
+    final Instant startInstant = Instant.parse("2016-12-30T00:00:00.00Z");
+    final Instant endInstant = Instant.parse("2017-01-13T00:00:00.01Z");
+
+    List<Instant> list = rangeOfInstants(startInstant, endInstant, Partitioning.WEEKS);
+    assertThat(list, contains(
+        Instant.parse("2016-12-30T00:00:00.00Z"),
+        Instant.parse("2017-01-06T00:00:00.00Z"),
+        Instant.parse("2017-01-13T00:00:00.00Z"))
+    );
+  }
+
+  @Test
+  public void shouldRangeOfInstantsMonths() throws Exception {
+    final Instant startInstant = Instant.parse("2017-01-31T00:00:00.00Z");
+    final Instant endInstant = Instant.parse("2017-03-28T00:00:00.01Z");
+
+    List<Instant> list = rangeOfInstants(startInstant, endInstant, Partitioning.MONTHS);
+    assertThat(list, contains(
+        Instant.parse("2017-01-31T00:00:00.00Z"),
+        Instant.parse("2017-02-28T00:00:00.00Z"),
+        Instant.parse("2017-03-28T00:00:00.00Z"))
+    );
+  }
+
+  @Test(expected=IllegalArgumentException.class)
+  public void shouldRaiseRangeOfInstantsStartAfterEnd() throws Exception {
+    final Instant startInstant = Instant.parse("2016-12-31T23:00:00.00Z");
+    final Instant endInstant = Instant.parse("2016-01-01T01:00:00.00Z");
+
+    rangeOfInstants(startInstant, endInstant, Partitioning.HOURS);
+  }
+
+  @Test(expected=IllegalArgumentException.class)
+  public void shouldRaiseRangeOfInstantsStartEqualsEnd() throws Exception {
+    final Instant startInstant = Instant.parse("2016-12-31T23:00:00.00Z");
+    final Instant endInstant = Instant.parse("2016-12-31T23:00:00.00Z");
+
+    rangeOfInstants(startInstant, endInstant, Partitioning.HOURS);
   }
 }
