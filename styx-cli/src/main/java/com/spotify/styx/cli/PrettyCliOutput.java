@@ -32,6 +32,7 @@ import static org.fusesource.jansi.Ansi.Color.RED;
 import static org.fusesource.jansi.Ansi.Color.YELLOW;
 
 import com.spotify.styx.api.cli.ActiveStatesPayload;
+import com.spotify.styx.model.Backfill;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
 import java.util.List;
@@ -115,5 +116,10 @@ class PrettyCliOutput implements CliOutput {
                                              formatTimestamp(eventInfo.timestamp()),
                                              eventInfo.name(),
                                              eventInfo.info())));
+  }
+
+  @Override
+  public void printBackfill(Backfill backfill) {
+    System.out.println(backfill);
   }
 }

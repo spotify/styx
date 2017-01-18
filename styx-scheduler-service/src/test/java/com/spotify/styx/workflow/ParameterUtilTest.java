@@ -20,15 +20,16 @@
 
 package com.spotify.styx.workflow;
 
-import static com.spotify.styx.workflow.ParameterUtil.decrementInstant;
-import static com.spotify.styx.workflow.ParameterUtil.incrementInstant;
-import static com.spotify.styx.workflow.ParameterUtil.rangeOfInstants;
-import static com.spotify.styx.workflow.ParameterUtil.truncateInstant;
+import static com.spotify.styx.util.ParameterUtil.decrementInstant;
+import static com.spotify.styx.util.ParameterUtil.incrementInstant;
+import static com.spotify.styx.util.ParameterUtil.rangeOfInstants;
+import static com.spotify.styx.util.ParameterUtil.truncateInstant;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.model.Partitioning;
+import com.spotify.styx.util.ParameterUtil;
 import java.time.Instant;
 import java.util.List;
 import org.junit.Test;

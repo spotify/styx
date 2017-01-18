@@ -1,6 +1,6 @@
 /*-
  * -\-\-
- * Spotify Styx CLI
+ * Spotify Styx Common
  * --
  * Copyright (C) 2016 Spotify AB
  * --
@@ -18,32 +18,25 @@
  * -/-/-
  */
 
-package com.spotify.styx.cli;
+package com.spotify.styx.api;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.model.Backfill;
 import java.util.List;
 
-/**
- * Cli printing interface
- */
-interface CliOutput {
+@AutoValue
+@JsonIgnoreProperties(ignoreUnknown = true)
+public abstract class BackfillsPayload {
 
-  void printActiveStates(ActiveStatesPayload activeStatesPayload);
+  @JsonProperty
+  public abstract List<Backfill> backfills();
 
-  void printEvents(List<EventInfo> eventInfos);
-
-  void printBackfill(Backfill backfill);
-
-  @AutoValue
-  abstract class EventInfo {
-    abstract long timestamp();
-    abstract String name();
-    abstract String info();
-
-    public static EventInfo create(long ts, String eventName, String eventInfo) {
-      return new AutoValue_CliOutput_EventInfo(ts, eventName, eventInfo);
-    }
+  @JsonCreator
+  static BackfillsPayload create(
+      @JsonProperty("backfills") List<Backfill> backfills) {
+    return new AutoValue_BackfillsPayload(backfills);
   }
 }

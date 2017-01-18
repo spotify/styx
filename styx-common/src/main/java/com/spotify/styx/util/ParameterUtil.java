@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.workflow;
+package com.spotify.styx.util;
 
 import static java.time.ZoneOffset.UTC;
 import static java.time.temporal.ChronoField.MONTH_OF_YEAR;
@@ -89,6 +89,31 @@ public final class ParameterUtil {
     return ISO_LOCAL_MONTH.format(
         instant.truncatedTo(ChronoUnit.DAYS)
             .atOffset(UTC));
+  }
+
+  public static Instant parseDate(String date) {
+    return Instant.from(LocalDate.from(
+        DateTimeFormatter.ISO_LOCAL_DATE.parse(date))
+                            .atStartOfDay(ZoneOffset.UTC));
+  }
+
+  public static Instant parseDateHour(String dateHour) {
+    return Instant.from(ISO_LOCAL_DATE_HOUR.parse(dateHour));
+  }
+
+  public static String toParameter(Partitioning partitioning, Instant instant) {
+    switch (partitioning) {
+      case DAYS:
+      case WEEKS:
+        return ParameterUtil.formatDate(instant);
+      case HOURS:
+        return ParameterUtil.formatDateHour(instant);
+      case MONTHS:
+        return ParameterUtil.formatMonth(instant);
+
+      default:
+        throw new IllegalArgumentException("Unknown partitioning " + partitioning);
+    }
   }
 
   /**

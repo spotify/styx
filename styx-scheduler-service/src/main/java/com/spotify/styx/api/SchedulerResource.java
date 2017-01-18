@@ -22,7 +22,7 @@ package com.spotify.styx.api;
 
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
-import static com.spotify.styx.workflow.ParameterUtil.instantFromWorkflowInstance;
+import static com.spotify.styx.util.ParameterUtil.instantFromWorkflowInstance;
 
 import com.spotify.apollo.Response;
 import com.spotify.apollo.entity.EntityMiddleware;

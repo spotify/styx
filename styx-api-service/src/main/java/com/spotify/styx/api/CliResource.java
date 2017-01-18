@@ -87,34 +87,33 @@ public class CliResource {
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
         .collect(toList());
 
-    final List<Route<AsyncHandler<Response<ByteString>>>> proxies = Arrays.asList(
+    final List<Route<AsyncHandler<Response<ByteString>>>> schedulerProxies = Arrays.asList(
         Route.async(
             "GET", BASE + "/<endpoint:path>",
-            rc -> proxy("/" + arg("endpoint", rc), rc)),
+            rc -> proxyToScheduler("/" + arg("endpoint", rc), rc)),
         Route.async(
             "POST", BASE + "/<endpoint:path>",
-            rc -> proxy("/" + arg("endpoint", rc), rc)),
+            rc -> proxyToScheduler("/" + arg("endpoint", rc), rc)),
         Route.async(
             "DELETE", BASE + "/<endpoint:path>",
-            rc -> proxy("/" + arg("endpoint", rc), rc)),
+            rc -> proxyToScheduler("/" + arg("endpoint", rc), rc)),
         Route.async(
             "PATCH", BASE + "/<endpoint:path>",
-            rc -> proxy("/" + arg("endpoint", rc), rc)),
+            rc -> proxyToScheduler("/" + arg("endpoint", rc), rc)),
         Route.async(
             "PUT", BASE + "/<endpoint:path>",
-            rc -> proxy("/" + arg("endpoint", rc), rc))
+            rc -> proxyToScheduler("/" + arg("endpoint", rc), rc))
     );
 
     return cat(
         Api.prefixRoutes(routes, V0, V1),
-        Api.prefixRoutes(proxies, V0, V1)
+        Api.prefixRoutes(schedulerProxies, V0, V1)
     );
   }
 
-  private CompletionStage<Response<ByteString>> proxy(String endpoint, RequestContext rc) {
+  private CompletionStage<Response<ByteString>> proxyToScheduler(String path, RequestContext rc) {
     return rc.requestScopedClient()
-        .send(rc.request()
-            .withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + endpoint));
+        .send(rc.request().withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + path));
   }
 
   private static String arg(String name, RequestContext rc) {

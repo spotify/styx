@@ -35,11 +35,13 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.docker.DockerRunner.RunSpec;
+import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.Trigger;
@@ -73,6 +75,16 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       DATA_ENDPOINT_DAILY);
   private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
   private static final Trigger TRIGGER2 = Trigger.unknown("trig2");
+  public static final Backfill BACKFILL = Backfill.newBuilder()
+      .id("backfill-1")
+      .start(Instant.parse("2015-01-01T00:00:00Z"))
+      .end(Instant.parse("2015-01-02T00:00:00Z"))
+      .workflowId(WorkflowId.create("styx", "styx.TestEndpoint"))
+      .concurrency(2)
+      .resource("backfill-1")
+      .nextTrigger(Instant.parse("2015-01-01T00:00:00Z"))
+      .partitioning(Partitioning.HOURS)
+      .build();
 
   @Test
   public void shouldCatchUpWithNaturalTriggers() throws Exception {
@@ -118,6 +130,27 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     runSpec = dockerRuns.get(2)._2;
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T14")));
+  }
+
+  @Test
+  public void testTriggerBackfillsWithinResourceLimit() throws Exception {
+    givenTheTimeIs("2016-03-14T15:30:00Z");
+    givenTheGlobalEnableFlagIs(true);
+    givenWorkflow(HOURLY_WORKFLOW);
+    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, false);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
+    givenBackfill(BACKFILL);
+
+    styxStarts();
+    tickScheduler();
+    awaitWorkflowInstanceState(
+        WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2015-01-01T00"),
+        RunState.State.QUEUED);
+    awaitWorkflowInstanceState(
+        WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2015-01-01T01"),
+        RunState.State.QUEUED);
+    tickScheduler();
+    awaitNumberOfDockerRuns(2);
   }
 
   @Test

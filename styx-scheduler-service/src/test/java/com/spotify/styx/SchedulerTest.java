@@ -27,9 +27,13 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.only;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
+import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Partitioning;
@@ -43,13 +47,16 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.TimeoutConfig;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
+import com.spotify.styx.util.ParameterUtil;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.junit.Test;
 
@@ -62,10 +69,33 @@ public class SchedulerTest {
   private static final WorkflowInstance INSTANCE =
       WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02");
 
+  private static final Backfill BACKFILL_1 = Backfill.newBuilder()
+      .id("backfill-1")
+      .start(Instant.parse("2016-12-02T22:00:00Z"))
+      .end(Instant.parse("2016-12-05T22:00:00Z"))
+      .workflowId(WORKFLOW_ID1)
+      .concurrency(2)
+      .resource("backfill-1")
+      .partitioning(Partitioning.HOURS)
+      .nextTrigger(Instant.parse("2016-12-02T22:00:00Z"))
+      .build();
+
+  private static final Backfill BACKFILL_2 = Backfill.newBuilder()
+      .id("backfill-2")
+      .start(Instant.parse("2016-12-02T00:00:00Z"))
+      .end(Instant.parse("2016-12-02T03:00:00Z"))
+      .workflowId(WORKFLOW_ID1)
+      .concurrency(3)
+      .resource("backfill-2")
+      .partitioning(Partitioning.HOURS)
+      .nextTrigger(Instant.parse("2016-12-02T00:00:00Z"))
+      .build();
+
   WorkflowCache workflowCache;
   Storage storage;
   StateManager stateManager;
   Scheduler scheduler;
+  TriggerListener triggerListener;
 
   Instant now = Instant.parse("2016-12-02T22:00:00Z");
   Time time = () -> now;
@@ -74,13 +104,15 @@ public class SchedulerTest {
 
   private void setUp(int timeoutSeconds) throws StateManager.IsClosed, IOException {
     workflowCache = new InMemWorkflowCache();
-    storage = mock(Storage.class);
     TimeoutConfig timeoutConfig = createWithDefaultTtl(ofSeconds(timeoutSeconds));
 
+    storage = mock(Storage.class);
+    triggerListener = mock(TriggerListener.class);
     when(storage.resources()).thenReturn(resourceLimits);
 
     stateManager = new SyncStateManager();
-    scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage);
+    scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage,
+                              triggerListener);
   }
 
   private void setResourceLimit(String resourceId, long limit) {
@@ -103,6 +135,130 @@ public class SchedulerTest {
         DataEndpoint.create(
             id.endpointId(), Partitioning.HOURS, empty(), empty(), empty(),
             Arrays.asList(resources)));
+  }
+
+  @Test
+  public void shouldTriggerBackfillsNew() throws Exception {
+    setUp(5);
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+    initWorkflow(workflow);
+    final int concurrency = BACKFILL_1.concurrency();
+    when(storage.backfills()).thenReturn(Collections.singletonList(BACKFILL_1));
+
+    scheduler.tick();
+
+    final List<Instant> instants =
+        ParameterUtil.rangeOfInstants(BACKFILL_1.start(), BACKFILL_1.end(),
+                                      workflow.schedule().partitioning());
+
+    instants.stream().limit(concurrency).forEach(
+        instant ->
+            verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_1.id()), instant));
+
+    verify(storage)
+        .storeBackfill(BACKFILL_1.builder().nextTrigger(instants.get(concurrency)).build());
+  }
+
+  @Test
+  public void shouldTriggerBackfillsInProgress() throws Exception {
+    setUp(5);
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+    initWorkflow(workflow);
+    when(storage.backfills()).thenReturn(
+        Collections.singletonList(BACKFILL_1.builder()
+            .nextTrigger(Instant.parse("2016-12-03T00:00:00Z"))
+            .build()));
+
+    stateManager.initialize
+        (RunState.fresh(
+            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23")));
+    stateManager.receive(
+        Event.triggerExecution(
+            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23"),
+            Trigger.backfill("backfill-1")));
+
+    scheduler.tick();
+
+    verify(triggerListener, only()).event(
+        workflow,
+        Trigger.backfill(BACKFILL_1.id()), Instant.parse("2016-12-03T00:00:00Z"));
+  }
+
+  @Test
+  public void shouldNotTriggerCompletedBackfillsAndUpdateCompleted() throws Exception {
+    setUp(5);
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+    initWorkflow(workflow);
+    Backfill backfill = BACKFILL_2.builder().nextTrigger(Instant.parse("2016-12-02T03:00:00Z")).build();
+    when(storage.backfills()).thenReturn(Collections.singletonList(backfill));
+
+    scheduler.tick();
+
+    verifyZeroInteractions(triggerListener);
+    verify(storage).storeBackfill(backfill.builder().completed(true).build());
+  }
+
+  @Test
+  public void shouldNotTriggerBackfillsIfResourceLimit() throws Exception {
+    setUp(5);
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+    initWorkflow(workflow);
+    when(storage.backfills()).thenReturn(Collections.singletonList(BACKFILL_1));
+
+    stateManager.initialize(
+        RunState.fresh(
+            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T22")));
+    stateManager.receive(
+        Event.triggerExecution(
+            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T22"),
+            Trigger.backfill("backfill-1")));
+    stateManager.initialize
+        (RunState.fresh(
+            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23")));
+    stateManager.receive(
+        Event.triggerExecution(
+            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23"),
+            Trigger.backfill("backfill-1")));
+
+    scheduler.tick();
+
+    verifyZeroInteractions(triggerListener);
+  }
+
+  @Test
+  public void shouldNotTriggerHaltedBackfills() throws Exception {
+    setUp(5);
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+    initWorkflow(workflow);
+    when(storage.backfills()).thenReturn(Collections.singletonList(
+        BACKFILL_1.builder().halted(true).build()));
+
+    scheduler.tick();
+
+    verifyZeroInteractions(triggerListener);
+  }
+
+  @Test
+  public void shouldNotTriggerCompletedBackfills() throws Exception {
+    setUp(5);
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+    initWorkflow(workflow);
+    when(storage.backfills()).thenReturn(Collections.singletonList(
+        BACKFILL_1.builder().completed(true).build()));
+
+    scheduler.tick();
+
+    verifyZeroInteractions(triggerListener);
+  }
+
+  @Test
+  public void shouldNotTriggerBackfillsWithMissingWorkflows() throws Exception {
+    setUp(5);
+    when(storage.backfills()).thenReturn(Collections.singletonList(BACKFILL_1));
+
+    scheduler.tick();
+
+    verifyZeroInteractions(triggerListener);
   }
 
   @Test
