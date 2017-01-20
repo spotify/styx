@@ -29,7 +29,7 @@ import com.spotify.styx.model.EventSerializer;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.model.WorkflowInstanceExecutionData;
+import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.RunnableWithException;
 import java.io.IOException;

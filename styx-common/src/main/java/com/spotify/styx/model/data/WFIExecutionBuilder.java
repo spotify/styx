@@ -18,8 +18,12 @@
  * -/-/-
  */
 
-package com.spotify.styx.model;
+package com.spotify.styx.model.data;
 
+import com.spotify.styx.model.EventVisitor;
+import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import java.time.Instant;

@@ -18,13 +18,16 @@
  * -/-/-
  */
 
-package com.spotify.styx.model;
+package com.spotify.styx.model.data;
 
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
 import com.spotify.styx.WorkflowInstanceEventFactory;
+import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.Time;
@@ -62,7 +65,7 @@ public class WFIExecutionBuilderTest {
             WORKFLOW_INSTANCE,
             Collections.singletonList(
                 Trigger.create(
-                    "trig-0",
+                    "trig0",
                     time("07:55"),
                     true,
                     Collections.emptyList()
@@ -114,7 +117,7 @@ public class WFIExecutionBuilderTest {
             WORKFLOW_INSTANCE,
             Arrays.asList(
                 Trigger.create(
-                    "trig-0",
+                    "trig0",
                     time("07:55"),
                     true,
                     Arrays.asList(
@@ -139,7 +142,7 @@ public class WFIExecutionBuilderTest {
                     )
                 ),
                 Trigger.create(
-                    "trig-1",
+                    "trig1",
                     time("09:55"),
                     false,
                     Arrays.asList(
@@ -194,7 +197,7 @@ public class WFIExecutionBuilderTest {
             WORKFLOW_INSTANCE,
             Collections.singletonList(
                 Trigger.create(
-                    "trig-0",
+                    "trig0",
                     time("07:55"),
                     false,
                     Arrays.asList(
@@ -249,7 +252,7 @@ public class WFIExecutionBuilderTest {
             WORKFLOW_INSTANCE,
             Collections.singletonList(
                 Trigger.create(
-                    "trig-0",
+                    "trig0",
                     time("07:55"),
                     false,
                     Arrays.asList(
@@ -303,7 +306,7 @@ public class WFIExecutionBuilderTest {
             WORKFLOW_INSTANCE,
             Arrays.asList(
                 Trigger.create(
-                    "trig-0",
+                    "trig0",
                     time("07:55"),
                     true,
                     Collections.singletonList(
@@ -318,7 +321,7 @@ public class WFIExecutionBuilderTest {
                     )
                 ),
                 Trigger.create(
-                    "trig-1",
+                    "trig1",
                     time("08:56"),
                     false,
                     Collections.singletonList(

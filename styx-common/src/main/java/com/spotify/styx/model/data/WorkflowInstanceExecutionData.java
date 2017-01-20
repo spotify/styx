@@ -18,11 +18,13 @@
  * -/-/-
  */
 
-package com.spotify.styx.model;
+package com.spotify.styx.model.data;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
+import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.WorkflowInstance;
 import java.util.Comparator;
 import java.util.List;
 

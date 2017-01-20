@@ -18,11 +18,30 @@
  * -/-/-
  */
 
-package com.spotify.styx.model;
+package com.spotify.styx.model.data;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.auto.value.AutoValue;
+import java.time.Instant;
 
 /**
- * The possible statuses of an execution.
+ * Value representing an execution status change
  */
-public enum ExecutionStatus {
-  STARTED, SUCCEEDED, FAILED, MISSING_DEPS, FATAL
+@AutoValue
+public abstract class ExecStatus {
+
+  @JsonProperty("timestamp")
+  public abstract Instant timestamp();
+
+  @JsonProperty("status")
+  public abstract String status();
+
+  @JsonCreator
+  public static ExecStatus create(
+      @JsonProperty("timestamp") Instant timestamp,
+      @JsonProperty("status") String status
+  ) {
+    return new AutoValue_ExecStatus(timestamp, status);
+  }
 }

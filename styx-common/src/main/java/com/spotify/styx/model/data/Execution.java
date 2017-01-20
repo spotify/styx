@@ -18,38 +18,33 @@
  * -/-/-
  */
 
-package com.spotify.styx.model;
+package com.spotify.styx.model.data;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import java.time.Instant;
 import java.util.List;
 
 /**
- * Value representing a {@link com.spotify.styx.model.WorkflowInstance} trigger
+ * Value representing an execution attempt
  */
 @AutoValue
-public abstract class Trigger {
+public abstract class Execution {
 
   @JsonProperty
-  public abstract String triggerId();
+  public abstract String executionId();
 
   @JsonProperty
-  public abstract Instant timestamp();
+  public abstract String dockerImage();
 
   @JsonProperty
-  public abstract boolean complete();
-
-  @JsonProperty
-  public abstract List<Execution> executions();
+  public abstract List<ExecStatus> statuses();
 
   @JsonCreator
-  public static Trigger create(
-      @JsonProperty("trigger_id") String triggerId,
-      @JsonProperty("timestamp") Instant timestamp,
-      @JsonProperty("complete") boolean complete,
-      @JsonProperty("executions") List<Execution> executions) {
-    return new AutoValue_Trigger(triggerId, timestamp, complete, executions);
+  public static Execution create(
+      @JsonProperty("execution_id") String executionId,
+      @JsonProperty("docker_image") String dockerImage,
+      @JsonProperty("statuses") List<ExecStatus> statuses) {
+    return new AutoValue_Execution(executionId, dockerImage, statuses);
   }
 }
