@@ -285,6 +285,8 @@ public class StyxScheduler implements AppInit {
     final WorkflowCache cache = new InMemWorkflowCache();
     final Storage storage = new MeteredStorage(storageFactory.apply(environment), stats, time);
 
+    warmUpCache(cache, storage);
+
     final QueuedStateManager stateManager = closer.register(
         new QueuedStateManager(time, eventWorker, storage));
 
@@ -352,6 +354,14 @@ public class StyxScheduler implements AppInit {
   @VisibleForTesting
   void tickTriggerManager() {
     triggerManager.tick();
+  }
+
+  private void warmUpCache(WorkflowCache cache, Storage storage) {
+    try {
+      storage.workflowsWithNextNaturalTrigger().keySet().forEach(cache::store);
+    } catch (IOException e) {
+      LOG.warn("Failed to get workflows from storage", e);
+    }
   }
 
   private void restoreState(
