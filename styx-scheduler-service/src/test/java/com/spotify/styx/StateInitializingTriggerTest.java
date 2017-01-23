@@ -95,6 +95,22 @@ public class StateInitializingTriggerTest {
   }
 
   @Test
+  public void shouldInjectTriggerExecutionEventWithTrigger() throws Exception {
+    DataEndpoint endpoint = dataEndpoint(HOURS);
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
+    setDockerImage(workflow.id(), workflow.schedule());
+    trigger.event(workflow, "trig", TIME);
+
+    WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(), "2016-01-18T09");
+    RunState state = stateManager.get(expectedInstance);
+
+    assertThat(state.state(), is(RunState.State.QUEUED));
+    assertThat(
+        state.data().trigger(),
+        hasValue(TriggerSerializer.convertTriggerToPersistentTrigger(Trigger.unknown("trig"))));
+  }
+
+  @Test
   public void shouldDoNothingIfDockerInfoMissing() throws Exception {
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, TestData.DAILY_DATA_ENDPOINT);
     setDockerImage(workflow.id(), workflow.schedule());

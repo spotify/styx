@@ -44,6 +44,11 @@ public class WFIExecutionBuilderTest {
       WorkflowInstance.parseKey("component1#endpoint1#2016-08-03T06");
   private static final WorkflowInstanceEventFactory E =
       new WorkflowInstanceEventFactory(WORKFLOW_INSTANCE);
+  private static final com.spotify.styx.state.Trigger
+      UNKNOWN_TRIGGER0 = com.spotify.styx.state.Trigger.unknown("trig0");
+  private static final com.spotify.styx.state.Trigger
+      UNKNOWN_TRIGGER1 = com.spotify.styx.state.Trigger.unknown("trig1");
+
 
   private ExecutionDescription desc(String dockerImage) {
     return ExecutionDescription.create(
@@ -54,7 +59,7 @@ public class WFIExecutionBuilderTest {
   public void testHaltEventDoesNotRequireExecutionAndGoesStraightToComplete() throws Exception {
     long c = 0L;
     List<SequenceEvent> events = Arrays.asList(
-        SequenceEvent.create(E.triggerExecution("trig-0"), c++, ts("07:55")),
+        SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.halt(), c++, ts("07:55"))
     );
     assertValidTransitionSequence(events);
@@ -80,7 +85,7 @@ public class WFIExecutionBuilderTest {
   public void testGeneralExample() throws Exception {
     long c = 0L;
     List<SequenceEvent> events = Arrays.asList(
-        SequenceEvent.create(E.triggerExecution("trig-0"), c++, ts("07:55")),
+        SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(), c++, ts("07:55")),
         SequenceEvent.create(E.submit(desc("img1")), c++, ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
@@ -95,7 +100,7 @@ public class WFIExecutionBuilderTest {
         SequenceEvent.create(E.terminate(0), c++, ts("08:58")),
         SequenceEvent.create(E.success(), c++, ts("08:59")),
 
-        SequenceEvent.create(E.triggerExecution("trig-1"), c++, ts("09:55")),
+        SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER1), c++, ts("09:55")),
         SequenceEvent.create(E.dequeue(), c++, ts("09:55")),
         SequenceEvent.create(E.submit(desc("img3")), c++, ts("09:55")),
         SequenceEvent.create(E.submitted("exec-id-10"), c++, ts("09:56")),
@@ -175,7 +180,7 @@ public class WFIExecutionBuilderTest {
   public void testTimeout() throws Exception {
     long c = 0L;
     List<SequenceEvent> events = Arrays.asList(
-        SequenceEvent.create(E.triggerExecution("trig-0"), c++, ts("07:55")),
+        SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(), c++, ts("07:55")),
         SequenceEvent.create(E.submit(desc("img1")), c++, ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
@@ -230,7 +235,7 @@ public class WFIExecutionBuilderTest {
   public void testRunError() throws Exception {
     long c = 0L;
     List<SequenceEvent> events = Arrays.asList(
-        SequenceEvent.create(E.triggerExecution("trig-0"), c++, ts("07:55")),
+        SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(), c++, ts("07:55")),
         SequenceEvent.create(E.submit(desc("img1")), c++, ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
@@ -285,13 +290,13 @@ public class WFIExecutionBuilderTest {
   public void testHaltAndReTrigger() throws Exception {
     long c = 0L;
     List<SequenceEvent> events = Arrays.asList(
-        SequenceEvent.create(E.triggerExecution("trig-0"), c++, ts("07:55")),
+        SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(), c++, ts("07:55")),
         SequenceEvent.create(E.submit(desc("img1")), c++, ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
         SequenceEvent.create(E.halt(), c++, ts("07:57")),
 
-        SequenceEvent.create(E.triggerExecution("trig-1"), c++, ts("08:56")),
+        SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER1), c++, ts("08:56")),
         SequenceEvent.create(E.dequeue(), c++, ts("08:56")),
         SequenceEvent.create(E.submit(desc("img2")), c++, ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-10"), c++, ts("08:56")),

@@ -35,7 +35,10 @@ public class EventSerializerTest {
 
   private static final WorkflowId WORKFLOW1 = WorkflowId.create("component", "endpoint1");
   private static final String PARAMETER1 = "2016-01-01";
-  private static final Trigger TRIGGER = Trigger.unknown("trig");
+  private static final Trigger UNKNOWN_TRIGGER = Trigger.unknown("trig");
+  private static final Trigger NATURAL_TRIGGER1 = Trigger.natural("trig1");
+  private static final Trigger ADHOC_TRIGGER2 = Trigger.adhoc("trig2");
+  private static final Trigger BACKFILL_TRIGGER3 = Trigger.backfill("trig3");
   private static final Trigger TRIGGER_UNKNOWN = Trigger.unknown("UNKNOWN");
   private static final WorkflowInstance INSTANCE1 = WorkflowInstance.create(WORKFLOW1, PARAMETER1);
   private static final String POD_NAME = "test-event";
@@ -52,7 +55,7 @@ public class EventSerializerTest {
   @Test
   public void testRoundtripAllEvents() {
     assertRoundtrip(Event.timeTrigger(INSTANCE1));
-    assertRoundtrip(Event.triggerExecution(INSTANCE1, TRIGGER));
+    assertRoundtrip(Event.triggerExecution(INSTANCE1, UNKNOWN_TRIGGER));
     assertRoundtrip(Event.info(INSTANCE1, Message.info("InfoMessage")));
     assertRoundtrip(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE));
     assertRoundtrip(Event.dequeue(INSTANCE1));
@@ -103,8 +106,14 @@ public class EventSerializerTest {
         eventSerializer.deserialize(json("retryAfter", "\"delay_millis\":12345")),
         is(Event.retryAfter(INSTANCE1, 12345)));
     assertThat(
-        eventSerializer.deserialize(json("triggerExecution", "\"trigger_id\":\"trig\"")),
-        is(Event.triggerExecution(INSTANCE1, TRIGGER)));
+        eventSerializer.deserialize(json("triggerExecution", "\"trigger\":{\"@type\":\"natural\",\"trigger_id\":\"trig1\"}")),
+        is(Event.triggerExecution(INSTANCE1, NATURAL_TRIGGER1)));
+    assertThat(
+        eventSerializer.deserialize(json("triggerExecution", "\"trigger\":{\"@type\":\"adhoc\",\"trigger_id\":\"trig2\"}")),
+        is(Event.triggerExecution(INSTANCE1, ADHOC_TRIGGER2)));
+    assertThat(
+        eventSerializer.deserialize(json("triggerExecution", "\"trigger\":{\"@type\":\"backfill\",\"trigger_id\":\"trig3\"}")),
+        is(Event.triggerExecution(INSTANCE1, BACKFILL_TRIGGER3)));
     assertThat(
         eventSerializer.deserialize(json("terminate", "\"exit_code\":20")),
         is(Event.terminate(INSTANCE1, 20)));
@@ -112,6 +121,9 @@ public class EventSerializerTest {
 
   @Test
   public void testDeserializeFromJsonWhenTransformationRequired() throws Exception {
+    assertThat(
+        eventSerializer.deserialize(json("triggerExecution", "\"trigger_id\":\"trig\"")),
+        is(Event.triggerExecution(INSTANCE1, UNKNOWN_TRIGGER)));
     assertThat(
         eventSerializer.deserialize(json("started", "\"pod_name\":\"" + POD_NAME + "\"")),
         is(Event.started(INSTANCE1))); // for backwards compatibility

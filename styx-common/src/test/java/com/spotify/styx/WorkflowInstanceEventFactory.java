@@ -38,8 +38,8 @@ public class WorkflowInstanceEventFactory {
     return Event.timeTrigger(workflowInstance);
   }
 
-  public Event triggerExecution(String triggerId) {
-    return Event.triggerExecution(workflowInstance, Trigger.unknown(triggerId));
+  public Event triggerExecution(Trigger trigger) {
+    return Event.triggerExecution(workflowInstance, trigger);
   }
 
   public Event info(Message message) {
