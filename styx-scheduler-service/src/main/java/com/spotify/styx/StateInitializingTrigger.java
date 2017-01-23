@@ -28,6 +28,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.workflow.ParameterUtil;
 import java.time.Instant;
@@ -65,7 +66,8 @@ final class StateInitializingTrigger implements TriggerListener {
 
     try {
       stateManager.initialize(initialState);
-      stateManager.receive(Event.triggerExecution(workflowInstance, triggerId));
+      stateManager.receive(
+          Event.triggerExecution(workflowInstance, Trigger.unknown(triggerId))); //todo change this
     } catch (StateManager.IsClosed isClosed) {
       LOG.warn("State receiver is closed", isClosed);
     }

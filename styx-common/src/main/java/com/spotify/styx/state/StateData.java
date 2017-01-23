@@ -22,6 +22,7 @@ package com.spotify.styx.state;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.state.TriggerSerializer.PersistentTrigger;
 import io.norberg.automatter.AutoMatter;
 import java.util.List;
 import java.util.Optional;
@@ -40,7 +41,8 @@ public interface StateData {
   double retryCost();
   Optional<Long> retryDelayMillis();
   Optional<Integer> lastExit();
-  Optional<String> triggerId();
+  Optional<PersistentTrigger> trigger();
+  Optional<String> triggerId(); //for backwards compatibility
   Optional<String> executionId();
   Optional<ExecutionDescription> executionDescription();
   List<Message> messages();

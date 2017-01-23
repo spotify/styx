@@ -43,6 +43,8 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.SyncStateManager;
+import com.spotify.styx.state.Trigger;
+import com.spotify.styx.state.TriggerSerializer;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
 import java.io.IOException;

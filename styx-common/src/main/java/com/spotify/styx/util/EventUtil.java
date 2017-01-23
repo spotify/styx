@@ -25,6 +25,7 @@ import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
+import com.spotify.styx.state.Trigger;
 
 /**
  * Utility for getting information about {@link Event}s
@@ -50,7 +51,7 @@ public final class EventUtil {
     }
 
     @Override
-    public String triggerExecution(WorkflowInstance workflowInstance, String triggerId) {
+    public String triggerExecution(WorkflowInstance workflowInstance, Trigger trigger) {
       return "triggerExecution";
     }
 

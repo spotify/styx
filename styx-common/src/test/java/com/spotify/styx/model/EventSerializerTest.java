@@ -24,6 +24,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
 import com.spotify.styx.state.Message;
+import com.spotify.styx.state.Trigger;
 import java.util.Arrays;
 import java.util.Optional;
 import okio.ByteString;
@@ -34,7 +35,8 @@ public class EventSerializerTest {
 
   private static final WorkflowId WORKFLOW1 = WorkflowId.create("component", "endpoint1");
   private static final String PARAMETER1 = "2016-01-01";
-  private static final String TRIGGER1 = "trig1";
+  private static final Trigger TRIGGER = Trigger.unknown("trig");
+  private static final Trigger TRIGGER_UNKNOWN = Trigger.unknown("UNKNOWN");
   private static final WorkflowInstance INSTANCE1 = WorkflowInstance.create(WORKFLOW1, PARAMETER1);
   private static final String POD_NAME = "test-event";
   private static final String DOCKER_IMAGE = "busybox:1.1";
@@ -50,7 +52,7 @@ public class EventSerializerTest {
   @Test
   public void testRoundtripAllEvents() {
     assertRoundtrip(Event.timeTrigger(INSTANCE1));
-    assertRoundtrip(Event.triggerExecution(INSTANCE1, TRIGGER1));
+    assertRoundtrip(Event.triggerExecution(INSTANCE1, TRIGGER));
     assertRoundtrip(Event.info(INSTANCE1, Message.info("InfoMessage")));
     assertRoundtrip(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE));
     assertRoundtrip(Event.dequeue(INSTANCE1));
@@ -102,7 +104,7 @@ public class EventSerializerTest {
         is(Event.retryAfter(INSTANCE1, 12345)));
     assertThat(
         eventSerializer.deserialize(json("triggerExecution", "\"trigger_id\":\"trig\"")),
-        is(Event.triggerExecution(INSTANCE1, "trig")));
+        is(Event.triggerExecution(INSTANCE1, TRIGGER)));
     assertThat(
         eventSerializer.deserialize(json("terminate", "\"exit_code\":20")),
         is(Event.terminate(INSTANCE1, 20)));
@@ -118,7 +120,7 @@ public class EventSerializerTest {
         is(Event.created(INSTANCE1, POD_NAME, "UNKNOWN")));
     assertThat(
         eventSerializer.deserialize(json("triggerExecution")),
-        is(Event.triggerExecution(INSTANCE1, "UNKNOWN")));
+        is(Event.triggerExecution(INSTANCE1, TRIGGER_UNKNOWN)));
   }
 
   private void assertRoundtrip(Event event) {

@@ -61,6 +61,10 @@ public class QueuedStateManagerTest {
   private final static String TEST_EXECUTION_ID_1 = "execution_1";
   private final static String DOCKER_IMAGE = "busybox:1.1";
 
+  private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
+  private static final Trigger TRIGGER2 = Trigger.unknown("trig2");
+  private static final Trigger TRIGGER3 = Trigger.unknown("trig3");
+
   private static final ExecutorService POOL = Executors.newFixedThreadPool(16);
 
   QueuedStateManager stateManager;
@@ -98,7 +102,7 @@ public class QueuedStateManagerTest {
   public void shouldNotBeActiveAfterHalt() throws Exception {
     setUp();
 
-    stateManager.receive(Event.triggerExecution(INSTANCE, "trig"));
+    stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER1));
     stateManager.receive(Event.halt(INSTANCE));
 
     assertTrue(stateManager.awaitIdle(1000));
@@ -114,13 +118,13 @@ public class QueuedStateManagerTest {
   public void shouldInitializeWFInstanceFromNextCounter() throws Exception {
     setUp();
 
-    stateManager.receive(Event.triggerExecution(INSTANCE, "trig1"));
+    stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER1));
     stateManager.receive(Event.dequeue(INSTANCE));
     stateManager.receive(Event.halt(INSTANCE));
     assertTrue(stateManager.awaitIdle(1000));
 
     stateManager.initialize(RunState.fresh(INSTANCE));
-    stateManager.receive(Event.triggerExecution(INSTANCE, "trig2"));
+    stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER2));
     stateManager.receive(Event.dequeue(INSTANCE));
     stateManager.receive(Event.created(INSTANCE, TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     stateManager.receive(Event.started(INSTANCE));
@@ -128,12 +132,12 @@ public class QueuedStateManagerTest {
     assertTrue(stateManager.awaitIdle(1000));
 
     stateManager.initialize(RunState.fresh(INSTANCE));
-    stateManager.receive(Event.triggerExecution(INSTANCE, "trig3"));
+    stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER3));
     assertTrue(stateManager.awaitIdle(1000));
 
     SortedSet<SequenceEvent> storedEvents = storage.readEvents(INSTANCE);
     SequenceEvent lastStoredEvent = storedEvents.last();
-    assertThat(lastStoredEvent.event(), is(Event.triggerExecution(INSTANCE, "trig3")));
+    assertThat(lastStoredEvent.event(), is(Event.triggerExecution(INSTANCE, TRIGGER3)));
     assertThat(storage.getLatestStoredCounter(INSTANCE), hasValue(8L));
     assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(8L));
   }
@@ -279,7 +283,7 @@ public class QueuedStateManagerTest {
     };
 
     stateManager.initialize(RunState.fresh(INSTANCE, throwing));
-    stateManager.receive(Event.triggerExecution(INSTANCE, "trig"));
+    stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER1));
 
     assertTrue(stateManager.awaitIdle(5000));
   }
@@ -332,7 +336,7 @@ public class QueuedStateManagerTest {
 
         try {
           stateManager.initialize(RunState.fresh(instance));
-          stateManager.receive(Event.triggerExecution(instance, "trig"));
+          stateManager.receive(Event.triggerExecution(instance, TRIGGER1));
           stateManager.receive(Event.dequeue(instance));
         } catch (StateManager.IsClosed ignored) {
         }

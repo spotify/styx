@@ -83,11 +83,11 @@ class WFIExecutionBuilder {
     }
 
     @Override
-    public Void triggerExecution(WorkflowInstance workflowInstance, String triggerId) {
+    public Void triggerExecution(WorkflowInstance workflowInstance, com.spotify.styx.state.Trigger trigger) {
       currWorkflowInstance = workflowInstance;
       completed = false;
 
-      currTriggerId = triggerId;
+      currTriggerId = trigger.triggerId();
       triggerTs = eventTs;
       return null;
     }

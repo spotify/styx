@@ -114,7 +114,7 @@ public class StateDataSerializationTest {
     assertThat(stateData.lastExit(), isEmpty());
     assertThat(stateData.retryCost(), equalTo(0.0));
     assertThat(stateData.retryDelayMillis(), isEmpty());
-    assertThat(stateData.triggerId(), isEmpty());
+    assertThat(stateData.trigger(), isEmpty());
     assertThat(stateData.executionId(), isEmpty());
     assertThat(stateData.executionDescription(), isEmpty());
     assertThat(stateData.messages(), is(empty()));
