@@ -36,6 +36,7 @@ import com.spotify.styx.model.EventSerializer.PersistentEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Json;
 import com.spotify.styx.util.RandomGenerator;
@@ -146,7 +147,7 @@ public class SchedulerResource {
     }
 
     final String triggerId = randomGenerator.generateUniqueId(AD_HOC_CLI_TRIGGER_PREFIX);
-    triggerListener.event(workflow, triggerId, instant);
+    triggerListener.event(workflow, Trigger.adhoc(triggerId), instant);
 
     // todo: change payload to a struct returning the triggerId as well so the user can refer to it
     return Response.forPayload(workflowInstance);

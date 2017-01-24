@@ -54,7 +54,7 @@ final class StateInitializingTrigger implements TriggerListener {
   }
 
   @Override
-  public void event(Workflow workflow, String triggerId, Instant instant) {
+  public void event(Workflow workflow, Trigger trigger, Instant instant) {
     if (!WorkflowValidator.hasDockerConfiguration(workflow, storage)) {
       LOG.warn("{} has no docker image or args info, skipping", workflow.id());
       return;
@@ -67,7 +67,7 @@ final class StateInitializingTrigger implements TriggerListener {
     try {
       stateManager.initialize(initialState);
       stateManager.receive(
-          Event.triggerExecution(workflowInstance, Trigger.unknown(triggerId))); //todo change this
+          Event.triggerExecution(workflowInstance, trigger));
     } catch (StateManager.IsClosed isClosed) {
       LOG.warn("State receiver is closed", isClosed);
     }
