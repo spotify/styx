@@ -42,7 +42,7 @@ public class JsonRoundtripTest {
 
   @Test
   public void testRoundtripSchedule() throws Exception {
-    WorkflowConfiguration before = TestData.FULL_DATA_WORKFLOW_CONFIGURATION;
+    WorkflowConfiguration before = TestData.FULL_WORKFLOW_CONFIGURATION;
     WorkflowConfiguration after = roundtrip(before, WorkflowConfiguration.class);
     assertThat(after, is(before));
   }

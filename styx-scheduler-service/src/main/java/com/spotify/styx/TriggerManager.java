@@ -20,9 +20,8 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.util.ParameterUtil.decrementInstant;
-import static com.spotify.styx.util.ParameterUtil.incrementInstant;
-import static com.spotify.styx.util.ParameterUtil.truncateInstant;
+import static com.spotify.styx.util.TimeUtil.lastInstant;
+import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.Objects.requireNonNull;
 
 import com.google.common.base.Throwables;
@@ -90,9 +89,13 @@ public class TriggerManager {
     map.entrySet().forEach(entry -> {
       final Workflow workflow = entry.getKey();
       final Schedule schedule = workflow.configuration().schedule();
-      final Instant next = entry.getValue().orElse(truncateInstant(now, schedule));
 
-      if (next.isAfter(now)) {
+      final Instant next = entry.getValue()
+          .orElseGet( // todo: persist if does not exist
+              () -> lastInstant(lastInstant(now, schedule), schedule));
+
+      final Instant nextWithOffset = workflow.configuration().addOffset(next);
+      if (now.isBefore(nextWithOffset)) {
         return;
       }
 
@@ -101,7 +104,7 @@ public class TriggerManager {
           final CompletionStage<Void> processed = triggerListener.event(
               workflow,
               Trigger.natural(),
-              decrementInstant(next, schedule));
+              next);
           // Wait for the event to be processed before proceeding to the next trigger
           processed.toCompletableFuture().get();
         } catch (AlreadyInitializedException e) {
@@ -114,9 +117,11 @@ public class TriggerManager {
         stats.naturalTrigger();
       }
 
-      Instant nextNaturalTrigger = incrementInstant(next, schedule);
+      final Instant nextNaturalTrigger = nextInstant(next, schedule);
+
       try {
         storage.updateNextNaturalTrigger(workflow.id(), nextNaturalTrigger);
+        // todo: store actual trigger time (nextWithOffset)
       } catch (IOException e) {
         LOG.error(
             "Sent trigger for workflow {}, but didn't succeed storing next scheduled run {}.",

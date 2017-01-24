@@ -203,6 +203,7 @@ public class LocalFileScheduleSourceTest {
             "foo",
             Schedule.HOURS,
             empty(),
+            empty(),
             Optional.of(emptyList()),
             empty(),
             empty(),
@@ -217,6 +218,7 @@ public class LocalFileScheduleSourceTest {
         WorkflowConfiguration.create(
             "foo",
             Schedule.DAYS,
+            empty(),
             empty(),
             Optional.of(singletonList("foo")),
             empty(),
@@ -233,6 +235,7 @@ public class LocalFileScheduleSourceTest {
             "foo",
             Schedule.HOURS,
             empty(),
+            empty(),
             Optional.of(Arrays.asList("foo", "bar")),
             empty(),
             empty(),
@@ -247,6 +250,7 @@ public class LocalFileScheduleSourceTest {
         WorkflowConfiguration.create(
             "bar",
             Schedule.DAYS,
+            empty(),
             empty(),
             Optional.of(Arrays.asList("baz", "bax")),
             empty(),

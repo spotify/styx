@@ -246,6 +246,7 @@ public class DockerRunnerHandlerTest {
     return WorkflowConfiguration.create(
         "styx.TestEndpoint",
         HOURS,
+        empty(),
         Optional.of(TEST_DOCKER_IMAGE),
         Optional.of(Lists.newArrayList(args)),
         empty(),

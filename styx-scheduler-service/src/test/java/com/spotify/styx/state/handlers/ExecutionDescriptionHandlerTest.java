@@ -172,6 +172,7 @@ public class ExecutionDescriptionHandlerTest {
     WorkflowConfiguration workflowConfiguration = WorkflowConfiguration.create(
         "styx.TestEndpoint",
         HOURS,
+        empty(),
         Optional.of("legacy-docker-image"),
         Optional.of(Lists.newArrayList("foo", "bar")),
         empty(),
@@ -197,6 +198,7 @@ public class ExecutionDescriptionHandlerTest {
     return WorkflowConfiguration.create(
         "styx.TestEndpoint",
         HOURS,
+        empty(),
         Optional.empty(),
         Optional.of(Lists.newArrayList(args)),
         empty(),

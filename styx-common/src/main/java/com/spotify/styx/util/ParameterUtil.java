@@ -26,7 +26,6 @@ import static java.time.temporal.ChronoField.YEAR;
 
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Schedule;
-import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -115,22 +114,6 @@ public final class ParameterUtil {
       default:
         throw new IllegalArgumentException("Unknown schedule " + schedule);
     }
-  }
-
-  /**
-   * Given a {@link Workflow} with certain frequency / {@link Schedule},
-   * it returns an instant that is 1 {@link TemporalUnit} less.
-   * e.g. Given an instant '2016-10-10T15:00:000' and hourly {@link Schedule}, the adjusted
-   * instant will return '2016-10-10T14:00:000'.
-   *
-   * @param instant The instant to adjust.
-   * @param schedule The frequency unit to adjust the instant for.
-   */
-  public static Instant decrementInstant(Instant instant, Schedule schedule) {
-    LocalDateTime dateTime = LocalDateTime.ofInstant(instant, ZoneId.of(UTC.toString()));
-    dateTime = dateTime.minus(1, scheduleToTemporalUnit(schedule));
-    Instant updatedInstant = dateTime.atZone(ZoneId.of(UTC.toString())).toInstant();
-    return updatedInstant;
   }
 
   /**
