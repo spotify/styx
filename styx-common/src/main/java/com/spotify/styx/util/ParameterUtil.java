@@ -70,7 +70,8 @@ public final class ParameterUtil {
 
   public static String formatDateTime(Instant instant) {
     return DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(
-        instant.atOffset(UTC));
+        instant.truncatedTo(ChronoUnit.SECONDS)
+            .atOffset(UTC));
   }
 
   public static String formatDate(Instant instant) {
@@ -112,7 +113,7 @@ public final class ParameterUtil {
         return ParameterUtil.formatMonth(instant);
 
       default:
-        throw new IllegalArgumentException("Unknown schedule " + schedule);
+        return ParameterUtil.formatDateTime(instant);
     }
   }
 

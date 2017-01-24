@@ -49,7 +49,7 @@ public class ParameterUtilTest {
   public void shouldFormatDateTime() throws Exception {
     final String dateTime = ParameterUtil.formatDateTime(TIME);
 
-    assertThat(dateTime, is("2016-01-19T09:11:22.333Z"));
+    assertThat(dateTime, is("2016-01-19T09:11:22Z"));
   }
 
   @Test

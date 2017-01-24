@@ -87,6 +87,46 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       .build();
 
   @Test
+  public void shouldRunCustomWorkflowSchedule() throws Exception {
+    Workflow customWorkflow = Workflow.create(
+        "styx",
+        TestData.WORKFLOW_URI,
+        WorkflowConfiguration.create(
+            "styx.TestEndpoint",
+            Schedule.parse("15,45 12,15 * * *"),
+            empty(), of("busybox"), of(emptyList()), empty(), empty(), emptyList()));
+
+    givenTheTimeIs("2016-03-14T15:30:00Z");
+    givenTheGlobalEnableFlagIs(true);
+    givenWorkflow(customWorkflow);
+    givenWorkflowEnabledStateIs(customWorkflow, true);
+    givenNextNaturalTrigger(customWorkflow, "2016-03-14T12:45:00Z");
+
+    styxStarts();
+    tickTriggerManager();
+    awaitWorkflowInstanceState(
+        WorkflowInstance.create(customWorkflow.id(), "2016-03-14T12:45:00Z"),
+        RunState.State.QUEUED);
+    tickScheduler();
+    awaitNumberOfDockerRuns(1);
+
+    WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
+    assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
+    assertThat(workflowInstance.parameter(), is("2016-03-14T12:45:00Z"));
+
+    tickTriggerManager();
+    awaitWorkflowInstanceState(
+        WorkflowInstance.create(customWorkflow.id(), "2016-03-14T15:15:00Z"),
+        RunState.State.QUEUED);
+    tickScheduler();
+    awaitNumberOfDockerRuns(2);
+
+    workflowInstance = dockerRuns.get(1)._1;
+    assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
+    assertThat(workflowInstance.parameter(), is("2016-03-14T15:15:00Z"));
+  }
+
+  @Test
   public void shouldCatchUpWithNaturalTriggers() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
     givenTheGlobalEnableFlagIs(true);
