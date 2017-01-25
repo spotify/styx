@@ -53,6 +53,7 @@ import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
@@ -90,6 +91,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   private static final String VALID_SHA = "470a229b49a14e7682af2abfdac3b881a8aacdf9";
   private static final String INVALID_SHA = "XXXXXX9b49a14e7682af2abfdac3b881a8aacdf9";
+
+  private static final Trigger TRIGGER = Trigger.unknown("trig");
 
   private static final ByteString STATEPAYLOAD_FULL =
       ByteString.encodeUtf8("{\"enabled\":\"true\", \"docker_image\":\"cherry:image\", "
@@ -350,7 +353,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V1);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
-    storage.writeEvent(create(Event.triggerExecution(wfi, "trig"), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi, TRIGGER), 0L, ms("07:00:00")));
     storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
     storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
 
@@ -379,7 +382,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V1);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
-    storage.writeEvent(create(Event.triggerExecution(wfi, "trig"), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi, TRIGGER), 0L, ms("07:00:00")));
     storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
     storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
 
@@ -412,9 +415,9 @@ public class WorkflowResourceTest extends VersionedApiTest {
     WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-11");
     WorkflowInstance wfi2 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-12");
     WorkflowInstance wfi3 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-13");
-    storage.writeEvent(create(Event.triggerExecution(wfi1, "trig"), 0L, ms("07:00:00")));
-    storage.writeEvent(create(Event.triggerExecution(wfi2, "trig"), 0L, ms("07:00:00")));
-    storage.writeEvent(create(Event.triggerExecution(wfi3, "trig"), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi1, TRIGGER), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi2, TRIGGER), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi3, TRIGGER), 0L, ms("07:00:00")));
 
     Response<ByteString> response = awaitResponse(
         serviceHelper.request("GET", path("/foo/bar/instances?offset=2016-08-12&limit=1")));

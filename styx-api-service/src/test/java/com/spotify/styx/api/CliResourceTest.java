@@ -37,6 +37,7 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Json;
@@ -49,7 +50,7 @@ public class CliResourceTest extends VersionedApiTest {
   private static final String COMPONENT_ID = "styx";
   private static final String ENDPOINT_ID = "test";
   private static final String PARAMETER = "1234";
-  private static final String TRIGGER = "foobar";
+  private static final Trigger TRIGGER = Trigger.unknown("foobar");
   private static final String OTHER_COMPONENT_ID = "styx-other";
   private static final WorkflowInstance WFI =
       WorkflowInstance.create(WorkflowId.create(COMPONENT_ID, ENDPOINT_ID), PARAMETER);

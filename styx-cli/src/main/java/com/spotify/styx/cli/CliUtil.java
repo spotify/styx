@@ -33,6 +33,7 @@ import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
+import com.spotify.styx.state.Trigger;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -96,8 +97,8 @@ class CliUtil {
     }
 
     @Override
-    public String triggerExecution(WorkflowInstance workflowInstance, String triggerId) {
-      return String.format("Trigger id: %s", triggerId);
+    public String triggerExecution(WorkflowInstance workflowInstance, Trigger trigger) {
+      return String.format("Trigger id: %s", trigger.triggerId());
     }
 
     @Override

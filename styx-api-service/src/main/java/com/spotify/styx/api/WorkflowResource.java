@@ -36,8 +36,8 @@ import com.spotify.apollo.route.Route;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.model.WorkflowInstanceExecutionData;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Json;
 import com.spotify.styx.util.ResourceNotFoundException;
@@ -225,7 +225,7 @@ public final class WorkflowResource {
     final WorkflowInstance workflowInstance = WorkflowInstance.create(workflowId, instanceId);
 
     try {
-      final WorkflowInstanceExecutionData  workflowInstanceExecutionData =
+      final WorkflowInstanceExecutionData workflowInstanceExecutionData =
           storage.executionData(workflowInstance);
 
       return Response.forPayload(workflowInstanceExecutionData);

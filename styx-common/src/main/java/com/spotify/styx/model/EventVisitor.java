@@ -24,6 +24,7 @@ import com.github.sviperll.adt4j.GenerateValueClassForVisitor;
 import com.github.sviperll.adt4j.Getter;
 import com.github.sviperll.adt4j.Visitor;
 import com.spotify.styx.state.Message;
+import com.spotify.styx.state.Trigger;
 
 /**
  * Generated {@link Event} ADT for all events that can be received by RunState
@@ -32,7 +33,7 @@ import com.spotify.styx.state.Message;
 @Visitor(resultVariableName = "R")
 public interface EventVisitor<R> {
 
-  R triggerExecution(@Getter WorkflowInstance workflowInstance, String triggerId);
+  R triggerExecution(@Getter WorkflowInstance workflowInstance, Trigger trigger);
   R info(@Getter WorkflowInstance workflowInstance, Message message);
   R dequeue(@Getter WorkflowInstance workflowInstance);
   R submit(@Getter WorkflowInstance workflowInstance, ExecutionDescription executionDescription);

@@ -30,6 +30,7 @@ import static com.spotify.styx.state.RunState.State.RUNNING;
 import static com.spotify.styx.state.RunState.State.SUBMITTED;
 import static com.spotify.styx.state.RunState.State.SUBMITTING;
 import static com.spotify.styx.state.RunState.State.TERMINATED;
+import static com.spotify.styx.state.TriggerSerializer.convertTriggerToPersistentTrigger;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Optional.empty;
 
@@ -141,7 +142,8 @@ public abstract class RunState {
           return state( // for backwards compatibility
               SUBMITTED,
               data().builder()
-                  .triggerId("UNKNOWN")
+                  .trigger(convertTriggerToPersistentTrigger(Trigger.unknown("UNKNOWN")))
+                  .triggerId("UNKNOWN") //for backwards compatibility
                   .build());
 
         default:
@@ -150,13 +152,14 @@ public abstract class RunState {
     }
 
     @Override
-    public RunState triggerExecution(WorkflowInstance workflowInstance, String triggerId) {
+    public RunState triggerExecution(WorkflowInstance workflowInstance, Trigger trigger) {
       switch (state()) {
         case NEW:
           return state(
               QUEUED,
               data().builder()
-                  .triggerId(triggerId)
+                  .trigger(TriggerSerializer.convertTriggerToPersistentTrigger(trigger))
+                  .triggerId(trigger.triggerId()) //for backwards compatibility
                   .build());
 
         default:

@@ -42,6 +42,7 @@ import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.testdata.TestData;
 import java.time.Instant;
@@ -70,6 +71,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       "styx",
       TestData.WORKFLOW_URI,
       DATA_ENDPOINT_DAILY);
+  private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
+  private static final Trigger TRIGGER2 = Trigger.unknown("trig2");
 
   @Test
   public void shouldCatchUpWithNaturalTriggers() throws Exception {
@@ -412,7 +415,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    givenStoredEvent(Event.triggerExecution(workflowInstance, "trig1"),                        0L);
+    givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER1),                       0L);
     givenStoredEvent(Event.created(workflowInstance, TEST_EXECUTION_ID_1, TEST_DOCKER_IMAGE),  1L);
     givenStoredEvent(Event.started(workflowInstance),                                          2L);
     givenStoredEvent(Event.terminate(workflowInstance, 30),                                    3L);
@@ -421,7 +424,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenStoredEvent(Event.terminate(workflowInstance, 30),                                    6L);
     givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                                7L);
     givenStoredEvent(Event.halt(workflowInstance),                                             8L);
-    givenStoredEvent(Event.triggerExecution(workflowInstance, "trig2"),                        9L);
+    givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER2),                       9L);
     givenStoredEvent(Event.created(workflowInstance, TEST_EXECUTION_ID_1, TEST_DOCKER_IMAGE), 10L);
     givenStoredEvent(Event.started(workflowInstance),                                         11L);
     givenStoredEvent(Event.terminate(workflowInstance, 30),                                   12L);
@@ -448,7 +451,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    givenStoredEvent(Event.triggerExecution(workflowInstance, "trig1"),           0L);
+    givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER1),          0L);
     givenStoredEvent(Event.dequeue(workflowInstance),                             1L);
     givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION),  2L);
     givenStoredEvent(Event.submitted(workflowInstance, "exec1"),                  3L);
@@ -462,7 +465,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenStoredEvent(Event.terminate(workflowInstance, 30),                      11L);
     givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                  12L);
     givenStoredEvent(Event.halt(workflowInstance),                               13L);
-    givenStoredEvent(Event.triggerExecution(workflowInstance, "trig2"),          14L);
+    givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER2),         14L);
     givenStoredEvent(Event.dequeue(workflowInstance),                            15L);
     givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION), 16L);
     givenStoredEvent(Event.submitted(workflowInstance, "exec3"),                 17L);
