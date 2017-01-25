@@ -47,6 +47,7 @@ import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
@@ -56,7 +57,7 @@ import org.junit.Test;
 public class StateInitializingTriggerTest {
 
   private static final Instant TIME = Instant.parse("2016-01-18T09:11:22.333Z");
-  private static final Trigger NATURAL_TRIGGER = Trigger.natural("trig");
+  private static final Trigger NATURAL_TRIGGER = Trigger.natural();
   private static final Trigger BACKFILL_TRIGGER = Trigger.backfill("trig");
 
   private static final Map<Partitioning, String> PARTITIONING_ARG_EXPECTS =
@@ -93,10 +94,10 @@ public class StateInitializingTriggerTest {
     RunState state = stateManager.get(expectedInstance);
 
     assertThat(state.state(), is(RunState.State.QUEUED));
-    assertThat(state.data().triggerId(), hasValue("trig"));
+    assertThat(state.data().triggerId(), hasValue(TriggerUtil.NATURAL_TRIGGER_ID));
     assertThat(
         state.data().trigger(),
-        hasValue(convertTriggerToPersistentTrigger(Trigger.natural("trig"))));
+        hasValue(convertTriggerToPersistentTrigger(Trigger.natural())));
   }
 
   @Test

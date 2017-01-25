@@ -48,7 +48,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class TriggerManagerTest {
 
-  private static final Trigger NATURAL_TRIGGER = Trigger.natural("natural-trigger");
+  private static final Trigger NATURAL_TRIGGER = Trigger.natural();
 
   private static final Instant NEXT_EXECUTION = Instant.parse("2016-10-01T00:00:00Z");
   private static final Instant NEXT_EXECUTION_PLUS_DAY = Instant.parse("2016-10-02T00:00:00Z");

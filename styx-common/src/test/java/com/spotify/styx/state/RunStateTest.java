@@ -38,6 +38,7 @@ import com.spotify.styx.WorkflowInstanceEventFactory;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.TriggerUtil;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -58,7 +59,7 @@ public class RunStateTest {
       DOCKER_IMAGE, Arrays.asList("--date", "{}", "--bar"), empty(), empty());
 
   private static final Trigger UNKNOWN_TRIGGER = Trigger.unknown("trig");
-  private static final Trigger NATURAL_TRIGGER1 = Trigger.natural("trig1");
+  private static final Trigger NATURAL_TRIGGER1 = Trigger.natural();
 
   private WorkflowInstanceEventFactory eventFactory =
       new WorkflowInstanceEventFactory(WORKFLOW_INSTANCE);
@@ -133,7 +134,9 @@ public class RunStateTest {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
     transitioner.receive(eventFactory.triggerExecution(NATURAL_TRIGGER1));
 
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().triggerId(), hasValue("trig1"));
+    assertThat(
+        transitioner.get(WORKFLOW_INSTANCE).data().triggerId(),
+        hasValue(TriggerUtil.NATURAL_TRIGGER_ID));
     assertThat(
         transitioner.get(WORKFLOW_INSTANCE).data().trigger(),
         hasValue(TriggerSerializer.convertTriggerToPersistentTrigger(NATURAL_TRIGGER1)));

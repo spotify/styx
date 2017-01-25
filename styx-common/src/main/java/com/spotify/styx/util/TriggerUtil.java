@@ -24,11 +24,17 @@ import com.spotify.styx.state.TriggerVisitor;
  */
 public class TriggerUtil {
 
+  public static final String NATURAL_TRIGGER_ID = "natural-trigger";
+
   private TriggerUtil() {
   }
 
   public static String name(Trigger trigger) {
     return trigger.accept(TriggerNameVisitor.INSTANCE);
+  }
+
+  public static String triggerId(Trigger trigger) {
+    return trigger.accept(TriggerIdVisitor.INSTANCE);
   }
 
   /**
@@ -38,7 +44,7 @@ public class TriggerUtil {
     INSTANCE;
 
     @Override
-    public String natural(String triggerId) {
+    public String natural() {
       return "natural";
     }
 
@@ -55,6 +61,33 @@ public class TriggerUtil {
     @Override
     public String unknown(String triggerId) {
       return "unknown";
+    }
+  }
+
+  /**
+   * A {@link TriggerVisitor} for extracting the id of a {@link Trigger}.
+   */
+  private enum TriggerIdVisitor implements TriggerVisitor<String> {
+    INSTANCE;
+
+    @Override
+    public String natural() {
+      return NATURAL_TRIGGER_ID;
+    }
+
+    @Override
+    public String adhoc(String triggerId) {
+      return triggerId;
+    }
+
+    @Override
+    public String backfill(String triggerId) {
+      return triggerId;
+    }
+
+    @Override
+    public String unknown(String triggerId) {
+      return triggerId;
     }
   }
 }

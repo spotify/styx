@@ -159,7 +159,7 @@ public class SchedulerResourceTest {
     assertThat(response.status(), is(Status.OK));
     assertThat(trigger, isPresent());
     assertThat(TriggerUtil.name(trigger.get()), is("adhoc"));
-    assertThat(trigger.get().triggerId(), startsWith("ad-hoc-cli-"));
+    assertThat(TriggerUtil.triggerId(trigger.get()), startsWith("ad-hoc-cli-"));
   }
 
   @Test

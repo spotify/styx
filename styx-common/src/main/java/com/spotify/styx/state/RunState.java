@@ -40,6 +40,7 @@ import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.util.Time;
+import com.spotify.styx.util.TriggerUtil;
 import java.time.Instant;
 
 /**
@@ -159,7 +160,7 @@ public abstract class RunState {
               QUEUED,
               data().builder()
                   .trigger(TriggerSerializer.convertTriggerToPersistentTrigger(trigger))
-                  .triggerId(trigger.triggerId()) //for backwards compatibility
+                  .triggerId(TriggerUtil.triggerId(trigger)) //for backwards compatibility
                   .build());
 
         default:

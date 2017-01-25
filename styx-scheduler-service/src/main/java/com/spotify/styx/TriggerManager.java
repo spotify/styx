@@ -48,8 +48,6 @@ public class TriggerManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(TriggerManager.class);
 
-  private static final String NATURAL_TRIGGER = "natural-trigger";
-
   private final TriggerListener triggerListener;
   private final Time time;
   private final Storage storage;
@@ -87,7 +85,7 @@ public class TriggerManager {
         try {
           triggerListener.event(
               workflow,
-              Trigger.natural(NATURAL_TRIGGER),
+              Trigger.natural(),
               decrementInstant(next, partitioning));
         } catch (AlreadyInitializedException e) {
           LOG.warn("{}", e.getMessage());
