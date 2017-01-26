@@ -61,6 +61,16 @@ public class TriggerManager {
   }
 
   void tick() {
+    try {
+      if (!storage.globalEnabled()) {
+        LOG.info("Triggering has been disabled globally.");
+        return;
+      }
+    } catch (IOException e) {
+      LOG.warn("Couldn't fetch global enabled status, skipping this run.");
+      return ;
+    }
+
     final Map<Workflow, Optional<Instant>> map;
     final Set<WorkflowId> enabled;
     try {
