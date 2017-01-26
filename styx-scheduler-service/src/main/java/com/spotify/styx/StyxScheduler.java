@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.monitoring.MeteredProxy.instrument;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
@@ -57,8 +58,6 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.monitoring.MeteredDockerRunner;
-import com.spotify.styx.monitoring.MeteredStorage;
 import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.MonitoringHandler;
 import com.spotify.styx.monitoring.Stats;
@@ -284,7 +283,7 @@ public class StyxScheduler implements AppInit {
 
     final Stats stats = statsFactory.apply(environment);
     final WorkflowCache cache = new InMemWorkflowCache();
-    final Storage storage = new MeteredStorage(storageFactory.apply(environment), stats, time);
+    final Storage storage = instrument(Storage.class, storageFactory.apply(environment), stats, time);
 
     warmUpCache(cache, storage);
 
@@ -299,7 +298,7 @@ public class StyxScheduler implements AppInit {
     final DockerRunner routingDockerRunner = DockerRunner.routing(
         id -> dockerRunnerFactory.create(id, environment, stateManager, executor, stats),
         dockerId);
-    final DockerRunner dockerRunner = new MeteredDockerRunner(routingDockerRunner, stats, time);
+    final DockerRunner dockerRunner = instrument(DockerRunner.class, routingDockerRunner, stats, time);
     final Publisher publisher = publisherFactory.apply(environment);
 
     final OutputHandler[] outputHandlers = new OutputHandler[] {
