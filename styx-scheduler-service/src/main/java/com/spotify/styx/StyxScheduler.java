@@ -467,7 +467,7 @@ public class StyxScheduler implements AppInit {
     final TriggerListener stateInitializingTrigger =
         new StateInitializingTrigger(stateFactory, stateManager, storage);
 
-    return (workflow, triggerId, instant) -> {
+    return (workflow, trigger, instant) -> {
       try {
         final boolean enabled = storage.workflowState(workflow.id()).enabled().orElse(false);
         if (!enabled || !storage.globalEnabled()) {
@@ -478,7 +478,7 @@ public class StyxScheduler implements AppInit {
         throw Throwables.propagate(e);
       }
 
-      stateInitializingTrigger.event(workflow, triggerId, instant);
+      stateInitializingTrigger.event(workflow, trigger, instant);
     };
   }
 

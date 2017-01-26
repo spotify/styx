@@ -36,7 +36,7 @@ public class EventSerializerTest {
   private static final WorkflowId WORKFLOW1 = WorkflowId.create("component", "endpoint1");
   private static final String PARAMETER1 = "2016-01-01";
   private static final Trigger UNKNOWN_TRIGGER = Trigger.unknown("trig");
-  private static final Trigger NATURAL_TRIGGER1 = Trigger.natural("trig1");
+  private static final Trigger NATURAL_TRIGGER1 = Trigger.natural();
   private static final Trigger ADHOC_TRIGGER2 = Trigger.adhoc("trig2");
   private static final Trigger BACKFILL_TRIGGER3 = Trigger.backfill("trig3");
   private static final Trigger TRIGGER_UNKNOWN = Trigger.unknown("UNKNOWN");
@@ -106,7 +106,7 @@ public class EventSerializerTest {
         eventSerializer.deserialize(json("retryAfter", "\"delay_millis\":12345")),
         is(Event.retryAfter(INSTANCE1, 12345)));
     assertThat(
-        eventSerializer.deserialize(json("triggerExecution", "\"trigger\":{\"@type\":\"natural\",\"trigger_id\":\"trig1\"}")),
+        eventSerializer.deserialize(json("triggerExecution", "\"trigger\":{\"@type\":\"natural\"}")),
         is(Event.triggerExecution(INSTANCE1, NATURAL_TRIGGER1)));
     assertThat(
         eventSerializer.deserialize(json("triggerExecution", "\"trigger\":{\"@type\":\"adhoc\",\"trigger_id\":\"trig2\"}")),

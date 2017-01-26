@@ -26,6 +26,7 @@ import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.util.TriggerUtil;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -87,7 +88,7 @@ class WFIExecutionBuilder {
       currWorkflowInstance = workflowInstance;
       completed = false;
 
-      currTriggerId = trigger.triggerId();
+      currTriggerId = TriggerUtil.triggerId(trigger);
       triggerTs = eventTs;
       return null;
     }

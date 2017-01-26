@@ -25,6 +25,7 @@ import static com.spotify.styx.model.Partitioning.DAYS;
 import static com.spotify.styx.model.Partitioning.HOURS;
 import static com.spotify.styx.model.Partitioning.MONTHS;
 import static com.spotify.styx.model.Partitioning.WEEKS;
+import static com.spotify.styx.state.TriggerSerializer.convertTriggerToPersistentTrigger;
 import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.is;
@@ -44,9 +45,9 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.Trigger;
-import com.spotify.styx.state.TriggerSerializer;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
@@ -56,6 +57,8 @@ import org.junit.Test;
 public class StateInitializingTriggerTest {
 
   private static final Instant TIME = Instant.parse("2016-01-18T09:11:22.333Z");
+  private static final Trigger NATURAL_TRIGGER = Trigger.natural();
+  private static final Trigger BACKFILL_TRIGGER = Trigger.backfill("trig");
 
   private static final Map<Partitioning, String> PARTITIONING_ARG_EXPECTS =
       ImmutableMap.of(
@@ -75,46 +78,50 @@ public class StateInitializingTriggerTest {
     DataEndpoint endpoint = dataEndpoint(HOURS);
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
     setDockerImage(workflow.id(), workflow.schedule());
-    trigger.event(workflow, "trig", TIME);
+    trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
     assertThat(stateManager.activeStatesSize(), is(1));
   }
 
   @Test
-  public void shouldInjectTriggerExecutionEventWithTriggerId() throws Exception {
+  public void shouldInjectTriggerExecutionEventWithNaturalTrigger() throws Exception {
     DataEndpoint endpoint = dataEndpoint(HOURS);
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
     setDockerImage(workflow.id(), workflow.schedule());
-    trigger.event(workflow, "trig", TIME);
+    trigger.event(workflow, NATURAL_TRIGGER, TIME);
+
+    WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(), "2016-01-18T09");
+    RunState state = stateManager.get(expectedInstance);
+
+    assertThat(state.state(), is(RunState.State.QUEUED));
+    assertThat(state.data().triggerId(), hasValue(TriggerUtil.NATURAL_TRIGGER_ID));
+    assertThat(
+        state.data().trigger(),
+        hasValue(convertTriggerToPersistentTrigger(Trigger.natural())));
+  }
+
+  @Test
+  public void shouldInjectTriggerExecutionEventWithBackfillTrigger() throws Exception {
+    DataEndpoint endpoint = dataEndpoint(HOURS);
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
+    setDockerImage(workflow.id(), workflow.schedule());
+    trigger.event(workflow, BACKFILL_TRIGGER, TIME);
 
     WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(), "2016-01-18T09");
     RunState state = stateManager.get(expectedInstance);
 
     assertThat(state.state(), is(RunState.State.QUEUED));
     assertThat(state.data().triggerId(), hasValue("trig"));
-  }
-
-  @Test
-  public void shouldInjectTriggerExecutionEventWithTrigger() throws Exception {
-    DataEndpoint endpoint = dataEndpoint(HOURS);
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
-    setDockerImage(workflow.id(), workflow.schedule());
-    trigger.event(workflow, "trig", TIME);
-
-    WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(), "2016-01-18T09");
-    RunState state = stateManager.get(expectedInstance);
-
-    assertThat(state.state(), is(RunState.State.QUEUED));
     assertThat(
         state.data().trigger(),
-        hasValue(TriggerSerializer.convertTriggerToPersistentTrigger(Trigger.unknown("trig"))));
+        hasValue(convertTriggerToPersistentTrigger(Trigger.backfill("trig"))));
   }
 
   @Test
   public void shouldDoNothingIfDockerInfoMissing() throws Exception {
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, TestData.DAILY_DATA_ENDPOINT);
     setDockerImage(workflow.id(), workflow.schedule());
-    trigger.event(workflow, "trig", TIME);
+    trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
     assertThat(stateManager.activeStatesSize(), is(0));
   }
@@ -125,7 +132,7 @@ public class StateInitializingTriggerTest {
       DataEndpoint endpoint = dataEndpoint(partitioningCase.getKey(), "--date", "{}", "--bar");
       Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
       setDockerImage(workflow.id(), workflow.schedule());
-      trigger.event(workflow, "trig", TIME);
+      trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
       RunState runState =
           stateManager.get(WorkflowInstance.create(workflow.id(), partitioningCase.getValue()));

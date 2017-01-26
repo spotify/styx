@@ -17,7 +17,6 @@
 package com.spotify.styx.state;
 
 import com.github.sviperll.adt4j.GenerateValueClassForVisitor;
-import com.github.sviperll.adt4j.Getter;
 import com.github.sviperll.adt4j.Visitor;
 
 /**
@@ -27,8 +26,8 @@ import com.github.sviperll.adt4j.Visitor;
 @Visitor(resultVariableName = "R")
 public interface TriggerVisitor<R> {
 
-  R natural(@Getter String triggerId);
-  R adhoc(@Getter String triggerId);
-  R backfill(@Getter String triggerId);
-  R unknown(@Getter String triggerId);
+  R natural();
+  R adhoc(String triggerId);
+  R backfill(String triggerId);
+  R unknown(String triggerId);
 }

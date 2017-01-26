@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
@@ -47,7 +48,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class TriggerManagerTest {
 
-  private static final String NATURAL_TRIGGER = "natural-trigger";
+  private static final Trigger NATURAL_TRIGGER = Trigger.natural();
 
   private static final Instant NEXT_EXECUTION = Instant.parse("2016-10-01T00:00:00Z");
   private static final Instant NEXT_EXECUTION_PLUS_DAY = Instant.parse("2016-10-02T00:00:00Z");
@@ -85,7 +86,7 @@ public class TriggerManagerTest {
   public void shouldTriggerExecutionOnEnabledWithoutNextNaturalTrigger() throws IOException {
     setupWithoutNextNaturalTrigger(true);
     triggerManager.tick();
-    verify(triggerListener).event(WORKFLOW_DAILY, "natural-trigger", MANAGER_TIME_MINUS_DAY_TRUNCATED);
+    verify(triggerListener).event(WORKFLOW_DAILY, NATURAL_TRIGGER, MANAGER_TIME_MINUS_DAY_TRUNCATED);
     verify(storage).updateNextNaturalTrigger(WORKFLOW_DAILY.id(), MANAGER_TIME_PLUS_DAY_TRUNCATED);
   }
 

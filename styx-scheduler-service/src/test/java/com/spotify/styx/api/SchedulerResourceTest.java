@@ -22,6 +22,7 @@ package com.spotify.styx.api;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
+import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresent;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
@@ -48,9 +49,11 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
@@ -85,7 +88,7 @@ public class SchedulerResourceTest {
                                                             TestData.WORKFLOW_URI,
                                                             TestData.MONTHLY_DATA_ENDPOINT);
   private Optional<Workflow> triggeredWorkflow = Optional.empty();
-  private Optional<String> triggerId = Optional.empty();
+  private Optional<Trigger> trigger = Optional.empty();
   private Optional<Instant> triggeredInstant = Optional.empty();
 
   @Rule
@@ -94,9 +97,9 @@ public class SchedulerResourceTest {
   void init(Environment environment) {
     final SchedulerResource schedulerResource = new SchedulerResource(
         stateManager,
-        (workflow, triggerId, instant) -> {
+        (workflow, trigger, instant) -> {
           this.triggeredWorkflow = Optional.of(workflow);
-          this.triggerId = Optional.of(triggerId);
+          this.trigger = Optional.of(trigger);
           this.triggeredInstant = Optional.of(instant);
         },
         storage,
@@ -147,14 +150,16 @@ public class SchedulerResourceTest {
   }
 
   @Test
-  public void testTriggeredWorkflowGeneratesTriggerId() throws Exception {
+  public void testTriggeredWorkflowGeneratesTrigger() throws Exception {
     storage.store(HOURLY_WORKFLOW);
     WorkflowInstance toTrigger = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2014-12-31T23");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
     assertThat(response.status(), is(Status.OK));
-    assertThat(triggerId, hasValue(startsWith("ad-hoc-cli-")));
+    assertThat(trigger, isPresent());
+    assertThat(TriggerUtil.name(trigger.get()), is("adhoc"));
+    assertThat(TriggerUtil.triggerId(trigger.get()), startsWith("ad-hoc-cli-"));
   }
 
   @Test
@@ -214,9 +219,9 @@ public class SchedulerResourceTest {
     ServiceHelper serviceHelper = ServiceHelper.create((environment) -> {
       final SchedulerResource schedulerResource = new SchedulerResource(
           stateManager,
-          (workflow, triggerId, instant) -> {
+          (workflow, trigger, instant) -> {
             this.triggeredWorkflow = Optional.of(workflow);
-            this.triggerId = Optional.of(triggerId);
+            this.trigger = Optional.of(trigger);
             this.triggeredInstant = Optional.of(instant);
           },
           failingStorage,

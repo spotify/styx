@@ -22,7 +22,6 @@ package com.spotify.styx.state;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
@@ -42,6 +41,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,9 +136,8 @@ public class QueuedStateManager implements StateManager {
 
   @Override
   public Map<WorkflowInstance, RunState> activeStates() {
-    final ImmutableMap.Builder<WorkflowInstance, RunState> builder = ImmutableMap.builder();
-    states.entrySet().forEach(entry -> builder.put(entry.getKey(), entry.getValue().runState));
-    return builder.build();
+    return states.entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, (entry) -> entry.getValue().runState));
   }
 
   @Override

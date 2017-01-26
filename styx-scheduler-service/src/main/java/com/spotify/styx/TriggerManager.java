@@ -29,6 +29,7 @@ import com.google.common.base.Throwables;
 import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
@@ -46,8 +47,6 @@ import org.slf4j.LoggerFactory;
 public class TriggerManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(TriggerManager.class);
-
-  private static final String NATURAL_TRIGGER = "natural-trigger";
 
   private final TriggerListener triggerListener;
   private final Time time;
@@ -84,7 +83,10 @@ public class TriggerManager {
 
       if (enabled.contains(workflow.id())) {
         try {
-          triggerListener.event(workflow, NATURAL_TRIGGER, decrementInstant(next, partitioning));
+          triggerListener.event(
+              workflow,
+              Trigger.natural(),
+              decrementInstant(next, partitioning));
         } catch (AlreadyInitializedException e) {
           LOG.warn("{}", e.getMessage());
         } catch (Throwable e) {

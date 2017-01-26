@@ -57,6 +57,7 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
+import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
@@ -92,7 +93,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private static final String VALID_SHA = "470a229b49a14e7682af2abfdac3b881a8aacdf9";
   private static final String INVALID_SHA = "XXXXXX9b49a14e7682af2abfdac3b881a8aacdf9";
 
-  private static final Trigger TRIGGER = Trigger.unknown("trig");
+  private static final Trigger NATURAL_TRIGGER = Trigger.natural();
+  private static final Trigger BACKFILL_TRIGGER = Trigger.backfill("backfill-1");
 
   private static final ByteString STATEPAYLOAD_FULL =
       ByteString.encodeUtf8("{\"enabled\":\"true\", \"docker_image\":\"cherry:image\", "
@@ -353,7 +355,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V1);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
-    storage.writeEvent(create(Event.triggerExecution(wfi, TRIGGER), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER), 0L, ms("07:00:00")));
     storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
     storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
 
@@ -367,7 +369,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "[0].workflow_instance.workflow_id.component_id", is("foo"));
     assertJson(response, "[0].workflow_instance.workflow_id.endpoint_id", is("bar"));
     assertJson(response, "[0].triggers", hasSize(1));
-    assertJson(response, "[0].triggers.[0].trigger_id", is("trig"));
+    assertJson(response, "[0].triggers.[0].trigger_id", is(TriggerUtil.NATURAL_TRIGGER_ID));
     assertJson(response, "[0].triggers.[0].complete", is(false));
     assertJson(response, "[0].triggers.[0].executions", hasSize(1));
     assertJson(response, "[0].triggers.[0].executions.[0].execution_id", is("exec"));
@@ -382,7 +384,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V1);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
-    storage.writeEvent(create(Event.triggerExecution(wfi, TRIGGER), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER), 0L, ms("07:00:00")));
     storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
     storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
 
@@ -395,7 +397,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "workflow_instance.workflow_id.component_id", is("foo"));
     assertJson(response, "workflow_instance.workflow_id.endpoint_id", is("bar"));
     assertJson(response, "triggers", hasSize(1));
-    assertJson(response, "triggers.[0].trigger_id", is("trig"));
+    assertJson(response, "triggers.[0].trigger_id", is(TriggerUtil.NATURAL_TRIGGER_ID));
     assertJson(response, "triggers.[0].timestamp", is("2016-08-10T07:00:00Z"));
     assertJson(response, "triggers.[0].complete", is(false));
     assertJson(response, "triggers.[0].executions", hasSize(1));
@@ -409,15 +411,36 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldReturnWorkflowInstanceDataBackfill() throws Exception {
+    sinceVersion(Api.Version.V1);
+
+    WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
+    storage.writeEvent(create(Event.triggerExecution(wfi, BACKFILL_TRIGGER), 0L, ms("07:00:00")));
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/foo/bar/instances/2016-08-10")));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+
+    assertJson(response, "workflow_instance.parameter", is("2016-08-10"));
+    assertJson(response, "workflow_instance.workflow_id.component_id", is("foo"));
+    assertJson(response, "workflow_instance.workflow_id.endpoint_id", is("bar"));
+    assertJson(response, "triggers", hasSize(1));
+    assertJson(response, "triggers.[0].trigger_id", is("backfill-1"));
+    assertJson(response, "triggers.[0].timestamp", is("2016-08-10T07:00:00Z"));
+    assertJson(response, "triggers.[0].complete", is(false));
+  }
+
+  @Test
   public void shouldPaginateWorkflowInstancesData() throws Exception {
     sinceVersion(Api.Version.V1);
 
     WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-11");
     WorkflowInstance wfi2 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-12");
     WorkflowInstance wfi3 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-13");
-    storage.writeEvent(create(Event.triggerExecution(wfi1, TRIGGER), 0L, ms("07:00:00")));
-    storage.writeEvent(create(Event.triggerExecution(wfi2, TRIGGER), 0L, ms("07:00:00")));
-    storage.writeEvent(create(Event.triggerExecution(wfi3, TRIGGER), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi1, NATURAL_TRIGGER), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi2, NATURAL_TRIGGER), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi3, NATURAL_TRIGGER), 0L, ms("07:00:00")));
 
     Response<ByteString> response = awaitResponse(
         serviceHelper.request("GET", path("/foo/bar/instances?offset=2016-08-12&limit=1")));

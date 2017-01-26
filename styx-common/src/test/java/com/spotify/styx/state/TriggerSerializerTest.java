@@ -31,7 +31,7 @@ public class TriggerSerializerTest {
 
   @Test
   public void testRoundtripAllEvents() {
-    assertRoundtrip(Trigger.natural(TRIGGER_ID));
+    assertRoundtrip(Trigger.natural());
     assertRoundtrip(Trigger.adhoc(TRIGGER_ID));
     assertRoundtrip(Trigger.backfill(TRIGGER_ID));
     assertRoundtrip(Trigger.unknown(TRIGGER_ID));
@@ -39,10 +39,22 @@ public class TriggerSerializerTest {
 
   @Test
   public void testDeserializeFromJson() throws Exception {
-    assertThat(triggerSerializer.deserialize(json("natural")), is(Trigger.natural(TRIGGER_ID)));
-    assertThat(triggerSerializer.deserialize(json("adhoc")), is(Trigger.adhoc(TRIGGER_ID)));
-    assertThat(triggerSerializer.deserialize(json("backfill")), is(Trigger.backfill(TRIGGER_ID)));
-    assertThat(triggerSerializer.deserialize(json("unknown")), is(Trigger.unknown(TRIGGER_ID)));
+    assertThat(triggerSerializer.deserialize(json("natural")), is(Trigger.natural()));
+    assertThat(
+        triggerSerializer.deserialize(json("adhoc", TRIGGER_ID)),
+        is(Trigger.adhoc(TRIGGER_ID)));
+    assertThat(
+        triggerSerializer.deserialize(json("backfill", TRIGGER_ID)),
+        is(Trigger.backfill(TRIGGER_ID)));
+    assertThat(
+        triggerSerializer.deserialize(json("unknown", TRIGGER_ID)),
+        is(Trigger.unknown(TRIGGER_ID)));
+  }
+
+  @Test
+  public void testNaturalTrigger() {
+    ByteString byteString = triggerSerializer.serialize(Trigger.natural());
+    assertThat(byteString, is(json("natural")));
   }
 
   private void assertRoundtrip(Trigger trigger) {
@@ -55,7 +67,13 @@ public class TriggerSerializerTest {
 
   private ByteString json(String triggerType) {
     return ByteString.encodeUtf8(String.format(
+        "{\"@type\":\"%s\"}",
+        triggerType));
+  }
+
+  private ByteString json(String triggerType, String triggerId) {
+    return ByteString.encodeUtf8(String.format(
         "{\"@type\":\"%s\",\"trigger_id\":\"%s\"}",
-        triggerType, TRIGGER_ID));
+        triggerType, triggerId));
   }
 }

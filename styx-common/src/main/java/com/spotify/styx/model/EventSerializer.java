@@ -367,6 +367,7 @@ public final class EventSerializer {
   }
 
   public static class Submit extends PersistentEvent {
+
     public final ExecutionDescription executionDescription;
 
     @JsonCreator

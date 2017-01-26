@@ -22,6 +22,8 @@ package com.spotify.styx.state;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
 import static com.jayway.jsonpath.matchers.JsonPathMatchers.hasJsonPath;
+import static com.jayway.jsonpath.matchers.JsonPathMatchers.isJson;
+import static com.jayway.jsonpath.matchers.JsonPathMatchers.withoutJsonPath;
 import static com.spotify.styx.state.TriggerSerializer.convertTriggerToPersistentTrigger;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -31,13 +33,14 @@ import static org.junit.Assert.assertThat;
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.util.Json;
+import com.spotify.styx.util.TriggerUtil;
 import java.util.Arrays;
 import java.util.Optional;
 import org.junit.Test;
 
 public class StateDataSerializationTest {
 
-  private static final String PAYLOAD =
+  private static final String PAYLOAD_NATURAL_TRIGGER =
       "{"
       + "\"execution_description\": {"
       + "  \"commit_sha\": \"474339ec18d3d04d5d513856bc8ca1d4f1aed03f\","
@@ -57,6 +60,7 @@ public class StateDataSerializationTest {
       + "\"retry_cost\": 0.4,"
       + "\"retry_delay_millis\": 600000,"
       + "\"tries\": 4,"
+      + "\"trigger\":{\"@type\":\"natural\"},"
       + "\"trigger_id\": \"natural-trigger\","
       + "\"messages\": ["
       + "  {\"level\":\"INFO\",\"line\":\"Message 1\"},"
@@ -65,7 +69,7 @@ public class StateDataSerializationTest {
       + "\"unknown_field\": \"foo\""
       + "}";
 
-  private static final String PAYLOAD2 =
+  private static final String PAYLOAD_BACKFILL_TRIGGER =
       "{"
       + "\"execution_description\": {"
       + "  \"commit_sha\": \"474339ec18d3d04d5d513856bc8ca1d4f1aed03f\","
@@ -85,8 +89,8 @@ public class StateDataSerializationTest {
       + "\"retry_cost\": 0.4,"
       + "\"retry_delay_millis\": 600000,"
       + "\"tries\": 4,"
-      + "\"trigger\":{\"@type\":\"natural\",\"trigger_id\":\"natural-trigger\"},"
-      + "\"trigger_id\": \"natural-trigger\","
+      + "\"trigger\":{\"@type\":\"backfill\",\"trigger_id\":\"backfill-1\"},"
+      + "\"trigger_id\": \"backfill-1\","
       + "\"messages\": ["
       + "  {\"level\":\"INFO\",\"line\":\"Message 1\"},"
       + "  {\"level\":\"WARNING\",\"line\":\"Message 2\"}"
@@ -94,8 +98,7 @@ public class StateDataSerializationTest {
       + "\"unknown_field\": \"foo\""
       + "}";
 
-  private static final StateData EXPECTED = StateData.newBuilder()
-      .triggerId("natural-trigger")
+  private static final StateData EXPECTED_NO_TRIGGER = StateData.newBuilder()
       .tries(4)
       .retryDelayMillis(600000L)
       .retryCost(0.4)
@@ -113,39 +116,35 @@ public class StateDataSerializationTest {
       .addMessage(Message.warning("Message 2"))
       .build();
 
-  private static final StateData EXPECTED2 = StateData.newBuilder()
-      .triggerId("natural-trigger")
-      .trigger(convertTriggerToPersistentTrigger(Trigger.natural("natural-trigger")))
-      .tries(4)
-      .retryDelayMillis(600000L)
-      .retryCost(0.4)
-      .lastExit(20)
-      .executionId("styx-run-12172683-c62f-4f32-899a-63a9741b73f9")
-      .executionDescription(
-          ExecutionDescription.create(
-              "pipeline-core:474339e",
-              Arrays.asList("echo", "hello", "world"),
-              Optional.of(DataEndpoint.Secret.create("pipeline-core-secret", "/etc/keys")),
-              Optional.of("474339ec18d3d04d5d513856bc8ca1d4f1aed03f")
-          )
-      )
-      .addMessage(Message.info("Message 1"))
-      .addMessage(Message.warning("Message 2"))
-      .build();
+  private static final StateData EXPECTED_NATURAL_TRIGGER =
+      EXPECTED_NO_TRIGGER.builder()
+          .triggerId(TriggerUtil.NATURAL_TRIGGER_ID)
+          .trigger(convertTriggerToPersistentTrigger(Trigger.natural()))
+          .build();
+
+  private static final StateData EXPECTED_BACKFILL_TRIGGER =
+      EXPECTED_NO_TRIGGER.builder()
+          .triggerId("backfill-1")
+          .trigger(convertTriggerToPersistentTrigger(Trigger.backfill("backfill-1")))
+          .build();
 
   @Test
   public void serializes() throws Exception {
-    String json = Json.OBJECT_MAPPER.writeValueAsString(EXPECTED);
-    String json2 = Json.OBJECT_MAPPER.writeValueAsString(EXPECTED2);
+    String jsonNaturalTrigger = Json.OBJECT_MAPPER.writeValueAsString(EXPECTED_NATURAL_TRIGGER);
+    String jsonBackfillTrigger = Json.OBJECT_MAPPER.writeValueAsString(EXPECTED_BACKFILL_TRIGGER);
 
-    assertStateDataJson(json);
-    assertStateDataJson(json2);
-    assertThat(json2, hasJsonPath("trigger.@type", equalTo("natural")));
-    assertThat(json2, hasJsonPath("trigger.trigger_id", equalTo("natural-trigger")));
+    assertStateDataJsonNoTrigger(jsonNaturalTrigger);
+    assertThat(jsonNaturalTrigger, hasJsonPath("trigger_id", equalTo(TriggerUtil.NATURAL_TRIGGER_ID)));
+    assertThat(jsonNaturalTrigger, hasJsonPath("trigger.@type", equalTo("natural")));
+    assertThat(jsonNaturalTrigger, isJson(withoutJsonPath("trigger.trigger_id")));
+
+    assertStateDataJsonNoTrigger(jsonBackfillTrigger);
+    assertThat(jsonBackfillTrigger, hasJsonPath("trigger_id", equalTo("backfill-1")));
+    assertThat(jsonBackfillTrigger, hasJsonPath("trigger.@type", equalTo("backfill")));
+    assertThat(jsonBackfillTrigger, hasJsonPath("trigger.trigger_id", equalTo("backfill-1")));
   }
 
-  private void assertStateDataJson(String json) {
-    assertThat(json, hasJsonPath("trigger_id", equalTo("natural-trigger")));
+  private void assertStateDataJsonNoTrigger(String json) {
     assertThat(json, hasJsonPath("tries", equalTo(4)));
     assertThat(json, hasJsonPath("retry_delay_millis", equalTo(600000)));
     assertThat(json, hasJsonPath("retry_cost", equalTo(0.4)));
@@ -160,23 +159,23 @@ public class StateDataSerializationTest {
 
   @Test
   public void deserializes() throws Exception {
-    StateData stateData = Json.OBJECT_MAPPER.readValue(PAYLOAD, StateData.class);
-    assertThat(stateData, equalTo(EXPECTED));
+    StateData stateData = Json.OBJECT_MAPPER.readValue(PAYLOAD_NATURAL_TRIGGER, StateData.class);
+    assertThat(stateData, equalTo(EXPECTED_NATURAL_TRIGGER));
 
-    StateData stateData2 = Json.OBJECT_MAPPER.readValue(PAYLOAD2, StateData.class);
-    assertThat(stateData2, equalTo(EXPECTED2));
+    StateData stateData2 = Json.OBJECT_MAPPER.readValue(PAYLOAD_BACKFILL_TRIGGER, StateData.class);
+    assertThat(stateData2, equalTo(EXPECTED_BACKFILL_TRIGGER));
   }
 
   @Test
   public void deserializesEmptyObject() throws Exception {
     StateData stateData = Json.OBJECT_MAPPER.readValue("{}", StateData.class);
 
-    assertThat(stateData.trigger(), is(Optional.empty()));
+    assertThat(stateData.triggerId(), isEmpty());
+    assertThat(stateData.trigger(), isEmpty());
     assertThat(stateData.tries(), equalTo(0));
     assertThat(stateData.lastExit(), isEmpty());
     assertThat(stateData.retryCost(), equalTo(0.0));
     assertThat(stateData.retryDelayMillis(), isEmpty());
-    assertThat(stateData.trigger(), isEmpty());
     assertThat(stateData.executionId(), isEmpty());
     assertThat(stateData.executionDescription(), isEmpty());
     assertThat(stateData.messages(), is(empty()));
