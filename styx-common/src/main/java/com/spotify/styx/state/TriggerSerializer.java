@@ -24,36 +24,17 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeId;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Throwables;
-import com.spotify.styx.util.Json;
-import java.io.IOException;
-import okio.ByteString;
 
-public class TriggerSerializer {
+public final class TriggerSerializer {
 
   private static final TriggerSerializerVisitor SERIALIZER_VISITOR = new TriggerSerializerVisitor();
-  private static final ObjectMapper OBJECT_MAPPER = Json.OBJECT_MAPPER;
+
+  private TriggerSerializer() {
+    // no instantiation
+  }
 
   public static PersistentTrigger convertTriggerToPersistentTrigger(Trigger trigger) {
     return trigger.accept(SERIALIZER_VISITOR);
-  }
-
-  public ByteString serialize(Trigger trigger) {
-    try {
-      return ByteString.of(OBJECT_MAPPER.writeValueAsBytes(convertTriggerToPersistentTrigger(trigger)));
-    } catch (JsonProcessingException e) {
-      throw Throwables.propagate(e);
-    }
-  }
-
-  public Trigger deserialize(ByteString json) {
-    try {
-      return OBJECT_MAPPER.readValue(json.toByteArray(), PersistentTrigger.class).toTrigger();
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
   }
 
   private static class TriggerSerializerVisitor implements TriggerVisitor<PersistentTrigger> {
@@ -65,26 +46,26 @@ public class TriggerSerializer {
 
     @Override
     public PersistentTrigger adhoc(String triggerId) {
-      return new PersistentTrigger.Adhoc(triggerId);
+      return new PersistentTriggerWithId("adhoc", triggerId);
     }
 
     @Override
     public PersistentTrigger backfill(String triggerId) {
-      return new PersistentTrigger.Backfill(triggerId);
+      return new PersistentTriggerWithId("backfill", triggerId);
     }
 
     @Override
     public PersistentTrigger unknown(String triggerId) {
-      return new PersistentTrigger.Unknown(triggerId);
+      return new PersistentTriggerWithId("unknown", triggerId);
     }
   }
 
   @JsonTypeInfo(use = Id.NAME, visible = true)
   @JsonSubTypes({
       @JsonSubTypes.Type(value = PersistentTrigger.class, name = "natural"),
-      @JsonSubTypes.Type(value = PersistentTrigger.Adhoc.class, name = "adhoc"),
-      @JsonSubTypes.Type(value = PersistentTrigger.Backfill.class, name = "backfill"),
-      @JsonSubTypes.Type(value = PersistentTrigger.Unknown.class, name = "unknown"),
+      @JsonSubTypes.Type(value = PersistentTriggerWithId.class, name = "adhoc"),
+      @JsonSubTypes.Type(value = PersistentTriggerWithId.class, name = "backfill"),
+      @JsonSubTypes.Type(value = PersistentTriggerWithId.class, name = "unknown"),
       })
   @JsonInclude(Include.NON_ABSENT)
   public static class PersistentTrigger {
@@ -99,18 +80,6 @@ public class TriggerSerializer {
       this.type = type;
     }
 
-    @Override
-    public boolean equals(Object o) {
-      if (o == this) {
-        return true;
-      }
-      if (o instanceof PersistentTrigger) {
-        PersistentTrigger that = (PersistentTrigger) o;
-        return (this.type.equals(that.type));
-      }
-      return false;
-    }
-
     public Trigger toTrigger() {
       switch (type) {
         case "natural":
@@ -121,94 +90,75 @@ public class TriggerSerializer {
       }
     }
 
-    public static class Adhoc extends PersistentTrigger {
-
-      public final String triggerId;
-
-      @JsonCreator
-      public Adhoc(
-          @JsonProperty("trigger_id") String triggerId) {
-        super("adhoc");
-        this.triggerId = triggerId;
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
       }
-
-      @Override
-      public Trigger toTrigger() {
-        return Trigger.adhoc(triggerId);
-      }
-
-      @Override
-      public boolean equals(Object o) {
-        if (o == this) {
-          return true;
-        }
-        if (o instanceof Adhoc) {
-          Adhoc that = (Adhoc) o;
-          return (this.type.equals(that.type))
-                 && (this.triggerId.equals(that.triggerId));
-        }
+      if (!(o instanceof PersistentTrigger)) {
         return false;
+      }
+
+      PersistentTrigger that = (PersistentTrigger) o;
+
+      return type.equals(that.type);
+    }
+
+    @Override
+    public int hashCode() {
+      return type.hashCode();
+    }
+  }
+
+  public static class PersistentTriggerWithId extends PersistentTrigger {
+
+    public final String triggerId;
+
+    @JsonCreator
+    public PersistentTriggerWithId(
+        @JsonProperty("@type") String type,
+        @JsonProperty("trigger_id") String triggerId) {
+      super(type);
+      this.triggerId = triggerId;
+    }
+
+    @Override
+    public Trigger toTrigger() {
+      switch (type) {
+        case "adhoc":
+          return Trigger.adhoc(triggerId);
+        case "backfill":
+          return Trigger.backfill(triggerId);
+        case "unknown":
+          return Trigger.unknown(triggerId);
+
+        default:
+          return super.toTrigger();
       }
     }
 
-    public static class Backfill extends PersistentTrigger {
-
-      public final String triggerId;
-
-      @JsonCreator
-      public Backfill(
-          @JsonProperty("trigger_id") String triggerId) {
-        super("backfill");
-        this.triggerId = triggerId;
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
       }
-
-      @Override
-      public Trigger toTrigger() {
-        return Trigger.backfill(triggerId);
-      }
-
-      @Override
-      public boolean equals(Object o) {
-        if (o == this) {
-          return true;
-        }
-        if (o instanceof Backfill) {
-          Backfill that = (Backfill) o;
-          return (this.type.equals(that.type))
-                 && (this.triggerId.equals(that.triggerId));
-        }
+      if (!(o instanceof PersistentTriggerWithId)) {
         return false;
       }
+      if (!super.equals(o)) {
+        return false;
+      }
+
+      PersistentTriggerWithId that = (PersistentTriggerWithId) o;
+
+      return triggerId.equals(that.triggerId);
     }
 
-    public static class Unknown extends PersistentTrigger {
-
-      public final String triggerId;
-
-      @JsonCreator
-      public Unknown(
-          @JsonProperty("trigger_id") String triggerId) {
-        super("unknown");
-        this.triggerId = triggerId;
-      }
-
-      @Override
-      public Trigger toTrigger() {
-        return Trigger.unknown(triggerId);
-      }
-
-      @Override
-      public boolean equals(Object o) {
-        if (o == this) {
-          return true;
-        }
-        if (o instanceof Unknown) {
-          Unknown that = (Unknown) o;
-          return (this.type.equals(that.type))
-                 && (this.triggerId.equals(that.triggerId));
-        }
-        return false;
-      }
+    @Override
+    public int hashCode() {
+      int result = super.hashCode();
+      result = 31 * result + triggerId.hashCode();
+      return result;
     }
   }
 }

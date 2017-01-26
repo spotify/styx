@@ -16,9 +16,14 @@
 
 package com.spotify.styx.state;
 
+import static com.spotify.styx.state.TriggerSerializer.convertTriggerToPersistentTrigger;
+import static com.spotify.styx.util.Json.OBJECT_MAPPER;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.base.Throwables;
+import java.io.IOException;
 import okio.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
@@ -26,8 +31,6 @@ import org.junit.Test;
 public class TriggerSerializerTest {
 
   private static final String TRIGGER_ID = "trig";
-
-  private TriggerSerializer triggerSerializer = new TriggerSerializer();
 
   @Test
   public void testRoundtripAllEvents() {
@@ -39,41 +42,57 @@ public class TriggerSerializerTest {
 
   @Test
   public void testDeserializeFromJson() throws Exception {
-    assertThat(triggerSerializer.deserialize(json("natural")), is(Trigger.natural()));
     assertThat(
-        triggerSerializer.deserialize(json("adhoc", TRIGGER_ID)),
+        deserialize(jsonNatural()),
+        is(Trigger.natural()));
+    assertThat(
+        deserialize(json("adhoc", TRIGGER_ID)),
         is(Trigger.adhoc(TRIGGER_ID)));
     assertThat(
-        triggerSerializer.deserialize(json("backfill", TRIGGER_ID)),
+        deserialize(json("backfill", TRIGGER_ID)),
         is(Trigger.backfill(TRIGGER_ID)));
     assertThat(
-        triggerSerializer.deserialize(json("unknown", TRIGGER_ID)),
+        deserialize(json("unknown", TRIGGER_ID)),
         is(Trigger.unknown(TRIGGER_ID)));
   }
 
   @Test
   public void testNaturalTrigger() {
-    ByteString byteString = triggerSerializer.serialize(Trigger.natural());
-    assertThat(byteString, is(json("natural")));
+    ByteString byteString = serialize(Trigger.natural());
+    assertThat(byteString, is(jsonNatural()));
   }
 
   private void assertRoundtrip(Trigger trigger) {
-    ByteString byteString = triggerSerializer.serialize(trigger);
-    Trigger deserializedTrigger = triggerSerializer.deserialize(byteString);
+    ByteString byteString = serialize(trigger);
+    Trigger deserializedTrigger = deserialize(byteString);
     Assert.assertThat(
         "serialized trigger did not match actual trigger after deserialization: " + byteString.utf8(),
         deserializedTrigger, is(trigger));
   }
 
-  private ByteString json(String triggerType) {
-    return ByteString.encodeUtf8(String.format(
-        "{\"@type\":\"%s\"}",
-        triggerType));
+  private ByteString jsonNatural() {
+    return ByteString.encodeUtf8("{\"@type\":\"natural\"}");
   }
 
   private ByteString json(String triggerType, String triggerId) {
     return ByteString.encodeUtf8(String.format(
         "{\"@type\":\"%s\",\"trigger_id\":\"%s\"}",
         triggerType, triggerId));
+  }
+
+  private ByteString serialize(Trigger trigger) {
+    try {
+      return ByteString.of(OBJECT_MAPPER.writeValueAsBytes(convertTriggerToPersistentTrigger(trigger)));
+    } catch (JsonProcessingException e) {
+      throw Throwables.propagate(e);
+    }
+  }
+
+  private Trigger deserialize(ByteString json) {
+    try {
+      return OBJECT_MAPPER.readValue(json.toByteArray(), TriggerSerializer.PersistentTrigger.class).toTrigger();
+    } catch (IOException e) {
+      throw Throwables.propagate(e);
+    }
   }
 }
