@@ -26,6 +26,7 @@ import com.codahale.metrics.Meter;
 import com.spotify.metrics.core.MetricId;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.state.RunState;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -41,8 +42,8 @@ public final class MetricsStats implements Stats {
       .tagged("what", "queued-events-count")
       .tagged("unit", "events");
 
-  private static final MetricId ACTIVE_STATES = BASE
-      .tagged("what", "active-states-count")
+  private static final MetricId ACTIVE_STATES_PER_RUNSTATE = BASE
+      .tagged("what", "active-states-per-runstate-count")
       .tagged("unit", "state");
 
   private static final MetricId ACTIVE_STATES_PER_WORKFLOW = BASE
@@ -122,8 +123,9 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
-  public void registerActiveStates(Gauge<Long> activeStatesCount) {
-    registry.register(ACTIVE_STATES, activeStatesCount);
+  public void registerActiveStates(RunState.State state, Gauge<Long> activeStatesCount) {
+    registry.register(ACTIVE_STATES_PER_RUNSTATE.tagged(
+        "state", state.name()), activeStatesCount);
   }
 
   @Override

@@ -89,6 +89,7 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -435,7 +436,6 @@ public class StyxScheduler implements AppInit {
       Stats stats) {
 
     final Gauge<Long> queuedEventsCount = stateManager::getQueuedEventsCount;
-    final Gauge<Long> activeStatesCount = stateManager::getActiveStatesCount;
     final Gauge<Long> allWorkflowsCount = () -> workflowCache.all().stream().count();
     final Gauge<Long> configuredWorkflowsCount = () -> workflowCache.all().stream()
         .filter(WorkflowValidator::hasDockerConfiguration)
@@ -453,8 +453,11 @@ public class StyxScheduler implements AppInit {
       }
     };
 
+    Arrays.stream(RunState.State.values()).forEach(state -> stats.registerActiveStates(
+        state,
+        () -> stateManager.activeStates().values().stream()
+            .filter(runState -> runState.state().equals(state)).count()));
     stats.registerQueuedEvents(queuedEventsCount);
-    stats.registerActiveStates(activeStatesCount);
     stats.registerWorkflowCount("all", allWorkflowsCount);
     stats.registerWorkflowCount("configured", configuredWorkflowsCount);
     stats.registerWorkflowCount("enabled", configuredEnabledWorkflowsCount);

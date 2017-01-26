@@ -22,6 +22,7 @@ package com.spotify.styx.monitoring;
 
 import com.codahale.metrics.Gauge;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.state.RunState;
 
 /**
  * Interface for collecting statistics from throughout the Styx service
@@ -36,7 +37,7 @@ public interface Stats {
 
   void registerQueuedEvents(Gauge<Long> queuedEventsCount);
 
-  void registerActiveStates(Gauge<Long> activeStatesCount);
+  void registerActiveStates(RunState.State state, Gauge<Long> activeStatesCount);
 
   void registerActiveStates(WorkflowId workflowId, Gauge<Long> activeStatesCount);
 

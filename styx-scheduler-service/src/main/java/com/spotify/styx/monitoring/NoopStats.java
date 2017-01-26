@@ -22,6 +22,7 @@ package com.spotify.styx.monitoring;
 
 import com.codahale.metrics.Gauge;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.state.RunState;
 
 final class NoopStats implements Stats {
 
@@ -42,7 +43,7 @@ final class NoopStats implements Stats {
   }
 
   @Override
-  public void registerActiveStates(Gauge<Long> activeStatesCount) {
+  public void registerActiveStates(RunState.State state, Gauge<Long> activeStatesCount) {
   }
 
   @Override
