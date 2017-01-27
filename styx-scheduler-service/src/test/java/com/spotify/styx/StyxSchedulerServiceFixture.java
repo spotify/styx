@@ -169,7 +169,7 @@ public class StyxSchedulerServiceFixture {
 
   void givenWorkflow(Workflow workflow) throws IOException {
     workflows.add(workflow);
-    storage.store(workflow);
+    storage.storeWorkflow(workflow);
   }
 
   void givenNextNaturalTrigger(Workflow workflow, String nextNaturalTrigger) throws IOException {

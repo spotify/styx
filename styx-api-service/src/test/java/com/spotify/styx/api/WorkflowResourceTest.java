@@ -140,7 +140,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Before
   public void setUp() throws Exception {
-    storage.store(WORKFLOW);
+    storage.storeWorkflow(WORKFLOW);
   }
 
   @After

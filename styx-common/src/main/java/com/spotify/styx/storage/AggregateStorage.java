@@ -124,7 +124,7 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public void store(Workflow workflow) throws IOException {
+  public void storeWorkflow(Workflow workflow) throws IOException {
     datastoreStorage.store(workflow);
   }
 

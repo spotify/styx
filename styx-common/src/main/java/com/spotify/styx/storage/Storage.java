@@ -85,7 +85,7 @@ public interface Storage {
    *
    * @param workflow the workflow to store
    */
-  void store(Workflow workflow) throws IOException;
+  void storeWorkflow(Workflow workflow) throws IOException;
 
   /**
    * Get a {@link Workflow} definition.

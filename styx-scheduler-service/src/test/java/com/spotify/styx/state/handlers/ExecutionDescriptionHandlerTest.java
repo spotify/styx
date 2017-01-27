@@ -81,7 +81,7 @@ public class ExecutionDescriptionHandlerTest {
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
     RunState runState = RunState.fresh(workflowInstance, toTest);
 
-    storage.store(workflow);
+    storage.storeWorkflow(workflow);
     storage.patchState(workflow.id(), workflowState);
     stateManager.initialize(runState);
     stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
@@ -110,7 +110,7 @@ public class ExecutionDescriptionHandlerTest {
     Storage storageSpy = Mockito.spy(storage);
     Mockito.when(storageSpy.workflowState(workflowInstance.workflowId()))
         .thenThrow(new IOException("TEST"));
-    storageSpy.store(workflow);
+    storageSpy.storeWorkflow(workflow);
     storageSpy.patchState(workflow.id(), workflowState);
 
     toTest = new ExecutionDescriptionHandler(storageSpy, stateManager);
@@ -144,7 +144,7 @@ public class ExecutionDescriptionHandlerTest {
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
-    storage.store(workflow);
+    storage.storeWorkflow(workflow);
     stateManager.initialize(runState);
     toTest.transitionInto(runState);
 
@@ -159,7 +159,7 @@ public class ExecutionDescriptionHandlerTest {
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
-    storage.store(workflow);
+    storage.storeWorkflow(workflow);
     stateManager.initialize(runState);
     toTest.transitionInto(runState);
 
@@ -180,7 +180,7 @@ public class ExecutionDescriptionHandlerTest {
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
-    storage.store(workflow);
+    storage.storeWorkflow(workflow);
     stateManager.initialize(runState);
     toTest.transitionInto(runState);
 
