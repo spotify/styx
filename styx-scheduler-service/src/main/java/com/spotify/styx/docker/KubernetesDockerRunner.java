@@ -21,8 +21,8 @@
 package com.spotify.styx.docker;
 
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
+import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.state.RunState.State.RUNNING;
-import static com.spotify.styx.util.Json.OBJECT_MAPPER;
 import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;

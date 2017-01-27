@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx;
+package com.spotify.styx.serialization;
 
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
@@ -27,7 +27,6 @@ import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.testdata.TestData;
-import com.spotify.styx.util.Json;
 import java.io.IOException;
 import java.util.Map;
 import org.junit.Test;

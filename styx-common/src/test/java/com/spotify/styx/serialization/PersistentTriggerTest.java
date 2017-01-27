@@ -18,14 +18,15 @@
  * -/-/-
  */
 
-package com.spotify.styx.state;
+package com.spotify.styx.serialization;
 
-import static com.spotify.styx.util.Json.OBJECT_MAPPER;
+import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Throwables;
+import com.spotify.styx.state.Trigger;
 import java.io.IOException;
 import okio.ByteString;
 import org.junit.Assert;

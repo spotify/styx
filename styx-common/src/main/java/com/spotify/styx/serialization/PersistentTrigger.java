@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.state;
+package com.spotify.styx.serialization;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -26,6 +26,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeId;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.spotify.styx.state.Trigger;
+import com.spotify.styx.state.TriggerVisitor;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, visible = true)
 @JsonSubTypes({
@@ -35,7 +37,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
     @JsonSubTypes.Type(value = PersistentTrigger.PersistentTriggerWithId.class, name = "unknown"),
     })
 @JsonInclude(JsonInclude.Include.NON_ABSENT)
-public class PersistentTrigger {
+class PersistentTrigger {
 
   private static final TriggerSerializerVisitor SERIALIZER_VISITOR = new TriggerSerializerVisitor();
 

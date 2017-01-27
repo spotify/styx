@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.model;
+package com.spotify.styx.serialization;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -31,9 +31,12 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Throwables;
+import com.spotify.styx.model.Event;
+import com.spotify.styx.model.EventVisitor;
+import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
-import com.spotify.styx.util.Json;
 import java.io.IOException;
 import java.util.Optional;
 import okio.ByteString;

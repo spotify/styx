@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.util;
+package com.spotify.styx.serialization;
 
 import static com.fasterxml.jackson.databind.DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY;
 import static com.fasterxml.jackson.databind.PropertyNamingStrategy.SNAKE_CASE;
@@ -27,8 +27,8 @@ import static com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.spotify.styx.state.PersistentTrigger;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.util.TypeWrapperModule;
 import io.norberg.automatter.jackson.AutoMatterModule;
 
 public final class Json {
@@ -36,7 +36,7 @@ public final class Json {
   private Json() {
   }
 
-  static final TypeWrapperModule ADT_MODULE = new TypeWrapperModule()
+  private static final TypeWrapperModule ADT_MODULE = new TypeWrapperModule()
       .setupWrapping(
           Trigger.class,
           PersistentTrigger.class,

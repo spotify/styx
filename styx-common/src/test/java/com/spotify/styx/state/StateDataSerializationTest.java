@@ -31,7 +31,7 @@ import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.util.Json;
+import com.spotify.styx.serialization.Json;
 import com.spotify.styx.util.TriggerUtil;
 import java.util.Arrays;
 import java.util.Optional;

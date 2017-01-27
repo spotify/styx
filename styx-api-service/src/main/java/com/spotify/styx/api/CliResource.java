@@ -22,7 +22,7 @@ package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V0;
 import static com.spotify.styx.api.Api.Version.V1;
-import static com.spotify.styx.model.EventSerializer.convertEventToPersistentEvent;
+import static com.spotify.styx.serialization.EventSerializer.convertEventToPersistentEvent;
 import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static com.spotify.styx.util.StreamUtil.cat;
 import static java.util.stream.Collectors.toList;
