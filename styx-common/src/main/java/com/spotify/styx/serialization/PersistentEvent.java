@@ -18,9 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.model;
-
-import static com.spotify.styx.state.TriggerSerializer.convertTriggerToPersistentTrigger;
+package com.spotify.styx.serialization;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -30,40 +28,40 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeId;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Throwables;
+import com.spotify.styx.model.Event;
+import com.spotify.styx.model.EventVisitor;
+import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
-import com.spotify.styx.state.TriggerSerializer.PersistentTrigger;
-import com.spotify.styx.util.Json;
-import java.io.IOException;
 import java.util.Optional;
-import okio.ByteString;
 
-public final class EventSerializer {
+@JsonTypeInfo(use = Id.NAME, visible = true)
+@JsonSubTypes({
+    @JsonSubTypes.Type(value = PersistentEvent.class, name = "timeTrigger"),
+    @JsonSubTypes.Type(value = PersistentEvent.TriggerExecution.class, name = "triggerExecution"),
+    @JsonSubTypes.Type(value = PersistentEvent.Info.class, name = "info"),
+    @JsonSubTypes.Type(value = PersistentEvent.Created.class, name = "created"),
+    @JsonSubTypes.Type(value = PersistentEvent.class, name = "dequeue"),
+    @JsonSubTypes.Type(value = PersistentEvent.Started.class, name = "started"),
+    @JsonSubTypes.Type(value = PersistentEvent.Terminate.class, name = "terminate"),
+    @JsonSubTypes.Type(value = PersistentEvent.RunError.class, name = "runError"),
+    @JsonSubTypes.Type(value = PersistentEvent.RetryAfter.class, name = "retryAfter"),
+    @JsonSubTypes.Type(value = PersistentEvent.class, name = "success"),
+    @JsonSubTypes.Type(value = PersistentEvent.class, name = "retry"),
+    @JsonSubTypes.Type(value = PersistentEvent.class, name = "stop"),
+    @JsonSubTypes.Type(value = PersistentEvent.class, name = "timeout"),
+    @JsonSubTypes.Type(value = PersistentEvent.class, name = "halt"),
+    @JsonSubTypes.Type(value = PersistentEvent.Submit.class, name = "submit"),
+    @JsonSubTypes.Type(value = PersistentEvent.Submitted.class, name = "submitted")
+    })
+@JsonInclude(Include.NON_ABSENT)
+class PersistentEvent {
 
   private static final SerializerVisitor SERIALIZER_VISITOR = new SerializerVisitor();
-  private static final ObjectMapper OBJECT_MAPPER = Json.OBJECT_MAPPER;
 
-  public static PersistentEvent convertEventToPersistentEvent(Event event) {
+  public static PersistentEvent wrap(Event event) {
     return event.accept(SERIALIZER_VISITOR);
-  }
-
-  public ByteString serialize(Event event) {
-    try {
-      return ByteString.of(OBJECT_MAPPER.writeValueAsBytes(convertEventToPersistentEvent(event)));
-    } catch (JsonProcessingException e) {
-      throw Throwables.propagate(e);
-    }
-  }
-
-  public Event deserialize(ByteString json) {
-    try {
-      return OBJECT_MAPPER.readValue(json.toByteArray(), PersistentEvent.class).toEvent();
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
   }
 
   public static class SerializerVisitor implements EventVisitor<PersistentEvent> {
@@ -75,9 +73,7 @@ public final class EventSerializer {
 
     @Override
     public PersistentEvent triggerExecution(WorkflowInstance workflowInstance, Trigger trigger) {
-      return new TriggerExecution(
-          workflowInstance.toKey(),
-          Optional.of(convertTriggerToPersistentTrigger(trigger)));
+      return new TriggerExecution(workflowInstance.toKey(), Optional.of(trigger));
     }
 
     @Override
@@ -149,77 +145,53 @@ public final class EventSerializer {
     public PersistentEvent halt(WorkflowInstance workflowInstance) {
       return new PersistentEvent("halt", workflowInstance.toKey());
     }
-
   }
 
-  @JsonTypeInfo(use = Id.NAME, visible = true)
-  @JsonSubTypes({
-      @JsonSubTypes.Type(value = PersistentEvent.class, name = "timeTrigger"),
-      @JsonSubTypes.Type(value = TriggerExecution.class, name = "triggerExecution"),
-      @JsonSubTypes.Type(value = Info.class, name = "info"),
-      @JsonSubTypes.Type(value = Created.class, name = "created"),
-      @JsonSubTypes.Type(value = PersistentEvent.class, name = "dequeue"),
-      @JsonSubTypes.Type(value = Started.class, name = "started"),
-      @JsonSubTypes.Type(value = Terminate.class, name = "terminate"),
-      @JsonSubTypes.Type(value = RunError.class, name = "runError"),
-      @JsonSubTypes.Type(value = RetryAfter.class, name = "retryAfter"),
-      @JsonSubTypes.Type(value = PersistentEvent.class, name = "success"),
-      @JsonSubTypes.Type(value = PersistentEvent.class, name = "retry"),
-      @JsonSubTypes.Type(value = PersistentEvent.class, name = "stop"),
-      @JsonSubTypes.Type(value = PersistentEvent.class, name = "timeout"),
-      @JsonSubTypes.Type(value = PersistentEvent.class, name = "halt"),
-      @JsonSubTypes.Type(value = Submit.class, name = "submit"),
-      @JsonSubTypes.Type(value = Submitted.class, name = "submitted")
-      })
-  @JsonInclude(Include.NON_ABSENT)
-  public static class PersistentEvent {
+  @JsonTypeId
+  @JsonProperty("@type") // from Id.NAME
+  public final String type;
+  public final String workflowInstance;
 
-    @JsonTypeId
-    @JsonProperty("@type") // from Id.NAME
-    public final String type;
-    public final String workflowInstance;
+  @JsonCreator
+  PersistentEvent(
+      @JsonProperty("@type") String type,
+      @JsonProperty("workflow_instance") String workflowInstance) {
+    this.type = type;
+    this.workflowInstance = workflowInstance;
+  }
 
-    @JsonCreator
-    PersistentEvent(
-        @JsonProperty("@type") String type,
-        @JsonProperty("workflow_instance") String workflowInstance) {
-      this.type = type;
-      this.workflowInstance = workflowInstance;
-    }
+  public Event toEvent() {
+    final WorkflowInstance workflowInstance = WorkflowInstance.parseKey(this.workflowInstance);
+    switch (type) {
+      case "timeTrigger":
+        return Event.timeTrigger(workflowInstance);
+      case "dequeue":
+        return Event.dequeue(workflowInstance);
+      case "success":
+        return Event.success(workflowInstance);
+      case "retry":
+        return Event.retry(workflowInstance);
+      case "stop":
+        return Event.stop(workflowInstance);
+      case "timeout":
+        return Event.timeout(workflowInstance);
+      case "halt":
+        return Event.halt(workflowInstance);
 
-    public Event toEvent() {
-      final WorkflowInstance workflowInstance = WorkflowInstance.parseKey(this.workflowInstance);
-      switch (type) {
-        case "timeTrigger":
-          return Event.timeTrigger(workflowInstance);
-        case "dequeue":
-          return Event.dequeue(workflowInstance);
-        case "success":
-          return Event.success(workflowInstance);
-        case "retry":
-          return Event.retry(workflowInstance);
-        case "stop":
-          return Event.stop(workflowInstance);
-        case "timeout":
-          return Event.timeout(workflowInstance);
-        case "halt":
-          return Event.halt(workflowInstance);
-
-        default:
-          throw new IllegalStateException("Event type " + type + " not covered by base PersistentEvent class");
-      }
+      default:
+        throw new IllegalStateException("Event type " + type + " not covered by base PersistentEvent class");
     }
   }
 
   public static class TriggerExecution extends PersistentEvent {
 
     public final Optional<String> triggerId; //for backwards compatibility
-    public final Optional<PersistentTrigger> trigger;
+    public final Optional<Trigger> trigger;
 
     @JsonCreator
     public TriggerExecution(
         @JsonProperty("workflow_instance") String workflowInstance,
-        @JsonProperty("trigger") Optional<PersistentTrigger> trigger) {
+        @JsonProperty("trigger") Optional<Trigger> trigger) {
       super("triggerExecution", workflowInstance);
       this.triggerId = Optional.empty();
       this.trigger = trigger;
@@ -228,7 +200,7 @@ public final class EventSerializer {
     @Override
     public Event toEvent() {
       if (trigger.isPresent()) {
-        return Event.triggerExecution(WorkflowInstance.parseKey(workflowInstance), trigger.get().toTrigger());
+        return Event.triggerExecution(WorkflowInstance.parseKey(workflowInstance), trigger.get());
       } else if (triggerId.isPresent()) {
         return Event.triggerExecution(WorkflowInstance.parseKey(workflowInstance), Trigger.unknown(triggerId.get()));
       } else {

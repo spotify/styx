@@ -20,12 +20,14 @@
 
 package com.spotify.styx.storage;
 
+import static com.spotify.styx.serialization.Json.deserializeEvent;
+import static com.spotify.styx.serialization.Json.serialize;
+
 import com.google.cloud.datastore.DatastoreException;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Sets;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.EventSerializer;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -71,8 +73,6 @@ public class BigtableStorage {
   private final Connection connection;
   private final Duration retryBaseDelay;
 
-  private final EventSerializer eventSerializer = new EventSerializer();
-
   BigtableStorage(Connection connection, Duration retryBaseDelay) {
     this.connection = Objects.requireNonNull(connection);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
@@ -100,7 +100,7 @@ public class BigtableStorage {
         final byte[] key = Bytes.toBytes(keyString);
         final Put put = new Put(key, sequenceEvent.timestamp());
 
-        final byte[] eventBytes = eventSerializer.serialize(sequenceEvent.event()).toByteArray();
+        final byte[] eventBytes = serialize(sequenceEvent.event()).toByteArray();
         put.addColumn(EVENT_CF, EVENT_QUALIFIER, eventBytes);
         eventsTable.put(put);
       }
@@ -173,7 +173,7 @@ public class BigtableStorage {
     final String key = new String(r.getRow());
     final long timestamp = r.getColumnLatestCell(EVENT_CF, EVENT_QUALIFIER).getTimestamp();
     final byte[] value = r.getValue(EVENT_CF, EVENT_QUALIFIER);
-    final Event event = eventSerializer.deserialize(ByteString.of(value));
+    final Event event = deserializeEvent(ByteString.of(value));
     return SequenceEvent.parseKey(key, event, timestamp);
   }
 

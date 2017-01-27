@@ -25,7 +25,6 @@ import static com.spotify.styx.model.Partitioning.DAYS;
 import static com.spotify.styx.model.Partitioning.HOURS;
 import static com.spotify.styx.model.Partitioning.MONTHS;
 import static com.spotify.styx.model.Partitioning.WEEKS;
-import static com.spotify.styx.state.TriggerSerializer.convertTriggerToPersistentTrigger;
 import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.is;
@@ -95,9 +94,7 @@ public class StateInitializingTriggerTest {
 
     assertThat(state.state(), is(RunState.State.QUEUED));
     assertThat(state.data().triggerId(), hasValue(TriggerUtil.NATURAL_TRIGGER_ID));
-    assertThat(
-        state.data().trigger(),
-        hasValue(convertTriggerToPersistentTrigger(Trigger.natural())));
+    assertThat(state.data().trigger(), hasValue(Trigger.natural()));
   }
 
   @Test
@@ -112,9 +109,7 @@ public class StateInitializingTriggerTest {
 
     assertThat(state.state(), is(RunState.State.QUEUED));
     assertThat(state.data().triggerId(), hasValue("trig"));
-    assertThat(
-        state.data().trigger(),
-        hasValue(convertTriggerToPersistentTrigger(Trigger.backfill("trig"))));
+    assertThat(state.data().trigger(), hasValue(Trigger.backfill("trig")));
   }
 
   @Test

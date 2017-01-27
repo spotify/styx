@@ -20,6 +20,8 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spotify.apollo.Response;
@@ -27,7 +29,7 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.SyncHandler;
-import com.spotify.styx.util.Json;
+import com.spotify.styx.serialization.Json;
 import okio.ByteString;
 
 /**
@@ -36,8 +38,6 @@ import okio.ByteString;
  * strings.
  */
 public final class Middlewares {
-
-  public static final ObjectMapper OBJECT_MAPPER = Json.OBJECT_MAPPER;
 
   private Middlewares() {
   }

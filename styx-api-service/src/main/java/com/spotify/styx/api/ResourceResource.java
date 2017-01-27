@@ -33,6 +33,7 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.serialization.Json;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.util.List;
@@ -53,7 +54,7 @@ public final class ResourceResource {
 
   public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
     final EntityMiddleware em =
-        EntityMiddleware.forCodec(JacksonEntityCodec.forMapper(Middlewares.OBJECT_MAPPER));
+        EntityMiddleware.forCodec(JacksonEntityCodec.forMapper(Json.OBJECT_MAPPER));
 
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Stream.of(
         Route.with(

@@ -20,7 +20,7 @@
 
 package com.spotify.styx.model.data;
 
-import static com.spotify.styx.util.Json.OBJECT_MAPPER;
+import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 

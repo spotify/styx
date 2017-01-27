@@ -23,9 +23,9 @@ package com.spotify.styx.api;
 import static com.spotify.styx.api.Api.Version.V0;
 import static com.spotify.styx.api.Api.Version.V1;
 import static com.spotify.styx.api.Middlewares.json;
+import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.util.StreamUtil.cat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -39,7 +39,6 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.Json;
 import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
@@ -53,7 +52,6 @@ public final class WorkflowResource {
 
   public static final String BASE = "/workflows";
   public static final int DEFAULT_PAGE_LIMIT = 24 * 7;
-  public static final ObjectMapper OBJECT_MAPPER = Json.OBJECT_MAPPER;
 
   private final Storage storage;
 

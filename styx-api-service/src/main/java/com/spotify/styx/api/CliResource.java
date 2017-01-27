@@ -22,7 +22,6 @@ package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V0;
 import static com.spotify.styx.api.Api.Version.V1;
-import static com.spotify.styx.model.EventSerializer.convertEventToPersistentEvent;
 import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static com.spotify.styx.util.StreamUtil.cat;
 import static java.util.stream.Collectors.toList;
@@ -38,10 +37,10 @@ import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.api.cli.EventsPayload;
-import com.spotify.styx.api.cli.EventsPayload.TimestampedPersistentEvent;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
@@ -73,7 +72,7 @@ public class CliResource {
 
   public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
     final EntityMiddleware em =
-        EntityMiddleware.forCodec(JacksonEntityCodec.forMapper(Middlewares.OBJECT_MAPPER));
+        EntityMiddleware.forCodec(JacksonEntityCodec.forMapper(Json.OBJECT_MAPPER));
 
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Stream.of(
         Route.with(
@@ -156,13 +155,13 @@ public class CliResource {
 
     try {
       final Set<SequenceEvent> sequenceEvents = storage.readEvents(workflowInstance);
-      final List<TimestampedPersistentEvent> timestampedPersistentEvents = sequenceEvents.stream()
-          .map(sequenceEvent -> TimestampedPersistentEvent.create(
-              convertEventToPersistentEvent(sequenceEvent.event()),
+      final List<EventsPayload.TimestampedEvent> timestampedEvents = sequenceEvents.stream()
+          .map(sequenceEvent -> EventsPayload.TimestampedEvent.create(
+              sequenceEvent.event(),
               sequenceEvent.timestamp()))
           .collect(toList());
 
-      return EventsPayload.create(timestampedPersistentEvents);
+      return EventsPayload.create(timestampedEvents);
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }

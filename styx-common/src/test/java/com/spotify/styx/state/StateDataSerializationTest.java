@@ -24,7 +24,6 @@ import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
 import static com.jayway.jsonpath.matchers.JsonPathMatchers.hasJsonPath;
 import static com.jayway.jsonpath.matchers.JsonPathMatchers.isJson;
 import static com.jayway.jsonpath.matchers.JsonPathMatchers.withoutJsonPath;
-import static com.spotify.styx.state.TriggerSerializer.convertTriggerToPersistentTrigger;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -32,7 +31,7 @@ import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.util.Json;
+import com.spotify.styx.serialization.Json;
 import com.spotify.styx.util.TriggerUtil;
 import java.util.Arrays;
 import java.util.Optional;
@@ -119,13 +118,13 @@ public class StateDataSerializationTest {
   private static final StateData EXPECTED_NATURAL_TRIGGER =
       EXPECTED_NO_TRIGGER.builder()
           .triggerId(TriggerUtil.NATURAL_TRIGGER_ID)
-          .trigger(convertTriggerToPersistentTrigger(Trigger.natural()))
+          .trigger(Trigger.natural())
           .build();
 
   private static final StateData EXPECTED_BACKFILL_TRIGGER =
       EXPECTED_NO_TRIGGER.builder()
           .triggerId("backfill-1")
-          .trigger(convertTriggerToPersistentTrigger(Trigger.backfill("backfill-1")))
+          .trigger(Trigger.backfill("backfill-1"))
           .build();
 
   @Test
