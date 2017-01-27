@@ -249,6 +249,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T14:00:00Z");
     WorkflowInstance workflowInstance =
         WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
 
@@ -280,6 +281,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(DAILY_WORKFLOW);
     givenWorkflowEnabledStateIs(DAILY_WORKFLOW, true);
+    givenNextNaturalTrigger(DAILY_WORKFLOW, "2016-03-13T00:00:00Z");
     WorkflowInstance workflowInstance =
         WorkflowInstance.create(DAILY_WORKFLOW.id(), "2016-03-13");
 

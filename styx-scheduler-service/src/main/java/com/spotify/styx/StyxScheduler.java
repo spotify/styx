@@ -25,7 +25,6 @@ import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static com.spotify.styx.util.ReplayEvents.transitionLogger;
-import static com.spotify.styx.util.TimeUtil.lastInstant;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toMap;
@@ -53,11 +52,9 @@ import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.WorkflowValidator;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.MonitoringHandler;
 import com.spotify.styx.monitoring.Stats;
@@ -81,6 +78,7 @@ import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
+import com.spotify.styx.workflow.WorkflowInitializer;
 import com.typesafe.config.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
@@ -93,7 +91,6 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -329,12 +326,13 @@ public class StyxScheduler implements AppInit {
         new StateInitializingTrigger(stateFactory, stateManager, storage);
     final TriggerManager triggerManager = new TriggerManager(trigger, time, storage, stats);
 
-    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
-                                              storage, trigger);
-
-    final Consumer<Workflow> workflowChangeListener = workflowChanged(workflowCache, storage,
-                                                                      stats, stateManager, time);
+    final WorkflowInitializer workflowInitializer = new WorkflowInitializer(storage, time);
     final Consumer<Workflow> workflowRemoveListener = workflowRemoved(storage);
+    final Consumer<Workflow> workflowChangeListener =
+        workflowChanged(workflowCache, workflowInitializer, stats, stateManager);
+
+    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
+        storage, trigger);
 
     restoreState(storage, outputHandlers, stateManager);
     startTriggerManager(triggerManager, executor);
@@ -531,10 +529,9 @@ public class StyxScheduler implements AppInit {
 
   private static Consumer<Workflow> workflowChanged(
       WorkflowCache cache,
-      Storage storage,
+      WorkflowInitializer workflowInitializer,
       Stats stats,
-      StateManager stateManager,
-      Time time) {
+      StateManager stateManager) {
 
     return (workflow) -> {
       stats.registerActiveStates(
@@ -542,23 +539,7 @@ public class StyxScheduler implements AppInit {
           () -> stateManager.getActiveStatesCount(workflow.id()));
 
       cache.store(workflow);
-      try {
-        Optional<Workflow> optWorkflow = storage.workflow(workflow.id());
-        storage.storeWorkflow(workflow);
-
-        // update nextNaturalTrigger only when schedule specification changes.
-        final Schedule schedule = workflow.configuration().schedule();
-        if (optWorkflow.isPresent() && !optWorkflow.get().configuration().schedule()
-            .equals(schedule)) {
-          final Instant nextNaturalTrigger = lastInstant(time.get(), schedule); // todo +offset
-          storage.patchState(workflow.id(),
-              WorkflowState.builder()
-                  .nextNaturalTrigger(nextNaturalTrigger)
-                  .build());
-        }
-      } catch (IOException e) {
-        LOG.warn("Failed to store workflow " + workflow, e);
-      }
+      workflowInitializer.inspectChange(workflow);
     };
   }
 

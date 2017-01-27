@@ -53,9 +53,11 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.TriggerInstantSpec;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -104,8 +106,6 @@ public class DatastoreStorageTest {
       WORKFLOW_WITH_DOCKER_IMAGE =
       Workflow.create(WORKFLOW_ID_WITH_DOCKER_IMG.componentId(), URI.create("http://foo"),
                       WORKFLOW_CONFIGURATION_WITH_DOCKER_IMAGE);
-
-  private static final Instant NEXT_EXECUTION = Instant.parse("2016-03-14T14:00:00Z");
 
   private static LocalDatastoreHelper helper;
   private DatastoreStorage storage;
@@ -163,14 +163,16 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldPersistNextScheduledRun() throws Exception {
-    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
-    storage.updateNextNaturalTrigger(WORKFLOW_WITH_DOCKER_IMAGE.id(), NEXT_EXECUTION);
+    Instant instant = Instant.parse("2016-03-14T14:00:00Z");
+    Instant offset = instant.plus(1, ChronoUnit.DAYS);
+    TriggerInstantSpec spec = TriggerInstantSpec.create(instant, offset);
 
-    final Map<Workflow, Optional<Instant>>
-        result =
-        storage.workflowsWithNextNaturalTrigger();
+    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
+    storage.updateNextNaturalTrigger(WORKFLOW_WITH_DOCKER_IMAGE.id(), spec);
+
+    final Map<Workflow, TriggerInstantSpec> result = storage.workflowsWithNextNaturalTrigger();
     assertThat(result.values().size(), is(1));
-    assertThat(result, hasEntry(WORKFLOW_WITH_DOCKER_IMAGE, Optional.of(NEXT_EXECUTION)));
+    assertThat(result, hasEntry(WORKFLOW_WITH_DOCKER_IMAGE, spec));
   }
 
   @Test

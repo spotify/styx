@@ -43,6 +43,7 @@ public abstract class WorkflowState {
   @JsonProperty
   public abstract Optional<String> commitSha();
 
+  // todo: update to TriggerInstantSpec
   @JsonProperty
   public abstract Optional<Instant> nextNaturalTrigger();
 

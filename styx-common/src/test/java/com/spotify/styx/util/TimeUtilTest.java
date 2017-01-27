@@ -24,6 +24,7 @@ import static com.spotify.styx.util.TimeUtil.addOffset;
 import static com.spotify.styx.util.TimeUtil.lastInstant;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.model.Schedule;
@@ -109,5 +110,10 @@ public class TimeUtilTest {
     ZonedDateTime offsetTime = addOffset(time, offset);
 
     assertThat(offsetTime, is(ZonedDateTime.parse("2017-02-05T08:07:11.22Z")));
+  }
+
+  @Test
+  public void cronScheduleShouldNotEqualEquivalentWellKnownSchedule() throws Exception {
+    assertFalse(Schedule.parse("0 * * * *").equals(Schedule.HOURS));
   }
 }
