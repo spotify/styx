@@ -27,8 +27,8 @@ import static com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.spotify.styx.state.PersistentTrigger;
 import com.spotify.styx.state.Trigger;
-import com.spotify.styx.state.TriggerSerializer;
 import io.norberg.automatter.jackson.AutoMatterModule;
 
 public final class Json {
@@ -39,9 +39,9 @@ public final class Json {
   static final TypeWrapperModule ADT_MODULE = new TypeWrapperModule()
       .setupWrapping(
           Trigger.class,
-          TriggerSerializer.PersistentTrigger.class,
-          TriggerSerializer::convertTriggerToPersistentTrigger,
-          TriggerSerializer.PersistentTrigger::toTrigger);
+          PersistentTrigger.class,
+          PersistentTrigger::wrap,
+          PersistentTrigger::toTrigger);
 
   public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
       .setPropertyNamingStrategy(SNAKE_CASE)

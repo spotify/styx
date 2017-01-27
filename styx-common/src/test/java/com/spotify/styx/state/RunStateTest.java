@@ -139,7 +139,7 @@ public class RunStateTest {
         hasValue(TriggerUtil.NATURAL_TRIGGER_ID));
     assertThat(
         transitioner.get(WORKFLOW_INSTANCE).data().trigger(),
-        hasValue(TriggerSerializer.convertTriggerToPersistentTrigger(NATURAL_TRIGGER1)));
+        hasValue(NATURAL_TRIGGER1));
   }
 
   @Test

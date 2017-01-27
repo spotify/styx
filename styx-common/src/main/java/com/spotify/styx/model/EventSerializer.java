@@ -20,8 +20,6 @@
 
 package com.spotify.styx.model;
 
-import static com.spotify.styx.state.TriggerSerializer.convertTriggerToPersistentTrigger;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
@@ -35,7 +33,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Throwables;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
-import com.spotify.styx.state.TriggerSerializer.PersistentTrigger;
 import com.spotify.styx.util.Json;
 import java.io.IOException;
 import java.util.Optional;
@@ -75,9 +72,7 @@ public final class EventSerializer {
 
     @Override
     public PersistentEvent triggerExecution(WorkflowInstance workflowInstance, Trigger trigger) {
-      return new TriggerExecution(
-          workflowInstance.toKey(),
-          Optional.of(convertTriggerToPersistentTrigger(trigger)));
+      return new TriggerExecution(workflowInstance.toKey(), Optional.of(trigger));
     }
 
     @Override
@@ -214,12 +209,12 @@ public final class EventSerializer {
   public static class TriggerExecution extends PersistentEvent {
 
     public final Optional<String> triggerId; //for backwards compatibility
-    public final Optional<PersistentTrigger> trigger;
+    public final Optional<Trigger> trigger;
 
     @JsonCreator
     public TriggerExecution(
         @JsonProperty("workflow_instance") String workflowInstance,
-        @JsonProperty("trigger") Optional<PersistentTrigger> trigger) {
+        @JsonProperty("trigger") Optional<Trigger> trigger) {
       super("triggerExecution", workflowInstance);
       this.triggerId = Optional.empty();
       this.trigger = trigger;
@@ -228,7 +223,7 @@ public final class EventSerializer {
     @Override
     public Event toEvent() {
       if (trigger.isPresent()) {
-        return Event.triggerExecution(WorkflowInstance.parseKey(workflowInstance), trigger.get().toTrigger());
+        return Event.triggerExecution(WorkflowInstance.parseKey(workflowInstance), trigger.get());
       } else if (triggerId.isPresent()) {
         return Event.triggerExecution(WorkflowInstance.parseKey(workflowInstance), Trigger.unknown(triggerId.get()));
       } else {
