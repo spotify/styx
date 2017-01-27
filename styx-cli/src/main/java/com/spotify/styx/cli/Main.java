@@ -20,9 +20,11 @@
 
 package com.spotify.styx.cli;
 
+import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
+import static com.spotify.styx.serialization.Json.serialize;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Throwables;
@@ -37,9 +39,6 @@ import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.serialization.EventSerializer;
-import com.spotify.styx.serialization.EventSerializer.PersistentEvent;
-import com.spotify.styx.serialization.Json;
 import com.spotify.styx.util.EventUtil;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -70,8 +69,6 @@ public final class Main {
   private static final String COMPONENT_DEST = "component";
   private static final String WORKFLOW_DEST = "workflow";
   private static final String PARAMETER_DEST = "parameter";
-
-  private static final ObjectMapper OBJECT_MAPPER = Json.OBJECT_MAPPER;
 
   private static final int EXIT_CODE_SUCCESS = 0;
   private static final int EXIT_CODE_API_ERROR = 1;
@@ -224,7 +221,7 @@ public final class Main {
             String eventName;
             String eventInfo;
             try {
-              Event typedEvent = OBJECT_MAPPER.convertValue(event, PersistentEvent.class).toEvent();
+              Event typedEvent = OBJECT_MAPPER.convertValue(event, Event.class);
               eventName = EventUtil.name(typedEvent);
               eventInfo = CliUtil.info(typedEvent);
             } catch (IllegalArgumentException e) {
@@ -245,7 +242,7 @@ public final class Main {
 
     final ByteString payload;
     try {
-      payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(workflowInstance));
+      payload = serialize(workflowInstance);
     } catch (JsonProcessingException e) {
       throw Throwables.propagate(e);
     }
@@ -258,10 +255,9 @@ public final class Main {
     WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
 
     Event halt = Event.halt(workflowInstance);
-    PersistentEvent persistentEvent = EventSerializer.convertEventToPersistentEvent(halt);
     final ByteString payload;
     try {
-      payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(persistentEvent));
+      payload = serialize(halt);
     } catch (JsonProcessingException e) {
       throw Throwables.propagate(e);
     }
@@ -274,10 +270,9 @@ public final class Main {
     WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
 
     Event dequeue = Event.dequeue(workflowInstance);
-    PersistentEvent persistentEvent = EventSerializer.convertEventToPersistentEvent(dequeue);
     final ByteString payload;
     try {
-      payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(persistentEvent));
+      payload = serialize(dequeue);
     } catch (JsonProcessingException e) {
       throw Throwables.propagate(e);
     }

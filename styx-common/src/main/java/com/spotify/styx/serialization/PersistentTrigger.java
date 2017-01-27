@@ -26,10 +26,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeId;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.state.TriggerVisitor;
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, visible = true)
+@JsonTypeInfo(use = Id.NAME, visible = true)
 @JsonSubTypes({
     @JsonSubTypes.Type(value = PersistentTrigger.class, name = "natural"),
     @JsonSubTypes.Type(value = PersistentTrigger.PersistentTriggerWithId.class, name = "adhoc"),

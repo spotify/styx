@@ -24,12 +24,16 @@ import static com.fasterxml.jackson.databind.DeserializationFeature.ACCEPT_SINGL
 import static com.fasterxml.jackson.databind.PropertyNamingStrategy.SNAKE_CASE;
 import static com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.spotify.styx.model.Event;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.TypeWrapperModule;
 import io.norberg.automatter.jackson.AutoMatterModule;
+import java.io.IOException;
+import okio.ByteString;
 
 public final class Json {
 
@@ -37,6 +41,11 @@ public final class Json {
   }
 
   private static final TypeWrapperModule ADT_MODULE = new TypeWrapperModule()
+      .setupWrapping(
+          Event.class,
+          PersistentEvent.class,
+          PersistentEvent::wrap,
+          PersistentEvent::toEvent)
       .setupWrapping(
           Trigger.class,
           PersistentTrigger.class,
@@ -51,4 +60,16 @@ public final class Json {
       .registerModule(new JavaTimeModule())
       .registerModule(new Jdk8Module())
       .registerModule(new AutoMatterModule());
+
+  public static ByteString serialize(Object value) throws JsonProcessingException {
+    return ByteString.of(OBJECT_MAPPER.writeValueAsBytes(value));
+  }
+
+  public static Event deserializeEvent(ByteString json) throws IOException {
+    return OBJECT_MAPPER.readValue(json.toByteArray(), Event.class);
+  }
+
+  public static Trigger deserializeTrigger(ByteString json) throws IOException {
+    return OBJECT_MAPPER.readValue(json.toByteArray(), Trigger.class);
+  }
 }

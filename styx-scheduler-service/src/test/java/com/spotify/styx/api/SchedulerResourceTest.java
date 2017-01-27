@@ -26,6 +26,8 @@ import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresent;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
+import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
+import static com.spotify.styx.serialization.Json.serialize;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.startsWith;
@@ -34,9 +36,6 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
@@ -45,7 +44,6 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.serialization.EventSerializer;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
@@ -68,13 +66,10 @@ import org.junit.Test;
 public class SchedulerResourceTest {
 
   private final InMemStorage storage = new InMemStorage();
-  private final EventSerializer eventSerializer = new EventSerializer();
   private final StateManager stateManager = new SyncStateManager();
 
   private static final WorkflowInstance WFI = WorkflowInstance.create(TestData.WORKFLOW_ID, "12345");
-  private static final ObjectMapper MAPPER = new ObjectMapper()
-      .setPropertyNamingStrategy(PropertyNamingStrategy.SNAKE_CASE)
-      .registerModule(new Jdk8Module());
+
   private final Workflow HOURLY_WORKFLOW = Workflow.create("styx",
                                                     TestData.WORKFLOW_URI,
                                                     TestData.HOURLY_DATA_ENDPOINT);
@@ -112,7 +107,7 @@ public class SchedulerResourceTest {
   private Response<ByteString> requestAndWaitTriggerWorkflowInstance(WorkflowInstance toTrigger)
       throws Exception {
 
-    ByteString eventPayload = ByteString.of(MAPPER.writeValueAsBytes(toTrigger));
+    ByteString eventPayload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(toTrigger));
     CompletionStage<Response<ByteString>> post =
         serviceHelper.request("POST", SchedulerResource.BASE + "/trigger", eventPayload);
 
@@ -125,7 +120,7 @@ public class SchedulerResourceTest {
     stateManager.initialize(initialState);
 
     Event injectedEvent = Event.timeout(WFI);
-    ByteString eventPayload = eventSerializer.serialize(injectedEvent);
+    ByteString eventPayload = serialize(injectedEvent);
     CompletionStage<Response<ByteString>> post =
         serviceHelper.request("POST", SchedulerResource.BASE + "/events", eventPayload);
 
@@ -138,7 +133,7 @@ public class SchedulerResourceTest {
   @Test
   public void testRejectUnknownWorkflowInstance() throws Exception {
     Event injectedEvent = Event.timeout(WFI);
-    ByteString eventPayload = eventSerializer.serialize(injectedEvent);
+    ByteString eventPayload = serialize(injectedEvent);
     CompletionStage<Response<ByteString>> post =
         serviceHelper.request("POST", SchedulerResource.BASE + "/events", eventPayload);
 
@@ -233,7 +228,7 @@ public class SchedulerResourceTest {
     serviceHelper.start();
 
     WorkflowInstance toTrigger = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-12-31T23");
-    ByteString eventPayload = ByteString.of(MAPPER.writeValueAsBytes(toTrigger));
+    ByteString eventPayload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(toTrigger));
     CompletionStage<Response<ByteString>> post =
         serviceHelper.request("POST", SchedulerResource.BASE + "/trigger", eventPayload);
     Response<ByteString> response = post.toCompletableFuture().get();

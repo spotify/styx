@@ -34,7 +34,6 @@ import com.spotify.styx.TriggerListener;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.serialization.EventSerializer.PersistentEvent;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
@@ -78,7 +77,7 @@ public class SchedulerResource {
 
     return Stream.of(
         Route.with(
-            em.response(PersistentEvent.class),
+            em.response(Event.class),
             "POST", BASE + "/events",
             rc -> this::injectEvent),
         Route.with(
@@ -89,8 +88,7 @@ public class SchedulerResource {
         .map(r -> r.withMiddleware(Middleware::syncToAsync));
   }
 
-  private Response<PersistentEvent> injectEvent(PersistentEvent persistentEvent) {
-    final Event event = persistentEvent.toEvent();
+  private Response<Event> injectEvent(Event event) {
     if (!stateManager.isActiveWorkflowInstance(event.workflowInstance())) {
       return Response.forStatus(BAD_REQUEST.withReasonPhrase("Workflow instance not found"));
     }
@@ -101,7 +99,7 @@ public class SchedulerResource {
       return Response.forStatus(INTERNAL_SERVER_ERROR);
     }
 
-    return Response.forPayload(persistentEvent);
+    return Response.forPayload(event);
   }
 
   private Response<WorkflowInstance> triggerWorkflowInstance(WorkflowInstance workflowInstance) {

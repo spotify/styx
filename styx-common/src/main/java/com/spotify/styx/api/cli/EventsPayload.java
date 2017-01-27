@@ -24,7 +24,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import com.spotify.styx.serialization.EventSerializer.PersistentEvent;
+import com.spotify.styx.model.Event;
 import java.util.List;
 
 /**
@@ -35,31 +35,29 @@ import java.util.List;
 public abstract class EventsPayload {
 
   @JsonProperty
-  public abstract List<TimestampedPersistentEvent> events();
+  public abstract List<TimestampedEvent> events();
 
   @AutoValue
   @JsonIgnoreProperties(ignoreUnknown = true)
-  public abstract static class TimestampedPersistentEvent {
+  public abstract static class TimestampedEvent {
 
     @JsonProperty
-    public abstract PersistentEvent event();
+    public abstract Event event();
 
     @JsonProperty
     public abstract long timestamp();
 
     @JsonCreator
-    public static EventsPayload.TimestampedPersistentEvent create(
-        @JsonProperty("event") PersistentEvent persistentEvent,
+    public static TimestampedEvent create(
+        @JsonProperty("event") Event event,
         @JsonProperty("timestamp") long timestamp) {
-      return new AutoValue_EventsPayload_TimestampedPersistentEvent(
-          persistentEvent,
-          timestamp);
+      return new AutoValue_EventsPayload_TimestampedEvent(event, timestamp);
     }
   }
 
   @JsonCreator
   public static EventsPayload create(
-      @JsonProperty("events") List<TimestampedPersistentEvent> events) {
+      @JsonProperty("events") List<TimestampedEvent> events) {
     return new AutoValue_EventsPayload(events);
   }
 }
