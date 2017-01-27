@@ -58,7 +58,6 @@ public class MeteredProxy implements InvocationHandler {
 
   @Override
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-    // todo: special case for store(Workflow workflow) -> storeWorkflow
     final String operation = method.getName();
 
     final Instant t0 = time.get();

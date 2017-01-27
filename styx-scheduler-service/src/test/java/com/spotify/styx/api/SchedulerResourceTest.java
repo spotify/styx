@@ -146,7 +146,7 @@ public class SchedulerResourceTest {
 
   @Test
   public void testTriggeredWorkflowGeneratesTrigger() throws Exception {
-    storage.store(HOURLY_WORKFLOW);
+    storage.storeWorkflow(HOURLY_WORKFLOW);
     WorkflowInstance toTrigger = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2014-12-31T23");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
@@ -159,7 +159,7 @@ public class SchedulerResourceTest {
 
   @Test
   public void testTriggerWorkflowInstanceHourly() throws Exception {
-    storage.store(HOURLY_WORKFLOW);
+    storage.storeWorkflow(HOURLY_WORKFLOW);
     WorkflowInstance toTrigger = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2014-12-31T23");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
@@ -171,7 +171,7 @@ public class SchedulerResourceTest {
 
   @Test
   public void testTriggerWorkflowInstanceDaily() throws Exception {
-    storage.store(DAILY_WORKFLOW);
+    storage.storeWorkflow(DAILY_WORKFLOW);
     WorkflowInstance toTrigger = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2014-12-31");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
@@ -183,7 +183,7 @@ public class SchedulerResourceTest {
 
   @Test
   public void testTriggerWorkflowInstanceWeekly() throws Exception {
-    storage.store(WEEKLY_WORKFLOW);
+    storage.storeWorkflow(WEEKLY_WORKFLOW);
     WorkflowInstance toTrigger = WorkflowInstance.create(WEEKLY_WORKFLOW.id(), "2016-01-03");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
@@ -242,7 +242,7 @@ public class SchedulerResourceTest {
 
   @Test
   public void testTriggerWorkflowInstanceUnsupportedPartitioning() throws Exception {
-    storage.store(MONTHLY_WORKFLOW);
+    storage.storeWorkflow(MONTHLY_WORKFLOW);
     WorkflowInstance toTrigger = WorkflowInstance.create(MONTHLY_WORKFLOW.id(), "2014-12");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
@@ -255,7 +255,7 @@ public class SchedulerResourceTest {
 
   @Test
   public void testTriggerWorkflowInstanceFuture() throws Exception {
-    storage.store(HOURLY_WORKFLOW);
+    storage.storeWorkflow(HOURLY_WORKFLOW);
     WorkflowInstance toTrigger = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-12-31T23");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
@@ -268,7 +268,7 @@ public class SchedulerResourceTest {
 
   @Test
   public void testTriggerWorkflowInstanceParseDayforHourly() throws Exception {
-    storage.store(HOURLY_WORKFLOW);
+    storage.storeWorkflow(HOURLY_WORKFLOW);
     WorkflowInstance toTrigger = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2015-12-31");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
@@ -282,7 +282,7 @@ public class SchedulerResourceTest {
 
   @Test
   public void testTriggerWorkflowInstanceParseHourforDaily() throws Exception {
-    storage.store(DAILY_WORKFLOW);
+    storage.storeWorkflow(DAILY_WORKFLOW);
     WorkflowInstance toTrigger = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2015-12-31T00");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
@@ -296,7 +296,7 @@ public class SchedulerResourceTest {
 
   @Test
   public void testTriggerAlreadyActiveWorkflowInstance() throws Exception {
-    storage.store(DAILY_WORKFLOW);
+    storage.storeWorkflow(DAILY_WORKFLOW);
     WorkflowInstance toTrigger = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2015-12-31");
     stateManager.initialize(RunState.fresh(toTrigger));
 

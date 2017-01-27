@@ -48,8 +48,8 @@ public class InMemoryStorageTest {
     WorkflowId id1 = WorkflowId.create("someComponent1", "someEndpoint1");
     WorkflowId id2 = WorkflowId.create("someComponent2", "someEndpoint2");
 
-    storage.store(workflow(id1));
-    storage.store(workflow(id2));
+    storage.storeWorkflow(workflow(id1));
+    storage.storeWorkflow(workflow(id2));
 
     WorkflowState workflowState = storage.workflowState(id1);
     assertThat(workflowState.enabled().get(), is(false));

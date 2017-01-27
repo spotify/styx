@@ -499,7 +499,7 @@ public class StyxScheduler implements AppInit {
       cache.store(workflow);
       try {
         Optional<Workflow> optWorkflow = storage.workflow(workflow.id());
-        storage.store(workflow);
+        storage.storeWorkflow(workflow);
 
         // update nextNaturalTrigger only when partitioning specification changes.
         final Partitioning partitioning = workflow.schedule().partitioning();

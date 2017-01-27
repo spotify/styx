@@ -89,7 +89,7 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public void store(Workflow workflow) throws IOException {
+  public void storeWorkflow(Workflow workflow) throws IOException {
     workflowStore.put(workflow.id(), workflow);
     components.add(workflow.id().componentId());
   }
