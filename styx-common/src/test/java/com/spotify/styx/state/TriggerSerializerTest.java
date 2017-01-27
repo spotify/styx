@@ -16,7 +16,6 @@
 
 package com.spotify.styx.state;
 
-import static com.spotify.styx.state.TriggerSerializer.convertTriggerToPersistentTrigger;
 import static com.spotify.styx.util.Json.OBJECT_MAPPER;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -82,7 +81,7 @@ public class TriggerSerializerTest {
 
   private ByteString serialize(Trigger trigger) {
     try {
-      return ByteString.of(OBJECT_MAPPER.writeValueAsBytes(convertTriggerToPersistentTrigger(trigger)));
+      return ByteString.of(OBJECT_MAPPER.writeValueAsBytes(trigger));
     } catch (JsonProcessingException e) {
       throw Throwables.propagate(e);
     }
@@ -90,7 +89,7 @@ public class TriggerSerializerTest {
 
   private Trigger deserialize(ByteString json) {
     try {
-      return OBJECT_MAPPER.readValue(json.toByteArray(), TriggerSerializer.PersistentTrigger.class).toTrigger();
+      return OBJECT_MAPPER.readValue(json.toByteArray(), Trigger.class);
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }

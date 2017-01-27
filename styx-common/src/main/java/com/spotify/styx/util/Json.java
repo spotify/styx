@@ -21,13 +21,14 @@
 package com.spotify.styx.util;
 
 import static com.fasterxml.jackson.databind.DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY;
-import static com.fasterxml.jackson.databind.PropertyNamingStrategy.LOWER_CAMEL_CASE;
 import static com.fasterxml.jackson.databind.PropertyNamingStrategy.SNAKE_CASE;
 import static com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.spotify.styx.state.Trigger;
+import com.spotify.styx.state.TriggerSerializer;
 import io.norberg.automatter.jackson.AutoMatterModule;
 
 public final class Json {
@@ -35,17 +36,19 @@ public final class Json {
   private Json() {
   }
 
+  static final TypeWrapperModule ADT_MODULE = new TypeWrapperModule()
+      .setupWrapping(
+          Trigger.class,
+          TriggerSerializer.PersistentTrigger.class,
+          TriggerSerializer::convertTriggerToPersistentTrigger,
+          TriggerSerializer.PersistentTrigger::toTrigger);
+
   public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
       .setPropertyNamingStrategy(SNAKE_CASE)
       .enable(ACCEPT_SINGLE_VALUE_AS_ARRAY)
       .disable(WRITE_DATES_AS_TIMESTAMPS)
+      .registerModule(ADT_MODULE)
       .registerModule(new JavaTimeModule())
       .registerModule(new Jdk8Module())
       .registerModule(new AutoMatterModule());
-
-  public static final ObjectMapper PUBSUB_MAPPER = new ObjectMapper()
-      .setPropertyNamingStrategy(LOWER_CAMEL_CASE)
-      .registerModule(new AutoMatterModule())
-      .registerModule(new JavaTimeModule())
-      .registerModule(new Jdk8Module());
 }
