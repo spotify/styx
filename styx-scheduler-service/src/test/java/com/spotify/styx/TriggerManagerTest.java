@@ -115,6 +115,14 @@ public class TriggerManagerTest {
   }
 
   @Test
+  public void shouldNotTriggerExecutionOnDisabledGlobally() throws IOException {
+    when(storage.globalEnabled()).thenReturn(false);
+    triggerManager.tick();
+    verify(triggerListener, never()).event(any(), any(), any());
+    verify(storage, never()).updateNextNaturalTrigger(any(), any());
+  }
+
+  @Test
   public void shouldNotUpdateNextNaturalTriggerIfTriggerListenerThrows() throws Exception {
     setupWithNextNaturalTrigger(true, NEXT_EXECUTION);
     doThrow(new RuntimeException()).when(triggerListener).event(any(), any(), any());
@@ -131,6 +139,7 @@ public class TriggerManagerTest {
   }
 
   private void setupWithNextNaturalTrigger(boolean enabled, Instant nextNaturalTrigger) throws IOException {
+    when(storage.globalEnabled()).thenReturn(true);
     if (enabled) {
       when(storage.enabled()).thenReturn(ImmutableSet.of(WORKFLOW_DAILY.id()));
     } else {
@@ -142,6 +151,7 @@ public class TriggerManagerTest {
   }
 
   private void setupWithoutNextNaturalTrigger(boolean enabled) throws IOException {
+    when(storage.globalEnabled()).thenReturn(true);
     if (enabled) {
       when(storage.enabled()).thenReturn(ImmutableSet.of(WORKFLOW_DAILY.id()));
     } else {

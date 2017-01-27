@@ -312,7 +312,8 @@ public class StyxScheduler implements AppInit {
     final StateFactory stateFactory =
         (workflowInstance) -> RunState.fresh(workflowInstance, time, outputHandlers);
 
-    final TriggerListener trigger = trigger(storage, stateFactory, stateManager);
+    final TriggerListener trigger =
+        new StateInitializingTrigger(stateFactory, stateManager, storage);
     final TriggerManager triggerManager = new TriggerManager(trigger, time, storage);
 
     final Consumer<Workflow> workflowChangeListener = workflowChanged(cache, storage,
@@ -460,28 +461,6 @@ public class StyxScheduler implements AppInit {
     stats.registerWorkflowCount("all", allWorkflowsCount);
     stats.registerWorkflowCount("configured", configuredWorkflowsCount);
     stats.registerWorkflowCount("enabled", configuredEnabledWorkflowsCount);
-  }
-
-  private TriggerListener trigger(
-      Storage storage,
-      StateFactory stateFactory,
-      StateManager stateManager) {
-    final TriggerListener stateInitializingTrigger =
-        new StateInitializingTrigger(stateFactory, stateManager, storage);
-
-    return (workflow, trigger, instant) -> {
-      try {
-        final boolean enabled = storage.workflowState(workflow.id()).enabled().orElse(false);
-        if (!enabled || !storage.globalEnabled()) {
-          LOG.info("Triggered disabled workflow {}", workflow.endpointId());
-          return;
-        }
-      } catch (IOException e) {
-        throw Throwables.propagate(e);
-      }
-
-      stateInitializingTrigger.event(workflow, trigger, instant);
-    };
   }
 
   private static Consumer<Workflow> workflowChanged(
