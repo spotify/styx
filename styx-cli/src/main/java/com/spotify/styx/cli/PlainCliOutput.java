@@ -22,7 +22,8 @@ package com.spotify.styx.cli;
 
 import static com.spotify.styx.cli.CliUtil.formatTimestamp;
 
-import com.spotify.styx.api.cli.ActiveStatesPayload;
+import com.spotify.styx.api.BackfillPayload;
+import com.spotify.styx.api.cli.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.Message;
@@ -37,14 +38,14 @@ import java.util.SortedSet;
 class PlainCliOutput implements CliOutput {
 
   @Override
-  public void printActiveStates(ActiveStatesPayload activeStatesPayload) {
-    SortedMap<WorkflowId, SortedSet<ActiveStatesPayload.ActiveState>> groupedActiveStates =
-        CliUtil.groupActiveStates(activeStatesPayload.activeStates());
+  public void printStates(RunStateDataPayload runStateDataPayload) {
+    SortedMap<WorkflowId, SortedSet<RunStateDataPayload.RunStateData>> groupedStates =
+        CliUtil.groupStates(runStateDataPayload.activeStates());
 
-    groupedActiveStates.entrySet().forEach(entry -> {
+    groupedStates.entrySet().forEach(entry -> {
       WorkflowId workflowId = entry.getKey();
-      entry.getValue().forEach(activeState -> {
-        final StateData stateData = activeState.stateData();
+      entry.getValue().forEach(RunStateData -> {
+        final StateData stateData = RunStateData.stateData();
         final List<Message> messages = stateData.messages();
 
         final String lastMessage;
@@ -59,8 +60,8 @@ class PlainCliOutput implements CliOutput {
             "%s %s %s %s %s %d %s",
             workflowId.componentId(),
             workflowId.endpointId(),
-            activeState.workflowInstance().parameter(),
-            activeState.state(),
+            RunStateData.workflowInstance().parameter(),
+            RunStateData.state(),
             stateData.executionId().orElse("<no-execution-id>"),
             stateData.tries(),
             lastMessage
@@ -83,5 +84,13 @@ class PlainCliOutput implements CliOutput {
   @Override
   public void printBackfill(Backfill backfill) {
     System.out.println(backfill);
+  }
+
+  @Override
+  public void printBackfill(BackfillPayload backfillPayload) {
+    printBackfill(backfillPayload.backfill());
+    if (backfillPayload.statuses().isPresent()) {
+      printStates(backfillPayload.statuses().get());
+    }
   }
 }

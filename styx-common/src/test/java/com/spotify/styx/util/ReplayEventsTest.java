@@ -31,27 +31,19 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
-import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.testdata.TestData;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Optional;
 import java.util.SortedSet;
 import org.junit.Before;
 import org.junit.Test;
 
 public class ReplayEventsTest {
-  private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.create(
-      "busybox:1.1",
-      Arrays.asList("foo", "bar"),
-      Optional.of(DataEndpoint.Secret.create("secret", "/dev/null")),
-      Optional.of("00000ef508c1cb905e360590ce3e7e9193f6b370"));
-
   Storage storage;
 
   @Before
@@ -66,7 +58,7 @@ public class ReplayEventsTest {
     events.add(SequenceEvent.create(Event.halt(WORKFLOW_INSTANCE),                                       1L, 1L));
     events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.backfill("bf-1")), 2L, 2L));
     events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE),                                    3L, 3L));
-    events.add(SequenceEvent.create(Event.submit(WORKFLOW_INSTANCE, EXECUTION_DESCRIPTION),              4L, 4L));
+    events.add(SequenceEvent.create(Event.submit(WORKFLOW_INSTANCE, TestData.EXECUTION_DESCRIPTION),     4L, 4L));
     events.add(SequenceEvent.create(Event.submitted(WORKFLOW_INSTANCE, "exec-1"),                        5L, 5L));
     events.add(SequenceEvent.create(Event.started(WORKFLOW_INSTANCE),                                    6L, 6L));
 
@@ -87,7 +79,7 @@ public class ReplayEventsTest {
     SortedSet<SequenceEvent> events = newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
     events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.backfill("bf-1")), 1L, 1L));
     events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE),                                    2L, 2L));
-    events.add(SequenceEvent.create(Event.submit(WORKFLOW_INSTANCE, EXECUTION_DESCRIPTION),              3L, 3L));
+    events.add(SequenceEvent.create(Event.submit(WORKFLOW_INSTANCE, TestData.EXECUTION_DESCRIPTION),     3L, 3L));
     events.add(SequenceEvent.create(Event.submitted(WORKFLOW_INSTANCE, "exec-1"),                        4L, 4L));
     events.add(SequenceEvent.create(Event.started(WORKFLOW_INSTANCE),                                    5L, 5L));
     events.add(SequenceEvent.create(Event.terminate(WORKFLOW_INSTANCE, 0),                               6L, 6L));

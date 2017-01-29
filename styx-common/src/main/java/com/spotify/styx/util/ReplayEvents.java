@@ -114,6 +114,10 @@ public final class ReplayEvents {
       throw Throwables.propagate(e);
     }
 
+    if (sequenceEvents.isEmpty()) {
+      return Optional.empty();
+    }
+
     RunState restoredState = RunState.fresh(workflowInstance, time);
     try {
       Map<WorkflowInstance, Long> instances = storage
@@ -121,12 +125,8 @@ public final class ReplayEvents {
       if (instances.keySet().contains(workflowInstance)) {
         lastConsumedEvent = instances.get(workflowInstance);
       } else {
-        if (sequenceEvents.isEmpty()) {
-          return Optional.empty();
-        }
         lastConsumedEvent = sequenceEvents.last().counter();
       }
-
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
@@ -147,7 +147,6 @@ public final class ReplayEvents {
         if (backfillFound) {
           return Optional.of(restoredState);
         }
-
         restoredState = RunState.fresh(workflowInstance, time);
       }
 

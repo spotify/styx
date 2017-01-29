@@ -25,6 +25,7 @@ import static com.spotify.styx.util.ParameterUtil.incrementInstant;
 import static com.spotify.styx.util.ParameterUtil.rangeOfInstants;
 import static com.spotify.styx.util.ParameterUtil.truncateInstant;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
@@ -171,18 +172,19 @@ public class ParameterUtilTest {
     );
   }
 
+  @Test
+  public void shouldReturnEmptyListStartEqualsEnd() throws Exception {
+    final Instant startInstant = Instant.parse("2016-12-31T23:00:00.00Z");
+    final Instant endInstant = Instant.parse("2016-12-31T23:00:00.00Z");
+
+    List<Instant> list = rangeOfInstants(startInstant, endInstant, Partitioning.HOURS);
+    assertThat(list, hasSize(0));
+  }
+
   @Test(expected=IllegalArgumentException.class)
   public void shouldRaiseRangeOfInstantsStartAfterEnd() throws Exception {
     final Instant startInstant = Instant.parse("2016-12-31T23:00:00.00Z");
     final Instant endInstant = Instant.parse("2016-01-01T01:00:00.00Z");
-
-    rangeOfInstants(startInstant, endInstant, Partitioning.HOURS);
-  }
-
-  @Test(expected=IllegalArgumentException.class)
-  public void shouldRaiseRangeOfInstantsStartEqualsEnd() throws Exception {
-    final Instant startInstant = Instant.parse("2016-12-31T23:00:00.00Z");
-    final Instant endInstant = Instant.parse("2016-12-31T23:00:00.00Z");
 
     rangeOfInstants(startInstant, endInstant, Partitioning.HOURS);
   }

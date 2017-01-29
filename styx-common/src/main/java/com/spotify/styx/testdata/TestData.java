@@ -31,9 +31,12 @@ import static java.util.Optional.of;
 
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.DataEndpoint.Secret;
+import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import java.net.URI;
+import java.util.Arrays;
+import java.util.Optional;
 
 public final class TestData {
 
@@ -72,4 +75,11 @@ public final class TestData {
       DataEndpoint.create(
           "styx.TestEndpoint", DAYS, of("busybox"), of(asList("x", "y")),
           of(Secret.create("name", "/path")), emptyList());
+
+  public static final ExecutionDescription EXECUTION_DESCRIPTION =
+      ExecutionDescription.create(
+          "busybox:1.1",
+          Arrays.asList("foo", "bar"),
+          Optional.of(DataEndpoint.Secret.create("secret", "/dev/null")),
+          Optional.of("00000ef508c1cb905e360590ce3e7e9193f6b370"));
 }

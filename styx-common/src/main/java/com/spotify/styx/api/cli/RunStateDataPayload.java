@@ -34,16 +34,17 @@ import java.util.List;
  */
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
-public abstract class ActiveStatesPayload {
+public abstract class RunStateDataPayload {
 
   @JsonProperty
-  public abstract List<ActiveState> activeStates();
+  //todo change the name of this variable, remove 'active'
+  public abstract List<RunStateData> activeStates();
 
   @AutoValue
   @JsonIgnoreProperties(ignoreUnknown = true)
-  public abstract static class ActiveState {
+  public abstract static class RunStateData {
 
-    public static final Comparator<ActiveState> PARAMETER_COMPARATOR =
+    public static final Comparator<RunStateData> PARAMETER_COMPARATOR =
         Comparator.comparing(a -> a.workflowInstance().parameter());
 
     @JsonProperty
@@ -56,17 +57,17 @@ public abstract class ActiveStatesPayload {
     public abstract StateData stateData();
 
     @JsonCreator
-    public static ActiveState create(
+    public static RunStateData create(
         @JsonProperty("workflow_instance") WorkflowInstance workflowInstance,
         @JsonProperty("state") String state,
         @JsonProperty("state_data") StateData stateData) {
-      return new AutoValue_ActiveStatesPayload_ActiveState(workflowInstance, state, stateData);
+      return new AutoValue_RunStateDataPayload_RunStateData(workflowInstance, state, stateData);
     }
   }
 
   @JsonCreator
-  public static ActiveStatesPayload create(
-      @JsonProperty("active_states") List<ActiveState> activeStates) {
-    return new AutoValue_ActiveStatesPayload(activeStates);
+  public static RunStateDataPayload create(
+      @JsonProperty("active_states") List<RunStateData> runStateDataList) {
+    return new AutoValue_RunStateDataPayload(runStateDataList);
   }
 }

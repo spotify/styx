@@ -24,7 +24,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import com.spotify.styx.model.Backfill;
 import java.util.List;
 
 @AutoValue
@@ -32,11 +31,11 @@ import java.util.List;
 public abstract class BackfillsPayload {
 
   @JsonProperty
-  public abstract List<Backfill> backfills();
+  public abstract List<BackfillPayload> backfills();
 
   @JsonCreator
   static BackfillsPayload create(
-      @JsonProperty("backfills") List<Backfill> backfills) {
+      @JsonProperty("backfills") List<BackfillPayload> backfills) {
     return new AutoValue_BackfillsPayload(backfills);
   }
 }

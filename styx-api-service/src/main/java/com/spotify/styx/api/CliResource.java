@@ -35,8 +35,8 @@ import com.spotify.apollo.entity.JacksonEntityCodec;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
-import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.api.cli.EventsPayload;
+import com.spotify.styx.api.cli.RunStateDataPayload;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -76,7 +76,7 @@ public class CliResource {
 
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Stream.of(
         Route.with(
-            em.serializerDirect(ActiveStatesPayload.class),
+            em.serializerDirect(RunStateDataPayload.class),
             "GET", BASE + "/activeStates",
             this::activeStates),
         Route.with(
@@ -120,10 +120,10 @@ public class CliResource {
     return rc.pathArgs().get(name);
   }
 
-  private ActiveStatesPayload activeStates(RequestContext requestContext) {
+  private RunStateDataPayload activeStates(RequestContext requestContext) {
     final Optional<String> componentOpt = requestContext.request().parameter("component");
 
-    final List<ActiveStatesPayload.ActiveState> runStates = Lists.newArrayList();
+    final List<RunStateDataPayload.RunStateData> runStates = Lists.newArrayList();
     try {
 
       final Map<WorkflowInstance, Long> activeStates = componentOpt.isPresent()
@@ -132,16 +132,16 @@ public class CliResource {
 
       final Map<RunState, Long> map = replayActiveStates(activeStates, storage, false);
       runStates.addAll(
-          map.keySet().stream().map(this::runStateToActiveState).collect(toList()));
+          map.keySet().stream().map(this::runStateToRunStateData).collect(toList()));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
 
-    return ActiveStatesPayload.create(runStates);
+    return RunStateDataPayload.create(runStates);
   }
 
-  private ActiveStatesPayload.ActiveState runStateToActiveState(RunState state) {
-    return ActiveStatesPayload.ActiveState.create(
+  private RunStateDataPayload.RunStateData runStateToRunStateData(RunState state) {
+    return RunStateDataPayload.RunStateData.create(
         state.workflowInstance(),
         state.state().toString(),
         state.data()

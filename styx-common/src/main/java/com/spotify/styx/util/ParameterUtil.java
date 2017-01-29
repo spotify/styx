@@ -191,12 +191,12 @@ public final class ParameterUtil {
    * @param startInstant              Defines the start of the time range (inclusive)
    * @param endInstant                Defines the end of the time range (exclusive)
    * @param partitioning              The partitioning unit to split the time range into
-   * @throws IllegalArgumentException If the starting {@link Instant} is later than or equal to
-   *                                  the ending {@link Instant}
+   * @throws IllegalArgumentException If the starting {@link Instant} is later than the ending
+   *                                  {@link Instant}
    */
   public static List<Instant> rangeOfInstants(Instant startInstant, Instant endInstant, Partitioning partitioning) {
-    if (!endInstant.isAfter(startInstant)) {
-      throw new IllegalArgumentException("Start time cannot be later than or equal to the end time");
+    if (endInstant.isBefore(startInstant)) {
+      throw new IllegalArgumentException("End time cannot be earlier the start time");
     }
     final List<Instant> listOfInstants = Lists.newArrayList();
 
