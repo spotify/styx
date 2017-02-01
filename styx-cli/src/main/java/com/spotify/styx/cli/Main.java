@@ -174,8 +174,8 @@ public final class Main {
             case CREATE:
               backfillCreate();
               break;
-            case DELETE:
-              backfillDelete();
+            case HALT:
+              backfillHalt();
               break;
             case SHOW:
               backfillShow();
@@ -228,8 +228,8 @@ public final class Main {
     });
   }
 
-  private void backfillDelete() {
-    final String id = namespace.getString(parser.backfillShowId.getDest());
+  private void backfillHalt() {
+    final String id = namespace.getString(parser.backfillHaltId.getDest());
     final Request request = Request.forUri(apiUrl("backfills", id), "DELETE");
     client.accept(request, null);
   }
@@ -441,9 +441,9 @@ public final class Main {
     final Argument backfillShowId =
         backfillShow.addArgument("backfill").help("Backfill ID");
 
-    final Subparser backfillDelete = BackfillCommand.DELETE.parser(backfillParser);
-    final Argument backfillDeleteId =
-        backfillDelete.addArgument("backfill").help("Backfill ID");
+    final Subparser backfillHalt = BackfillCommand.HALT.parser(backfillParser);
+    final Argument backfillHaltId =
+        backfillHalt.addArgument("backfill").help("Backfill ID");
 
     final Subparser backfillList = BackfillCommand.LIST.parser(backfillParser);
     final Argument backfillListComponent =
@@ -527,7 +527,7 @@ public final class Main {
   private enum BackfillCommand {
     LIST("ls", "List backfills"),
     CREATE("", "Create a backfill"),
-    DELETE("rm", "Delete a backfill"),
+    HALT("h", "Halt a backfill"),
     SHOW("get", "Show info about a specific backfill");
 
     private final String alias;
