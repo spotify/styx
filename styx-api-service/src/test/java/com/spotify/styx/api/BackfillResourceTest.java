@@ -224,6 +224,15 @@ public class BackfillResourceTest extends VersionedApiTest {
     Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
         response.payload().get().toByteArray(), Backfill.class);
     assertThat(postedBackfill.id().matches("backfill-[\\d-]+"), is(true));
+    assertThat(postedBackfill.start(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
+    assertThat(postedBackfill.end(), equalTo(Instant.parse("2017-02-01T00:00:00Z")));
+    assertThat(postedBackfill.workflowId(), equalTo(WorkflowId.create("component", "workflow2")));
+    assertThat(postedBackfill.concurrency(), equalTo(1));
+    assertThat(postedBackfill.resource(), equalTo(postedBackfill.id()));
+    assertThat(postedBackfill.nextTrigger(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
+    assertThat(postedBackfill.partitioning(), equalTo(Partitioning.HOURS));
+    assertThat(postedBackfill.completed(), equalTo(false));
+    assertThat(postedBackfill.halted(), equalTo(false));
   }
 
   @Test

@@ -211,6 +211,7 @@ public final class BackfillResource {
         .id(id)
         .completed(false)
         .workflowId(workflowId)
+        .concurrency(input.concurrency())
         .start(input.start())
         .end(input.end())
         .resource(id)
