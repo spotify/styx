@@ -69,39 +69,18 @@ class PrettyCliOutput implements CliOutput {
           lastMessage = colored(messageColor, message.line());
         }
 
-        final Ansi ansi_state;
-        switch (RunStateData.state()) {
-          case "QUEUED":
-            ansi_state = coloredBright(BLACK, RunStateData.state());
-            break;
-
-          case "RUNNING":
-            ansi_state = coloredBright(GREEN, RunStateData.state());
-            break;
-
-          default:
-            ansi_state = colored(DEFAULT, RunStateData.state());
-        }
+        final Ansi ansiState = getAnsiForState(RunStateData);
 
         System.out.println(String.format(
             "  %-20s %-20s %-47s %-7d %s",
             RunStateData.workflowInstance().parameter(),
-            ansi_state,
+            ansiState,
             stateData.executionId().orElse("<no-execution-id>"),
             stateData.tries(),
             lastMessage
         ));
       });
     });
-  }
-
-  private Ansi.Color messageColor(Message.MessageLevel level) {
-    switch (level) {
-      case INFO:    return GREEN;
-      case WARNING: return YELLOW;
-      case ERROR:   return RED;
-      default:      return DEFAULT;
-    }
   }
 
   @Override
@@ -121,14 +100,110 @@ class PrettyCliOutput implements CliOutput {
 
   @Override
   public void printBackfill(Backfill backfill) {
-    System.out.println(backfill);
+    System.out.println(String.format("%32s %s",
+                                     "Backfill id:",
+                                     colored(CYAN, backfill.id())));
+    System.out.println(String.format("%32s %s",
+                                     "Component id:",
+                                     colored(CYAN, backfill.workflowId().componentId())));
+    System.out.println(String.format("%32s %s",
+                                     "Workflow id:",
+                                     colored(CYAN, backfill.workflowId().endpointId())));
+    System.out.println(String.format("%32s %20s",
+                                     "Start date/datehour (inclusive):",
+                                     colored(CYAN, backfill.start())));
+    System.out.println(String.format("%32s %20s",
+                                     "End date/datehour (exclusive):",
+                                     colored(CYAN, backfill.end())));
+    if (!backfill.halted() && !backfill.completed()) {
+      System.out.println(String.format("%32s %20s",
+                                       "Next date/datehour:",
+                                       colored(CYAN, backfill.nextTrigger())));
+    }
+    System.out.println(String.format("%32s %s",
+                                     "Completed:",
+                                     colored(CYAN, backfill.completed())));
+    System.out.println(String.format("%32s %s",
+                                     "Halted:",
+                                     colored(CYAN, backfill.halted())));
   }
 
   @Override
   public void printBackfill(BackfillPayload backfillPayload) {
+    System.out.println(coloredBright(RED, "BACKFILL DATA"));
+    System.out.println();
     printBackfill(backfillPayload.backfill());
+    System.out.println();
+    System.out.println(coloredBright(RED, "BACKFILL PROGRESS"));
+    System.out.println();
     if (backfillPayload.statuses().isPresent()) {
       printStates(backfillPayload.statuses().get());
+    }
+  }
+
+  private Ansi getAnsiForState(RunStateDataPayload.RunStateData RunStateData) {
+    Ansi ansiState;
+    switch (RunStateData.state()) {
+      case "WAITING":
+        ansiState = coloredBright(BLACK, RunStateData.state());
+        break;
+
+      case "NEW":
+        ansiState = coloredBright(BLACK, RunStateData.state());
+        break;
+
+      case "QUEUED":
+        ansiState = coloredBright(BLACK, RunStateData.state());
+        break;
+
+      case "PREPARE":
+        ansiState = colored(CYAN, RunStateData.state());
+        break;
+
+      case "SUBMITTING":
+        ansiState = colored(CYAN, RunStateData.state());
+        break;
+
+      case "SUBMITTED":
+        ansiState = colored(CYAN, RunStateData.state());
+        break;
+
+      case "RUNNING":
+        ansiState = coloredBright(BLUE, RunStateData.state());
+        break;
+
+      case "TERMINATED":
+        ansiState = coloredBright(BLACK, RunStateData.state());
+        break;
+
+      case "FAILED":
+        ansiState = colored(RED, RunStateData.state());
+        break;
+
+      case "UNKNOWN":
+        ansiState = coloredBright(RED, RunStateData.state());
+        break;
+
+      case "ERROR":
+        ansiState = coloredBright(RED, RunStateData.state());
+        break;
+
+      case "DONE":
+        ansiState = coloredBright(GREEN, RunStateData.state());
+        break;
+
+      default:
+        ansiState = colored(DEFAULT, RunStateData.state());
+    }
+    return ansiState;
+  }
+
+  private Ansi.Color messageColor(Message.MessageLevel level) {
+    switch (level) {
+      case INFO:    return GREEN;
+      case WARNING: return YELLOW;
+      case ERROR:   return RED;
+      default:      return DEFAULT;
     }
   }
 }
