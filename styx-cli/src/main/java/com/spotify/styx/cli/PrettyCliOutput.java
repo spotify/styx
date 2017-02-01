@@ -31,7 +31,9 @@ import static org.fusesource.jansi.Ansi.Color.GREEN;
 import static org.fusesource.jansi.Ansi.Color.RED;
 import static org.fusesource.jansi.Ansi.Color.YELLOW;
 
-import com.spotify.styx.api.cli.ActiveStatesPayload;
+import com.spotify.styx.api.BackfillPayload;
+import com.spotify.styx.api.cli.RunStateDataPayload;
+import com.spotify.styx.model.Backfill;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
 import java.util.List;
@@ -40,7 +42,7 @@ import org.fusesource.jansi.Ansi;
 class PrettyCliOutput implements CliOutput {
 
   @Override
-  public void printActiveStates(ActiveStatesPayload activeStatesPayload) {
+  public void printStates(RunStateDataPayload runStateDataPayload) {
     System.out.println(String.format(
         "  %-20s %-12s %-47s %-7s %s",
         "WORKFLOW INSTANCE",
@@ -49,13 +51,13 @@ class PrettyCliOutput implements CliOutput {
         "TRIES",
         "PREVIOUS EXECUTION MESSAGE"));
 
-    CliUtil.groupActiveStates(activeStatesPayload.activeStates()).entrySet().forEach(entry -> {
+    CliUtil.groupStates(runStateDataPayload.activeStates()).entrySet().forEach(entry -> {
       System.out.println();
       System.out.println(String.format("%s %s",
                                        colored(CYAN, entry.getKey().componentId()),
                                        colored(BLUE, entry.getKey().endpointId())));
-      entry.getValue().forEach(activeState -> {
-        final StateData stateData = activeState.stateData();
+      entry.getValue().forEach(RunStateData -> {
+        final StateData stateData = RunStateData.stateData();
         final List<Message> messages = stateData.messages();
 
         final Ansi lastMessage;
@@ -67,24 +69,24 @@ class PrettyCliOutput implements CliOutput {
           lastMessage = colored(messageColor, message.line());
         }
 
-        final Ansi state;
-        switch (activeState.state()) {
+        final Ansi ansi_state;
+        switch (RunStateData.state()) {
           case "QUEUED":
-            state = coloredBright(BLACK, activeState.state());
+            ansi_state = coloredBright(BLACK, RunStateData.state());
             break;
 
           case "RUNNING":
-            state = coloredBright(GREEN, activeState.state());
+            ansi_state = coloredBright(GREEN, RunStateData.state());
             break;
 
           default:
-            state = colored(DEFAULT, activeState.state());
+            ansi_state = colored(DEFAULT, RunStateData.state());
         }
 
         System.out.println(String.format(
             "  %-20s %-20s %-47s %-7d %s",
-            activeState.workflowInstance().parameter(),
-            state,
+            RunStateData.workflowInstance().parameter(),
+            ansi_state,
             stateData.executionId().orElse("<no-execution-id>"),
             stateData.tries(),
             lastMessage
@@ -115,5 +117,18 @@ class PrettyCliOutput implements CliOutput {
                                              formatTimestamp(eventInfo.timestamp()),
                                              eventInfo.name(),
                                              eventInfo.info())));
+  }
+
+  @Override
+  public void printBackfill(Backfill backfill) {
+    System.out.println(backfill);
+  }
+
+  @Override
+  public void printBackfill(BackfillPayload backfillPayload) {
+    printBackfill(backfillPayload.backfill());
+    if (backfillPayload.statuses().isPresent()) {
+      printStates(backfillPayload.statuses().get());
+    }
   }
 }

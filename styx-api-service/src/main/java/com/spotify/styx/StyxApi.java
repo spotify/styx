@@ -29,6 +29,7 @@ import com.google.common.io.Closer;
 import com.spotify.apollo.AppInit;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.route.Route;
+import com.spotify.styx.api.BackfillResource;
 import com.spotify.styx.api.CliResource;
 import com.spotify.styx.api.ResourceResource;
 import com.spotify.styx.api.StyxConfigResource;
@@ -95,6 +96,7 @@ public class StyxApi implements AppInit {
 
     final WorkflowResource workflowResource = new WorkflowResource(storage);
     final ResourceResource resourceResource = new ResourceResource(storage);
+    final BackfillResource backfillResource = new BackfillResource(storage);
     final StyxConfigResource styxConfigResource = new StyxConfigResource(storage);
     final CliResource cliResource = new CliResource(schedulerServiceBaseUrl, storage);
 
@@ -102,6 +104,7 @@ public class StyxApi implements AppInit {
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
         .registerRoutes(workflowResource.routes())
         .registerRoutes(resourceResource.routes())
+        .registerRoutes(backfillResource.routes())
         .registerRoutes(styxConfigResource.routes())
         .registerRoutes(cliResource.routes());
   }

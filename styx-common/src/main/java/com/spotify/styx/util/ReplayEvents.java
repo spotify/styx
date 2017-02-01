@@ -31,6 +31,7 @@ import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 import java.util.SortedSet;
 import java.util.stream.Collectors;
 import javaslang.Tuple;
@@ -67,7 +68,7 @@ public final class ReplayEvents {
       } catch (IOException e) {
         throw Throwables.propagate(e);
       }
-      RunState restoreState = RunState.fresh(workflowInstance, time);
+      RunState restoredState = RunState.fresh(workflowInstance, time);
 
       for (SequenceEvent sequenceEvent : sequenceEvents) {
         // At the time of writing, we don't expect to get events while Styx is not running.
@@ -83,19 +84,80 @@ public final class ReplayEvents {
         time.set(Instant.ofEpochMilli(sequenceEvent.timestamp()));
 
         if ("triggerExecution".equals(EventUtil.name(sequenceEvent.event()))) {
-          restoreState = RunState.fresh(workflowInstance, time);
+          restoredState = RunState.fresh(workflowInstance, time);
         }
 
         if (printLogs) {
           LOG.info("  replaying #{} {}", sequenceEvent.counter(), sequenceEvent.event());
         }
-        restoreState = restoreState.transition(sequenceEvent.event());
-        replayLogger.transitionInto(restoreState);
+        restoredState = restoredState.transition(sequenceEvent.event());
+        replayLogger.transitionInto(restoredState);
       }
 
-      return Tuple.of(restoreState, lastConsumedEvent);
+      return Tuple.of(restoredState, lastConsumedEvent);
     })
     .collect(Collectors.toMap(Tuple2::_1, Tuple2::_2));
+  }
+
+  public static Optional<RunState> getBackfillRunState(
+      WorkflowInstance workflowInstance,
+      Storage storage,
+      String backfillId) {
+    final SettableTime time = new SettableTime();
+    boolean backfillFound = false;
+    final long lastConsumedEvent;
+
+    final SortedSet<SequenceEvent> sequenceEvents;
+    try {
+      sequenceEvents = storage.readEvents(workflowInstance);
+    } catch (IOException e) {
+      throw Throwables.propagate(e);
+    }
+
+    if (sequenceEvents.isEmpty()) {
+      return Optional.empty();
+    }
+
+    RunState restoredState = RunState.fresh(workflowInstance, time);
+    try {
+      Map<WorkflowInstance, Long> instances = storage
+          .readActiveWorkflowInstances(workflowInstance.workflowId().componentId());
+      if (instances.keySet().contains(workflowInstance)) {
+        lastConsumedEvent = instances.get(workflowInstance);
+      } else {
+        lastConsumedEvent = sequenceEvents.last().counter();
+      }
+    } catch (IOException e) {
+      throw Throwables.propagate(e);
+    }
+
+    for (SequenceEvent sequenceEvent : sequenceEvents) {
+      // At the time of writing, we don't expect to get events while Styx is not running.
+      // That is because the only event producers are going to be in the same process.
+      // Thus, we don't expect any event in the sequence to be later than the last consumed
+      // event. We will treat this as an error for now and skip the rest of the events.
+      if (sequenceEvent.counter() > lastConsumedEvent) {
+        LOG.error("Got unexpected newer event than the last consumed event {} > {} for {}",
+            sequenceEvent.counter(), lastConsumedEvent, workflowInstance.toKey());
+        break;
+      }
+
+      time.set(Instant.ofEpochMilli(sequenceEvent.timestamp()));
+      if ("triggerExecution".equals(EventUtil.name(sequenceEvent.event()))) {
+        if (backfillFound) {
+          return Optional.of(restoredState);
+        }
+        restoredState = RunState.fresh(workflowInstance, time);
+      }
+
+      restoredState = restoredState.transition(sequenceEvent.event());
+      if ("triggerExecution".equals(EventUtil.name(sequenceEvent.event()))
+          && restoredState.data().trigger().isPresent()
+          && backfillId.equals(TriggerUtil.triggerId(restoredState.data().trigger().get()))) {
+        backfillFound = true;
+      }
+    }
+    return backfillFound ? Optional.of(restoredState) : Optional.empty();
   }
 
   public static OutputHandler transitionLogger(String prefix) {

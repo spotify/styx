@@ -35,21 +35,30 @@ import com.spotify.apollo.core.Service;
 import com.spotify.apollo.core.Services;
 import com.spotify.apollo.environment.ApolloEnvironmentModule;
 import com.spotify.apollo.http.client.HttpClientModule;
-import com.spotify.styx.api.cli.ActiveStatesPayload;
+import com.spotify.styx.api.BackfillPayload;
+import com.spotify.styx.api.BackfillsPayload;
+import com.spotify.styx.api.cli.RunStateDataPayload;
+import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.util.EventUtil;
+import com.spotify.styx.util.ParameterUtil;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.inf.Argument;
+import net.sourceforge.argparse4j.inf.ArgumentAction;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
@@ -63,9 +72,11 @@ public final class Main {
   private static final String UTF_8 = "UTF-8";
   private static final String ENV_VAR_PREFIX = "STYX_CLI";
   private static final String STYX_CLI_API_ENDPOINT = "/api/v1/cli";
+  private static final String STYX_API_ENDPOINT = "/api/v1";
   private static final int TTL_REQUEST = 90;
 
   private static final String COMMAND_DEST = "command";
+  private static final String SUBCOMMAND_DEST = "subcommand";
   private static final String COMPONENT_DEST = "component";
   private static final String WORKFLOW_DEST = "workflow";
   private static final String PARAMETER_DEST = "parameter";
@@ -157,6 +168,28 @@ public final class Main {
           retryWorkflowInstance();
           break;
 
+        case BACKFILL:
+          final BackfillCommand backfillCommand = namespace.get(SUBCOMMAND_DEST);
+          switch (backfillCommand) {
+            case CREATE:
+              backfillCreate();
+              break;
+            case DELETE:
+              backfillDelete();
+              break;
+            case SHOW:
+              backfillShow();
+              break;
+            case LIST:
+              backfillList();
+              break;
+            default:
+              throw new RuntimeException("Unrecognized command: " + backfillCommand);
+          }
+          // TODO: remove this once signalling is in place
+          signaller.signalShutdown();
+          break;
+
         default:
           // parsing unknown command will fail so this should never happen...
           throw new RuntimeException("Unrecognized command: " + command);
@@ -166,14 +199,87 @@ public final class Main {
     }
   }
 
+  private void backfillCreate() {
+    final String component = namespace.getString(parser.backfillCreateComponent.getDest());
+    final String workflow = namespace.getString(parser.backfillCreateWorkflow.getDest());
+    final String start = namespace.getString(parser.backfillCreateStart.getDest());
+    final String end = namespace.getString(parser.backfillCreateEnd.getDest());
+    final int concurrency = namespace.getInt(parser.backfillCreateConcurrency.getDest());
+
+    final BackfillInput backfillInput = BackfillInput.create(
+        Instant.parse(start), Instant.parse(end), component, workflow, concurrency);
+
+    final ByteString payload;
+    try {
+      payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(backfillInput));
+    } catch (JsonProcessingException e) {
+      throw Throwables.propagate(e);
+    }
+    final Request request = Request.forUri(apiUrl("backfills"), "POST").withPayload(payload);
+    client.accept(request, bytes -> {
+      final Backfill backfill;
+      try {
+        backfill = OBJECT_MAPPER.readValue(bytes, Backfill.class);
+      } catch (IOException e) {
+        e.printStackTrace();
+        return;
+      }
+      cliOutput.printBackfill(backfill);
+    });
+  }
+
+  private void backfillDelete() {
+    final String id = namespace.getString(parser.backfillShowId.getDest());
+    final Request request = Request.forUri(apiUrl("backfills", id), "DELETE");
+    client.accept(request, null);
+  }
+
+  private void backfillShow() {
+    final String id = namespace.getString(parser.backfillShowId.getDest());
+    final Request request = Request.forUri(apiUrl("backfills", id));
+    client.accept(request, bytes -> {
+      final BackfillPayload backfillStatus;
+      try {
+        backfillStatus = OBJECT_MAPPER.readValue(bytes, BackfillPayload.class);
+      } catch (IOException e) {
+        e.printStackTrace();
+        return;
+      }
+      cliOutput.printBackfill(backfillStatus);
+    });
+  }
+
+  private void backfillList() throws UnsupportedEncodingException {
+    String uri = apiUrl("backfills");
+    final String component = namespace.getString(parser.backfillListComponent.getDest());
+    if (component != null) {
+      uri += "?component=" + URLEncoder.encode(component, UTF_8);
+    }
+    final Request request = Request.forUri(uri);
+    client.accept(request, bytes -> {
+      final BackfillsPayload backfills;
+      try {
+        backfills = OBJECT_MAPPER.readValue(bytes, BackfillsPayload.class);
+      } catch (IOException e) {
+        e.printStackTrace();
+        return;
+      }
+      backfills.backfills().forEach(cliOutput::printBackfill);
+    });
+  }
+
   private String apiUrl(CharSequence... parts) {
+    return "http://" + apiHost + STYX_API_ENDPOINT + "/" + String.join("/", parts);
+  }
+
+  private String cliApiUrl(CharSequence... parts) {
     return "http://" + apiHost + STYX_CLI_API_ENDPOINT + "/" + String.join("/", parts);
   }
 
   private void activeStates()
       throws UnsupportedEncodingException {
 
-    String uri = apiUrl("activeStates");
+    String uri = cliApiUrl("activeStates");
     String component = namespace.getString(parser.listComponent.getDest());
     if (component != null) {
       uri += "?component=" + URLEncoder.encode(component, UTF_8);
@@ -183,7 +289,7 @@ public final class Main {
         Request.forUri(uri).withTtl(Duration.ofSeconds(TTL_REQUEST)),
         bytes -> {
           try {
-            cliOutput.printActiveStates(OBJECT_MAPPER.readValue(bytes, ActiveStatesPayload.class));
+            cliOutput.printStates(OBJECT_MAPPER.readValue(bytes, RunStateDataPayload.class));
           } catch (IOException e) {
             throw Throwables.propagate(e);
           }
@@ -197,7 +303,7 @@ public final class Main {
     String parameter = workflowInstance.parameter();
 
     client.accept(
-        Request.forUri(apiUrl("events", component, workflow, parameter))
+        Request.forUri(cliApiUrl("events", component, workflow, parameter))
             .withTtl(Duration.ofSeconds(TTL_REQUEST)),
         bytes -> {
           final JsonNode jsonNode;
@@ -246,7 +352,7 @@ public final class Main {
     } catch (JsonProcessingException e) {
       throw Throwables.propagate(e);
     }
-    Request request = Request.forUri(apiUrl("trigger"), "POST")
+    Request request = Request.forUri(cliApiUrl("trigger"), "POST")
         .withPayload(payload);
     client.accept(request, null);
   }
@@ -261,7 +367,7 @@ public final class Main {
     } catch (JsonProcessingException e) {
       throw Throwables.propagate(e);
     }
-    Request request = Request.forUri(apiUrl("events"), "POST")
+    Request request = Request.forUri(cliApiUrl("events"), "POST")
         .withPayload(payload);
     client.accept(request, null);
   }
@@ -276,7 +382,7 @@ public final class Main {
     } catch (JsonProcessingException e) {
       throw Throwables.propagate(e);
     }
-    Request request = Request.forUri(apiUrl("events"), "POST")
+    Request request = Request.forUri(cliApiUrl("events"), "POST")
         .withPayload(payload);
     client.accept(request, null);
   }
@@ -323,9 +429,37 @@ public final class Main {
         .description("Styx CLI")
         .version("Styx CLI " + Main.class.getPackage().getImplementationVersion());
 
-    final Subparsers subCommands = parser.addSubparsers()
-        .title("commands")
-        .metavar(" ");
+    final PartitionAction partitionAction = new PartitionAction();
+
+    final Subparsers subCommands = parser.addSubparsers().title("commands").metavar(" ");
+
+    final Subparsers backfillParser =
+        Command.BACKFILL.parser(subCommands)
+            .addSubparsers().title("commands").metavar(" ");
+
+    final Subparser backfillShow = BackfillCommand.SHOW.parser(backfillParser);
+    final Argument backfillShowId =
+        backfillShow.addArgument("backfill").help("Backfill ID");
+
+    final Subparser backfillDelete = BackfillCommand.DELETE.parser(backfillParser);
+    final Argument backfillDeleteId =
+        backfillDelete.addArgument("backfill").help("Backfill ID");
+
+    final Subparser backfillList = BackfillCommand.LIST.parser(backfillParser);
+    final Argument backfillListComponent =
+        backfillList.addArgument("-c", "--component").help("only show  backfills for COMPONENT");
+
+    final Subparser backfillCreate = BackfillCommand.CREATE.parser(backfillParser);
+    final Argument backfillCreateComponent =
+        backfillCreate.addArgument(COMPONENT_DEST).help("Component ID");
+    final Argument backfillCreateWorkflow =
+        backfillCreate.addArgument(WORKFLOW_DEST).help("Workflow ID");
+    final Argument backfillCreateStart =
+        backfillCreate.addArgument("start").help("Start date/datehour (inclusive)").action(partitionAction);
+    final Argument backfillCreateEnd =
+        backfillCreate.addArgument("end").help("End date/datehour (exclusive)").action(partitionAction);
+    final Argument backfillCreateConcurrency =
+        backfillCreate.addArgument("concurrency").help("The number of jobs to run in parallel").type(Integer.class);
 
     final Subparser list = Command.LIST.parser(subCommands);
     final Argument listComponent = list.addArgument("-c", "--component")
@@ -364,7 +498,8 @@ public final class Main {
     EVENTS("e", "List events for a workflow instance"),
     HALT("h", "Halt a workflow instance"),
     TRIGGER("t", "Trigger a completed workflow instance"),
-    RETRY("r", "Retry a workflow instance that is in a waiting state");
+    RETRY("r", "Retry a workflow instance that is in a waiting state"),
+    BACKFILL(null, "Commands related to backfills");
 
     private final String alias;
     private final String description;
@@ -375,12 +510,81 @@ public final class Main {
     }
 
     public Subparser parser(Subparsers subCommands) {
-      return subCommands
+      Subparser subparser = subCommands
           .addParser(name().toLowerCase())
-          .aliases(alias)
           .setDefault(COMMAND_DEST, this)
           .description(description)
           .help(description);
+
+      if (alias != null && !alias.isEmpty()) {
+        subparser.aliases(alias);
+      }
+
+      return subparser;
+    }
+  }
+
+  private enum BackfillCommand {
+    LIST("ls", "List backfills"),
+    CREATE("", "Create a backfill"),
+    DELETE("rm", "Delete a backfill"),
+    SHOW("get", "Show info about a specific backfill");
+
+    private final String alias;
+    private final String description;
+
+    BackfillCommand(String alias, String description) {
+      this.alias = alias;
+      this.description = description;
+    }
+
+    public Subparser parser(Subparsers subCommands) {
+      Subparser subparser = subCommands
+          .addParser(name().toLowerCase())
+          .setDefault(SUBCOMMAND_DEST, this)
+          .description(description)
+          .help(description);
+
+      if (alias != null && !alias.isEmpty()) {
+        subparser.aliases(alias);
+      }
+
+      return subparser;
+    }
+  }
+
+  private static class PartitionAction implements ArgumentAction {
+
+    @Override
+    public void run(ArgumentParser parser, Argument arg,
+                    Map<String, Object> attrs, String flag, Object value)
+        throws ArgumentParserException {
+      Instant instant = null;
+      try {
+        instant = ParameterUtil.parseDateHour(value.toString());
+      } catch (DateTimeParseException ignored) {
+        try {
+          instant = ParameterUtil.parseDate(value.toString());
+        } catch (Exception ignoredInner) {
+        }
+      }
+
+      if (instant == null) {
+        throw new ArgumentParserException(
+            String.format("could not parse date/datehour for parameter '%s'", arg.textualName()),
+            parser);
+      }
+
+      attrs.put(arg.getDest(), instant);
+    }
+
+    @Override
+    public void onAttach(Argument arg) {
+    }
+
+    @Override
+    public boolean consumeArgument() {
+      return true;
     }
   }
 }

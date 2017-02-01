@@ -20,17 +20,17 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.util.ParameterUtil.toParameter;
+
 import com.spotify.styx.StyxScheduler.StateFactory;
 import com.spotify.styx.docker.WorkflowValidator;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.workflow.ParameterUtil;
 import java.time.Instant;
 import java.util.Objects;
 import org.slf4j.Logger;
@@ -70,21 +70,6 @@ final class StateInitializingTrigger implements TriggerListener {
           Event.triggerExecution(workflowInstance, trigger));
     } catch (StateManager.IsClosed isClosed) {
       LOG.warn("State receiver is closed", isClosed);
-    }
-  }
-
-  private static String toParameter(Partitioning partitioning, Instant instant) {
-    switch (partitioning) {
-      case DAYS:
-      case WEEKS:
-        return ParameterUtil.formatDate(instant);
-      case HOURS:
-        return ParameterUtil.formatDateHour(instant);
-      case MONTHS:
-        return ParameterUtil.formatMonth(instant);
-
-      default:
-        throw new IllegalArgumentException("Unknown partitioning " + partitioning);
     }
   }
 }

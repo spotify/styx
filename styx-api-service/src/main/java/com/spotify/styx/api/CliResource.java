@@ -35,8 +35,8 @@ import com.spotify.apollo.entity.JacksonEntityCodec;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
-import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.api.cli.EventsPayload;
+import com.spotify.styx.api.cli.RunStateDataPayload;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -76,7 +76,7 @@ public class CliResource {
 
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Stream.of(
         Route.with(
-            em.serializerDirect(ActiveStatesPayload.class),
+            em.serializerDirect(RunStateDataPayload.class),
             "GET", BASE + "/activeStates",
             this::activeStates),
         Route.with(
@@ -87,44 +87,43 @@ public class CliResource {
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
         .collect(toList());
 
-    final List<Route<AsyncHandler<Response<ByteString>>>> proxies = Arrays.asList(
+    final List<Route<AsyncHandler<Response<ByteString>>>> schedulerProxies = Arrays.asList(
         Route.async(
             "GET", BASE + "/<endpoint:path>",
-            rc -> proxy("/" + arg("endpoint", rc), rc)),
+            rc -> proxyToScheduler("/" + arg("endpoint", rc), rc)),
         Route.async(
             "POST", BASE + "/<endpoint:path>",
-            rc -> proxy("/" + arg("endpoint", rc), rc)),
+            rc -> proxyToScheduler("/" + arg("endpoint", rc), rc)),
         Route.async(
             "DELETE", BASE + "/<endpoint:path>",
-            rc -> proxy("/" + arg("endpoint", rc), rc)),
+            rc -> proxyToScheduler("/" + arg("endpoint", rc), rc)),
         Route.async(
             "PATCH", BASE + "/<endpoint:path>",
-            rc -> proxy("/" + arg("endpoint", rc), rc)),
+            rc -> proxyToScheduler("/" + arg("endpoint", rc), rc)),
         Route.async(
             "PUT", BASE + "/<endpoint:path>",
-            rc -> proxy("/" + arg("endpoint", rc), rc))
+            rc -> proxyToScheduler("/" + arg("endpoint", rc), rc))
     );
 
     return cat(
         Api.prefixRoutes(routes, V0, V1),
-        Api.prefixRoutes(proxies, V0, V1)
+        Api.prefixRoutes(schedulerProxies, V0, V1)
     );
   }
 
-  private CompletionStage<Response<ByteString>> proxy(String endpoint, RequestContext rc) {
+  private CompletionStage<Response<ByteString>> proxyToScheduler(String path, RequestContext rc) {
     return rc.requestScopedClient()
-        .send(rc.request()
-            .withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + endpoint));
+        .send(rc.request().withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + path));
   }
 
   private static String arg(String name, RequestContext rc) {
     return rc.pathArgs().get(name);
   }
 
-  private ActiveStatesPayload activeStates(RequestContext requestContext) {
+  private RunStateDataPayload activeStates(RequestContext requestContext) {
     final Optional<String> componentOpt = requestContext.request().parameter("component");
 
-    final List<ActiveStatesPayload.ActiveState> runStates = Lists.newArrayList();
+    final List<RunStateDataPayload.RunStateData> runStates = Lists.newArrayList();
     try {
 
       final Map<WorkflowInstance, Long> activeStates = componentOpt.isPresent()
@@ -133,16 +132,16 @@ public class CliResource {
 
       final Map<RunState, Long> map = replayActiveStates(activeStates, storage, false);
       runStates.addAll(
-          map.keySet().stream().map(this::runStateToActiveState).collect(toList()));
+          map.keySet().stream().map(this::runStateToRunStateData).collect(toList()));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
 
-    return ActiveStatesPayload.create(runStates);
+    return RunStateDataPayload.create(runStates);
   }
 
-  private ActiveStatesPayload.ActiveState runStateToActiveState(RunState state) {
-    return ActiveStatesPayload.ActiveState.create(
+  private RunStateDataPayload.RunStateData runStateToRunStateData(RunState state) {
+    return RunStateDataPayload.RunStateData.create(
         state.workflowInstance(),
         state.state().toString(),
         state.data()

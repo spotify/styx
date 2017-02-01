@@ -23,10 +23,10 @@ package com.spotify.styx;
 import static com.spotify.styx.monitoring.MeteredProxy.instrument;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
+import static com.spotify.styx.util.ParameterUtil.incrementInstant;
+import static com.spotify.styx.util.ParameterUtil.truncateInstant;
 import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static com.spotify.styx.util.ReplayEvents.transitionLogger;
-import static com.spotify.styx.workflow.ParameterUtil.incrementInstant;
-import static com.spotify.styx.workflow.ParameterUtil.truncateInstant;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toMap;
@@ -282,17 +282,16 @@ public class StyxScheduler implements AppInit {
     closer.register(executorCloser("event-worker", eventWorker));
 
     final Stats stats = statsFactory.apply(environment);
-    final WorkflowCache cache = new InMemWorkflowCache();
+    final WorkflowCache workflowCache = new InMemWorkflowCache();
     final Storage storage = instrument(Storage.class, storageFactory.apply(environment), stats, time);
 
-    warmUpCache(cache, storage);
+    warmUpCache(workflowCache, storage);
 
     final QueuedStateManager stateManager = closer.register(
         new QueuedStateManager(time, eventWorker, storage));
 
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
-    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, cache, storage);
 
     final Supplier<String> dockerId = new CachedSupplier<>(storage::globalDockerRunnerId, time);
     final DockerRunner routingDockerRunner = DockerRunner.routing(
@@ -316,7 +315,10 @@ public class StyxScheduler implements AppInit {
         new StateInitializingTrigger(stateFactory, stateManager, storage);
     final TriggerManager triggerManager = new TriggerManager(trigger, time, storage);
 
-    final Consumer<Workflow> workflowChangeListener = workflowChanged(cache, storage,
+    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
+                                              storage, trigger);
+
+    final Consumer<Workflow> workflowChangeListener = workflowChanged(workflowCache, storage,
                                                                       stats, stateManager, time);
     final Consumer<Workflow> workflowRemoveListener = workflowRemoved(storage);
 
@@ -324,9 +326,10 @@ public class StyxScheduler implements AppInit {
     startTriggerManager(triggerManager, executor);
     startScheduleSources(environment, executor, workflowChangeListener, workflowRemoveListener);
     startScheduler(scheduler, executor);
-    setupMetrics(stateManager, cache, storage, stats);
+    setupMetrics(stateManager, workflowCache, storage, stats);
 
-    final SchedulerResource schedulerResource = new SchedulerResource(stateManager, trigger, storage, time);
+    final SchedulerResource schedulerResource = new SchedulerResource(stateManager, trigger,
+                                                                      storage, time);
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))

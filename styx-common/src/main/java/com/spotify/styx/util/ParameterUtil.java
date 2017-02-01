@@ -18,12 +18,13 @@
  * -/-/-
  */
 
-package com.spotify.styx.workflow;
+package com.spotify.styx.util;
 
 import static java.time.ZoneOffset.UTC;
 import static java.time.temporal.ChronoField.MONTH_OF_YEAR;
 import static java.time.temporal.ChronoField.YEAR;
 
+import com.google.common.collect.Lists;
 import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
@@ -40,6 +41,7 @@ import java.time.format.SignStyle;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalUnit;
+import java.util.List;
 import javaslang.control.Either;
 
 /**
@@ -87,6 +89,31 @@ public final class ParameterUtil {
     return ISO_LOCAL_MONTH.format(
         instant.truncatedTo(ChronoUnit.DAYS)
             .atOffset(UTC));
+  }
+
+  public static Instant parseDate(String date) {
+    return Instant.from(LocalDate.from(
+        DateTimeFormatter.ISO_LOCAL_DATE.parse(date))
+                            .atStartOfDay(ZoneOffset.UTC));
+  }
+
+  public static Instant parseDateHour(String dateHour) {
+    return Instant.from(ISO_LOCAL_DATE_HOUR.parse(dateHour));
+  }
+
+  public static String toParameter(Partitioning partitioning, Instant instant) {
+    switch (partitioning) {
+      case DAYS:
+      case WEEKS:
+        return ParameterUtil.formatDate(instant);
+      case HOURS:
+        return ParameterUtil.formatDateHour(instant);
+      case MONTHS:
+        return ParameterUtil.formatMonth(instant);
+
+      default:
+        throw new IllegalArgumentException("Unknown partitioning " + partitioning);
+    }
   }
 
   /**
@@ -155,6 +182,31 @@ public final class ParameterUtil {
       default:
         throw new IllegalArgumentException("Partitioning not supported: " + partitioning);
     }
+  }
+
+  /**
+   * Generates a list of {@link Instant}s obtained by partitioning a time range defined by a
+   * starting and a ending {@link Instant}s, and based on the provided {@link Partitioning}.
+   *
+   * @param startInstant              Defines the start of the time range (inclusive)
+   * @param endInstant                Defines the end of the time range (exclusive)
+   * @param partitioning              The partitioning unit to split the time range into
+   * @throws IllegalArgumentException If the starting {@link Instant} is later than the ending
+   *                                  {@link Instant}
+   */
+  public static List<Instant> rangeOfInstants(Instant startInstant, Instant endInstant, Partitioning partitioning) {
+    if (endInstant.isBefore(startInstant)) {
+      throw new IllegalArgumentException("End time cannot be earlier the start time");
+    }
+    final List<Instant> listOfInstants = Lists.newArrayList();
+
+    Instant instantToProcess = startInstant;
+    while (instantToProcess.isBefore(endInstant)) {
+      listOfInstants.add(instantToProcess);
+      instantToProcess = incrementInstant(instantToProcess, partitioning);
+    }
+
+    return listOfInstants;
   }
 
   public static Either<String, Instant> instantFromWorkflowInstance(

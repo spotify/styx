@@ -35,7 +35,9 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.spotify.apollo.test.ServiceHelper;
 import com.spotify.styx.docker.DockerRunner;
+import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
@@ -174,6 +176,14 @@ public class StyxSchedulerServiceFixture {
 
   void givenNextNaturalTrigger(Workflow workflow, String nextNaturalTrigger) throws IOException {
     storage.updateNextNaturalTrigger(workflow.id(), Instant.parse(nextNaturalTrigger));
+  }
+
+  void givenBackfill(Backfill backfill) throws IOException {
+    storage.storeBackfill(backfill);
+  }
+
+  void givenResource(Resource resource) throws IOException {
+    storage.storeResource(resource);
   }
 
   void workflowChanges(Workflow workflow) {

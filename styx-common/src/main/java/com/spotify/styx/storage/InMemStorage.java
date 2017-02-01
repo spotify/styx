@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
@@ -54,6 +55,7 @@ public class InMemStorage implements Storage {
   private final Set<String> components = Sets.newConcurrentHashSet();
   private final ConcurrentMap<WorkflowId, Workflow> workflowStore = Maps.newConcurrentMap();
   private final ConcurrentMap<String, Resource> resourceStore = Maps.newConcurrentMap();
+  private final ConcurrentMap<String, Backfill> backfillStore = Maps.newConcurrentMap();
   private final ConcurrentMap<WorkflowId, String> dockerImagesPerWorkflowId = Maps.newConcurrentMap();
   private final ConcurrentMap<String, String> dockerImagesPerComponent = Maps.newConcurrentMap();
   private final ConcurrentMap<WorkflowId, WorkflowState> workflowStatePerWorkflowId = Maps.newConcurrentMap();
@@ -208,6 +210,21 @@ public class InMemStorage implements Storage {
   @Override
   public void deleteResource(String id) throws IOException {
     resourceStore.remove(id);
+  }
+
+  @Override
+  public List<Backfill> backfills() throws IOException {
+    return ImmutableList.copyOf(backfillStore.values());
+  }
+
+  @Override
+  public Optional<Backfill> backfill(String id) throws IOException {
+    return Optional.ofNullable(backfillStore.get(id));
+  }
+
+  @Override
+  public void storeBackfill(Backfill backfill) throws IOException {
+    backfillStore.put(backfill.id(), backfill);
   }
 
   @Override

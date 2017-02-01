@@ -20,9 +20,9 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.workflow.ParameterUtil.decrementInstant;
-import static com.spotify.styx.workflow.ParameterUtil.incrementInstant;
-import static com.spotify.styx.workflow.ParameterUtil.truncateInstant;
+import static com.spotify.styx.util.ParameterUtil.decrementInstant;
+import static com.spotify.styx.util.ParameterUtil.incrementInstant;
+import static com.spotify.styx.util.ParameterUtil.truncateInstant;
 import static java.util.Objects.requireNonNull;
 
 import com.google.common.base.Throwables;

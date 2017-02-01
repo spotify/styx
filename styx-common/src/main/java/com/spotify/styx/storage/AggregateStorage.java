@@ -21,6 +21,7 @@
 package com.spotify.styx.storage;
 
 import com.google.cloud.datastore.Datastore;
+import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
@@ -175,11 +176,6 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public void storeResource(Resource resource) throws IOException {
-    datastoreStorage.postResource(resource);
-  }
-
-  @Override
   public List<Resource> resources() throws IOException {
     return datastoreStorage.getResources();
   }
@@ -187,5 +183,25 @@ public class AggregateStorage implements Storage {
   @Override
   public void deleteResource(String id) throws IOException {
     datastoreStorage.deleteResource(id);
+  }
+
+  @Override
+  public void storeBackfill(Backfill backfill) throws IOException {
+    datastoreStorage.storeBackfill(backfill);
+  }
+
+  @Override
+  public void storeResource(Resource resource) throws IOException {
+    datastoreStorage.postResource(resource);
+  }
+
+  @Override
+  public List<Backfill> backfills() throws IOException {
+    return datastoreStorage.getBackfills();
+  }
+
+  @Override
+  public Optional<Backfill> backfill(String id) throws IOException {
+    return datastoreStorage.getBackfill(id);
   }
 }

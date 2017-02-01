@@ -31,8 +31,8 @@ import static org.junit.Assert.assertThat;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
-import com.spotify.styx.api.cli.ActiveStatesPayload;
 import com.spotify.styx.api.cli.EventsPayload;
+import com.spotify.styx.api.cli.RunStateDataPayload;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
@@ -125,7 +125,7 @@ public class CliResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(withCode(Status.OK)));
 
     String json = response.payload().get().utf8();
-    ActiveStatesPayload parsed = Json.OBJECT_MAPPER.readValue(json, ActiveStatesPayload.class);
+    RunStateDataPayload parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
     assertThat(parsed.activeStates(), hasSize(2));
   }
@@ -145,7 +145,7 @@ public class CliResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(withCode(Status.OK)));
 
     String json = response.payload().get().utf8();
-    ActiveStatesPayload parsed = Json.OBJECT_MAPPER.readValue(json, ActiveStatesPayload.class);
+    RunStateDataPayload parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
     assertThat(parsed.activeStates(), hasSize(1));
     assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().componentId(), is(COMPONENT_ID));
