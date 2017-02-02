@@ -291,14 +291,7 @@ class KubernetesDockerRunner implements DockerRunner {
         return;
       }
 
-      final String podName = pod.getMetadata().getName();
-      LOG.info("Pod event for {} at resource version {}", podName, lastResourceVersion);
-      LOG.info("Action: {}", action);
-      try {
-        LOG.info("Status: {}", OBJECT_MAPPER.writeValueAsString(pod.getStatus()));
-      } catch (JsonProcessingException e) {
-        LOG.info("Status: {}", pod.getStatus());
-      }
+      logEvent(action, pod);
 
       try {
         inspectPod(action, pod);
@@ -306,6 +299,20 @@ class KubernetesDockerRunner implements DockerRunner {
         // fixme: this breaks the kubernetes api convention of not interpreting the resource version
         // https://github.com/kubernetes/kubernetes/blob/release-1.2/docs/devel/api-conventions.md#metadata
         lastResourceVersion = Integer.parseInt(pod.getMetadata().getResourceVersion());
+      }
+    }
+
+    private void logEvent(Action action, Pod pod) {
+      final String podName = pod.getMetadata().getName();
+      LOG.info("Pod event for {} at resource version {}", podName, lastResourceVersion);
+      LOG.info("Action: {}", action);
+      final String workflowInstance = pod.getMetadata().getAnnotations()
+              .getOrDefault(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION, "N/A");
+      LOG.info("Workflow instance: {}", workflowInstance);
+      try {
+        LOG.info("Status: {}", OBJECT_MAPPER.writeValueAsString(pod.getStatus()));
+      } catch (JsonProcessingException e) {
+        LOG.info("Status: {}", pod.getStatus());
       }
     }
 
