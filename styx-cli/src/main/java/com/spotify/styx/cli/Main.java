@@ -51,6 +51,8 @@ import java.net.URLEncoder;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
@@ -251,9 +253,17 @@ public final class Main {
 
   private void backfillList() throws UnsupportedEncodingException {
     String uri = apiUrl("backfills");
+    List<String> queries = new ArrayList<>();
     final String component = namespace.getString(parser.backfillListComponent.getDest());
     if (component != null) {
-      uri += "?component=" + URLEncoder.encode(component, UTF_8);
+      queries.add("component=" + URLEncoder.encode(component, UTF_8));
+    }
+    final String workflow = namespace.getString(parser.backfillListWorkflow.getDest());
+    if (workflow != null) {
+      queries.add("workflow=" + URLEncoder.encode(workflow, UTF_8));
+    }
+    if (!queries.isEmpty()) {
+      uri += "?" + String.join("&", queries);
     }
     final Request request = Request.forUri(uri);
     client.accept(request, bytes -> {
@@ -446,6 +456,8 @@ public final class Main {
         backfillHalt.addArgument("backfill").help("Backfill ID");
 
     final Subparser backfillList = BackfillCommand.LIST.parser(backfillParser);
+    final Argument backfillListWorkflow =
+        backfillList.addArgument("-w", "--workflow").help("only show  backfills for WORKFLOW");
     final Argument backfillListComponent =
         backfillList.addArgument("-c", "--component").help("only show  backfills for COMPONENT");
 

@@ -127,14 +127,14 @@ class PrettyCliOutput implements CliOutput {
   @Override
   public void printBackfillPayload(BackfillPayload backfillPayload) {
     println(coloredBright(RED, "BACKFILL DATA"));
-    println();
     printBackfill(backfillPayload.backfill());
-    println();
-    println(coloredBright(RED, "BACKFILL PROGRESS"));
-    println();
     if (backfillPayload.statuses().isPresent()) {
+      println();
+      println(coloredBright(RED, "BACKFILL PROGRESS"));
       printStates(backfillPayload.statuses().get());
     }
+    println();
+    println();
   }
 
   private Ansi getAnsiForState(RunStateDataPayload.RunStateData RunStateData) {

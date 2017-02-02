@@ -101,6 +101,17 @@ public class BackfillResourceTest extends VersionedApiTest {
       .partitioning(Partitioning.DAYS)
       .build();
 
+  private static final Backfill BACKFILL_3 = Backfill.newBuilder()
+      .id("backfill-3")
+      .start(Instant.parse("2017-01-01T00:00:00Z"))
+      .end(Instant.parse("2017-01-02T00:00:00Z"))
+      .workflowId(WorkflowId.create("other_component", "other_workflow"))
+      .concurrency(2)
+      .resource("backfill-3")
+      .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+      .partitioning(Partitioning.DAYS)
+      .build();
+
   public BackfillResourceTest(Api.Version version) {
     super(BackfillResource.BASE, version, "backfill-test");
   }
@@ -125,12 +136,22 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Before
   public void setUp() throws Exception {
-    storage.storeWorkflow(Workflow.create(BACKFILL_1.workflowId().componentId(), URI.create("http://example.com"), DataEndpoint
-        .create(BACKFILL_1.workflowId().endpointId(), Partitioning.HOURS, Optional.empty(), Optional.empty(), Optional.empty(), Collections
-            .emptyList())));
-    storage.storeWorkflow(Workflow.create(BACKFILL_2.workflowId().componentId(), URI.create("http://example.com"), DataEndpoint
-        .create(BACKFILL_2.workflowId().endpointId(), Partitioning.HOURS, Optional.empty(), Optional.empty(), Optional.empty(), Collections
-            .emptyList())));
+    storage.storeWorkflow(Workflow.create(
+        BACKFILL_1.workflowId().componentId(), URI.create("http://example.com"),
+        DataEndpoint.create(BACKFILL_1.workflowId().endpointId(), Partitioning.HOURS,
+                            Optional.empty(), Optional.empty(), Optional.empty(),
+                            Collections.emptyList())));
+    storage.storeWorkflow(Workflow.create(
+        BACKFILL_2.workflowId().componentId(), URI.create("http://example.com"),
+        DataEndpoint.create(BACKFILL_2.workflowId().endpointId(),
+                            Partitioning.HOURS, Optional.empty(),
+                            Optional.empty(), Optional.empty(),
+                            Collections.emptyList())));
+    storage.storeWorkflow(Workflow.create(
+        BACKFILL_3.workflowId().componentId(), URI.create("http://example.com"),
+        DataEndpoint.create(BACKFILL_3.workflowId().endpointId(), Partitioning.HOURS,
+                            Optional.empty(), Optional.empty(), Optional.empty(),
+                            Collections.emptyList())));
     storage.storeBackfill(BACKFILL_1);
   }
 
@@ -167,6 +188,24 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
     assertJson(response, "backfills[0].backfill.id", equalTo(BACKFILL_1.id()));
     assertJson(response, "backfills[0].statuses.active_states", hasSize(24));
+  }
+
+  @Test
+  public void shouldFilterBackfills() throws Exception {
+    sinceVersion(Api.Version.V1);
+
+    storage.storeBackfill(BACKFILL_2);
+    storage.storeBackfill(BACKFILL_3);
+
+    final String uri = path(String.format("?component=%s&workflow=%s",
+                                          BACKFILL_1.workflowId().componentId(),
+                                          BACKFILL_1.workflowId().endpointId()));
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", uri));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfills", hasSize(1));
+    assertJson(response, "backfills[0].backfill.id", equalTo(BACKFILL_1.id()));
   }
 
   @Test
