@@ -48,6 +48,7 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.testdata.TestData;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Optional;
 import org.junit.Test;
@@ -75,7 +76,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       DATA_ENDPOINT_DAILY);
   private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
   private static final Trigger TRIGGER2 = Trigger.unknown("trig2");
-  public static final Backfill BACKFILL = Backfill.newBuilder()
+  private static final Backfill BACKFILL = Backfill.newBuilder()
       .id("backfill-1")
       .start(Instant.parse("2015-01-01T00:00:00Z"))
       .end(Instant.parse("2015-01-02T00:00:00Z"))
@@ -151,6 +152,34 @@ public class SystemTest extends StyxSchedulerServiceFixture {
         RunState.State.QUEUED);
     tickScheduler();
     awaitNumberOfDockerRuns(2);
+  }
+
+  @Test
+  public void testTriggerBackfillsWillComplete() throws Exception {
+    givenTheTimeIs("2016-03-14T15:30:00Z");
+    givenTheGlobalEnableFlagIs(true);
+    givenWorkflow(HOURLY_WORKFLOW);
+    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, false);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
+    final Backfill singleHourBackfill = BACKFILL.builder()
+        .end(BACKFILL.start().plus(1, ChronoUnit.HOURS)).build();
+    givenBackfill(singleHourBackfill);
+
+    styxStarts();
+    tickScheduler();
+    awaitWorkflowInstanceState(
+        WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2015-01-01T00"),
+        RunState.State.QUEUED);
+    tickScheduler();
+    awaitNumberOfDockerRuns(1);
+    WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
+
+    injectEvent(Event.started(workflowInstance));
+    injectEvent(Event.terminate(workflowInstance, 0));
+    awaitWorkflowInstanceCompletion(workflowInstance);
+    awaitBackfillCompleted(singleHourBackfill.id());
+    tickScheduler();
+    assertThat(getState(workflowInstance), is(nullValue()));
   }
 
   @Test

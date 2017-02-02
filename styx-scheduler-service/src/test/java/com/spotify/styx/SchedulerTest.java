@@ -189,13 +189,14 @@ public class SchedulerTest {
     setUp(5);
     final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
     initWorkflow(workflow);
-    Backfill backfill = BACKFILL_2.builder().nextTrigger(Instant.parse("2016-12-02T03:00:00Z")).build();
-    when(storage.backfills()).thenReturn(Collections.singletonList(backfill));
+    Backfill backfillWithNoPartitionsLeft = BACKFILL_2.builder().nextTrigger(BACKFILL_2.end()).build();
+    when(storage.backfills()).thenReturn(Collections.singletonList(backfillWithNoPartitionsLeft));
 
     scheduler.tick();
 
     verifyZeroInteractions(triggerListener);
-    verify(storage).storeBackfill(backfill.builder().completed(true).build());
+    final Backfill completedBackfill = backfillWithNoPartitionsLeft.builder().completed(true).build();
+    verify(storage).storeBackfill(completedBackfill);
   }
 
   @Test
