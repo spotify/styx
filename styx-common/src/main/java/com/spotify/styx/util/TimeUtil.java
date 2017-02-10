@@ -47,9 +47,11 @@ public class TimeUtil {
   private static final String YEARLY_CRON = "0 0 1 1 *";
 
   /**
-   * Gets the last execution instant for a {@link Schedule}, relative to a given instant.
+   * Gets the last execution instant for a {@link Schedule}, relative to a given instant. If
+   * the given instant is exactly at an execution time of the partitioning, it will be returned
+   * as is.
    *
-   * <p>e.g. an hourly partitioning has a last execution instant at 13:00 relative to 13:22.
+   * <p>e.g. an hourly schedule has a last execution instant at 13:00 relative to 13:22.
    *
    * @param instant  The instant to calculate the last execution instant relative to
    * @param schedule The partitioning of executions
@@ -58,9 +60,10 @@ public class TimeUtil {
   public static Instant lastInstant(Instant instant, Schedule schedule) {
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
     final ZonedDateTime utcDateTime = instant.atZone(UTC);
-    final ZonedDateTime lastDateTime = executionTime.lastExecution(utcDateTime);
 
-    return lastDateTime.toInstant();
+    return (executionTime.isMatch(utcDateTime))
+        ? instant
+        : executionTime.lastExecution(utcDateTime).toInstant();
   }
 
   /**
@@ -78,6 +81,20 @@ public class TimeUtil {
     final ZonedDateTime nextDateTime = executionTime.nextExecution(utcDateTime);
 
     return nextDateTime.toInstant();
+  }
+
+  /**
+   * Tests if a given instant is aligned with the execution times of a {@link Schedule}.
+   *
+   * @param instant  The instant to test
+   * @param schedule The schedule to test against
+   * @return true if the given instant aligns with the partitioning
+   */
+  public static boolean isAligned(Instant instant, Schedule schedule) {
+    final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
+    final ZonedDateTime utcDateTime = instant.atZone(UTC);
+
+    return executionTime.isMatch(utcDateTime);
   }
 
   /**
