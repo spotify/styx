@@ -65,6 +65,10 @@ public final class Json {
     return ByteString.of(OBJECT_MAPPER.writeValueAsBytes(value));
   }
 
+  public static <T> T deserialize(ByteString json, Class<T> clazz) throws IOException {
+    return OBJECT_MAPPER.readValue(json.toByteArray(), clazz);
+  }
+
   public static Event deserializeEvent(ByteString json) throws IOException {
     return OBJECT_MAPPER.readValue(json.toByteArray(), Event.class);
   }
