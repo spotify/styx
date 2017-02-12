@@ -126,6 +126,33 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
+  public void runErrorOnMissingPodIPSucceeded() throws Exception {
+    pod.setStatus(terminatedNoPodIP("Succeeded", 0));
+
+    assertGeneratesEventsAndTransitions(
+        RunState.State.SUBMITTED, pod,
+        Event.runError(WFI, "Could not find PodIP"));
+  }
+
+  @Test
+  public void runErrorOnMissingPodIPFailed() throws Exception {
+    pod.setStatus(terminatedNoPodIP("Failed", 137));
+
+    assertGeneratesEventsAndTransitions(
+        RunState.State.SUBMITTED, pod,
+        Event.runError(WFI, "Could not find PodIP"));
+  }
+
+  @Test
+  public void noRunErrorOnMissingPodIPNoFailedStatus() throws Exception {
+    pod.setStatus(terminatedNoPodIP("Running", 0));
+
+    assertGeneratesEventsAndTransitions(
+        RunState.State.SUBMITTED, pod,
+        Event.started(WFI));
+  }
+
+  @Test
   public void noEventsWhenStateInTerminated() throws Exception {
     pod.setStatus(podStatusNoContainer("Unknown"));
 
@@ -187,6 +214,19 @@ public class KubernetesPodEventTranslatorTest {
         null));
   }
 
+  static PodStatus terminatedNoPodIP(String phase, int exitCode) {
+    PodStatus podStatus = new PodStatus(emptyList(), Lists.newArrayList(), "", "", phase, "", "", "");
+    ContainerState cs = new ContainerState(
+        null,
+        new ContainerStateTerminated("", exitCode, "", "", "", 0, ""),
+        null);
+    podStatus.getContainerStatuses()
+        .add(new ContainerStatus(KubernetesDockerRunner.STYX_RUN, "", "", cs,
+            KubernetesDockerRunner.STYX_RUN, true, 0, cs));
+
+    return podStatus;
+  }
+
   static PodStatus waiting(String phase, String reason) {
     return podStatus(phase, true, new ContainerState(
         null,
@@ -203,6 +243,6 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   static PodStatus podStatusNoContainer(String phase) {
-    return new PodStatus(emptyList(), Lists.newArrayList(), "", "", phase, "", "", "");
+    return new PodStatus(emptyList(), Lists.newArrayList(), "", "", phase, "00.00.00.00", "", "");
   }
 }
