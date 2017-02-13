@@ -82,7 +82,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       .end(Instant.parse("2015-01-02T00:00:00Z"))
       .workflowId(WorkflowId.create("styx", "styx.TestEndpoint"))
       .concurrency(2)
-      .resource("backfill-1")
       .nextTrigger(Instant.parse("2015-01-01T00:00:00Z"))
       .partitioning(Partitioning.HOURS)
       .build();

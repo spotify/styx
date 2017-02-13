@@ -217,7 +217,6 @@ public final class BackfillResource {
         .concurrency(input.concurrency())
         .start(input.start())
         .end(input.end())
-        .resource(id)
         .partitioning(partitioning)
         .nextTrigger(input.start())
         .halted(false);

@@ -45,9 +45,6 @@ public interface Backfill {
   int concurrency();
 
   @JsonProperty
-  String resource();
-
-  @JsonProperty
   Instant nextTrigger();
 
   @JsonProperty

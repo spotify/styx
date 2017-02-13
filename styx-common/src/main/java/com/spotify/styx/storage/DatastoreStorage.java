@@ -88,7 +88,6 @@ class DatastoreStorage {
   public static final String PROPERTY_CONCURRENCY = "concurrency";
   public static final String PROPERTY_START = "start";
   public static final String PROPERTY_END = "end";
-  public static final String PROPERTY_RESOURCE = "resource";
   public static final String PROPERTY_NEXT_TRIGGER = "nextTrigger";
   public static final String PROPERTY_PARTITIONING = "partitioning";
   public static final String PROPERTY_COMPLETED = "completed";
@@ -568,7 +567,6 @@ class DatastoreStorage {
         .end(datetimeToInstant(entity.getDateTime(PROPERTY_END)))
         .workflowId(workflowId)
         .concurrency((int) entity.getLong(PROPERTY_CONCURRENCY))
-        .resource(entity.getString(PROPERTY_RESOURCE))
         .nextTrigger(datetimeToInstant(entity.getDateTime(PROPERTY_NEXT_TRIGGER)))
         .partitioning(Partitioning.valueOf(entity.getString(PROPERTY_PARTITIONING)))
         .completed(entity.getBoolean(PROPERTY_COMPLETED))
@@ -589,7 +587,6 @@ class DatastoreStorage {
         .set(PROPERTY_END, instantToDatetime(backfill.end()))
         .set(PROPERTY_COMPONENT, backfill.workflowId().componentId())
         .set(PROPERTY_WORKFLOW, backfill.workflowId().endpointId())
-        .set(PROPERTY_RESOURCE, backfill.resource())
         .set(PROPERTY_PARTITIONING, backfill.partitioning().name())
         .set(PROPERTY_NEXT_TRIGGER, instantToDatetime(backfill.nextTrigger()))
         .set(PROPERTY_COMPLETED, backfill.completed())

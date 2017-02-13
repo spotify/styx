@@ -75,7 +75,6 @@ public class SchedulerTest {
       .end(Instant.parse("2016-12-05T22:00:00Z"))
       .workflowId(WORKFLOW_ID1)
       .concurrency(2)
-      .resource("backfill-1")
       .partitioning(Partitioning.HOURS)
       .nextTrigger(Instant.parse("2016-12-02T22:00:00Z"))
       .build();
@@ -86,7 +85,6 @@ public class SchedulerTest {
       .end(Instant.parse("2016-12-02T03:00:00Z"))
       .workflowId(WORKFLOW_ID1)
       .concurrency(3)
-      .resource("backfill-2")
       .partitioning(Partitioning.HOURS)
       .nextTrigger(Instant.parse("2016-12-02T00:00:00Z"))
       .build();
