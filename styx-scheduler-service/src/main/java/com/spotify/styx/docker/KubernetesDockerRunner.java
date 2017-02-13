@@ -304,15 +304,18 @@ class KubernetesDockerRunner implements DockerRunner {
 
     private void logEvent(Action action, Pod pod) {
       final String podName = pod.getMetadata().getName();
-      LOG.info("Pod event for {} at resource version {}", podName, lastResourceVersion);
-      LOG.info("Action: {}", action);
       final String workflowInstance = pod.getMetadata().getAnnotations()
               .getOrDefault(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION, "N/A");
-      LOG.info("Workflow instance: {}", workflowInstance);
+      final String status = readStatus(pod);
+      LOG.info("Pod event for {} at resource version {}, action: {}, workflow instance: {}, status: {}",
+               podName, lastResourceVersion, action, workflowInstance, status);
+    }
+
+    private String readStatus(Pod pod) {
       try {
-        LOG.info("Status: {}", OBJECT_MAPPER.writeValueAsString(pod.getStatus()));
+        return OBJECT_MAPPER.writeValueAsString(pod.getStatus());
       } catch (JsonProcessingException e) {
-        LOG.info("Status: {}", pod.getStatus());
+        return pod.getStatus().toString();
       }
     }
 
