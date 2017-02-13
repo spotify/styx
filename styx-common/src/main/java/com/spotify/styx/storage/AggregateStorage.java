@@ -94,6 +94,11 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
+  public boolean debugEnabled() throws IOException {
+    return datastoreStorage.debugEnabled();
+  }
+
+  @Override
   public boolean setGlobalEnabled(boolean enabled) throws IOException {
     return datastoreStorage.setGlobalEnabled(enabled);
   }

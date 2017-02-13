@@ -79,6 +79,11 @@ public class InMemStorage implements Storage {
   }
 
   @Override
+  public boolean debugEnabled() throws IOException {
+    throw new UnsupportedOperationException("Unsupported Operation!");
+  }
+
+  @Override
   public boolean setGlobalEnabled(boolean enabled) {
     final boolean oldValue = globalEnabled();
     this.globalEnabled = enabled;

@@ -40,12 +40,14 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 public class DockerRunnerHandlerTest {
 
@@ -53,10 +55,11 @@ public class DockerRunnerHandlerTest {
   private String startImageName;
   private List<String> startArgs;
   private String cleanupExecutionId;
+  private Storage storage = Mockito.mock(Storage.class);
 
   private StateManager stateManager = new SyncStateManager();
   private DockerRunnerHandler dockerRunnerHandler =
-      new DockerRunnerHandler(new FakeDockerRunner(), stateManager);
+      new DockerRunnerHandler(new FakeDockerRunner(), stateManager, storage);
 
   private static final String TEST_EXECUTION_ID = "execution_1";
   private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
@@ -95,7 +98,7 @@ public class DockerRunnerHandlerTest {
   @Test
   public void shouldFailIfDockerRunnerRaisesException() throws Exception {
     DockerRunnerHandler dockerRunnerHandler =
-        new DockerRunnerHandler(new ExceptionalDockerRunner(), stateManager);
+        new DockerRunnerHandler(new ExceptionalDockerRunner(), stateManager, storage);
 
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
