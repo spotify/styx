@@ -69,6 +69,11 @@ public interface Storage {
   boolean globalEnabled() throws IOException;
 
   /**
+   * Get the debug flag for Styx.
+   */
+  boolean debugEnabled() throws IOException;
+
+  /**
    * Set the global enabled flag for Styx.
    *
    * @param enabled     The global enabled flag

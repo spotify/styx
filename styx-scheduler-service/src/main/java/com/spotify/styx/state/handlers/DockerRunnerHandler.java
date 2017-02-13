@@ -30,6 +30,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -48,12 +49,15 @@ public class DockerRunnerHandler implements OutputHandler {
 
   private final DockerRunner dockerRunner;
   private final StateManager stateManager;
+  private final Storage storage;
 
   public DockerRunnerHandler(
       DockerRunner dockerRunner,
-      StateManager stateManager) {
+      StateManager stateManager,
+      Storage storage) {
     this.dockerRunner = requireNonNull(dockerRunner);
     this.stateManager = requireNonNull(stateManager);
+    this.storage = requireNonNull(storage);
   }
 
   @Override
@@ -87,9 +91,20 @@ public class DockerRunnerHandler implements OutputHandler {
       case ERROR:
         if (state.data().executionId().isPresent()) {
           final String executionId = state.data().executionId().get();
-          LOG.info("Cleaning up {} pod: {}", state.workflowInstance().toKey(), executionId);
 
-          dockerRunner.cleanup(executionId);
+          boolean debugEnabled = false;
+          try {
+            debugEnabled = storage.debugEnabled();
+          } catch (IOException e) {
+            LOG.info("Couldn't fetch debug flag. Will clean up pod anyway.");
+          }
+
+          if (!debugEnabled) {
+            LOG.info("Cleaning up {} pod: {}", state.workflowInstance().toKey(), executionId);
+            dockerRunner.cleanup(executionId);
+          } else {
+            LOG.info("Keeping {} pod: {}", state.workflowInstance().toKey(), executionId);
+          }
         }
         break;
 

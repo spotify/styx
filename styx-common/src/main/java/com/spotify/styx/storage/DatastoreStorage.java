@@ -93,12 +93,14 @@ class DatastoreStorage {
   public static final String PROPERTY_PARTITIONING = "partitioning";
   public static final String PROPERTY_COMPLETED = "completed";
   public static final String PROPERTY_HALTED = "halted";
+  public static final String PROPERTY_DEBUG_ENABLED = "debug";
 
   public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
 
   public static final boolean DEFAULT_CONFIG_ENABLED = true;
   public static final String DEFAULT_CONFIG_DOCKER_RUNNER_ID = "default";
   public static final boolean DEFAULT_WORKFLOW_ENABLED = false;
+  public static final boolean DEFAULT_DEBUG_ENABLED = false;
 
   public static final int MAX_RETRIES = 100;
 
@@ -133,6 +135,10 @@ class DatastoreStorage {
 
   boolean globalEnabled() throws IOException {
     return readConfigBoolean(PROPERTY_CONFIG_ENABLED, DEFAULT_CONFIG_ENABLED);
+  }
+
+  boolean debugEnabled() throws IOException {
+    return readConfigBoolean(PROPERTY_DEBUG_ENABLED, DEFAULT_DEBUG_ENABLED);
   }
 
   public String globalDockerRunnerId() {

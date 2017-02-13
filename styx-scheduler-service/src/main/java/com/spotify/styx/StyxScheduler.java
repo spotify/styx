@@ -302,7 +302,7 @@ public class StyxScheduler implements AppInit {
 
     final OutputHandler[] outputHandlers = new OutputHandler[] {
         transitionLogger(""),
-        new DockerRunnerHandler(dockerRunner, stateManager),
+        new DockerRunnerHandler(dockerRunner, stateManager, storage),
         new TerminationHandler(retryUtil, stateManager),
         new MonitoringHandler(time, stats),
         new PublisherHandler(publisher),
