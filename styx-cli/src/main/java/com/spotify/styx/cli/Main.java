@@ -245,7 +245,7 @@ public final class Main {
         e.printStackTrace();
         return;
       }
-      cliOutput.printBackfill(backfillStatus);
+      cliOutput.printBackfillPayload(backfillStatus);
     });
   }
 
@@ -264,7 +264,7 @@ public final class Main {
         e.printStackTrace();
         return;
       }
-      backfills.backfills().forEach(cliOutput::printBackfill);
+      backfills.backfills().forEach(cliOutput::printBackfillPayload);
     });
   }
 

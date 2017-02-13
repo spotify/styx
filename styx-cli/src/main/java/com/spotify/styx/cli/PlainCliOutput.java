@@ -83,20 +83,20 @@ class PlainCliOutput implements CliOutput {
 
   @Override
   public void printBackfill(Backfill backfill) {
-    System.out.println(String.format("Backfill id: %s", backfill.id()));
-    System.out.println(String.format("Component id: %s", backfill.workflowId().componentId()));
-    System.out.println(String.format("Workflow id: %s", backfill.workflowId().endpointId()));
-    System.out.println(String.format("Start date/datehour (inclusive): %s", backfill.start()));
-    System.out.println(String.format("End date/datehour (exclusive): %s", backfill.end()));
-    if (!backfill.halted() && !backfill.completed()) {
-      System.out.println(String.format("Next date/datehour: %s", backfill.nextTrigger()));
-    }
-    System.out.println(String.format("Completed: %s", backfill.completed()));
-    System.out.println(String.format("Halted: %s", backfill.halted()));
+    System.out.println(String.format("%s %s %s %s %s %s %s %s %s",
+                                     backfill.id(),
+                                     backfill.workflowId().componentId(),
+                                     backfill.workflowId().endpointId(),
+                                     backfill.halted(),
+                                     backfill.completed(),
+                                     backfill.concurrency(),
+                                     backfill.start(),
+                                     backfill.end(),
+                                     backfill.nextTrigger()));
   }
 
   @Override
-  public void printBackfill(BackfillPayload backfillPayload) {
+  public void printBackfillPayload(BackfillPayload backfillPayload) {
     printBackfill(backfillPayload.backfill());
     if (backfillPayload.statuses().isPresent()) {
       printStates(backfillPayload.statuses().get());

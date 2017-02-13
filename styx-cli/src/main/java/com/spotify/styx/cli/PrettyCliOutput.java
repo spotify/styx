@@ -23,6 +23,7 @@ package com.spotify.styx.cli;
 import static com.spotify.styx.cli.CliUtil.colored;
 import static com.spotify.styx.cli.CliUtil.coloredBright;
 import static com.spotify.styx.cli.CliUtil.formatTimestamp;
+import static com.spotify.styx.util.ParameterUtil.toParameter;
 import static org.fusesource.jansi.Ansi.Color.BLACK;
 import static org.fusesource.jansi.Ansi.Color.BLUE;
 import static org.fusesource.jansi.Ansi.Color.CYAN;
@@ -31,9 +32,12 @@ import static org.fusesource.jansi.Ansi.Color.GREEN;
 import static org.fusesource.jansi.Ansi.Color.RED;
 import static org.fusesource.jansi.Ansi.Color.YELLOW;
 
+import com.google.common.collect.Iterables;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.cli.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.Partitioning;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
 import java.util.List;
@@ -41,161 +45,115 @@ import org.fusesource.jansi.Ansi;
 
 class PrettyCliOutput implements CliOutput {
 
+  private void println() {
+    System.out.println();
+  }
+
+  private static void println(Object output) {
+    System.out.println(output.toString());
+  }
+
+  private static void format(String format, Object... args) {
+    System.out.println(String.format(format, args));
+  }
+
   @Override
   public void printStates(RunStateDataPayload runStateDataPayload) {
-    System.out.println(String.format(
+    format(
         "  %-20s %-12s %-47s %-7s %s",
         "WORKFLOW INSTANCE",
         "STATE",
         "LAST EXECUTION ID",
         "TRIES",
-        "PREVIOUS EXECUTION MESSAGE"));
+        "PREVIOUS EXECUTION MESSAGE");
 
     CliUtil.groupStates(runStateDataPayload.activeStates()).entrySet().forEach(entry -> {
-      System.out.println();
-      System.out.println(String.format("%s %s",
-                                       colored(CYAN, entry.getKey().componentId()),
-                                       colored(BLUE, entry.getKey().endpointId())));
-      entry.getValue().forEach(RunStateData -> {
-        final StateData stateData = RunStateData.stateData();
-        final List<Message> messages = stateData.messages();
+      println();
+      format("%s %s",
+             colored(CYAN, entry.getKey().componentId()),
+             colored(BLUE, entry.getKey().endpointId()));
+      entry.getValue().forEach(runStateData -> {
+        final StateData stateData = runStateData.stateData();
+        final Ansi ansiState = getAnsiForState(runStateData);
 
-        final Ansi lastMessage;
-        if (messages.isEmpty()) {
-          lastMessage = colored(DEFAULT, "No info");
-        } else {
-          final Message message = messages.get(messages.size() - 1);
-          final Ansi.Color messageColor = messageColor(message.level());
-          lastMessage = colored(messageColor, message.line());
-        }
+        final Message lastMessage = Iterables.getLast(
+            stateData.messages(), Message.create(Message.MessageLevel.UNKNOWN, "No info"));
+        final Ansi ansiMessage = colored(messageColor(lastMessage.level()),
+                                         lastMessage.line());
 
-        final Ansi ansiState = getAnsiForState(RunStateData);
-
-        System.out.println(String.format(
-            "  %-20s %-20s %-47s %-7d %s",
-            RunStateData.workflowInstance().parameter(),
-            ansiState,
-            stateData.executionId().orElse("<no-execution-id>"),
-            stateData.tries(),
-            lastMessage
-        ));
+        format("  %-20s %-20s %-47s %-7d %s",
+               runStateData.workflowInstance().parameter(),
+               ansiState,
+               stateData.executionId().orElse("<no-execution-id>"),
+               stateData.tries(),
+               ansiMessage
+        );
       });
     });
   }
 
   @Override
   public void printEvents(List<EventInfo> eventInfos) {
-    final String format = "%-25s %-25s %s";
-    System.out.println(String.format(format,
-                                     "TIME",
-                                     "EVENT",
-                                     "DATA"));
+    final String formatString = "%-25s %-25s %s";
+    format(formatString,
+           "TIME",
+           "EVENT",
+           "DATA");
     eventInfos.forEach(
         eventInfo ->
-            System.out.println(String.format(format,
-                                             formatTimestamp(eventInfo.timestamp()),
-                                             eventInfo.name(),
-                                             eventInfo.info())));
+            format(formatString,
+                   formatTimestamp(eventInfo.timestamp()),
+                   eventInfo.name(),
+                   eventInfo.info()));
   }
 
   @Override
   public void printBackfill(Backfill backfill) {
-    System.out.println(String.format("%32s %s",
-                                     "Backfill id:",
-                                     colored(CYAN, backfill.id())));
-    System.out.println(String.format("%32s %s",
-                                     "Component id:",
-                                     colored(CYAN, backfill.workflowId().componentId())));
-    System.out.println(String.format("%32s %s",
-                                     "Workflow id:",
-                                     colored(CYAN, backfill.workflowId().endpointId())));
-    System.out.println(String.format("%32s %20s",
-                                     "Start date/datehour (inclusive):",
-                                     colored(CYAN, backfill.start())));
-    System.out.println(String.format("%32s %20s",
-                                     "End date/datehour (exclusive):",
-                                     colored(CYAN, backfill.end())));
-    if (!backfill.halted() && !backfill.completed()) {
-      System.out.println(String.format("%32s %20s",
-                                       "Next date/datehour:",
-                                       colored(CYAN, backfill.nextTrigger())));
-    }
-    System.out.println(String.format("%32s %s",
-                                     "Completed:",
-                                     colored(CYAN, backfill.completed())));
-    System.out.println(String.format("%32s %s",
-                                     "Halted:",
-                                     colored(CYAN, backfill.halted())));
+    final Partitioning partitioning = backfill.partitioning();
+    final WorkflowId workflowId = backfill.workflowId();
+    final String s = "%15s %s";
+
+    format(s, "id:",           colored(CYAN, backfill.id()));
+    format(s, "component:",    colored(CYAN, workflowId.componentId()));
+    format(s, "workflow:",     colored(CYAN, workflowId.endpointId()));
+    format(s, "halted:",       colored(CYAN, backfill.halted()));
+    format(s, "completed:",    colored(CYAN, backfill.completed()));
+    format(s, "concurrency:",  colored(CYAN, backfill.concurrency()));
+    format(s, "start (incl):", colored(CYAN, toParameter(partitioning, backfill.start())));
+    format(s, "end (excl):",   colored(CYAN, toParameter(partitioning, backfill.end())));
+    format(s, "next trigger:", colored(CYAN, toParameter(partitioning, backfill.nextTrigger())));
   }
 
   @Override
-  public void printBackfill(BackfillPayload backfillPayload) {
-    System.out.println(coloredBright(RED, "BACKFILL DATA"));
-    System.out.println();
+  public void printBackfillPayload(BackfillPayload backfillPayload) {
+    println(coloredBright(RED, "BACKFILL DATA"));
+    println();
     printBackfill(backfillPayload.backfill());
-    System.out.println();
-    System.out.println(coloredBright(RED, "BACKFILL PROGRESS"));
-    System.out.println();
+    println();
+    println(coloredBright(RED, "BACKFILL PROGRESS"));
+    println();
     if (backfillPayload.statuses().isPresent()) {
       printStates(backfillPayload.statuses().get());
     }
   }
 
   private Ansi getAnsiForState(RunStateDataPayload.RunStateData RunStateData) {
-    Ansi ansiState;
-    switch (RunStateData.state()) {
-      case "WAITING":
-        ansiState = coloredBright(BLACK, RunStateData.state());
-        break;
-
-      case "NEW":
-        ansiState = coloredBright(BLACK, RunStateData.state());
-        break;
-
-      case "QUEUED":
-        ansiState = coloredBright(BLACK, RunStateData.state());
-        break;
-
-      case "PREPARE":
-        ansiState = colored(CYAN, RunStateData.state());
-        break;
-
-      case "SUBMITTING":
-        ansiState = colored(CYAN, RunStateData.state());
-        break;
-
-      case "SUBMITTED":
-        ansiState = colored(CYAN, RunStateData.state());
-        break;
-
-      case "RUNNING":
-        ansiState = coloredBright(BLUE, RunStateData.state());
-        break;
-
-      case "TERMINATED":
-        ansiState = coloredBright(BLACK, RunStateData.state());
-        break;
-
-      case "FAILED":
-        ansiState = colored(RED, RunStateData.state());
-        break;
-
-      case "UNKNOWN":
-        ansiState = coloredBright(RED, RunStateData.state());
-        break;
-
-      case "ERROR":
-        ansiState = coloredBright(RED, RunStateData.state());
-        break;
-
-      case "DONE":
-        ansiState = coloredBright(GREEN, RunStateData.state());
-        break;
-
-      default:
-        ansiState = colored(DEFAULT, RunStateData.state());
+    final String state = RunStateData.state();
+    switch (state) {
+      case "WAITING":    return coloredBright(BLACK, state);
+      case "NEW":        return coloredBright(BLACK, state);
+      case "QUEUED":     return coloredBright(BLACK, state);
+      case "PREPARE":    return colored(CYAN, state);
+      case "SUBMITTING": return colored(CYAN, state);
+      case "SUBMITTED":  return colored(CYAN, state);
+      case "RUNNING":    return coloredBright(BLUE, state);
+      case "TERMINATED": return coloredBright(BLACK, state);
+      case "FAILED":     return colored(RED, state);
+      case "UNKNOWN":    return coloredBright(RED, state);
+      case "ERROR":      return coloredBright(RED, state);
+      case "DONE":       return coloredBright(GREEN, state);
+      default:           return colored(DEFAULT, state);
     }
-    return ansiState;
   }
 
   private Ansi.Color messageColor(Message.MessageLevel level) {
