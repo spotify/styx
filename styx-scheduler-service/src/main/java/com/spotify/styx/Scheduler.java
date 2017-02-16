@@ -86,6 +86,9 @@ public class Scheduler {
 
   private static final Logger LOG = LoggerFactory.getLogger(Scheduler.class);
 
+  @VisibleForTesting
+  static final String GLOBAL_RESOURCE_ID = "GLOBAL_STYX_CLUSTER";
+
   private final Time time;
   private final TimeoutConfig ttls;
   private final StateManager stateManager;
@@ -112,6 +115,8 @@ public class Scheduler {
       return;
     }
 
+    final boolean useGlobalConcurrency = resources.containsKey(GLOBAL_RESOURCE_ID);
+
     final List<InstanceState> activeStates = stateManager.activeStates().entrySet().stream()
         .map(entry -> InstanceState.create(entry.getKey(), entry.getValue()))
         .collect(toList());
@@ -127,13 +132,15 @@ public class Scheduler {
             .map(InstanceState::workflowInstance)
             .map(WorkflowInstance::workflowId)
             .distinct()
-            .collect(toMap(workflowId -> workflowId, this::workflowResources));
+            .collect(toMap(
+                workflowId -> workflowId,
+                workflowId -> workflowResources(useGlobalConcurrency, workflowId)));
 
     final Map<String, Long> currentResourceUsage =
         activeStates.parallelStream()
             .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
             .filter(entry -> entry.runState().state() != State.QUEUED)
-            .flatMap(this::pairWithResources)
+            .flatMap(instanceState -> pairWithResources(useGlobalConcurrency, instanceState))
             .collect(groupingByConcurrent(
                 ResourceWithInstance::resource,
                 ConcurrentHashMap::new,
@@ -206,9 +213,10 @@ public class Scheduler {
     }
   }
 
-  private Stream<ResourceWithInstance> pairWithResources(InstanceState instanceState) {
+  private Stream<ResourceWithInstance> pairWithResources(boolean useGlobalConcurrency,
+                                                         InstanceState instanceState) {
     final WorkflowId workflowId = instanceState.workflowInstance().workflowId();
-    return workflowResources(workflowId).stream()
+    return workflowResources(useGlobalConcurrency, workflowId).stream()
         .map(resource -> ResourceWithInstance.create(resource, instanceState));
   }
 
@@ -292,8 +300,12 @@ public class Scheduler {
     }
   }
 
-  private Set<String> workflowResources(WorkflowId workflowId) {
+  private Set<String> workflowResources(boolean useGlobalConcurrency, WorkflowId workflowId) {
     final ImmutableSet.Builder<String> builder = ImmutableSet.builder();
+
+    if (useGlobalConcurrency) {
+      builder.add(GLOBAL_RESOURCE_ID);
+    }
 
     workflowCache.workflow(workflowId)
         .ifPresent(workflow -> builder.addAll(workflow.schedule().resources()));
