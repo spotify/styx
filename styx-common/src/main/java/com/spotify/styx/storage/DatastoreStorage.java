@@ -76,6 +76,7 @@ class DatastoreStorage {
 
   public static final String PROPERTY_CONFIG_ENABLED = "enabled";
   public static final String PROPERTY_CONFIG_DOCKER_RUNNER_ID = "dockerRunnerId";
+  public static final String PROPERTY_CONFIG_CONCURRENCY = "concurrency";
   public static final String PROPERTY_WORKFLOW_JSON = "json";
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
   public static final String PROPERTY_NEXT_NATURAL_TRIGGER = "nextNaturalTrigger";
@@ -593,5 +594,11 @@ class DatastoreStorage {
         .set(PROPERTY_HALTED, backfill.halted());
 
     return builder.build();
+  }
+
+  public Optional<Long> globalConcurrency() {
+    return getOpt(datastore, globalConfigKey)
+        .filter(e -> e.contains(PROPERTY_CONFIG_CONCURRENCY))
+        .map(e -> e.getLong(PROPERTY_CONFIG_CONCURRENCY));
   }
 }
