@@ -32,8 +32,8 @@ import static java.util.stream.Collectors.toSet;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.Event;
@@ -208,14 +208,7 @@ public class Scheduler {
 
   private Stream<ResourceWithInstance> pairWithResources(InstanceState instanceState) {
     final WorkflowId workflowId = instanceState.workflowInstance().workflowId();
-    final Optional<Workflow> workflowOpt = workflowCache.workflow(workflowId);
-    if (!workflowOpt.isPresent()) {
-      return Stream.empty();
-    }
-
-    final List<String> referencedResources = workflowOpt.get().schedule().resources();
-
-    return referencedResources.stream()
+    return workflowResources(workflowId).stream()
         .map(resource -> ResourceWithInstance.create(resource, instanceState));
   }
 
@@ -300,12 +293,12 @@ public class Scheduler {
   }
 
   private Set<String> workflowResources(WorkflowId workflowId) {
-    final Optional<Workflow> workflowOpt = workflowCache.workflow(workflowId);
-    if (!workflowOpt.isPresent()) {
-      return emptySet();
-    }
+    final ImmutableSet.Builder<String> builder = ImmutableSet.builder();
 
-    return Sets.newHashSet(workflowOpt.get().schedule().resources());
+    workflowCache.workflow(workflowId)
+        .ifPresent(workflow -> builder.addAll(workflow.schedule().resources()));
+
+    return builder.build();
   }
 
   private boolean shouldExecute(RunState runState) {
