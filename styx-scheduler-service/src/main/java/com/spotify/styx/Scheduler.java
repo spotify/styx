@@ -20,20 +20,20 @@
 
 package com.spotify.styx;
 
+import static java.lang.String.format;
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.groupingByConcurrent;
-import static java.util.stream.Collectors.toCollection;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+import com.spotify.styx.Graph.Edge;
+import com.spotify.styx.Graph.FlowEdge;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.Event;
@@ -54,17 +54,18 @@ import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,112 +118,191 @@ public class Scheduler {
       return;
     }
 
-    globalConcurrency.ifPresent(
-        concurrency ->
-            resources.put(GLOBAL_RESOURCE_ID,
-                          Resource.create(GLOBAL_RESOURCE_ID, concurrency)));
+    final Map<WorkflowInstance, RunState> states = stateManager.activeStates();
+    final Set<WorkflowInstance> excluded = new HashSet<>();
+    final Map<WorkflowId, Set<String>> resourceRefs = new HashMap<>();
+    final Map<String, Long> resourceUsage = new HashMap<>();
 
-    final List<InstanceState> activeStates = stateManager.activeStates().entrySet().stream()
+    // validate states for timeouts and unknown resource refs
+    for (RunState runState : states.values()) {
+      // send timeouts and exclude
+      if (hasTimedOut(runState)) {
+        sendTimeout(runState);
+        excluded.add(runState.workflowInstance());
+        continue;
+      }
+
+      WorkflowId workflowId = runState.workflowInstance().workflowId();
+      Set<String> refs = workflowResources(workflowId);
+
+      // add to resource usage if not queued
+      if (runState.state() != State.QUEUED) {
+        for (String ref : refs) {
+          resourceUsage.compute(ref, (ignore, prev) -> (prev != null ? prev : 0L) + 1);
+        }
+      }
+
+      // validate resource references if eligible for execution
+      if (shouldExecute(runState)) {
+        List<String> unknown = refs.stream()
+            .filter(ref -> !resources.containsKey(ref))
+            .collect(toList());
+
+        if (!unknown.isEmpty()) {
+          sendError(runState, format("Referenced resources not found: %s", unknown));
+          excluded.add(runState.workflowInstance());
+        } else {
+          resourceRefs.putIfAbsent(workflowId, refs);
+        }
+      }
+    }
+
+    // sort out states eligible for scheduling
+    final List<InstanceState> eligibleStates = states.entrySet().stream()
+        .filter(entry -> !excluded.contains(entry.getKey()))
+        .filter(entry -> shouldExecute(entry.getValue()))
         .map(entry -> InstanceState.create(entry.getKey(), entry.getValue()))
         .collect(toList());
 
-    final Set<WorkflowInstance> timedOutInstances =
-        activeStates.parallelStream()
-            .filter(entry -> hasTimedOut(entry.runState()))
-            .map(InstanceState::workflowInstance)
-            .collect(toSet());
+    globalConcurrency.ifPresent(concurrency ->
+        System.out.println(GLOBAL_RESOURCE_ID + " = " + concurrency));
 
-    final Map<WorkflowId, Set<String>> workflowResourceReferences =
-        activeStates.parallelStream()
-            .map(InstanceState::workflowInstance)
-            .map(WorkflowInstance::workflowId)
-            .distinct()
-            .collect(toMap(
-                workflowId -> workflowId,
-                workflowId -> workflowResources(globalConcurrency, workflowId)));
-
-    final Map<String, Long> currentResourceUsage =
-        activeStates.parallelStream()
-            .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
-            .filter(entry -> entry.runState().state() != State.QUEUED)
-            .flatMap(instanceState -> pairWithResources(globalConcurrency, instanceState))
-            .collect(groupingByConcurrent(
-                ResourceWithInstance::resource,
-                ConcurrentHashMap::new,
-                counting()));
-
-    final List<InstanceState> eligibleInstances =
-        activeStates.parallelStream()
-            .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
-            .filter(entry -> shouldExecute(entry.runState()))
-            .collect(toCollection(Lists::newArrayList));
-    Collections.shuffle(eligibleInstances);
-
-    final Consumer<InstanceState> limitAndDequeue = (instance) -> {
-      final Set<String> resourceRefs =
-          workflowResourceReferences.getOrDefault(instance.workflowInstance().workflowId(),
-              emptySet());
-
-      if (resourceRefs.isEmpty()) {
-        sendDequeue(instance);
-      } else {
-        evaluateResourcesForDequeue(resources, currentResourceUsage, instance, resourceRefs);
-      }
-    };
-
-    timedOutInstances.forEach(this::sendTimeout);
-    eligibleInstances.forEach(limitAndDequeue);
-
-    triggerBackfills(activeStates);
+    graph(resources, resourceUsage, resourceRefs, eligibleStates);
+    triggerBackfills(eligibleStates);
   }
 
-  private void evaluateResourcesForDequeue(
+  private void graph(
       Map<String, Resource> resources,
-      Map<String, Long> currentResourceUsage,
-      InstanceState instance,
-      Set<String> resourceRefs) {
-    final Set<String> unknownResources = resourceRefs.stream()
-        .filter(resourceRef -> !resources.containsKey(resourceRef))
-        .collect(toSet());
+      Map<String, Long> resourceUsage,
+      Map<WorkflowId, Set<String>> resourceRefs,
+      List<InstanceState> eligibleStates) {
 
-    final Set<String> depletedResources = resourceRefs.stream()
-        .filter(resourceId -> {
-          if (!resources.containsKey(resourceId)) {
-            return false;
-          }
+    final int numInstances = eligibleStates.size();
+    final int numResourceRefs = resourceRefs.values().stream().mapToInt(Set::size).sum();
+    final int numNodes = numInstances + numResourceRefs + 2; // + source and sink
 
-          final Resource resource = resources.get(resourceId);
-          final long usage = currentResourceUsage.getOrDefault(resourceId, 0L);
-          return usage >= resource.concurrency();
-        })
-        .collect(toSet());
+    final Graph graph = new Graph(numNodes);
+    final AtomicInteger nodeCounter = new AtomicInteger(1); // 0 is the sink
+    final Map<String, Set<Edge>> resourceEdges = new HashMap<>();
+    final Map<String, Integer> instanceNodes = new HashMap<>();
+    final Function<String, Integer> newNode = (obj) ->
+        instanceNodes.computeIfAbsent(obj, (ignore) -> lt(numNodes, nodeCounter.getAndIncrement()));
 
-    if (!unknownResources.isEmpty()) {
-      stateManager.receiveIgnoreClosed(Event.runError(
-          instance.workflowInstance(),
-          String.format("Referenced resources not found: %s", unknownResources)));
-    } else if (!depletedResources.isEmpty()) {
-      final Message message = Message.info(
+    // set up resource reference paths for workflows, going to the sink
+    // e.g. r2 -> r1 -> sink
+    final Map<WorkflowId, Integer> resourcePathStarts = new HashMap<>();
+    final String[] nodeResources = new String[numNodes];
+
+    for (Entry<WorkflowId, Set<String>> wfResources : resourceRefs.entrySet()) {
+      WorkflowId wfid = wfResources.getKey();
+      int connect = graph.sink(); // todo: replace with global resource node before sink
+      int rank = Graph.MAX_RANK - 1;
+
+      for (String ref : wfResources.getValue()) {
+        Resource resource = resources.get(ref);
+        String nodeName = ref + "_lim:" + resource.concurrency();
+        int node = newNode.apply(wfid.toKey() + nodeName);
+
+        // remember the resource ref for the node
+        nodeResources[node] = ref;
+
+        graph.setName(node, nodeName);
+        graph.setRank(node, rank);
+
+        // create resource edge with remaining capacity
+        long capacity = resource.concurrency() - resourceUsage.getOrDefault(ref, 0L);
+        graph.createEdge(node, connect, (int) capacity);
+
+        // alias edge with existing edges for same resource
+        Set<Edge> edges = resourceEdges.computeIfAbsent(ref, (ignore) -> new HashSet<>());
+        for (Edge edge : edges) {
+          graph.createEdgeAlias(node, connect, edge.u(), edge.v());
+        }
+        edges.add(Edge.create(node, connect));
+
+        connect = node;
+        rank--;
+      }
+
+      // remember the last resource node for the workflow
+      resourcePathStarts.put(wfid, connect);
+    }
+
+    // set up unit-capacity edges for eligible workflow instances from the source to the
+    // start of the resource path, or directly to the sink if no resource path exists
+    final InstanceState[] nodeInstances = new InstanceState[numNodes];
+    final Map<WorkflowId, Set<InstanceState>> statesByWorkflow = eligibleStates.stream()
+        .collect(groupingBy(
+            instanceState -> instanceState.workflowInstance().workflowId(),
+            toSet()));
+
+    for (Entry<WorkflowId, Set<InstanceState>> wf : statesByWorkflow.entrySet()) {
+      WorkflowId wfid = wf.getKey();
+      int resourcePathNode = resourcePathStarts.getOrDefault(wfid, graph.sink());
+
+      for (InstanceState instanceState : wf.getValue()) {
+        int node = newNode.apply(instanceState.workflowInstance().toKey());
+
+        // remember the instance state for the node
+        nodeInstances[node] = instanceState;
+
+        graph.setName(node, instanceState.workflowInstance().toKey());
+        graph.setRank(node, 1);
+        graph.createEdge(graph.source(), node, 1);
+        graph.createEdge(node, resourcePathNode, 1);
+      }
+    }
+
+    // find a maximum flow through the graph, which will tell us which instances to schedule
+    // and which resources have been depleted
+    graph.solve();
+
+    // dequeue all instances with flow from the source
+    Set<FlowEdge> flowFromSource = graph.flowingEdgesFrom(graph.source());
+    for (FlowEdge flowEdge : flowFromSource) {
+      InstanceState toTrigger = nodeInstances[flowEdge.edge().v()];
+      sendDequeue(toTrigger);
+    }
+
+    // send resource depletion message to all instances with no flow from the source
+    Set<FlowEdge> nonFlowFromSource = graph.nonFlowingEdgesFrom(graph.source());
+    for (FlowEdge noFlowEdge : nonFlowFromSource) {
+      InstanceState notTriggered = nodeInstances[noFlowEdge.edge().v()];
+      List<String> depletedResources = new ArrayList<>();
+
+      // todo: find better way to write this
+      int resourcePathStart = resourcePathStarts.get(notTriggered.workflowInstance().workflowId());
+      Optional<FlowEdge> resourceEdge = graph.edgesFrom(resourcePathStart)
+          .stream()
+          .findFirst();
+      while (resourceEdge.isPresent()) {
+        FlowEdge flowEdge = resourceEdge.get();
+
+        if (flowEdge.flow() == flowEdge.capacity()) {
+          depletedResources.add(nodeResources[flowEdge.edge().u()]);
+        }
+
+        resourceEdge = graph.edgesFrom(flowEdge.edge().v())
+            .stream()
+            .findFirst();
+      }
+
+      Message message = Message.info(
           String.format("Resource limit reached for: %s",
               depletedResources.stream()
                   .map(resources::get)
                   .collect(toList())));
-      final List<Message> messages = instance.runState().data().messages();
-      if (messages.size() == 0 || !message.equals(messages.get(messages.size() - 1))) {
-        stateManager.receiveIgnoreClosed(Event.info(instance.workflowInstance(), message));
-      }
-    } else {
-      resourceRefs.forEach(id -> currentResourceUsage.computeIfAbsent(id, id_ -> 0L));
-      resourceRefs.forEach(id -> currentResourceUsage.compute(id, (id_, l) -> l + 1));
-      sendDequeue(instance);
+      sendMessage(message, notTriggered);
     }
+
+    graph.printDot();
   }
 
-  private Stream<ResourceWithInstance> pairWithResources(Optional<Long> globalConcurrency,
-                                                         InstanceState instanceState) {
-    final WorkflowId workflowId = instanceState.workflowInstance().workflowId();
-    return workflowResources(globalConcurrency, workflowId).stream()
-        .map(resource -> ResourceWithInstance.create(resource, instanceState));
+  private int lt(int max, int n) {
+    if (n >= max) {
+      throw new RuntimeException("Number (" + n + ") greater than or equal to " + max);
+    }
+    return n;
   }
 
   @VisibleForTesting
@@ -305,15 +385,16 @@ public class Scheduler {
     }
   }
 
-  private Set<String> workflowResources(Optional<Long> globalConcurrency, WorkflowId workflowId) {
-    final ImmutableSet.Builder<String> builder = ImmutableSet.builder();
+  private Set<String> workflowResources(WorkflowId workflowId) {
+    final Optional<Workflow> workflowOpt = workflowCache.workflow(workflowId);
 
-    globalConcurrency.ifPresent(concurrency -> builder.add(GLOBAL_RESOURCE_ID));
+    // todo: ignore workflow if not present? instead of running it without resource limits
+    if (!workflowOpt.isPresent()) {
+      return emptySet();
+    }
 
-    workflowCache.workflow(workflowId)
-        .ifPresent(workflow -> builder.addAll(workflow.schedule().resources()));
-
-    return builder.build();
+    // copy to set to deduplicate
+    return Sets.newLinkedHashSet(workflowOpt.get().schedule().resources());
   }
 
   private boolean shouldExecute(RunState runState) {
@@ -354,9 +435,20 @@ public class Scheduler {
     return !deadline.isAfter(now);
   }
 
-  private void sendTimeout(WorkflowInstance workflowInstance) {
-    LOG.info("Found stale state, issuing timeout for {}", workflowInstance);
-    stateManager.receiveIgnoreClosed(Event.timeout(workflowInstance));
+  private void sendTimeout(RunState runState) {
+    LOG.info("Found stale state, issuing timeout for {}", runState.workflowInstance());
+    stateManager.receiveIgnoreClosed(Event.timeout(runState.workflowInstance()));
+  }
+
+  private void sendMessage(Message message, InstanceState instance) {
+    final List<Message> messages = instance.runState().data().messages();
+    if (messages.size() == 0 || !message.equals(messages.get(messages.size() - 1))) {
+      stateManager.receiveIgnoreClosed(Event.info(instance.workflowInstance(), message));
+    }
+  }
+
+  private void sendError(RunState runState, String message) {
+    stateManager.receiveIgnoreClosed(Event.runError(runState.workflowInstance(), message));
   }
 
   @AutoValue
@@ -366,16 +458,6 @@ public class Scheduler {
 
     static InstanceState create(WorkflowInstance workflowInstance, RunState runState) {
       return new AutoValue_Scheduler_InstanceState(workflowInstance, runState);
-    }
-  }
-
-  @AutoValue
-  abstract static class ResourceWithInstance {
-    abstract String resource();
-    abstract InstanceState instanceState();
-
-    static ResourceWithInstance create(String resource, InstanceState instanceState) {
-      return new AutoValue_Scheduler_ResourceWithInstance(resource, instanceState);
     }
   }
 }
