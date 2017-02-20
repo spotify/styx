@@ -265,12 +265,6 @@ public class Scheduler {
           ParameterUtil.rangeOfInstants(backfill.nextTrigger(), backfill.end(),
                                         workflow.schedule().partitioning());
 
-      if (partitionsRemaining.isEmpty()) {
-        builder.completed(true);
-        storeBackfill(builder.build());
-        return;
-      }
-
       final List<Instant> partitionsNeeded =
           partitionsRemaining.stream().limit(needed).collect(toList());
 
