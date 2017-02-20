@@ -224,7 +224,9 @@ public class Scheduler {
     final List<Backfill> backfills;
     try {
       backfills = storage.backfills().stream()
+          // TODO: filter in datastore
           .filter(backfill -> !backfill.completed())
+          // TODO: filter in datastore
           .filter(backfill -> !backfill.halted())
           .collect(toList());
     } catch (IOException e) {

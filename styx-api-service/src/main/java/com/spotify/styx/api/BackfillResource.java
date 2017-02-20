@@ -115,11 +115,13 @@ public final class BackfillResource {
     }
     if (componentOpt.isPresent()) {
       final String component = componentOpt.get();
+      // TODO: filter in datastore
       backfills = backfills
           .filter(backfill -> backfill.workflowId().componentId().equals(component));
     }
     if (workflowOpt.isPresent()) {
       final String workflow = workflowOpt.get();
+      // TODO: filter in datastore
       backfills = backfills
           .filter(backfill -> backfill.workflowId().endpointId().equals(workflow));
     }
