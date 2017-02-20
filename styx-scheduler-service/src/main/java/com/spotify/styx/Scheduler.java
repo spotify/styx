@@ -224,7 +224,9 @@ public class Scheduler {
     final List<Backfill> backfills;
     try {
       backfills = storage.backfills().stream()
+          // TODO: filter in datastore
           .filter(backfill -> !backfill.completed())
+          // TODO: filter in datastore
           .filter(backfill -> !backfill.halted())
           .collect(toList());
     } catch (IOException e) {
@@ -249,8 +251,7 @@ public class Scheduler {
 
       if (!workflowOpt.isPresent()) {
         LOG.warn("workflow not found for backfill, skipping rest of triggers: {}", backfill);
-        builder.completed(true);
-        builder.nextTrigger(backfill.end());
+        builder.halted(true);
         storeBackfill(builder.build());
         return;
       }
@@ -262,22 +263,14 @@ public class Scheduler {
 
       final Workflow workflow = workflowOpt.get();
 
-      final List<Instant> parameters =
+      final List<Instant> partitionsRemaining =
           ParameterUtil.rangeOfInstants(backfill.nextTrigger(), backfill.end(),
-                                        workflow.schedule().partitioning())
-              .stream()
-              .limit(needed + 1)
-              .collect(toList());
+                                        workflow.schedule().partitioning());
 
-      if (parameters.isEmpty()) {
-        builder.completed(true);
-        storeBackfill(builder.build());
-        return;
-      }
+      final List<Instant> partitionsNeeded =
+          partitionsRemaining.stream().limit(needed).collect(toList());
 
-      final List<Instant> triggers = parameters.stream().limit(needed).collect(toList());
-
-      triggers.forEach(
+      partitionsNeeded.forEach(
           partition -> {
             try {
               triggerListener.event(workflow, Trigger.backfill(backfill.id()), partition);
@@ -287,13 +280,13 @@ public class Scheduler {
             }
           });
 
-      final Instant nextTrigger;
-      if (parameters.size() > triggers.size()) {
-        nextTrigger = parameters.get(triggers.size());
+      if (partitionsRemaining.size() > partitionsNeeded.size()) {
+        builder.nextTrigger(partitionsRemaining.get(partitionsNeeded.size()));
       } else {
-        nextTrigger = parameters.get(triggers.size() - 1);
+        builder.nextTrigger(backfill.end());
+        builder.completed(true);
       }
-      builder.nextTrigger(nextTrigger);
+
       storeBackfill(builder.build());
     });
   }

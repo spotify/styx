@@ -51,6 +51,8 @@ import java.net.URLEncoder;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
@@ -174,8 +176,8 @@ public final class Main {
             case CREATE:
               backfillCreate();
               break;
-            case DELETE:
-              backfillDelete();
+            case HALT:
+              backfillHalt();
               break;
             case SHOW:
               backfillShow();
@@ -228,8 +230,8 @@ public final class Main {
     });
   }
 
-  private void backfillDelete() {
-    final String id = namespace.getString(parser.backfillShowId.getDest());
+  private void backfillHalt() {
+    final String id = namespace.getString(parser.backfillHaltId.getDest());
     final Request request = Request.forUri(apiUrl("backfills", id), "DELETE");
     client.accept(request, null);
   }
@@ -245,15 +247,23 @@ public final class Main {
         e.printStackTrace();
         return;
       }
-      cliOutput.printBackfill(backfillStatus);
+      cliOutput.printBackfillPayload(backfillStatus);
     });
   }
 
   private void backfillList() throws UnsupportedEncodingException {
     String uri = apiUrl("backfills");
+    List<String> queries = new ArrayList<>();
     final String component = namespace.getString(parser.backfillListComponent.getDest());
     if (component != null) {
-      uri += "?component=" + URLEncoder.encode(component, UTF_8);
+      queries.add("component=" + URLEncoder.encode(component, UTF_8));
+    }
+    final String workflow = namespace.getString(parser.backfillListWorkflow.getDest());
+    if (workflow != null) {
+      queries.add("workflow=" + URLEncoder.encode(workflow, UTF_8));
+    }
+    if (!queries.isEmpty()) {
+      uri += "?" + String.join("&", queries);
     }
     final Request request = Request.forUri(uri);
     client.accept(request, bytes -> {
@@ -264,7 +274,7 @@ public final class Main {
         e.printStackTrace();
         return;
       }
-      backfills.backfills().forEach(cliOutput::printBackfill);
+      backfills.backfills().forEach(cliOutput::printBackfillPayload);
     });
   }
 
@@ -441,11 +451,13 @@ public final class Main {
     final Argument backfillShowId =
         backfillShow.addArgument("backfill").help("Backfill ID");
 
-    final Subparser backfillDelete = BackfillCommand.DELETE.parser(backfillParser);
-    final Argument backfillDeleteId =
-        backfillDelete.addArgument("backfill").help("Backfill ID");
+    final Subparser backfillHalt = BackfillCommand.HALT.parser(backfillParser);
+    final Argument backfillHaltId =
+        backfillHalt.addArgument("backfill").help("Backfill ID");
 
     final Subparser backfillList = BackfillCommand.LIST.parser(backfillParser);
+    final Argument backfillListWorkflow =
+        backfillList.addArgument("-w", "--workflow").help("only show  backfills for WORKFLOW");
     final Argument backfillListComponent =
         backfillList.addArgument("-c", "--component").help("only show  backfills for COMPONENT");
 
@@ -527,7 +539,7 @@ public final class Main {
   private enum BackfillCommand {
     LIST("ls", "List backfills"),
     CREATE("", "Create a backfill"),
-    DELETE("rm", "Delete a backfill"),
+    HALT("h", "Halt a backfill"),
     SHOW("get", "Show info about a specific backfill");
 
     private final String alias;

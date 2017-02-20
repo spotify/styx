@@ -104,31 +104,36 @@ public final class BackfillResource {
 
   private BackfillsPayload getBackfills(RequestContext requestContext) {
     final Optional<String> componentOpt = requestContext.request().parameter("component");
+    final Optional<String> workflowOpt = requestContext.request().parameter("workflow");
     final Optional<String> statusesFlagOpt = requestContext.request().parameter("status");
 
-    final List<BackfillPayload> backfillPayloads;
-    List<Backfill> backfills;
+    Stream<Backfill> backfills;
     try {
-      backfills = storage.backfills();
+      backfills = storage.backfills().stream();
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
     if (componentOpt.isPresent()) {
       final String component = componentOpt.get();
-      backfills = backfills.stream()
-          .filter(
-              backfill ->
-                  backfill.workflowId().componentId().equals(component))
-          .collect(toList());
+      // TODO: filter in datastore
+      backfills = backfills
+          .filter(backfill -> backfill.workflowId().componentId().equals(component));
+    }
+    if (workflowOpt.isPresent()) {
+      final String workflow = workflowOpt.get();
+      // TODO: filter in datastore
+      backfills = backfills
+          .filter(backfill -> backfill.workflowId().endpointId().equals(workflow));
     }
 
-    backfillPayloads = backfills.stream()
+    final List<BackfillPayload> backfillPayloads = backfills
         .map(backfill -> BackfillPayload.create(
             backfill,
             "true".equals(statusesFlagOpt.orElse("false"))
             ? Optional.of(RunStateDataPayload.create(retrieveBackfillStatuses(backfill)))
             : Optional.empty()))
         .collect(toList());
+
     return BackfillsPayload.create(backfillPayloads);
   }
 
@@ -211,9 +216,9 @@ public final class BackfillResource {
         .id(id)
         .completed(false)
         .workflowId(workflowId)
+        .concurrency(input.concurrency())
         .start(input.start())
         .end(input.end())
-        .resource(id)
         .partitioning(partitioning)
         .nextTrigger(input.start())
         .halted(false);

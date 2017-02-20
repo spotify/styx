@@ -55,6 +55,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import javaslang.Tuple;
@@ -260,6 +261,13 @@ public class StyxSchedulerServiceFixture {
 
   long timeOffsetSeconds(int secondsOffset) {
     return now.plusSeconds(secondsOffset).toEpochMilli();
+  }
+
+  void awaitBackfillCompleted(String id) {
+    await().until(() -> {
+      final Optional<Backfill> backfill = storage.backfill(id);
+      return backfill.isPresent() && backfill.get().completed();
+    });
   }
 
   void awaitNumberOfDockerRuns(int n) {

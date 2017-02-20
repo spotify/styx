@@ -37,7 +37,7 @@ interface CliOutput {
 
   void printBackfill(Backfill backfill);
 
-  void printBackfill(BackfillPayload backfillPayload);
+  void printBackfillPayload(BackfillPayload backfillPayload);
 
   @AutoValue
   abstract class EventInfo {

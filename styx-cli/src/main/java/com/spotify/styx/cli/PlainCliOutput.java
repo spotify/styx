@@ -83,11 +83,20 @@ class PlainCliOutput implements CliOutput {
 
   @Override
   public void printBackfill(Backfill backfill) {
-    System.out.println(backfill);
+    System.out.println(String.format("%s %s %s %s %s %s %s %s %s",
+                                     backfill.id(),
+                                     backfill.workflowId().componentId(),
+                                     backfill.workflowId().endpointId(),
+                                     backfill.halted(),
+                                     backfill.completed(),
+                                     backfill.concurrency(),
+                                     backfill.start(),
+                                     backfill.end(),
+                                     backfill.nextTrigger()));
   }
 
   @Override
-  public void printBackfill(BackfillPayload backfillPayload) {
+  public void printBackfillPayload(BackfillPayload backfillPayload) {
     printBackfill(backfillPayload.backfill());
     if (backfillPayload.statuses().isPresent()) {
       printStates(backfillPayload.statuses().get());
