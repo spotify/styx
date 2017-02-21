@@ -51,7 +51,7 @@ public interface Backfill {
   Partitioning partitioning();
 
   @JsonProperty
-  boolean completed();
+  boolean allTriggered();
 
   @JsonProperty
   boolean halted();

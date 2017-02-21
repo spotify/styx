@@ -193,7 +193,7 @@ public class SchedulerTest {
     scheduler.tick();
 
     verifyZeroInteractions(triggerListener);
-    final Backfill completedBackfill = backfillWithNoPartitionsLeft.builder().completed(true).build();
+    final Backfill completedBackfill = backfillWithNoPartitionsLeft.builder().allTriggered(true).build();
     verify(storage).storeBackfill(completedBackfill);
   }
 
@@ -243,7 +243,7 @@ public class SchedulerTest {
     final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
     initWorkflow(workflow);
     when(storage.backfills()).thenReturn(Collections.singletonList(
-        BACKFILL_1.builder().completed(true).build()));
+        BACKFILL_1.builder().allTriggered(true).build()));
 
     scheduler.tick();
 

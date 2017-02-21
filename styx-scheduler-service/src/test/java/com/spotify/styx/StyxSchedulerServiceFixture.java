@@ -266,7 +266,7 @@ public class StyxSchedulerServiceFixture {
   void awaitBackfillCompleted(String id) {
     await().until(() -> {
       final Optional<Backfill> backfill = storage.backfill(id);
-      return backfill.isPresent() && backfill.get().completed();
+      return backfill.isPresent() && backfill.get().allTriggered();
     });
   }
 

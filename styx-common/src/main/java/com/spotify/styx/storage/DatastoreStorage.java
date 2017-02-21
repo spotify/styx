@@ -90,7 +90,7 @@ class DatastoreStorage {
   public static final String PROPERTY_END = "end";
   public static final String PROPERTY_NEXT_TRIGGER = "nextTrigger";
   public static final String PROPERTY_PARTITIONING = "partitioning";
-  public static final String PROPERTY_COMPLETED = "completed";
+  public static final String PROPERTY_ALL_TRIGGERED = "allTriggered";
   public static final String PROPERTY_HALTED = "halted";
   public static final String PROPERTY_DEBUG_ENABLED = "debug";
 
@@ -569,7 +569,7 @@ class DatastoreStorage {
         .concurrency((int) entity.getLong(PROPERTY_CONCURRENCY))
         .nextTrigger(datetimeToInstant(entity.getDateTime(PROPERTY_NEXT_TRIGGER)))
         .partitioning(Partitioning.valueOf(entity.getString(PROPERTY_PARTITIONING)))
-        .completed(entity.getBoolean(PROPERTY_COMPLETED))
+        .allTriggered(entity.getBoolean(PROPERTY_ALL_TRIGGERED))
         .halted(entity.getBoolean(PROPERTY_HALTED))
         .build();
   }
@@ -589,7 +589,7 @@ class DatastoreStorage {
         .set(PROPERTY_WORKFLOW, backfill.workflowId().endpointId())
         .set(PROPERTY_PARTITIONING, backfill.partitioning().name())
         .set(PROPERTY_NEXT_TRIGGER, instantToDatetime(backfill.nextTrigger()))
-        .set(PROPERTY_COMPLETED, backfill.completed())
+        .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())
         .set(PROPERTY_HALTED, backfill.halted());
 
     return builder.build();

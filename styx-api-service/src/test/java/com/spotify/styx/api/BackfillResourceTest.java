@@ -266,7 +266,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(postedBackfill.concurrency(), equalTo(1));
     assertThat(postedBackfill.nextTrigger(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
     assertThat(postedBackfill.partitioning(), equalTo(Partitioning.HOURS));
-    assertThat(postedBackfill.completed(), equalTo(false));
+    assertThat(postedBackfill.allTriggered(), equalTo(false));
     assertThat(postedBackfill.halted(), equalTo(false));
   }
 

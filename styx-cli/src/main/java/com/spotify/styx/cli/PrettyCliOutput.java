@@ -113,15 +113,15 @@ class PrettyCliOutput implements CliOutput {
     final WorkflowId workflowId = backfill.workflowId();
     final String s = "%15s %s";
 
-    format(s, "id:",           colored(CYAN, backfill.id()));
-    format(s, "component:",    colored(CYAN, workflowId.componentId()));
-    format(s, "workflow:",     colored(CYAN, workflowId.endpointId()));
-    format(s, "halted:",       colored(CYAN, backfill.halted()));
-    format(s, "completed:",    colored(CYAN, backfill.completed()));
-    format(s, "concurrency:",  colored(CYAN, backfill.concurrency()));
-    format(s, "start (incl):", colored(CYAN, toParameter(partitioning, backfill.start())));
-    format(s, "end (excl):",   colored(CYAN, toParameter(partitioning, backfill.end())));
-    format(s, "next trigger:", colored(CYAN, toParameter(partitioning, backfill.nextTrigger())));
+    format(s, "id:",            colored(CYAN, backfill.id()));
+    format(s, "component:",     colored(CYAN, workflowId.componentId()));
+    format(s, "workflow:",      colored(CYAN, workflowId.endpointId()));
+    format(s, "halted:",        colored(CYAN, backfill.halted()));
+    format(s, "all triggered:", colored(CYAN, backfill.allTriggered()));
+    format(s, "concurrency:",   colored(CYAN, backfill.concurrency()));
+    format(s, "start (incl):",  colored(CYAN, toParameter(partitioning, backfill.start())));
+    format(s, "end (excl):",    colored(CYAN, toParameter(partitioning, backfill.end())));
+    format(s, "next trigger:",  colored(CYAN, toParameter(partitioning, backfill.nextTrigger())));
   }
 
   @Override

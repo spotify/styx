@@ -225,7 +225,7 @@ public class Scheduler {
     try {
       backfills = storage.backfills().stream()
           // TODO: filter in datastore
-          .filter(backfill -> !backfill.completed())
+          .filter(backfill -> !backfill.allTriggered())
           // TODO: filter in datastore
           .filter(backfill -> !backfill.halted())
           .collect(toList());
@@ -284,7 +284,7 @@ public class Scheduler {
         builder.nextTrigger(partitionsRemaining.get(partitionsNeeded.size()));
       } else {
         builder.nextTrigger(backfill.end());
-        builder.completed(true);
+        builder.allTriggered(true);
       }
 
       storeBackfill(builder.build());
