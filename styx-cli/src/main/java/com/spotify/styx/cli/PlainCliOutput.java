@@ -88,7 +88,7 @@ class PlainCliOutput implements CliOutput {
                                      backfill.workflowId().componentId(),
                                      backfill.workflowId().endpointId(),
                                      backfill.halted(),
-                                     backfill.completed(),
+                                     backfill.allTriggered(),
                                      backfill.concurrency(),
                                      backfill.start(),
                                      backfill.end(),

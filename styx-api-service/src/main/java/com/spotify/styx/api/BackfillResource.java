@@ -214,7 +214,7 @@ public final class BackfillResource {
 
     builder
         .id(id)
-        .completed(false)
+        .allTriggered(false)
         .workflowId(workflowId)
         .concurrency(input.concurrency())
         .start(input.start())
