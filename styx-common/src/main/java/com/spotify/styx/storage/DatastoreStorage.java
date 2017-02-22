@@ -359,19 +359,20 @@ class DatastoreStorage {
   }
 
   Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
+    Optional<String> dockerImage =
+        workflow(workflowId).flatMap(wf -> wf.schedule().dockerImage());
+    if (dockerImage.isPresent()) {
+      return dockerImage;
+    }
+
     final Key workflowKey = workflowKey(workflowId);
-    Optional<String> dockerImage = getOptStringProperty(datastore, workflowKey, PROPERTY_DOCKER_IMAGE);
+    dockerImage = getOptStringProperty(datastore, workflowKey, PROPERTY_DOCKER_IMAGE);
     if (dockerImage.isPresent()) {
       return dockerImage;
     }
 
     final Key componentKey = componentKeyFactory.newKey(workflowId.componentId());
-    dockerImage = getOptStringProperty(datastore, componentKey, PROPERTY_DOCKER_IMAGE);
-    if (dockerImage.isPresent()) {
-      return dockerImage;
-    }
-
-    return workflow(workflowId).flatMap(wf -> wf.schedule().dockerImage());
+    return getOptStringProperty(datastore, componentKey, PROPERTY_DOCKER_IMAGE);
   }
 
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
