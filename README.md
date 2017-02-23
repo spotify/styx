@@ -24,7 +24,7 @@ processes that transform data periodically. It's initial use case is to run jobs
 [Luigi], but it does not have any hard ties to Luigi. Styx can just as well execute a container
 with some simple bash scripts.
 
-Styx was build to function smoothly on Google Cloud Platform, thus it makes use of Google products
+Styx was built to function smoothly on Google Cloud Platform, thus it makes use of Google products
 such as Google Cloud Datastore, Google Cloud Bigtable and Google Container Engine. However, the 
 integrations with these products are all done through clear interfaces and other backends can 
 easily be added.
@@ -32,7 +32,7 @@ easily be added.
 ## Key concepts
 
 The key type of information that Styx concerns itself with are Workflows. A Workflow is either
-enabled or disabled and is has a Schedule. A Schedule specifies how often a Workflow should be 
+enabled or disabled and has a Schedule. A Schedule specifies how often a Workflow should be 
 triggered, which docker image to run and which arguments to pass to it on each execution. Each time
 a Workflow is triggered, a Workflow Instance is created. The Workflow instance is tracked as 
 'active' until at least on execution of the docker image returns with a 0 exit code. Styx will keep
@@ -40,7 +40,7 @@ track of Workflow Instance executions and provides information about them via th
 
 ## Development status
 Styx is in Alpha and is actively being developed. It is deployed internally at Spotify and is
-being used to run around 300 different production workflows. Because of how we build and integrate
+being used to run around 1500 different production workflows. Because of how we build and integrate
 infrastructure components at Spotify, this repository does not contain a GUI at the time of 
 writing, while we do have one internally. The goal is to break out more of these components into
 open source projects that complement each other.
