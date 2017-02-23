@@ -61,6 +61,27 @@ public class ParameterUtilTest {
   }
 
   @Test
+  public void shouldFormatMonth() throws Exception {
+    final String month = ParameterUtil.formatMonth(TIME);
+
+    assertThat(month, is("2016-01"));
+  }
+
+  @Test
+  public void shouldParseDateHour() throws Exception {
+    final Instant instant = ParameterUtil.parseDateHour("2016-01-19T08");
+
+    assertThat(instant, is(Instant.parse("2016-01-19T08:00:00.000Z")));
+  }
+
+  @Test
+  public void shouldParseDate() throws Exception {
+    final Instant instant = ParameterUtil.parseDate("2016-01-19");
+
+    assertThat(instant, is(Instant.parse("2016-01-19T00:00:00.000Z")));
+  }
+
+  @Test
   public void shouldDecrementInstant() throws Exception {
     final Instant time = Instant.parse("2016-01-19T08:11:22.333Z");
     final Instant timeMinusDay = Instant.parse("2016-01-18T09:11:22.333Z");

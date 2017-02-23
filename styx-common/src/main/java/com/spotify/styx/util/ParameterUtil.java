@@ -98,7 +98,8 @@ public final class ParameterUtil {
   }
 
   public static Instant parseDateHour(String dateHour) {
-    return Instant.from(ISO_LOCAL_DATE_HOUR.parse(dateHour));
+    return Instant.from(LocalDateTime.from(
+        ISO_LOCAL_DATE_HOUR.parse(dateHour)).atOffset(ZoneOffset.UTC));
   }
 
   public static String toParameter(Partitioning partitioning, Instant instant) {
