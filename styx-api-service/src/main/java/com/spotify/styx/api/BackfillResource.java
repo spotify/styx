@@ -126,7 +126,7 @@ public final class BackfillResource {
           .filter(backfill -> backfill.workflowId().endpointId().equals(workflow));
     }
 
-    final List<BackfillPayload> backfillPayloads = backfills
+    final List<BackfillPayload> backfillPayloads = backfills.parallel()
         .map(backfill -> BackfillPayload.create(
             backfill,
             "true".equals(statusesFlagOpt.orElse("false"))
@@ -257,7 +257,7 @@ public final class BackfillResource {
 
     final List<Instant> processedInstants = rangeOfInstants(
         backfill.start(), backfill.nextTrigger(), backfill.partitioning());
-    processedStates = processedInstants.stream()
+    processedStates = processedInstants.parallelStream()
         .map(instant -> {
           final WorkflowInstance wfi = WorkflowInstance
               .create(backfill.workflowId(), toParameter(backfill.partitioning(), instant));
