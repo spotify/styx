@@ -69,6 +69,11 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
+  public Optional<Long> globalConcurrency() throws IOException {
+    return datastoreStorage.globalConcurrency();
+  }
+
+  @Override
   public Map<WorkflowInstance, Long> readActiveWorkflowInstances() throws IOException {
     return datastoreStorage.allActiveStates();
   }

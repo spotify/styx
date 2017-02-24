@@ -51,6 +51,7 @@ import java.util.stream.Collectors;
 public class InMemStorage implements Storage {
 
   private boolean globalEnabled = true;
+  private Optional<Long> globalConcurrency;
   private final Set<WorkflowId> enabledWorkflows = Sets.newConcurrentHashSet();
   private final Set<String> components = Sets.newConcurrentHashSet();
   private final ConcurrentMap<WorkflowId, Workflow> workflowStore = Maps.newConcurrentMap();
@@ -258,6 +259,11 @@ public class InMemStorage implements Storage {
       final SequenceEvent lastStoredEvent = storedEvents.last();
       return Optional.of(lastStoredEvent.counter());
     }
+  }
+
+  @Override
+  public Optional<Long> globalConcurrency() throws IOException {
+    return globalConcurrency;
   }
 
   @Override
