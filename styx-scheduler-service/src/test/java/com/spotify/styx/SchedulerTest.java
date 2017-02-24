@@ -67,7 +67,7 @@ public class SchedulerTest {
   private static final WorkflowId WORKFLOW_ID2 =
       WorkflowId.create("styx2", "example2");
   private static final WorkflowInstance INSTANCE =
-      WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02");
+      WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T01");
 
   private static final Backfill BACKFILL_1 = Backfill.newBuilder()
       .id("backfill-1")
@@ -333,6 +333,22 @@ public class SchedulerTest {
     stateManager.get(INSTANCE).data().messages().get(0).line(),
         is("Referenced resources not found: [unknown]"));
     assertThat(stateManager.get(INSTANCE).state(), is(State.FAILED));
+  }
+
+  @Test
+  public void shouldIssueInfoIfGlobalResourceDepleted() throws Exception {
+    setUp(20);
+    setResourceLimit(Scheduler.GLOBAL_RESOURCE_ID, 0);
+    initWorkflow(workflowUsingResources(WORKFLOW_ID1));
+    init(RunState.create(INSTANCE, State.QUEUED, time));
+
+    scheduler.tick();
+
+    assertThat(
+        stateManager.get(INSTANCE).data().messages().get(0).line(),
+        is(String.format("Resource limit reached for: [Resource{id=%s, concurrency=%d}]",
+                         Scheduler.GLOBAL_RESOURCE_ID, 0)));
+    assertThat(stateManager.get(INSTANCE).state(), is(State.QUEUED));
   }
 
   @Test
