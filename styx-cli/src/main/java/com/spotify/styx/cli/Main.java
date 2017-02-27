@@ -171,6 +171,8 @@ public final class Main {
             case CREATE:
               backfillCreate();
               break;
+            case EDIT:
+              backfillEdit();
             case HALT:
               backfillHalt();
               break;
@@ -219,6 +221,43 @@ public final class Main {
       return;
     }
     cliOutput.printBackfill(backfill);
+  }
+
+  private void backfillEdit() {
+    final Integer concurrency = namespace.getInt(parser.backfillEditConcurrency.getDest());
+    final String id = namespace.getString(parser.backfillEditId.getDest());
+    final Request getRequest = Request.forUri(apiUrl("backfills", id));
+
+    byte[] getResponse = send(getRequest);
+    final BackfillPayload backfillPayload;
+    try {
+      backfillPayload = OBJECT_MAPPER.readValue(getResponse, BackfillPayload.class);
+    } catch (IOException e) {
+      e.printStackTrace();
+      return;
+    }
+
+    Backfill editedBackfill = backfillPayload.backfill();
+    if (concurrency != null) {
+      editedBackfill = backfillPayload.backfill().builder().concurrency(concurrency).build();
+    }
+    final ByteString putPayload;
+    try {
+      putPayload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(editedBackfill));
+    } catch (JsonProcessingException e) {
+      throw Throwables.propagate(e);
+    }
+    final Request putRequest = Request.forUri(apiUrl("backfills", id), "PUT").withPayload(putPayload);
+    byte[] putResponse = send(putRequest);
+
+    final Backfill newBackfill;
+    try {
+      newBackfill = OBJECT_MAPPER.readValue(putResponse, Backfill.class);
+    } catch (IOException e) {
+      e.printStackTrace();
+      return;
+    }
+    cliOutput.printBackfill(newBackfill);
   }
 
   private void backfillHalt() {
@@ -430,6 +469,13 @@ public final class Main {
     final Argument backfillShowId =
         backfillShow.addArgument("backfill").help("Backfill ID");
 
+    final Subparser backfillEdit = BackfillCommand.EDIT.parser(backfillParser);
+    final Argument backfillEditId =
+        backfillEdit.addArgument("backfill").help("Backfill ID");
+    final Argument backfillEditConcurrency =
+        backfillEdit.addArgument("--concurrency").help("set the concurrency value for the backfill")
+            .type(Integer.class);
+
     final Subparser backfillHalt = BackfillCommand.HALT.parser(backfillParser);
     final Argument backfillHaltId =
         backfillHalt.addArgument("backfill").help("Backfill ID");
@@ -518,6 +564,7 @@ public final class Main {
   private enum BackfillCommand {
     LIST("ls", "List backfills"),
     CREATE("", "Create a backfill"),
+    EDIT("e", "Edit a backfill"),
     HALT("h", "Halt a backfill"),
     SHOW("get", "Show info about a specific backfill");
 
