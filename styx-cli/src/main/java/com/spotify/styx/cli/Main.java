@@ -55,8 +55,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
+import java.util.concurrent.ExecutionException;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.inf.Argument;
@@ -92,8 +91,7 @@ public final class Main {
   private final String apiHost;
   private final Service cliService;
   private final CliOutput cliOutput;
-
-  private BiConsumer<Request, Consumer<byte[]>> client;
+  private Client client;
 
   private Main(
       StyxCliParser parser,
@@ -144,10 +142,7 @@ public final class Main {
     final Command command = namespace.get(COMMAND_DEST);
 
     try (Service.Instance instance = cliService.start()) {
-      final Service.Signaller signaller = instance.getSignaller();
-
-      client = errorHandlingClient(
-          ApolloEnvironmentModule.environment(instance).environment().client(), signaller);
+      client = ApolloEnvironmentModule.environment(instance).environment().client();
 
       switch (command) {
         case LIST:
@@ -176,6 +171,8 @@ public final class Main {
             case CREATE:
               backfillCreate();
               break;
+            case EDIT:
+              backfillEdit();
             case HALT:
               backfillHalt();
               break;
@@ -188,16 +185,13 @@ public final class Main {
             default:
               throw new RuntimeException("Unrecognized command: " + backfillCommand);
           }
-          // TODO: remove this once signalling is in place
-          signaller.signalShutdown();
           break;
 
         default:
           // parsing unknown command will fail so this should never happen...
           throw new RuntimeException("Unrecognized command: " + command);
       }
-
-      instance.waitForShutdown();
+      instance.getSignaller().signalShutdown();
     }
   }
 
@@ -218,37 +212,72 @@ public final class Main {
       throw Throwables.propagate(e);
     }
     final Request request = Request.forUri(apiUrl("backfills"), "POST").withPayload(payload);
-    client.accept(request, bytes -> {
-      final Backfill backfill;
-      try {
-        backfill = OBJECT_MAPPER.readValue(bytes, Backfill.class);
-      } catch (IOException e) {
-        e.printStackTrace();
-        return;
-      }
-      cliOutput.printBackfill(backfill);
-    });
+    byte[] response = send(request);
+    final Backfill backfill;
+    try {
+      backfill = OBJECT_MAPPER.readValue(response, Backfill.class);
+    } catch (IOException e) {
+      e.printStackTrace();
+      return;
+    }
+    cliOutput.printBackfill(backfill);
+  }
+
+  private void backfillEdit() {
+    final Integer concurrency = namespace.getInt(parser.backfillEditConcurrency.getDest());
+    final String id = namespace.getString(parser.backfillEditId.getDest());
+    final Request getRequest = Request.forUri(apiUrl("backfills", id));
+
+    byte[] getResponse = send(getRequest);
+    final BackfillPayload backfillPayload;
+    try {
+      backfillPayload = OBJECT_MAPPER.readValue(getResponse, BackfillPayload.class);
+    } catch (IOException e) {
+      e.printStackTrace();
+      return;
+    }
+
+    Backfill editedBackfill = backfillPayload.backfill();
+    if (concurrency != null) {
+      editedBackfill = backfillPayload.backfill().builder().concurrency(concurrency).build();
+    }
+    final ByteString putPayload;
+    try {
+      putPayload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(editedBackfill));
+    } catch (JsonProcessingException e) {
+      throw Throwables.propagate(e);
+    }
+    final Request putRequest = Request.forUri(apiUrl("backfills", id), "PUT").withPayload(putPayload);
+    byte[] putResponse = send(putRequest);
+
+    final Backfill newBackfill;
+    try {
+      newBackfill = OBJECT_MAPPER.readValue(putResponse, Backfill.class);
+    } catch (IOException e) {
+      e.printStackTrace();
+      return;
+    }
+    cliOutput.printBackfill(newBackfill);
   }
 
   private void backfillHalt() {
     final String id = namespace.getString(parser.backfillHaltId.getDest());
     final Request request = Request.forUri(apiUrl("backfills", id), "DELETE");
-    client.accept(request, null);
+    send(request);
   }
 
   private void backfillShow() {
     final String id = namespace.getString(parser.backfillShowId.getDest());
     final Request request = Request.forUri(apiUrl("backfills", id));
-    client.accept(request, bytes -> {
-      final BackfillPayload backfillStatus;
-      try {
-        backfillStatus = OBJECT_MAPPER.readValue(bytes, BackfillPayload.class);
-      } catch (IOException e) {
-        e.printStackTrace();
-        return;
-      }
-      cliOutput.printBackfillPayload(backfillStatus);
-    });
+    byte[] response = send(request);
+    final BackfillPayload backfillStatus;
+    try {
+      backfillStatus = OBJECT_MAPPER.readValue(response, BackfillPayload.class);
+    } catch (IOException e) {
+      e.printStackTrace();
+      return;
+    }
+    cliOutput.printBackfillPayload(backfillStatus);
   }
 
   private void backfillList() throws UnsupportedEncodingException {
@@ -266,16 +295,15 @@ public final class Main {
       uri += "?" + String.join("&", queries);
     }
     final Request request = Request.forUri(uri);
-    client.accept(request, bytes -> {
-      final BackfillsPayload backfills;
-      try {
-        backfills = OBJECT_MAPPER.readValue(bytes, BackfillsPayload.class);
-      } catch (IOException e) {
-        e.printStackTrace();
-        return;
-      }
-      backfills.backfills().forEach(cliOutput::printBackfillPayload);
-    });
+    byte[] response = send(request);
+    final BackfillsPayload backfills;
+    try {
+      backfills = OBJECT_MAPPER.readValue(response, BackfillsPayload.class);
+    } catch (IOException e) {
+      e.printStackTrace();
+      return;
+    }
+    backfills.backfills().forEach(cliOutput::printBackfillPayload);
   }
 
   private String apiUrl(CharSequence... parts) {
@@ -295,15 +323,12 @@ public final class Main {
       uri += "?component=" + URLEncoder.encode(component, UTF_8);
     }
 
-    client.accept(
-        Request.forUri(uri).withTtl(Duration.ofSeconds(TTL_REQUEST)),
-        bytes -> {
-          try {
-            cliOutput.printStates(OBJECT_MAPPER.readValue(bytes, RunStateDataPayload.class));
-          } catch (IOException e) {
-            throw Throwables.propagate(e);
-          }
-        });
+    byte[] response = send(Request.forUri(uri).withTtl(Duration.ofSeconds(TTL_REQUEST)));
+    try {
+      cliOutput.printStates(OBJECT_MAPPER.readValue(response, RunStateDataPayload.class));
+    } catch (IOException e) {
+      throw Throwables.propagate(e);
+    }
   }
 
   private void eventsForWorkflowInstance() {
@@ -312,45 +337,43 @@ public final class Main {
     String workflow = workflowInstance.workflowId().endpointId();
     String parameter = workflowInstance.parameter();
 
-    client.accept(
-        Request.forUri(cliApiUrl("events", component, workflow, parameter))
-            .withTtl(Duration.ofSeconds(TTL_REQUEST)),
-        bytes -> {
-          final JsonNode jsonNode;
-          try {
-            jsonNode = OBJECT_MAPPER.readTree(bytes);
-          } catch (IOException e) {
-            throw Throwables.propagate(e);
-          }
+    byte[] response = send(Request.forUri(cliApiUrl("events", component, workflow, parameter))
+        .withTtl(Duration.ofSeconds(TTL_REQUEST)));
 
-          if (!jsonNode.isObject()) {
-            throw new RuntimeException("Invalid json returned from API");
-          }
+    final JsonNode jsonNode;
+    try {
+      jsonNode = OBJECT_MAPPER.readTree(response);
+    } catch (IOException e) {
+      throw Throwables.propagate(e);
+    }
 
-          final ObjectNode json = (ObjectNode) jsonNode;
-          final ArrayNode events = json.withArray("events");
-          final ImmutableList.Builder<CliOutput.EventInfo> eventInfos = ImmutableList.builder();
-          for (JsonNode eventWithTimestamp : events) {
-            final long ts = eventWithTimestamp.get("timestamp").asLong();
-            final JsonNode event = eventWithTimestamp.get("event");
+    if (!jsonNode.isObject()) {
+      throw new RuntimeException("Invalid json returned from API");
+    }
 
-            String eventName;
-            String eventInfo;
-            try {
-              Event typedEvent = OBJECT_MAPPER.convertValue(event, Event.class);
-              eventName = EventUtil.name(typedEvent);
-              eventInfo = CliUtil.info(typedEvent);
-            } catch (IllegalArgumentException e) {
-              // fall back to just inspecting the json
-              eventName = event.get("@type").asText();
-              eventInfo = "";
-            }
+    final ObjectNode json = (ObjectNode) jsonNode;
+    final ArrayNode events = json.withArray("events");
+    final ImmutableList.Builder<CliOutput.EventInfo> eventInfos = ImmutableList.builder();
+    for (JsonNode eventWithTimestamp : events) {
+      final long ts = eventWithTimestamp.get("timestamp").asLong();
+      final JsonNode event = eventWithTimestamp.get("event");
 
-            eventInfos.add(CliOutput.EventInfo.create(ts, eventName, eventInfo));
-          }
+      String eventName;
+      String eventInfo;
+      try {
+        Event typedEvent = OBJECT_MAPPER.convertValue(event, Event.class);
+        eventName = EventUtil.name(typedEvent);
+        eventInfo = CliUtil.info(typedEvent);
+      } catch (IllegalArgumentException e) {
+        // fall back to just inspecting the json
+        eventName = event.get("@type").asText();
+        eventInfo = "";
+      }
 
-          cliOutput.printEvents(eventInfos.build());
-        });
+      eventInfos.add(CliOutput.EventInfo.create(ts, eventName, eventInfo));
+    }
+
+    cliOutput.printEvents(eventInfos.build());
   }
 
   private void triggerWorkflowInstance() {
@@ -364,7 +387,7 @@ public final class Main {
     }
     Request request = Request.forUri(cliApiUrl("trigger"), "POST")
         .withPayload(payload);
-    client.accept(request, null);
+    send(request);
   }
 
   private void haltWorkflowInstance() {
@@ -379,7 +402,7 @@ public final class Main {
     }
     Request request = Request.forUri(cliApiUrl("events"), "POST")
         .withPayload(payload);
-    client.accept(request, null);
+    send(request);
   }
 
   private void retryWorkflowInstance() {
@@ -394,7 +417,7 @@ public final class Main {
     }
     Request request = Request.forUri(cliApiUrl("events"), "POST")
         .withPayload(payload);
-    client.accept(request, null);
+    send(request);
   }
 
   private static WorkflowInstance getWorkflowInstance(Namespace namespace) {
@@ -405,32 +428,27 @@ public final class Main {
         namespace.getString(PARAMETER_DEST));
   }
 
-  private static BiConsumer<Request, Consumer<byte[]>> errorHandlingClient(
-      Client client, Service.Signaller signaller) {
-    return (request, consumer) ->
-      client.send(request)
-          .handle((response, throwable) -> {
-            if (throwable != null) {
-              throw Throwables.propagate(throwable);
-            }
-            switch (response.status().family()) {
-              case SUCCESSFUL:
-              case REDIRECTION:
-                return response.payload().orElse(ByteString.EMPTY).toByteArray();
-              default:
-                throw new RuntimeException(
-                    response.status().code() + " " + response.status().reasonPhrase());
-            }
-          })
-          .thenAccept(consumer != null ? consumer : bytes -> { })
-          .whenComplete((ignored, throwable) -> {
-            if (throwable != null) {
-              System.err.println("An API error occurred: "
-                                 + Throwables.getRootCause(throwable).getMessage());
-              System.exit(EXIT_CODE_API_ERROR);
-            }
-            signaller.signalShutdown();
-          });
+  private byte[] send(Request request) {
+    try {
+      return client.send(request).handle((response, throwable) -> {
+        if (throwable != null) {
+          throw Throwables.propagate(throwable);
+        }
+        switch (response.status().family()) {
+          case SUCCESSFUL:
+          case REDIRECTION:
+            return response.payload().orElse(ByteString.EMPTY).toByteArray();
+          default:
+            System.err.println("An API error occurred: " + response.status().reasonPhrase());
+            System.exit(EXIT_CODE_API_ERROR);
+            return null;
+        }
+      }).toCompletableFuture().get();
+    } catch (InterruptedException | ExecutionException e) {
+      e.printStackTrace();
+      System.exit(EXIT_CODE_API_ERROR);
+      return null;
+    }
   }
 
   private static class StyxCliParser {
@@ -450,6 +468,13 @@ public final class Main {
     final Subparser backfillShow = BackfillCommand.SHOW.parser(backfillParser);
     final Argument backfillShowId =
         backfillShow.addArgument("backfill").help("Backfill ID");
+
+    final Subparser backfillEdit = BackfillCommand.EDIT.parser(backfillParser);
+    final Argument backfillEditId =
+        backfillEdit.addArgument("backfill").help("Backfill ID");
+    final Argument backfillEditConcurrency =
+        backfillEdit.addArgument("--concurrency").help("set the concurrency value for the backfill")
+            .type(Integer.class);
 
     final Subparser backfillHalt = BackfillCommand.HALT.parser(backfillParser);
     final Argument backfillHaltId =
@@ -539,6 +564,7 @@ public final class Main {
   private enum BackfillCommand {
     LIST("ls", "List backfills"),
     CREATE("", "Create a backfill"),
+    EDIT("e", "Edit a backfill"),
     HALT("h", "Halt a backfill"),
     SHOW("get", "Show info about a specific backfill");
 
