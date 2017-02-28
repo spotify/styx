@@ -20,13 +20,19 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.apollo.StatusType.Family.SUCCESSFUL;
 import static com.spotify.styx.api.Api.Version.V1;
+import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.util.ParameterUtil.rangeOfInstants;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 import static com.spotify.styx.util.ParameterUtil.truncateInstant;
+import static com.spotify.styx.util.StreamUtil.cat;
 import static java.util.stream.Collectors.toList;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Throwables;
+import com.spotify.apollo.Client;
+import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
@@ -35,11 +41,13 @@ import com.spotify.apollo.entity.JacksonEntityCodec;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
+import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.api.cli.RunStateDataPayload;
 import com.spotify.styx.api.cli.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.BackfillInput;
+import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
@@ -52,10 +60,13 @@ import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.ReplayEvents;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
@@ -63,10 +74,15 @@ import okio.ByteString;
 public final class BackfillResource {
 
   static final String BASE = "/backfills";
+  private static final String SCHEDULER_BASE_PATH = "/api/v0";
+  private static final String UNKNOWN = "UNKNOWN";
+  private static final String WAITING = "WAITING";
 
   private final Storage storage;
+  private final String schedulerServiceBaseUrl;
 
-  public BackfillResource(Storage storage) {
+  public BackfillResource(String schedulerServiceBaseUrl, Storage storage) {
+    this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
     this.storage = Objects.requireNonNull(storage);
   }
 
@@ -74,7 +90,7 @@ public final class BackfillResource {
     final EntityMiddleware em =
         EntityMiddleware.forCodec(JacksonEntityCodec.forMapper(Json.OBJECT_MAPPER));
 
-    final List<Route<AsyncHandler<Response<ByteString>>>> routes = Stream.of(
+    final List<Route<AsyncHandler<Response<ByteString>>>> entityRoutes = Stream.of(
         Route.with(
             em.serializerDirect(BackfillsPayload.class),
             "GET", BASE,
@@ -88,10 +104,6 @@ public final class BackfillResource {
             "GET", BASE + "/<bid>",
             rc -> getBackfill(arg("bid", rc))),
         Route.with(
-            em.serializerResponse(Void.class),
-            "DELETE", BASE + "/<bid>",
-            rc -> haltBackfill(arg("bid", rc))),
-        Route.with(
             em.response(Backfill.class),
             "PUT", BASE + "/<bid>",
             rc -> payload -> updateBackfill(arg("bid", rc), payload))
@@ -99,7 +111,16 @@ public final class BackfillResource {
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
         .collect(toList());
 
-    return Api.prefixRoutes(routes, V1);
+    final List<Route<AsyncHandler<Response<ByteString>>>> routes = Collections.singletonList(
+        Route.async(
+            "DELETE", BASE + "/<bid>",
+            rc -> haltBackfill(arg("bid", rc), rc))
+    );
+
+    return cat(
+        Api.prefixRoutes(entityRoutes, V1),
+        Api.prefixRoutes(routes, V1)
+    );
   }
 
   private BackfillsPayload getBackfills(RequestContext requestContext) {
@@ -139,9 +160,9 @@ public final class BackfillResource {
 
   private Response<BackfillPayload> getBackfill(String id) {
     try {
-      Optional<Backfill> backfillOpt = storage.backfill(id);
+      final Optional<Backfill> backfillOpt = storage.backfill(id);
       if (backfillOpt.isPresent()) {
-        List<RunStateData> statuses = retrieveBackfillStatuses(backfillOpt.get());
+        final List<RunStateData> statuses = retrieveBackfillStatuses(backfillOpt.get());
         return Response.forPayload(BackfillPayload.create(
             backfillOpt.get(), Optional.of(RunStateDataPayload.create(statuses))));
       } else {
@@ -152,20 +173,67 @@ public final class BackfillResource {
     }
   }
 
-  private Response<Void> haltBackfill(String id) {
+  private String schedulerApiUrl(CharSequence... parts) {
+    return schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + "/" + String.join("/", parts);
+  }
+
+  private CompletionStage<Response<ByteString>> haltBackfill(String id, RequestContext rc) {
     try {
       final Optional<Backfill> backfillOptional = storage.backfill(id);
       if (backfillOptional.isPresent()) {
-        storage.storeBackfill(backfillOptional.get().builder().halted(true).build());
+        final Backfill backfill = backfillOptional.get();
+        storage.storeBackfill(backfill.builder().halted(true).build());
+        return haltActiveBackfillInstances(backfill, rc.requestScopedClient());
       } else {
-        return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("backfill not found"));
+        return CompletableFuture.completedFuture(
+            Response.forStatus(Status.NOT_FOUND.withReasonPhrase("backfill not found")));
       }
     } catch (IOException e) {
-      return Response.forStatus(
+      return CompletableFuture.completedFuture(Response.forStatus(
           Status.INTERNAL_SERVER_ERROR
-              .withReasonPhrase("could not halt backfill: " + e.getMessage()));
+              .withReasonPhrase("could not halt backfill: " + e.getMessage())));
     }
-    return Response.ok();
+  }
+
+  private CompletionStage<Response<ByteString>> haltActiveBackfillInstances(Backfill backfill, Client client) {
+    return CompletableFutures.allAsList(
+        retrieveBackfillStatuses(backfill).stream()
+            .filter(BackfillResource::isActiveState)
+            .map(RunStateData::workflowInstance)
+            .map(workflowInstance -> haltActiveBackfillInstance(workflowInstance, client))
+            .collect(toList()))
+        .handle((result, throwable) -> {
+          if (throwable != null || result.contains(Boolean.FALSE)) {
+            return Response.forStatus(
+                Status.INTERNAL_SERVER_ERROR
+                    .withReasonPhrase(
+                        "some active instances cannot be halted, however no new ones will be triggered"));
+          } else {
+            return Response.ok();
+          }
+        });
+  }
+
+  private CompletionStage<Boolean> haltActiveBackfillInstance(WorkflowInstance workflowInstance,
+                                                                Client client) {
+    try {
+      final ByteString payload = serialize(Event.halt(workflowInstance));
+      final Request request = Request.forUri(schedulerApiUrl("events"), "POST")
+          .withPayload(payload);
+      return client.send(request)
+          .thenApply(response -> response.status().family().equals(SUCCESSFUL));
+    } catch (JsonProcessingException e) {
+      return CompletableFuture.completedFuture(false);
+    }
+  }
+
+  private static boolean isActiveState(RunStateData runStateData) {
+    final String state  = runStateData.state();
+    switch (state) {
+      case UNKNOWN: return false;
+      case WAITING: return false;
+      default:      return !RunState.State.valueOf(state).isTerminal();
+    }
   }
 
   private Response<Backfill> postBackfill(BackfillInput input) {
@@ -269,7 +337,7 @@ public final class BackfillResource {
             RunState state = restoredStateOpt.get();
             return RunStateData.create(state.workflowInstance(), state.state().name(), state.data());
           } else {
-            return RunStateData.create(wfi, "UNKNOWN", StateData.zero());
+            return RunStateData.create(wfi, UNKNOWN, StateData.zero());
           }
         })
         .collect(toList());
@@ -280,7 +348,7 @@ public final class BackfillResource {
         .map(instant -> {
           final WorkflowInstance wfi = WorkflowInstance.create(
               backfill.workflowId(), toParameter(backfill.partitioning(), instant));
-          return RunStateData.create(wfi, "WAITING", StateData.zero());
+          return RunStateData.create(wfi, WAITING, StateData.zero());
         })
         .collect(toList());
 
