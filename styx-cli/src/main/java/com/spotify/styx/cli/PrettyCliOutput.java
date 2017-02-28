@@ -45,12 +45,10 @@ import org.fusesource.jansi.Ansi;
 
 class PrettyCliOutput implements CliOutput {
 
+  private static final String BACKFILL_FORMAT = "%28s  %6s  %13s %12s  %-13s  %-13s  %-13s  %s  %s";
+
   private void println() {
     System.out.println();
-  }
-
-  private static void println(Object output) {
-    System.out.println(output.toString());
   }
 
   private static void format(String format, Object... args) {
@@ -111,30 +109,56 @@ class PrettyCliOutput implements CliOutput {
   public void printBackfill(Backfill backfill) {
     final Partitioning partitioning = backfill.partitioning();
     final WorkflowId workflowId = backfill.workflowId();
-    final String s = "%15s %s";
 
-    format(s, "id:",            colored(CYAN, backfill.id()));
-    format(s, "component:",     colored(CYAN, workflowId.componentId()));
-    format(s, "workflow:",      colored(CYAN, workflowId.endpointId()));
-    format(s, "halted:",        colored(CYAN, backfill.halted()));
-    format(s, "all triggered:", colored(CYAN, backfill.allTriggered()));
-    format(s, "concurrency:",   colored(CYAN, backfill.concurrency()));
-    format(s, "start (incl):",  colored(CYAN, toParameter(partitioning, backfill.start())));
-    format(s, "end (excl):",    colored(CYAN, toParameter(partitioning, backfill.end())));
-    format(s, "next trigger:",  colored(CYAN, toParameter(partitioning, backfill.nextTrigger())));
+    format(BACKFILL_FORMAT,
+           backfill.id(),
+           backfill.halted(),
+           backfill.allTriggered(),
+           backfill.concurrency(),
+           toParameter(partitioning, backfill.start()),
+           toParameter(partitioning, backfill.end()),
+           toParameter(partitioning, backfill.nextTrigger()),
+           workflowId.componentId(),
+           workflowId.endpointId());
+  }
+
+  private void printBackfillHeader() {
+    format(BACKFILL_FORMAT,
+           "BACKFILL ID",
+           "HALTED",
+           "ALL TRIGGERED",
+           "CONCURRENCY",
+           "START (INCL)",
+           "END (EXCL)",
+           "NEXT TRIGGER",
+           "COMPONENT",
+           "WORKFLOW");
   }
 
   @Override
   public void printBackfillPayload(BackfillPayload backfillPayload) {
-    println(coloredBright(RED, "BACKFILL DATA"));
+    printBackfillHeader();
+
     printBackfill(backfillPayload.backfill());
     if (backfillPayload.statuses().isPresent()) {
       println();
-      println(coloredBright(RED, "BACKFILL PROGRESS"));
+      println();
       printStates(backfillPayload.statuses().get());
     }
-    println();
-    println();
+  }
+
+  @Override
+  public void printBackfills(List<BackfillPayload> backfills) {
+    printBackfillHeader();
+
+    for (BackfillPayload backfillPayload : backfills) {
+      printBackfill(backfillPayload.backfill());
+      if (backfillPayload.statuses().isPresent()) {
+        println();
+        println();
+        printStates(backfillPayload.statuses().get());
+      }
+    }
   }
 
   private Ansi getAnsiForState(RunStateDataPayload.RunStateData RunStateData) {
