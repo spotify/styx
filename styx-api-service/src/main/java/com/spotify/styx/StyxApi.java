@@ -96,7 +96,7 @@ public class StyxApi implements AppInit {
 
     final WorkflowResource workflowResource = new WorkflowResource(storage);
     final ResourceResource resourceResource = new ResourceResource(storage);
-    final BackfillResource backfillResource = new BackfillResource(storage);
+    final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl, storage);
     final StyxConfigResource styxConfigResource = new StyxConfigResource(storage);
     final CliResource cliResource = new CliResource(schedulerServiceBaseUrl, storage);
 

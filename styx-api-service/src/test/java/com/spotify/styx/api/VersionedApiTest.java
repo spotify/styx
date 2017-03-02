@@ -27,6 +27,7 @@ import static org.junit.Assume.assumeThat;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.test.ServiceHelper;
+import com.spotify.apollo.test.StubClient;
 import java.util.Collection;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
@@ -66,6 +67,12 @@ public abstract class VersionedApiTest {
     this.basePath = basePath;
     this.version = version;
     this.serviceHelper = ServiceHelper.create(this::init, serviceName);
+  }
+
+  protected VersionedApiTest(String basePath, Api.Version version, String serviceName, StubClient stubClient) {
+    this.basePath = basePath;
+    this.version = version;
+    this.serviceHelper = ServiceHelper.create(this::init, serviceName, stubClient);
   }
 
   /**

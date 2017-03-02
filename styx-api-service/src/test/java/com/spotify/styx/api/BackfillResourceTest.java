@@ -28,7 +28,11 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.internal.verification.VerificationModeFactory.times;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Key;
@@ -37,9 +41,14 @@ import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
+import com.spotify.apollo.Status;
 import com.spotify.apollo.StatusType;
+import com.spotify.apollo.test.StubClient;
+import com.spotify.apollo.test.response.ResponseWithDelay;
+import com.spotify.apollo.test.response.Responses;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.DataEndpoint;
@@ -70,6 +79,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class BackfillResourceTest extends VersionedApiTest {
+
+  private static final String SCHEDULER_BASE = "http://localhost:8080";
 
   private static LocalDatastoreHelper localDatastore;
   private Connection bigtable = setupBigTableMockTable();
@@ -110,12 +121,13 @@ public class BackfillResourceTest extends VersionedApiTest {
       .build();
 
   public BackfillResourceTest(Api.Version version) {
-    super(BackfillResource.BASE, version, "backfill-test");
+    super(BackfillResource.BASE, version, "backfill-test", spy(StubClient.class));
   }
 
   @Override
   void init(Environment environment) {
-    environment.routingEngine().registerRoutes(new BackfillResource(storage).routes());
+    environment.routingEngine()
+        .registerRoutes(new BackfillResource(SCHEDULER_BASE, storage).routes());
   }
 
   @BeforeClass
@@ -329,18 +341,99 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldDeleteBackfill() throws Exception {
+  public void shouldHaltBackfill() throws Exception {
     sinceVersion(Api.Version.V1);
 
-    assertThat(storage.backfill(BACKFILL_1.id()).get().concurrency(), equalTo(1));
+    serviceHelper.stubClient()
+        .respond(Response.forStatus(Status.ACCEPTED))
+        .to(SCHEDULER_BASE + "/api/v0/events");
+
+    WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
+    storage.storeBackfill(BACKFILL_1.builder().nextTrigger(Instant.parse("2017-01-01T02:00:00Z")).build());
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(wfi, Trigger.backfill("backfill-1")), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi),                                          2L, 2L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi, TestData.EXECUTION_DESCRIPTION),           3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                              4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                          5L, 5L));
+    storage.writeActiveState(wfi, 5L);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("DELETE", path("/" + BACKFILL_1.id())));
+    assertThat(response.status().reasonPhrase(),
+        response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
 
+    assertThat(storage.backfill(BACKFILL_1.id()).get().halted(), equalTo(true));
+    verify(serviceHelper.stubClient(), times(1)).send(any());
+  }
+
+  @Test
+  public void shouldNotHaltWaitingInstanceInBackfill() throws Exception {
+    sinceVersion(Api.Version.V1);
+
+    serviceHelper.stubClient()
+        .respond(Response.forStatus(Status.ACCEPTED))
+        .to(SCHEDULER_BASE + "/api/v0/events");
+
+    WorkflowInstance wfi1 = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
+    WorkflowInstance wfi2 = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T02");
+    storage.storeBackfill(BACKFILL_1.builder().nextTrigger(Instant.parse("2017-01-01T03:00:00Z")).build());
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(wfi1, Trigger.backfill("backfill-1")), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi1),                                          2L, 2L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi1, TestData.EXECUTION_DESCRIPTION),           3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi1, "exec-1"),                              4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.started(wfi1),                                          5L, 5L));
+    storage.writeActiveState(wfi1, 5L);
+    storage.writeActiveState(wfi2, 5L);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("DELETE", path("/" + BACKFILL_1.id())));
     assertThat(response.status().reasonPhrase(),
                response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
 
     assertThat(storage.backfill(BACKFILL_1.id()).get().halted(), equalTo(true));
+    verify(serviceHelper.stubClient(), times(1)).send(any());
+  }
+
+  @Test
+  public void shouldReturnServerErrorIfFailedToSend() throws Exception {
+    sinceVersion(Api.Version.V1);
+
+    serviceHelper.stubClient().respond(Responses.sequence(ImmutableList.of(ResponseWithDelay
+                                                                               .forResponse(Response
+                                                                                                .forStatus(
+                                                                                                    Status.INTERNAL_SERVER_ERROR)),
+                                                                           ResponseWithDelay
+                                                                               .forResponse(Response
+                                                                                                .forStatus(
+                                                                                                    Status.ACCEPTED)))))
+        .to(SCHEDULER_BASE + "/api/v0/events");
+
+    WorkflowInstance wfi1 = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
+    WorkflowInstance wfi2 = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T02");
+    storage.storeBackfill(BACKFILL_1.builder().nextTrigger(Instant.parse("2017-01-01T03:00:00Z")).build());
+
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(wfi1, Trigger.backfill("backfill-1")), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi1),                                          2L, 2L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi1, TestData.EXECUTION_DESCRIPTION),           3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi1, "exec-1"),                              4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.started(wfi1),                                          5L, 5L));
+
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(wfi2, Trigger.backfill("backfill-1")), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi2),                                          2L, 2L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi2, TestData.EXECUTION_DESCRIPTION),           3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi2, "exec-2"),                              4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.started(wfi2),                                          5L, 5L));
+
+    storage.writeActiveState(wfi1, 5L);
+    storage.writeActiveState(wfi2, 5L);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("DELETE", path("/" + BACKFILL_1.id())));
+    assertThat(response.status().reasonPhrase(),
+               response, hasStatus(belongsToFamily(StatusType.Family.SERVER_ERROR)));
+
+    assertThat(storage.backfill(BACKFILL_1.id()).get().halted(), equalTo(true));
+    verify(serviceHelper.stubClient(), times(2)).send(any());
   }
 
   @Test
