@@ -102,4 +102,9 @@ class PlainCliOutput implements CliOutput {
       printStates(backfillPayload.statuses().get());
     }
   }
+
+  @Override
+  public void printBackfills(List<BackfillPayload> backfills) {
+    backfills.forEach(this::printBackfillPayload);
+  }
 }

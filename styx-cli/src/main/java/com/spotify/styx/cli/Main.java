@@ -303,7 +303,7 @@ public final class Main {
       e.printStackTrace();
       return;
     }
-    backfills.backfills().forEach(cliOutput::printBackfillPayload);
+    cliOutput.printBackfills(backfills.backfills());
   }
 
   private String apiUrl(CharSequence... parts) {

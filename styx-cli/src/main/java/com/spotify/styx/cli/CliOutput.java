@@ -39,6 +39,8 @@ interface CliOutput {
 
   void printBackfillPayload(BackfillPayload backfillPayload);
 
+  void printBackfills(List<BackfillPayload> backfills);
+
   @AutoValue
   abstract class EventInfo {
     abstract long timestamp();
