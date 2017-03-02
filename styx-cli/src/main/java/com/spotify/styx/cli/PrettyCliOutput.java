@@ -47,29 +47,20 @@ class PrettyCliOutput implements CliOutput {
 
   private static final String BACKFILL_FORMAT = "%28s  %6s  %13s %12s  %-13s  %-13s  %-13s  %s  %s";
 
-  private void println() {
-    System.out.println();
-  }
-
-  private static void format(String format, Object... args) {
-    System.out.println(String.format(format, args));
-  }
-
   @Override
   public void printStates(RunStateDataPayload runStateDataPayload) {
-    format(
-        "  %-20s %-12s %-47s %-7s %s",
-        "WORKFLOW INSTANCE",
-        "STATE",
-        "LAST EXECUTION ID",
-        "TRIES",
-        "PREVIOUS EXECUTION MESSAGE");
+    System.out.println(String.format("  %-20s %-12s %-47s %-7s %s",
+                                     "WORKFLOW INSTANCE",
+                                     "STATE",
+                                     "LAST EXECUTION ID",
+                                     "TRIES",
+                                     "PREVIOUS EXECUTION MESSAGE"));
 
     CliUtil.groupStates(runStateDataPayload.activeStates()).entrySet().forEach(entry -> {
-      println();
-      format("%s %s",
-             colored(CYAN, entry.getKey().componentId()),
-             colored(BLUE, entry.getKey().endpointId()));
+      System.out.println();
+      System.out.println(String.format("%s %s",
+                                       colored(CYAN, entry.getKey().componentId()),
+                                       colored(BLUE, entry.getKey().endpointId())));
       entry.getValue().forEach(runStateData -> {
         final StateData stateData = runStateData.stateData();
         final Ansi ansiState = getAnsiForState(runStateData);
@@ -79,13 +70,12 @@ class PrettyCliOutput implements CliOutput {
         final Ansi ansiMessage = colored(messageColor(lastMessage.level()),
                                          lastMessage.line());
 
-        format("  %-20s %-20s %-47s %-7d %s",
-               runStateData.workflowInstance().parameter(),
-               ansiState,
-               stateData.executionId().orElse("<no-execution-id>"),
-               stateData.tries(),
-               ansiMessage
-        );
+        System.out.println(String.format("  %-20s %-20s %-47s %-7d %s",
+                                         runStateData.workflowInstance().parameter(),
+                                         ansiState,
+                                         stateData.executionId().orElse("<no-execution-id>"),
+                                         stateData.tries(),
+                                         ansiMessage));
       });
     });
   }
@@ -93,16 +83,15 @@ class PrettyCliOutput implements CliOutput {
   @Override
   public void printEvents(List<EventInfo> eventInfos) {
     final String formatString = "%-25s %-25s %s";
-    format(formatString,
-           "TIME",
-           "EVENT",
-           "DATA");
+    System.out.println(String.format(formatString,
+                                     "TIME",
+                                     "EVENT",
+                                     "DATA"));
     eventInfos.forEach(
-        eventInfo ->
-            format(formatString,
-                   formatTimestamp(eventInfo.timestamp()),
-                   eventInfo.name(),
-                   eventInfo.info()));
+        eventInfo -> System.out.println(String.format(formatString,
+                                                      formatTimestamp(eventInfo.timestamp()),
+                                                      eventInfo.name(),
+                                                      eventInfo.info())));
   }
 
   @Override
@@ -110,29 +99,29 @@ class PrettyCliOutput implements CliOutput {
     final Partitioning partitioning = backfill.partitioning();
     final WorkflowId workflowId = backfill.workflowId();
 
-    format(BACKFILL_FORMAT,
-           backfill.id(),
-           backfill.halted(),
-           backfill.allTriggered(),
-           backfill.concurrency(),
-           toParameter(partitioning, backfill.start()),
-           toParameter(partitioning, backfill.end()),
-           toParameter(partitioning, backfill.nextTrigger()),
-           workflowId.componentId(),
-           workflowId.endpointId());
+    System.out.println(String.format(BACKFILL_FORMAT,
+                                     backfill.id(),
+                                     backfill.halted(),
+                                     backfill.allTriggered(),
+                                     backfill.concurrency(),
+                                     toParameter(partitioning, backfill.start()),
+                                     toParameter(partitioning, backfill.end()),
+                                     toParameter(partitioning, backfill.nextTrigger()),
+                                     workflowId.componentId(),
+                                     workflowId.endpointId()));
   }
 
   private void printBackfillHeader() {
-    format(BACKFILL_FORMAT,
-           "BACKFILL ID",
-           "HALTED",
-           "ALL TRIGGERED",
-           "CONCURRENCY",
-           "START (INCL)",
-           "END (EXCL)",
-           "NEXT TRIGGER",
-           "COMPONENT",
-           "WORKFLOW");
+    System.out.println(String.format(BACKFILL_FORMAT,
+                                     "BACKFILL ID",
+                                     "HALTED",
+                                     "ALL TRIGGERED",
+                                     "CONCURRENCY",
+                                     "START (INCL)",
+                                     "END (EXCL)",
+                                     "NEXT TRIGGER",
+                                     "COMPONENT",
+                                     "WORKFLOW"));
   }
 
   @Override
@@ -141,8 +130,8 @@ class PrettyCliOutput implements CliOutput {
 
     printBackfill(backfillPayload.backfill());
     if (backfillPayload.statuses().isPresent()) {
-      println();
-      println();
+      System.out.println();
+      System.out.println();
       printStates(backfillPayload.statuses().get());
     }
   }
@@ -154,8 +143,8 @@ class PrettyCliOutput implements CliOutput {
     for (BackfillPayload backfillPayload : backfills) {
       printBackfill(backfillPayload.backfill());
       if (backfillPayload.statuses().isPresent()) {
-        println();
-        println();
+        System.out.println();
+        System.out.println();
         printStates(backfillPayload.statuses().get());
       }
     }
