@@ -316,7 +316,7 @@ public class StyxScheduler implements AppInit {
     final TriggerManager triggerManager = new TriggerManager(trigger, time, storage);
 
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
-                                              storage, trigger);
+                                              storage, trigger, Scheduler.createRateLimiter());
 
     final Consumer<Workflow> workflowChangeListener = workflowChanged(workflowCache, storage,
                                                                       stats, stateManager, time);

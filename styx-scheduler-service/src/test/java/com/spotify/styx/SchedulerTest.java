@@ -23,9 +23,11 @@ package com.spotify.styx;
 import static com.spotify.styx.state.TimeoutConfig.createWithDefaultTtl;
 import static java.time.Duration.ofSeconds;
 import static java.util.Optional.empty;
+import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.only;
 import static org.mockito.Mockito.verify;
@@ -59,6 +61,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import org.awaitility.Duration;
+import org.awaitility.core.ConditionTimeoutException;
 import org.junit.Test;
 
 public class SchedulerTest {
@@ -109,10 +113,11 @@ public class SchedulerTest {
     triggerListener = mock(TriggerListener.class);
     when(storage.resources()).thenReturn(resourceLimits);
     when(storage.globalConcurrency()).thenReturn(Optional.empty());
+    when(storage.submissionRate()).thenReturn(Optional.empty());
 
     stateManager = new SyncStateManager();
     scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage,
-                              triggerListener);
+                              triggerListener, Scheduler.createRateLimiter());
   }
 
   private void setResourceLimit(String resourceId, long limit) {
@@ -321,6 +326,29 @@ public class SchedulerTest {
     scheduler.tick();
 
     assertThat(stateManager.get(INSTANCE).state(), is(State.PREPARE));
+  }
+
+  @Test
+  public void shouldThrottleNewTriggers() throws Exception {
+    setUp(20);
+    // Set very low throttling rate to practically allow for a single submission
+    when(storage.submissionRate()).thenReturn(Optional.of(0.0001D));
+    initWorkflow(workflowUsingResources(WORKFLOW_ID1));
+
+    final RunState i0 = RunState.create(instance(WORKFLOW_ID1, "i0"), State.QUEUED, time);
+    init(i0);
+    scheduler.tick();
+
+    assertThat(stateManager.get(i0.workflowInstance()).state(), is(State.PREPARE));
+
+    final RunState i1 = RunState.create(instance(WORKFLOW_ID1, "i1"), State.QUEUED, time);
+    init(i1);
+    try {
+      await().atMost(Duration.ONE_SECOND).until(() -> scheduler.tick());
+      fail();
+    } catch (ConditionTimeoutException e) {
+      assertThat(stateManager.get(i1.workflowInstance()).state(), is(State.QUEUED));
+    }
   }
 
   @Test

@@ -51,7 +51,8 @@ import java.util.stream.Collectors;
 public class InMemStorage implements Storage {
 
   private boolean globalEnabled = true;
-  private Optional<Long> globalConcurrency;
+  private Optional<Long> globalConcurrency = Optional.empty();
+  private Optional<Double> submissionRate = Optional.empty();
   private final Set<WorkflowId> enabledWorkflows = Sets.newConcurrentHashSet();
   private final Set<String> components = Sets.newConcurrentHashSet();
   private final ConcurrentMap<WorkflowId, Workflow> workflowStore = Maps.newConcurrentMap();
@@ -82,6 +83,11 @@ public class InMemStorage implements Storage {
   @Override
   public boolean debugEnabled() throws IOException {
     throw new UnsupportedOperationException("Unsupported Operation!");
+  }
+
+  @Override
+  public Optional<Double> submissionRate() throws IOException {
+    return submissionRate;
   }
 
   @Override
