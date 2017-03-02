@@ -21,16 +21,17 @@
 package com.spotify.styx.cli;
 
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
+import static com.spotify.styx.serialization.Json.deserialize;
 import static com.spotify.styx.serialization.Json.serialize;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
+import com.spotify.apollo.Response;
 import com.spotify.apollo.core.Service;
 import com.spotify.apollo.core.Services;
 import com.spotify.apollo.environment.ApolloEnvironmentModule;
@@ -39,6 +40,7 @@ import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.cli.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowId;
@@ -46,7 +48,6 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.ParameterUtil;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.time.Duration;
 import java.time.Instant;
@@ -72,7 +73,6 @@ public final class Main {
 
   private static final String UTF_8 = "UTF-8";
   private static final String ENV_VAR_PREFIX = "STYX_CLI";
-  private static final String STYX_CLI_API_ENDPOINT = "/api/v1/cli";
   private static final String STYX_API_ENDPOINT = "/api/v1";
   private static final int TTL_REQUEST = 90;
 
@@ -83,8 +83,9 @@ public final class Main {
   private static final String PARAMETER_DEST = "parameter";
 
   private static final int EXIT_CODE_SUCCESS = 0;
-  private static final int EXIT_CODE_API_ERROR = 1;
+  private static final int EXIT_CODE_UNKNOWN_ERROR = 1;
   private static final int EXIT_CODE_ARGUMENT_ERROR = 2;
+  private static final int EXIT_CODE_API_ERROR = 3;
 
   private final StyxCliParser parser;
   private final Namespace namespace;
@@ -119,11 +120,11 @@ public final class Main {
       }
     } catch (HelpScreenException e) {
       System.exit(EXIT_CODE_SUCCESS);
-      return;
+      return; // needed to convince compiler that flow is interrupted
     } catch (ArgumentParserException e) {
       parser.parser.handleError(e);
       System.exit(EXIT_CODE_ARGUMENT_ERROR);
-      return;
+      return; // needed to convince compiler that flow is interrupted
     }
 
     final Service cliService = Services.usingName("styx-cli")
@@ -138,7 +139,7 @@ public final class Main {
     new Main(parser, namespace, apiHost, cliService, cliOutput).run();
   }
 
-  private void run() throws IOException, InterruptedException {
+  private void run() {
     final Command command = namespace.get(COMMAND_DEST);
 
     try (Service.Instance instance = cliService.start()) {
@@ -173,6 +174,7 @@ public final class Main {
               break;
             case EDIT:
               backfillEdit();
+              break;
             case HALT:
               backfillHalt();
               break;
@@ -183,19 +185,30 @@ public final class Main {
               backfillList();
               break;
             default:
-              throw new RuntimeException("Unrecognized command: " + backfillCommand);
+              // parsing unknown command will fail so this would only catch non-exhaustive switches
+              throw new ArgumentParserException(
+                  String.format("Unrecognized command: %s %s", command, backfillCommand),
+                  parser.parser);
           }
           break;
 
         default:
-          // parsing unknown command will fail so this should never happen...
-          throw new RuntimeException("Unrecognized command: " + command);
+          // parsing unknown command will fail so this would only catch non-exhaustive switches
+          throw new ArgumentParserException("Unrecognized command: " + command, parser.parser);
       }
-      instance.getSignaller().signalShutdown();
+    } catch (ArgumentParserException e) {
+      parser.parser.handleError(e);
+      System.exit(EXIT_CODE_ARGUMENT_ERROR);
+    } catch (InterruptedException | ExecutionException e) {
+      e.printStackTrace();
+      System.exit(EXIT_CODE_UNKNOWN_ERROR);
+    } catch (Exception e) {
+      System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage());
+      System.exit(EXIT_CODE_API_ERROR);
     }
   }
 
-  private void backfillCreate() {
+  private void backfillCreate() throws ExecutionException, InterruptedException, IOException {
     final String component = namespace.getString(parser.backfillCreateComponent.getDest());
     final String workflow = namespace.getString(parser.backfillCreateWorkflow.getDest());
     final String start = namespace.getString(parser.backfillCreateStart.getDest());
@@ -205,84 +218,47 @@ public final class Main {
     final BackfillInput backfillInput = BackfillInput.create(
         Instant.parse(start), Instant.parse(end), component, workflow, concurrency);
 
-    final ByteString payload;
-    try {
-      payload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(backfillInput));
-    } catch (JsonProcessingException e) {
-      throw Throwables.propagate(e);
-    }
-    final Request request = Request.forUri(apiUrl("backfills"), "POST").withPayload(payload);
-    byte[] response = send(request);
-    final Backfill backfill;
-    try {
-      backfill = OBJECT_MAPPER.readValue(response, Backfill.class);
-    } catch (IOException e) {
-      e.printStackTrace();
-      return;
-    }
+    final ByteString payload = serialize(backfillInput);
+    final ByteString response = send(
+        Request.forUri(apiUrl("backfills"), "POST").withPayload(payload));
+    final Backfill backfill = deserialize(response, Backfill.class);
     cliOutput.printBackfill(backfill);
   }
 
-  private void backfillEdit() {
+  private void backfillEdit() throws ExecutionException, InterruptedException, IOException {
     final Integer concurrency = namespace.getInt(parser.backfillEditConcurrency.getDest());
     final String id = namespace.getString(parser.backfillEditId.getDest());
-    final Request getRequest = Request.forUri(apiUrl("backfills", id));
 
-    byte[] getResponse = send(getRequest);
-    final BackfillPayload backfillPayload;
-    try {
-      backfillPayload = OBJECT_MAPPER.readValue(getResponse, BackfillPayload.class);
-    } catch (IOException e) {
-      e.printStackTrace();
-      return;
-    }
-
-    Backfill editedBackfill = backfillPayload.backfill();
+    final ByteString getResponse = send(Request.forUri(apiUrl("backfills", id)));
+    final BackfillPayload backfillPayload = deserialize(getResponse, BackfillPayload.class);
+    final BackfillBuilder editedBackfillBuilder = backfillPayload.backfill().builder();
     if (concurrency != null) {
-      editedBackfill = backfillPayload.backfill().builder().concurrency(concurrency).build();
+      editedBackfillBuilder.concurrency(concurrency);
     }
-    final ByteString putPayload;
-    try {
-      putPayload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(editedBackfill));
-    } catch (JsonProcessingException e) {
-      throw Throwables.propagate(e);
-    }
-    final Request putRequest = Request.forUri(apiUrl("backfills", id), "PUT").withPayload(putPayload);
-    byte[] putResponse = send(putRequest);
+    final ByteString putPayload = serialize(editedBackfillBuilder.build());
+    final ByteString putResponse = send(
+        Request.forUri(apiUrl("backfills", id), "PUT").withPayload(putPayload));
 
-    final Backfill newBackfill;
-    try {
-      newBackfill = OBJECT_MAPPER.readValue(putResponse, Backfill.class);
-    } catch (IOException e) {
-      e.printStackTrace();
-      return;
-    }
+    final Backfill newBackfill = deserialize(putResponse, Backfill.class);
     cliOutput.printBackfill(newBackfill);
   }
 
-  private void backfillHalt() {
+  private void backfillHalt() throws ExecutionException, InterruptedException {
     final String id = namespace.getString(parser.backfillHaltId.getDest());
-    final Request request = Request.forUri(apiUrl("backfills", id), "DELETE");
-    send(request);
+    send(Request.forUri(apiUrl("backfills", id), "DELETE"));
   }
 
-  private void backfillShow() {
+  private void backfillShow() throws ExecutionException, InterruptedException, IOException {
     final String id = namespace.getString(parser.backfillShowId.getDest());
-    final Request request = Request.forUri(apiUrl("backfills", id));
-    byte[] response = send(request);
-    final BackfillPayload backfillStatus;
-    try {
-      backfillStatus = OBJECT_MAPPER.readValue(response, BackfillPayload.class);
-    } catch (IOException e) {
-      e.printStackTrace();
-      return;
-    }
+    final ByteString response = send(Request.forUri(apiUrl("backfills", id)));
+    final BackfillPayload backfillStatus = deserialize(response, BackfillPayload.class);
     cliOutput.printBackfillPayload(backfillStatus);
   }
 
-  private void backfillList() throws UnsupportedEncodingException {
+  private void backfillList()
+      throws IOException, ExecutionException, InterruptedException {
     String uri = apiUrl("backfills");
-    List<String> queries = new ArrayList<>();
+    final List<String> queries = new ArrayList<>();
     final String component = namespace.getString(parser.backfillListComponent.getDest());
     if (component != null) {
       queries.add("component=" + URLEncoder.encode(component, UTF_8));
@@ -294,58 +270,35 @@ public final class Main {
     if (!queries.isEmpty()) {
       uri += "?" + String.join("&", queries);
     }
-    final Request request = Request.forUri(uri);
-    byte[] response = send(request);
-    final BackfillsPayload backfills;
-    try {
-      backfills = OBJECT_MAPPER.readValue(response, BackfillsPayload.class);
-    } catch (IOException e) {
-      e.printStackTrace();
-      return;
-    }
+    final ByteString response = send(Request.forUri(uri));
+    final BackfillsPayload backfills = deserialize(response, BackfillsPayload.class);
     cliOutput.printBackfills(backfills.backfills());
   }
 
-  private String apiUrl(CharSequence... parts) {
-    return "http://" + apiHost + STYX_API_ENDPOINT + "/" + String.join("/", parts);
-  }
-
-  private String cliApiUrl(CharSequence... parts) {
-    return "http://" + apiHost + STYX_CLI_API_ENDPOINT + "/" + String.join("/", parts);
-  }
-
-  private void activeStates()
-      throws UnsupportedEncodingException {
-
-    String uri = cliApiUrl("activeStates");
-    String component = namespace.getString(parser.listComponent.getDest());
+  private void activeStates() throws IOException, ExecutionException, InterruptedException {
+    String uri = apiUrl("cli", "activeStates");
+    final String component = namespace.getString(parser.listComponent.getDest());
     if (component != null) {
       uri += "?component=" + URLEncoder.encode(component, UTF_8);
     }
 
-    byte[] response = send(Request.forUri(uri).withTtl(Duration.ofSeconds(TTL_REQUEST)));
-    try {
-      cliOutput.printStates(OBJECT_MAPPER.readValue(response, RunStateDataPayload.class));
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
+    final ByteString response = send(Request.forUri(uri).withTtl(Duration.ofSeconds(TTL_REQUEST)));
+    final RunStateDataPayload runStateDataPayload = deserialize(response, RunStateDataPayload.class);
+    cliOutput.printStates(runStateDataPayload);
   }
 
-  private void eventsForWorkflowInstance() {
-    WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
-    String component = workflowInstance.workflowId().componentId();
-    String workflow = workflowInstance.workflowId().endpointId();
-    String parameter = workflowInstance.parameter();
+  private void eventsForWorkflowInstance()
+      throws ExecutionException, InterruptedException, IOException {
+    final WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
+    final String component = workflowInstance.workflowId().componentId();
+    final String workflow = workflowInstance.workflowId().endpointId();
+    final String parameter = workflowInstance.parameter();
 
-    byte[] response = send(Request.forUri(cliApiUrl("events", component, workflow, parameter))
-        .withTtl(Duration.ofSeconds(TTL_REQUEST)));
+    final ByteString response = send(
+        Request.forUri(apiUrl("cli", "events", component, workflow, parameter))
+            .withTtl(Duration.ofSeconds(TTL_REQUEST)));
 
-    final JsonNode jsonNode;
-    try {
-      jsonNode = OBJECT_MAPPER.readTree(response);
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
+    final JsonNode jsonNode = OBJECT_MAPPER.readTree(response.toByteArray());
 
     if (!jsonNode.isObject()) {
       throw new RuntimeException("Invalid json returned from API");
@@ -376,48 +329,25 @@ public final class Main {
     cliOutput.printEvents(eventInfos.build());
   }
 
-  private void triggerWorkflowInstance() {
-    WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
-
-    final ByteString payload;
-    try {
-      payload = serialize(workflowInstance);
-    } catch (JsonProcessingException e) {
-      throw Throwables.propagate(e);
-    }
-    Request request = Request.forUri(cliApiUrl("trigger"), "POST")
-        .withPayload(payload);
-    send(request);
+  private void triggerWorkflowInstance()
+      throws ExecutionException, InterruptedException, JsonProcessingException {
+    final WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
+    final ByteString payload = serialize(workflowInstance);
+    send(Request.forUri(apiUrl("cli", "trigger"), "POST").withPayload(payload));
   }
 
-  private void haltWorkflowInstance() {
-    WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
-
-    Event halt = Event.halt(workflowInstance);
-    final ByteString payload;
-    try {
-      payload = serialize(halt);
-    } catch (JsonProcessingException e) {
-      throw Throwables.propagate(e);
-    }
-    Request request = Request.forUri(cliApiUrl("events"), "POST")
-        .withPayload(payload);
-    send(request);
+  private void haltWorkflowInstance()
+      throws ExecutionException, InterruptedException, JsonProcessingException {
+    final WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
+    final ByteString payload = serialize(Event.halt(workflowInstance));
+    send(Request.forUri(apiUrl("cli", "events"), "POST").withPayload(payload));
   }
 
-  private void retryWorkflowInstance() {
-    WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
-
-    Event dequeue = Event.dequeue(workflowInstance);
-    final ByteString payload;
-    try {
-      payload = serialize(dequeue);
-    } catch (JsonProcessingException e) {
-      throw Throwables.propagate(e);
-    }
-    Request request = Request.forUri(cliApiUrl("events"), "POST")
-        .withPayload(payload);
-    send(request);
+  private void retryWorkflowInstance()
+      throws ExecutionException, InterruptedException, JsonProcessingException {
+    final WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
+    final ByteString payload = serialize(Event.dequeue(workflowInstance));
+    send(Request.forUri(apiUrl("cli", "events"), "POST").withPayload(payload));
   }
 
   private static WorkflowInstance getWorkflowInstance(Namespace namespace) {
@@ -428,26 +358,21 @@ public final class Main {
         namespace.getString(PARAMETER_DEST));
   }
 
-  private byte[] send(Request request) {
-    try {
-      return client.send(request).handle((response, throwable) -> {
-        if (throwable != null) {
-          throw Throwables.propagate(throwable);
-        }
-        switch (response.status().family()) {
-          case SUCCESSFUL:
-          case REDIRECTION:
-            return response.payload().orElse(ByteString.EMPTY).toByteArray();
-          default:
-            System.err.println("An API error occurred: " + response.status().reasonPhrase());
-            System.exit(EXIT_CODE_API_ERROR);
-            return null;
-        }
-      }).toCompletableFuture().get();
-    } catch (InterruptedException | ExecutionException e) {
-      e.printStackTrace();
-      System.exit(EXIT_CODE_API_ERROR);
-      return null;
+  private String apiUrl(CharSequence... parts) {
+    return "http://" + apiHost + STYX_API_ENDPOINT + "/" + String.join("/", parts);
+  }
+
+  private ByteString send(Request request) throws ExecutionException, InterruptedException {
+    final Response<ByteString> response = client.send(request).toCompletableFuture().get();
+
+    switch (response.status().family()) {
+      case SUCCESSFUL:
+        return response.payload().orElse(ByteString.EMPTY);
+      default:
+        throw new RuntimeException(
+            String.format("API error: %d %s",
+                          response.status().code(),
+                          response.status().reasonPhrase()));
     }
   }
 
