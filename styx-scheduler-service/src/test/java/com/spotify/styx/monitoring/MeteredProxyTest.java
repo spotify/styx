@@ -20,6 +20,8 @@
 
 package com.spotify.styx.monitoring;
 
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -29,9 +31,14 @@ import com.spotify.styx.util.Time;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 public class MeteredProxyTest {
+
+  @Rule
+  public ExpectedException expect = ExpectedException.none();
 
   Instant now = Instant.now();
   Instant later = now.plusMillis(123);
@@ -61,5 +68,18 @@ public class MeteredProxyTest {
 
     verify(mock).cleanup("barbaz");
     verify(stats).dockerOperation("cleanup", 123);
+  }
+
+  @Test
+  public void surfaceExceptions() throws Exception {
+    DockerRunner mock = mock(DockerRunner.class);
+    DockerRunner proxy = MeteredProxy.instrument(DockerRunner.class, mock, stats, time);
+
+    doThrow(new RuntimeException("with message")).when(mock).cleanup(any());
+
+    expect.expect(RuntimeException.class);
+    expect.expectMessage("with message");
+
+    proxy.cleanup("foo");
   }
 }

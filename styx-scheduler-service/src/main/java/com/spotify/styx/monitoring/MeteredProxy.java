@@ -24,6 +24,7 @@ import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.time.Instant;
@@ -61,7 +62,12 @@ public class MeteredProxy implements InvocationHandler {
     final String operation = method.getName();
 
     final Instant t0 = time.get();
-    final Object ret = method.invoke(delegate, args);
+    final Object ret;
+    try {
+      ret = method.invoke(delegate, args);
+    } catch (InvocationTargetException e) {
+      throw e.getTargetException();
+    }
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
 
     if (delegate instanceof Storage) {
