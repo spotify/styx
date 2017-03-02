@@ -4,7 +4,7 @@
   <parent>
     <groupId>com.spotify</groupId>
     <artifactId>styx</artifactId>
-    <version>0.2.16</version>
+    <version>0.2.17-SNAPSHOT</version>
   </parent>
 
   <name>Spotify Styx CLI</name>
@@ -14,7 +14,7 @@
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-common</artifactId>
-      <version>0.2.16</version>
+      <version>0.2.17-SNAPSHOT</version>
     </dependency>
 
     <dependency>
