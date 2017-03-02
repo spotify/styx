@@ -232,12 +232,7 @@ public class Scheduler {
   private void triggerBackfills(Collection<InstanceState> activeStates) {
     final List<Backfill> backfills;
     try {
-      backfills = storage.backfills().stream()
-          // TODO: filter in datastore
-          .filter(backfill -> !backfill.allTriggered())
-          // TODO: filter in datastore
-          .filter(backfill -> !backfill.halted())
-          .collect(toList());
+      backfills = storage.backfills(false);
     } catch (IOException e) {
       LOG.warn("Failed to get backfills", e);
       return;

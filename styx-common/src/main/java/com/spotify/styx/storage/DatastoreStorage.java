@@ -544,21 +544,59 @@ class DatastoreStorage {
   }
 
   Optional<Backfill> getBackfill(String id) {
-    Entity entity = datastore.get(datastore.newKeyFactory().kind(KIND_BACKFILL).newKey(id));
+    final Entity entity = datastore.get(datastore.newKeyFactory().kind(KIND_BACKFILL).newKey(id));
     if (entity == null) {
       return Optional.empty();
     }
     return Optional.of(entityToBackfill(entity));
   }
 
-  List<Backfill> getBackfills() {
-    final EntityQuery query = Query.entityQueryBuilder().kind(KIND_BACKFILL).build();
+  private EntityQuery.Builder backfillQueryBuilder(boolean showAll) {
+    final EntityQuery.Builder queryBuilder = Query.entityQueryBuilder().kind(KIND_BACKFILL);
+
+    if (!showAll) {
+      queryBuilder
+          .filter(PropertyFilter.eq(PROPERTY_ALL_TRIGGERED, false))
+          .filter(PropertyFilter.eq(PROPERTY_HALTED, false));
+    }
+
+    return queryBuilder;
+  }
+
+  private List<Backfill> backfillsForQuery(Query<Entity> query) {
     final QueryResults<Entity> results = datastore.run(query);
     final ImmutableList.Builder<Backfill> resources = ImmutableList.builder();
-    while (results.hasNext()) {
-      resources.add(entityToBackfill(results.next()));
-    }
+    results.forEachRemaining(entity -> resources.add(entityToBackfill(entity)));
     return resources.build();
+  }
+
+  List<Backfill> getBackfills(boolean showAll) {
+    return backfillsForQuery(backfillQueryBuilder(showAll).build());
+  }
+
+  List<Backfill> getBackfillsForComponent(boolean showAll, String component) {
+    final EntityQuery query = backfillQueryBuilder(showAll)
+        .filter(PropertyFilter.eq(PROPERTY_COMPONENT, component))
+        .build();
+
+    return backfillsForQuery(query);
+  }
+
+  List<Backfill> getBackfillsForWorkflow(boolean showAll, String workflow) {
+    final EntityQuery query = backfillQueryBuilder(showAll)
+        .filter(PropertyFilter.eq(PROPERTY_WORKFLOW, workflow))
+        .build();
+
+    return backfillsForQuery(query);
+  }
+
+  List<Backfill> getBackfillsForWorkflowId(boolean showAll, WorkflowId workflowId) {
+    final EntityQuery query = backfillQueryBuilder(showAll)
+        .filter(PropertyFilter.eq(PROPERTY_COMPONENT, workflowId.componentId()))
+        .filter(PropertyFilter.eq(PROPERTY_WORKFLOW, workflowId.endpointId()))
+        .build();
+
+    return backfillsForQuery(query);
   }
 
   private Backfill entityToBackfill(Entity entity) {

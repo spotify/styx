@@ -76,7 +76,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       DATA_ENDPOINT_DAILY);
   private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
   private static final Trigger TRIGGER2 = Trigger.unknown("trig2");
-  private static final Backfill BACKFILL = Backfill.newBuilder()
+  private static final Backfill ONE_DAY_HOURLY_BACKFILL = Backfill.newBuilder()
       .id("backfill-1")
       .start(Instant.parse("2015-01-01T00:00:00Z"))
       .end(Instant.parse("2015-01-02T00:00:00Z"))
@@ -139,7 +139,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, false);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
-    givenBackfill(BACKFILL);
+    givenBackfill(ONE_DAY_HOURLY_BACKFILL);
 
     styxStarts();
     tickScheduler();
@@ -160,8 +160,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, false);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
-    final Backfill singleHourBackfill = BACKFILL.builder()
-        .end(BACKFILL.start().plus(1, ChronoUnit.HOURS)).build();
+    final Backfill singleHourBackfill = ONE_DAY_HOURLY_BACKFILL.builder()
+        .end(ONE_DAY_HOURLY_BACKFILL.start().plus(1, ChronoUnit.HOURS)).build();
     givenBackfill(singleHourBackfill);
 
     styxStarts();

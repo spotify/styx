@@ -44,6 +44,7 @@ import java.util.SortedSet;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * A Storage implementation with state stored in memory. For testing.
@@ -225,8 +226,51 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public List<Backfill> backfills() throws IOException {
-    return ImmutableList.copyOf(backfillStore.values());
+  public List<Backfill> backfills(boolean showAll) throws IOException {
+    Stream<Backfill> backfillStream = backfillStore.values().stream();
+
+    if (!showAll) {
+      backfillStream = backfillStream.filter(backfill -> backfill.halted() && backfill.allTriggered());
+    }
+
+    return ImmutableList.copyOf(backfillStream.collect(Collectors.toList())
+    );
+  }
+
+  @Override
+  public List<Backfill> backfillsForComponent(boolean showAll, String component) throws IOException {
+    Stream<Backfill> backfillStream = backfillStore.values().stream()
+        .filter(backfill -> backfill.workflowId().componentId().equals(component));
+
+    if (!showAll) {
+      backfillStream = backfillStream.filter(backfill -> backfill.halted() && backfill.allTriggered());
+    }
+
+    return ImmutableList.copyOf(backfillStream.collect(Collectors.toList()));
+  }
+
+  @Override
+  public List<Backfill> backfillsForWorkflow(boolean showAll, String workflow) throws IOException {
+    Stream<Backfill> backfillStream = backfillStore.values().stream()
+        .filter(backfill -> backfill.workflowId().endpointId().equals(workflow));
+
+    if (!showAll) {
+      backfillStream = backfillStream.filter(backfill -> backfill.halted() && backfill.allTriggered());
+    }
+
+    return ImmutableList.copyOf(backfillStream.collect(Collectors.toList()));
+  }
+
+  @Override
+  public List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId) throws IOException {
+    Stream<Backfill> backfillStream = backfillStore.values().stream()
+        .filter(backfill -> backfill.workflowId().equals(workflowId));
+
+    if (!showAll) {
+      backfillStream = backfillStream.filter(backfill -> backfill.halted() && backfill.allTriggered());
+    }
+
+    return ImmutableList.copyOf(backfillStream.collect(Collectors.toList()));
   }
 
   @Override
