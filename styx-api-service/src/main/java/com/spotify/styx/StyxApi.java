@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.api.Middlewares.clientValidator;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
@@ -31,14 +32,20 @@ import com.spotify.apollo.Environment;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.BackfillResource;
 import com.spotify.styx.api.CliResource;
+import com.spotify.styx.api.Middlewares;
 import com.spotify.styx.api.ResourceResource;
 import com.spotify.styx.api.StyxConfigResource;
 import com.spotify.styx.api.WorkflowResource;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.StorageFactory;
 import com.typesafe.config.Config;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Supplier;
 import org.apache.hadoop.hbase.client.Connection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,13 +107,18 @@ public class StyxApi implements AppInit {
     final StyxConfigResource styxConfigResource = new StyxConfigResource(storage);
     final CliResource cliResource = new CliResource(schedulerServiceBaseUrl, storage);
 
+    final Supplier<Optional<List<String>>> clientBlacklistSupplier =
+        new CachedSupplier<>(storage::clientBlacklist, Instant::now);
+
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
         .registerRoutes(workflowResource.routes())
         .registerRoutes(resourceResource.routes())
-        .registerRoutes(backfillResource.routes())
+        .registerRoutes(backfillResource.routes()
+                            .map(r -> r.withMiddleware(clientValidator(clientBlacklistSupplier))))
         .registerRoutes(styxConfigResource.routes())
-        .registerRoutes(cliResource.routes());
+        .registerRoutes(cliResource.routes()
+                            .map(r -> r.withMiddleware(clientValidator(clientBlacklistSupplier))));
   }
 
   private static AggregateStorage storage(Environment environment) {

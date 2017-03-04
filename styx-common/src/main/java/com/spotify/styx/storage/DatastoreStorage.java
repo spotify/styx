@@ -57,6 +57,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,6 +78,7 @@ class DatastoreStorage {
   public static final String PROPERTY_CONFIG_ENABLED = "enabled";
   public static final String PROPERTY_CONFIG_DOCKER_RUNNER_ID = "dockerRunnerId";
   public static final String PROPERTY_CONFIG_CONCURRENCY = "concurrency";
+  public static final String PROPERTY_CONFIG_CLIENT_BLACKLIST = "clientBlacklist";
   public static final String PROPERTY_WORKFLOW_JSON = "json";
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
   public static final String PROPERTY_NEXT_NATURAL_TRIGGER = "nextNaturalTrigger";
@@ -597,15 +599,22 @@ class DatastoreStorage {
     return builder.build();
   }
 
-  public Optional<Long> globalConcurrency() {
+  Optional<Long> globalConcurrency() {
     return getOpt(datastore, globalConfigKey)
         .filter(e -> e.contains(PROPERTY_CONFIG_CONCURRENCY))
         .map(e -> e.getLong(PROPERTY_CONFIG_CONCURRENCY));
   }
 
-  public Optional<Double> submissionRate() {
+  Optional<Double> submissionRate() {
     return getOpt(datastore, globalConfigKey)
         .filter(e -> e.contains(PROPERTY_SUBMISSION_RATE_LIMIT))
         .map(e -> e.getDouble(PROPERTY_SUBMISSION_RATE_LIMIT));
+  }
+
+  Optional<List<String>> clientBlacklist() {
+    return getOpt(datastore, globalConfigKey)
+        .filter(e -> e.contains(PROPERTY_CONFIG_CLIENT_BLACKLIST))
+        .map(e -> e.getList(PROPERTY_CONFIG_CLIENT_BLACKLIST).stream().map(v -> (String) v.get())
+            .collect(Collectors.toList()));
   }
 }

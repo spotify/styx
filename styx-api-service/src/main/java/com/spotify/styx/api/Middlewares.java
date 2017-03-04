@@ -23,11 +23,17 @@ package com.spotify.styx.api;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.SyncHandler;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.function.Supplier;
 import okio.ByteString;
 
 /**
@@ -49,7 +55,7 @@ public final class Middlewares {
       jsonAsync() {
     return innerHandler -> innerHandler.map(response -> {
       if (!response.payload().isPresent()) {
-        //noinspection unchecked
+        // noinspection unchecked
         return (Response<ByteString>) response;
       }
 
@@ -66,5 +72,23 @@ public final class Middlewares {
                 "Failed to serialize response " + e.getMessage()));
       }
     });
+  }
+
+  public static Middleware<AsyncHandler<? extends Response<?>>,
+      AsyncHandler<? extends Response<ByteString>>> clientValidator(
+      Supplier<Optional<List<String>>> supplier) {
+    return innerHandler -> requestContext -> {
+      if (requestContext.request().header("User-Agent")
+          .map(header -> supplier.get().orElse(ImmutableList.of()).contains(header))
+          .orElse(false)) {
+        // TODO: fire some stats
+        return CompletableFuture
+            .completedFuture(Response.forStatus(Status.NOT_ACCEPTABLE.withReasonPhrase(
+                "blacklisted client version, please upgrade")));
+      } else {
+        // noinspection unchecked
+        return (CompletionStage<Response<ByteString>>) innerHandler.invoke(requestContext);
+      }
+    };
   }
 }
