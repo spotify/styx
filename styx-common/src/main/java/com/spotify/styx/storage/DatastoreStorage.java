@@ -94,7 +94,7 @@ class DatastoreStorage {
   public static final String PROPERTY_ALL_TRIGGERED = "allTriggered";
   public static final String PROPERTY_HALTED = "halted";
   public static final String PROPERTY_DEBUG_ENABLED = "debug";
-  public static final String PROPERTY_SUBMISSION_RATE = "submissionRate";
+  public static final String PROPERTY_SUBMISSION_RATE = "submissionRateLimit";
 
   public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
 
