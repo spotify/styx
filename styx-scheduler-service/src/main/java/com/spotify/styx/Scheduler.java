@@ -34,7 +34,6 @@ import com.google.auto.value.AutoValue;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.Event;
@@ -98,7 +97,7 @@ public class Scheduler {
   private final TriggerListener triggerListener;
 
   public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager,
-      WorkflowCache workflowCache, Storage storage, TriggerListener triggerListener) {
+                   WorkflowCache workflowCache, Storage storage, TriggerListener triggerListener) {
     this.time = Objects.requireNonNull(time);
     this.ttls = Objects.requireNonNull(ttls);
     this.stateManager = Objects.requireNonNull(stateManager);
@@ -165,7 +164,7 @@ public class Scheduler {
               emptySet());
 
       if (resourceRefs.isEmpty()) {
-        sendDequeueWithThrottling(instance);
+        sendDequeue(instance);
       } else {
         evaluateResourcesForDequeue(resources, currentResourceUsage, instance, resourceRefs);
       }
@@ -215,7 +214,7 @@ public class Scheduler {
     } else {
       resourceRefs.forEach(id -> currentResourceUsage.computeIfAbsent(id, id_ -> 0L));
       resourceRefs.forEach(id -> currentResourceUsage.compute(id, (id_, l) -> l + 1));
-      sendDequeueWithThrottling(instance);
+      sendDequeue(instance);
     }
   }
 
@@ -330,7 +329,7 @@ public class Scheduler {
     return !deadline.isAfter(now);
   }
 
-  private void sendDequeueWithThrottling(InstanceState instanceState) {
+  private void sendDequeue(InstanceState instanceState) {
     final WorkflowInstance workflowInstance = instanceState.workflowInstance();
     final RunState state = instanceState.runState();
 
