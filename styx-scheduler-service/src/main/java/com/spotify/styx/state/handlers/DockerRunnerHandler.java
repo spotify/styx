@@ -23,6 +23,7 @@ package com.spotify.styx.state.handlers;
 import static java.util.Objects.requireNonNull;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
@@ -37,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,40 +52,50 @@ public class DockerRunnerHandler implements OutputHandler {
   private final DockerRunner dockerRunner;
   private final StateManager stateManager;
   private final Storage storage;
+  private final RateLimiter rateLimiter;
+  private final ExecutorService executor;
 
   public DockerRunnerHandler(
       DockerRunner dockerRunner,
       StateManager stateManager,
-      Storage storage) {
+      Storage storage,
+      RateLimiter rateLimiter,
+      ExecutorService executor) {
     this.dockerRunner = requireNonNull(dockerRunner);
     this.stateManager = requireNonNull(stateManager);
     this.storage = requireNonNull(storage);
+    this.rateLimiter = requireNonNull(rateLimiter, "rateLimiter");
+    this.executor = requireNonNull(executor, "executor");
   }
 
   @Override
   public void transitionInto(RunState state) {
     switch (state.state()) {
       case SUBMITTING:
-        try {
-          final String executionId = dockerRunnerStart(state);
-          // this is racy
-          final Event submitted = Event.submitted(state.workflowInstance(), executionId);
+        // Perform rate limited submission on a separate thread pool to avoid blocking the caller.
+        executor.submit(() -> {
+          rateLimiter.acquire();
           try {
-            stateManager.receive(submitted);
-          } catch (StateManager.IsClosed isClosed) {
-            LOG.warn("Could not send 'created' event", isClosed);
+            final String executionId = dockerRunnerStart(state);
+            // this is racy
+            final Event submitted = Event.submitted(state.workflowInstance(), executionId);
+            try {
+              stateManager.receive(submitted);
+            } catch (StateManager.IsClosed isClosed) {
+              LOG.warn("Could not send 'created' event", isClosed);
+            }
+          } catch (ResourceNotFoundException e) {
+            LOG.error("Unable to start docker procedure.", e);
+            stateManager.receiveIgnoreClosed(Event.halt(state.workflowInstance()));
+          } catch (Throwable e) {
+            try {
+              LOG.error("Failed the docker starting procedure for " + state.workflowInstance().toKey(), e);
+              stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()));
+            } catch (StateManager.IsClosed isClosed) {
+              LOG.warn("Failed to send 'runError' event", isClosed);
+            }
           }
-        } catch (ResourceNotFoundException e) {
-          LOG.error("Unable to start docker procedure.", e);
-          stateManager.receiveIgnoreClosed(Event.halt(state.workflowInstance()));
-        } catch (Throwable e) {
-          try {
-            LOG.error("Failed the docker starting procedure for " + state.workflowInstance().toKey(), e);
-            stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()));
-          } catch (StateManager.IsClosed isClosed) {
-            LOG.warn("Failed to send 'runError' event", isClosed);
-          }
-        }
+        });
         break;
 
       case TERMINATED:

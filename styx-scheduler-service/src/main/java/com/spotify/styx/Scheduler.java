@@ -89,7 +89,6 @@ public class Scheduler {
 
   @VisibleForTesting
   static final String GLOBAL_RESOURCE_ID = "GLOBAL_STYX_CLUSTER";
-  private static final double DEFAULT_SUBMISSION_RATE_PER_SEC = 1000D;
 
   private final Time time;
   private final TimeoutConfig ttls;
@@ -97,30 +96,18 @@ public class Scheduler {
   private final WorkflowCache workflowCache;
   private final Storage storage;
   private final TriggerListener triggerListener;
-  private final RateLimiter rateLimiter;
 
   public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager,
-                   WorkflowCache workflowCache, Storage storage, TriggerListener triggerListener,
-                   RateLimiter rateLimiter) {
+      WorkflowCache workflowCache, Storage storage, TriggerListener triggerListener) {
     this.time = Objects.requireNonNull(time);
     this.ttls = Objects.requireNonNull(ttls);
     this.stateManager = Objects.requireNonNull(stateManager);
     this.workflowCache = Objects.requireNonNull(workflowCache);
     this.storage = Objects.requireNonNull(storage);
     this.triggerListener = Objects.requireNonNull(triggerListener);
-    this.rateLimiter = Objects.requireNonNull(rateLimiter);
   }
 
   void tick() {
-    try {
-      Double updatedRate = storage.submissionRate().orElse(DEFAULT_SUBMISSION_RATE_PER_SEC);
-      if (Double.compare(updatedRate, rateLimiter.getRate()) != 0) {
-        rateLimiter.setRate(updatedRate);
-      }
-    } catch (IOException e) {
-      LOG.warn("Failed to fetch the submission rate config from storage, skipping RateLimiter update");
-    }
-
     final Map<String, Resource> resources;
     final Optional<Long> globalConcurrency;
     try {
@@ -347,7 +334,6 @@ public class Scheduler {
     final WorkflowInstance workflowInstance = instanceState.workflowInstance();
     final RunState state = instanceState.runState();
 
-    rateLimiter.acquire();
     if (state.data().tries() == 0) {
       LOG.info("Triggering {}", workflowInstance.toKey());
     } else {
@@ -367,10 +353,6 @@ public class Scheduler {
         .plus(ttls.ttlOf(runState.state()));
 
     return !deadline.isAfter(now);
-  }
-
-  public static RateLimiter createRateLimiter() {
-    return RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
   }
 
   private void sendTimeout(WorkflowInstance workflowInstance) {

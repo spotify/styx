@@ -117,7 +117,7 @@ public class SchedulerTest {
 
     stateManager = new SyncStateManager();
     scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage,
-                              triggerListener, Scheduler.createRateLimiter());
+                              triggerListener);
   }
 
   private void setResourceLimit(String resourceId, long limit) {
@@ -326,29 +326,6 @@ public class SchedulerTest {
     scheduler.tick();
 
     assertThat(stateManager.get(INSTANCE).state(), is(State.PREPARE));
-  }
-
-  @Test
-  public void shouldThrottleNewTriggers() throws Exception {
-    setUp(20);
-    // Set very low throttling rate to practically allow for a single submission
-    when(storage.submissionRate()).thenReturn(Optional.of(0.0001D));
-    initWorkflow(workflowUsingResources(WORKFLOW_ID1));
-
-    final RunState i0 = RunState.create(instance(WORKFLOW_ID1, "i0"), State.QUEUED, time);
-    init(i0);
-    scheduler.tick();
-
-    assertThat(stateManager.get(i0.workflowInstance()).state(), is(State.PREPARE));
-
-    final RunState i1 = RunState.create(instance(WORKFLOW_ID1, "i1"), State.QUEUED, time);
-    init(i1);
-    try {
-      await().atMost(Duration.ONE_SECOND).until(() -> scheduler.tick());
-      fail();
-    } catch (ConditionTimeoutException e) {
-      assertThat(stateManager.get(i1.workflowInstance()).state(), is(State.QUEUED));
-    }
   }
 
   @Test
