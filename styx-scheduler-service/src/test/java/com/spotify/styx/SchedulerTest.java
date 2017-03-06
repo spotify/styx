@@ -23,11 +23,9 @@ package com.spotify.styx;
 import static com.spotify.styx.state.TimeoutConfig.createWithDefaultTtl;
 import static java.time.Duration.ofSeconds;
 import static java.util.Optional.empty;
-import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.only;
 import static org.mockito.Mockito.verify;
@@ -61,8 +59,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import org.awaitility.Duration;
-import org.awaitility.core.ConditionTimeoutException;
 import org.junit.Test;
 
 public class SchedulerTest {
@@ -113,7 +109,6 @@ public class SchedulerTest {
     triggerListener = mock(TriggerListener.class);
     when(storage.resources()).thenReturn(resourceLimits);
     when(storage.globalConcurrency()).thenReturn(Optional.empty());
-    when(storage.submissionRate()).thenReturn(Optional.empty());
 
     stateManager = new SyncStateManager();
     scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage,
