@@ -121,8 +121,8 @@ public class StyxScheduler implements AppInit {
   public static final String STYX_MODE_DEVELOPMENT = "development";
 
   public static final int SCHEDULER_TICK_INTERVAL_SECONDS = 2;
-  public static final int SUBMISSION_RATE_LIMITER_UPDATE_TICK_INTERVAL_SECONDS = 5;
   public static final int TRIGGER_MANAGER_TICK_INTERVAL_SECONDS = 1;
+  public static final int RUNTIME_CONFIG_UPDATE_INTERVAL_SECONDS = 5;
   public static final Duration DEFAULT_RETRY_BASE_DELAY = Duration.ofMinutes(3);
   public static final int DEFAULT_RETRY_MAX_EXPONENT = 4;
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
@@ -441,7 +441,7 @@ public class StyxScheduler implements AppInit {
     exec.scheduleAtFixedRate(
         guard(() -> updateRuntimeConfig(storage, submissionRateLimiter)),
         0,
-        SUBMISSION_RATE_LIMITER_UPDATE_TICK_INTERVAL_SECONDS,
+        RUNTIME_CONFIG_UPDATE_INTERVAL_SECONDS,
         TimeUnit.SECONDS);
   }
 
