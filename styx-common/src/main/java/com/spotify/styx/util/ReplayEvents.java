@@ -101,11 +101,11 @@ public final class ReplayEvents {
 
   public static Optional<RunState> getBackfillRunState(
       WorkflowInstance workflowInstance,
+      Map<WorkflowInstance, Long> activeWorkflowInstances,
       Storage storage,
       String backfillId) {
     final SettableTime time = new SettableTime();
     boolean backfillFound = false;
-    final long lastConsumedEvent;
 
     final SortedSet<SequenceEvent> sequenceEvents;
     try {
@@ -119,17 +119,9 @@ public final class ReplayEvents {
     }
 
     RunState restoredState = RunState.fresh(workflowInstance, time);
-    try {
-      Map<WorkflowInstance, Long> instances = storage
-          .readActiveWorkflowInstances(workflowInstance.workflowId().componentId());
-      if (instances.keySet().contains(workflowInstance)) {
-        lastConsumedEvent = instances.get(workflowInstance);
-      } else {
-        lastConsumedEvent = sequenceEvents.last().counter();
-      }
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
+
+    final long lastConsumedEvent =
+        activeWorkflowInstances.getOrDefault(workflowInstance, sequenceEvents.last().counter());
 
     for (SequenceEvent sequenceEvent : sequenceEvents) {
       // At the time of writing, we don't expect to get events while Styx is not running.

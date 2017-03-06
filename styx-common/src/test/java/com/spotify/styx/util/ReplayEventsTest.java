@@ -63,11 +63,11 @@ public class ReplayEventsTest {
     events.add(SequenceEvent.create(Event.started(WORKFLOW_INSTANCE),                                    6L, 6L));
 
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
-    when(storage.readActiveWorkflowInstances(WORKFLOW_INSTANCE.workflowId().componentId()))
-        .thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, 6L));
 
     RunState restoredRunState =
-        ReplayEvents.getBackfillRunState(WORKFLOW_INSTANCE, storage, "bf-1").get();
+        ReplayEvents
+            .getBackfillRunState(WORKFLOW_INSTANCE, ImmutableMap.of(WORKFLOW_INSTANCE, 6L), storage,
+                                 "bf-1").get();
 
     assertThat(restoredRunState.state(), is(RUNNING));
     assertThat(restoredRunState.data().trigger(), isPresent());
@@ -89,11 +89,9 @@ public class ReplayEventsTest {
     events.add(SequenceEvent.create(Event.halt(WORKFLOW_INSTANCE),                                     10L, 10L));
 
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
-    when(storage.readActiveWorkflowInstances(WORKFLOW_INSTANCE.workflowId().componentId()))
-        .thenReturn(ImmutableMap.of());
 
     RunState restoredRunState =
-        ReplayEvents.getBackfillRunState(WORKFLOW_INSTANCE, storage, "bf-1").get();
+        ReplayEvents.getBackfillRunState(WORKFLOW_INSTANCE, ImmutableMap.of(), storage, "bf-1").get();
 
     assertThat(restoredRunState.state(), is(DONE));
     assertThat(restoredRunState.data().lastExit(), isPresent());
@@ -107,11 +105,11 @@ public class ReplayEventsTest {
     events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE),                                    2L, 2L));
 
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
-    when(storage.readActiveWorkflowInstances(WORKFLOW_INSTANCE.workflowId().componentId()))
-        .thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, 2L));
 
     Optional<RunState> restoredRunState =
-        ReplayEvents.getBackfillRunState(WORKFLOW_INSTANCE, storage, "erroneous-id");
+        ReplayEvents
+            .getBackfillRunState(WORKFLOW_INSTANCE, ImmutableMap.of(WORKFLOW_INSTANCE, 2L), storage,
+                                 "erroneous-id");
 
     assertThat(restoredRunState, is(Optional.empty()));
   }

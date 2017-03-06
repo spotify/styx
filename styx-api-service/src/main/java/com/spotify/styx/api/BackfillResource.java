@@ -62,6 +62,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -323,6 +324,13 @@ public final class BackfillResource {
     final List<RunStateData> processedStates;
     final List<RunStateData> waitingStates;
 
+    Map<WorkflowInstance, Long> activeWorkflowInstances;
+    try {
+      activeWorkflowInstances = storage.readActiveWorkflowInstances();
+    } catch (IOException e) {
+      throw Throwables.propagate(e);
+    }
+
     final List<Instant> processedInstants = rangeOfInstants(
         backfill.start(), backfill.nextTrigger(), backfill.partitioning());
     processedStates = processedInstants.parallelStream()
@@ -331,6 +339,7 @@ public final class BackfillResource {
               .create(backfill.workflowId(), toParameter(backfill.partitioning(), instant));
           Optional<RunState> restoredStateOpt = ReplayEvents.getBackfillRunState(
               wfi,
+              activeWorkflowInstances,
               storage,
               backfill.id());
           if (restoredStateOpt.isPresent()) {
