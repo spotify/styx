@@ -24,6 +24,7 @@ import static com.spotify.styx.model.Partitioning.HOURS;
 import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
@@ -111,7 +112,7 @@ public class DockerRunnerHandlerTest {
 
     // Let the submission proceed and verify it does so
     semaphore.release();
-    verify(dockerRunner, timeout(60_000)).start(eq(instance1), any(RunSpec.class));
+    verify(dockerRunner, timeout(60_000).times(1)).start(eq(instance1), any(RunSpec.class));
 
     verifyNoMoreInteractions(rateLimiter);
 
@@ -125,15 +126,16 @@ public class DockerRunnerHandlerTest {
     verifyNoMoreInteractions(dockerRunner);
 
     semaphore.release();
-    verify(dockerRunner, timeout(60_000)).start(eq(instance2), any(RunSpec.class));
+    verify(dockerRunner, timeout(60_000).times(2)).start(any(WorkflowInstance.class), any(RunSpec.class));
     verifyNoMoreInteractions(rateLimiter);
 
     semaphore.release();
     semaphore.release();
 
-    verify(dockerRunner, timeout(60_000)).start(eq(instance3), any(RunSpec.class));
-    verify(dockerRunner, timeout(60_000)).start(eq(instance4), any(RunSpec.class));
+    verify(dockerRunner, timeout(60_000).times(4)).start(instanceCaptor.capture(), any(RunSpec.class));
     verifyNoMoreInteractions(rateLimiter);
+
+    assertThat(instanceCaptor.getAllValues(), containsInAnyOrder(instance1, instance2, instance3, instance4));
   }
 
   private WorkflowInstance startWorkflowInstance(String parameter) throws Exception {
