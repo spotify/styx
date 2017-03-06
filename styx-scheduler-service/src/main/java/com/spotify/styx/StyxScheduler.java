@@ -339,7 +339,7 @@ public class StyxScheduler implements AppInit {
     startTriggerManager(triggerManager, executor);
     startScheduleSources(environment, executor, workflowChangeListener, workflowRemoveListener);
     startScheduler(scheduler, executor);
-    startSubmissionRateLimiterUpdate(storage, submissionRateLimiter, executor);
+    startRuntimeConfigUpdate(storage, executor, submissionRateLimiter);
     setupMetrics(stateManager, workflowCache, storage, stats);
 
     final SchedulerResource schedulerResource = new SchedulerResource(stateManager, trigger,
@@ -372,19 +372,6 @@ public class StyxScheduler implements AppInit {
   @VisibleForTesting
   void tickTriggerManager() {
     triggerManager.tick();
-  }
-
-  private static void updateSubmissionRateLimiter(Storage storage, RateLimiter rateLimiter) {
-    try {
-      Double updatedRate = storage.submissionRateLimit().orElse(
-          StyxScheduler.DEFAULT_SUBMISSION_RATE_PER_SEC);
-      if (Double.compare(updatedRate, rateLimiter.getRate()) != 0) {
-        rateLimiter.setRate(updatedRate);
-      }
-    } catch (IOException e) {
-      LOG.warn("Failed to fetch the submission rate config from storage, "
-          + "skipping RateLimiter update");
-    }
   }
 
   private void warmUpCache(WorkflowCache cache, Storage storage) {
@@ -449,13 +436,26 @@ public class StyxScheduler implements AppInit {
         TimeUnit.SECONDS);
   }
 
-  private static void startSubmissionRateLimiterUpdate(Storage storage, RateLimiter rateLimiter,
-      ScheduledExecutorService exec) {
+  private static void startRuntimeConfigUpdate(Storage storage, ScheduledExecutorService exec,
+      RateLimiter submissionRateLimiter) {
     exec.scheduleAtFixedRate(
-        guard(() -> updateSubmissionRateLimiter(storage, rateLimiter)),
+        guard(() -> updateRuntimeConfig(storage, submissionRateLimiter)),
         0,
         SUBMISSION_RATE_LIMITER_UPDATE_TICK_INTERVAL_SECONDS,
         TimeUnit.SECONDS);
+  }
+
+  private static void updateRuntimeConfig(Storage storage, RateLimiter rateLimiter) {
+    try {
+      Double updatedRate = storage.submissionRateLimit().orElse(
+          StyxScheduler.DEFAULT_SUBMISSION_RATE_PER_SEC);
+      if (Double.compare(updatedRate, rateLimiter.getRate()) != 0) {
+        rateLimiter.setRate(updatedRate);
+      }
+    } catch (IOException e) {
+      LOG.warn("Failed to fetch the submission rate config from storage, "
+          + "skipping RateLimiter update");
+    }
   }
 
   private static Runnable guard(Runnable delegate) {
