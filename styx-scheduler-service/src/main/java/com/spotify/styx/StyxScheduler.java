@@ -453,7 +453,7 @@ public class StyxScheduler implements AppInit {
       ScheduledExecutorService exec) {
     exec.scheduleAtFixedRate(
         guard(() -> updateSubmissionRateLimiter(storage, rateLimiter)),
-        SUBMISSION_RATE_LIMITER_UPDATE_TICK_INTERVAL_SECONDS,
+        0,
         SUBMISSION_RATE_LIMITER_UPDATE_TICK_INTERVAL_SECONDS,
         TimeUnit.SECONDS);
   }
