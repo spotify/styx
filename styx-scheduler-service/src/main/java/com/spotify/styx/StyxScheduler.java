@@ -447,9 +447,11 @@ public class StyxScheduler implements AppInit {
 
   private static void updateRuntimeConfig(Storage storage, RateLimiter rateLimiter) {
     try {
+      double currentRate = rateLimiter.getRate();
       Double updatedRate = storage.submissionRateLimit().orElse(
           StyxScheduler.DEFAULT_SUBMISSION_RATE_PER_SEC);
-      if (Double.compare(updatedRate, rateLimiter.getRate()) != 0) {
+      if (Double.compare(updatedRate, currentRate) != 0) {
+        LOG.info("Updating submission rate limit: {} -> {}", currentRate, updatedRate);
         rateLimiter.setRate(updatedRate);
       }
     } catch (IOException e) {
