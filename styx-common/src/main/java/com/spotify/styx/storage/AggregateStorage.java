@@ -104,7 +104,7 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public Optional<Double> submissionRate() throws IOException {
+  public Optional<Double> submissionRateLimit() throws IOException {
     return datastoreStorage.submissionRate();
   }
 

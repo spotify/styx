@@ -94,7 +94,7 @@ class DatastoreStorage {
   public static final String PROPERTY_ALL_TRIGGERED = "allTriggered";
   public static final String PROPERTY_HALTED = "halted";
   public static final String PROPERTY_DEBUG_ENABLED = "debug";
-  public static final String PROPERTY_SUBMISSION_RATE = "submissionRate";
+  public static final String PROPERTY_SUBMISSION_RATE_LIMIT = "submissionRateLimit";
 
   public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
 
@@ -605,7 +605,7 @@ class DatastoreStorage {
 
   public Optional<Double> submissionRate() {
     return getOpt(datastore, globalConfigKey)
-        .filter(e -> e.contains(PROPERTY_SUBMISSION_RATE))
-        .map(e -> e.getDouble(PROPERTY_SUBMISSION_RATE));
+        .filter(e -> e.contains(PROPERTY_SUBMISSION_RATE_LIMIT))
+        .map(e -> e.getDouble(PROPERTY_SUBMISSION_RATE_LIMIT));
   }
 }

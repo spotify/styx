@@ -44,6 +44,7 @@ import com.google.cloud.datastore.Datastore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.io.Closer;
+import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.apollo.AppInit;
 import com.spotify.apollo.Environment;
@@ -121,11 +122,13 @@ public class StyxScheduler implements AppInit {
 
   public static final int SCHEDULER_TICK_INTERVAL_SECONDS = 2;
   public static final int TRIGGER_MANAGER_TICK_INTERVAL_SECONDS = 1;
+  public static final int RUNTIME_CONFIG_UPDATE_INTERVAL_SECONDS = 5;
   public static final Duration DEFAULT_RETRY_BASE_DELAY = Duration.ofMinutes(3);
   public static final int DEFAULT_RETRY_MAX_EXPONENT = 4;
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
   public static final RetryUtil DEFAULT_RETRY_UTIL =
       new RetryUtil(DEFAULT_RETRY_BASE_DELAY, DEFAULT_RETRY_MAX_EXPONENT);
+  public static final double DEFAULT_SUBMISSION_RATE_PER_SEC = 1000D;
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxScheduler.class);
 
@@ -275,11 +278,18 @@ public class StyxScheduler implements AppInit {
         .setNameFormat("styx-event-worker-%d")
         .setUncaughtExceptionHandler(uncaughtExceptionHandler)
         .build();
+    final ThreadFactory dockerRunnerTf = new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat("styx-docker-runner-%d")
+        .setUncaughtExceptionHandler(uncaughtExceptionHandler)
+        .build();
 
     final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
     final ExecutorService eventWorker = Executors.newFixedThreadPool(16, eventTf);
+    final ExecutorService dockerRunnerExecutor = Executors.newSingleThreadExecutor(dockerRunnerTf);
     closer.register(executorCloser("scheduler", executor));
     closer.register(executorCloser("event-worker", eventWorker));
+    closer.register(executorCloser("docker-runner", dockerRunnerExecutor));
 
     final Stats stats = statsFactory.apply(environment);
     final WorkflowCache workflowCache = new InMemWorkflowCache();
@@ -300,9 +310,12 @@ public class StyxScheduler implements AppInit {
     final DockerRunner dockerRunner = instrument(DockerRunner.class, routingDockerRunner, stats, time);
     final Publisher publisher = publisherFactory.apply(environment);
 
+    RateLimiter submissionRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
+
     final OutputHandler[] outputHandlers = new OutputHandler[] {
         transitionLogger(""),
-        new DockerRunnerHandler(dockerRunner, stateManager, storage),
+        new DockerRunnerHandler(
+            dockerRunner, stateManager, storage, submissionRateLimiter, dockerRunnerExecutor),
         new TerminationHandler(retryUtil, stateManager),
         new MonitoringHandler(time, stats),
         new PublisherHandler(publisher),
@@ -316,7 +329,7 @@ public class StyxScheduler implements AppInit {
     final TriggerManager triggerManager = new TriggerManager(trigger, time, storage);
 
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
-                                              storage, trigger, Scheduler.createRateLimiter());
+                                              storage, trigger);
 
     final Consumer<Workflow> workflowChangeListener = workflowChanged(workflowCache, storage,
                                                                       stats, stateManager, time);
@@ -326,6 +339,7 @@ public class StyxScheduler implements AppInit {
     startTriggerManager(triggerManager, executor);
     startScheduleSources(environment, executor, workflowChangeListener, workflowRemoveListener);
     startScheduler(scheduler, executor);
+    startRuntimeConfigUpdate(storage, executor, submissionRateLimiter);
     setupMetrics(stateManager, workflowCache, storage, stats);
 
     final SchedulerResource schedulerResource = new SchedulerResource(stateManager, trigger,
@@ -420,6 +434,28 @@ public class StyxScheduler implements AppInit {
         SCHEDULER_TICK_INTERVAL_SECONDS,
         SCHEDULER_TICK_INTERVAL_SECONDS,
         TimeUnit.SECONDS);
+  }
+
+  private static void startRuntimeConfigUpdate(Storage storage, ScheduledExecutorService exec,
+      RateLimiter submissionRateLimiter) {
+    exec.scheduleAtFixedRate(
+        guard(() -> updateRuntimeConfig(storage, submissionRateLimiter)),
+        0,
+        RUNTIME_CONFIG_UPDATE_INTERVAL_SECONDS,
+        TimeUnit.SECONDS);
+  }
+
+  private static void updateRuntimeConfig(Storage storage, RateLimiter rateLimiter) {
+    try {
+      Double updatedRate = storage.submissionRateLimit().orElse(
+          StyxScheduler.DEFAULT_SUBMISSION_RATE_PER_SEC);
+      if (Double.compare(updatedRate, rateLimiter.getRate()) != 0) {
+        rateLimiter.setRate(updatedRate);
+      }
+    } catch (IOException e) {
+      LOG.warn("Failed to fetch the submission rate config from storage, "
+          + "skipping RateLimiter update");
+    }
   }
 
   private static Runnable guard(Runnable delegate) {
