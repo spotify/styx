@@ -45,5 +45,7 @@ public interface Stats {
 
   void pullImageError();
 
+  void naturalTrigger();
+
   Stats NOOP = new NoopStats();
 }

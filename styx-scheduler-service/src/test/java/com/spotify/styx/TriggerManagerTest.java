@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
@@ -71,7 +72,7 @@ public class TriggerManagerTest {
 
   @Before
   public void setUp() throws IOException {
-    triggerManager = new TriggerManager(triggerListener, MANAGER_TIME, storage);
+    triggerManager = new TriggerManager(triggerListener, MANAGER_TIME, storage, Stats.NOOP);
   }
 
   @Test

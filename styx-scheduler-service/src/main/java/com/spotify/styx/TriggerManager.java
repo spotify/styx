@@ -29,6 +29,7 @@ import com.google.common.base.Throwables;
 import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
@@ -51,13 +52,16 @@ public class TriggerManager {
   private final TriggerListener triggerListener;
   private final Time time;
   private final Storage storage;
+  private final Stats stats;
 
   public TriggerManager(TriggerListener triggerListener,
                         Time time,
-                        Storage storage) {
+                        Storage storage,
+                        Stats stats) {
     this.triggerListener = requireNonNull(triggerListener);
     this.time = requireNonNull(time);
     this.storage = requireNonNull(storage);
+    this.stats = requireNonNull(stats);
   }
 
   void tick() {
@@ -104,6 +108,8 @@ public class TriggerManager {
           return; // so we don't update the trigger time
         }
       }
+
+      stats.naturalTrigger();
 
       Instant nextNaturalTrigger = incrementInstant(next, partitioning);
       try {
