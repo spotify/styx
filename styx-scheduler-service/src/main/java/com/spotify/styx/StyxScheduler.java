@@ -340,7 +340,7 @@ public class StyxScheduler implements AppInit {
     startScheduleSources(environment, executor, workflowChangeListener, workflowRemoveListener);
     startScheduler(scheduler, executor);
     startRuntimeConfigUpdate(storage, executor, submissionRateLimiter);
-    setupMetrics(stateManager, workflowCache, storage, stats);
+    setupMetrics(stateManager, workflowCache, storage, submissionRateLimiter, stats);
 
     final SchedulerResource schedulerResource = new SchedulerResource(stateManager, trigger,
                                                                       storage, time);
@@ -447,9 +447,11 @@ public class StyxScheduler implements AppInit {
 
   private static void updateRuntimeConfig(Storage storage, RateLimiter rateLimiter) {
     try {
+      double currentRate = rateLimiter.getRate();
       Double updatedRate = storage.submissionRateLimit().orElse(
           StyxScheduler.DEFAULT_SUBMISSION_RATE_PER_SEC);
-      if (Double.compare(updatedRate, rateLimiter.getRate()) != 0) {
+      if (Double.compare(updatedRate, currentRate) != 0) {
+        LOG.info("Updating submission rate limit: {} -> {}", currentRate, updatedRate);
         rateLimiter.setRate(updatedRate);
       }
     } catch (IOException e) {
@@ -472,6 +474,7 @@ public class StyxScheduler implements AppInit {
       StateManager stateManager,
       WorkflowCache workflowCache,
       Storage storage,
+      RateLimiter submissionRateLimiter,
       Stats stats) {
 
     final Gauge<Long> queuedEventsCount = stateManager::getQueuedEventsCount;
@@ -500,6 +503,7 @@ public class StyxScheduler implements AppInit {
     stats.registerWorkflowCount("all", allWorkflowsCount);
     stats.registerWorkflowCount("configured", configuredWorkflowsCount);
     stats.registerWorkflowCount("enabled", configuredEnabledWorkflowsCount);
+    stats.registerSubmissionRateLimit(submissionRateLimiter::getRate);
   }
 
   private static Consumer<Workflow> workflowChanged(
