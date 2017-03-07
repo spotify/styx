@@ -104,6 +104,11 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
+  public Optional<Double> submissionRateLimit() throws IOException {
+    return datastoreStorage.submissionRate();
+  }
+
+  @Override
   public boolean setGlobalEnabled(boolean enabled) throws IOException {
     return datastoreStorage.setGlobalEnabled(enabled);
   }

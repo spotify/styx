@@ -79,6 +79,11 @@ public interface Storage {
   boolean debugEnabled() throws IOException;
 
   /**
+   * Get the per-second submission rate limit for Styx.
+   */
+  Optional<Double> submissionRateLimit() throws IOException;
+
+  /**
    * Set the global enabled flag for Styx.
    *
    * @param enabled     The global enabled flag
