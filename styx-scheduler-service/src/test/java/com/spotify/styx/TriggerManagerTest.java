@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -73,6 +74,8 @@ public class TriggerManagerTest {
   @Before
   public void setUp() throws IOException {
     triggerManager = new TriggerManager(triggerListener, MANAGER_TIME, storage, Stats.NOOP);
+    when(triggerListener.event(any(Workflow.class), any(Trigger.class), any(Instant.class)))
+        .thenReturn(CompletableFuture.completedFuture(null));
   }
 
   @Test

@@ -55,6 +55,7 @@ import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import okio.ByteString;
 import org.junit.Rule;
@@ -96,6 +97,7 @@ public class SchedulerResourceTest {
           this.triggeredWorkflow = Optional.of(workflow);
           this.trigger = Optional.of(trigger);
           this.triggeredInstant = Optional.of(instant);
+          return CompletableFuture.completedFuture(null);
         },
         storage,
         () -> Instant.parse("2015-12-31T23:59:10.000Z"));
@@ -218,6 +220,7 @@ public class SchedulerResourceTest {
             this.triggeredWorkflow = Optional.of(workflow);
             this.trigger = Optional.of(trigger);
             this.triggeredInstant = Optional.of(instant);
+            return CompletableFuture.completedFuture(null);
           },
           failingStorage,
           () -> Instant.parse("2015-12-31T23:59:10.000Z"));

@@ -26,6 +26,8 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * An implementation of {@link StateManager} that process all events synchronously on the thread
@@ -48,7 +50,7 @@ public class SyncStateManager implements StateManager {
   }
 
   @Override
-  public void receive(Event event) {
+  public CompletionStage<Void> receive(Event event) {
     WorkflowInstance key = event.workflowInstance();
     RunState currentState = states.get(key);
 
@@ -61,6 +63,8 @@ public class SyncStateManager implements StateManager {
     }
 
     nextState.outputHandler().transitionInto(nextState);
+
+    return CompletableFuture.completedFuture(null);
   }
 
   @Override
