@@ -82,6 +82,10 @@ public final class MetricsStats implements Stats {
       .tagged("what", "natural-trigger-rate")
       .tagged("unit", UNIT_FREQUENCY);
 
+  private static final MetricId SUBMISSION_RATE_LIMIT = BASE
+      .tagged("what", "submission-rate-limit")
+      .tagged("unit", UNIT_FREQUENCY);
+
   private final SemanticMetricRegistry registry;
 
   private final Histogram submitToRunning;
@@ -146,6 +150,11 @@ public final class MetricsStats implements Stats {
   @Override
   public void registerWorkflowCount(String status, Gauge<Long> workflowCount) {
     registry.register(WORKFLOW_COUNT.tagged("status", status), workflowCount);
+  }
+
+  @Override
+  public void registerSubmissionRateLimit(Gauge<Double> submissionRateLimit) {
+    registry.register(SUBMISSION_RATE_LIMIT, submissionRateLimit);
   }
 
   @Override

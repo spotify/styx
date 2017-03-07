@@ -61,4 +61,8 @@ final class NoopStats implements Stats {
   @Override
   public void naturalTrigger() {
   }
+
+  @Override
+  public void registerSubmissionRateLimit(Gauge<Double> submissionRateLimit) {
+  }
 }

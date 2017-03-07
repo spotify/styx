@@ -47,5 +47,7 @@ public interface Stats {
 
   void naturalTrigger();
 
+  void registerSubmissionRateLimit(Gauge<Double> submissionRateLimit);
+
   Stats NOOP = new NoopStats();
 }
