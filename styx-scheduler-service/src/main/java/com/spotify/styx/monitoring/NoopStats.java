@@ -57,4 +57,8 @@ final class NoopStats implements Stats {
   @Override
   public void pullImageError() {
   }
+
+  @Override
+  public void naturalTrigger() {
+  }
 }

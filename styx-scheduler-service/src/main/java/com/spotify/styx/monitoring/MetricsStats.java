@@ -78,10 +78,15 @@ public final class MetricsStats implements Stats {
       .tagged("what", "pull-image-error-rate")
       .tagged("unit", UNIT_FREQUENCY);
 
+  private static final MetricId NATURAL_TRIGGER_RATE = BASE
+      .tagged("what", "natural-trigger-rate")
+      .tagged("unit", UNIT_FREQUENCY);
+
   private final SemanticMetricRegistry registry;
 
   private final Histogram submitToRunning;
   private final Meter pullImageErrorMeter;
+  private final Meter naturalTrigger;
   private final ConcurrentMap<String, Histogram> storageOperationHistograms;
   private final ConcurrentMap<String, Meter> storageOperationMeters;
   private final ConcurrentMap<String, Histogram> dockerOperationHistograms;
@@ -93,6 +98,7 @@ public final class MetricsStats implements Stats {
 
     this.submitToRunning = registry.histogram(TRANSITIONING_DURATION);
     this.pullImageErrorMeter = registry.meter(PULL_IMAGE_ERROR_RATE);
+    this.naturalTrigger = registry.meter(NATURAL_TRIGGER_RATE);
     this.storageOperationHistograms = new ConcurrentHashMap<>();
     this.storageOperationMeters = new ConcurrentHashMap<>();
     this.dockerOperationHistograms = new ConcurrentHashMap<>();
@@ -140,6 +146,11 @@ public final class MetricsStats implements Stats {
   @Override
   public void registerWorkflowCount(String status, Gauge<Long> workflowCount) {
     registry.register(WORKFLOW_COUNT.tagged("status", status), workflowCount);
+  }
+
+  @Override
+  public void naturalTrigger() {
+    naturalTrigger.mark();
   }
 
   @Override
