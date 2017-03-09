@@ -107,9 +107,9 @@ public class TriggerManager {
           LOG.warn("Triggering {} threw exception", workflow.id(), e);
           return; // so we don't update the trigger time
         }
-      }
 
-      stats.naturalTrigger();
+        stats.naturalTrigger();
+      }
 
       Instant nextNaturalTrigger = incrementInstant(next, partitioning);
       try {
