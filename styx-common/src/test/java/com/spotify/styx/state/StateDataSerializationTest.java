@@ -107,6 +107,7 @@ public class StateDataSerializationTest {
           ExecutionDescription.create(
               "pipeline-core:474339e",
               Arrays.asList("echo", "hello", "world"),
+              false,
               Optional.of(DataEndpoint.Secret.create("pipeline-core-secret", "/etc/keys")),
               Optional.of("474339ec18d3d04d5d513856bc8ca1d4f1aed03f")
           )

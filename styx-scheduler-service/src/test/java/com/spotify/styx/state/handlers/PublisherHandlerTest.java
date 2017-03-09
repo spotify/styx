@@ -54,7 +54,7 @@ public class PublisherHandlerTest {
   @Test
   public void testPublishesRollingOutStateOnSubmitted() throws Exception {
     ExecutionDescription executionDescription =
-        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), empty(), Optional.of(COMMIT_SHA));
+        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), false, empty(), Optional.of(COMMIT_SHA));
     RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.SUBMITTED,
@@ -70,7 +70,7 @@ public class PublisherHandlerTest {
   @Test
   public void testPublishesDoneStateOnRunning() throws Exception {
     ExecutionDescription executionDescription =
-        ExecutionDescription.create("busybox:1.1", emptyList(), empty(), Optional.of(COMMIT_SHA));
+        ExecutionDescription.create("busybox:1.1", emptyList(), false, empty(), Optional.of(COMMIT_SHA));
     RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.RUNNING,
@@ -88,7 +88,7 @@ public class PublisherHandlerTest {
     outputHandler = new PublisherHandler(new FailingPublisher(publisher, 2));
 
     ExecutionDescription executionDescription =
-        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), empty(), Optional.of(COMMIT_SHA));
+        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), false, empty(), Optional.of(COMMIT_SHA));
     RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.SUBMITTED,
@@ -106,7 +106,7 @@ public class PublisherHandlerTest {
     outputHandler = new PublisherHandler(new FailingPublisher(publisher, 2));
 
     ExecutionDescription executionDescription =
-        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), empty(), Optional.of(COMMIT_SHA));
+        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), false, empty(), Optional.of(COMMIT_SHA));
     RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.RUNNING,

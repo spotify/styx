@@ -56,7 +56,7 @@ public class RunStateTest {
 
   private static final String DOCKER_IMAGE = "busybox:1.1";
   private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.create(
-      DOCKER_IMAGE, Arrays.asList("--date", "{}", "--bar"), empty(), empty());
+      DOCKER_IMAGE, Arrays.asList("--date", "{}", "--bar"), false, empty(), empty());
 
   private static final Trigger UNKNOWN_TRIGGER = Trigger.unknown("trig");
   private static final Trigger NATURAL_TRIGGER1 = Trigger.natural();

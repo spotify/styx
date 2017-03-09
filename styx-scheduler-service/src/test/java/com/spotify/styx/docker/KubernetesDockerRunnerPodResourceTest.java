@@ -56,7 +56,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.create(
-            "busybox", ImmutableList.of(), empty()));
+            "busybox", ImmutableList.of(), false, empty()));
 
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(containers.size(), is(1));
@@ -70,7 +70,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.create(
-            "busybox:v7", ImmutableList.of(), empty()));
+            "busybox:v7", ImmutableList.of(), false, empty()));
 
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(containers.size(), is(1));
@@ -84,7 +84,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.create(
-            "busybox", ImmutableList.of("echo", "foo", "bar"), empty()));
+            "busybox", ImmutableList.of("echo", "foo", "bar"), false, empty()));
 
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(containers.size(), is(1));
@@ -98,7 +98,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.create(
-            "busybox", ImmutableList.of(), empty()));
+            "busybox", ImmutableList.of(), false, empty()));
 
     Map<String, String> annotations = pod.getMetadata().getAnnotations();
     assertThat(annotations, hasEntry(STYX_WORKFLOW_INSTANCE_ANNOTATION, WORKFLOW_INSTANCE.toKey()));
@@ -113,7 +113,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.create(
-            "busybox", ImmutableList.of(), empty()));
+            "busybox", ImmutableList.of(), false, empty()));
 
     assertThat(pod.getSpec().getRestartPolicy(), is("Never"));
   }
@@ -123,7 +123,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.create(
-            "busybox", ImmutableList.of(), empty()));
+            "busybox", ImmutableList.of(), false, empty()));
 
     List<Volume> volumes = pod.getSpec().getVolumes();
     List<Container> containers = pod.getSpec().getContainers();
@@ -141,7 +141,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.create(
-            "busybox", ImmutableList.of(), Optional.of(secret)));
+            "busybox", ImmutableList.of(), false, Optional.of(secret)));
 
     List<Volume> volumes = pod.getSpec().getVolumes();
     List<Container> containers = pod.getSpec().getContainers();
@@ -166,7 +166,7 @@ public class KubernetesDockerRunnerPodResourceTest {
   public void shouldConfigureEnvironmentVariables() throws Exception {
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec.create("busybox", ImmutableList.of(), Optional.empty()));
+        DockerRunner.RunSpec.create("busybox", ImmutableList.of(), false, empty()));
     List<EnvVar> envVars = pod.getSpec().getContainers().get(0).getEnv();
 
     EnvVar endpoint = new EnvVar();

@@ -69,7 +69,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       DATA_ENDPOINT_HOURLY);
   private static final ExecutionDescription TEST_EXECUTION_DESCRIPTION =
       ExecutionDescription.create(
-          TEST_DOCKER_IMAGE, Arrays.asList("--date", "{}", "--bar"), empty(), empty());
+          TEST_DOCKER_IMAGE, Arrays.asList("--date", "{}", "--bar"), false, empty(), empty());
   private static final Workflow DAILY_WORKFLOW = Workflow.create(
       "styx",
       TestData.WORKFLOW_URI,

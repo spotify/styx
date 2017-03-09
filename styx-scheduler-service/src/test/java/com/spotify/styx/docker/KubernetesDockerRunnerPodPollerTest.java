@@ -60,7 +60,7 @@ public class KubernetesDockerRunnerPodPollerTest {
   private static final WorkflowInstance WORKFLOW_INSTANCE_2 =
       WorkflowInstance.create(TestData.WORKFLOW_ID_2, "bar");
   private static final DockerRunner.RunSpec RUN_SPEC =
-      DockerRunner.RunSpec.create("busybox", ImmutableList.of(), Optional.empty());
+      DockerRunner.RunSpec.create("busybox", ImmutableList.of(), false, Optional.empty());
 
   @Mock
   KubernetesClient k8sClient;

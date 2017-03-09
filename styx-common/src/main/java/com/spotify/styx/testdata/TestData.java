@@ -80,6 +80,7 @@ public final class TestData {
       ExecutionDescription.create(
           "busybox:1.1",
           Arrays.asList("foo", "bar"),
+          false,
           Optional.of(DataEndpoint.Secret.create("secret", "/dev/null")),
           Optional.of("00000ef508c1cb905e360590ce3e7e9193f6b370"));
 }

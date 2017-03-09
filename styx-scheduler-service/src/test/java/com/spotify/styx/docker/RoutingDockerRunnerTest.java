@@ -46,7 +46,7 @@ public class RoutingDockerRunnerTest {
   static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(
       TestData.WORKFLOW_ID, "param");
   static final DockerRunner.RunSpec RUN_SPEC = DockerRunner.RunSpec.create(
-      "busybox", ImmutableList.of("foo", "bar"), Optional.empty());
+      "busybox", ImmutableList.of("foo", "bar"), false, Optional.empty());
   static final String MOCK_EXEC_ID = "mock-run-id-0";
 
   int createCounter = 0;

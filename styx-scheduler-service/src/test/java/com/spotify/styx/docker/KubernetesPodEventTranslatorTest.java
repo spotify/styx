@@ -49,7 +49,7 @@ public class KubernetesPodEventTranslatorTest {
   private static final WorkflowInstance WFI =
       WorkflowInstance.create(TestData.WORKFLOW_ID, "foo");
   private static final DockerRunner.RunSpec RUN_SPEC =
-      DockerRunner.RunSpec.create("busybox", ImmutableList.of(), Optional.empty());
+      DockerRunner.RunSpec.create("busybox", ImmutableList.of(), false, Optional.empty());
 
   Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC);
 

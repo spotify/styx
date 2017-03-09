@@ -66,17 +66,20 @@ public interface DockerRunner extends Closeable {
 
     public abstract ImmutableList<String> args();
 
+    public abstract boolean terminationLogging();
+
     public abstract Optional<DataEndpoint.Secret> secret();
 
     public static RunSpec create(
         String imageName,
         ImmutableList<String> args,
+        boolean terminationLogging,
         Optional<DataEndpoint.Secret> secret) {
-      return new AutoValue_DockerRunner_RunSpec(imageName, args, secret);
+      return new AutoValue_DockerRunner_RunSpec(imageName, args, terminationLogging, secret);
     }
 
     public static RunSpec simple(String imageName, String... args) {
-      return new AutoValue_DockerRunner_RunSpec(imageName, ImmutableList.copyOf(args), empty());
+      return new AutoValue_DockerRunner_RunSpec(imageName, ImmutableList.copyOf(args), false, empty());
     }
   }
 
