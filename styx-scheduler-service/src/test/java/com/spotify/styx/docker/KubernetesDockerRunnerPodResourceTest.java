@@ -21,6 +21,7 @@
 package com.spotify.styx.docker;
 
 import static com.jcabi.matchers.RegexMatchers.matchesPattern;
+import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_TERMINATION_LOGGING_ANNOTATION;
 import static com.spotify.styx.docker.KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.contains;
@@ -106,6 +107,28 @@ public class KubernetesDockerRunnerPodResourceTest {
     WorkflowInstance workflowInstance =
         WorkflowInstance.parseKey(annotations.get(STYX_WORKFLOW_INSTANCE_ANNOTATION));
     assertThat(workflowInstance, is(WORKFLOW_INSTANCE));
+  }
+
+  @Test
+  public void shouldAddTerminationLoggingAnnotationWhenFalse() throws Exception {
+    Pod pod = KubernetesDockerRunner.createPod(
+        WORKFLOW_INSTANCE,
+        DockerRunner.RunSpec.create(
+            "busybox", ImmutableList.of(), false, empty()));
+
+    Map<String, String> annotations = pod.getMetadata().getAnnotations();
+    assertThat(annotations.get(DOCKER_TERMINATION_LOGGING_ANNOTATION), is("false"));
+  }
+
+  @Test
+  public void shouldAddTerminationLoggingAnnotationWhenTrue() throws Exception {
+    Pod pod = KubernetesDockerRunner.createPod(
+        WORKFLOW_INSTANCE,
+        DockerRunner.RunSpec.create(
+            "busybox", ImmutableList.of(), true, empty()));
+
+    Map<String, String> annotations = pod.getMetadata().getAnnotations();
+    assertThat(annotations.get(DOCKER_TERMINATION_LOGGING_ANNOTATION), is("true"));
   }
 
   @Test
