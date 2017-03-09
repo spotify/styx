@@ -37,6 +37,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
+import com.google.bigtable.repackaged.com.google.common.collect.ImmutableList;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
@@ -44,6 +45,7 @@ import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.KeyQuery;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
+import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.Partitioning;
@@ -511,6 +513,34 @@ public class DatastoreStorageTest {
     helper.options().service().put(config);
 
     assertThat(storage.globalDockerRunnerId(), is("foobar"));
+  }
+
+  @Test
+  public void shouldNotReturnClientBlacklist() {
+    assertFalse(storage.clientBlacklist().isPresent());
+  }
+
+  @Test
+  public void shouldReturnEmptyClientBlacklist() {
+    Entity config = Entity.builder(storage.globalConfigKey)
+        .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
+             ImmutableList.of()).build();
+    helper.options().service().put(config);
+    assertTrue(storage.clientBlacklist().get().isEmpty());
+  }
+
+  @Test
+  public void shouldReturnClientBlacklist() {
+    Entity config = Entity.builder(storage.globalConfigKey)
+        .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
+             ImmutableList.of(StringValue.of("v1"), StringValue.of("v2"), StringValue.of("v3")))
+        .build();
+    helper.options().service().put(config);
+    List<String> blacklist = storage.clientBlacklist().get();
+    assertThat(blacklist.size(), is(3));
+    assertThat(blacklist.get(0), is("v1"));
+    assertThat(blacklist.get(1), is("v2"));
+    assertThat(blacklist.get(2), is("v3"));
   }
 
   private Workflow workflow(WorkflowId workflowId) {

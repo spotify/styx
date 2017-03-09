@@ -86,6 +86,8 @@ public final class Main {
   private static final int EXIT_CODE_UNKNOWN_ERROR = 1;
   private static final int EXIT_CODE_ARGUMENT_ERROR = 2;
   private static final int EXIT_CODE_API_ERROR = 3;
+  private static final String STYX_CLI_VERSION =
+      "Styx CLI " + Main.class.getPackage().getImplementationVersion();
 
   private final StyxCliParser parser;
   private final Namespace namespace;
@@ -363,7 +365,9 @@ public final class Main {
   }
 
   private ByteString send(Request request) throws ExecutionException, InterruptedException {
-    final Response<ByteString> response = client.send(request).toCompletableFuture().get();
+    final Response<ByteString> response =
+        client.send(request.withHeader("User-Agent", STYX_CLI_VERSION)).toCompletableFuture()
+            .get();
 
     switch (response.status().family()) {
       case SUCCESSFUL:
@@ -380,7 +384,7 @@ public final class Main {
 
     final ArgumentParser parser = ArgumentParsers.newArgumentParser("styx")
         .description("Styx CLI")
-        .version("Styx CLI " + Main.class.getPackage().getImplementationVersion());
+        .version(STYX_CLI_VERSION);
 
     final PartitionAction partitionAction = new PartitionAction();
 

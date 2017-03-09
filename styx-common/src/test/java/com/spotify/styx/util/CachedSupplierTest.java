@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx;
+package com.spotify.styx.util;
 
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;

@@ -266,4 +266,11 @@ public interface Storage {
   Optional<Backfill> backfill(String id) throws IOException;
 
   void storeBackfill(Backfill backfill) throws IOException;
+
+  /**
+   * Get client blacklist.
+   *
+   * @return the client blacklist or {@link Optional#empty()}
+   */
+  Optional<List<String>> clientBlacklist();
 }

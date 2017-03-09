@@ -18,10 +18,9 @@
  * -/-/-
  */
 
-package com.spotify.styx;
+package com.spotify.styx.util;
 
 import com.google.common.base.Throwables;
-import com.spotify.styx.util.Time;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -84,7 +83,7 @@ public class CachedSupplier<T> implements Supplier<T> {
   }
 
   @FunctionalInterface
-  interface ThrowingSupplier<T, E extends Exception> {
+  public interface ThrowingSupplier<T, E extends Exception> {
     T get() throws E;
   }
 }

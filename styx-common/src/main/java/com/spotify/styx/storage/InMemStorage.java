@@ -297,4 +297,9 @@ public class InMemStorage implements Storage {
   public Optional<Long> getCounterFromActiveStates(WorkflowInstance workflowInstance) throws IOException {
     return Optional.ofNullable(activeStatesMap.get(workflowInstance));
   }
+
+  @Override
+  public Optional<List<String>> clientBlacklist() {
+    return Optional.empty();
+  }
 }

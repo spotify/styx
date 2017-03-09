@@ -219,4 +219,9 @@ public class AggregateStorage implements Storage {
   public Optional<Backfill> backfill(String id) throws IOException {
     return datastoreStorage.getBackfill(id);
   }
+
+  @Override
+  public Optional<List<String>> clientBlacklist() {
+    return datastoreStorage.clientBlacklist();
+  }
 }

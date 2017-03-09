@@ -77,6 +77,7 @@ import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
