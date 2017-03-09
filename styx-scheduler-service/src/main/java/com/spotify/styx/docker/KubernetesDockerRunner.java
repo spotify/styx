@@ -221,7 +221,11 @@ class KubernetesDockerRunner implements DockerRunner {
     try {
       final PodList list = client.pods().list();
       examineRunningWFISandAssociatedPods(list);
+
+      final int resourceVersion = Integer.parseInt(list.getMetadata().getResourceVersion());
+
       for (Pod pod : list.getItems()) {
+        logEvent(Watcher.Action.MODIFIED, pod, resourceVersion, true);
         inspectPod(Watcher.Action.MODIFIED, pod);
       }
     } catch (Throwable t) {
@@ -275,6 +279,25 @@ class KubernetesDockerRunner implements DockerRunner {
     }
   }
 
+  private void logEvent(Watcher.Action action, Pod pod, int resourceVersion,
+                        boolean polled) {
+    final String podName = pod.getMetadata().getName();
+    final String workflowInstance = pod.getMetadata().getAnnotations()
+        .getOrDefault(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION, "N/A");
+    final String status = readStatus(pod);
+
+    LOG.info("{}Pod event for {} at resource version {}, action: {}, workflow instance: {}, status: {}",
+             polled ? "Polled: " : "", podName, resourceVersion, action, workflowInstance, status);
+  }
+
+  private String readStatus(Pod pod) {
+    try {
+      return OBJECT_MAPPER.writeValueAsString(pod.getStatus());
+    } catch (JsonProcessingException e) {
+      return pod.getStatus().toString();
+    }
+  }
+
   public class PodWatcher implements Watcher<Pod> {
 
     private static final int RECONNECT_DELAY_SECONDS = 1;
@@ -291,7 +314,7 @@ class KubernetesDockerRunner implements DockerRunner {
         return;
       }
 
-      logEvent(action, pod);
+      logEvent(action, pod, lastResourceVersion, false);
 
       try {
         inspectPod(action, pod);
@@ -302,28 +325,11 @@ class KubernetesDockerRunner implements DockerRunner {
       }
     }
 
-    private void logEvent(Action action, Pod pod) {
-      final String podName = pod.getMetadata().getName();
-      final String workflowInstance = pod.getMetadata().getAnnotations()
-              .getOrDefault(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION, "N/A");
-      final String status = readStatus(pod);
-      LOG.info("Pod event for {} at resource version {}, action: {}, workflow instance: {}, status: {}",
-               podName, lastResourceVersion, action, workflowInstance, status);
-    }
-
-    private String readStatus(Pod pod) {
-      try {
-        return OBJECT_MAPPER.writeValueAsString(pod.getStatus());
-      } catch (JsonProcessingException e) {
-        return pod.getStatus().toString();
-      }
-    }
-
     private void reconnect() {
       LOG.warn("Re-establishing watching from {}", lastResourceVersion);
 
       try {
-        client.pods()
+        watch = client.pods()
             .withResourceVersion(Integer.toString(lastResourceVersion))
             .watch(this);
       } catch (Throwable e) {
