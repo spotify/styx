@@ -40,7 +40,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -99,11 +101,12 @@ public class TriggerManager {
 
       if (enabled.contains(workflow.id())) {
         try {
-          CompletionStage<Void> processed = triggerListener.event(
+          final CompletionStage<Void> processed = triggerListener.event(
               workflow,
               Trigger.natural(),
               decrementInstant(next, partitioning));
-          processed.toCompletableFuture().get(1, TimeUnit.MINUTES);
+          // Wait for the event to be processed before proceeding to the next trigger
+          processed.toCompletableFuture().get();
         } catch (AlreadyInitializedException e) {
           LOG.warn("{}", e.getMessage());
         } catch (Throwable e) {
