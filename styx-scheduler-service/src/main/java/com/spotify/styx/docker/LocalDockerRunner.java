@@ -127,7 +127,9 @@ class LocalDockerRunner implements DockerRunner {
       }
 
       if (!containerInfo.state().running()) {
-        final int exitCode = containerInfo.state().exitCode(); // FIXME
+        // Unlike in KubernetesDockerRunner case, where docker_termination_logging is supported,
+        // here we are susceptible to Docker exit code bug, https://github.com/kubernetes/kubernetes/issues/41516.
+        final int exitCode = containerInfo.state().exitCode();
         final WorkflowInstance workflowInstance = inFlight.remove(containerId);
 
         // trigger started event if we didn't see the container in running before

@@ -20,8 +20,14 @@
 
 package com.spotify.styx.docker;
 
+import static com.spotify.styx.docker.DockerRunner.LOG;
+import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_TERMINATION_LOGGING_ANNOTATION;
 import static java.util.Collections.emptyList;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
@@ -32,6 +38,8 @@ import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodStatus;
 import io.fabric8.kubernetes.client.Watcher;
+
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -43,6 +51,60 @@ public final class KubernetesPodEventTranslator {
 
   private static final Predicate<ContainerStatus> IS_STYX_CONTAINER =
       (cs) -> KubernetesDockerRunner.STYX_RUN.equals(cs.getName());
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private static class TerminationLogMessage {
+    String componentId;
+    String workflowId;
+    String parameter;
+    String executionId;
+    String event;
+    int exitCode;
+
+    @JsonCreator
+    public TerminationLogMessage(
+        @JsonProperty(value = "component_id", required = true) String componentId,
+        @JsonProperty(value = "workflow_id", required = true) String workflowId,
+        @JsonProperty(value = "parameter", required = true) String parameter,
+        @JsonProperty(value = "execution_id", required = true) String executionId,
+        @JsonProperty(value = "event", required = true) String event,
+        @JsonProperty(value = "exit_code", required = true) int exitCode
+    ) {
+      this.componentId = componentId;
+      this.workflowId = workflowId;
+      this.parameter = parameter;
+      this.executionId = executionId;
+      this.event = event;
+      this.exitCode = exitCode;
+    }
+  }
+
+  private static int getExitCode(Pod pod, ContainerStatus status) {
+    if ("true".equals(pod.getMetadata().getAnnotations().get(DOCKER_TERMINATION_LOGGING_ANNOTATION))) {
+      if (status.getState() == null
+          || status.getState().getTerminated() == null
+          || status.getState().getTerminated().getMessage() == null) {
+        LOG.warn("Missing termination log message");
+
+        // make sure to signal an error to be on the safe side, as opposed to the purported exit code
+        return 127;
+      }
+      try {
+        final TerminationLogMessage message = new ObjectMapper().readValue(
+            status.getState().getTerminated().getMessage(),
+            TerminationLogMessage.class);
+
+        return message.exitCode;
+      } catch (IOException e) {
+        LOG.warn("Unexpected termination log message", e);
+
+        // make sure to signal an error to be on the safe side, as opposed to the purported exit code
+        return 127;
+      }
+    }
+
+    return status.getState().getTerminated().getExitCode();
+  }
 
   public static List<Event> translate(
       WorkflowInstance workflowInstance,
@@ -89,7 +151,7 @@ public final class KubernetesPodEventTranslator {
       case "Failed":
         exitCode = pod.getStatus().getContainerStatuses().stream()
             .filter(IS_STYX_CONTAINER)
-            .map(cs -> cs.getState().getTerminated().getExitCode()) // FIXME
+            .map(cs -> getExitCode(pod, cs))
             .findFirst();
         break;
 
