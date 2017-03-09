@@ -22,6 +22,7 @@ package com.spotify.styx.docker;
 
 import static java.util.Collections.emptyList;
 
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
@@ -141,6 +142,10 @@ public final class KubernetesPodEventTranslator {
 
       case "Succeeded":
       case "Failed":
+        if (Strings.isNullOrEmpty(pod.getStatus().getPodIP())) {
+          return Optional.of(Event.runError(workflowInstance, "Could not find PodIP"));
+        }
+
         final Optional<ContainerStatus> containerStatusOpt =
             pod.getStatus().getContainerStatuses().stream()
                 .filter(IS_STYX_CONTAINER)
