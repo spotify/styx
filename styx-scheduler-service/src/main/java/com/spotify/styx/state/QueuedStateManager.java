@@ -20,6 +20,8 @@
 
 package com.spotify.styx.state;
 
+import static com.spotify.styx.util.FutureUtil.exceptionallyCompletedFuture;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
@@ -127,8 +129,9 @@ public class QueuedStateManager implements StateManager {
 
     final InstanceState state = states.get(event.workflowInstance());
     if (state == null) {
-      LOG.warn("Received event for unknown workflow instance: {}", event);
-      return null;
+      String message = "Received event for unknown workflow instance: " + event;
+      LOG.warn(message);
+      return exceptionallyCompletedFuture(new IllegalArgumentException(message));
     }
 
     CompletionStage<Void> processed = state.transition(event);

@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.util.FutureUtil.exceptionallyCompletedFuture;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 
 import com.spotify.styx.StyxScheduler.StateFactory;
@@ -35,9 +36,6 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,9 +74,7 @@ final class StateInitializingTrigger implements TriggerListener {
     } catch (StateManager.IsClosed isClosed) {
       LOG.warn("State receiver is closed when processing workflow {} for trigger {} at {}",
                workflow, trigger, instant, isClosed);
-      CompletableFuture<Void> failure = new CompletableFuture<>();
-      failure.completeExceptionally(isClosed);
-      return failure;
+      return exceptionallyCompletedFuture(isClosed);
     }
   }
 }
