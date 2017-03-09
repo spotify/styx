@@ -175,6 +175,7 @@ public class ExecutionDescriptionHandlerTest {
         Optional.of("legacy-docker-image"),
         Optional.of(Lists.newArrayList("foo", "bar")),
         empty(),
+        empty(),
         emptyList());
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
@@ -198,6 +199,7 @@ public class ExecutionDescriptionHandlerTest {
         HOURS,
         Optional.empty(),
         Optional.of(Lists.newArrayList(args)),
+        empty(),
         empty(),
         emptyList());
   }

@@ -48,12 +48,12 @@ import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.styx.model.DataEndpoint;
-import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.util.ResourceNotFoundException;
+
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
@@ -83,26 +83,26 @@ public class DatastoreStorageTest {
 
   private static final DataEndpoint DATA_ENDPOINT_EMPTY_CONF =
       DataEndpoint.create(
-          WORKFLOW_ID_NO_DOCKER_IMG.endpointId(), DAYS, empty(), empty(), empty(), emptyList());
+          WORKFLOW_ID_NO_DOCKER_IMG.endpointId(), DAYS, empty(), empty(), empty(), empty(), emptyList());
   private static final Optional<String> DOCKER_IMAGE = of("busybox");
   private static final String DOCKER_IMAGE_COMPONENT = "busybox:component";
   private static final String DOCKER_IMAGE_WORKFLOW = "busybox:workflow";
   private static final String COMMIT_SHA = "dcee675978b4d89e291bb695d0ca7deaf05d2a32";
   private static final DataEndpoint DATA_ENDPOINT_WITH_DOCKER_IMAGE =
       DataEndpoint.create(
-          WORKFLOW_ID_WITH_DOCKER_IMG.endpointId(), DAYS, DOCKER_IMAGE, empty(), empty(), emptyList());
+          WORKFLOW_ID_WITH_DOCKER_IMG.endpointId(), DAYS, DOCKER_IMAGE, empty(), empty(), empty(), emptyList());
   private static final Workflow
       WORKFLOW_NO_DOCKER_IMAGE =
       Workflow.create(WORKFLOW_ID_NO_DOCKER_IMG.componentId(), URI.create("http://foo"),
-                      DATA_ENDPOINT_EMPTY_CONF);
+          DATA_ENDPOINT_EMPTY_CONF);
   private static final Workflow
       WORKFLOW_NO_STATE =
       Workflow.create(WORKFLOW_ID_NO_STATE.componentId(), URI.create("http://foo"),
-                      DATA_ENDPOINT_EMPTY_CONF);
+          DATA_ENDPOINT_EMPTY_CONF);
   private static final Workflow
       WORKFLOW_WITH_DOCKER_IMAGE =
       Workflow.create(WORKFLOW_ID_WITH_DOCKER_IMG.componentId(), URI.create("http://foo"),
-                      DATA_ENDPOINT_WITH_DOCKER_IMAGE);
+          DATA_ENDPOINT_WITH_DOCKER_IMAGE);
 
   private static final Instant NEXT_EXECUTION = Instant.parse("2016-03-14T14:00:00Z");
 
@@ -189,7 +189,7 @@ public class DatastoreStorageTest {
   public void shouldReturnEmptyOptionalWhenWorkflowIdDoesNotExist() throws Exception {
     Optional<Workflow> retrieved = storage.workflow(WorkflowId.create("foo", "bar"));
 
-    assertThat(retrieved, is(Optional.empty()));
+    assertThat(retrieved, is(empty()));
   }
 
   @Test
@@ -224,9 +224,10 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldPersistDockerImagePerWorkflowId() throws Exception {
-    storage.store(Workflow.create(WORKFLOW_ID1.componentId(), URI.create("http://foo"), DataEndpoint
-        .create(WORKFLOW_ID1.endpointId(), Partitioning.DAYS, Optional.empty(), Optional.empty(),
-                Optional.empty(), emptyList())));
+    storage.store(Workflow.create(
+        WORKFLOW_ID1.componentId(),
+        URI.create("http://foo"),
+        DataEndpoint.create(WORKFLOW_ID1.endpointId(), DAYS, empty(), empty(), empty(), empty(), emptyList())));
     storage.patchState(WORKFLOW_ID1, patchDockerImage(DOCKER_IMAGE_WORKFLOW));
     Optional<String> retrieved = storage.getDockerImage(WORKFLOW_ID1);
 
@@ -235,9 +236,10 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldPersistCommitShaPerWorkflowId() throws Exception {
-    storage.store(Workflow.create(WORKFLOW_ID1.componentId(), URI.create("http://foo"), DataEndpoint
-        .create(WORKFLOW_ID1.endpointId(), Partitioning.DAYS, Optional.empty(), Optional.empty(),
-                Optional.empty(), emptyList())));
+    storage.store(Workflow.create(
+        WORKFLOW_ID1.componentId(),
+        URI.create("http://foo"),
+        DataEndpoint.create(WORKFLOW_ID1.endpointId(), DAYS, empty(), empty(), empty(), empty(), emptyList())));
     storage.patchState(WORKFLOW_ID1, WorkflowState.builder().commitSha(COMMIT_SHA).build());
     WorkflowState retrieved = storage.workflowState(WORKFLOW_ID1);
 
@@ -249,7 +251,7 @@ public class DatastoreStorageTest {
   public void shouldReturnEmptyOptionalWhenImageDoesNotExist() throws Exception {
     storage.store(WORKFLOW_NO_DOCKER_IMAGE);
     Optional<String> retrieved = storage.getDockerImage(WORKFLOW_ID_NO_DOCKER_IMG);
-    assertThat(retrieved, is(Optional.empty()));
+    assertThat(retrieved, is(empty()));
   }
 
   @Test
@@ -269,7 +271,7 @@ public class DatastoreStorageTest {
     assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_COMPONENT)));
 
     storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
-    retrieved  = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
+    retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
     assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_COMPONENT)));
   }
 
@@ -281,7 +283,7 @@ public class DatastoreStorageTest {
     assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
 
     storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
-    retrieved  = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
+    retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
     assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
   }
 
@@ -485,9 +487,10 @@ public class DatastoreStorageTest {
 
   @Test
   public void allFieldsAreSetWhenRetrievingWorkflowState() throws Exception {
-    storage.store(Workflow.create(WORKFLOW_ID1.componentId(), URI.create("http://not/important"), DataEndpoint
-        .create(WORKFLOW_ID1.endpointId(), Partitioning.DAYS, Optional.empty(), Optional.empty(),
-                Optional.empty(), emptyList())));
+    storage.store(Workflow.create(
+        WORKFLOW_ID1.componentId(),
+        URI.create("http://not/important"),
+        DataEndpoint.create(WORKFLOW_ID1.endpointId(), DAYS, empty(), empty(), empty(), empty(), emptyList())));
     WorkflowState state = WorkflowState.builder()
         .enabled(true)
         .dockerImage(DOCKER_IMAGE.get())
@@ -524,7 +527,7 @@ public class DatastoreStorageTest {
   public void shouldReturnEmptyClientBlacklist() {
     Entity config = Entity.builder(storage.globalConfigKey)
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
-             ImmutableList.of()).build();
+            ImmutableList.of()).build();
     helper.options().service().put(config);
     assertTrue(storage.clientBlacklist().get().isEmpty());
   }
@@ -533,7 +536,7 @@ public class DatastoreStorageTest {
   public void shouldReturnClientBlacklist() {
     Entity config = Entity.builder(storage.globalConfigKey)
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
-             ImmutableList.of(StringValue.of("v1"), StringValue.of("v2"), StringValue.of("v3")))
+            ImmutableList.of(StringValue.of("v1"), StringValue.of("v2"), StringValue.of("v3")))
         .build();
     helper.options().service().put(config);
     List<String> blacklist = storage.clientBlacklist().get();
@@ -547,6 +550,6 @@ public class DatastoreStorageTest {
     return Workflow.create(
         workflowId.componentId(),
         URI.create("http://foo"),
-        DataEndpoint.create(workflowId.endpointId(), HOURS, empty(), empty(), empty(), emptyList()));
+        DataEndpoint.create(workflowId.endpointId(), HOURS, empty(), empty(), empty(), empty(), emptyList()));
   }
 }

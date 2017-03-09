@@ -2,7 +2,7 @@
  * -\-\-
  * Spotify Styx Common
  * --
- * Copyright (C) 2016 Spotify AB
+ * Copyright (C) 2017 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -47,6 +48,16 @@ public abstract class DataEndpoint {
   @JsonProperty
   public abstract Optional<List<String>> dockerArgs();
 
+  /**
+   * Toggles behavior to reliably report exit status from the Docker container, via
+   * https://kubernetes.io/docs/tasks/debug-application-cluster/determine-reason-pod-failure/#writing-and-reading-a-termination-message
+   *
+   * <p>Ideally this should be unneeded, but mere exitCode is known to sometimes spuriously
+   * return 0 when in fact the container has been killed. See https://github.com/kubernetes/kubernetes/issues/41516
+   */
+  @JsonProperty
+  public abstract boolean dockerTerminationLogging();
+
   @JsonProperty
   public abstract Optional<Secret> secret();
 
@@ -59,10 +70,12 @@ public abstract class DataEndpoint {
       @JsonProperty("partitioning") Partitioning partitioning,
       @JsonProperty("docker_image") Optional<String> dockerImage,
       @JsonProperty("docker_args") Optional<List<String>> dockerArgs,
+      @JsonProperty("docker_termination_logging") Optional<Boolean> dockerTerminationLogging,
       @JsonProperty("secret") Optional<Secret> secret,
       @JsonProperty("resources") List<String> resources) {
 
-    return new AutoValue_DataEndpoint(id, partitioning, dockerImage, dockerArgs, secret,
+    return new AutoValue_DataEndpoint(id, partitioning, dockerImage, dockerArgs,
+        dockerTerminationLogging.orElse(false), secret,
         resources == null ? Collections.emptyList() : resources);
   }
 

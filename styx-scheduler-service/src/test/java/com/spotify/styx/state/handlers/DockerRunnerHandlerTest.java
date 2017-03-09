@@ -249,6 +249,7 @@ public class DockerRunnerHandlerTest {
         Optional.of(TEST_DOCKER_IMAGE),
         Optional.of(Lists.newArrayList(args)),
         empty(),
+        empty(),
         emptyList());
   }
 }

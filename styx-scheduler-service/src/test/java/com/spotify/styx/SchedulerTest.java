@@ -133,7 +133,7 @@ public class SchedulerTest {
         id.componentId(),
         URI.create("http://example.com"),
         DataEndpoint.create(
-            id.endpointId(), Partitioning.HOURS, empty(), empty(), empty(),
+            id.endpointId(), Partitioning.HOURS, empty(), empty(), empty(), empty(),
             Arrays.asList(resources)));
   }
 
