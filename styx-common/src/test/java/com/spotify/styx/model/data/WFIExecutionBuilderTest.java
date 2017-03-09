@@ -52,7 +52,7 @@ public class WFIExecutionBuilderTest {
 
   private ExecutionDescription desc(String dockerImage) {
     return ExecutionDescription.create(
-        dockerImage, Collections.emptyList(), Optional.empty(), Optional.empty());
+        dockerImage, Collections.emptyList(), false, Optional.empty(), Optional.empty());
   }
 
   @Test

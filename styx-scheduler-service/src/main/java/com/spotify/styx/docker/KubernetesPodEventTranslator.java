@@ -89,7 +89,7 @@ public final class KubernetesPodEventTranslator {
       case "Failed":
         exitCode = pod.getStatus().getContainerStatuses().stream()
             .filter(IS_STYX_CONTAINER)
-            .map(cs -> cs.getState().getTerminated().getExitCode())
+            .map(cs -> cs.getState().getTerminated().getExitCode()) // FIXME
             .findFirst();
         break;
 

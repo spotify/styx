@@ -127,7 +127,7 @@ class LocalDockerRunner implements DockerRunner {
       }
 
       if (!containerInfo.state().running()) {
-        final int exitCode = containerInfo.state().exitCode();
+        final int exitCode = containerInfo.state().exitCode(); // FIXME
         final WorkflowInstance workflowInstance = inFlight.remove(containerId);
 
         // trigger started event if we didn't see the container in running before

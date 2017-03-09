@@ -140,10 +140,11 @@ public class DockerRunnerHandler implements OutputHandler {
     final DockerRunner.RunSpec runSpec = DockerRunner.RunSpec.create(
         dockerImage,
         ImmutableList.copyOf(command),
+        executionDescription.dockerTerminationLogging(),
         executionDescription.secret());
 
-    LOG.info("running:{} image:{} args:{}", workflowInstance.toKey(), runSpec.imageName(),
-             runSpec.args());
+    LOG.info("running:{} image:{} args:{} termination_logging:{}", workflowInstance.toKey(),
+        runSpec.imageName(), runSpec.args(), runSpec.terminationLogging());
 
     return dockerRunner.start(workflowInstance, runSpec);
   }

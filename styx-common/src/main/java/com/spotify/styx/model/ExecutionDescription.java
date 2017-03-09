@@ -41,6 +41,9 @@ public abstract class ExecutionDescription {
   public abstract List<String> dockerArgs();
 
   @JsonProperty
+  public abstract boolean dockerTerminationLogging();
+
+  @JsonProperty
   public abstract Optional<DataEndpoint.Secret> secret();
 
   @JsonProperty
@@ -50,12 +53,13 @@ public abstract class ExecutionDescription {
   public static ExecutionDescription create(
       @JsonProperty("docker_image") String dockerImage,
       @JsonProperty("docker_args") List<String> dockerArgs,
+      @JsonProperty("docker_termination_logging") boolean dockerTerminationLogging,
       @JsonProperty("secret") Optional<DataEndpoint.Secret> secret,
       @JsonProperty("commit_sha") Optional<String> commitSha) {
-    return new AutoValue_ExecutionDescription(dockerImage, dockerArgs, secret, commitSha);
+    return new AutoValue_ExecutionDescription(dockerImage, dockerArgs, dockerTerminationLogging, secret, commitSha);
   }
 
   public static ExecutionDescription forImage(String dockerImage) {
-    return new AutoValue_ExecutionDescription(dockerImage, emptyList(), empty(), empty());
+    return new AutoValue_ExecutionDescription(dockerImage, emptyList(), false, empty(), empty());
   }
 }

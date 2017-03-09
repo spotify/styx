@@ -32,9 +32,10 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
+import okio.ByteString;
+
 import java.util.Arrays;
 import java.util.Optional;
-import okio.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -54,6 +55,7 @@ public class PersistentEventTest {
   private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.create(
       DOCKER_IMAGE,
       Arrays.asList("foo", "bar"),
+      false,
       Optional.of(DataEndpoint.Secret.create("secret", "/dev/null")),
       Optional.of(COMMIT_SHA));
 

@@ -81,7 +81,7 @@ public class DockerRunnerHandlerTest {
   private static final String TEST_EXECUTION_ID = "execution_1";
   private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
   private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.create(
-      TEST_DOCKER_IMAGE, Arrays.asList("--date", "{}", "--bar"), empty(), empty());
+      TEST_DOCKER_IMAGE, Arrays.asList("--date", "{}", "--bar"), false, empty(), empty());
   private static final Trigger TRIGGER = Trigger.unknown("trig");
 
   @Captor ArgumentCaptor<WorkflowInstance> instanceCaptor;

@@ -71,6 +71,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String NAMESPACE = "default";
   static final String STYX_RUN = "styx-run";
   static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
+  static final String DOCKER_TERMINATION_LOGGING_ANNOTATION = "styx-docker-termination-logging";
   static final String COMPONENT_ID = "STYX_COMPONENT_ID";
   static final String ENDPOINT_ID = "STYX_ENDPOINT_ID";
   static final String WORKFLOW_ID = "STYX_WORKFLOW_ID";
@@ -144,6 +145,7 @@ class KubernetesDockerRunner implements DockerRunner {
         .withNewMetadata()
         .withName(podName)
         .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
+        .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION, String.valueOf(runSpec.terminationLogging()))
         .endMetadata();
     PodFluent.SpecNested<PodBuilder> spec = podBuilder.withNewSpec()
         .withRestartPolicy("Never");

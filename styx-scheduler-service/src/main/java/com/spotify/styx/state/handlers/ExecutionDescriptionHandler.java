@@ -115,6 +115,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
     return ExecutionDescription.create(
         dockerImageOpt.get(),
         dockerArgsOpt.get(),
+        workflow.schedule().dockerTerminationLogging(),
         workflow.schedule().secret(),
         workflowState.commitSha());
   }
