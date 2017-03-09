@@ -260,42 +260,34 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldNotOverwriteDockerImageFromWorkflowWhenUsingComponent() throws Exception {
+  public void shouldOverwriteDockerImageFromWorkflowWhenUsingComponent() throws Exception {
+    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
     WorkflowState state = patchDockerImage(DOCKER_IMAGE_COMPONENT);
-
-    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
     storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id().componentId(), state);
-    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
-    assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_COMPONENT)));
 
-    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
-    retrieved  = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
-    assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_COMPONENT)));
+    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
+    assertThat(retrieved, is(WORKFLOW_WITH_DOCKER_IMAGE.schedule().dockerImage()));
   }
 
   @Test
-  public void shouldNotOverwriteDockerImageFromWorkflowWhenUsingWorkflowId() throws Exception {
+  public void shouldOverwriteDockerImageFromWorkflowWhenUsingWorkflowId() throws Exception {
     storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
     storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id(), patchDockerImage(DOCKER_IMAGE_WORKFLOW));
     Optional<String> retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
-    assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
-
-    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
-    retrieved  = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
-    assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
+    assertThat(retrieved, is(WORKFLOW_WITH_DOCKER_IMAGE.schedule().dockerImage()));
   }
 
   @Test
   public void shouldNotOverwriteDockerImageFromComponentWhenUsingWorkflowId() throws Exception {
     WorkflowState state = patchDockerImage(DOCKER_IMAGE_COMPONENT);
 
-    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
-    storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id(), patchDockerImage(DOCKER_IMAGE_WORKFLOW));
-    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
+    storage.store(WORKFLOW_NO_DOCKER_IMAGE);
+    storage.patchState(WORKFLOW_NO_DOCKER_IMAGE.id(), patchDockerImage(DOCKER_IMAGE_WORKFLOW));
+    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_NO_DOCKER_IMAGE.id());
     assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
 
-    storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id().componentId(), state);
-    retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
+    storage.patchState(WORKFLOW_NO_DOCKER_IMAGE.id().componentId(), state);
+    retrieved = storage.getDockerImage(WORKFLOW_NO_DOCKER_IMAGE.id());
     assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
   }
 
