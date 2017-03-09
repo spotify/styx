@@ -57,10 +57,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
   private static final DataEndpoint DATA_ENDPOINT_HOURLY = DataEndpoint.create(
       "styx.TestEndpoint", Partitioning.HOURS, of("busybox"), of(asList("--hour", "{}")),
-      empty(), emptyList());
+      empty(), empty(), emptyList());
   private static final DataEndpoint DATA_ENDPOINT_DAILY = DataEndpoint.create(
       "styx.TestEndpoint", Partitioning.DAYS, of("busybox"), of(asList("--hour", "{}")),
-      empty(), emptyList());
+      empty(), empty(), emptyList());
   private static final String TEST_EXECUTION_ID_1 = "execution_1";
   private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
   private static final Workflow HOURLY_WORKFLOW = Workflow.create(
@@ -302,7 +302,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     workflowChanges(Workflow.create(DAILY_WORKFLOW.componentId(),
         DAILY_WORKFLOW.componentUri(),
         DataEndpoint.create(DATA_ENDPOINT_DAILY.id(), DATA_ENDPOINT_DAILY.partitioning(),
-            Optional.of("freebox"), DATA_ENDPOINT_DAILY.dockerArgs(),
+            Optional.of("freebox"), DATA_ENDPOINT_DAILY.dockerArgs(), empty(),
             DATA_ENDPOINT_DAILY.secret(), emptyList())));
     timePasses(StyxScheduler.SCHEDULER_TICK_INTERVAL_SECONDS, SECONDS);
     awaitNumberOfDockerRunsWontChange(1);
@@ -351,7 +351,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     DataEndpoint changedDataEndpoint = DataEndpoint.create(
         DATA_ENDPOINT_HOURLY.id(), Partitioning.HOURS, of("busybox:v777"),
-        of(asList("other", "args")), empty(), emptyList());
+        of(asList("other", "args")), empty(), empty(), emptyList());
 
     Workflow changedWorkflow = Workflow.create(
         HOURLY_WORKFLOW.componentId(),

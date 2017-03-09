@@ -149,6 +149,7 @@ public class StateInitializingTriggerTest {
         Optional.of("busybox"),
         Optional.of(Lists.newArrayList(args)),
         empty(),
+        empty(),
         emptyList());
   }
 

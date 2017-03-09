@@ -85,7 +85,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   private static final DataEndpoint DATA_ENDPOINT =
-      DataEndpoint.create("bar", Partitioning.DAYS, empty(), empty(), empty(), emptyList());
+      DataEndpoint.create("bar", Partitioning.DAYS, empty(), empty(), empty(), empty(), emptyList());
 
   private static final Workflow WORKFLOW =
       Workflow.create("foo", URI.create("/hejhej"), DATA_ENDPOINT);

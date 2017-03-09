@@ -39,6 +39,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.schedule.ScheduleSource;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
+
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -205,6 +206,7 @@ public class LocalFileScheduleSourceTest {
             empty(),
             Optional.of(emptyList()),
             empty(),
+            empty(),
             emptyList()));
   }
 
@@ -218,6 +220,7 @@ public class LocalFileScheduleSourceTest {
             Partitioning.DAYS,
             empty(),
             Optional.of(singletonList("foo")),
+            empty(),
             empty(),
             emptyList()));
   }
@@ -233,6 +236,7 @@ public class LocalFileScheduleSourceTest {
             empty(),
             Optional.of(Arrays.asList("foo", "bar")),
             empty(),
+            empty(),
             emptyList()));
   }
 
@@ -246,6 +250,7 @@ public class LocalFileScheduleSourceTest {
             Partitioning.DAYS,
             empty(),
             Optional.of(Arrays.asList("baz", "bax")),
+            empty(),
             empty(),
             emptyList()));
   }
