@@ -127,7 +127,7 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void terminateEvent_withTerminationLoggingButNoMessage_shouldHaveErrorExitCode() throws Exception {
+  public void errorExitCodeOnTerminationLoggingButNoMessage() throws Exception {
     Pod pod = podWithTerminationLogging();
     pod.setStatus(terminated("Succeeded", 0, null));
 
@@ -138,7 +138,7 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void terminateEvent_withTerminationLoggingButInvalidJson_shouldHaveErrorExitCode() throws Exception {
+  public void errorExitCodeOnTerminationLoggingButInvalidJson() throws Exception {
     Pod pod = podWithTerminationLogging();
     pod.setStatus(terminated("Succeeded", 0, "SUCCESS"));
 
@@ -148,7 +148,7 @@ public class KubernetesPodEventTranslatorTest {
         Event.terminate(WFI, 127));
   }
   @Test
-  public void terminateEvent_withTerminationLoggingButPartialJson_shouldHaveErrorExitCode() throws Exception {
+  public void errorExitCodeOnTerminationLoggingButPartialJson() throws Exception {
     Pod pod = podWithTerminationLogging();
     pod.setStatus(terminated("Succeeded", 0, "{\"exit_code\":0}"));
 
@@ -159,7 +159,7 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void terminateEvent_withTerminationLoggingAndZeroExitCode_shouldHaveExitCodeFromMessage() throws Exception {
+  public void exitCodeFromMessageOnTerminationLoggingAndZeroExitCode() throws Exception {
     Pod pod = podWithTerminationLogging();
     pod.setStatus(terminated("Succeeded", 0, String.format(MESSAGE_FORMAT, 1)));
 
@@ -170,7 +170,7 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void terminateEvent_withTerminationLoggingAndNonzeroExitCode_shouldHaveExitCodeFromMessage() throws Exception {
+  public void exitCodeFromMessageOnTerminationLoggingAndNonzeroExitCode() throws Exception {
     Pod pod = podWithTerminationLogging();
     pod.setStatus(terminated("Failed", 2, String.format(MESSAGE_FORMAT, 3)));
 

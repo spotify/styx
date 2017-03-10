@@ -80,30 +80,30 @@ public final class KubernetesPodEventTranslator {
   }
 
   private static int getExitCode(Pod pod, ContainerStatus status) {
+    final ContainerStateTerminated terminated = status.getState().getTerminated();
+
     if ("true".equals(pod.getMetadata().getAnnotations().get(DOCKER_TERMINATION_LOGGING_ANNOTATION))) {
-      if (status.getState() == null
-          || status.getState().getTerminated() == null
-          || status.getState().getTerminated().getMessage() == null) {
-        LOG.warn("Missing termination log message");
+      if (terminated.getMessage() == null) {
+        LOG.warn("Missing termination log message for container {}", status.getContainerID());
 
         // make sure to signal an error to be on the safe side, as opposed to the purported exit code
         return 127;
       }
       try {
         final TerminationLogMessage message = new ObjectMapper().readValue(
-            status.getState().getTerminated().getMessage(),
+            terminated.getMessage(),
             TerminationLogMessage.class);
 
         return message.exitCode;
       } catch (IOException e) {
-        LOG.warn("Unexpected termination log message", e);
+        LOG.warn("Unexpected termination log message for container {}", status.getContainerID(), e);
 
         // make sure to signal an error to be on the safe side, as opposed to the purported exit code
         return 127;
       }
     }
 
-    return status.getState().getTerminated().getExitCode();
+    return terminated.getExitCode();
   }
 
   public static List<Event> translate(
