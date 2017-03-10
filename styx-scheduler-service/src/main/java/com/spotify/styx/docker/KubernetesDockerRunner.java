@@ -28,6 +28,7 @@ import static java.util.stream.Collectors.toSet;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.Event;
@@ -40,6 +41,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import io.fabric8.kubernetes.api.model.EnvVar;
+import io.fabric8.kubernetes.api.model.EnvVarBuilder;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.PodFluent;
@@ -51,6 +53,7 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
+
 import java.io.IOException;
 import java.net.ProtocolException;
 import java.util.List;
@@ -77,6 +80,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String WORKFLOW_ID = "STYX_WORKFLOW_ID";
   static final String PARAMETER = "STYX_PARAMETER";
   static final String EXECUTION_ID = "STYX_EXECUTION_ID";
+  static final String TERMINATION_LOG = "STYX_TERMINATION_LOG";
   static final int POLL_PODS_INTERVAL_SECONDS = 60;
 
   private static final ScheduledExecutorService EXECUTOR =
@@ -125,21 +129,31 @@ class KubernetesDockerRunner implements DockerRunner {
     final String podName = STYX_RUN + "-" + UUID.randomUUID().toString();
 
     // inject environment variables
-    EnvVar envVarComponent = new EnvVar();
-    envVarComponent.setName(COMPONENT_ID);
-    envVarComponent.setValue(workflowInstance.workflowId().componentId());
-    EnvVar envVarEndpoint = new EnvVar();
-    envVarEndpoint.setName(ENDPOINT_ID);
-    envVarEndpoint.setValue(workflowInstance.workflowId().endpointId());
-    EnvVar envVarWorkflow = new EnvVar();
-    envVarWorkflow.setName(WORKFLOW_ID);
-    envVarWorkflow.setValue(workflowInstance.workflowId().endpointId());
-    EnvVar envVarParameter = new EnvVar();
-    envVarParameter.setName(PARAMETER);
-    envVarParameter.setValue(workflowInstance.parameter());
-    EnvVar envVarExecution = new EnvVar();
-    envVarExecution.setName(EXECUTION_ID);
-    envVarExecution.setValue(podName);
+    List<EnvVar> env = Lists.newArrayList();
+    env.add(new EnvVarBuilder()
+        .withName(COMPONENT_ID)
+        .withValue(workflowInstance.workflowId().componentId())
+        .build());
+    env.add(new EnvVarBuilder()
+        .withName(ENDPOINT_ID)
+        .withValue(workflowInstance.workflowId().endpointId())
+        .build());
+    env.add(new EnvVarBuilder()
+        .withName(WORKFLOW_ID)
+        .withValue(workflowInstance.workflowId().endpointId())
+        .build());
+    env.add(new EnvVarBuilder()
+        .withName(PARAMETER)
+        .withValue(workflowInstance.parameter())
+        .build());
+    env.add(new EnvVarBuilder()
+        .withName(EXECUTION_ID)
+        .withValue(podName)
+        .build());
+    env.add(new EnvVarBuilder()
+        .withName(TERMINATION_LOG)
+        .withValue("/termination-log")
+        .build());
 
     PodBuilder podBuilder = new PodBuilder()
         .withNewMetadata()
@@ -154,8 +168,7 @@ class KubernetesDockerRunner implements DockerRunner {
             .withName(STYX_RUN)
             .withImage(imageWithTag)
             .withArgs(runSpec.args())
-            .withEnv(envVarComponent, envVarEndpoint, envVarWorkflow, envVarParameter,
-                envVarExecution);
+            .withEnv(env);
 
     if (runSpec.secret().isPresent()) {
       final DataEndpoint.Secret secret = runSpec.secret().get();
