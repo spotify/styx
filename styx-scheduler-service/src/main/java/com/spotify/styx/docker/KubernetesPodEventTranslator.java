@@ -54,27 +54,12 @@ public final class KubernetesPodEventTranslator {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private static class TerminationLogMessage {
-    String componentId;
-    String workflowId;
-    String parameter;
-    String executionId;
-    String event;
     int exitCode;
 
     @JsonCreator
     public TerminationLogMessage(
-        @JsonProperty(value = "component_id", required = true) String componentId,
-        @JsonProperty(value = "workflow_id", required = true) String workflowId,
-        @JsonProperty(value = "parameter", required = true) String parameter,
-        @JsonProperty(value = "execution_id", required = true) String executionId,
-        @JsonProperty(value = "event", required = true) String event,
         @JsonProperty(value = "exit_code", required = true) int exitCode
     ) {
-      this.componentId = componentId;
-      this.workflowId = workflowId;
-      this.parameter = parameter;
-      this.executionId = executionId;
-      this.event = event;
       this.exitCode = exitCode;
     }
   }

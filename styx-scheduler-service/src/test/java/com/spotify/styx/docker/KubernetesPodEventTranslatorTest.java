@@ -150,7 +150,7 @@ public class KubernetesPodEventTranslatorTest {
   @Test
   public void errorExitCodeOnTerminationLoggingButPartialJson() throws Exception {
     Pod pod = podWithTerminationLogging();
-    pod.setStatus(terminated("Succeeded", 0, "{\"exit_code\":0}"));
+    pod.setStatus(terminated("Succeeded", 0, "{\"workflow_id\":\"dummy\"}"));
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
