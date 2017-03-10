@@ -38,6 +38,7 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.Message.MessageLevel;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import java.time.Instant;
@@ -262,11 +263,13 @@ public abstract class RunState {
       switch (state()) {
         case RUNNING:
           final double cost = exitCost(exitCode);
-          final Message.MessageLevel level = messageLevel(exitCode);
+          final int consecutiveFailures = consecutiveFailures(data(), exitCode);
+          final MessageLevel level = messageLevel(exitCode);
 
           final StateData newStateData = data().builder()
               .retryCost(data().retryCost() + cost)
               .lastExit(exitCode)
+              .consecutiveFailures(consecutiveFailures)
               .addMessage(Message.create(level, "Exit code: " + exitCode.map(String::valueOf).orElse("-")))
               .build();
 
@@ -287,14 +290,26 @@ public abstract class RunState {
       }).orElse(FAILURE_COST);
     }
 
-    Message.MessageLevel messageLevel(Optional<Integer> exitCode) {
+    int consecutiveFailures(StateData data, Optional<Integer> exitCode) {
       return exitCode.map(c -> {
         switch (c) {
-          case SUCCESS_EXIT_CODE:      return Message.MessageLevel.INFO;
-          case MISSING_DEPS_EXIT_CODE: return Message.MessageLevel.WARNING;
-          default:                     return Message.MessageLevel.ERROR;
+          case SUCCESS_EXIT_CODE:
+          case MISSING_DEPS_EXIT_CODE:
+            return 0;
+          default:
+            return data.consecutiveFailures() + 1;
         }
-      }).orElse(Message.MessageLevel.ERROR);
+      }).orElse(data.consecutiveFailures() + 1);
+    }
+
+    MessageLevel messageLevel(Optional<Integer> exitCode) {
+      return exitCode.map(c -> {
+        switch (c) {
+          case SUCCESS_EXIT_CODE:      return MessageLevel.INFO;
+          case MISSING_DEPS_EXIT_CODE: return MessageLevel.WARNING;
+          default:                     return MessageLevel.ERROR;
+        }
+      }).orElse(MessageLevel.ERROR);
     }
 
     @Override
@@ -308,6 +323,7 @@ public abstract class RunState {
           final StateData newStateData = data().builder()
               .retryCost(data().retryCost() + FAILURE_COST)
               .lastExit(empty())
+              .consecutiveFailures(data().consecutiveFailures() + 1)
               .addMessage(Message.error(message))
               .build();
 

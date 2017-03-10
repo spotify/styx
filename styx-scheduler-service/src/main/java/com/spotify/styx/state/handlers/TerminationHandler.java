@@ -81,7 +81,7 @@ public class TerminationHandler implements OutputHandler {
       if (state.data().lastExit().map(c -> c == MISSING_DEPS_EXIT_CODE).orElse(false)) {
         delayMillis = Duration.ofMinutes(MISSING_DEPS_RETRY_DELAY_MINUTES).toMillis();
       } else {
-        delayMillis = retryUtil.calculateDelay(state.data().tries()).toMillis();
+        delayMillis = retryUtil.calculateDelay(state.data().consecutiveFailures()).toMillis();
       }
       stateManager.receiveIgnoreClosed(Event.retryAfter(workflowInstance, delayMillis));
     } else {
