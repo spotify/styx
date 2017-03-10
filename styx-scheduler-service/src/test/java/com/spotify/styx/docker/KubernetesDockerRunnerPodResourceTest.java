@@ -23,6 +23,7 @@ package com.spotify.styx.docker;
 import static com.jcabi.matchers.RegexMatchers.matchesPattern;
 import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_TERMINATION_LOGGING_ANNOTATION;
 import static com.spotify.styx.docker.KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION;
+import static com.spotify.styx.docker.KubernetesDockerRunner.TERMINATION_LOG;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasEntry;
@@ -39,6 +40,7 @@ import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.Volume;
 import io.fabric8.kubernetes.api.model.VolumeMount;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -110,7 +112,7 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldAddTerminationLoggingAnnotationWhenFalse() throws Exception {
+  public void shouldDisableTerminationLoggingWhenFalse() throws Exception {
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.create(
@@ -118,10 +120,15 @@ public class KubernetesDockerRunnerPodResourceTest {
 
     Map<String, String> annotations = pod.getMetadata().getAnnotations();
     assertThat(annotations.get(DOCKER_TERMINATION_LOGGING_ANNOTATION), is("false"));
+
+    List<Container> containers = pod.getSpec().getContainers();
+    Optional<EnvVar> terminationLogVar = containers.get(0).getEnv().stream()
+        .filter(e -> TERMINATION_LOG.equals(e.getName())).findAny();
+    assertThat(terminationLogVar.get().getValue(), is("/termination-log"));
   }
 
   @Test
-  public void shouldAddTerminationLoggingAnnotationWhenTrue() throws Exception {
+  public void shouldEnableTerminationLoggingWhenTrue() throws Exception {
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.create(
@@ -129,6 +136,11 @@ public class KubernetesDockerRunnerPodResourceTest {
 
     Map<String, String> annotations = pod.getMetadata().getAnnotations();
     assertThat(annotations.get(DOCKER_TERMINATION_LOGGING_ANNOTATION), is("true"));
+
+    List<Container> containers = pod.getSpec().getContainers();
+    Optional<EnvVar> terminationLogVar = containers.get(0).getEnv().stream()
+        .filter(e -> TERMINATION_LOG.equals(e.getName())).findAny();
+    assertThat(terminationLogVar.get().getValue(), is("/termination-log"));
   }
 
   @Test
@@ -206,7 +218,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     parameter.setValue(WORKFLOW_INSTANCE.parameter());
     EnvVar execution = envVars.get(4);
 
-    assertThat(envVars.size(), is(5));
+    assertThat(envVars.size(), is(6));
     assertThat(envVars, hasItem(component));
     assertThat(envVars, hasItem(workflow));
     assertThat(envVars, hasItem(endpoint));

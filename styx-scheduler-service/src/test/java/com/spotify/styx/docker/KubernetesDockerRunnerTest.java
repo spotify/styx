@@ -135,7 +135,7 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldCompleteWithStatusCodeOnSucceeded() throws Exception {
-    createdPod.setStatus(terminated("Succeeded", 20));
+    createdPod.setStatus(terminated("Succeeded", 20, null));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
     assertThat(stateManager.get(WORKFLOW_INSTANCE).data().lastExit(), hasValue(20));
@@ -216,7 +216,7 @@ public class KubernetesDockerRunnerTest {
   public void shouldDiscardChangesForOldExecutions() throws Exception {
     // simulate event from different pod, but still with the same workflow instance annotation
     createdPod.getMetadata().setName(POD_NAME + "-other");
-    createdPod.setStatus(terminated("Succeeded", 20));
+    createdPod.setStatus(terminated("Succeeded", 20, null));
 
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
