@@ -134,7 +134,7 @@ public class KubernetesPodEventTranslatorTest {
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
-        Event.terminate(WFI, 127));
+        Event.terminate(WFI, -1));
   }
 
   @Test
@@ -145,7 +145,7 @@ public class KubernetesPodEventTranslatorTest {
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
-        Event.terminate(WFI, 127));
+        Event.terminate(WFI, -1));
   }
   @Test
   public void errorExitCodeOnTerminationLoggingButPartialJson() throws Exception {
@@ -155,7 +155,7 @@ public class KubernetesPodEventTranslatorTest {
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
-        Event.terminate(WFI, 127));
+        Event.terminate(WFI, -1));
   }
 
   @Test
@@ -167,6 +167,17 @@ public class KubernetesPodEventTranslatorTest {
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
         Event.terminate(WFI, 1));
+  }
+
+  @Test
+  public void noExitCodeFromEitherMessageOnTerminationLoggingNorDocker() throws Exception {
+    Pod pod = podWithTerminationLogging();
+    pod.setStatus(terminated("Succeeded", null, null));
+
+    assertGeneratesEventsAndTransitions(
+        RunState.State.SUBMITTED, pod,
+        Event.started(WFI),
+        Event.terminate(WFI, -1));
   }
 
   @Test
@@ -244,7 +255,7 @@ public class KubernetesPodEventTranslatorTest {
         null));
   }
 
-  static PodStatus terminated(String phase, int exitCode, String message) {
+  static PodStatus terminated(String phase, Integer exitCode, String message) {
     return podStatus(phase, true, new ContainerState(
         null,
         new ContainerStateTerminated("", exitCode, "", message, "", 0, ""),
