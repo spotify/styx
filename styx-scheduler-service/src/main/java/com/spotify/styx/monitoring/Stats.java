@@ -50,4 +50,10 @@ public interface Stats {
   void registerSubmissionRateLimit(Gauge<Double> submissionRateLimit);
 
   Stats NOOP = new NoopStats();
+
+  void terminationLogMissing();
+
+  void terminationLogInvalid();
+
+  void exitCodeMismatch();
 }

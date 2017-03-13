@@ -82,6 +82,18 @@ public final class MetricsStats implements Stats {
       .tagged("what", "natural-trigger-rate")
       .tagged("unit", UNIT_FREQUENCY);
 
+  private static final MetricId TERMINATION_LOG_MISSING = BASE
+      .tagged("what", "termination-log-missing")
+      .tagged("unit", UNIT_FREQUENCY);
+
+  private static final MetricId TERMINATION_LOG_INVALID = BASE
+      .tagged("what", "termination-log-invalid")
+      .tagged("unit", UNIT_FREQUENCY);
+
+  private static final MetricId EXIT_CODE_MISMATCH = BASE
+      .tagged("what", "exit-code-mismatch")
+      .tagged("unit", UNIT_FREQUENCY);
+
   private static final MetricId SUBMISSION_RATE_LIMIT = BASE
       .tagged("what", "submission-rate-limit")
       .tagged("unit", UNIT_FREQUENCY);
@@ -91,6 +103,9 @@ public final class MetricsStats implements Stats {
   private final Histogram submitToRunning;
   private final Meter pullImageErrorMeter;
   private final Meter naturalTrigger;
+  private final Meter terminationLogMissing;
+  private final Meter terminationLogInvalid;
+  private final Meter exitCodeMismatch;
   private final ConcurrentMap<String, Histogram> storageOperationHistograms;
   private final ConcurrentMap<String, Meter> storageOperationMeters;
   private final ConcurrentMap<String, Histogram> dockerOperationHistograms;
@@ -103,6 +118,9 @@ public final class MetricsStats implements Stats {
     this.submitToRunning = registry.histogram(TRANSITIONING_DURATION);
     this.pullImageErrorMeter = registry.meter(PULL_IMAGE_ERROR_RATE);
     this.naturalTrigger = registry.meter(NATURAL_TRIGGER_RATE);
+    this.terminationLogMissing = registry.meter(TERMINATION_LOG_MISSING);
+    this.terminationLogInvalid = registry.meter(TERMINATION_LOG_INVALID);
+    this.exitCodeMismatch = registry.meter(EXIT_CODE_MISMATCH);
     this.storageOperationHistograms = new ConcurrentHashMap<>();
     this.storageOperationMeters = new ConcurrentHashMap<>();
     this.dockerOperationHistograms = new ConcurrentHashMap<>();
@@ -155,6 +173,21 @@ public final class MetricsStats implements Stats {
   @Override
   public void registerSubmissionRateLimit(Gauge<Double> submissionRateLimit) {
     registry.register(SUBMISSION_RATE_LIMIT, submissionRateLimit);
+  }
+
+  @Override
+  public void terminationLogMissing() {
+    terminationLogMissing.mark();
+  }
+
+  @Override
+  public void terminationLogInvalid() {
+    terminationLogInvalid.mark();
+  }
+
+  @Override
+  public void exitCodeMismatch() {
+    exitCodeMismatch.mark();
   }
 
   @Override

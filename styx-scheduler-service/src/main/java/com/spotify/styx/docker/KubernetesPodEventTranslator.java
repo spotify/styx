@@ -31,6 +31,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
 import io.fabric8.kubernetes.api.model.ContainerStateWaiting;
@@ -39,8 +40,10 @@ import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodStatus;
 import io.fabric8.kubernetes.client.Watcher;
 
+import io.fabric8.kubernetes.client.Watcher.Action;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
 
@@ -64,26 +67,46 @@ public final class KubernetesPodEventTranslator {
     }
   }
 
-  private static Optional<Integer> getExitCode(Pod pod, ContainerStatus status) {
+  private static Optional<Integer> getExitCode(Pod pod, ContainerStatus status, Stats stats) {
     final ContainerStateTerminated terminated = status.getState().getTerminated();
 
+    // Check termination log exit code, if available
     if ("true".equals(pod.getMetadata().getAnnotations().get(DOCKER_TERMINATION_LOGGING_ANNOTATION))) {
       if (terminated.getMessage() == null) {
         LOG.warn("Missing termination log message for container {}", status.getContainerID());
-        return Optional.empty();
-      }
-      try {
-        final TerminationLogMessage message = new ObjectMapper().readValue(
-            terminated.getMessage(),
-            TerminationLogMessage.class);
+        stats.terminationLogMissing();
+      } else {
+        try {
+          final TerminationLogMessage message = new ObjectMapper().readValue(
+              terminated.getMessage(),
+              TerminationLogMessage.class);
 
-        return Optional.of(message.exitCode);
-      } catch (IOException e) {
-        LOG.warn("Unexpected termination log message for container {}", status.getContainerID(), e);
+          if (!Objects.equals(message.exitCode, terminated.getExitCode())) {
+            stats.exitCodeMismatch();
+          }
+
+          return Optional.of(message.exitCode);
+        } catch (IOException e) {
+          stats.terminationLogInvalid();
+          LOG.warn("Unexpected termination log message for container {}",
+              status.getContainerID(), e);
+        }
+      }
+
+      // If there's no termination log exit code, fall back to k8s exit code if it is not zero.
+      // Rationale: It is important for users to be able to get the exit code of the container to be
+      // able to debug failures, but at the same time we must be careful about using the use the k8s
+      // exit code when checking whether the execution was successful as dockerd some times returns
+      // incorrect exit codes.
+      // TODO: consider separating execution status and debugging info in the "terminate" event.
+      if (terminated.getExitCode() != null && terminated.getExitCode() != 0) {
+        return Optional.of(terminated.getExitCode());
+      } else {
         return Optional.empty();
       }
     }
 
+    // No termination log expected, use k8s exit code
     if (terminated.getExitCode() == null) {
       LOG.warn("Missing exit code for container {}", status.getContainerID());
       return Optional.empty();
@@ -95,8 +118,9 @@ public final class KubernetesPodEventTranslator {
   public static List<Event> translate(
       WorkflowInstance workflowInstance,
       RunState state,
-      Watcher.Action action,
-      Pod pod) {
+      Action action,
+      Pod pod,
+      Stats stats) {
 
     if (action == Watcher.Action.DELETED) {
       return emptyList();
@@ -138,7 +162,7 @@ public final class KubernetesPodEventTranslator {
         exited = true;
         exitCode = pod.getStatus().getContainerStatuses().stream()
             .filter(IS_STYX_CONTAINER)
-            .map(cs -> getExitCode(pod, cs))
+            .map(cs -> getExitCode(pod, cs, stats))
             .filter(Optional::isPresent)
             .map(Optional::get)
             .findFirst();

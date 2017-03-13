@@ -65,4 +65,16 @@ final class NoopStats implements Stats {
   @Override
   public void registerSubmissionRateLimit(Gauge<Double> submissionRateLimit) {
   }
+
+  @Override
+  public void terminationLogMissing() {
+  }
+
+  @Override
+  public void terminationLogInvalid() {
+  }
+
+  @Override
+  public void exitCodeMismatch() {
+  }
 }
