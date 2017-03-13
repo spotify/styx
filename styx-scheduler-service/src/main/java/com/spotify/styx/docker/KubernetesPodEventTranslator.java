@@ -130,8 +130,7 @@ public final class KubernetesPodEventTranslator {
       case "Running":
         // check that the styx container is ready
         started = status.getContainerStatuses().stream()
-            .filter(IS_STYX_CONTAINER.and(ContainerStatus::getReady))
-            .findFirst().isPresent();
+            .anyMatch(IS_STYX_CONTAINER.and(ContainerStatus::getReady));
         break;
 
       case "Succeeded":
