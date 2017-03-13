@@ -152,7 +152,7 @@ class KubernetesDockerRunner implements DockerRunner {
         .build());
     env.add(new EnvVarBuilder()
         .withName(TERMINATION_LOG)
-        .withValue("/termination-log")
+        .withValue("/dev/termination-log")
         .build());
 
     PodBuilder podBuilder = new PodBuilder()
