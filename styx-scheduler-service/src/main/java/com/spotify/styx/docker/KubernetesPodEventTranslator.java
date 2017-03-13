@@ -32,6 +32,7 @@ import com.google.common.collect.Lists;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
+import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.RunState;
 import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
 import io.fabric8.kubernetes.api.model.ContainerStateWaiting;
@@ -46,6 +47,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
+import okio.ByteString;
 
 public final class KubernetesPodEventTranslator {
 
@@ -77,9 +79,9 @@ public final class KubernetesPodEventTranslator {
         stats.terminationLogMissing();
       } else {
         try {
-          final TerminationLogMessage message = new ObjectMapper().readValue(
-              terminated.getMessage(),
-              TerminationLogMessage.class);
+
+          final TerminationLogMessage message = Json.deserialize(
+              ByteString.encodeUtf8(terminated.getMessage()), TerminationLogMessage.class);
 
           if (!Objects.equals(message.exitCode, terminated.getExitCode())) {
             stats.exitCodeMismatch();
