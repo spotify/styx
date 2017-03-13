@@ -416,7 +416,7 @@ class KubernetesDockerRunner implements DockerRunner {
     }
 
     @Override
-    public Boolean terminate(WorkflowInstance workflowInstance, int exitCode) {
+    public Boolean terminate(WorkflowInstance workflowInstance, Optional<Integer> exitCode) {
       return false;
     }
 

@@ -38,9 +38,11 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.Message.MessageLevel;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * State machine for run states.
@@ -257,7 +259,7 @@ public abstract class RunState {
     }
 
     @Override
-    public RunState terminate(WorkflowInstance workflowInstance, int exitCode) {
+    public RunState terminate(WorkflowInstance workflowInstance, Optional<Integer> exitCode) {
       switch (state()) {
         case RUNNING:
           final double cost = exitCost(exitCode);
@@ -266,7 +268,7 @@ public abstract class RunState {
           final StateData newStateData = data().builder()
               .retryCost(data().retryCost() + cost)
               .lastExit(exitCode)
-              .addMessage(Message.create(level, "Exit code: " + exitCode))
+              .addMessage(Message.create(level, "Exit code: " + exitCode.map(String::valueOf).orElse("-")))
               .build();
 
           return state(TERMINATED, newStateData);
@@ -276,20 +278,24 @@ public abstract class RunState {
       }
     }
 
-    double exitCost(int exitCode) {
-      switch (exitCode) {
-        case SUCCESS_EXIT_CODE:      return 0.0;
-        case MISSING_DEPS_EXIT_CODE: return MISSING_DEPS_COST;
-        default:                     return FAILURE_COST;
-      }
+    double exitCost(Optional<Integer> exitCode) {
+      return exitCode.map(c -> {
+        switch (c) {
+          case SUCCESS_EXIT_CODE:      return 0.0;
+          case MISSING_DEPS_EXIT_CODE: return MISSING_DEPS_COST;
+          default:                     return FAILURE_COST;
+        }
+      }).orElse(FAILURE_COST);
     }
 
-    Message.MessageLevel messageLevel(int exitCode) {
-      switch (exitCode) {
-        case SUCCESS_EXIT_CODE:      return Message.MessageLevel.INFO;
-        case MISSING_DEPS_EXIT_CODE: return Message.MessageLevel.WARNING;
-        default:                     return Message.MessageLevel.ERROR;
-      }
+    Message.MessageLevel messageLevel(Optional<Integer> exitCode) {
+      return exitCode.map(c -> {
+        switch (c) {
+          case SUCCESS_EXIT_CODE:      return Message.MessageLevel.INFO;
+          case MISSING_DEPS_EXIT_CODE: return Message.MessageLevel.WARNING;
+          default:                     return Message.MessageLevel.ERROR;
+        }
+      }).orElse(Message.MessageLevel.ERROR);
     }
 
     @Override

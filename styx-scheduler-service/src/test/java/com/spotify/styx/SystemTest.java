@@ -174,7 +174,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
 
     injectEvent(Event.started(workflowInstance));
-    injectEvent(Event.terminate(workflowInstance, 0));
+    injectEvent(Event.terminate(workflowInstance, Optional.of(0)));
     awaitWorkflowInstanceCompletion(workflowInstance);
     awaitBackfillCompleted(singleHourBackfill.id());
     tickScheduler();
@@ -296,7 +296,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-13")));
 
     injectEvent(Event.started(workflowInstance));
-    injectEvent(Event.terminate(workflowInstance, 0));
+    injectEvent(Event.terminate(workflowInstance, Optional.of(0)));
     awaitWorkflowInstanceCompletion(workflowInstance);
 
     workflowChanges(Workflow.create(DAILY_WORKFLOW.componentId(),
@@ -346,7 +346,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T15")));
 
     injectEvent(Event.started(workflowInstance));
-    injectEvent(Event.terminate(workflowInstance, 20));
+    injectEvent(Event.terminate(workflowInstance, Optional.of(20)));
     awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
     DataEndpoint changedDataEndpoint = DataEndpoint.create(
@@ -388,7 +388,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
 
     injectEvent(Event.started(workflowInstance));
-    injectEvent(Event.terminate(workflowInstance, 20));
+    injectEvent(Event.terminate(workflowInstance, Optional.of(20)));
     awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
     assertThat(dockerCleans, contains(TEST_EXECUTION_ID));
@@ -423,11 +423,11 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    givenStoredEventAtTime(Event.timeTrigger(workflowInstance),       0L, timeOffsetSeconds(1));
-    givenStoredEventAtTime(Event.started(workflowInstance),           1L, timeOffsetSeconds(2));
-    givenStoredEventAtTime(Event.terminate(workflowInstance, 20),     2L, timeOffsetSeconds(3));
-    givenStoredEventAtTime(Event.retryAfter(workflowInstance, 30000), 3L, timeOffsetSeconds(4));
-    givenActiveStateAtSequenceCount(workflowInstance,                 3L);
+    givenStoredEventAtTime(Event.timeTrigger(workflowInstance),                0L, timeOffsetSeconds(1));
+    givenStoredEventAtTime(Event.started(workflowInstance),                    1L, timeOffsetSeconds(2));
+    givenStoredEventAtTime(Event.terminate(workflowInstance, Optional.of(20)), 2L, timeOffsetSeconds(3));
+    givenStoredEventAtTime(Event.retryAfter(workflowInstance, 30000),          3L, timeOffsetSeconds(4));
+    givenActiveStateAtSequenceCount(workflowInstance,                          3L);
 
     givenTheTimeIs("2016-03-14T16:01:00Z");
     styxStarts();
@@ -447,14 +447,14 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    givenStoredEvent(Event.timeTrigger(workflowInstance),       0L);
-    givenStoredEvent(Event.started(workflowInstance),           1L);
-    givenStoredEvent(Event.terminate(workflowInstance, 20),     2L);
-    givenStoredEvent(Event.retry(workflowInstance),             3L);
-    givenStoredEvent(Event.started(workflowInstance),           4L);
-    givenStoredEvent(Event.terminate(workflowInstance, 20),     5L);
-    givenStoredEvent(Event.retryAfter(workflowInstance, 30000), 6L);
-    givenActiveStateAtSequenceCount(workflowInstance,           6L);
+    givenStoredEvent(Event.timeTrigger(workflowInstance),               0L);
+    givenStoredEvent(Event.started(workflowInstance),                   1L);
+    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(20)),2L);
+    givenStoredEvent(Event.retry(workflowInstance),                     3L);
+    givenStoredEvent(Event.started(workflowInstance),                   4L);
+    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(20)),5L);
+    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),         6L);
+    givenActiveStateAtSequenceCount(workflowInstance,                   6L);
 
     styxStarts();
 
@@ -479,16 +479,16 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER1),                       0L);
     givenStoredEvent(Event.created(workflowInstance, TEST_EXECUTION_ID_1, TEST_DOCKER_IMAGE),  1L);
     givenStoredEvent(Event.started(workflowInstance),                                          2L);
-    givenStoredEvent(Event.terminate(workflowInstance, 30),                                    3L);
+    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),                       3L);
     givenStoredEvent(Event.retry(workflowInstance),                                            4L);
     givenStoredEvent(Event.started(workflowInstance),                                          5L);
-    givenStoredEvent(Event.terminate(workflowInstance, 30),                                    6L);
+    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),                       6L);
     givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                                7L);
     givenStoredEvent(Event.halt(workflowInstance),                                             8L);
     givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER2),                       9L);
     givenStoredEvent(Event.created(workflowInstance, TEST_EXECUTION_ID_1, TEST_DOCKER_IMAGE), 10L);
     givenStoredEvent(Event.started(workflowInstance),                                         11L);
-    givenStoredEvent(Event.terminate(workflowInstance, 30),                                   12L);
+    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),                      12L);
     givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                               13L);
     givenActiveStateAtSequenceCount(workflowInstance,                                         13L);
 
@@ -517,13 +517,13 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION),  2L);
     givenStoredEvent(Event.submitted(workflowInstance, "exec1"),                  3L);
     givenStoredEvent(Event.started(workflowInstance),                             4L);
-    givenStoredEvent(Event.terminate(workflowInstance, 30),                       5L);
+    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),          5L);
     givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                   6L);
     givenStoredEvent(Event.dequeue(workflowInstance),                             7L);
     givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION),  8L);
     givenStoredEvent(Event.submitted(workflowInstance, "exec2"),                  9L);
     givenStoredEvent(Event.started(workflowInstance),                            10L);
-    givenStoredEvent(Event.terminate(workflowInstance, 30),                      11L);
+    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),         11L);
     givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                  12L);
     givenStoredEvent(Event.halt(workflowInstance),                               13L);
     givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER2),         14L);
@@ -531,7 +531,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION), 16L);
     givenStoredEvent(Event.submitted(workflowInstance, "exec3"),                 17L);
     givenStoredEvent(Event.started(workflowInstance),                            18L);
-    givenStoredEvent(Event.terminate(workflowInstance, 30),                      19L);
+    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),         19L);
     givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                  20L);
     givenActiveStateAtSequenceCount(workflowInstance,                            20L);
 

@@ -210,7 +210,7 @@ public class QueuedStateManagerTest {
 
     stateManager.receive(Event.timeTrigger(INSTANCE));
     stateManager.receive(Event.started(INSTANCE));
-    stateManager.receive(Event.terminate(INSTANCE, 0));
+    stateManager.receive(Event.terminate(INSTANCE, Optional.of(0)));
     stateManager.receive(Event.success(INSTANCE));
 
     assertTrue(stateManager.awaitIdle(1000));
@@ -224,9 +224,9 @@ public class QueuedStateManagerTest {
     assertThat(storage.activeStatesMap, hasKey(INSTANCE));
     assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(NO_EVENTS_PROCESSED));
 
-    stateManager.receive(Event.timeTrigger(INSTANCE));          // 0
-    stateManager.receive(Event.started(INSTANCE));              // 1
-    stateManager.receive(Event.terminate(INSTANCE, 0));         // 2
+    stateManager.receive(Event.timeTrigger(INSTANCE));                       // 0
+    stateManager.receive(Event.started(INSTANCE));                           // 1
+    stateManager.receive(Event.terminate(INSTANCE, Optional.of(0)));         // 2
 
     assertTrue(stateManager.awaitIdle(1000));
     assertThat(storage.getLatestStoredCounter(INSTANCE), hasValue(2L));
@@ -318,7 +318,7 @@ public class QueuedStateManagerTest {
             "", Collections.emptyList(), false, Optional.empty(), Optional.empty())));
         stateManager.receive(Event.submitted(instance, "id"));
         stateManager.receive(Event.started(instance));
-        stateManager.receive(Event.terminate(instance, 20));
+        stateManager.receive(Event.terminate(instance, Optional.of(20)));
         stateManager.receive(Event.retryAfter(instance, 300));
         stateManager.receive(Event.dequeue(instance));
       } catch (StateManager.IsClosed ignored) {

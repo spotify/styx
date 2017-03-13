@@ -67,7 +67,7 @@ public class PersistentEventTest {
     assertRoundtrip(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE));
     assertRoundtrip(Event.dequeue(INSTANCE1));
     assertRoundtrip(Event.started(INSTANCE1));
-    assertRoundtrip(Event.terminate(INSTANCE1, 20));
+    assertRoundtrip(Event.terminate(INSTANCE1, Optional.of(20)));
     assertRoundtrip(Event.runError(INSTANCE1, "ErrorMessage"));
     assertRoundtrip(Event.success(INSTANCE1));
     assertRoundtrip(Event.retryAfter(INSTANCE1, 12345));
@@ -122,7 +122,7 @@ public class PersistentEventTest {
         is(Event.triggerExecution(INSTANCE1, BACKFILL_TRIGGER3)));
     assertThat(
         deserializeEvent(json("terminate", "\"exit_code\":20")),
-        is(Event.terminate(INSTANCE1, 20)));
+        is(Event.terminate(INSTANCE1, Optional.of(20))));
   }
 
   @Test

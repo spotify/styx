@@ -36,6 +36,7 @@ import com.spotify.styx.state.StateManager;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -129,7 +130,7 @@ class LocalDockerRunner implements DockerRunner {
       if (!containerInfo.state().running()) {
         // Unlike in KubernetesDockerRunner case, where docker_termination_logging is supported,
         // here we are susceptible to Docker exit code bug, https://github.com/kubernetes/kubernetes/issues/41516.
-        final int exitCode = containerInfo.state().exitCode();
+        final Optional<Integer> exitCode = Optional.ofNullable(containerInfo.state().exitCode());
         final WorkflowInstance workflowInstance = inFlight.remove(containerId);
 
         // trigger started event if we didn't see the container in running before

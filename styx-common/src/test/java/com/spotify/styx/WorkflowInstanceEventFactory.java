@@ -25,6 +25,7 @@ import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
+import java.util.Optional;
 
 public class WorkflowInstanceEventFactory {
 
@@ -66,8 +67,12 @@ public class WorkflowInstanceEventFactory {
     return Event.started(workflowInstance);
   }
 
-  public Event terminate(int exitCode) {
+  public Event terminate(Optional<Integer> exitCode) {
     return Event.terminate(workflowInstance, exitCode);
+  }
+
+  public Event terminate(int exitCode) {
+    return Event.terminate(workflowInstance, Optional.of(exitCode));
   }
 
   public Event runError(String message) {

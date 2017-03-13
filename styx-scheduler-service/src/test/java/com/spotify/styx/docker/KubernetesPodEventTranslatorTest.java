@@ -60,7 +60,7 @@ public class KubernetesPodEventTranslatorTest {
 
     assertGeneratesEventsAndTransitions(
         RunState.State.RUNNING, pod,
-        Event.terminate(WFI, 20));
+        Event.terminate(WFI, Optional.of(20)));
   }
 
   @Test
@@ -70,7 +70,7 @@ public class KubernetesPodEventTranslatorTest {
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
-        Event.terminate(WFI, 0));
+        Event.terminate(WFI, Optional.of(0)));
   }
 
   @Test
@@ -134,7 +134,7 @@ public class KubernetesPodEventTranslatorTest {
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
-        Event.terminate(WFI, -1));
+        Event.terminate(WFI, Optional.empty()));
   }
 
   @Test
@@ -145,7 +145,7 @@ public class KubernetesPodEventTranslatorTest {
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
-        Event.terminate(WFI, -1));
+        Event.terminate(WFI, Optional.empty()));
   }
   @Test
   public void errorExitCodeOnTerminationLoggingButPartialJson() throws Exception {
@@ -155,7 +155,7 @@ public class KubernetesPodEventTranslatorTest {
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
-        Event.terminate(WFI, -1));
+        Event.terminate(WFI, Optional.empty()));
   }
 
   @Test
@@ -166,7 +166,7 @@ public class KubernetesPodEventTranslatorTest {
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
-        Event.terminate(WFI, 1));
+        Event.terminate(WFI, Optional.of(1)));
   }
 
   @Test
@@ -177,7 +177,7 @@ public class KubernetesPodEventTranslatorTest {
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
-        Event.terminate(WFI, -1));
+        Event.terminate(WFI, Optional.empty()));
   }
 
   @Test
@@ -188,7 +188,7 @@ public class KubernetesPodEventTranslatorTest {
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
-        Event.terminate(WFI, 3));
+        Event.terminate(WFI, Optional.of(3)));
 
     // and even if the code from the message astonishingly signals success...
     pod = podWithTerminationLogging();
@@ -197,7 +197,7 @@ public class KubernetesPodEventTranslatorTest {
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
-        Event.terminate(WFI, 0));
+        Event.terminate(WFI, Optional.of(0)));
   }
 
   @Test

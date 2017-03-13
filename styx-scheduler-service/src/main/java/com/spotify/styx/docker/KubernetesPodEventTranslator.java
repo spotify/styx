@@ -46,8 +46,6 @@ import java.util.function.Predicate;
 
 public final class KubernetesPodEventTranslator {
 
-  private static final int NO_EXIT_CODE = -1;
-
   private KubernetesPodEventTranslator() {
   }
 
@@ -66,31 +64,31 @@ public final class KubernetesPodEventTranslator {
     }
   }
 
-  private static int getExitCode(Pod pod, ContainerStatus status) {
+  private static Optional<Integer> getExitCode(Pod pod, ContainerStatus status) {
     final ContainerStateTerminated terminated = status.getState().getTerminated();
 
     if ("true".equals(pod.getMetadata().getAnnotations().get(DOCKER_TERMINATION_LOGGING_ANNOTATION))) {
       if (terminated.getMessage() == null) {
         LOG.warn("Missing termination log message for container {}", status.getContainerID());
-        return NO_EXIT_CODE;
+        return Optional.empty();
       }
       try {
         final TerminationLogMessage message = new ObjectMapper().readValue(
             terminated.getMessage(),
             TerminationLogMessage.class);
 
-        return message.exitCode;
+        return Optional.of(message.exitCode);
       } catch (IOException e) {
         LOG.warn("Unexpected termination log message for container {}", status.getContainerID(), e);
-        return NO_EXIT_CODE;
+        return Optional.empty();
       }
     }
 
     if (terminated.getExitCode() == null) {
       LOG.warn("Missing exit code for container {}", status.getContainerID());
-      return NO_EXIT_CODE;
+      return Optional.empty();
     } else {
-      return terminated.getExitCode();
+      return Optional.of(terminated.getExitCode());
     }
   }
 
@@ -124,6 +122,7 @@ public final class KubernetesPodEventTranslator {
     final PodStatus status = pod.getStatus();
     final String phase = status.getPhase();
 
+    boolean exited = false;
     boolean started = false;
     Optional<Integer> exitCode = Optional.empty();
 
@@ -137,9 +136,12 @@ public final class KubernetesPodEventTranslator {
 
       case "Succeeded":
       case "Failed":
+        exited = true;
         exitCode = pod.getStatus().getContainerStatuses().stream()
             .filter(IS_STYX_CONTAINER)
             .map(cs -> getExitCode(pod, cs))
+            .filter(Optional::isPresent)
+            .map(Optional::get)
             .findFirst();
         break;
 
@@ -158,7 +160,7 @@ public final class KubernetesPodEventTranslator {
       }
     }
 
-    if (exitCode.isPresent()) {
+    if (exited) {
       switch (state.state()) {
         case PREPARE:
         case SUBMITTED:
@@ -166,7 +168,7 @@ public final class KubernetesPodEventTranslator {
           // intentional fall-through
 
         case RUNNING:
-          generatedEvents.add(Event.terminate(workflowInstance, exitCode.get()));
+          generatedEvents.add(Event.terminate(workflowInstance, exitCode));
           break;
 
         default:
