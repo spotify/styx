@@ -495,6 +495,11 @@ public class StyxScheduler implements AppInit {
         return 0L;
       }
     };
+    final Gauge<Long> dockerTerminationLoggingEnabledWorkflowsCount =
+        () -> workflowCache.all().stream()
+            .filter(WorkflowValidator::hasDockerConfiguration)
+            .filter((workflow) -> workflow.schedule().dockerTerminationLogging())
+            .count();
 
     Arrays.stream(RunState.State.values()).forEach(state -> stats.registerActiveStates(
         state,
@@ -504,6 +509,8 @@ public class StyxScheduler implements AppInit {
     stats.registerWorkflowCount("all", allWorkflowsCount);
     stats.registerWorkflowCount("configured", configuredWorkflowsCount);
     stats.registerWorkflowCount("enabled", configuredEnabledWorkflowsCount);
+    stats.registerWorkflowCount("docker_termination_logging_enabled",
+                                dockerTerminationLoggingEnabledWorkflowsCount);
     stats.registerSubmissionRateLimit(submissionRateLimiter::getRate);
   }
 
