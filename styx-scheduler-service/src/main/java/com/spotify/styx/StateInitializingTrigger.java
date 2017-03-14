@@ -21,6 +21,7 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.util.ParameterUtil.toParameter;
+import static java.lang.String.format;
 
 import com.spotify.styx.StyxScheduler.StateFactory;
 import com.spotify.styx.docker.WorkflowValidator;
@@ -69,7 +70,8 @@ final class StateInitializingTrigger implements TriggerListener {
       stateManager.receive(
           Event.triggerExecution(workflowInstance, trigger));
     } catch (StateManager.IsClosed isClosed) {
-      LOG.warn("State receiver is closed", isClosed);
+      LOG.warn("State receiver is closed when processing workflow {} for trigger {} at {}",
+               workflow, trigger, instant, isClosed);
     }
   }
 }
