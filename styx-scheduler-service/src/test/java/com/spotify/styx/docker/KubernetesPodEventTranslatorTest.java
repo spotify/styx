@@ -172,6 +172,39 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
+  public void errorContainerExitCodeAndUnparsableTerminationLog() throws Exception {
+    Pod pod = podWithTerminationLogging();
+    pod.setStatus(terminated("Failed", 17, "{\"workf"));
+
+    assertGeneratesEventsAndTransitions(
+        RunState.State.SUBMITTED, pod,
+        Event.started(WFI),
+        Event.terminate(WFI, Optional.of(17)));
+  }
+
+  @Test
+  public void zeroContainerExitCodeAndInvalidTerminationLog() throws Exception {
+    Pod pod = podWithTerminationLogging();
+    pod.setStatus(terminated("Failed", 0, "{\"workflow_id\":\"dummy\"}"));
+
+    assertGeneratesEventsAndTransitions(
+        RunState.State.SUBMITTED, pod,
+        Event.started(WFI),
+        Event.terminate(WFI, Optional.empty()));
+  }
+
+  @Test
+  public void zeroContainerExitCodeAndUnparsableTerminationLog() throws Exception {
+    Pod pod = podWithTerminationLogging();
+    pod.setStatus(terminated("Failed", 0, "{\"workflo"));
+
+    assertGeneratesEventsAndTransitions(
+        RunState.State.SUBMITTED, pod,
+        Event.started(WFI),
+        Event.terminate(WFI, Optional.empty()));
+  }
+
+  @Test
   public void exitCodeFromMessageOnTerminationLoggingAndZeroExitCode() throws Exception {
     Pod pod = podWithTerminationLogging();
     pod.setStatus(terminated("Succeeded", 0, String.format(MESSAGE_FORMAT, 1)));
@@ -202,15 +235,17 @@ public class KubernetesPodEventTranslatorTest {
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
         Event.terminate(WFI, Optional.of(3)));
+  }
 
-    // and even if the code from the message astonishingly signals success...
-    pod = podWithTerminationLogging();
-    pod.setStatus(terminated("Failed", 4, String.format(MESSAGE_FORMAT, 0)));
+  @Test
+  public void zeroExitCodeFromTerminationLogAndNonZeroContainerExitCode() throws Exception {
+    Pod pod = podWithTerminationLogging();
+    pod.setStatus(terminated("Failed", 2, String.format(MESSAGE_FORMAT, 0)));
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
-        Event.terminate(WFI, Optional.of(0)));
+        Event.terminate(WFI, Optional.of(2)));
   }
 
   @Test
