@@ -46,6 +46,8 @@ import java.util.function.Predicate;
 
 public final class KubernetesPodEventTranslator {
 
+  private static final int NO_EXIT_CODE = -1;
+
   private KubernetesPodEventTranslator() {
   }
 
@@ -70,9 +72,7 @@ public final class KubernetesPodEventTranslator {
     if ("true".equals(pod.getMetadata().getAnnotations().get(DOCKER_TERMINATION_LOGGING_ANNOTATION))) {
       if (terminated.getMessage() == null) {
         LOG.warn("Missing termination log message for container {}", status.getContainerID());
-
-        // make sure to signal an error to be on the safe side, as opposed to the purported exit code
-        return 127;
+        return NO_EXIT_CODE;
       }
       try {
         final TerminationLogMessage message = new ObjectMapper().readValue(
@@ -82,13 +82,16 @@ public final class KubernetesPodEventTranslator {
         return message.exitCode;
       } catch (IOException e) {
         LOG.warn("Unexpected termination log message for container {}", status.getContainerID(), e);
-
-        // make sure to signal an error to be on the safe side, as opposed to the purported exit code
-        return 127;
+        return NO_EXIT_CODE;
       }
     }
 
-    return terminated.getExitCode();
+    if (terminated.getExitCode() == null) {
+      LOG.warn("Missing exit code for container {}", status.getContainerID());
+      return NO_EXIT_CODE;
+    } else {
+      return terminated.getExitCode();
+    }
   }
 
   public static List<Event> translate(
