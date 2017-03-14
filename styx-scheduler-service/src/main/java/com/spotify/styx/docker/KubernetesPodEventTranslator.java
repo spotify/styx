@@ -99,7 +99,7 @@ public final class KubernetesPodEventTranslator {
       // exit code when checking whether the execution was successful as dockerd some times returns
       // incorrect exit codes.
       // TODO: consider separating execution status and debugging info in the "terminate" event.
-      if (!(Objects.equals(terminated.getExitCode(), 0))) {
+      if (terminated.getExitCode() != null && terminated.getExitCode() != 0) {
         return Optional.of(terminated.getExitCode());
       } else {
         return Optional.empty();
