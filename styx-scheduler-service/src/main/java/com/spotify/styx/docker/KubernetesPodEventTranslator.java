@@ -82,10 +82,22 @@ public final class KubernetesPodEventTranslator {
               ByteString.encodeUtf8(terminated.getMessage()), TerminationLogMessage.class);
 
           if (!Objects.equals(message.exitCode, terminated.getExitCode())) {
+            LOG.warn("Exit code mismatch for container {}. Container exit code: {}. "
+                    + "Termination log exit code: {}",
+                status.getContainerID(), terminated.getExitCode(), message.exitCode);
             stats.exitCodeMismatch();
           }
 
-          return Optional.of(message.exitCode);
+          if (terminated.getExitCode() != null && message.exitCode == 0) {
+            // If we have a non-zero container exit code but a zero termination log exit code,
+            // return the container exit code to indicate failure. This guards against jobs that
+            // incorrectly write a successful exit code to the termination log _before_ running
+            // the actual job, which then fails. We could then still incorrectly get a zero exit
+            // code from docker, but there is not a lot we can do about that.
+            return Optional.of(terminated.getExitCode());
+          } else {
+            return Optional.of(message.exitCode);
+          }
         } catch (IOException e) {
           stats.terminationLogInvalid();
           LOG.warn("Unexpected termination log message for container {}",

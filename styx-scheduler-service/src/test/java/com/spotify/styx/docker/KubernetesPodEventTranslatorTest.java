@@ -202,15 +202,17 @@ public class KubernetesPodEventTranslatorTest {
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
         Event.terminate(WFI, Optional.of(3)));
+  }
 
-    // and even if the code from the message astonishingly signals success...
-    pod = podWithTerminationLogging();
-    pod.setStatus(terminated("Failed", 4, String.format(MESSAGE_FORMAT, 0)));
+  @Test
+  public void zeroExitCodeFromTerminationLogAndNonZeroContainerExitCode() throws Exception {
+    Pod pod = podWithTerminationLogging();
+    pod.setStatus(terminated("Failed", 2, String.format(MESSAGE_FORMAT, 0)));
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
-        Event.terminate(WFI, Optional.of(0)));
+        Event.terminate(WFI, Optional.of(2)));
   }
 
   @Test
