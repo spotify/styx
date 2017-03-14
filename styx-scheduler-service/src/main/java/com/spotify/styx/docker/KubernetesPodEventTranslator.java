@@ -78,6 +78,7 @@ public final class KubernetesPodEventTranslator {
       } else {
         try {
 
+          // TODO: handle multiple termination log messages
           final TerminationLogMessage message = Json.deserialize(
               ByteString.encodeUtf8(terminated.getMessage()), TerminationLogMessage.class);
 
