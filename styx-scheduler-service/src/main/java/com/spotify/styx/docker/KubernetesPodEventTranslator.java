@@ -27,7 +27,6 @@ import static java.util.Collections.emptyList;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
@@ -40,7 +39,6 @@ import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodStatus;
 import io.fabric8.kubernetes.client.Watcher;
-
 import io.fabric8.kubernetes.client.Watcher.Action;
 import java.io.IOException;
 import java.util.List;
@@ -101,7 +99,7 @@ public final class KubernetesPodEventTranslator {
       // exit code when checking whether the execution was successful as dockerd some times returns
       // incorrect exit codes.
       // TODO: consider separating execution status and debugging info in the "terminate" event.
-      if (terminated.getExitCode() != null && terminated.getExitCode() != 0) {
+      if (!(Objects.equals(terminated.getExitCode(), 0))) {
         return Optional.of(terminated.getExitCode());
       } else {
         return Optional.empty();
