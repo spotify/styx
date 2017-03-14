@@ -21,7 +21,6 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.util.ParameterUtil.toParameter;
-import static java.lang.String.format;
 
 import com.spotify.styx.StyxScheduler.StateFactory;
 import com.spotify.styx.docker.WorkflowValidator;
