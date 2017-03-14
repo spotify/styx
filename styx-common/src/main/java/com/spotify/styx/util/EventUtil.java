@@ -26,6 +26,7 @@ import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
+import java.util.Optional;
 
 /**
  * Utility for getting information about {@link Event}s
@@ -76,7 +77,7 @@ public final class EventUtil {
     }
 
     @Override
-    public String terminate(WorkflowInstance workflowInstance, int exitCode) {
+    public String terminate(WorkflowInstance workflowInstance, Optional<Integer> exitCode) {
       return "terminate";
     }
 

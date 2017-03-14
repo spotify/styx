@@ -25,6 +25,7 @@ import com.github.sviperll.adt4j.Getter;
 import com.github.sviperll.adt4j.Visitor;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
+import java.util.Optional;
 
 /**
  * Generated {@link Event} ADT for all events that can be received by RunState
@@ -39,7 +40,7 @@ public interface EventVisitor<R> {
   R submit(@Getter WorkflowInstance workflowInstance, ExecutionDescription executionDescription);
   R submitted(@Getter WorkflowInstance workflowInstance, String executionId);
   R started(@Getter WorkflowInstance workflowInstance);
-  R terminate(@Getter WorkflowInstance workflowInstance, int exitCode);
+  R terminate(@Getter WorkflowInstance workflowInstance, Optional<Integer> exitCode);
   R runError(@Getter WorkflowInstance workflowInstance, String message);
   R success(@Getter WorkflowInstance workflowInstance);
   R retryAfter(@Getter WorkflowInstance workflowInstance, long delayMillis);

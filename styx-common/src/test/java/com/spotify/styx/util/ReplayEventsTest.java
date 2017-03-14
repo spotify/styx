@@ -82,7 +82,7 @@ public class ReplayEventsTest {
     events.add(SequenceEvent.create(Event.submit(WORKFLOW_INSTANCE, TestData.EXECUTION_DESCRIPTION),     3L, 3L));
     events.add(SequenceEvent.create(Event.submitted(WORKFLOW_INSTANCE, "exec-1"),                        4L, 4L));
     events.add(SequenceEvent.create(Event.started(WORKFLOW_INSTANCE),                                    5L, 5L));
-    events.add(SequenceEvent.create(Event.terminate(WORKFLOW_INSTANCE, 0),                               6L, 6L));
+    events.add(SequenceEvent.create(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)),                  6L, 6L));
     events.add(SequenceEvent.create(Event.success(WORKFLOW_INSTANCE),                                    7L, 7L));
     events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.adhoc("ad-hoc")),  8L, 8L));
     events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE),                                    9L, 9L));

@@ -107,7 +107,7 @@ class PersistentEvent {
     }
 
     @Override
-    public PersistentEvent terminate(WorkflowInstance workflowInstance, int exitCode) {
+    public PersistentEvent terminate(WorkflowInstance workflowInstance, Optional<Integer> exitCode) {
       return new Terminate(workflowInstance.toKey(), exitCode);
     }
 
@@ -286,12 +286,12 @@ class PersistentEvent {
 
   public static class Terminate extends PersistentEvent {
 
-    public final int exitCode;
+    public final Optional<Integer> exitCode;
 
     @JsonCreator
     public Terminate(
         @JsonProperty("workflow_instance") String workflowInstance,
-        @JsonProperty("exit_code") int exitCode) {
+        @JsonProperty("exit_code") Optional<Integer> exitCode) {
       super("terminate", workflowInstance);
       this.exitCode = exitCode;
     }

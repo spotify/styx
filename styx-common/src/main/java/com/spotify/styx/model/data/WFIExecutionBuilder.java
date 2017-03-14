@@ -30,6 +30,7 @@ import com.spotify.styx.util.TriggerUtil;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 class WFIExecutionBuilder {
 
@@ -141,17 +142,19 @@ class WFIExecutionBuilder {
     }
 
     @Override
-    public Void terminate(WorkflowInstance workflowInstance, int exitCode) {
+    public Void terminate(WorkflowInstance workflowInstance, Optional<Integer> exitCode) {
       currWorkflowInstance = workflowInstance;
 
-      String status;
-      if (exitCode == 0) {
-        status = "SUCCESS";
-      } else if (exitCode == RunState.MISSING_DEPS_EXIT_CODE) {
-        status = "MISSING_DEPS";
-      } else {
-        status = "FAILED";
-      }
+      String status = exitCode.map(c -> {
+        if (c == 0) {
+          return "SUCCESS";
+        } else if (c == RunState.MISSING_DEPS_EXIT_CODE) {
+          return "MISSING_DEPS";
+        } else {
+          return "FAILED";
+        }
+      }).orElse("FAILED");
+
       executionStatusList.add(ExecStatus.create(eventTs, status));
 
       closeExecution();

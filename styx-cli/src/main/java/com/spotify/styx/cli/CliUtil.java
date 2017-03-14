@@ -39,6 +39,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
@@ -123,8 +124,8 @@ class CliUtil {
     }
 
     @Override
-    public String terminate(WorkflowInstance workflowInstance, int exitCode) {
-      return String.format("Exit code: %d", exitCode);
+    public String terminate(WorkflowInstance workflowInstance, Optional<Integer> exitCode) {
+      return "Exit code: " + exitCode.map(String::valueOf).orElse("-");
     }
 
     @Override

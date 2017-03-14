@@ -278,7 +278,7 @@ class KubernetesDockerRunner implements DockerRunner {
       return;
     }
 
-    final List<Event> events = translate(workflowInstance, runState, action, pod);
+    final List<Event> events = translate(workflowInstance, runState, action, pod, stats);
 
     for (Event event : events) {
       if (event.accept(new PullImageErrorMatcher())) {
@@ -416,7 +416,7 @@ class KubernetesDockerRunner implements DockerRunner {
     }
 
     @Override
-    public Boolean terminate(WorkflowInstance workflowInstance, int exitCode) {
+    public Boolean terminate(WorkflowInstance workflowInstance, Optional<Integer> exitCode) {
       return false;
     }
 
