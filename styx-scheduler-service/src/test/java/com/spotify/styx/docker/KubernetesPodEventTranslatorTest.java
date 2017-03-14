@@ -30,6 +30,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.testdata.TestData;
 import io.fabric8.kubernetes.api.model.ContainerState;
@@ -147,6 +148,7 @@ public class KubernetesPodEventTranslatorTest {
         Event.started(WFI),
         Event.terminate(WFI, Optional.empty()));
   }
+
   @Test
   public void errorExitCodeOnTerminationLoggingButPartialJson() throws Exception {
     Pod pod = podWithTerminationLogging();
@@ -156,6 +158,17 @@ public class KubernetesPodEventTranslatorTest {
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
         Event.terminate(WFI, Optional.empty()));
+  }
+
+  @Test
+  public void errorExitCodeOnTerminationLoggingButK8sFallback() throws Exception {
+    Pod pod = podWithTerminationLogging();
+    pod.setStatus(terminated("Failed", 17, "{\"workflow_id\":\"dummy\"}"));
+
+    assertGeneratesEventsAndTransitions(
+        RunState.State.SUBMITTED, pod,
+        Event.started(WFI),
+        Event.terminate(WFI, Optional.of(17)));
   }
 
   @Test
@@ -219,7 +232,7 @@ public class KubernetesPodEventTranslatorTest {
     pod.setStatus(terminated("Succeeded", 0, null));
     RunState state = RunState.create(WFI, RunState.State.TERMINATED);
 
-    List<Event> events = translate(WFI, state, Watcher.Action.DELETED, pod);
+    List<Event> events = translate(WFI, state, Watcher.Action.DELETED, pod, Stats.NOOP);
     assertThat(events, empty());
   }
 
@@ -229,7 +242,7 @@ public class KubernetesPodEventTranslatorTest {
       Event... expectedEvents) {
 
     RunState state = RunState.create(WFI, initialState);
-    List<Event> events = translate(WFI, state, Watcher.Action.MODIFIED, pod);
+    List<Event> events = translate(WFI, state, Watcher.Action.MODIFIED, pod, Stats.NOOP);
     assertThat(events, contains(expectedEvents));
 
     // ensure no exceptions are thrown when transitioning
@@ -243,7 +256,7 @@ public class KubernetesPodEventTranslatorTest {
       Pod pod) {
 
     RunState state = RunState.create(WFI, initialState);
-    List<Event> events = translate(WFI, state, Watcher.Action.MODIFIED, pod);
+    List<Event> events = translate(WFI, state, Watcher.Action.MODIFIED, pod, Stats.NOOP);
 
     assertThat(events, empty());
   }

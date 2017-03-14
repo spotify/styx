@@ -278,7 +278,7 @@ class KubernetesDockerRunner implements DockerRunner {
       return;
     }
 
-    final List<Event> events = translate(workflowInstance, runState, action, pod);
+    final List<Event> events = translate(workflowInstance, runState, action, pod, stats);
 
     for (Event event : events) {
       if (event.accept(new PullImageErrorMatcher())) {
