@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.util.ParameterUtil.incrementInstant;
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
@@ -267,24 +268,10 @@ public class Scheduler {
 
       final int remainingCapacity =
           backfill.concurrency() - backfillStates.getOrDefault(backfill.id(), 0L).intValue();
-      if (remainingCapacity <= 0) {
-        return;
-      }
 
-      final List<Instant> partitionsRemaining =
-          ParameterUtil.rangeOfInstants(backfill.nextTrigger(), backfill.end(),
-                                        workflow.schedule().partitioning());
+      Instant partition = backfill.nextTrigger();
 
-      if (partitionsRemaining.isEmpty()) {
-        storeBackfill(backfill.builder().allTriggered(true).build());
-        return;
-      }
-
-      final int partitionsToTrigger = Math.min(remainingCapacity, partitionsRemaining.size());
-
-      for (int i = 0; i < partitionsToTrigger; i++) {
-        Instant partition = partitionsRemaining.get(i);
-
+      for (int i = 0; i < remainingCapacity && partition.isBefore(backfill.end()); i++) {
         try {
           triggerListener
               .event(workflow, Trigger.backfill(backfill.id()), partition)
@@ -301,15 +288,17 @@ public class Scheduler {
           throw new RuntimeException(e);
         }
 
-        final BackfillBuilder builder = backfill.builder();
-        if (i < partitionsRemaining.size() - 1) {
-          final Instant nextPartition = partitionsRemaining.get(i + 1);
-          builder.nextTrigger(nextPartition);
-        } else {
-          builder.nextTrigger(backfill.end());
-          builder.allTriggered(true);
-        }
-        storeBackfill(builder.build());
+        partition = incrementInstant(partition, backfill.partitioning());
+        storeBackfill(backfill.builder()
+            .nextTrigger(partition)
+            .build());
+      }
+
+      if (partition.equals(backfill.end())) {
+        storeBackfill(backfill.builder()
+            .nextTrigger(backfill.end())
+            .allTriggered(true)
+            .build());
       }
     });
   }
