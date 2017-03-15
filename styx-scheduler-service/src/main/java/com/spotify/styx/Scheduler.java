@@ -264,16 +264,22 @@ public class Scheduler {
         return;
       }
 
-      final int remainingCapacity = backfill.concurrency() - backfillStates.getOrDefault(backfill.id(), 0L).intValue();
+      final Workflow workflow = workflowOpt.get();
+
+      final int remainingCapacity =
+          backfill.concurrency() - backfillStates.getOrDefault(backfill.id(), 0L).intValue();
       if (remainingCapacity <= 0) {
         return;
       }
 
-      final Workflow workflow = workflowOpt.get();
-
       final List<Instant> partitionsRemaining =
           ParameterUtil.rangeOfInstants(backfill.nextTrigger(), backfill.end(),
                                         workflow.schedule().partitioning());
+
+      if (partitionsRemaining.isEmpty()) {
+        storeBackfill(backfill.builder().allTriggered(true).build());
+        return;
+      }
 
       final int partitionsToTrigger = Math.min(remainingCapacity, partitionsRemaining.size());
 

@@ -208,6 +208,26 @@ public class SchedulerTest {
   }
 
   @Test
+  public void shouldTriggerBackfillsToCompletion() throws Exception {
+    setUp(5);
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+    initWorkflow(workflow);
+    when(storage.backfills()).thenReturn(Collections.singletonList(BACKFILL_2));
+
+    scheduler.tick();
+
+    List<Instant> instants =
+        ParameterUtil.rangeOfInstants(BACKFILL_2.start(), BACKFILL_2.end(), BACKFILL_2.partitioning());
+    instants.forEach(
+        instant ->
+            verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_2.id()), instant));
+
+    final Backfill completedBackfill =
+        BACKFILL_2.builder().nextTrigger(BACKFILL_2.end()).allTriggered(true).build();
+    verify(storage).storeBackfill(completedBackfill);
+  }
+
+  @Test
   public void shouldNotTriggerCompletedBackfillsAndUpdateCompleted() throws Exception {
     setUp(5);
     final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
@@ -286,11 +306,10 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldTriggerBackfillsSynchronously() throws Exception {
+  public void shouldTriggerAndUpdateBackfillsSynchronously() throws Exception {
     setUp(5);
     final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
     initWorkflow(workflow);
-    final int concurrency = BACKFILL_1.concurrency();
     when(storage.backfills()).thenReturn(Collections.singletonList(BACKFILL_1));
 
     // Collect unfinished triggering futures as the trigger listener is called
@@ -324,10 +343,9 @@ public class SchedulerTest {
           .event(any(Workflow.class), any(Trigger.class), eq(instant));
 
       triggerProcessed.complete(null);
+      verify(storage, timeout(60_000))
+          .storeBackfill(BACKFILL_1.builder().nextTrigger(instants.get(i + 1)).build());
     }
-
-    verify(storage, timeout(60_000))
-        .storeBackfill(BACKFILL_1.builder().nextTrigger(instants.get(concurrency)).build());
   }
 
   @Test
