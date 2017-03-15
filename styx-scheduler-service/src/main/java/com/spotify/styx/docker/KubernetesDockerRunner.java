@@ -53,7 +53,6 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
-
 import java.io.IOException;
 import java.net.ProtocolException;
 import java.util.List;
