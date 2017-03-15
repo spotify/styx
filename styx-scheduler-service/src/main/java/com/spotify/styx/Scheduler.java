@@ -62,7 +62,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
@@ -251,19 +253,19 @@ public class Scheduler {
             counting()));
 
     backfills.forEach(backfill -> {
-      final BackfillBuilder builder = backfill.builder();
 
       final Optional<Workflow> workflowOpt = workflowCache.workflow(backfill.workflowId());
 
       if (!workflowOpt.isPresent()) {
         LOG.warn("workflow not found for backfill, skipping rest of triggers: {}", backfill);
+        final BackfillBuilder builder = backfill.builder();
         builder.halted(true);
         storeBackfill(builder.build());
         return;
       }
 
-      final int needed = backfill.concurrency() - backfillStates.getOrDefault(backfill.id(), 0L).intValue();
-      if (needed <= 0) {
+      final int remainingCapacity = backfill.concurrency() - backfillStates.getOrDefault(backfill.id(), 0L).intValue();
+      if (remainingCapacity <= 0) {
         return;
       }
 
@@ -273,27 +275,37 @@ public class Scheduler {
           ParameterUtil.rangeOfInstants(backfill.nextTrigger(), backfill.end(),
                                         workflow.schedule().partitioning());
 
-      final List<Instant> partitionsNeeded =
-          partitionsRemaining.stream().limit(needed).collect(toList());
+      final int partitionsToTrigger = Math.min(remainingCapacity, partitionsRemaining.size());
 
-      partitionsNeeded.forEach(
-          partition -> {
-            try {
-              triggerListener.event(workflow, Trigger.backfill(backfill.id()), partition);
-            } catch (AlreadyInitializedException e) {
-              LOG.warn("tried to trigger backfill for already active state [{}]: {}",
-                       partition, backfill);
-            }
-          });
+      for (int i = 0; i < partitionsToTrigger; i++) {
+        Instant partition = partitionsRemaining.get(i);
 
-      if (partitionsRemaining.size() > partitionsNeeded.size()) {
-        builder.nextTrigger(partitionsRemaining.get(partitionsNeeded.size()));
-      } else {
-        builder.nextTrigger(backfill.end());
-        builder.allTriggered(true);
+        try {
+          triggerListener
+              .event(workflow, Trigger.backfill(backfill.id()), partition)
+              .toCompletableFuture().get();
+        } catch (AlreadyInitializedException e) {
+          LOG.warn("tried to trigger backfill for already active state [{}]: {}",
+              partition, backfill);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+          LOG.error("failed to trigger backfill for state [{}]: {}",
+              partition, backfill);
+          throw new RuntimeException(e);
+        }
+
+        final BackfillBuilder builder = backfill.builder();
+        if (i < partitionsRemaining.size() - 1) {
+          final Instant nextPartition = partitionsRemaining.get(i + 1);
+          builder.nextTrigger(nextPartition);
+        } else {
+          builder.nextTrigger(backfill.end());
+          builder.allTriggered(true);
+        }
+        storeBackfill(builder.build());
       }
-
-      storeBackfill(builder.build());
     });
   }
 
