@@ -22,25 +22,37 @@ package com.spotify.styx;
 
 import static com.spotify.styx.testdata.TestData.FULL_DATA_ENDPOINT;
 import static java.time.temporal.ChronoUnit.DAYS;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.sameInstance;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.api.client.repackaged.com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
+import com.spotify.styx.util.FutureUtil;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.hamcrest.Matchers;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -71,11 +83,46 @@ public class TriggerManagerTest {
   private TriggerManager triggerManager;
   private final Time MANAGER_TIME = () -> Instant.parse("2016-10-10T13:11:11Z");
 
+  private final ExecutorService executor = Executors.newCachedThreadPool();
+
+  @After
+  public void tearDown() throws Exception {
+    executor.shutdownNow();
+  }
+
   @Before
   public void setUp() throws IOException {
     triggerManager = new TriggerManager(triggerListener, MANAGER_TIME, storage, Stats.NOOP);
     when(triggerListener.event(any(Workflow.class), any(Trigger.class), any(Instant.class)))
         .thenReturn(CompletableFuture.completedFuture(null));
+  }
+
+  @Test
+  public void shouldNotUpdateNextNaturalTriggerUntilTriggerExecutionIsComplete() throws Exception {
+    setupWithNextNaturalTrigger(true, NEXT_EXECUTION);
+    final CompletableFuture<Void> triggerExecutionFuture = new CompletableFuture<>();
+    when(triggerListener.event(any(Workflow.class), any(Trigger.class), any(Instant.class)))
+        .thenReturn(triggerExecutionFuture);
+    executor.execute(triggerManager::tick);
+    verify(triggerListener, timeout(60_000)).event(
+        WORKFLOW_DAILY, NATURAL_TRIGGER, NEXT_EXECUTION_MINUS_DAY);
+    // HACK: Sleep to avoid racily missing an undesired invocation of updateNextNaturalTrigger
+    Thread.sleep(5000);
+    verify(storage, never()).updateNextNaturalTrigger(any(WorkflowId.class), any(Instant.class));
+    triggerExecutionFuture.complete(null);
+    verify(storage, timeout(60_000)).updateNextNaturalTrigger(
+        WORKFLOW_DAILY.id(), NEXT_EXECUTION_PLUS_DAY);
+  }
+
+  @Test
+  public void shouldNotUpdateNextNaturalTriggerIfTriggerExecutionFails() throws Exception {
+    setupWithNextNaturalTrigger(true, NEXT_EXECUTION);
+    when(triggerListener.event(any(Workflow.class), any(Trigger.class), any(Instant.class)))
+        .thenReturn(FutureUtil.exceptionallyCompletedFuture(
+            new RuntimeException("trigger execution failure!")));
+    triggerManager.tick();
+    verify(triggerListener).event(WORKFLOW_DAILY, NATURAL_TRIGGER, NEXT_EXECUTION_MINUS_DAY);
+    verify(storage, never()).updateNextNaturalTrigger(any(WorkflowId.class), any(Instant.class));
   }
 
   @Test
