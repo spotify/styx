@@ -63,6 +63,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
@@ -273,9 +274,11 @@ public class Scheduler {
 
       for (int i = 0; i < remainingCapacity && partition.isBefore(backfill.end()); i++) {
         try {
-          triggerListener
+          CompletableFuture<Void> processed = triggerListener
               .event(workflow, Trigger.backfill(backfill.id()), partition)
-              .toCompletableFuture().get();
+              .toCompletableFuture();
+          // Wait for the trigger execution to complete before proceeding to the next partition
+          processed.get();
         } catch (AlreadyInitializedException e) {
           LOG.warn("tried to trigger backfill for already active state [{}]: {}",
               partition, backfill);
