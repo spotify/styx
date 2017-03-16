@@ -22,6 +22,7 @@ package com.spotify.styx.docker;
 
 import static com.spotify.styx.docker.DockerRunner.LOG;
 import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_TERMINATION_LOGGING_ANNOTATION;
+import static com.spotify.styx.docker.KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION;
 import static java.util.Collections.emptyList;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -67,7 +68,10 @@ public final class KubernetesPodEventTranslator {
     }
   }
 
-  private static Optional<Integer> getExitCode(Pod pod, ContainerStatus status, Stats stats) {
+  private static Optional<Integer> getExitCodeIfValid(String workflowInstance,
+                                                      Pod pod,
+                                                      ContainerStatus status,
+                                                      Stats stats) {
     final ContainerStateTerminated terminated = status.getState().getTerminated();
 
     // Check termination log exit code, if available
@@ -77,15 +81,15 @@ public final class KubernetesPodEventTranslator {
         stats.terminationLogMissing();
       } else {
         try {
-
           // TODO: handle multiple termination log messages
           final TerminationLogMessage message = Json.deserialize(
               ByteString.encodeUtf8(terminated.getMessage()), TerminationLogMessage.class);
 
           if (!Objects.equals(message.exitCode, terminated.getExitCode())) {
-            LOG.warn("Exit code mismatch for container {}. Container exit code: {}. "
-                    + "Termination log exit code: {}",
-                status.getContainerID(), terminated.getExitCode(), message.exitCode);
+            LOG.warn("Exit code mismatch for workflow instance {} container {}. Container exit code: {}. "
+                + "Termination log exit code: {}",
+                workflowInstance, status.getContainerID(), terminated.getExitCode(),
+                message.exitCode);
             stats.exitCodeMismatch();
           }
 
@@ -101,8 +105,8 @@ public final class KubernetesPodEventTranslator {
           }
         } catch (IOException e) {
           stats.terminationLogInvalid();
-          LOG.warn("Unexpected termination log message for container {}",
-              status.getContainerID(), e);
+          LOG.warn("Unexpected termination log message for workflow instance {} container {}",
+              workflowInstance, status.getContainerID(), e);
         }
       }
 
@@ -121,7 +125,8 @@ public final class KubernetesPodEventTranslator {
 
     // No termination log expected, use k8s exit code
     if (terminated.getExitCode() == null) {
-      LOG.warn("Missing exit code for container {}", status.getContainerID());
+      LOG.warn("Missing exit code for workflow instance {} container {}", workflowInstance,
+               status.getContainerID());
       return Optional.empty();
     } else {
       return Optional.of(terminated.getExitCode());
@@ -175,7 +180,10 @@ public final class KubernetesPodEventTranslator {
         exited = true;
         exitCode = pod.getStatus().getContainerStatuses().stream()
             .filter(IS_STYX_CONTAINER)
-            .map(cs -> getExitCode(pod, cs, stats))
+            .map(cs -> getExitCodeIfValid(
+                workflowInstance.toKey(),
+                pod,
+                cs, stats))
             .filter(Optional::isPresent)
             .map(Optional::get)
             .findFirst();
