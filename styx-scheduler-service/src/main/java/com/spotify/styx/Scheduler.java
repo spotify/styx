@@ -254,7 +254,6 @@ public class Scheduler {
             counting()));
 
     backfills.forEach(backfill -> {
-
       final Optional<Workflow> workflowOpt = workflowCache.workflow(backfill.workflowId());
 
       if (!workflowOpt.isPresent()) {
