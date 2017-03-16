@@ -68,14 +68,14 @@ public final class KubernetesPodEventTranslator {
     }
   }
 
-  private static Optional<Integer> getExitCodeIfValid(String workflowInstanceAnnotation,
-                                                      String terminationLoggingAnnotation,
+  private static Optional<Integer> getExitCodeIfValid(String workflowInstance,
+                                                      String terminationLoggingEnabled,
                                                       ContainerStatus status,
                                                       Stats stats) {
     final ContainerStateTerminated terminated = status.getState().getTerminated();
 
     // Check termination log exit code, if available
-    if ("true".equals(terminationLoggingAnnotation)) {
+    if ("true".equals(terminationLoggingEnabled)) {
       if (terminated.getMessage() == null) {
         LOG.warn("Missing termination log message for container {}", status.getContainerID());
         stats.terminationLogMissing();
@@ -88,7 +88,7 @@ public final class KubernetesPodEventTranslator {
           if (!Objects.equals(message.exitCode, terminated.getExitCode())) {
             LOG.warn("Exit code mismatch for workflow instance {} container {}. Container exit code: {}. "
                 + "Termination log exit code: {}",
-                workflowInstanceAnnotation, status.getContainerID(), terminated.getExitCode(),
+                workflowInstance, status.getContainerID(), terminated.getExitCode(),
                 message.exitCode);
             stats.exitCodeMismatch();
           }
@@ -106,7 +106,7 @@ public final class KubernetesPodEventTranslator {
         } catch (IOException e) {
           stats.terminationLogInvalid();
           LOG.warn("Unexpected termination log message for workflow instance {} container {}",
-              workflowInstanceAnnotation, status.getContainerID(), e);
+              workflowInstance, status.getContainerID(), e);
         }
       }
 
@@ -125,7 +125,7 @@ public final class KubernetesPodEventTranslator {
 
     // No termination log expected, use k8s exit code
     if (terminated.getExitCode() == null) {
-      LOG.warn("Missing exit code for workflow instance {} container {}", workflowInstanceAnnotation,
+      LOG.warn("Missing exit code for workflow instance {} container {}", workflowInstance,
                status.getContainerID());
       return Optional.empty();
     } else {
@@ -161,11 +161,6 @@ public final class KubernetesPodEventTranslator {
       return generatedEvents;
     }
 
-    final String workflowInstanceAnnotation =
-        pod.getMetadata().getAnnotations().get(STYX_WORKFLOW_INSTANCE_ANNOTATION);
-    final String terminationLoggingAnnotation =
-        pod.getMetadata().getAnnotations().get(DOCKER_TERMINATION_LOGGING_ANNOTATION);
-
     final PodStatus status = pod.getStatus();
     final String phase = status.getPhase();
 
@@ -186,8 +181,8 @@ public final class KubernetesPodEventTranslator {
         exitCode = pod.getStatus().getContainerStatuses().stream()
             .filter(IS_STYX_CONTAINER)
             .map(cs -> getExitCodeIfValid(
-                workflowInstanceAnnotation,
-                terminationLoggingAnnotation,
+                workflowInstance.toKey(),
+                pod.getMetadata().getAnnotations().get(DOCKER_TERMINATION_LOGGING_ANNOTATION),
                 cs, stats))
             .filter(Optional::isPresent)
             .map(Optional::get)
