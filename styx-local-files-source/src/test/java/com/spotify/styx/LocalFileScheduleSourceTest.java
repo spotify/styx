@@ -39,7 +39,6 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.schedule.ScheduleSource;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
-
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;

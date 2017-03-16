@@ -21,8 +21,9 @@
 package com.spotify.styx.state;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
-import static com.spotify.styx.state.QueuedStateManager.NO_EVENTS_PROCESSED;
+import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
 import static java.util.concurrent.ForkJoinPool.commonPool;
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
@@ -218,15 +219,27 @@ public class QueuedStateManagerTest {
   }
 
   @Test
-  public void shouldActivateStateOnInitialize() throws Exception {
+  public void shouldWriteActiveStateOnEvent() throws Exception {
     setUp();
 
-    assertThat(storage.activeStatesMap, hasKey(INSTANCE));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(NO_EVENTS_PROCESSED));
+    assertThat(storage.activeStatesMap.isEmpty(), is(true));
+    assertThat(storage.getCounterFromActiveStates(INSTANCE), isEmpty());
 
-    stateManager.receive(Event.timeTrigger(INSTANCE));                       // 0
-    stateManager.receive(Event.started(INSTANCE));                           // 1
-    stateManager.receive(Event.terminate(INSTANCE, Optional.of(0)));         // 2
+    stateManager.receive(Event.timeTrigger(INSTANCE))   // 0
+        .toCompletableFuture().get(1, MINUTES);
+
+    assertThat(storage.activeStatesMap, hasKey(INSTANCE));
+    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(0L));
+
+    stateManager.receive(Event.started(INSTANCE))       // 1
+        .toCompletableFuture().get(1, MINUTES);
+
+    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(1L));
+
+    stateManager.receive(Event.terminate(INSTANCE, Optional.of(0)))  // 2
+        .toCompletableFuture().get(1, MINUTES);
+
+    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(2L));
 
     assertTrue(stateManager.awaitIdle(1000));
     assertThat(storage.getLatestStoredCounter(INSTANCE), hasValue(2L));

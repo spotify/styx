@@ -39,6 +39,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletionStage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,10 +98,12 @@ public class TriggerManager {
 
       if (enabled.contains(workflow.id())) {
         try {
-          triggerListener.event(
+          final CompletionStage<Void> processed = triggerListener.event(
               workflow,
               Trigger.natural(),
               decrementInstant(next, partitioning));
+          // Wait for the event to be processed before proceeding to the next trigger
+          processed.toCompletableFuture().get();
         } catch (AlreadyInitializedException e) {
           LOG.warn("{}", e.getMessage());
         } catch (Throwable e) {

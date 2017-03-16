@@ -23,6 +23,7 @@ package com.spotify.styx;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.state.Trigger;
 import java.time.Instant;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Interface to manage triggering of executions.
@@ -31,10 +32,9 @@ public interface TriggerListener {
 
   /**
    * Handles a triggering event for some {@link Workflow} at some {@link Instant} in time.
-   *
-   * @param workflow   The workflow that generated the event
+   *  @param workflow   The workflow that generated the event
    * @param trigger    The {@link Trigger} identifying the triggering event
    * @param instant    The instant at which the event is supposed to happen
    */
-  void event(Workflow workflow, Trigger trigger, Instant instant);
+  CompletionStage<Void> event(Workflow workflow, Trigger trigger, Instant instant);
 }

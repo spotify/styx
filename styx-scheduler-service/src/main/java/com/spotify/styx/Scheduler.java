@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.util.ParameterUtil.incrementInstant;
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
@@ -62,7 +63,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
@@ -251,49 +254,54 @@ public class Scheduler {
             counting()));
 
     backfills.forEach(backfill -> {
-      final BackfillBuilder builder = backfill.builder();
-
       final Optional<Workflow> workflowOpt = workflowCache.workflow(backfill.workflowId());
 
       if (!workflowOpt.isPresent()) {
         LOG.warn("workflow not found for backfill, skipping rest of triggers: {}", backfill);
+        final BackfillBuilder builder = backfill.builder();
         builder.halted(true);
         storeBackfill(builder.build());
         return;
       }
 
-      final int needed = backfill.concurrency() - backfillStates.getOrDefault(backfill.id(), 0L).intValue();
-      if (needed <= 0) {
-        return;
-      }
-
       final Workflow workflow = workflowOpt.get();
 
-      final List<Instant> partitionsRemaining =
-          ParameterUtil.rangeOfInstants(backfill.nextTrigger(), backfill.end(),
-                                        workflow.schedule().partitioning());
+      final int remainingCapacity =
+          backfill.concurrency() - backfillStates.getOrDefault(backfill.id(), 0L).intValue();
 
-      final List<Instant> partitionsNeeded =
-          partitionsRemaining.stream().limit(needed).collect(toList());
+      Instant partition = backfill.nextTrigger();
 
-      partitionsNeeded.forEach(
-          partition -> {
-            try {
-              triggerListener.event(workflow, Trigger.backfill(backfill.id()), partition);
-            } catch (AlreadyInitializedException e) {
-              LOG.warn("tried to trigger backfill for already active state [{}]: {}",
-                       partition, backfill);
-            }
-          });
+      for (int i = 0; i < remainingCapacity && partition.isBefore(backfill.end()); i++) {
+        try {
+          CompletableFuture<Void> processed = triggerListener
+              .event(workflow, Trigger.backfill(backfill.id()), partition)
+              .toCompletableFuture();
+          // Wait for the trigger execution to complete before proceeding to the next partition
+          processed.get();
+        } catch (AlreadyInitializedException e) {
+          LOG.warn("tried to trigger backfill for already active state [{}]: {}",
+              partition, backfill);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+          LOG.error("failed to trigger backfill for state [{}]: {}",
+              partition, backfill);
+          throw new RuntimeException(e);
+        }
 
-      if (partitionsRemaining.size() > partitionsNeeded.size()) {
-        builder.nextTrigger(partitionsRemaining.get(partitionsNeeded.size()));
-      } else {
-        builder.nextTrigger(backfill.end());
-        builder.allTriggered(true);
+        partition = incrementInstant(partition, backfill.partitioning());
+        storeBackfill(backfill.builder()
+            .nextTrigger(partition)
+            .build());
       }
 
-      storeBackfill(builder.build());
+      if (partition.equals(backfill.end())) {
+        storeBackfill(backfill.builder()
+            .nextTrigger(backfill.end())
+            .allTriggered(true)
+            .build());
+      }
     });
   }
 

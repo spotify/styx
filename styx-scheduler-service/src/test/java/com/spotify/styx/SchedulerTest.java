@@ -25,13 +25,20 @@ import static java.time.Duration.ofSeconds;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.only;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
+import com.google.api.client.repackaged.com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.DataEndpoint;
@@ -59,8 +66,18 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import org.junit.After;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.runners.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.class)
 public class SchedulerTest {
 
   private static final WorkflowId WORKFLOW_ID1 =
@@ -101,6 +118,13 @@ public class SchedulerTest {
 
   List<Resource> resourceLimits = Lists.newArrayList();
 
+  ExecutorService executor = Executors.newCachedThreadPool();
+
+  @After
+  public void tearDown() throws Exception {
+    executor.shutdownNow();
+  }
+
   private void setUp(int timeoutSeconds) throws StateManager.IsClosed, IOException {
     workflowCache = new InMemWorkflowCache();
     TimeoutConfig timeoutConfig = createWithDefaultTtl(ofSeconds(timeoutSeconds));
@@ -113,6 +137,9 @@ public class SchedulerTest {
     stateManager = new SyncStateManager();
     scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage,
                               triggerListener);
+
+    when(triggerListener.event(any(Workflow.class), any(Trigger.class), any(Instant.class)))
+        .then(a -> CompletableFuture.completedFuture(null));
   }
 
   private void setResourceLimit(String resourceId, long limit) {
@@ -182,6 +209,26 @@ public class SchedulerTest {
     verify(triggerListener, only()).event(
         workflow,
         Trigger.backfill(BACKFILL_1.id()), Instant.parse("2016-12-03T00:00:00Z"));
+  }
+
+  @Test
+  public void shouldTriggerBackfillsToCompletion() throws Exception {
+    setUp(5);
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+    initWorkflow(workflow);
+    when(storage.backfills()).thenReturn(Collections.singletonList(BACKFILL_2));
+
+    scheduler.tick();
+
+    List<Instant> instants =
+        ParameterUtil.rangeOfInstants(BACKFILL_2.start(), BACKFILL_2.end(), BACKFILL_2.partitioning());
+    instants.forEach(
+        instant ->
+            verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_2.id()), instant));
+
+    final Backfill completedBackfill =
+        BACKFILL_2.builder().nextTrigger(BACKFILL_2.end()).allTriggered(true).build();
+    verify(storage).storeBackfill(completedBackfill);
   }
 
   @Test
@@ -260,6 +307,75 @@ public class SchedulerTest {
     scheduler.tick();
 
     verifyZeroInteractions(triggerListener);
+  }
+
+  @Test
+  public void shouldTriggerAndUpdateBackfillsSynchronously() throws Exception {
+    setUp(5);
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+    initWorkflow(workflow);
+    when(storage.backfills()).thenReturn(Collections.singletonList(BACKFILL_1));
+
+    // Collect unfinished triggering futures as the trigger listener is called
+    final BlockingQueue<CompletableFuture<Void>> triggerProcessingFutures =
+        new LinkedBlockingQueue<>();
+
+    when(triggerListener.event(
+        any(Workflow.class), any(Trigger.class), any(Instant.class)))
+        .then(a -> {
+          CompletableFuture<Void> processed = new CompletableFuture<>();
+          triggerProcessingFutures.add(processed);
+          return processed;
+        });
+
+    // Run a single tick of the scheduler
+    executor.execute(scheduler::tick);
+
+    final List<Instant> instants =
+        ParameterUtil.rangeOfInstants(BACKFILL_1.start(), BACKFILL_1.end(),
+            workflow.schedule().partitioning());
+
+    // Go through each expected trigger sequentially and verify that the next partition is not
+    // triggered before the future for the previous partition trigger is completed
+    for (int i = 0; i < BACKFILL_1.concurrency(); i++) {
+      final Instant instant = instants.get(i);
+
+      final CompletableFuture<Void> triggerProcessed = triggerProcessingFutures.poll(1, TimeUnit.MINUTES);
+      assertThat(triggerProcessingFutures.isEmpty(), is(true));
+
+      verify(triggerListener, timeout(60_000))
+          .event(any(Workflow.class), any(Trigger.class), eq(instant));
+
+      triggerProcessed.complete(null);
+      verify(storage, timeout(60_000))
+          .storeBackfill(BACKFILL_1.builder().nextTrigger(instants.get(i + 1)).build());
+    }
+  }
+
+  @Test
+  public void shouldNotContinueTriggeringBackfillsIfTriggerFails() throws Exception {
+    setUp(5);
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+    initWorkflow(workflow);
+    when(storage.backfills()).thenReturn(Collections.singletonList(BACKFILL_1));
+
+    RuntimeException rootCause = new RuntimeException("trigger listener failure!");
+
+    when(triggerListener.event(
+        any(Workflow.class), any(Trigger.class), any(Instant.class)))
+        .thenThrow(rootCause);
+
+    try {
+      scheduler.tick();
+      fail();
+    } catch (Exception e) {
+      assertThat(Throwables.getRootCause(e), is(sameInstance(rootCause)));
+    }
+
+    verify(triggerListener, timeout(60_000))
+        .event(any(Workflow.class), any(Trigger.class), any(Instant.class));
+
+    verifyNoMoreInteractions(triggerListener);
   }
 
   @Test

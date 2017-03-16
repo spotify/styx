@@ -53,7 +53,6 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.util.ResourceNotFoundException;
-
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;

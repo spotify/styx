@@ -32,10 +32,9 @@ import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
-import org.junit.Test;
-
 import java.io.IOException;
 import java.net.URI;
+import org.junit.Test;
 
 /**
  * Tests the InMemoryStorage that is used for testing.

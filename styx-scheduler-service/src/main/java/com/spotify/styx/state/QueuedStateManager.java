@@ -20,6 +20,8 @@
 
 package com.spotify.styx.state;
 
+import static com.spotify.styx.util.FutureUtil.exceptionallyCompletedFuture;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
@@ -34,6 +36,8 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
@@ -101,7 +105,6 @@ public class QueuedStateManager implements StateManager {
     final long counter;
     try {
       counter = storage.getLatestStoredCounter(workflowInstance).orElse(NO_EVENTS_PROCESSED);
-      storeActivation(workflowInstance, counter);
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
@@ -121,17 +124,19 @@ public class QueuedStateManager implements StateManager {
   }
 
   @Override
-  public void receive(Event event) throws IsClosed {
+  public CompletionStage<Void> receive(Event event) throws IsClosed {
     ensureRunning();
 
     final InstanceState state = states.get(event.workflowInstance());
     if (state == null) {
-      LOG.warn("Received event for unknown workflow instance: {}", event);
-      return;
+      String message = "Received event for unknown workflow instance: " + event;
+      LOG.warn(message);
+      return exceptionallyCompletedFuture(new IllegalArgumentException(message));
     }
 
-    state.transition(event);
+    CompletionStage<Void> processed = state.transition(event);
     signalDispatcher();
+    return processed;
   }
 
   @Override
@@ -251,12 +256,13 @@ public class QueuedStateManager implements StateManager {
    *
    * <p>This method is only called from within a {@link InstanceState#enqueue(Runnable)} block
    * which means there will only be at most one concurrent call for each {@link InstanceState}.
-   *
    * @param state            The current state that is being processed
    * @param counterPosition  The counter position at which the state transitioned
    * @param event            The event that transitioned the state
+   * @param processed        A future that will be completed when the state has been processed.
    */
-  private void process(RunState state, long counterPosition, Event event) {
+  private void process(RunState state, long counterPosition, Event event,
+      CompletableFuture<Void> processed) {
     final WorkflowInstance key = state.workflowInstance();
     final SequenceEvent sequenceEvent = SequenceEvent.create(
         event,
@@ -273,19 +279,27 @@ public class QueuedStateManager implements StateManager {
         storeActivation(key, counterPosition);
       }
 
-      activeEvents.incrementAndGet();
-      workerPool.execute(() -> {
-        try {
-          state.outputHandler().transitionInto(state);
-        } catch (Throwable e) {
-          LOG.warn("Output handler threw", e);
-        } finally {
-          activeEvents.decrementAndGet();
-        }
-      });
     } catch (IOException e) {
       LOG.error("Failed to read/write from/to Storage", e);
+      processed.completeExceptionally(e);
+      return;
+    } catch (Throwable t) {
+      processed.completeExceptionally(t);
+      throw t;
     }
+
+    activeEvents.incrementAndGet();
+    workerPool.execute(() -> {
+      try {
+        state.outputHandler().transitionInto(state);
+        processed.complete(null);
+      } catch (Throwable e) {
+        LOG.warn("Output handler threw", e);
+        processed.completeExceptionally(e);
+      } finally {
+        activeEvents.decrementAndGet();
+      }
+    });
   }
 
   private void storeEvent(SequenceEvent sequenceEvent) throws IOException {
@@ -327,7 +341,7 @@ public class QueuedStateManager implements StateManager {
 
     /**
      * Transition the state and counter with the given {@link Event}. Then {@link #enqueue(Runnable)}
-     * a call to {@link #process(RunState, long, Event)} for persisting and acting on the
+     * a call to {@link #process(RunState, long, Event, CompletableFuture)} for persisting and acting on the
      * transitioned state.
      *
      * <p>This method is synchronized so it can make local field updates safely. It is only
@@ -336,21 +350,24 @@ public class QueuedStateManager implements StateManager {
      *
      * @param event  The event to use in the transition
      */
-    synchronized void transition(Event event) {
+    synchronized CompletionStage<Void> transition(Event event) {
       LOG.debug("Event {} -> {}", event, this);
+      CompletableFuture<Void> processed = new CompletableFuture<>();
 
       final RunState nextState;
       try {
         nextState = runState.transition(event);
       } catch (IllegalStateException e) {
         LOG.warn("Illegal state transition", e);
-        return;
+        processed.completeExceptionally(e);
+        return processed;
       }
 
       final long currentCount = counter++;
       runState = nextState;
 
-      enqueue(() -> process(nextState, currentCount, event));
+      enqueue(() -> process(nextState, currentCount, event, processed));
+      return processed;
     }
 
     void enqueue(Runnable transition) {

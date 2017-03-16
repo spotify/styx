@@ -32,7 +32,6 @@ import com.spotify.apollo.Environment;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.BackfillResource;
 import com.spotify.styx.api.CliResource;
-import com.spotify.styx.api.Middlewares;
 import com.spotify.styx.api.ResourceResource;
 import com.spotify.styx.api.StyxConfigResource;
 import com.spotify.styx.api.WorkflowResource;
