@@ -25,16 +25,20 @@ import static java.time.Duration.ofSeconds;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.only;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
+import com.google.api.client.repackaged.com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.DataEndpoint;
@@ -346,6 +350,32 @@ public class SchedulerTest {
       verify(storage, timeout(60_000))
           .storeBackfill(BACKFILL_1.builder().nextTrigger(instants.get(i + 1)).build());
     }
+  }
+
+  @Test
+  public void shouldNotContinueTriggeringBackfillsIfTriggerFails() throws Exception {
+    setUp(5);
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+    initWorkflow(workflow);
+    when(storage.backfills()).thenReturn(Collections.singletonList(BACKFILL_1));
+
+    RuntimeException rootCause = new RuntimeException("trigger listener failure!");
+
+    when(triggerListener.event(
+        any(Workflow.class), any(Trigger.class), any(Instant.class)))
+        .thenThrow(rootCause);
+
+    try {
+      scheduler.tick();
+      fail();
+    } catch (Exception e) {
+      assertThat(Throwables.getRootCause(e), is(sameInstance(rootCause)));
+    }
+
+    verify(triggerListener, timeout(60_000))
+        .event(any(Workflow.class), any(Trigger.class), any(Instant.class));
+
+    verifyNoMoreInteractions(triggerListener);
   }
 
   @Test
