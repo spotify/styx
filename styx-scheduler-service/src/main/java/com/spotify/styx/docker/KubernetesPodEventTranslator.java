@@ -68,6 +68,8 @@ public final class KubernetesPodEventTranslator {
   }
 
   private static Optional<Integer> getExitCode(Pod pod, ContainerStatus status, Stats stats) {
+    final String workflowInstance = pod.getMetadata().getAnnotations()
+        .getOrDefault(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION, "N/A");
     final ContainerStateTerminated terminated = status.getState().getTerminated();
 
     // Check termination log exit code, if available
@@ -83,9 +85,9 @@ public final class KubernetesPodEventTranslator {
               ByteString.encodeUtf8(terminated.getMessage()), TerminationLogMessage.class);
 
           if (!Objects.equals(message.exitCode, terminated.getExitCode())) {
-            LOG.warn("Exit code mismatch for container {}. Container exit code: {}. "
+            LOG.warn("Exit code mismatch for workflow instance {} container {}. Container exit code: {}. "
                     + "Termination log exit code: {}",
-                status.getContainerID(), terminated.getExitCode(), message.exitCode);
+                workflowInstance, status.getContainerID(), terminated.getExitCode(), message.exitCode);
             stats.exitCodeMismatch();
           }
 
@@ -101,8 +103,8 @@ public final class KubernetesPodEventTranslator {
           }
         } catch (IOException e) {
           stats.terminationLogInvalid();
-          LOG.warn("Unexpected termination log message for container {}",
-              status.getContainerID(), e);
+          LOG.warn("Unexpected termination log message for workflow instance {} container {}",
+              workflowInstance, status.getContainerID(), e);
         }
       }
 
@@ -121,7 +123,8 @@ public final class KubernetesPodEventTranslator {
 
     // No termination log expected, use k8s exit code
     if (terminated.getExitCode() == null) {
-      LOG.warn("Missing exit code for container {}", status.getContainerID());
+      LOG.warn("Missing exit code for workflow instance {} container {}", workflowInstance,
+               status.getContainerID());
       return Optional.empty();
     } else {
       return Optional.of(terminated.getExitCode());
