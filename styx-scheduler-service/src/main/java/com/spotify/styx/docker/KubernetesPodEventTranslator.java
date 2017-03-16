@@ -69,13 +69,13 @@ public final class KubernetesPodEventTranslator {
   }
 
   private static Optional<Integer> getExitCodeIfValid(String workflowInstance,
-                                                      String terminationLoggingEnabled,
+                                                      Pod pod,
                                                       ContainerStatus status,
                                                       Stats stats) {
     final ContainerStateTerminated terminated = status.getState().getTerminated();
 
     // Check termination log exit code, if available
-    if ("true".equals(terminationLoggingEnabled)) {
+    if ("true".equals(pod.getMetadata().getAnnotations().get(DOCKER_TERMINATION_LOGGING_ANNOTATION))) {
       if (terminated.getMessage() == null) {
         LOG.warn("Missing termination log message for container {}", status.getContainerID());
         stats.terminationLogMissing();
@@ -182,7 +182,7 @@ public final class KubernetesPodEventTranslator {
             .filter(IS_STYX_CONTAINER)
             .map(cs -> getExitCodeIfValid(
                 workflowInstance.toKey(),
-                pod.getMetadata().getAnnotations().get(DOCKER_TERMINATION_LOGGING_ANNOTATION),
+                pod,
                 cs, stats))
             .filter(Optional::isPresent)
             .map(Optional::get)
