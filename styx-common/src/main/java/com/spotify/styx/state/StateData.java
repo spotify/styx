@@ -37,6 +37,7 @@ import java.util.Optional;
 public interface StateData {
 
   int tries();
+  int consecutiveFailures();
   double retryCost();
   Optional<Long> retryDelayMillis();
   Optional<Integer> lastExit();
