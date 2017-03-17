@@ -20,8 +20,6 @@
 
 package com.spotify.styx.state.handlers;
 
-import static com.google.common.base.Preconditions.checkState;
-
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
@@ -55,9 +53,7 @@ public class TerminationHandler implements OutputHandler {
   public void transitionInto(RunState state) {
     switch (state.state()) {
       case TERMINATED:
-        checkState(state.data().lastExit().isPresent(), "Missing exit code");
-
-        if (state.data().lastExit().get() == 0) {
+        if (state.data().lastExit().map(v -> v.equals(0)).orElse(false)) {
           stateManager.receiveIgnoreClosed(Event.success(state.workflowInstance()));
         } else {
           checkRetry(state);

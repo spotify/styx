@@ -41,6 +41,7 @@ import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.RetryUtil;
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -65,7 +66,7 @@ public class TerminationHandlerTest {
 
   @Test
   public void shouldCompleteOnZeroExitCode() throws Exception {
-    StateData data = data(1, 1.0, 0);
+    StateData data = data(1, 1.0, Optional.of(0));
     RunState zeroTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, transitions::add);
     stateManager.initialize(zeroTerm);
     outputHandler.transitionInto(zeroTerm);
@@ -76,7 +77,18 @@ public class TerminationHandlerTest {
 
   @Test
   public void shouldScheduleRetryOnNonZero() throws Exception {
-    StateData data = data(1, 1.0, 1);
+    StateData data = data(1, 1.0, Optional.of(1));
+    RunState nonZeroTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, transitions::add);
+    stateManager.initialize(nonZeroTerm);
+    outputHandler.transitionInto(nonZeroTerm);
+
+    RunState nextState = transitions.get(0);
+    assertThat(nextState.state(), is(QUEUED));
+  }
+
+  @Test
+  public void shouldScheduleRetryOnMissingExitCode() throws Exception {
+    StateData data = data(1, 1.0, Optional.empty());
     RunState nonZeroTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, transitions::add);
     stateManager.initialize(nonZeroTerm);
     outputHandler.transitionInto(nonZeroTerm);
@@ -87,7 +99,7 @@ public class TerminationHandlerTest {
 
   @Test
   public void shouldScheduleRetryOnFail() throws Exception {
-    StateData data = data(1, 1.0, 1);
+    StateData data = data(1, 1.0, Optional.of(1));
     RunState failed = RunState.create(WORKFLOW_INSTANCE, FAILED, data, transitions::add);
     stateManager.initialize(failed);
     outputHandler.transitionInto(failed);
@@ -98,7 +110,7 @@ public class TerminationHandlerTest {
 
   @Test
   public void shouldFailOnNonZeroMaxRetriesReached() throws Exception {
-    StateData data = data(400, MAX_RETRY_COST, 1);
+    StateData data = data(400, MAX_RETRY_COST, Optional.of(1));
     RunState maxedTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, transitions::add);
     stateManager.initialize(maxedTerm);
     outputHandler.transitionInto(maxedTerm);
@@ -109,7 +121,7 @@ public class TerminationHandlerTest {
 
   @Test
   public void shouldFailOnFailMaxRetriesReached() throws Exception {
-    StateData data = data(400, MAX_RETRY_COST, 1);
+    StateData data = data(400, MAX_RETRY_COST, Optional.of(1));
     RunState maxedTerm = RunState.create(WORKFLOW_INSTANCE, FAILED, data, transitions::add);
     stateManager.initialize(maxedTerm);
     outputHandler.transitionInto(maxedTerm);
@@ -120,7 +132,7 @@ public class TerminationHandlerTest {
 
   @Test
   public void shouldScheduleRetryOf10MinutesOnMissingDependencies() throws Exception {
-    StateData data = data(1, 1.0, 20);
+    StateData data = data(1, 1.0, Optional.of(20));
     RunState missingDeps = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, transitions::add);
     stateManager.initialize(missingDeps);
     outputHandler.transitionInto(missingDeps);
@@ -131,7 +143,7 @@ public class TerminationHandlerTest {
     assertThat(nextState.data().retryDelayMillis(), hasValue(Duration.ofMinutes(10).toMillis()));
   }
 
-  private StateData data(int tries, double cost, int lastExit) {
+  private StateData data(int tries, double cost, Optional<Integer> lastExit) {
     return StateData.newBuilder()
         .tries(tries)
         .retryCost(cost)
