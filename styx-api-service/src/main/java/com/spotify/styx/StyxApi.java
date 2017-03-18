@@ -31,8 +31,9 @@ import com.spotify.apollo.AppInit;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.BackfillResource;
-import com.spotify.styx.api.CliResource;
 import com.spotify.styx.api.ResourceResource;
+import com.spotify.styx.api.SchedulerResource;
+import com.spotify.styx.api.StatusResource;
 import com.spotify.styx.api.StyxConfigResource;
 import com.spotify.styx.api.WorkflowResource;
 import com.spotify.styx.storage.AggregateStorage;
@@ -101,22 +102,40 @@ public class StyxApi implements AppInit {
     final Storage storage = storageFactory.apply(environment);
 
     final WorkflowResource workflowResource = new WorkflowResource(storage);
-    final ResourceResource resourceResource = new ResourceResource(storage);
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl, storage);
+    final ResourceResource resourceResource = new ResourceResource(storage);
     final StyxConfigResource styxConfigResource = new StyxConfigResource(storage);
-    final CliResource cliResource = new CliResource(schedulerServiceBaseUrl, storage);
+    final StatusResource statusResource = new StatusResource(storage);
+    final SchedulerResource schedulerResource = new SchedulerResource(schedulerServiceBaseUrl);
+
+    final com.spotify.styx.api.deprecated.WorkflowResource
+        deprecatedWorkflowResource =
+        new com.spotify.styx.api.deprecated.WorkflowResource(workflowResource);
+    final com.spotify.styx.api.deprecated.BackfillResource
+        deprecatedBackfillResource =
+        new com.spotify.styx.api.deprecated.BackfillResource(backfillResource);
+    final com.spotify.styx.api.deprecated.CliResource
+        deprecatedCliResource =
+        new com.spotify.styx.api.deprecated.CliResource(statusResource, schedulerResource);
 
     final Supplier<Optional<List<String>>> clientBlacklistSupplier =
         new CachedSupplier<>(storage::clientBlacklist, Instant::now);
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
+        // TODO remove deprecated resources
+        .registerRoutes(deprecatedWorkflowResource.routes())
+        .registerRoutes(deprecatedBackfillResource.routes())
+        .registerRoutes(deprecatedCliResource.routes()
+                            .map(r -> r.withMiddleware(clientValidator(clientBlacklistSupplier))))
         .registerRoutes(workflowResource.routes())
-        .registerRoutes(resourceResource.routes())
         .registerRoutes(backfillResource.routes()
                             .map(r -> r.withMiddleware(clientValidator(clientBlacklistSupplier))))
+        .registerRoutes(resourceResource.routes())
         .registerRoutes(styxConfigResource.routes())
-        .registerRoutes(cliResource.routes()
+        .registerRoutes(statusResource.routes()
+                            .map(r -> r.withMiddleware(clientValidator(clientBlacklistSupplier))))
+        .registerRoutes(schedulerResource.routes()
                             .map(r -> r.withMiddleware(clientValidator(clientBlacklistSupplier))));
   }
 

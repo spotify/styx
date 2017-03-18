@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.api;
+package com.spotify.styx.api.deprecated;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -28,14 +28,15 @@ import java.util.List;
 
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Deprecated
 public abstract class BackfillsPayload {
 
   @JsonProperty
   public abstract List<BackfillPayload> backfills();
 
   @JsonCreator
-  static BackfillsPayload create(
+  public static BackfillsPayload create(
       @JsonProperty("backfills") List<BackfillPayload> backfills) {
-    return new com.spotify.styx.api.AutoValue_BackfillsPayload(backfills);
+    return new com.spotify.styx.api.deprecated.AutoValue_BackfillsPayload(backfills);
   }
 }

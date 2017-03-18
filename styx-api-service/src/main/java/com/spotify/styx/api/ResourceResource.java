@@ -21,6 +21,7 @@
 package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V1;
+import static com.spotify.styx.api.Api.Version.V2;
 import static java.util.stream.Collectors.toList;
 
 import com.google.common.base.Throwables;
@@ -81,7 +82,7 @@ public final class ResourceResource {
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
         .collect(toList());
 
-    return Api.prefixRoutes(routes, V1);
+    return Api.prefixRoutes(routes, V1, V2);
   }
 
   private ResourcesPayload getResources() {

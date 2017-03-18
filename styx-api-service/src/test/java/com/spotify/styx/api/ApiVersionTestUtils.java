@@ -52,4 +52,48 @@ class ApiVersionTestUtils {
       }
     };
   }
+
+  /**
+   * A matcher that matches if the inspected {@link Api.Version} is at most as high as the given
+   * lower bound.
+   *
+   * @param upperBound  The upper bound to match against
+   * @return A hamcrest matcher as described above
+   */
+  static Matcher<Api.Version> isAtMost(Api.Version upperBound) {
+    return new TypeSafeMatcher<Api.Version>() {
+      @Override
+      protected boolean matchesSafely(Api.Version item) {
+        return item.ordinal() <= upperBound.ordinal();
+      }
+
+      @Override
+      public void describeTo(Description description) {
+        description.appendText("Version is at most");
+        description.appendValue(upperBound);
+      }
+    };
+  }
+
+  /**
+   * A matcher that matches if the inspected {@link Api.Version} is exactly the same as the given
+   * verwsion
+   *
+   * @param version  The version to match against
+   * @return A hamcrest matcher as described above
+   */
+  static Matcher<Api.Version> is(Api.Version version) {
+    return new TypeSafeMatcher<Api.Version>() {
+      @Override
+      protected boolean matchesSafely(Api.Version item) {
+        return item.ordinal() == version.ordinal();
+      }
+
+      @Override
+      public void describeTo(Description description) {
+        description.appendText("Version can only be");
+        description.appendValue(version);
+      }
+    };
+  }
 }

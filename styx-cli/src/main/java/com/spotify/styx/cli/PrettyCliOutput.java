@@ -33,8 +33,8 @@ import static org.fusesource.jansi.Ansi.Color.RED;
 import static org.fusesource.jansi.Ansi.Color.YELLOW;
 
 import com.google.common.collect.Iterables;
-import com.spotify.styx.api.BackfillPayload;
-import com.spotify.styx.api.cli.RunStateDataPayload;
+import com.spotify.styx.api.deprecated.BackfillPayload;
+import com.spotify.styx.api.deprecated.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.WorkflowId;

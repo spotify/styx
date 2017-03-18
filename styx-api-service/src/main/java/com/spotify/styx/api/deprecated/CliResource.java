@@ -18,16 +18,13 @@
  * -/-/-
  */
 
-package com.spotify.styx.api;
+package com.spotify.styx.api.deprecated;
 
 import static com.spotify.styx.api.Api.Version.V0;
 import static com.spotify.styx.api.Api.Version.V1;
-import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static com.spotify.styx.util.StreamUtil.cat;
 import static java.util.stream.Collectors.toList;
 
-import com.google.api.client.util.Lists;
-import com.google.common.base.Throwables;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.entity.EntityMiddleware;
@@ -35,21 +32,14 @@ import com.spotify.apollo.entity.JacksonEntityCodec;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
-import com.spotify.styx.api.cli.EventsPayload;
-import com.spotify.styx.api.cli.RunStateDataPayload;
-import com.spotify.styx.model.SequenceEvent;
-import com.spotify.styx.model.WorkflowId;
-import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.api.Api;
+import com.spotify.styx.api.EventsPayload;
+import com.spotify.styx.api.SchedulerResource;
+import com.spotify.styx.api.StatusResource;
 import com.spotify.styx.serialization.Json;
-import com.spotify.styx.state.RunState;
-import com.spotify.styx.storage.Storage;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Stream;
 import okio.ByteString;
@@ -57,17 +47,16 @@ import okio.ByteString;
 /**
  * API endpoints for the cli
  */
+@Deprecated
 public class CliResource {
 
-  public static final String BASE = "/cli";
-  public static final String SCHEDULER_BASE_PATH = "/api/v0";
+  static final String BASE = "/cli";
+  private final StatusResource statusResource;
+  private SchedulerResource schedulerResource;
 
-  private final String schedulerServiceBaseUrl;
-  private final Storage storage;
-
-  public CliResource(String schedulerServiceBaseUrl, Storage storage) {
-    this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
-    this.storage = Objects.requireNonNull(storage);
+  public CliResource(StatusResource statusResource, SchedulerResource schedulerResource) {
+    this.statusResource = Objects.requireNonNull(statusResource);
+    this.schedulerResource = Objects.requireNonNull(schedulerResource);
   }
 
   public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
@@ -112,8 +101,7 @@ public class CliResource {
   }
 
   private CompletionStage<Response<ByteString>> proxyToScheduler(String path, RequestContext rc) {
-    return rc.requestScopedClient()
-        .send(rc.request().withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + path));
+    return schedulerResource.proxyToScheduler(path, rc);
   }
 
   private static String arg(String name, RequestContext rc) {
@@ -121,48 +109,10 @@ public class CliResource {
   }
 
   private RunStateDataPayload activeStates(RequestContext requestContext) {
-    final Optional<String> componentOpt = requestContext.request().parameter("component");
-
-    final List<RunStateDataPayload.RunStateData> runStates = Lists.newArrayList();
-    try {
-
-      final Map<WorkflowInstance, Long> activeStates = componentOpt.isPresent()
-          ? storage.readActiveWorkflowInstances(componentOpt.get())
-          : storage.readActiveWorkflowInstances();
-
-      final Map<RunState, Long> map = replayActiveStates(activeStates, storage, false);
-      runStates.addAll(
-          map.keySet().stream().map(this::runStateToRunStateData).collect(toList()));
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
-
-    return RunStateDataPayload.create(runStates);
-  }
-
-  private RunStateDataPayload.RunStateData runStateToRunStateData(RunState state) {
-    return RunStateDataPayload.RunStateData.create(
-        state.workflowInstance(),
-        state.state().toString(),
-        state.data()
-    );
+    return statusResource.activeStates(requestContext);
   }
 
   private EventsPayload eventsForWorkflowInstance(String cid, String eid, String iid) {
-    final WorkflowId workflowId = WorkflowId.create(cid, eid);
-    final WorkflowInstance workflowInstance = WorkflowInstance.create(workflowId, iid);
-
-    try {
-      final Set<SequenceEvent> sequenceEvents = storage.readEvents(workflowInstance);
-      final List<EventsPayload.TimestampedEvent> timestampedEvents = sequenceEvents.stream()
-          .map(sequenceEvent -> EventsPayload.TimestampedEvent.create(
-              sequenceEvent.event(),
-              sequenceEvent.timestamp()))
-          .collect(toList());
-
-      return EventsPayload.create(timestampedEvents);
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
+    return statusResource.eventsForWorkflowInstance(cid, eid, iid);
   }
 }

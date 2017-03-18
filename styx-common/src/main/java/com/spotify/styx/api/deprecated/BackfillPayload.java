@@ -18,46 +18,30 @@
  * -/-/-
  */
 
-package com.spotify.styx.api.cli;
+package com.spotify.styx.api.deprecated;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import com.spotify.styx.model.Event;
-import java.util.List;
+import com.spotify.styx.model.Backfill;
+import java.util.Optional;
 
-/**
- * convert Event to EventsPayload (with associated timestamps)
- */
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
-public abstract class EventsPayload {
+@Deprecated
+public abstract class BackfillPayload {
 
   @JsonProperty
-  public abstract List<TimestampedEvent> events();
+  public abstract Backfill backfill();
 
-  @AutoValue
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  public abstract static class TimestampedEvent {
-
-    @JsonProperty
-    public abstract Event event();
-
-    @JsonProperty
-    public abstract long timestamp();
-
-    @JsonCreator
-    public static TimestampedEvent create(
-        @JsonProperty("event") Event event,
-        @JsonProperty("timestamp") long timestamp) {
-      return new AutoValue_EventsPayload_TimestampedEvent(event, timestamp);
-    }
-  }
+  @JsonProperty
+  public abstract Optional<RunStateDataPayload> statuses();
 
   @JsonCreator
-  public static EventsPayload create(
-      @JsonProperty("events") List<TimestampedEvent> events) {
-    return new AutoValue_EventsPayload(events);
+  public static BackfillPayload create(
+      @JsonProperty("backfill") Backfill backfill,
+      @JsonProperty("statuses") Optional<RunStateDataPayload> statuses) {
+    return new com.spotify.styx.api.deprecated.AutoValue_BackfillPayload(backfill, statuses);
   }
 }

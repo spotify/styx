@@ -21,7 +21,9 @@
 package com.spotify.styx.api;
 
 import static com.spotify.styx.api.ApiVersionTestUtils.ALL_VERSIONS;
+import static com.spotify.styx.api.ApiVersionTestUtils.is;
 import static com.spotify.styx.api.ApiVersionTestUtils.isAtLeast;
+import static com.spotify.styx.api.ApiVersionTestUtils.isAtMost;
 import static org.junit.Assume.assumeThat;
 
 import com.spotify.apollo.Environment;
@@ -80,7 +82,7 @@ public abstract class VersionedApiTest {
    *
    * @param environment The Apollo test environment
    */
-  abstract void init(Environment environment);
+  protected abstract void init(Environment environment);
 
   /**
    * Test precondition that only runs the calling test case if the version under test is equal or
@@ -90,6 +92,26 @@ public abstract class VersionedApiTest {
    */
   protected void sinceVersion(Api.Version version) {
     assumeThat(this.version, isAtLeast(version));
+  }
+
+  /**
+   * Test precondition that only runs the calling test case if the version under test is equal or
+   * lower than the given version.
+   *
+   * @param version The version from which the tests are valid
+   */
+  protected void tillVersion(Api.Version version) {
+    assumeThat(this.version, isAtMost(version));
+  }
+
+  /**
+   * Test precondition that only runs the calling test case if the version under test is exactly
+   * the same as the given version.
+   *
+   * @param version The version from which the tests are valid
+   */
+  protected void isVersion(Api.Version version) {
+    assumeThat(this.version, is(version));
   }
 
   /**

@@ -21,7 +21,7 @@
 package com.spotify.styx.api;
 
 import static com.spotify.apollo.StatusType.Family.SUCCESSFUL;
-import static com.spotify.styx.api.Api.Version.V1;
+import static com.spotify.styx.api.Api.Version.V2;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.util.ParameterUtil.rangeOfInstants;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
@@ -42,8 +42,10 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
 import com.spotify.futures.CompletableFutures;
-import com.spotify.styx.api.cli.RunStateDataPayload;
-import com.spotify.styx.api.cli.RunStateDataPayload.RunStateData;
+import com.spotify.styx.api.deprecated.BackfillPayload;
+import com.spotify.styx.api.deprecated.BackfillsPayload;
+import com.spotify.styx.api.deprecated.RunStateDataPayload;
+import com.spotify.styx.api.deprecated.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.BackfillInput;
@@ -87,6 +89,7 @@ public final class BackfillResource {
     this.storage = Objects.requireNonNull(storage);
   }
 
+  // FIXME
   public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
     final EntityMiddleware em =
         EntityMiddleware.forCodec(JacksonEntityCodec.forMapper(Json.OBJECT_MAPPER));
@@ -119,12 +122,12 @@ public final class BackfillResource {
     );
 
     return cat(
-        Api.prefixRoutes(entityRoutes, V1),
-        Api.prefixRoutes(routes, V1)
+        Api.prefixRoutes(entityRoutes, V2),
+        Api.prefixRoutes(routes, V2)
     );
   }
 
-  private BackfillsPayload getBackfills(RequestContext requestContext) {
+  public BackfillsPayload getBackfills(RequestContext requestContext) {
     final Optional<String> componentOpt = requestContext.request().parameter("component");
     final Optional<String> workflowOpt = requestContext.request().parameter("workflow");
     final Optional<String> statusesFlagOpt = requestContext.request().parameter("status");
@@ -159,7 +162,7 @@ public final class BackfillResource {
     return BackfillsPayload.create(backfillPayloads);
   }
 
-  private Response<BackfillPayload> getBackfill(String id) {
+  public Response<BackfillPayload> getBackfill(String id) {
     try {
       final Optional<Backfill> backfillOpt = storage.backfill(id);
       if (backfillOpt.isPresent()) {
@@ -178,7 +181,7 @@ public final class BackfillResource {
     return schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + "/" + String.join("/", parts);
   }
 
-  private CompletionStage<Response<ByteString>> haltBackfill(String id, RequestContext rc) {
+  public CompletionStage<Response<ByteString>> haltBackfill(String id, RequestContext rc) {
     try {
       final Optional<Backfill> backfillOptional = storage.backfill(id);
       if (backfillOptional.isPresent()) {
@@ -216,7 +219,7 @@ public final class BackfillResource {
   }
 
   private CompletionStage<Boolean> haltActiveBackfillInstance(WorkflowInstance workflowInstance,
-                                                                Client client) {
+                                                              Client client) {
     try {
       final ByteString payload = serialize(Event.halt(workflowInstance));
       final Request request = Request.forUri(schedulerApiUrl("events"), "POST")
@@ -237,7 +240,7 @@ public final class BackfillResource {
     }
   }
 
-  private Response<Backfill> postBackfill(BackfillInput input) {
+  public Response<Backfill> postBackfill(BackfillInput input) {
     final BackfillBuilder builder = Backfill.newBuilder();
 
     final String id = RandomGenerator.DEFAULT.generateUniqueId("backfill");
@@ -303,7 +306,7 @@ public final class BackfillResource {
     return Response.forPayload(backfill);
   }
 
-  private Response<Backfill> updateBackfill(String id, Backfill backfill) {
+  public Response<Backfill> updateBackfill(String id, Backfill backfill) {
     if (!backfill.id().equals(id)) {
       return Response.forStatus(
           Status.BAD_REQUEST.withReasonPhrase("ID of payload does not match ID in uri."));

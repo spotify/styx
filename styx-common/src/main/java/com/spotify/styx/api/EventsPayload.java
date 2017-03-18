@@ -24,18 +24,40 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
+import com.spotify.styx.model.Event;
 import java.util.List;
 
+/**
+ * convert Event to EventsPayload (with associated timestamps)
+ */
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
-public abstract class BackfillsPayload {
+public abstract class EventsPayload {
 
   @JsonProperty
-  public abstract List<BackfillPayload> backfills();
+  public abstract List<TimestampedEvent> events();
+
+  @AutoValue
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public abstract static class TimestampedEvent {
+
+    @JsonProperty
+    public abstract Event event();
+
+    @JsonProperty
+    public abstract long timestamp();
+
+    @JsonCreator
+    public static TimestampedEvent create(
+        @JsonProperty("event") Event event,
+        @JsonProperty("timestamp") long timestamp) {
+      return new AutoValue_EventsPayload_TimestampedEvent(event, timestamp);
+    }
+  }
 
   @JsonCreator
-  static BackfillsPayload create(
-      @JsonProperty("backfills") List<BackfillPayload> backfills) {
-    return new com.spotify.styx.api.AutoValue_BackfillsPayload(backfills);
+  public static EventsPayload create(
+      @JsonProperty("events") List<TimestampedEvent> events) {
+    return new AutoValue_EventsPayload(events);
   }
 }

@@ -24,7 +24,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import com.spotify.styx.api.cli.RunStateDataPayload;
+import com.spotify.styx.api.deprecated.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
 import java.util.Optional;
 
@@ -42,6 +42,6 @@ public abstract class BackfillPayload {
   static BackfillPayload create(
       @JsonProperty("backfill") Backfill backfill,
       @JsonProperty("statuses") Optional<RunStateDataPayload> statuses) {
-    return new AutoValue_BackfillPayload(backfill, statuses);
+    return new com.spotify.styx.api.AutoValue_BackfillPayload(backfill, statuses);
   }
 }

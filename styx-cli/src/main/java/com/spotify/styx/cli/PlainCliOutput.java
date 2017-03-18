@@ -22,8 +22,8 @@ package com.spotify.styx.cli;
 
 import static com.spotify.styx.cli.CliUtil.formatTimestamp;
 
-import com.spotify.styx.api.BackfillPayload;
-import com.spotify.styx.api.cli.RunStateDataPayload;
+import com.spotify.styx.api.deprecated.BackfillPayload;
+import com.spotify.styx.api.deprecated.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.Message;

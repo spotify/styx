@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.api.cli;
+package com.spotify.styx.api.deprecated;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -34,6 +34,7 @@ import java.util.List;
  */
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Deprecated
 public abstract class RunStateDataPayload {
 
   @JsonProperty
