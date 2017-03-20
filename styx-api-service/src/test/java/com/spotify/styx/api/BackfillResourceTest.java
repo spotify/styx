@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.api.deprecated;
+package com.spotify.styx.api;
 
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.belongsToFamily;
@@ -49,8 +49,6 @@ import com.spotify.apollo.StatusType;
 import com.spotify.apollo.test.StubClient;
 import com.spotify.apollo.test.response.ResponseWithDelay;
 import com.spotify.apollo.test.response.Responses;
-import com.spotify.styx.api.Api;
-import com.spotify.styx.api.VersionedApiTest;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.Event;
@@ -80,7 +78,6 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-@Deprecated
 public class BackfillResourceTest extends VersionedApiTest {
 
   private static final String SCHEDULER_BASE = "http://localhost:8080";
@@ -131,8 +128,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   protected void init(Environment environment) {
     environment.routingEngine()
         .registerRoutes(
-            new BackfillResource(new com.spotify.styx.api.BackfillResource(SCHEDULER_BASE, storage))
-                .routes());
+            new BackfillResource(SCHEDULER_BASE, storage).routes());
   }
 
   @BeforeClass
@@ -181,7 +177,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldListBackfillsNoStatus() throws Exception {
-    isVersion(Api.Version.V1);
+    sinceVersion(Api.Version.V2);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("")));
@@ -193,7 +189,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldListBackfillsWithStatus() throws Exception {
-    isVersion(Api.Version.V1);
+    sinceVersion(Api.Version.V2);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("?status=true")));
@@ -205,7 +201,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldFilterBackfills() throws Exception {
-    isVersion(Api.Version.V1);
+    sinceVersion(Api.Version.V2);
 
     storage.storeBackfill(BACKFILL_2);
     storage.storeBackfill(BACKFILL_3);
@@ -223,7 +219,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldListMultipleBackfills() throws Exception {
-    isVersion(Api.Version.V1);
+    isVersion(Api.Version.V2);
 
     storage.storeBackfill(BACKFILL_2);
     Response<ByteString> response =
@@ -235,7 +231,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldGetBackfillStatus() throws Exception {
-    isVersion(Api.Version.V1);
+    isVersion(Api.Version.V2);
 
     WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
     storage.storeBackfill(BACKFILL_1.builder().nextTrigger(Instant.parse("2017-01-01T02:00:00Z")).build());
@@ -260,7 +256,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldPostBackfill() throws Exception {
-    isVersion(Api.Version.V1);
+    isVersion(Api.Version.V2);
 
     final String json = "{\"start\":\"2017-01-01T00:00:00Z\"," +
                         "\"end\":\"2017-02-01T00:00:00Z\"," +
@@ -273,13 +269,12 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     assertThat(response.status().reasonPhrase(),
                response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
-    com.spotify.styx.model.deprecated.Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
-        response.payload().get().toByteArray(), com.spotify.styx.model.deprecated.Backfill.class);
+    Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
+        response.payload().get().toByteArray(), Backfill.class);
     assertThat(postedBackfill.id().matches("backfill-[\\d-]+"), is(true));
     assertThat(postedBackfill.start(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
     assertThat(postedBackfill.end(), equalTo(Instant.parse("2017-02-01T00:00:00Z")));
-    assertThat(postedBackfill.workflowId(), equalTo(
-        com.spotify.styx.model.deprecated.WorkflowId.create("component", "workflow2")));
+    assertThat(postedBackfill.workflowId(), equalTo(WorkflowId.create("component", "workflow2")));
     assertThat(postedBackfill.concurrency(), equalTo(1));
     assertThat(postedBackfill.nextTrigger(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
     assertThat(postedBackfill.partitioning(), equalTo(Partitioning.HOURS));
@@ -289,7 +284,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldFailOnMisalignedRange() throws Exception {
-    isVersion(Api.Version.V1);
+    isVersion(Api.Version.V2);
 
     final String json = "{\"start\":\"2017-01-01T00:00:01Z\"," +
                         "\"end\":\"2017-02-01T00:00:00Z\"," +
@@ -306,7 +301,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldFailOnAlreadyActiveWithinRange() throws Exception {
-    isVersion(Api.Version.V1);
+    isVersion(Api.Version.V2);
 
     final BackfillInput backfillInput = BackfillInput.create(
         BACKFILL_1.start(),
@@ -326,13 +321,11 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldUpdateBackfill() throws Exception {
-    isVersion(Api.Version.V1);
+    isVersion(Api.Version.V2);
 
     assertThat(storage.backfill(BACKFILL_1.id()).get().concurrency(), equalTo(1));
 
-    final com.spotify.styx.model.deprecated.Backfill
-        updatedBackfill = com.spotify.styx.model.deprecated.Backfill
-            .create(BACKFILL_1.builder().concurrency(4).build());
+    final Backfill updatedBackfill = BACKFILL_1.builder().concurrency(4).build();
     final String json = Json.OBJECT_MAPPER.writeValueAsString(updatedBackfill);
 
     Response<ByteString> response =
@@ -349,7 +342,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldHaltBackfill() throws Exception {
-    isVersion(Api.Version.V1);
+    isVersion(Api.Version.V2);
 
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.ACCEPTED))
@@ -375,7 +368,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldNotHaltWaitingInstanceInBackfill() throws Exception {
-    isVersion(Api.Version.V1);
+    isVersion(Api.Version.V2);
 
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.ACCEPTED))
@@ -403,7 +396,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldReturnServerErrorIfFailedToSend() throws Exception {
-    isVersion(Api.Version.V1);
+    isVersion(Api.Version.V2);
 
     serviceHelper.stubClient().respond(Responses.sequence(ImmutableList.of(ResponseWithDelay
                                                                                .forResponse(Response
@@ -445,7 +438,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldOnlyUpdateBackfillIfSameId() throws Exception {
-    isVersion(Api.Version.V1);
+    isVersion(Api.Version.V2);
 
     final Backfill updatedBackfill = BACKFILL_1.builder().concurrency(4).build();
     final String json = Json.OBJECT_MAPPER.writeValueAsString(updatedBackfill);

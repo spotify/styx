@@ -42,10 +42,7 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
 import com.spotify.futures.CompletableFutures;
-import com.spotify.styx.api.deprecated.BackfillPayload;
-import com.spotify.styx.api.deprecated.BackfillsPayload;
-import com.spotify.styx.api.deprecated.RunStateDataPayload;
-import com.spotify.styx.api.deprecated.RunStateDataPayload.RunStateData;
+import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.BackfillInput;
@@ -148,7 +145,7 @@ public final class BackfillResource {
       final String workflow = workflowOpt.get();
       // TODO: filter in datastore
       backfills = backfills
-          .filter(backfill -> backfill.workflowId().endpointId().equals(workflow));
+          .filter(backfill -> backfill.workflowId().id().equals(workflow));
     }
 
     final List<BackfillPayload> backfillPayloads = backfills.parallel()

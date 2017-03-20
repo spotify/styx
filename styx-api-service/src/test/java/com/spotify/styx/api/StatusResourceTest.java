@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.api.deprecated;
+package com.spotify.styx.api;
 
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasPayload;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
@@ -31,11 +31,6 @@ import static org.junit.Assert.assertThat;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
-import com.spotify.styx.api.Api;
-import com.spotify.styx.api.EventsPayload;
-import com.spotify.styx.api.SchedulerResource;
-import com.spotify.styx.api.StatusResource;
-import com.spotify.styx.api.VersionedApiTest;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
@@ -47,10 +42,8 @@ import com.spotify.styx.storage.Storage;
 import okio.ByteString;
 import org.junit.Test;
 
-@Deprecated
-public class CliResourceTest extends VersionedApiTest {
+public class StatusResourceTest extends VersionedApiTest {
 
-  private static final String SCHEDULER_BASE = "http://localhost:8080";
   private static final String COMPONENT_ID = "styx";
   private static final String ENDPOINT_ID = "test";
   private static final String PARAMETER = "1234";
@@ -63,51 +56,21 @@ public class CliResourceTest extends VersionedApiTest {
 
   private Storage storage = new InMemStorage();
 
-  public CliResourceTest(Api.Version version) {
-    super(CliResource.BASE, version);
+  public StatusResourceTest(Api.Version version) {
+    super(StatusResource.BASE, version);
   }
 
   @Override
   protected void init(Environment environment) {
-    final CliResource
-        cliResource =
-        new CliResource(new StatusResource(storage), new SchedulerResource(SCHEDULER_BASE));
+    final StatusResource statusResource = new StatusResource(storage);
 
     environment.routingEngine()
-        .registerRoutes(cliResource.routes());
-  }
-
-  @Test
-  public void testEventInjectionProxy() throws Exception {
-    tillVersion(Api.Version.V1);
-
-    serviceHelper.stubClient()
-        .respond(Response.forStatus(Status.ACCEPTED))
-        .to(SCHEDULER_BASE + "/api/v0/events");
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("POST", path("/events")));
-
-    assertThat(response, hasStatus(withCode(Status.ACCEPTED)));
-  }
-
-  @Test
-  public void testTriggerWorkflowInstanceProxy() throws Exception {
-    tillVersion(Api.Version.V1);
-
-    serviceHelper.stubClient()
-        .respond(Response.forStatus(Status.ACCEPTED))
-        .to(SCHEDULER_BASE + "/api/v0/trigger");
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("POST", path("/trigger")));
-
-    assertThat(response, hasStatus(withCode(Status.ACCEPTED)));
+        .registerRoutes(statusResource.routes());
   }
 
   @Test
   public void testEventsRoundtrip() throws Exception {
-    tillVersion(Api.Version.V1);
+    sinceVersion(Api.Version.V2);
 
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI, TRIGGER), 0L, 0L));
     storage.writeEvent(SequenceEvent.create(Event.created(WFI, "exec0", "img0"), 1L, 1L));
@@ -127,7 +90,7 @@ public class CliResourceTest extends VersionedApiTest {
 
   @Test
   public void testGetAllActiveStates() throws Exception {
-    tillVersion(Api.Version.V1);
+    sinceVersion(Api.Version.V2);
 
     storage.writeActiveState(WFI, 42L);
     storage.writeActiveState(OTHER_WFI, 84L);
@@ -139,14 +102,15 @@ public class CliResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(withCode(Status.OK)));
 
     String json = response.payload().get().utf8();
-    RunStateDataPayload parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
+    RunStateDataPayload
+        parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
     assertThat(parsed.activeStates(), hasSize(2));
   }
 
   @Test
   public void testFilterActiveStatesOnComponent() throws Exception {
-    tillVersion(Api.Version.V1);
+    sinceVersion(Api.Version.V2);
 
     WorkflowInstance OTHER_WFI =
         WorkflowInstance.create(WorkflowId.create(COMPONENT_ID + "-other", ENDPOINT_ID), PARAMETER);
@@ -161,7 +125,8 @@ public class CliResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(withCode(Status.OK)));
 
     String json = response.payload().get().utf8();
-    RunStateDataPayload parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
+    RunStateDataPayload
+        parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
     assertThat(parsed.activeStates(), hasSize(1));
     assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().componentId(), is(COMPONENT_ID));

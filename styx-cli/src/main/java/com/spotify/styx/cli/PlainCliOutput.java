@@ -22,8 +22,8 @@ package com.spotify.styx.cli;
 
 import static com.spotify.styx.cli.CliUtil.formatTimestamp;
 
-import com.spotify.styx.api.deprecated.BackfillPayload;
-import com.spotify.styx.api.deprecated.RunStateDataPayload;
+import com.spotify.styx.api.BackfillPayload;
+import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.Message;
@@ -59,7 +59,7 @@ class PlainCliOutput implements CliOutput {
         System.out.println(String.format(
             "%s %s %s %s %s %d %s",
             workflowId.componentId(),
-            workflowId.endpointId(),
+            workflowId.id(),
             RunStateData.workflowInstance().parameter(),
             RunStateData.state(),
             stateData.executionId().orElse("<no-execution-id>"),
@@ -86,7 +86,7 @@ class PlainCliOutput implements CliOutput {
     System.out.println(String.format("%s %s %s %s %s %s %s %s %s",
                                      backfill.id(),
                                      backfill.workflowId().componentId(),
-                                     backfill.workflowId().endpointId(),
+                                     backfill.workflowId().id(),
                                      backfill.halted(),
                                      backfill.allTriggered(),
                                      backfill.concurrency(),

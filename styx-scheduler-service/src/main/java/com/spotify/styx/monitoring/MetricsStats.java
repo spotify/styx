@@ -161,7 +161,7 @@ public final class MetricsStats implements Stats {
     activeStatesPerWorkflowGauges.computeIfAbsent(
         workflowId, (ignoreKey) -> registry.register(
             ACTIVE_STATES_PER_WORKFLOW.tagged(
-                "component-id", workflowId.componentId(), "endpoint-id", workflowId.endpointId()),
+                "component-id", workflowId.componentId(), "workflow-id", workflowId.id()),
             activeStatesCount));
   }
 

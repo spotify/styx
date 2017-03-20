@@ -109,7 +109,7 @@ public class CliResource {
   }
 
   private RunStateDataPayload activeStates(RequestContext requestContext) {
-    return statusResource.activeStates(requestContext);
+    return RunStateDataPayload.create(statusResource.activeStates(requestContext));
   }
 
   private EventsPayload eventsForWorkflowInstance(String cid, String eid, String iid) {

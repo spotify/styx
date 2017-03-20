@@ -32,8 +32,8 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.Api;
-import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
+import com.spotify.styx.model.deprecated.Backfill;
 import com.spotify.styx.serialization.Json;
 import java.util.Collections;
 import java.util.List;
@@ -91,29 +91,36 @@ public final class BackfillResource {
   }
 
   private BackfillsPayload getBackfills(RequestContext requestContext) {
-    // FIXME: adaptor
-    return backfillResource.getBackfills(requestContext);
+    return BackfillsPayload.create(backfillResource.getBackfills(requestContext));
   }
 
   private Response<BackfillPayload> getBackfill(String id) {
-    // FIXME: adaptor
-    return backfillResource.getBackfill(id);
+    final Response<com.spotify.styx.api.BackfillPayload> response = backfillResource.getBackfill(id);
+    return backfillResource.getBackfill(id).payload()
+        .map(BackfillPayload::create)
+        .map(Response::forPayload)
+        .orElse(Response.forStatus(response.status()));
   }
 
-
   private CompletionStage<Response<ByteString>> haltBackfill(String id, RequestContext rc) {
-    // FIXME: adaptor
     return backfillResource.haltBackfill(id, rc);
   }
 
   private Response<Backfill> postBackfill(BackfillInput input) {
-    // FIXME: adaptor
-    return backfillResource.postBackfill(input);
+    final Response<com.spotify.styx.model.Backfill> response = backfillResource.postBackfill(input);
+    return response.payload()
+        .map(Backfill::create)
+        .map(Response::forPayload)
+        .orElse(Response.forStatus(response.status()));
   }
 
   private Response<Backfill> updateBackfill(String id, Backfill backfill) {
-    // FIXME: adaptor
-    return backfillResource.updateBackfill(id, backfill);
+    final Response<com.spotify.styx.model.Backfill> response =
+        backfillResource.updateBackfill(id, Backfill.create(backfill));
+    return response.payload()
+        .map(Backfill::create)
+        .map(Response::forPayload)
+        .orElse(Response.forStatus(response.status()));
   }
 
   private static String arg(String name, RequestContext rc) {

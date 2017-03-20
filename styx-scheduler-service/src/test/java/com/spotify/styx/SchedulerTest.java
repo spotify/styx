@@ -41,7 +41,7 @@ import static org.mockito.Mockito.when;
 import com.google.api.client.repackaged.com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Resource;
@@ -159,8 +159,8 @@ public class SchedulerTest {
     return Workflow.create(
         id.componentId(),
         URI.create("http://example.com"),
-        DataEndpoint.create(
-            id.endpointId(), Partitioning.HOURS, empty(), empty(), empty(), empty(),
+        Schedule.create(
+            id.id(), Partitioning.HOURS, empty(), empty(), empty(), empty(),
             Arrays.asList(resources)));
   }
 

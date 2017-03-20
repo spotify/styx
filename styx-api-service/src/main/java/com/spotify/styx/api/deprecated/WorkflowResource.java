@@ -32,12 +32,13 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.Api;
-import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
+import com.spotify.styx.model.data.deprecated.WorkflowInstanceExecutionData;
+import com.spotify.styx.model.deprecated.Workflow;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
 
@@ -89,22 +90,22 @@ public final class WorkflowResource {
   }
 
   private Response<WorkflowState> patchState(String componentId, String endpointId, Request request) {
-    // FIXME: adaptor
     return workflowResource.patchState(componentId, endpointId, request);
   }
 
   private Response<WorkflowState> patchState(String componentId, Request request) {
-    // FIXME: adaptor
     return workflowResource.patchState(componentId, request);
   }
 
   private Response<Workflow> workflow(String componentId, String endpointId) {
-    // FIXME: adaptor
-    return workflowResource.workflow(componentId, endpointId);
+    final Response<com.spotify.styx.model.Workflow> response = workflowResource.workflow(componentId, endpointId);
+    return response.payload()
+        .map(Workflow::create)
+        .map(Response::forPayload)
+        .orElse(Response.forStatus(response.status()));
   }
 
   private Response<WorkflowState> state(String componentId, String endpointId) {
-    // FIXME: adaptor
     return workflowResource.state(componentId, endpointId);
   }
 
@@ -112,16 +113,24 @@ public final class WorkflowResource {
       String componentId,
       String endpointId,
       Request request) {
-    // FIXME: adaptor
-    return workflowResource.instances(componentId, endpointId, request);
+    final Response<List<com.spotify.styx.model.data.WorkflowInstanceExecutionData>>
+        response = workflowResource.instances(componentId, endpointId, request);
+    return response.payload()
+        .map(l -> l.stream().map(WorkflowInstanceExecutionData::create).collect(Collectors.toList()))
+        .map(Response::forPayload)
+        .orElse(Response.forStatus(response.status()));
   }
 
   private Response<WorkflowInstanceExecutionData> instance(
       String componentId,
       String endpointId,
       String instanceId) {
-    // FIXME: adaptor
-    return workflowResource.instance(componentId, endpointId, instanceId);
+    final Response<com.spotify.styx.model.data.WorkflowInstanceExecutionData>
+        response = workflowResource.instance(componentId, endpointId, instanceId);
+    return response.payload()
+        .map(WorkflowInstanceExecutionData::create)
+        .map(Response::forPayload)
+        .orElse(Response.forStatus(response.status()));
   }
 
   private static String arg(String name, RequestContext rc) {

@@ -18,17 +18,22 @@
  * -/-/-
  */
 
-package com.spotify.styx.model.data;
+package com.spotify.styx.model.data.deprecated;
 
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.model.data.ExecStatus;
+import com.spotify.styx.model.data.Execution;
+import com.spotify.styx.model.data.Trigger;
+import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import java.time.Instant;
 import java.util.Arrays;
 import org.junit.Test;
 
+@Deprecated
 public class WorkflowInstanceExecutionDataTest {
 
   @Test
@@ -139,9 +144,10 @@ public class WorkflowInstanceExecutionDataTest {
         + jsonTrigger0 + "," + jsonTrigger1
         + "]}";
 
-    WorkflowInstanceExecutionData
+    com.spotify.styx.model.data.WorkflowInstanceExecutionData
         executionData = OBJECT_MAPPER.readValue(json, WorkflowInstanceExecutionData.class);
-    WorkflowInstanceExecutionData expected = WorkflowInstanceExecutionData.create(
+    com.spotify.styx.model.data.WorkflowInstanceExecutionData
+        expected = WorkflowInstanceExecutionData.create(
         WorkflowInstance.parseKey("component1#endpoint1#2016-08-03T06"),
         Arrays.asList(
             Trigger.create(

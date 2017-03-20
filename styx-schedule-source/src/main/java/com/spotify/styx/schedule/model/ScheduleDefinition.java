@@ -24,24 +24,24 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Schedule;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 
 /**
- * Mainly a list of {@link DataEndpoint}s
+ * Mainly a list of {@link Schedule}s
  */
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
 public abstract class ScheduleDefinition {
 
   @JsonProperty
-  public abstract List<DataEndpoint> dataEndpoints();
+  public abstract List<Schedule> dataEndpoints();
 
   @JsonCreator
   public static ScheduleDefinition create(
-      @JsonProperty("data_endpoints") @Nullable List<DataEndpoint> dataEndpoints) {
+      @JsonProperty("data_endpoints") @Nullable List<Schedule> dataEndpoints) {
     if (dataEndpoints == null) {
       dataEndpoints = Collections.emptyList();
     }

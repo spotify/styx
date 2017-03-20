@@ -18,24 +18,22 @@
  * -/-/-
  */
 
-package com.spotify.styx.api.deprecated;
+package com.spotify.styx.api;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import com.spotify.styx.model.deprecated.WorkflowInstance;
+import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.StateData;
 import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Value type for all current active states
  */
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
-@Deprecated
 public abstract class RunStateDataPayload {
 
   @JsonProperty
@@ -44,7 +42,6 @@ public abstract class RunStateDataPayload {
 
   @AutoValue
   @JsonIgnoreProperties(ignoreUnknown = true)
-  @Deprecated
   public abstract static class RunStateData {
 
     public static final Comparator<RunStateData> PARAMETER_COMPARATOR =
@@ -66,24 +63,11 @@ public abstract class RunStateDataPayload {
         @JsonProperty("state_data") StateData stateData) {
       return new AutoValue_RunStateDataPayload_RunStateData(workflowInstance, state, stateData);
     }
-
-    public static RunStateData create(
-        com.spotify.styx.api.RunStateDataPayload.RunStateData runStateData) {
-      return new AutoValue_RunStateDataPayload_RunStateData(
-          WorkflowInstance.create(runStateData.workflowInstance()), runStateData.state(),
-          runStateData.stateData());
-    }
   }
 
   @JsonCreator
   public static RunStateDataPayload create(
       @JsonProperty("active_states") List<RunStateData> runStateDataList) {
     return new AutoValue_RunStateDataPayload(runStateDataList);
-  }
-
-  public static RunStateDataPayload create(
-      com.spotify.styx.api.RunStateDataPayload runStateDataPayload) {
-    return new AutoValue_RunStateDataPayload(runStateDataPayload.activeStates().stream().map(
-        RunStateData::create).collect(Collectors.toList()));
   }
 }

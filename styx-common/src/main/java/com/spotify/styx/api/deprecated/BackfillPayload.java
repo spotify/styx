@@ -20,11 +20,10 @@
 
 package com.spotify.styx.api.deprecated;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.deprecated.Backfill;
 import java.util.Optional;
 
 @AutoValue
@@ -38,10 +37,15 @@ public abstract class BackfillPayload {
   @JsonProperty
   public abstract Optional<RunStateDataPayload> statuses();
 
-  @JsonCreator
   public static BackfillPayload create(
-      @JsonProperty("backfill") Backfill backfill,
-      @JsonProperty("statuses") Optional<RunStateDataPayload> statuses) {
-    return new com.spotify.styx.api.deprecated.AutoValue_BackfillPayload(backfill, statuses);
+      com.spotify.styx.api.BackfillPayload backfillPayload) {
+    final com.spotify.styx.model.Backfill backfill = backfillPayload.backfill();
+    final Optional<com.spotify.styx.api.RunStateDataPayload>
+        runStateDataPayload = backfillPayload.statuses();
+
+    final Backfill deprecatedBackfill = Backfill.create(backfill);
+    final Optional<RunStateDataPayload> deprecatedRunStateDataPayload =
+        runStateDataPayload.map(RunStateDataPayload::create);
+    return new AutoValue_BackfillPayload(deprecatedBackfill, deprecatedRunStateDataPayload);
   }
 }

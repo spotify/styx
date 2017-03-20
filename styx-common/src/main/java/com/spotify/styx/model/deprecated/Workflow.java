@@ -18,29 +18,42 @@
  * -/-/-
  */
 
-package com.spotify.styx.api;
+package com.spotify.styx.model.deprecated;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import com.spotify.styx.model.Backfill;
-import java.util.Optional;
+import com.spotify.styx.model.Schedule;
+import java.net.URI;
 
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
-public abstract class BackfillPayload {
+@Deprecated
+public abstract class Workflow {
 
   @JsonProperty
-  public abstract Backfill backfill();
+  public abstract String componentId();
 
   @JsonProperty
-  public abstract Optional<RunStateDataPayload> statuses();
+  public abstract String endpointId();
+
+  @JsonProperty
+  public abstract URI componentUri();
+
+  @JsonProperty
+  public abstract Schedule schedule();
 
   @JsonCreator
-  static BackfillPayload create(
-      @JsonProperty("backfill") Backfill backfill,
-      @JsonProperty("statuses") Optional<RunStateDataPayload> statuses) {
-    return new AutoValue_BackfillPayload(backfill, statuses);
+  public static Workflow create(
+      @JsonProperty("component_id") String componentId,
+      @JsonProperty("component_uri") URI componentUri,
+      @JsonProperty("schedule") Schedule schedule) {
+    return new AutoValue_Workflow(componentId, schedule.id(), componentUri, schedule);
+  }
+
+  public static Workflow create(com.spotify.styx.model.Workflow workflow) {
+    return new AutoValue_Workflow(workflow.componentId(), workflow.workflowId(),
+                                  workflow.componentUri(), workflow.schedule());
   }
 }

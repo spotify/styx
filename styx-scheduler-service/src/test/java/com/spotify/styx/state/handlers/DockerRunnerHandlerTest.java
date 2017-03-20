@@ -40,7 +40,7 @@ import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
-import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Workflow;
@@ -214,7 +214,7 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldPerformCleanupOnFailed() throws Exception {
-    DataEndpoint endpoint = dataEndpoint("--date", "{}", "--bar");
+    Schedule endpoint = dataEndpoint("--date", "{}", "--bar");
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.FAILED,
@@ -228,7 +228,7 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldPerformCleanupOnFailedThroughTransitions() throws Exception {
-    DataEndpoint endpoint = dataEndpoint("--date", "{}", "--bar");
+    Schedule endpoint = dataEndpoint("--date", "{}", "--bar");
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.NEW, dockerRunnerHandler);
@@ -242,8 +242,8 @@ public class DockerRunnerHandlerTest {
     verify(dockerRunner).cleanup(TEST_EXECUTION_ID);
   }
 
-  private DataEndpoint dataEndpoint(String... args) {
-    return DataEndpoint.create(
+  private Schedule dataEndpoint(String... args) {
+    return Schedule.create(
         "styx.TestEndpoint",
         HOURS,
         Optional.of(TEST_DOCKER_IMAGE),

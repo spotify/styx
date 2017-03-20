@@ -47,7 +47,7 @@ import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
-import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -80,16 +80,16 @@ public class DatastoreStorageTest {
   private static final WorkflowId WORKFLOW_ID_NO_STATE = WorkflowId.create("noStateComp", "NoStateEndpoint");
   private static final WorkflowId WORKFLOW_ID_WITH_DOCKER_IMG = WorkflowId.create("dockerComp", "dockerEndpoint");
 
-  private static final DataEndpoint DATA_ENDPOINT_EMPTY_CONF =
-      DataEndpoint.create(
-          WORKFLOW_ID_NO_DOCKER_IMG.endpointId(), DAYS, empty(), empty(), empty(), empty(), emptyList());
+  private static final Schedule DATA_ENDPOINT_EMPTY_CONF =
+      Schedule.create(
+          WORKFLOW_ID_NO_DOCKER_IMG.id(), DAYS, empty(), empty(), empty(), empty(), emptyList());
   private static final Optional<String> DOCKER_IMAGE = of("busybox");
   private static final String DOCKER_IMAGE_COMPONENT = "busybox:component";
   private static final String DOCKER_IMAGE_WORKFLOW = "busybox:workflow";
   private static final String COMMIT_SHA = "dcee675978b4d89e291bb695d0ca7deaf05d2a32";
-  private static final DataEndpoint DATA_ENDPOINT_WITH_DOCKER_IMAGE =
-      DataEndpoint.create(
-          WORKFLOW_ID_WITH_DOCKER_IMG.endpointId(), DAYS, DOCKER_IMAGE, empty(), empty(), empty(), emptyList());
+  private static final Schedule DATA_ENDPOINT_WITH_DOCKER_IMAGE =
+      Schedule.create(
+          WORKFLOW_ID_WITH_DOCKER_IMG.id(), DAYS, DOCKER_IMAGE, empty(), empty(), empty(), emptyList());
   private static final Workflow
       WORKFLOW_NO_DOCKER_IMAGE =
       Workflow.create(WORKFLOW_ID_NO_DOCKER_IMG.componentId(), URI.create("http://foo"),
@@ -226,7 +226,8 @@ public class DatastoreStorageTest {
     storage.store(Workflow.create(
         WORKFLOW_ID1.componentId(),
         URI.create("http://foo"),
-        DataEndpoint.create(WORKFLOW_ID1.endpointId(), DAYS, empty(), empty(), empty(), empty(), emptyList())));
+        Schedule
+            .create(WORKFLOW_ID1.id(), DAYS, empty(), empty(), empty(), empty(), emptyList())));
     storage.patchState(WORKFLOW_ID1, patchDockerImage(DOCKER_IMAGE_WORKFLOW));
     Optional<String> retrieved = storage.getDockerImage(WORKFLOW_ID1);
 
@@ -238,7 +239,8 @@ public class DatastoreStorageTest {
     storage.store(Workflow.create(
         WORKFLOW_ID1.componentId(),
         URI.create("http://foo"),
-        DataEndpoint.create(WORKFLOW_ID1.endpointId(), DAYS, empty(), empty(), empty(), empty(), emptyList())));
+        Schedule
+            .create(WORKFLOW_ID1.id(), DAYS, empty(), empty(), empty(), empty(), emptyList())));
     storage.patchState(WORKFLOW_ID1, WorkflowState.builder().commitSha(COMMIT_SHA).build());
     WorkflowState retrieved = storage.workflowState(WORKFLOW_ID1);
 
@@ -427,7 +429,7 @@ public class DatastoreStorageTest {
     Entity instance = activeInstances.get(0);
     assertThat(instance.getLong(DatastoreStorage.PROPERTY_COUNTER), is(42L));
     assertThat(instance.getString(DatastoreStorage.PROPERTY_COMPONENT), is(WORKFLOW_INSTANCE.workflowId().componentId()));
-    assertThat(instance.getString(DatastoreStorage.PROPERTY_WORKFLOW), is(WORKFLOW_INSTANCE.workflowId().endpointId()));
+    assertThat(instance.getString(DatastoreStorage.PROPERTY_WORKFLOW), is(WORKFLOW_INSTANCE.workflowId().id()));
     assertThat(instance.getString(DatastoreStorage.PROPERTY_PARAMETER), is(WORKFLOW_INSTANCE.parameter()));
   }
 
@@ -489,7 +491,8 @@ public class DatastoreStorageTest {
     storage.store(Workflow.create(
         WORKFLOW_ID1.componentId(),
         URI.create("http://not/important"),
-        DataEndpoint.create(WORKFLOW_ID1.endpointId(), DAYS, empty(), empty(), empty(), empty(), emptyList())));
+        Schedule
+            .create(WORKFLOW_ID1.id(), DAYS, empty(), empty(), empty(), empty(), emptyList())));
     WorkflowState state = WorkflowState.builder()
         .enabled(true)
         .dockerImage(DOCKER_IMAGE.get())
@@ -549,6 +552,7 @@ public class DatastoreStorageTest {
     return Workflow.create(
         workflowId.componentId(),
         URI.create("http://foo"),
-        DataEndpoint.create(workflowId.endpointId(), HOURS, empty(), empty(), empty(), empty(), emptyList()));
+        Schedule
+            .create(workflowId.id(), HOURS, empty(), empty(), empty(), empty(), emptyList()));
   }
 }

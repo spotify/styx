@@ -30,10 +30,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.spotify.styx.model.DataEndpoint;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Message;
@@ -133,13 +133,14 @@ class KubernetesDockerRunner implements DockerRunner {
         .withName(COMPONENT_ID)
         .withValue(workflowInstance.workflowId().componentId())
         .build());
+    // TODO: for backward compatibility
     env.add(new EnvVarBuilder()
         .withName(ENDPOINT_ID)
-        .withValue(workflowInstance.workflowId().endpointId())
+        .withValue(workflowInstance.workflowId().id())
         .build());
     env.add(new EnvVarBuilder()
         .withName(WORKFLOW_ID)
-        .withValue(workflowInstance.workflowId().endpointId())
+        .withValue(workflowInstance.workflowId().id())
         .build());
     env.add(new EnvVarBuilder()
         .withName(PARAMETER)
@@ -170,7 +171,7 @@ class KubernetesDockerRunner implements DockerRunner {
             .withEnv(env);
 
     if (runSpec.secret().isPresent()) {
-      final DataEndpoint.Secret secret = runSpec.secret().get();
+      final Schedule.Secret secret = runSpec.secret().get();
       spec = spec.addNewVolume()
           .withName(secret.name())
           .withNewSecret()

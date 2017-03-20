@@ -29,7 +29,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
-import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.util.TriggerUtil;
@@ -108,7 +108,7 @@ public class StateDataSerializationTest {
               "pipeline-core:474339e",
               Arrays.asList("echo", "hello", "world"),
               false,
-              Optional.of(DataEndpoint.Secret.create("pipeline-core-secret", "/etc/keys")),
+              Optional.of(Schedule.Secret.create("pipeline-core-secret", "/etc/keys")),
               Optional.of("474339ec18d3d04d5d513856bc8ca1d4f1aed03f")
           )
       )

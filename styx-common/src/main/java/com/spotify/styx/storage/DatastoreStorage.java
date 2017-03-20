@@ -222,7 +222,7 @@ class DatastoreStorage {
             return Json.OBJECT_MAPPER
                 .readValue(e.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
           } catch (IOException e1) {
-            LOG.info("Failed to read workflow for {}, {}", workflowId.componentId(), workflowId.endpointId());
+            LOG.info("Failed to read workflow for {}, {}", workflowId.componentId(), workflowId.id());
           }
           return null;
         });
@@ -241,7 +241,7 @@ class DatastoreStorage {
       final Optional<Entity> workflowOpt = getOpt(transaction, workflowKey);
       if (!workflowOpt.isPresent()) {
         throw new ResourceNotFoundException(
-            String.format("%s:%s doesn't exist.", workflowId.componentId(), workflowId.endpointId()));
+            String.format("%s:%s doesn't exist.", workflowId.componentId(), workflowId.id()));
       }
 
       final Entity.Builder builder = Entity
@@ -311,7 +311,7 @@ class DatastoreStorage {
       final Key key = activeWorkflowInstanceKey(workflowInstance);
       final Entity entity = Entity.builder(key)
           .set(PROPERTY_COMPONENT, workflowInstance.workflowId().componentId())
-          .set(PROPERTY_WORKFLOW, workflowInstance.workflowId().endpointId())
+          .set(PROPERTY_WORKFLOW, workflowInstance.workflowId().id())
           .set(PROPERTY_PARAMETER, workflowInstance.parameter())
           .set(PROPERTY_COUNTER, counter)
           .build();
@@ -333,7 +333,7 @@ class DatastoreStorage {
       final Optional<Entity> workflowOpt = getOpt(transaction, workflowKey);
       if (!workflowOpt.isPresent()) {
         throw new ResourceNotFoundException(
-            String.format("%s:%s doesn't exist.", workflowId.componentId(), workflowId.endpointId()));
+            String.format("%s:%s doesn't exist.", workflowId.componentId(), workflowId.id()));
       }
 
       final Entity.Builder builder = Entity.builder(workflowOpt.get());
@@ -430,7 +430,7 @@ class DatastoreStorage {
     return datastore.newKeyFactory()
         .ancestors(PathElement.of(KIND_COMPONENT, workflowId.componentId()))
         .kind(KIND_WORKFLOW)
-        .newKey(workflowId.endpointId());
+        .newKey(workflowId.id());
   }
 
   private Key activeWorkflowInstanceKey(WorkflowInstance workflowInstance) {
@@ -590,7 +590,7 @@ class DatastoreStorage {
         .set(PROPERTY_START, instantToDatetime(backfill.start()))
         .set(PROPERTY_END, instantToDatetime(backfill.end()))
         .set(PROPERTY_COMPONENT, backfill.workflowId().componentId())
-        .set(PROPERTY_WORKFLOW, backfill.workflowId().endpointId())
+        .set(PROPERTY_WORKFLOW, backfill.workflowId().id())
         .set(PROPERTY_PARTITIONING, backfill.partitioning().name())
         .set(PROPERTY_NEXT_TRIGGER, instantToDatetime(backfill.nextTrigger()))
         .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())

@@ -36,6 +36,6 @@ public abstract class BackfillsPayload {
   @JsonCreator
   static BackfillsPayload create(
       @JsonProperty("backfills") List<BackfillPayload> backfills) {
-    return new com.spotify.styx.api.AutoValue_BackfillsPayload(backfills);
+    return new AutoValue_BackfillsPayload(backfills);
   }
 }

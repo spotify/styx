@@ -33,8 +33,8 @@ import static org.fusesource.jansi.Ansi.Color.RED;
 import static org.fusesource.jansi.Ansi.Color.YELLOW;
 
 import com.google.common.collect.Iterables;
-import com.spotify.styx.api.deprecated.BackfillPayload;
-import com.spotify.styx.api.deprecated.RunStateDataPayload;
+import com.spotify.styx.api.BackfillPayload;
+import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.WorkflowId;
@@ -60,7 +60,7 @@ class PrettyCliOutput implements CliOutput {
       System.out.println();
       System.out.println(String.format("%s %s",
                                        colored(CYAN, entry.getKey().componentId()),
-                                       colored(BLUE, entry.getKey().endpointId())));
+                                       colored(BLUE, entry.getKey().id())));
       entry.getValue().forEach(runStateData -> {
         final StateData stateData = runStateData.stateData();
         final Ansi ansiState = getAnsiForState(runStateData);
@@ -108,7 +108,7 @@ class PrettyCliOutput implements CliOutput {
                                      toParameter(partitioning, backfill.end()),
                                      toParameter(partitioning, backfill.nextTrigger()),
                                      workflowId.componentId(),
-                                     workflowId.endpointId()));
+                                     workflowId.id()));
   }
 
   private void printBackfillHeader() {

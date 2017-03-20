@@ -36,7 +36,7 @@ import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Partitioning;
@@ -55,10 +55,10 @@ import org.junit.Test;
 
 public class SystemTest extends StyxSchedulerServiceFixture {
 
-  private static final DataEndpoint DATA_ENDPOINT_HOURLY = DataEndpoint.create(
+  private static final Schedule DATA_ENDPOINT_HOURLY = Schedule.create(
       "styx.TestEndpoint", Partitioning.HOURS, of("busybox"), of(asList("--hour", "{}")),
       empty(), empty(), emptyList());
-  private static final DataEndpoint DATA_ENDPOINT_DAILY = DataEndpoint.create(
+  private static final Schedule DATA_ENDPOINT_DAILY = Schedule.create(
       "styx.TestEndpoint", Partitioning.DAYS, of("busybox"), of(asList("--hour", "{}")),
       empty(), empty(), emptyList());
   private static final String TEST_EXECUTION_ID_1 = "execution_1";
@@ -300,10 +300,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     awaitWorkflowInstanceCompletion(workflowInstance);
 
     workflowChanges(Workflow.create(DAILY_WORKFLOW.componentId(),
-        DAILY_WORKFLOW.componentUri(),
-        DataEndpoint.create(DATA_ENDPOINT_DAILY.id(), DATA_ENDPOINT_DAILY.partitioning(),
-            Optional.of("freebox"), DATA_ENDPOINT_DAILY.dockerArgs(), empty(),
-            DATA_ENDPOINT_DAILY.secret(), emptyList())));
+                                    DAILY_WORKFLOW.componentUri(),
+                                    Schedule.create(DATA_ENDPOINT_DAILY.id(), DATA_ENDPOINT_DAILY.partitioning(),
+                                                    Optional.of("freebox"), DATA_ENDPOINT_DAILY.dockerArgs(), empty(),
+                                                    DATA_ENDPOINT_DAILY.secret(), emptyList())));
     timePasses(StyxScheduler.SCHEDULER_TICK_INTERVAL_SECONDS, SECONDS);
     awaitNumberOfDockerRunsWontChange(1);
 
@@ -349,7 +349,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     injectEvent(Event.terminate(workflowInstance, Optional.of(20)));
     awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
-    DataEndpoint changedDataEndpoint = DataEndpoint.create(
+    Schedule changedDataEndpoint = Schedule.create(
         DATA_ENDPOINT_HOURLY.id(), Partitioning.HOURS, of("busybox:v777"),
         of(asList("other", "args")), empty(), empty(), emptyList());
 

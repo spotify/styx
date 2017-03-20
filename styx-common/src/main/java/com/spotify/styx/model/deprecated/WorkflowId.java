@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.model;
+package com.spotify.styx.model.deprecated;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -32,6 +32,7 @@ import java.util.Comparator;
  * independent of the current configuration of a {@link Workflow}.
  */
 @AutoValue
+@Deprecated
 public abstract class WorkflowId {
 
   public static final Comparator<WorkflowId> KEY_COMPARATOR =
@@ -41,29 +42,20 @@ public abstract class WorkflowId {
   public abstract String componentId();
 
   @JsonProperty
-  public abstract String id();
+  public abstract String endpointId();
 
   public String toKey() {
-    return componentId() + "#" + id();
+    return componentId() + "#" + endpointId();
   }
 
   @JsonCreator
   public static WorkflowId create(
       @JsonProperty("component_id") String componentId,
-      @JsonProperty("id") String id) {
+      @JsonProperty("endpoint_id") String id) {
     return new AutoValue_WorkflowId(componentId, id);
   }
 
-  public static WorkflowId ofWorkflow(Workflow workflow) {
-    return new AutoValue_WorkflowId(workflow.componentId(), workflow.workflowId());
-  }
-
-  public static WorkflowId parseKey(String key) {
-    final int hashPos = key.indexOf('#');
-    if (hashPos < 1) {
-      throw new IllegalArgumentException("Key must contain a hash '#' sign on position > 0");
-    }
-
-    return create(key.substring(0, hashPos), key.substring(hashPos + 1));
+  public static WorkflowId create(com.spotify.styx.model.WorkflowId workflowId) {
+    return new AutoValue_WorkflowId(workflowId.componentId(), workflowId.id());
   }
 }

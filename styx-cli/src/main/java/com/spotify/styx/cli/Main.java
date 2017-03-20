@@ -36,9 +36,9 @@ import com.spotify.apollo.core.Service;
 import com.spotify.apollo.core.Services;
 import com.spotify.apollo.environment.ApolloEnvironmentModule;
 import com.spotify.apollo.http.client.HttpClientModule;
-import com.spotify.styx.api.deprecated.BackfillPayload;
-import com.spotify.styx.api.deprecated.BackfillsPayload;
-import com.spotify.styx.api.deprecated.RunStateDataPayload;
+import com.spotify.styx.api.BackfillPayload;
+import com.spotify.styx.api.BackfillsPayload;
+import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.BackfillInput;
@@ -293,7 +293,7 @@ public final class Main {
       throws ExecutionException, InterruptedException, IOException {
     final WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
     final String component = workflowInstance.workflowId().componentId();
-    final String workflow = workflowInstance.workflowId().endpointId();
+    final String workflow = workflowInstance.workflowId().id();
     final String parameter = workflowInstance.parameter();
 
     final ByteString response = send(
