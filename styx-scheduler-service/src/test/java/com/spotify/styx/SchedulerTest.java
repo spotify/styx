@@ -30,6 +30,7 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.only;
 import static org.mockito.Mockito.timeout;
@@ -170,7 +171,7 @@ public class SchedulerTest {
     final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
     initWorkflow(workflow);
     final int concurrency = BACKFILL_1.concurrency();
-    when(storage.backfills()).thenReturn(Collections.singletonList(BACKFILL_1));
+    when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(BACKFILL_1));
 
     scheduler.tick();
 
@@ -191,7 +192,7 @@ public class SchedulerTest {
     setUp(5);
     final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
     initWorkflow(workflow);
-    when(storage.backfills()).thenReturn(
+    when(storage.backfills(anyBoolean())).thenReturn(
         Collections.singletonList(BACKFILL_1.builder()
             .nextTrigger(Instant.parse("2016-12-03T00:00:00Z"))
             .build()));
@@ -216,7 +217,7 @@ public class SchedulerTest {
     setUp(5);
     final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
     initWorkflow(workflow);
-    when(storage.backfills()).thenReturn(Collections.singletonList(BACKFILL_2));
+    when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(BACKFILL_2));
 
     scheduler.tick();
 
@@ -237,7 +238,7 @@ public class SchedulerTest {
     final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
     initWorkflow(workflow);
     Backfill backfillWithNoPartitionsLeft = BACKFILL_2.builder().nextTrigger(BACKFILL_2.end()).build();
-    when(storage.backfills()).thenReturn(Collections.singletonList(backfillWithNoPartitionsLeft));
+    when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(backfillWithNoPartitionsLeft));
 
     scheduler.tick();
 
@@ -251,7 +252,7 @@ public class SchedulerTest {
     setUp(5);
     final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
     initWorkflow(workflow);
-    when(storage.backfills()).thenReturn(Collections.singletonList(BACKFILL_1));
+    when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(BACKFILL_1));
 
     stateManager.initialize(
         RunState.fresh(
@@ -274,35 +275,9 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldNotTriggerHaltedBackfills() throws Exception {
-    setUp(5);
-    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
-    initWorkflow(workflow);
-    when(storage.backfills()).thenReturn(Collections.singletonList(
-        BACKFILL_1.builder().halted(true).build()));
-
-    scheduler.tick();
-
-    verifyZeroInteractions(triggerListener);
-  }
-
-  @Test
-  public void shouldNotTriggerCompletedBackfills() throws Exception {
-    setUp(5);
-    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
-    initWorkflow(workflow);
-    when(storage.backfills()).thenReturn(Collections.singletonList(
-        BACKFILL_1.builder().allTriggered(true).build()));
-
-    scheduler.tick();
-
-    verifyZeroInteractions(triggerListener);
-  }
-
-  @Test
   public void shouldNotTriggerBackfillsWithMissingWorkflows() throws Exception {
     setUp(5);
-    when(storage.backfills()).thenReturn(Collections.singletonList(BACKFILL_1));
+    when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(BACKFILL_1));
 
     scheduler.tick();
 
@@ -314,7 +289,7 @@ public class SchedulerTest {
     setUp(5);
     final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
     initWorkflow(workflow);
-    when(storage.backfills()).thenReturn(Collections.singletonList(BACKFILL_1));
+    when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(BACKFILL_1));
 
     // Collect unfinished triggering futures as the trigger listener is called
     final BlockingQueue<CompletableFuture<Void>> triggerProcessingFutures =
@@ -357,7 +332,7 @@ public class SchedulerTest {
     setUp(5);
     final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
     initWorkflow(workflow);
-    when(storage.backfills()).thenReturn(Collections.singletonList(BACKFILL_1));
+    when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(BACKFILL_1));
 
     RuntimeException rootCause = new RuntimeException("trigger listener failure!");
 

@@ -124,34 +124,34 @@ public final class BackfillResource {
     );
   }
 
-  public BackfillsPayload getBackfills(RequestContext requestContext) {
-    final Optional<String> componentOpt = requestContext.request().parameter("component");
-    final Optional<String> workflowOpt = requestContext.request().parameter("workflow");
-    final Optional<String> statusesFlagOpt = requestContext.request().parameter("status");
+  public BackfillsPayload getBackfills(RequestContext rc) {
+    final Optional<String> componentOpt = rc.request().parameter("component");
+    final Optional<String> workflowOpt = rc.request().parameter("workflow");
+    final boolean includeStatuses = rc.request().parameter("status").orElse("false").equals("true");
+    final boolean showAll = rc.request().parameter("showAll").orElse("false").equals("true");
 
-    Stream<Backfill> backfills;
+    final Stream<Backfill> backfills;
     try {
-      backfills = storage.backfills().stream();
+      if (componentOpt.isPresent() && workflowOpt.isPresent()) {
+        final WorkflowId workflowId = WorkflowId.create(componentOpt.get(), workflowOpt.get());
+        backfills = storage.backfillsForWorkflowId(showAll, workflowId).stream();
+      } else if (componentOpt.isPresent()) {
+        final String component = componentOpt.get();
+        backfills = storage.backfillsForComponent(showAll, component).stream();
+      } else if (workflowOpt.isPresent()) {
+        final String workflow = workflowOpt.get();
+        backfills = storage.backfillsForWorkflow(showAll, workflow).stream();
+      } else {
+        backfills = storage.backfills(showAll).stream();
+      }
     } catch (IOException e) {
       throw Throwables.propagate(e);
-    }
-    if (componentOpt.isPresent()) {
-      final String component = componentOpt.get();
-      // TODO: filter in datastore
-      backfills = backfills
-          .filter(backfill -> backfill.workflowId().componentId().equals(component));
-    }
-    if (workflowOpt.isPresent()) {
-      final String workflow = workflowOpt.get();
-      // TODO: filter in datastore
-      backfills = backfills
-          .filter(backfill -> backfill.workflowId().id().equals(workflow));
     }
 
     final List<BackfillPayload> backfillPayloads = backfills.parallel()
         .map(backfill -> BackfillPayload.create(
             backfill,
-            "true".equals(statusesFlagOpt.orElse("false"))
+            includeStatuses
             ? Optional.of(RunStateDataPayload.create(retrieveBackfillStatuses(backfill)))
             : Optional.empty()))
         .collect(toList());

@@ -199,8 +199,39 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertJson(response, "backfills[0].statuses.active_states", hasSize(24));
   }
 
+  public void shouldFilterBackfillsOnComponent() throws Exception {
+    sinceVersion(Api.Version.V2);
+
+    storage.storeBackfill(BACKFILL_3);
+
+    final String uri = path(String.format("?component=%s",
+                                          BACKFILL_1.workflowId().componentId()));
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", uri));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfills", hasSize(1));
+  }
+
   @Test
-  public void shouldFilterBackfills() throws Exception {
+  public void shouldFilterBackfillsOnWorkflow() throws Exception {
+    sinceVersion(Api.Version.V2);
+
+    storage.storeBackfill(BACKFILL_2);
+    storage.storeBackfill(BACKFILL_3);
+
+    final String uri = path(String.format("?workflow=%s",
+                                          BACKFILL_1.workflowId().id()));
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", uri));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfills", hasSize(1));
+    assertJson(response, "backfills[0].backfill.id", equalTo(BACKFILL_1.id()));
+  }
+
+  @Test
+  public void shouldFilterBackfillsOnComponentWorkflow() throws Exception {
     sinceVersion(Api.Version.V2);
 
     storage.storeBackfill(BACKFILL_2);
@@ -218,8 +249,31 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldListActiveBackfillsByDefault() throws Exception {
+    sinceVersion(Api.Version.V2);
+
+    storage.storeBackfill(BACKFILL_2.builder().halted(true).build());
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("")));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfills", hasSize(1));
+  }
+
+  @Test
+  public void shouldListAllBackfillsWithFlag() throws Exception {
+    sinceVersion(Api.Version.V2);
+
+    storage.storeBackfill(BACKFILL_2.builder().halted(true).build());
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("?showAll=true")));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfills", hasSize(2));
+  }
+   @Test
   public void shouldListMultipleBackfills() throws Exception {
-    isVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V2);
 
     storage.storeBackfill(BACKFILL_2);
     Response<ByteString> response =
@@ -231,7 +285,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldGetBackfillStatus() throws Exception {
-    isVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V2);
 
     WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
     storage.storeBackfill(BACKFILL_1.builder().nextTrigger(Instant.parse("2017-01-01T02:00:00Z")).build());
@@ -256,7 +310,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldPostBackfill() throws Exception {
-    isVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V2);
 
     final String json = "{\"start\":\"2017-01-01T00:00:00Z\"," +
                         "\"end\":\"2017-02-01T00:00:00Z\"," +
@@ -284,7 +338,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldFailOnMisalignedRange() throws Exception {
-    isVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V2);
 
     final String json = "{\"start\":\"2017-01-01T00:00:01Z\"," +
                         "\"end\":\"2017-02-01T00:00:00Z\"," +
@@ -301,7 +355,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldFailOnAlreadyActiveWithinRange() throws Exception {
-    isVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V2);
 
     final BackfillInput backfillInput = BackfillInput.create(
         BACKFILL_1.start(),
@@ -321,7 +375,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldUpdateBackfill() throws Exception {
-    isVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V2);
 
     assertThat(storage.backfill(BACKFILL_1.id()).get().concurrency(), equalTo(1));
 
@@ -342,7 +396,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldHaltBackfill() throws Exception {
-    isVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V2);
 
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.ACCEPTED))
@@ -368,7 +422,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldNotHaltWaitingInstanceInBackfill() throws Exception {
-    isVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V2);
 
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.ACCEPTED))
@@ -396,7 +450,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldReturnServerErrorIfFailedToSend() throws Exception {
-    isVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V2);
 
     serviceHelper.stubClient().respond(Responses.sequence(ImmutableList.of(ResponseWithDelay
                                                                                .forResponse(Response
@@ -438,7 +492,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldOnlyUpdateBackfillIfSameId() throws Exception {
-    isVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V2);
 
     final Backfill updatedBackfill = BACKFILL_1.builder().concurrency(4).build();
     final String json = Json.OBJECT_MAPPER.writeValueAsString(updatedBackfill);
