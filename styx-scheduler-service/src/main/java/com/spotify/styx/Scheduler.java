@@ -50,7 +50,6 @@ import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
-import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;

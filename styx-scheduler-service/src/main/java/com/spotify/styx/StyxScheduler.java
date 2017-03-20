@@ -81,6 +81,7 @@ import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
+import com.spotify.styx.util.TriggerUtil;
 import com.typesafe.config.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
@@ -501,10 +502,25 @@ public class StyxScheduler implements AppInit {
             .filter((workflow) -> workflow.schedule().dockerTerminationLogging())
             .count();
 
-    Arrays.stream(RunState.State.values()).forEach(state -> stats.registerActiveStates(
-        state,
-        () -> stateManager.activeStates().values().stream()
-            .filter(runState -> runState.state().equals(state)).count()));
+    Arrays.stream(RunState.State.values()).forEach(state -> {
+      TriggerUtil.triggerTypesList().forEach(triggerTypeName ->
+          stats.registerActiveStates(
+              state,
+              triggerTypeName,
+              () -> stateManager.activeStates().values().stream()
+                  .filter(runState -> runState.state().equals(state))
+                  .filter(runState -> runState.data().trigger().isPresent() && triggerTypeName
+                      .equals(TriggerUtil.name(runState.data().trigger().get())))
+                  .count()));
+      stats.registerActiveStates(
+          state,
+          "none",
+          () -> stateManager.activeStates().values().stream()
+              .filter(runState -> runState.state().equals(state))
+              .filter(runState -> !runState.data().trigger().isPresent())
+              .count());
+    });
+
     stats.registerQueuedEvents(queuedEventsCount);
     stats.registerWorkflowCount("all", allWorkflowsCount);
     stats.registerWorkflowCount("configured", configuredWorkflowsCount);

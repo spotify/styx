@@ -22,6 +22,10 @@ package com.spotify.styx.util;
 
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.state.TriggerVisitor;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Utility for getting information about {@link Trigger}s
@@ -43,6 +47,12 @@ public class TriggerUtil {
 
   public static String triggerId(Trigger trigger) {
     return trigger.accept(TriggerIdVisitor.INSTANCE);
+  }
+
+  public static List<String> triggerTypesList() {
+    return Arrays.stream(TriggerVisitor.class.getDeclaredMethods())
+        .map(Method::getName)
+        .collect(Collectors.toList());
   }
 
   private enum TriggerIsBackfillVisitor implements TriggerVisitor<Boolean> {

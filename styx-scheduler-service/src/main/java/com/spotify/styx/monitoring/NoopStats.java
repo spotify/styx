@@ -43,7 +43,8 @@ final class NoopStats implements Stats {
   }
 
   @Override
-  public void registerActiveStates(RunState.State state, Gauge<Long> activeStatesCount) {
+  public void registerActiveStates(RunState.State state, String triggerName,
+                                   Gauge<Long> activeStatesCount) {
   }
 
   @Override
