@@ -261,7 +261,13 @@ public interface Storage {
 
   void deleteResource(String id) throws IOException;
 
-  List<Backfill> backfills() throws IOException;
+  List<Backfill> backfills(boolean showAll) throws IOException;
+
+  List<Backfill> backfillsForComponent(boolean showAll, String component) throws IOException;
+
+  List<Backfill> backfillsForWorkflow(boolean showAll, String workflow) throws IOException;
+
+  List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId) throws IOException;
 
   Optional<Backfill> backfill(String id) throws IOException;
 

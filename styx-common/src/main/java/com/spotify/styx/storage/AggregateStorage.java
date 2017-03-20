@@ -211,8 +211,23 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public List<Backfill> backfills() throws IOException {
-    return datastoreStorage.getBackfills();
+  public List<Backfill> backfills(boolean showAll) throws IOException {
+    return datastoreStorage.getBackfills(showAll);
+  }
+
+  @Override
+  public List<Backfill> backfillsForComponent(boolean showAll, String component) throws IOException {
+    return datastoreStorage.getBackfillsForComponent(showAll, component);
+  }
+
+  @Override
+  public List<Backfill> backfillsForWorkflow(boolean showAll, String workflow) throws IOException {
+    return datastoreStorage.getBackfillsForWorkflow(showAll, workflow);
+  }
+
+  @Override
+  public List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId) throws IOException {
+    return datastoreStorage.getBackfillsForWorkflowId(showAll, workflowId);
   }
 
   @Override

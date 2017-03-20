@@ -199,7 +199,39 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldFilterBackfills() throws Exception {
+  public void shouldFilterBackfillsOnComponent() throws Exception {
+    sinceVersion(Api.Version.V1);
+
+    storage.storeBackfill(BACKFILL_3);
+
+    final String uri = path(String.format("?component=%s",
+                                          BACKFILL_1.workflowId().componentId()));
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", uri));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfills", hasSize(1));
+  }
+
+  @Test
+  public void shouldFilterBackfillsOnWorkflow() throws Exception {
+    sinceVersion(Api.Version.V1);
+
+    storage.storeBackfill(BACKFILL_2);
+    storage.storeBackfill(BACKFILL_3);
+
+    final String uri = path(String.format("?workflow=%s",
+                                          BACKFILL_1.workflowId().endpointId()));
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", uri));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfills", hasSize(1));
+    assertJson(response, "backfills[0].backfill.id", equalTo(BACKFILL_1.id()));
+  }
+
+  @Test
+  public void shouldFilterBackfillsOnComponentWorkflow() throws Exception {
     sinceVersion(Api.Version.V1);
 
     storage.storeBackfill(BACKFILL_2);
@@ -217,6 +249,29 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldListActiveBackfillsByDefault() throws Exception {
+    sinceVersion(Api.Version.V1);
+
+    storage.storeBackfill(BACKFILL_2.builder().halted(true).build());
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("")));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfills", hasSize(1));
+  }
+
+  @Test
+  public void shouldListAllBackfillsWithFlag() throws Exception {
+    sinceVersion(Api.Version.V1);
+
+    storage.storeBackfill(BACKFILL_2.builder().halted(true).build());
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("?showAll=true")));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfills", hasSize(2));
+  }
+   @Test
   public void shouldListMultipleBackfills() throws Exception {
     sinceVersion(Api.Version.V1);
 
