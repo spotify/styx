@@ -31,11 +31,14 @@ import com.google.cloud.datastore.KeyFactory;
 import com.google.cloud.datastore.PathElement;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
+import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
+import com.google.cloud.datastore.StructuredQuery.Filter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.spotify.styx.model.Backfill;
@@ -551,13 +554,20 @@ class DatastoreStorage {
     return Optional.of(entityToBackfill(entity));
   }
 
-  private EntityQuery.Builder backfillQueryBuilder(boolean showAll) {
+  private EntityQuery.Builder backfillQueryBuilder(boolean showAll, Filter... filters) {
     final EntityQuery.Builder queryBuilder = Query.entityQueryBuilder().kind(KIND_BACKFILL);
 
+    final List<Filter> andedFilters = Lists.newArrayList(filters);
+
     if (!showAll) {
-      queryBuilder
-          .filter(PropertyFilter.eq(PROPERTY_ALL_TRIGGERED, false))
-          .filter(PropertyFilter.eq(PROPERTY_HALTED, false));
+      andedFilters.add(PropertyFilter.eq(PROPERTY_ALL_TRIGGERED, false));
+      andedFilters.add(PropertyFilter.eq(PROPERTY_HALTED, false));
+    }
+
+    if (!andedFilters.isEmpty()) {
+      final Filter head = andedFilters.get(0);
+      final Filter[] tail = andedFilters.stream().skip(1).toArray(Filter[]::new);
+      queryBuilder.filter(CompositeFilter.and(head, tail));
     }
 
     return queryBuilder;
@@ -575,25 +585,26 @@ class DatastoreStorage {
   }
 
   List<Backfill> getBackfillsForComponent(boolean showAll, String component) {
-    final EntityQuery query = backfillQueryBuilder(showAll)
-        .filter(PropertyFilter.eq(PROPERTY_COMPONENT, component))
+    final EntityQuery query = backfillQueryBuilder(showAll,
+                                                   PropertyFilter.eq(PROPERTY_COMPONENT, component))
         .build();
 
     return backfillsForQuery(query);
   }
 
   List<Backfill> getBackfillsForWorkflow(boolean showAll, String workflow) {
-    final EntityQuery query = backfillQueryBuilder(showAll)
-        .filter(PropertyFilter.eq(PROPERTY_WORKFLOW, workflow))
+    final EntityQuery query = backfillQueryBuilder(showAll,
+                                                   PropertyFilter.eq(PROPERTY_WORKFLOW, workflow))
         .build();
 
     return backfillsForQuery(query);
   }
 
   List<Backfill> getBackfillsForWorkflowId(boolean showAll, WorkflowId workflowId) {
-    final EntityQuery query = backfillQueryBuilder(showAll)
-        .filter(PropertyFilter.eq(PROPERTY_COMPONENT, workflowId.componentId()))
-        .filter(PropertyFilter.eq(PROPERTY_WORKFLOW, workflowId.endpointId()))
+    final EntityQuery query = backfillQueryBuilder(
+        showAll,
+        PropertyFilter.eq(PROPERTY_COMPONENT, workflowId.componentId()),
+        PropertyFilter.eq(PROPERTY_WORKFLOW, workflowId.endpointId()))
         .build();
 
     return backfillsForQuery(query);

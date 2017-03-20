@@ -199,6 +199,21 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldFilterBackfillsOnComponentEvenWhenInactive() throws Exception {
+    sinceVersion(Api.Version.V1);
+
+    storage.storeBackfill(BACKFILL_3.builder().allTriggered(true).build());
+
+    final String uri = path(String.format("?showAll=true&component=%s",
+                                          BACKFILL_3.workflowId().componentId()));
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", uri));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfills", hasSize(1));
+  }
+
+  @Test
   public void shouldFilterBackfillsOnComponent() throws Exception {
     sinceVersion(Api.Version.V1);
 
@@ -252,7 +267,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldListActiveBackfillsByDefault() throws Exception {
     sinceVersion(Api.Version.V1);
 
-    storage.storeBackfill(BACKFILL_2.builder().halted(true).build());
+    storage.storeBackfill(BACKFILL_2.builder().allTriggered(true).build());
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("")));
 
