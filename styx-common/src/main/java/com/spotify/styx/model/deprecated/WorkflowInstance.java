@@ -61,4 +61,11 @@ public abstract class WorkflowInstance {
     return new AutoValue_WorkflowInstance(WorkflowId.create(workflowInstance.workflowId()),
                                           workflowInstance.parameter());
   }
+
+  public static com.spotify.styx.model.WorkflowInstance create(WorkflowInstance workflowInstance) {
+    return com.spotify.styx.model.WorkflowInstance.create(
+        com.spotify.styx.model.WorkflowId.create(workflowInstance.workflowId().componentId(),
+                                                 workflowInstance.workflowId().endpointId()),
+        workflowInstance.parameter());
+  }
 }

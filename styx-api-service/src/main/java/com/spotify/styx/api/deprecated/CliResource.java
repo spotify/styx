@@ -25,6 +25,9 @@ import static com.spotify.styx.api.Api.Version.V1;
 import static com.spotify.styx.util.StreamUtil.cat;
 import static java.util.stream.Collectors.toList;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.api.client.repackaged.com.google.common.base.Throwables;
+import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.entity.EntityMiddleware;
@@ -34,10 +37,10 @@ import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.Api;
 import com.spotify.styx.api.EventsPayload;
-import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.api.StatusResource;
+import com.spotify.styx.model.deprecated.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
-import java.util.Arrays;
+import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletionStage;
@@ -51,12 +54,16 @@ import okio.ByteString;
 public class CliResource {
 
   static final String BASE = "/cli";
-  private final StatusResource statusResource;
-  private SchedulerResource schedulerResource;
+  private static final String SCHEDULER_BASE_PATH = "/api/v0";
+  private static final String EVENTS_PATH = "/events";
+  private static final String TRIGGER_PATH = "/trigger";
 
-  public CliResource(StatusResource statusResource, SchedulerResource schedulerResource) {
+  private final StatusResource statusResource;
+  private final String schedulerServiceBaseUrl;
+
+  public CliResource(StatusResource statusResource, String schedulerServiceBaseUrl) {
     this.statusResource = Objects.requireNonNull(statusResource);
-    this.schedulerResource = Objects.requireNonNull(schedulerResource);
+    this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
   }
 
   public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
@@ -76,23 +83,15 @@ public class CliResource {
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
         .collect(toList());
 
-    final List<Route<AsyncHandler<Response<ByteString>>>> schedulerProxies = Arrays.asList(
+    final List<Route<AsyncHandler<Response<ByteString>>>> schedulerProxies = Stream.of(
         Route.async(
-            "GET", BASE + "/<endpoint:path>",
-            rc -> proxyToScheduler("/" + arg("endpoint", rc), rc)),
-        Route.async(
-            "POST", BASE + "/<endpoint:path>",
-            rc -> proxyToScheduler("/" + arg("endpoint", rc), rc)),
-        Route.async(
-            "DELETE", BASE + "/<endpoint:path>",
-            rc -> proxyToScheduler("/" + arg("endpoint", rc), rc)),
-        Route.async(
-            "PATCH", BASE + "/<endpoint:path>",
-            rc -> proxyToScheduler("/" + arg("endpoint", rc), rc)),
-        Route.async(
-            "PUT", BASE + "/<endpoint:path>",
-            rc -> proxyToScheduler("/" + arg("endpoint", rc), rc))
-    );
+            "POST", BASE + EVENTS_PATH,
+            this::proxyEvent),
+        Route.with(
+            em.asyncResponse(WorkflowInstance.class),
+            "POST", BASE + TRIGGER_PATH,
+            rc -> workflowInstance -> proxyTrigger(workflowInstance, rc)))
+        .collect(toList());
 
     return cat(
         Api.prefixRoutes(routes, V0, V1),
@@ -100,8 +99,35 @@ public class CliResource {
     );
   }
 
-  private CompletionStage<Response<ByteString>> proxyToScheduler(String path, RequestContext rc) {
-    return schedulerResource.proxyToScheduler(path, rc);
+  private CompletionStage<Response<ByteString>> proxyEvent(RequestContext rc) {
+    return rc.requestScopedClient()
+        .send(rc.request().withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + EVENTS_PATH));
+  }
+
+
+  private CompletionStage<Response<WorkflowInstance>> proxyTrigger(
+      WorkflowInstance workflowInstance, RequestContext rc) {
+    final ByteString payload;
+    try {
+      payload = Json.serialize(WorkflowInstance.create(workflowInstance));
+    } catch (JsonProcessingException e) {
+      throw Throwables.propagate(e);
+    }
+    final Request request =
+        Request.forUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + TRIGGER_PATH)
+            .withPayload(payload);
+    return rc.requestScopedClient().send(request).thenApply(response -> {
+      final com.spotify.styx.model.WorkflowInstance responsePayload;
+      try {
+        responsePayload = Json.deserialize(response.payload().get(),
+                             com.spotify.styx.model.WorkflowInstance.class);
+      } catch (IOException e) {
+        throw Throwables.propagate(e);
+      }
+      return Response.forStatus(response.status())
+          .withPayload(WorkflowInstance.create(responsePayload))
+          .withHeaders(response.headers());
+    });
   }
 
   private static String arg(String name, RequestContext rc) {

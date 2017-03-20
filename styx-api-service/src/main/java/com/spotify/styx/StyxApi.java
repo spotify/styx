@@ -116,7 +116,7 @@ public class StyxApi implements AppInit {
         new com.spotify.styx.api.deprecated.BackfillResource(backfillResource);
     final com.spotify.styx.api.deprecated.CliResource
         deprecatedCliResource =
-        new com.spotify.styx.api.deprecated.CliResource(statusResource, schedulerResource);
+        new com.spotify.styx.api.deprecated.CliResource(statusResource, schedulerServiceBaseUrl);
 
     final Supplier<Optional<List<String>>> clientBlacklistSupplier =
         new CachedSupplier<>(storage::clientBlacklist, Instant::now);

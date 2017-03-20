@@ -2,7 +2,7 @@
  * -\-\-
  * Spotify Styx API Service
  * --
- * Copyright (C) 2016 Spotify AB
+ * Copyright (C) 2017 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ package com.spotify.styx.api;
 import static com.spotify.styx.api.Api.Version.V2;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
-import static com.spotify.styx.util.StreamUtil.cat;
 
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
@@ -60,16 +59,16 @@ public final class WorkflowResource {
 
   // FIXME
   public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
-    final List<Route<AsyncHandler<Response<ByteString>>>> v0 = Arrays.asList(
+    final List<Route<AsyncHandler<Response<ByteString>>>> routes = Arrays.asList(
         Route.with(
             json(), "GET", BASE + "/<cid>/<eid>",
             rc -> workflow(arg("cid", rc), arg("eid", rc))),
         Route.with(
             json(), "GET", BASE + "/<cid>/<eid>/instances",
-            rc -> Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Use v1 api"))),
+            rc -> instances(arg("cid", rc), arg("eid", rc), rc.request())),
         Route.with(
             json(), "GET", BASE + "/<cid>/<eid>/instances/<iid>",
-            rc -> Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Use v1 api"))),
+            rc -> instance(arg("cid", rc), arg("eid", rc), arg("iid", rc))),
         Route.with(
             json(), "GET", BASE + "/<cid>/<eid>/state",
             rc -> state(arg("cid", rc), arg("eid", rc))),
@@ -81,19 +80,7 @@ public final class WorkflowResource {
             rc -> patchState(arg("cid", rc), rc.request()))
     );
 
-    final List<Route<AsyncHandler<Response<ByteString>>>> v1 = Arrays.asList(
-        Route.with(
-            json(), "GET", BASE + "/<cid>/<eid>/instances",
-            rc -> instances(arg("cid", rc), arg("eid", rc), rc.request())),
-        Route.with(
-            json(), "GET", BASE + "/<cid>/<eid>/instances/<iid>",
-            rc -> instance(arg("cid", rc), arg("eid", rc), arg("iid", rc)))
-    );
-
-    return cat(
-        Api.prefixRoutes(v0, V2),
-        Api.prefixRoutes(v1, V2)
-    );
+    return Api.prefixRoutes(routes, V2);
   }
 
 

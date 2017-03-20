@@ -33,7 +33,6 @@ import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.styx.api.Api;
 import com.spotify.styx.api.EventsPayload;
-import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.api.StatusResource;
 import com.spotify.styx.api.VersionedApiTest;
 import com.spotify.styx.model.Event;
@@ -71,10 +70,9 @@ public class CliResourceTest extends VersionedApiTest {
   protected void init(Environment environment) {
     final CliResource
         cliResource =
-        new CliResource(new StatusResource(storage), new SchedulerResource(SCHEDULER_BASE));
+        new CliResource(new StatusResource(storage), SCHEDULER_BASE);
 
-    environment.routingEngine()
-        .registerRoutes(cliResource.routes());
+    environment.routingEngine().registerRoutes(cliResource.routes());
   }
 
   @Test
@@ -96,13 +94,19 @@ public class CliResourceTest extends VersionedApiTest {
     tillVersion(Api.Version.V1);
 
     serviceHelper.stubClient()
-        .respond(Response.forStatus(Status.ACCEPTED))
+        .respond(Response.forStatus(Status.ACCEPTED).withPayload(Json.serialize(WFI)))
         .to(SCHEDULER_BASE + "/api/v0/trigger");
 
+    com.spotify.styx.model.deprecated.WorkflowInstance workflowInstance =
+        com.spotify.styx.model.deprecated.WorkflowInstance.create(WFI);
     Response<ByteString> response =
-        awaitResponse(serviceHelper.request("POST", path("/trigger")));
+        awaitResponse(serviceHelper.request("POST", path("/trigger"),
+                                            Json.serialize(workflowInstance)));
 
     assertThat(response, hasStatus(withCode(Status.ACCEPTED)));
+    assertThat(Json.deserialize(response.payload().get(),
+                                com.spotify.styx.model.deprecated.WorkflowInstance.class),
+               is(workflowInstance));
   }
 
   @Test

@@ -2,7 +2,7 @@
  * -\-\-
  * Spotify Styx API Service
  * --
- * Copyright (C) 2016 Spotify AB
+ * Copyright (C) 2017 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -69,7 +69,7 @@ public class SchedulerResource {
     return Api.prefixRoutes(schedulerProxies, V2);
   }
 
-  public CompletionStage<Response<ByteString>> proxyToScheduler(String path, RequestContext rc) {
+  private CompletionStage<Response<ByteString>> proxyToScheduler(String path, RequestContext rc) {
     return rc.requestScopedClient()
         .send(rc.request().withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + path));
   }
