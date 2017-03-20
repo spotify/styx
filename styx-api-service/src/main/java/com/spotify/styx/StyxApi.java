@@ -125,7 +125,8 @@ public class StyxApi implements AppInit {
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
         // TODO remove deprecated resources
         .registerRoutes(deprecatedWorkflowResource.routes())
-        .registerRoutes(deprecatedBackfillResource.routes())
+        .registerRoutes(deprecatedBackfillResource.routes()
+                            .map(r -> r.withMiddleware(clientValidator(clientBlacklistSupplier))))
         .registerRoutes(deprecatedCliResource.routes()
                             .map(r -> r.withMiddleware(clientValidator(clientBlacklistSupplier))))
         .registerRoutes(workflowResource.routes())
