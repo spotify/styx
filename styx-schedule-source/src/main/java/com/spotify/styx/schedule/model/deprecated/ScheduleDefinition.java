@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.schedule.model;
+package com.spotify.styx.schedule.model.deprecated;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -42,7 +42,7 @@ public abstract class ScheduleDefinition {
 
   @JsonCreator
   public static ScheduleDefinition create(
-      @JsonProperty("workflows") @Nullable List<Schedule> schedules) {
+      @JsonProperty("data_endpoints") @Nullable List<Schedule> schedules) {
     if (schedules == null) {
       schedules = Collections.emptyList();
     }
