@@ -1,4 +1,4 @@
 schedules:
   - id: foo
-    partitioning: days
+    schedule: days
     docker_args: [foo]

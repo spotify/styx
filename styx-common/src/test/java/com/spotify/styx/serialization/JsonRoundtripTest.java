@@ -63,9 +63,9 @@ public class JsonRoundtripTest {
   @Test
   public void testLegacyPartitioningSupport() throws Exception {
     for (Map.Entry<String, Partitioning> testCase : LEGACY_PARTITIONING_TESTS.entrySet()) {
-      String json = "{\"id\":\"styx.TestWeekly\",\"partitioning\":\"" + testCase.getKey() + "\"}";
+      String json = "{\"id\":\"styx.TestWeekly\",\"schedule\":\"" + testCase.getKey() + "\"}";
       Schedule after = roundtrip(json, Schedule.class);
-      assertThat(after.partitioning(), is(testCase.getValue()));
+      assertThat(after.schedule(), is(testCase.getValue()));
     }
   }
 

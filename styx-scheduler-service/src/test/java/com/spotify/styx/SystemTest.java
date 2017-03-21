@@ -301,7 +301,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     workflowChanges(Workflow.create(DAILY_WORKFLOW.componentId(),
                                     DAILY_WORKFLOW.componentUri(),
-                                    Schedule.create(SCHEDULE_DAILY.id(), SCHEDULE_DAILY.partitioning(),
+                                    Schedule.create(SCHEDULE_DAILY.id(), SCHEDULE_DAILY.schedule(),
                                                     Optional.of("freebox"), SCHEDULE_DAILY.dockerArgs(), empty(),
                                                     SCHEDULE_DAILY.secret(), emptyList())));
     timePasses(StyxScheduler.SCHEDULER_TICK_INTERVAL_SECONDS, SECONDS);

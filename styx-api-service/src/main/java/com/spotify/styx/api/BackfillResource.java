@@ -250,7 +250,7 @@ public final class BackfillResource {
       if (!workflowOpt.isPresent()) {
         return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("workflow not found"));
       }
-      partitioning = workflowOpt.get().schedule().partitioning();
+      partitioning = workflowOpt.get().schedule().schedule();
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }
