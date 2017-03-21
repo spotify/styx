@@ -74,8 +74,8 @@ public class StateInitializingTriggerTest {
 
   @Test
   public void shouldInitializeWorkflowInstance() throws Exception {
-    Schedule endpoint = dataEndpoint(HOURS);
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
+    Schedule schedule = schedule(HOURS);
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
     setDockerImage(workflow.id(), workflow.schedule());
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
@@ -84,8 +84,8 @@ public class StateInitializingTriggerTest {
 
   @Test
   public void shouldInjectTriggerExecutionEventWithNaturalTrigger() throws Exception {
-    Schedule endpoint = dataEndpoint(HOURS);
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
+    Schedule schedule = schedule(HOURS);
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
     setDockerImage(workflow.id(), workflow.schedule());
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
@@ -99,8 +99,8 @@ public class StateInitializingTriggerTest {
 
   @Test
   public void shouldInjectTriggerExecutionEventWithBackfillTrigger() throws Exception {
-    Schedule endpoint = dataEndpoint(HOURS);
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
+    Schedule schedule = schedule(HOURS);
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
     setDockerImage(workflow.id(), workflow.schedule());
     trigger.event(workflow, BACKFILL_TRIGGER, TIME);
 
@@ -114,7 +114,7 @@ public class StateInitializingTriggerTest {
 
   @Test
   public void shouldDoNothingIfDockerInfoMissing() throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, TestData.DAILY_DATA_ENDPOINT);
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, TestData.DAILY_SCHEDULE);
     setDockerImage(workflow.id(), workflow.schedule());
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
@@ -124,8 +124,8 @@ public class StateInitializingTriggerTest {
   @Test
   public void shouldCreateWorkflowInstanceParameter() throws Exception {
     for (Map.Entry<Partitioning, String> partitioningCase : PARTITIONING_ARG_EXPECTS.entrySet()) {
-      Schedule endpoint = dataEndpoint(partitioningCase.getKey(), "--date", "{}", "--bar");
-      Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
+      Schedule schedule = schedule(partitioningCase.getKey(), "--date", "{}", "--bar");
+      Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
       setDockerImage(workflow.id(), workflow.schedule());
       trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
@@ -142,7 +142,7 @@ public class StateInitializingTriggerTest {
     assertThat(PARTITIONING_ARG_EXPECTS.keySet(), is(Sets.newHashSet(Partitioning.values())));
   }
 
-  private Schedule dataEndpoint(Partitioning partitioning, String... args) {
+  private Schedule schedule(Partitioning partitioning, String... args) {
     return Schedule.create(
         "styx.TestEndpoint",
         partitioning,

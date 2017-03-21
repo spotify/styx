@@ -449,9 +449,9 @@ class DatastoreStorage {
 
   private WorkflowId parseWorkflowId(Entity workflow) {
     final String componentId = workflow.key().ancestors().get(0).name();
-    final String endpointId = workflow.key().name();
+    final String id = workflow.key().name();
 
-    return WorkflowId.create(componentId, endpointId);
+    return WorkflowId.create(componentId, id);
   }
 
   /**

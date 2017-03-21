@@ -41,8 +41,8 @@ public class JsonRoundtripTest {
   private static final Logger LOG = LoggerFactory.getLogger(JsonRoundtripTest.class);
 
   @Test
-  public void testRoundtripDataEndpoint() throws Exception {
-    Schedule before = TestData.FULL_DATA_ENDPOINT;
+  public void testRoundtripSchedule() throws Exception {
+    Schedule before = TestData.FULL_DATA_SCHEDULE;
     Schedule after = roundtrip(before, Schedule.class);
     assertThat(after, is(before));
   }

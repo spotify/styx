@@ -55,23 +55,23 @@ public final class TestData {
   public static final WorkflowInstance WORKFLOW_INSTANCE =
       WorkflowInstance.create(WORKFLOW_ID, "2016-09-01");
 
-  public static final Schedule HOURLY_DATA_ENDPOINT =
+  public static final Schedule HOURLY_SCHEDULE =
       Schedule.create(
           "styx.TestEndpoint", HOURS, empty(), empty(), empty(), empty(), emptyList());
 
-  public static final Schedule DAILY_DATA_ENDPOINT =
+  public static final Schedule DAILY_SCHEDULE =
       Schedule.create(
           "styx.TestEndpoint", DAYS, empty(), empty(), empty(), empty(), emptyList());
 
-  public static final Schedule WEEKLY_DATA_ENDPOINT =
+  public static final Schedule WEEKLY_SCHEDULE =
       Schedule.create(
           "styx.TestEndpoint", WEEKS, empty(), empty(), empty(), empty(), emptyList());
 
-  public static final Schedule MONTHLY_DATA_ENDPOINT =
+  public static final Schedule MONTHLY_SCHEDULE =
       Schedule.create(
           "styx.TestEndpoint", MONTHS, empty(), empty(), empty(), empty(), emptyList());
 
-  public static final Schedule FULL_DATA_ENDPOINT =
+  public static final Schedule FULL_DATA_SCHEDULE =
       Schedule.create(
           "styx.TestEndpoint", DAYS, of("busybox"), of(asList("x", "y")), of(false),
           of(Secret.create("name", "/path")), emptyList());

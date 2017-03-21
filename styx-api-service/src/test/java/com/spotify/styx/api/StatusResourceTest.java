@@ -45,14 +45,14 @@ import org.junit.Test;
 public class StatusResourceTest extends VersionedApiTest {
 
   private static final String COMPONENT_ID = "styx";
-  private static final String ENDPOINT_ID = "test";
+  private static final String ID = "test";
   private static final String PARAMETER = "1234";
   private static final Trigger TRIGGER = Trigger.unknown("foobar");
   private static final String OTHER_COMPONENT_ID = "styx-other";
   private static final WorkflowInstance WFI =
-      WorkflowInstance.create(WorkflowId.create(COMPONENT_ID, ENDPOINT_ID), PARAMETER);
+      WorkflowInstance.create(WorkflowId.create(COMPONENT_ID, ID), PARAMETER);
   private static final WorkflowInstance OTHER_WFI =
-      WorkflowInstance.create(WorkflowId.create(OTHER_COMPONENT_ID, ENDPOINT_ID), PARAMETER);
+      WorkflowInstance.create(WorkflowId.create(OTHER_COMPONENT_ID, ID), PARAMETER);
 
   private Storage storage = new InMemStorage();
 
@@ -113,7 +113,7 @@ public class StatusResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V2);
 
     WorkflowInstance OTHER_WFI =
-        WorkflowInstance.create(WorkflowId.create(COMPONENT_ID + "-other", ENDPOINT_ID), PARAMETER);
+        WorkflowInstance.create(WorkflowId.create(COMPONENT_ID + "-other", ID), PARAMETER);
 
     storage.writeActiveState(WFI, 42L);
     storage.writeActiveState(OTHER_WFI, 84L);

@@ -72,7 +72,7 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldTransitionIntoSubmitting() throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint("--date", "{}", "--bar"));
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule("--date", "{}", "--bar"));
     WorkflowState workflowState = WorkflowState.builder()
         .enabled(true)
         .dockerImage(DOCKER_IMAGE)
@@ -99,7 +99,7 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldTransitionIntoFailedIfStorageError() throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint("--date", "{}", "--bar"));
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule("--date", "{}", "--bar"));
     WorkflowState workflowState = WorkflowState.builder()
         .enabled(true)
         .dockerImage(DOCKER_IMAGE)
@@ -139,8 +139,8 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldHaltIfMissingDockerArgs() throws Exception {
-    Schedule dataEndpoint = TestData.DAILY_DATA_ENDPOINT;
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint);
+    Schedule schedule = TestData.DAILY_SCHEDULE;
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
@@ -154,8 +154,8 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldHaltIfMissingDockerImage() throws Exception {
-    Schedule dataEndpoint = dataEndpoint("foo", "bar");
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint);
+    Schedule schedule = schedule("foo", "bar");
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
@@ -168,8 +168,8 @@ public class ExecutionDescriptionHandlerTest {
   }
 
   @Test
-  public void shouldFallbackToDockerImageInEndpointDefinition() throws Exception {
-    Schedule dataEndpoint = Schedule.create(
+  public void shouldFallbackToDockerImageInScheduleDefinition() throws Exception {
+    Schedule schedule = Schedule.create(
         "styx.TestEndpoint",
         HOURS,
         Optional.of("legacy-docker-image"),
@@ -177,7 +177,7 @@ public class ExecutionDescriptionHandlerTest {
         empty(),
         empty(),
         emptyList());
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint);
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
@@ -193,7 +193,7 @@ public class ExecutionDescriptionHandlerTest {
     assertThat(data.executionDescription().get().dockerImage(), is("legacy-docker-image"));
   }
 
-  private Schedule dataEndpoint(String... args) {
+  private Schedule schedule(String... args) {
     return Schedule.create(
         "styx.TestEndpoint",
         HOURS,

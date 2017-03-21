@@ -75,6 +75,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
   static final String DOCKER_TERMINATION_LOGGING_ANNOTATION = "styx-docker-termination-logging";
   static final String COMPONENT_ID = "STYX_COMPONENT_ID";
+  // TODO: for backward compatibility, delete later
   static final String ENDPOINT_ID = "STYX_ENDPOINT_ID";
   static final String WORKFLOW_ID = "STYX_WORKFLOW_ID";
   static final String PARAMETER = "STYX_PARAMETER";
@@ -133,7 +134,7 @@ class KubernetesDockerRunner implements DockerRunner {
         .withName(COMPONENT_ID)
         .withValue(workflowInstance.workflowId().componentId())
         .build());
-    // TODO: for backward compatibility
+    // TODO: for backward compatibility, delete later
     env.add(new EnvVarBuilder()
         .withName(ENDPOINT_ID)
         .withValue(workflowInstance.workflowId().id())
