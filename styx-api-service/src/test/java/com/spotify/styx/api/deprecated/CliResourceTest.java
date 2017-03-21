@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.api;
+package com.spotify.styx.api.deprecated;
 
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasPayload;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
@@ -31,8 +31,10 @@ import static org.junit.Assert.assertThat;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
-import com.spotify.styx.api.cli.EventsPayload;
-import com.spotify.styx.api.cli.RunStateDataPayload;
+import com.spotify.styx.api.Api;
+import com.spotify.styx.api.EventsPayload;
+import com.spotify.styx.api.StatusResource;
+import com.spotify.styx.api.VersionedApiTest;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
@@ -44,6 +46,7 @@ import com.spotify.styx.storage.Storage;
 import okio.ByteString;
 import org.junit.Test;
 
+@Deprecated
 public class CliResourceTest extends VersionedApiTest {
 
   private static final String SCHEDULER_BASE = "http://localhost:8080";
@@ -64,15 +67,18 @@ public class CliResourceTest extends VersionedApiTest {
   }
 
   @Override
-  void init(Environment environment) {
-    final CliResource cliResource = new CliResource(SCHEDULER_BASE, storage);
+  protected void init(Environment environment) {
+    final CliResource
+        cliResource =
+        new CliResource(new StatusResource(storage), SCHEDULER_BASE);
 
-    environment.routingEngine()
-        .registerRoutes(cliResource.routes());
+    environment.routingEngine().registerRoutes(cliResource.routes());
   }
 
   @Test
   public void testEventInjectionProxy() throws Exception {
+    tillVersion(Api.Version.V1);
+
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.ACCEPTED))
         .to(SCHEDULER_BASE + "/api/v0/events");
@@ -85,18 +91,28 @@ public class CliResourceTest extends VersionedApiTest {
 
   @Test
   public void testTriggerWorkflowInstanceProxy() throws Exception {
+    tillVersion(Api.Version.V1);
+
     serviceHelper.stubClient()
-        .respond(Response.forStatus(Status.ACCEPTED))
+        .respond(Response.forStatus(Status.ACCEPTED).withPayload(Json.serialize(WFI)))
         .to(SCHEDULER_BASE + "/api/v0/trigger");
 
+    com.spotify.styx.model.deprecated.WorkflowInstance workflowInstance =
+        com.spotify.styx.model.deprecated.WorkflowInstance.create(WFI);
     Response<ByteString> response =
-        awaitResponse(serviceHelper.request("POST", path("/trigger")));
+        awaitResponse(serviceHelper.request("POST", path("/trigger"),
+                                            Json.serialize(workflowInstance)));
 
     assertThat(response, hasStatus(withCode(Status.ACCEPTED)));
+    assertThat(Json.deserialize(response.payload().get(),
+                                com.spotify.styx.model.deprecated.WorkflowInstance.class),
+               is(workflowInstance));
   }
 
   @Test
   public void testEventsRoundtrip() throws Exception {
+    tillVersion(Api.Version.V1);
+
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI, TRIGGER), 0L, 0L));
     storage.writeEvent(SequenceEvent.create(Event.created(WFI, "exec0", "img0"), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI), 2L, 2L));
@@ -115,6 +131,8 @@ public class CliResourceTest extends VersionedApiTest {
 
   @Test
   public void testGetAllActiveStates() throws Exception {
+    tillVersion(Api.Version.V1);
+
     storage.writeActiveState(WFI, 42L);
     storage.writeActiveState(OTHER_WFI, 84L);
     assertThat(storage.readActiveWorkflowInstances().entrySet(), hasSize(2));
@@ -132,6 +150,8 @@ public class CliResourceTest extends VersionedApiTest {
 
   @Test
   public void testFilterActiveStatesOnComponent() throws Exception {
+    tillVersion(Api.Version.V1);
+
     WorkflowInstance OTHER_WFI =
         WorkflowInstance.create(WorkflowId.create(COMPONENT_ID + "-other", ENDPOINT_ID), PARAMETER);
 

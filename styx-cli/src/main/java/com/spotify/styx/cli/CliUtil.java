@@ -26,7 +26,7 @@ import static org.fusesource.jansi.Ansi.ansi;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.spotify.styx.api.cli.RunStateDataPayload.RunStateData;
+import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;

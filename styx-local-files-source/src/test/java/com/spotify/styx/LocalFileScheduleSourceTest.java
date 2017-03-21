@@ -33,7 +33,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.io.Closer;
 import com.google.common.io.Resources;
-import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.schedule.ScheduleSource;
@@ -182,11 +182,11 @@ public class LocalFileScheduleSourceTest {
   }
 
   private void changeListener(Workflow workflow) {
-    workflows.put(workflow.endpointId(), workflow);
+    workflows.put(workflow.workflowId(), workflow);
   }
 
   private void removeListener(Workflow workflow) {
-    workflows.remove(workflow.endpointId());
+    workflows.remove(workflow.workflowId());
   }
 
   private byte[] readResource(String filename) throws IOException, URISyntaxException {
@@ -199,7 +199,7 @@ public class LocalFileScheduleSourceTest {
     return Workflow.create(
         "test-file.yaml",
         testPath.toUri(),
-        DataEndpoint.create(
+        Schedule.create(
             "foo",
             Partitioning.HOURS,
             empty(),
@@ -214,7 +214,7 @@ public class LocalFileScheduleSourceTest {
     return Workflow.create(
         "test-file.yaml",
         testPath.toUri(),
-        DataEndpoint.create(
+        Schedule.create(
             "foo",
             Partitioning.DAYS,
             empty(),
@@ -229,7 +229,7 @@ public class LocalFileScheduleSourceTest {
     return Workflow.create(
         "test-file.yaml",
         testPath.toUri(),
-        DataEndpoint.create(
+        Schedule.create(
             "foo",
             Partitioning.HOURS,
             empty(),
@@ -244,7 +244,7 @@ public class LocalFileScheduleSourceTest {
     return Workflow.create(
         "test-file.yaml",
         testPath.toUri(),
-        DataEndpoint.create(
+        Schedule.create(
             "bar",
             Partitioning.DAYS,
             empty(),

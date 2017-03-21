@@ -2,7 +2,7 @@
  * -\-\-
  * Spotify Styx Common
  * --
- * Copyright (C) 2016 Spotify AB
+ * Copyright (C) 2017 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ public abstract class WorkflowInstance {
 
   /**
    * This property contains the thing needed to turn a general purpose Workflow into something
-   * that satisfies a specific data endpoint partition. Might be for example
+   * that satisfies a specific schedule partition. Might be for example
    * '-Pdatehour=2016-01-01T08'.
    */
   @JsonProperty

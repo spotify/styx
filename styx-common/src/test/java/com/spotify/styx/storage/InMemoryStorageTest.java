@@ -28,7 +28,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
-import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
@@ -78,6 +78,7 @@ public class InMemoryStorageTest {
     return Workflow.create(
         workflowId.componentId(),
         URI.create("http://foo"),
-        DataEndpoint.create(workflowId.endpointId(), HOURS, empty(), empty(), empty(), empty(), emptyList()));
+        Schedule
+            .create(workflowId.id(), HOURS, empty(), empty(), empty(), empty(), emptyList()));
   }
 }

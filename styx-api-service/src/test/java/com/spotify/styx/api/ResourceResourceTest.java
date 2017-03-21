@@ -70,7 +70,7 @@ public class ResourceResourceTest extends VersionedApiTest {
   }
 
   @Override
-  void init(Environment environment) {
+  protected void init(Environment environment) {
     ResourceResource resourceResource = new ResourceResource(storage);
 
     environment.routingEngine().registerRoutes(resourceResource.routes());

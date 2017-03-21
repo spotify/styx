@@ -22,7 +22,7 @@ package com.spotify.styx.cli;
 
 import com.google.auto.value.AutoValue;
 import com.spotify.styx.api.BackfillPayload;
-import com.spotify.styx.api.cli.RunStateDataPayload;
+import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
 import java.util.List;
 

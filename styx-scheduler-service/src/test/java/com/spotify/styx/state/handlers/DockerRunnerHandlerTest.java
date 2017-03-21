@@ -40,7 +40,7 @@ import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
-import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Workflow;
@@ -138,7 +138,7 @@ public class DockerRunnerHandlerTest {
   }
 
   private WorkflowInstance startWorkflowInstance(String parameter) throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint());
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule());
     ExecutionDescription desc = ExecutionDescription.forImage(TEST_DOCKER_IMAGE);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), parameter);
     StateData stateData = StateData.newBuilder().executionDescription(desc).build();
@@ -150,7 +150,7 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldPassInArguments() throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint());
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
     ExecutionDescription desc = ExecutionDescription.forImage(TEST_DOCKER_IMAGE);
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
@@ -167,7 +167,7 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldInterpolatePartitioningArgument() throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint());
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
         StateData.newBuilder().executionDescription(EXECUTION_DESCRIPTION).build());
@@ -185,7 +185,7 @@ public class DockerRunnerHandlerTest {
     when(dockerRunner.start(any(WorkflowInstance.class), any(RunSpec.class)))
         .thenThrow(new IOException("Testing exception."));
 
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint());
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
         StateData.newBuilder().executionDescription(EXECUTION_DESCRIPTION).build());
@@ -200,7 +200,7 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldHaltIfMissingExecutionDescription() throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, dataEndpoint());
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING);
 
@@ -214,8 +214,8 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldPerformCleanupOnFailed() throws Exception {
-    DataEndpoint endpoint = dataEndpoint("--date", "{}", "--bar");
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
+    Schedule schedule = schedule("--date", "{}", "--bar");
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.FAILED,
         StateData.newBuilder().executionId(TEST_EXECUTION_ID).build());
@@ -228,8 +228,8 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldPerformCleanupOnFailedThroughTransitions() throws Exception {
-    DataEndpoint endpoint = dataEndpoint("--date", "{}", "--bar");
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
+    Schedule schedule = schedule("--date", "{}", "--bar");
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.NEW, dockerRunnerHandler);
 
@@ -242,8 +242,8 @@ public class DockerRunnerHandlerTest {
     verify(dockerRunner).cleanup(TEST_EXECUTION_ID);
   }
 
-  private DataEndpoint dataEndpoint(String... args) {
-    return DataEndpoint.create(
+  private Schedule schedule(String... args) {
+    return Schedule.create(
         "styx.TestEndpoint",
         HOURS,
         Optional.of(TEST_DOCKER_IMAGE),

@@ -2,7 +2,7 @@
  * -\-\-
  * Spotify Styx Common
  * --
- * Copyright (C) 2016 Spotify AB
+ * Copyright (C) 2017 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,21 +41,21 @@ public abstract class WorkflowId {
   public abstract String componentId();
 
   @JsonProperty
-  public abstract String endpointId();
+  public abstract String id();
 
   public String toKey() {
-    return componentId() + "#" + endpointId();
+    return componentId() + "#" + id();
   }
 
   @JsonCreator
   public static WorkflowId create(
       @JsonProperty("component_id") String componentId,
-      @JsonProperty("endpoint_id") String endpointId) {
-    return new AutoValue_WorkflowId(componentId, endpointId);
+      @JsonProperty("id") String id) {
+    return new AutoValue_WorkflowId(componentId, id);
   }
 
   public static WorkflowId ofWorkflow(Workflow workflow) {
-    return new AutoValue_WorkflowId(workflow.componentId(), workflow.endpointId());
+    return new AutoValue_WorkflowId(workflow.componentId(), workflow.workflowId());
   }
 
   public static WorkflowId parseKey(String key) {

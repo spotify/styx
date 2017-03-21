@@ -31,13 +31,14 @@ import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
 
-class JsonMatchers {
+public class JsonMatchers {
 
-  static <T> void assertJson(Response<ByteString> response, String jsonPath, Matcher<T> matcher) {
+  public static <T> void assertJson(Response<ByteString> response, String jsonPath,
+                                    Matcher<T> matcher) {
     assertThat(response, hasPayload(asByteString(hasJsonPath(jsonPath, matcher))));
   }
 
-  static <T> void assertNoJson(Response<ByteString> response, String jsonPath) {
+  public static <T> void assertNoJson(Response<ByteString> response, String jsonPath) {
     assertThat(response, hasPayload(asByteString(hasNoJsonPath(jsonPath))));
   }
 
