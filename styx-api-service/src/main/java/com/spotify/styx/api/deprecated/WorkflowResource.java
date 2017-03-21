@@ -53,7 +53,7 @@ public final class WorkflowResource {
   }
 
   public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
-    final List<Route<AsyncHandler<Response<ByteString>>>> v0 = Arrays.asList(
+    final List<Route<AsyncHandler<Response<ByteString>>>> v0Routes = Arrays.asList(
         Route.with(
             json(), "GET", BASE + "/<cid>/<eid>",
             rc -> workflow(arg("cid", rc), arg("eid", rc))),
@@ -74,7 +74,7 @@ public final class WorkflowResource {
             rc -> patchState(arg("cid", rc), rc.request()))
     );
 
-    final List<Route<AsyncHandler<Response<ByteString>>>> v1 = Arrays.asList(
+    final List<Route<AsyncHandler<Response<ByteString>>>> v1Routes = Arrays.asList(
         Route.with(
             json(), "GET", BASE + "/<cid>/<eid>/instances",
             rc -> instances(arg("cid", rc), arg("eid", rc), rc.request())),
@@ -84,8 +84,8 @@ public final class WorkflowResource {
     );
 
     return cat(
-        Api.prefixRoutes(v0, V0, V1),
-        Api.prefixRoutes(v1, V1)
+        Api.prefixRoutes(v0Routes, V0, V1),
+        Api.prefixRoutes(v1Routes, V1)
     );
   }
 

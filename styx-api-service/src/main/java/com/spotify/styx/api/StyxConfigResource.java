@@ -53,7 +53,7 @@ public class StyxConfigResource {
   }
 
   public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
-    final List<Route<AsyncHandler<Response<ByteString>>>> v0 = Arrays.asList(
+    final List<Route<AsyncHandler<Response<ByteString>>>> routes = Arrays.asList(
         Route.with(
             json(), "GET", BASE,
             rc -> styxConfig()),
@@ -62,7 +62,7 @@ public class StyxConfigResource {
             rc -> patchStyxConfig(rc.request()))
     );
 
-    return Api.prefixRoutes(v0, V0, V1, V2);
+    return Api.prefixRoutes(routes, V0, V1, V2);
   }
 
   private Response<StyxConfig> styxConfig() {

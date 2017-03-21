@@ -57,7 +57,6 @@ public final class WorkflowResource {
     this.storage = Objects.requireNonNull(storage);
   }
 
-  // FIXME
   public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Arrays.asList(
         Route.with(

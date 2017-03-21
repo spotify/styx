@@ -51,19 +51,19 @@ public class SchedulerResource {
     final List<Route<AsyncHandler<Response<ByteString>>>> schedulerProxies = Arrays.asList(
         Route.async(
             "GET", BASE + "/<endpoint:path>",
-            rc -> proxyToScheduler("/" + arg(rc), rc)),
+            rc -> proxyToScheduler("/" + rc.pathArgs().get("endpoint"), rc)),
         Route.async(
             "POST", BASE + "/<endpoint:path>",
-            rc -> proxyToScheduler("/" + arg(rc), rc)),
+            rc -> proxyToScheduler("/" + rc.pathArgs().get("endpoint"), rc)),
         Route.async(
             "DELETE", BASE + "/<endpoint:path>",
-            rc -> proxyToScheduler("/" + arg(rc), rc)),
+            rc -> proxyToScheduler("/" + rc.pathArgs().get("endpoint"), rc)),
         Route.async(
             "PATCH", BASE + "/<endpoint:path>",
-            rc -> proxyToScheduler("/" + arg(rc), rc)),
+            rc -> proxyToScheduler("/" + rc.pathArgs().get("endpoint"), rc)),
         Route.async(
             "PUT", BASE + "/<endpoint:path>",
-            rc -> proxyToScheduler("/" + arg(rc), rc))
+            rc -> proxyToScheduler("/" + rc.pathArgs().get("endpoint"), rc))
     );
 
     return Api.prefixRoutes(schedulerProxies, V2);
@@ -72,9 +72,5 @@ public class SchedulerResource {
   private CompletionStage<Response<ByteString>> proxyToScheduler(String path, RequestContext rc) {
     return rc.requestScopedClient()
         .send(rc.request().withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + path));
-  }
-
-  private static String arg(RequestContext rc) {
-    return rc.pathArgs().get("endpoint");
   }
 }

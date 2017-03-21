@@ -86,7 +86,6 @@ public final class BackfillResource {
     this.storage = Objects.requireNonNull(storage);
   }
 
-  // FIXME
   public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
     final EntityMiddleware em =
         EntityMiddleware.forCodec(JacksonEntityCodec.forMapper(Json.OBJECT_MAPPER));
