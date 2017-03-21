@@ -48,4 +48,9 @@ public abstract class ScheduleDefinition {
     }
     return new AutoValue_ScheduleDefinition(schedules);
   }
+
+  public static com.spotify.styx.schedule.model.ScheduleDefinition create(
+      ScheduleDefinition scheduleDefinition) {
+    return com.spotify.styx.schedule.model.ScheduleDefinition.create(scheduleDefinition.schedules());
+  }
 }

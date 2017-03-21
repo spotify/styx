@@ -34,7 +34,6 @@ import javax.annotation.Nullable;
  */
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
-@Deprecated
 public abstract class ScheduleDefinition {
 
   @JsonProperty
