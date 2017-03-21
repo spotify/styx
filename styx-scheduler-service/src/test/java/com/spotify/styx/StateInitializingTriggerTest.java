@@ -36,7 +36,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
@@ -74,8 +74,8 @@ public class StateInitializingTriggerTest {
 
   @Test
   public void shouldInitializeWorkflowInstance() throws Exception {
-    DataEndpoint endpoint = dataEndpoint(HOURS);
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
+    Schedule schedule = schedule(HOURS);
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
     setDockerImage(workflow.id(), workflow.schedule());
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
@@ -84,8 +84,8 @@ public class StateInitializingTriggerTest {
 
   @Test
   public void shouldInjectTriggerExecutionEventWithNaturalTrigger() throws Exception {
-    DataEndpoint endpoint = dataEndpoint(HOURS);
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
+    Schedule schedule = schedule(HOURS);
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
     setDockerImage(workflow.id(), workflow.schedule());
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
@@ -99,8 +99,8 @@ public class StateInitializingTriggerTest {
 
   @Test
   public void shouldInjectTriggerExecutionEventWithBackfillTrigger() throws Exception {
-    DataEndpoint endpoint = dataEndpoint(HOURS);
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
+    Schedule schedule = schedule(HOURS);
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
     setDockerImage(workflow.id(), workflow.schedule());
     trigger.event(workflow, BACKFILL_TRIGGER, TIME);
 
@@ -114,7 +114,7 @@ public class StateInitializingTriggerTest {
 
   @Test
   public void shouldDoNothingIfDockerInfoMissing() throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, TestData.DAILY_DATA_ENDPOINT);
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, TestData.DAILY_SCHEDULE);
     setDockerImage(workflow.id(), workflow.schedule());
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
@@ -124,8 +124,8 @@ public class StateInitializingTriggerTest {
   @Test
   public void shouldCreateWorkflowInstanceParameter() throws Exception {
     for (Map.Entry<Partitioning, String> partitioningCase : PARTITIONING_ARG_EXPECTS.entrySet()) {
-      DataEndpoint endpoint = dataEndpoint(partitioningCase.getKey(), "--date", "{}", "--bar");
-      Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, endpoint);
+      Schedule schedule = schedule(partitioningCase.getKey(), "--date", "{}", "--bar");
+      Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
       setDockerImage(workflow.id(), workflow.schedule());
       trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
@@ -142,8 +142,8 @@ public class StateInitializingTriggerTest {
     assertThat(PARTITIONING_ARG_EXPECTS.keySet(), is(Sets.newHashSet(Partitioning.values())));
   }
 
-  private DataEndpoint dataEndpoint(Partitioning partitioning, String... args) {
-    return DataEndpoint.create(
+  private Schedule schedule(Partitioning partitioning, String... args) {
+    return Schedule.create(
         "styx.TestEndpoint",
         partitioning,
         Optional.of("busybox"),
@@ -154,7 +154,7 @@ public class StateInitializingTriggerTest {
   }
 
   // todo: do not use deprecated getDockerImage method
-  private void setDockerImage(WorkflowId workflowId, DataEndpoint schedule) throws IOException {
+  private void setDockerImage(WorkflowId workflowId, Schedule schedule) throws IOException {
     when(storage.getDockerImage(workflowId)).thenReturn(schedule.dockerImage());
   }
 }

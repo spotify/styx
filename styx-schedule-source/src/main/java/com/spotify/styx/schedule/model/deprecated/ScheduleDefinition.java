@@ -1,6 +1,6 @@
 /*-
  * -\-\-
- * Spotify Styx Common
+ * Spotify Styx Schedule Source API
  * --
  * Copyright (C) 2016 Spotify AB
  * --
@@ -18,46 +18,39 @@
  * -/-/-
  */
 
-package com.spotify.styx.api.cli;
+package com.spotify.styx.schedule.model.deprecated;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Schedule;
+import java.util.Collections;
 import java.util.List;
+import javax.annotation.Nullable;
 
 /**
- * convert Event to EventsPayload (with associated timestamps)
+ * Mainly a list of {@link Schedule}s
  */
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
-public abstract class EventsPayload {
+@Deprecated
+public abstract class ScheduleDefinition {
 
   @JsonProperty
-  public abstract List<TimestampedEvent> events();
-
-  @AutoValue
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  public abstract static class TimestampedEvent {
-
-    @JsonProperty
-    public abstract Event event();
-
-    @JsonProperty
-    public abstract long timestamp();
-
-    @JsonCreator
-    public static TimestampedEvent create(
-        @JsonProperty("event") Event event,
-        @JsonProperty("timestamp") long timestamp) {
-      return new AutoValue_EventsPayload_TimestampedEvent(event, timestamp);
-    }
-  }
+  public abstract List<Schedule> schedules();
 
   @JsonCreator
-  public static EventsPayload create(
-      @JsonProperty("events") List<TimestampedEvent> events) {
-    return new AutoValue_EventsPayload(events);
+  public static ScheduleDefinition create(
+      @JsonProperty("data_endpoints") @Nullable List<Schedule> schedules) {
+    if (schedules == null) {
+      schedules = Collections.emptyList();
+    }
+    return new AutoValue_ScheduleDefinition(schedules);
+  }
+
+  public static com.spotify.styx.schedule.model.ScheduleDefinition create(
+      ScheduleDefinition scheduleDefinition) {
+    return com.spotify.styx.schedule.model.ScheduleDefinition.create(scheduleDefinition.schedules());
   }
 }

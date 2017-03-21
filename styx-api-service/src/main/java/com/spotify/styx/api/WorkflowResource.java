@@ -2,7 +2,7 @@
  * -\-\-
  * Spotify Styx API Service
  * --
- * Copyright (C) 2016 Spotify AB
+ * Copyright (C) 2017 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +20,9 @@
 
 package com.spotify.styx.api;
 
-import static com.spotify.styx.api.Api.Version.V0;
-import static com.spotify.styx.api.Api.Version.V1;
+import static com.spotify.styx.api.Api.Version.V2;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
-import static com.spotify.styx.util.StreamUtil.cat;
 
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
@@ -50,7 +48,7 @@ import okio.ByteString;
 
 public final class WorkflowResource {
 
-  public static final String BASE = "/workflows";
+  static final String BASE = "/workflows";
   public static final int DEFAULT_PAGE_LIMIT = 24 * 7;
 
   private final Storage storage;
@@ -60,49 +58,38 @@ public final class WorkflowResource {
   }
 
   public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
-    final List<Route<AsyncHandler<Response<ByteString>>>> v0 = Arrays.asList(
+    final List<Route<AsyncHandler<Response<ByteString>>>> routes = Arrays.asList(
         Route.with(
-            json(), "GET", BASE + "/<cid>/<eid>",
-            rc -> workflow(arg("cid", rc), arg("eid", rc))),
+            json(), "GET", BASE + "/<cid>/<wfid>",
+            rc -> workflow(arg("cid", rc), arg("wfid", rc))),
         Route.with(
-            json(), "GET", BASE + "/<cid>/<eid>/instances",
-            rc -> Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Use v1 api"))),
+            json(), "GET", BASE + "/<cid>/<wfid>/instances",
+            rc -> instances(arg("cid", rc), arg("wfid", rc), rc.request())),
         Route.with(
-            json(), "GET", BASE + "/<cid>/<eid>/instances/<iid>",
-            rc -> Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Use v1 api"))),
+            json(), "GET", BASE + "/<cid>/<wfid>/instances/<iid>",
+            rc -> instance(arg("cid", rc), arg("wfid", rc), arg("iid", rc))),
         Route.with(
-            json(), "GET", BASE + "/<cid>/<eid>/state",
-            rc -> state(arg("cid", rc), arg("eid", rc))),
+            json(), "GET", BASE + "/<cid>/<wfid>/state",
+            rc -> state(arg("cid", rc), arg("wfid", rc))),
         Route.with(
-            json(), "PATCH", BASE + "/<cid>/<eid>/state",
-            rc -> patchState(arg("cid", rc), arg("eid", rc), rc.request())),
+            json(), "PATCH", BASE + "/<cid>/<wfid>/state",
+            rc -> patchState(arg("cid", rc), arg("wfid", rc), rc.request())),
         Route.with(
             json(), "PATCH", BASE + "/<cid>/state",
             rc -> patchState(arg("cid", rc), rc.request()))
     );
 
-    final List<Route<AsyncHandler<Response<ByteString>>>> v1 = Arrays.asList(
-        Route.with(
-            json(), "GET", BASE + "/<cid>/<eid>/instances",
-            rc -> instances(rc.request(), arg("cid", rc), arg("eid", rc))),
-        Route.with(
-            json(), "GET", BASE + "/<cid>/<eid>/instances/<iid>",
-            rc -> instance(arg("cid", rc), arg("eid", rc), arg("iid", rc)))
-    );
-
-    return cat(
-        Api.prefixRoutes(v0, V0, V1),
-        Api.prefixRoutes(v1, V1)
-    );
+    return Api.prefixRoutes(routes, V2);
   }
 
-  private Response<WorkflowState> patchState(String componentId, String endpointId, Request request) {
+
+  public Response<WorkflowState> patchState(String componentId, String id, Request request) {
     final Optional<ByteString> payload = request.payload();
     if (!payload.isPresent()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
     }
 
-    WorkflowId workflowId = WorkflowId.create(componentId, endpointId);
+    WorkflowId workflowId = WorkflowId.create(componentId, id);
     WorkflowState patchState;
     try {
       patchState = OBJECT_MAPPER.readValue(payload.get().toByteArray(), WorkflowState.class);
@@ -127,10 +114,10 @@ public final class WorkflowResource {
               Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Failed to update the state."));
     }
 
-    return state(componentId, endpointId);
+    return state(componentId, id);
   }
 
-  private Response<WorkflowState> patchState(String componentId, Request request) {
+  public Response<WorkflowState> patchState(String componentId, Request request) {
     final Optional<ByteString> payload = request.payload();
     if (!payload.isPresent()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
@@ -168,8 +155,8 @@ public final class WorkflowResource {
     return Response.forPayload(patchState);
   }
 
-  private Response<Workflow> workflow(String componentId, String endpointId) {
-    final WorkflowId workflowId = WorkflowId.create(componentId, endpointId);
+  public Response<Workflow> workflow(String componentId, String id) {
+    final WorkflowId workflowId = WorkflowId.create(componentId, id);
     final Optional<Workflow> workflowOpt;
     try {
       workflowOpt = storage.workflow(workflowId);
@@ -184,8 +171,8 @@ public final class WorkflowResource {
     return Response.forPayload(workflowOpt.get());
   }
 
-  private Response<WorkflowState> state(String componentId, String endpointId) {
-    final WorkflowId workflowId = WorkflowId.create(componentId, endpointId);
+  public Response<WorkflowState> state(String componentId, String id) {
+    final WorkflowId workflowId = WorkflowId.create(componentId, id);
     WorkflowState workflowState;
     try {
       workflowState = storage.workflowState(workflowId);
@@ -196,12 +183,11 @@ public final class WorkflowResource {
     return Response.forPayload(workflowState);
   }
 
-  private Response<List<WorkflowInstanceExecutionData>> instances(
-      Request request,
+  public Response<List<WorkflowInstanceExecutionData>> instances(
       String componentId,
-      String endpointId) {
-
-    final WorkflowId workflowId = WorkflowId.create(componentId, endpointId);
+      String id,
+      Request request) {
+    final WorkflowId workflowId = WorkflowId.create(componentId, id);
     final String offset = request.parameter("offset").orElse("");
     final int limit = request.parameter("limit").map(Integer::parseInt).orElse(DEFAULT_PAGE_LIMIT);
 
@@ -215,11 +201,11 @@ public final class WorkflowResource {
     return Response.forPayload(data);
   }
 
-  private Response<WorkflowInstanceExecutionData> instance(
+  public Response<WorkflowInstanceExecutionData> instance(
       String componentId,
-      String endpointId,
+      String id,
       String instanceId) {
-    final WorkflowId workflowId = WorkflowId.create(componentId, endpointId);
+    final WorkflowId workflowId = WorkflowId.create(componentId, id);
     final WorkflowInstance workflowInstance = WorkflowInstance.create(workflowId, instanceId);
 
     try {

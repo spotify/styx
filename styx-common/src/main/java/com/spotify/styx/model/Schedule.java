@@ -29,11 +29,11 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A specification of a scheduled data endpoint
+ * A specification of a scheduled workflow
  */
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
-public abstract class DataEndpoint {
+public abstract class Schedule {
 
   @JsonProperty
   public abstract String id();
@@ -64,7 +64,7 @@ public abstract class DataEndpoint {
   public abstract List<String> resources();
 
   @JsonCreator
-  public static DataEndpoint create(
+  public static Schedule create(
       @JsonProperty("id") String id,
       @JsonProperty("partitioning") Partitioning partitioning,
       @JsonProperty("docker_image") Optional<String> dockerImage,
@@ -73,7 +73,7 @@ public abstract class DataEndpoint {
       @JsonProperty("secret") Optional<Secret> secret,
       @JsonProperty("resources") List<String> resources) {
 
-    return new AutoValue_DataEndpoint(id, partitioning, dockerImage, dockerArgs,
+    return new AutoValue_Schedule(id, partitioning, dockerImage, dockerArgs,
         dockerTerminationLogging.orElse(false), secret,
         resources == null ? Collections.emptyList() : resources);
   }
@@ -92,7 +92,7 @@ public abstract class DataEndpoint {
     public static Secret create(
         @JsonProperty("name") String name,
         @JsonProperty("mount_path") String mountPath) {
-      return new AutoValue_DataEndpoint_Secret(name, mountPath);
+      return new AutoValue_Schedule_Secret(name, mountPath);
     }
   }
 

@@ -32,7 +32,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableList;
-import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.testdata.TestData;
 import io.fabric8.kubernetes.api.model.Container;
@@ -171,7 +171,7 @@ public class KubernetesDockerRunnerPodResourceTest {
 
   @Test
   public void shouldConfigureSecretsMount() throws Exception {
-    DataEndpoint.Secret secret = DataEndpoint.Secret.create("my-secret", "/etc/secrets");
+    Schedule.Secret secret = Schedule.Secret.create("my-secret", "/etc/secrets");
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.create(
@@ -203,12 +203,9 @@ public class KubernetesDockerRunnerPodResourceTest {
         DockerRunner.RunSpec.create("busybox", ImmutableList.of(), false, empty()));
     List<EnvVar> envVars = pod.getSpec().getContainers().get(0).getEnv();
 
-    EnvVar endpoint = new EnvVar();
-    endpoint.setName(KubernetesDockerRunner.ENDPOINT_ID);
-    endpoint.setValue(WORKFLOW_INSTANCE.workflowId().endpointId());
     EnvVar workflow = new EnvVar();
     workflow.setName(KubernetesDockerRunner.WORKFLOW_ID);
-    workflow.setValue(WORKFLOW_INSTANCE.workflowId().endpointId());
+    workflow.setValue(WORKFLOW_INSTANCE.workflowId().id());
     EnvVar component = new EnvVar();
     component.setName(KubernetesDockerRunner.COMPONENT_ID);
     component.setValue(WORKFLOW_INSTANCE.workflowId().componentId());
@@ -220,7 +217,6 @@ public class KubernetesDockerRunnerPodResourceTest {
     assertThat(envVars.size(), is(6));
     assertThat(envVars, hasItem(component));
     assertThat(envVars, hasItem(workflow));
-    assertThat(envVars, hasItem(endpoint));
     assertThat(envVars, hasItem(parameter));
     assertThat(execution.getName(),is(KubernetesDockerRunner.EXECUTION_ID));
     assertThat(execution.getValue(),

@@ -73,16 +73,16 @@ public class SchedulerResourceTest {
 
   private final Workflow HOURLY_WORKFLOW = Workflow.create("styx",
                                                     TestData.WORKFLOW_URI,
-                                                    TestData.HOURLY_DATA_ENDPOINT);
+                                                    TestData.HOURLY_SCHEDULE);
   private final Workflow DAILY_WORKFLOW = Workflow.create("styx",
                                                            TestData.WORKFLOW_URI,
-                                                           TestData.DAILY_DATA_ENDPOINT);
+                                                           TestData.DAILY_SCHEDULE);
   private final Workflow WEEKLY_WORKFLOW = Workflow.create("styx",
                                                           TestData.WORKFLOW_URI,
-                                                          TestData.WEEKLY_DATA_ENDPOINT);
+                                                          TestData.WEEKLY_SCHEDULE);
   private final Workflow MONTHLY_WORKFLOW = Workflow.create("styx",
                                                             TestData.WORKFLOW_URI,
-                                                            TestData.MONTHLY_DATA_ENDPOINT);
+                                                            TestData.MONTHLY_SCHEDULE);
   private Optional<Workflow> triggeredWorkflow = Optional.empty();
   private Optional<Trigger> trigger = Optional.empty();
   private Optional<Instant> triggeredInstant = Optional.empty();

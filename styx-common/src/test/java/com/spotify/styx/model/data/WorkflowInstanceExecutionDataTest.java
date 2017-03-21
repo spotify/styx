@@ -131,7 +131,7 @@ public class WorkflowInstanceExecutionDataTest {
         + "\"workflow_instance\":{"
           + "\"workflow_id\":{"
             + "\"component_id\":\"component1\","
-            + "\"endpoint_id\":\"endpoint1\""
+            + "\"id\":\"endpoint1\""
           + "},"
           + "\"parameter\":\"2016-08-03T06\""
         + "},"

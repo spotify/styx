@@ -25,7 +25,7 @@ import static com.spotify.styx.serialization.Json.serialize;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
-import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowId;
@@ -55,7 +55,7 @@ public class PersistentEventTest {
       DOCKER_IMAGE,
       Arrays.asList("foo", "bar"),
       false,
-      Optional.of(DataEndpoint.Secret.create("secret", "/dev/null")),
+      Optional.of(Schedule.Secret.create("secret", "/dev/null")),
       Optional.of(COMMIT_SHA));
 
   @Test

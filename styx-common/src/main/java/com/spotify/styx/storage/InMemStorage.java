@@ -252,7 +252,7 @@ public class InMemStorage implements Storage {
   @Override
   public List<Backfill> backfillsForWorkflow(boolean showAll, String workflow) throws IOException {
     Stream<Backfill> backfillStream = backfillStore.values().stream()
-        .filter(backfill -> backfill.workflowId().endpointId().equals(workflow));
+        .filter(backfill -> backfill.workflowId().id().equals(workflow));
 
     if (!showAll) {
       backfillStream = backfillStream.filter(backfill -> backfill.halted() && backfill.allTriggered());

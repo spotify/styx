@@ -22,6 +22,7 @@ package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V0;
 import static com.spotify.styx.api.Api.Version.V1;
+import static com.spotify.styx.api.Api.Version.V2;
 import static com.spotify.styx.api.Middlewares.json;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -43,7 +44,7 @@ import okio.ByteString;
 
 public class StyxConfigResource {
 
-  private static final String BASE = "/config";
+  static final String BASE = "/config";
 
   private final Storage storage;
 
@@ -52,7 +53,7 @@ public class StyxConfigResource {
   }
 
   public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
-    final List<Route<AsyncHandler<Response<ByteString>>>> v0 = Arrays.asList(
+    final List<Route<AsyncHandler<Response<ByteString>>>> routes = Arrays.asList(
         Route.with(
             json(), "GET", BASE,
             rc -> styxConfig()),
@@ -61,7 +62,7 @@ public class StyxConfigResource {
             rc -> patchStyxConfig(rc.request()))
     );
 
-    return Api.prefixRoutes(v0, V0, V1);
+    return Api.prefixRoutes(routes, V0, V1, V2);
   }
 
   private Response<StyxConfig> styxConfig() {

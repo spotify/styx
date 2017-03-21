@@ -29,9 +29,9 @@ import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
 
-import com.spotify.styx.model.DataEndpoint;
-import com.spotify.styx.model.DataEndpoint.Secret;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.Schedule.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import java.net.URI;
@@ -55,24 +55,24 @@ public final class TestData {
   public static final WorkflowInstance WORKFLOW_INSTANCE =
       WorkflowInstance.create(WORKFLOW_ID, "2016-09-01");
 
-  public static final DataEndpoint HOURLY_DATA_ENDPOINT =
-      DataEndpoint.create(
+  public static final Schedule HOURLY_SCHEDULE =
+      Schedule.create(
           "styx.TestEndpoint", HOURS, empty(), empty(), empty(), empty(), emptyList());
 
-  public static final DataEndpoint DAILY_DATA_ENDPOINT =
-      DataEndpoint.create(
+  public static final Schedule DAILY_SCHEDULE =
+      Schedule.create(
           "styx.TestEndpoint", DAYS, empty(), empty(), empty(), empty(), emptyList());
 
-  public static final DataEndpoint WEEKLY_DATA_ENDPOINT =
-      DataEndpoint.create(
+  public static final Schedule WEEKLY_SCHEDULE =
+      Schedule.create(
           "styx.TestEndpoint", WEEKS, empty(), empty(), empty(), empty(), emptyList());
 
-  public static final DataEndpoint MONTHLY_DATA_ENDPOINT =
-      DataEndpoint.create(
+  public static final Schedule MONTHLY_SCHEDULE =
+      Schedule.create(
           "styx.TestEndpoint", MONTHS, empty(), empty(), empty(), empty(), emptyList());
 
-  public static final DataEndpoint FULL_DATA_ENDPOINT =
-      DataEndpoint.create(
+  public static final Schedule FULL_DATA_SCHEDULE =
+      Schedule.create(
           "styx.TestEndpoint", DAYS, of("busybox"), of(asList("x", "y")), of(false),
           of(Secret.create("name", "/path")), emptyList());
 
@@ -81,6 +81,6 @@ public final class TestData {
           "busybox:1.1",
           Arrays.asList("foo", "bar"),
           false,
-          Optional.of(DataEndpoint.Secret.create("secret", "/dev/null")),
+          Optional.of(Schedule.Secret.create("secret", "/dev/null")),
           Optional.of("00000ef508c1cb905e360590ce3e7e9193f6b370"));
 }

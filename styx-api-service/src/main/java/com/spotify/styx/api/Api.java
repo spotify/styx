@@ -27,17 +27,17 @@ import java.util.Collection;
 import java.util.stream.Stream;
 import okio.ByteString;
 
-final class Api {
+public final class Api {
 
-  enum Version {
-    V0, V1;
+  public enum Version {
+    V0, V1, V2;
 
     public String prefix() {
       return "/api/v" + ordinal();
     }
   }
 
-  static Stream<Route<AsyncHandler<Response<ByteString>>>> prefixRoutes(
+  public static Stream<Route<AsyncHandler<Response<ByteString>>>> prefixRoutes(
       Collection<Route<AsyncHandler<Response<ByteString>>>> routes,
       Version... versions) {
     return Stream.of(versions)

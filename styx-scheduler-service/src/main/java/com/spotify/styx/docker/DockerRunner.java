@@ -24,7 +24,7 @@ import static java.util.Optional.empty;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
-import com.spotify.styx.model.DataEndpoint;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.StateManager;
@@ -68,13 +68,13 @@ public interface DockerRunner extends Closeable {
 
     public abstract boolean terminationLogging();
 
-    public abstract Optional<DataEndpoint.Secret> secret();
+    public abstract Optional<Schedule.Secret> secret();
 
     public static RunSpec create(
         String imageName,
         ImmutableList<String> args,
         boolean terminationLogging,
-        Optional<DataEndpoint.Secret> secret) {
+        Optional<Schedule.Secret> secret) {
       return new AutoValue_DockerRunner_RunSpec(imageName, args, terminationLogging, secret);
     }
 
