@@ -23,6 +23,7 @@ package com.spotify.styx.cli;
 import static com.spotify.styx.cli.CliUtil.colored;
 import static com.spotify.styx.cli.CliUtil.coloredBright;
 import static com.spotify.styx.cli.CliUtil.formatTimestamp;
+import static com.spotify.styx.util.ParameterUtil.rangeOfInstants;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 import static org.fusesource.jansi.Ansi.Color.BLACK;
 import static org.fusesource.jansi.Ansi.Color.BLUE;
@@ -44,8 +45,6 @@ import java.util.List;
 import org.fusesource.jansi.Ansi;
 
 class PrettyCliOutput implements CliOutput {
-
-  private static final String BACKFILL_FORMAT = "%28s  %6s  %13s %12s  %-13s  %-13s  %-13s  %s  %s";
 
   @Override
   public void printStates(RunStateDataPayload runStateDataPayload) {
@@ -94,15 +93,29 @@ class PrettyCliOutput implements CliOutput {
                                                       eventInfo.info())));
   }
 
+  private static final String BACKFILL_FORMAT = "%28s  %7s  %8s  %10s  %9s  %11s  %-13s  %-13s  %-13s  %s  %s";
+
   @Override
   public void printBackfill(Backfill backfill) {
     final Schedule schedule = backfill.schedule();
     final WorkflowId workflowId = backfill.workflowId();
+    final int remaining = rangeOfInstants(backfill.nextTrigger(), backfill.end(), schedule).size();
+    final int total = rangeOfInstants(backfill.start(), backfill.end(), schedule).size();
+    final String state;
+    if (backfill.halted()) {
+      state = "HALTED";
+    } else if (backfill.allTriggered()) {
+      state = "DONE";
+    } else {
+      state = "RUNNING";
+    }
 
     System.out.println(String.format(BACKFILL_FORMAT,
                                      backfill.id(),
-                                     backfill.halted(),
-                                     backfill.allTriggered(),
+                                     state,
+                                     String.format("%.0f%%", 100 - 100f * remaining / total),
+                                     total,
+                                     remaining,
                                      backfill.concurrency(),
                                      toParameter(schedule, backfill.start()),
                                      toParameter(schedule, backfill.end()),
@@ -113,13 +126,15 @@ class PrettyCliOutput implements CliOutput {
 
   private void printBackfillHeader() {
     System.out.println(String.format(BACKFILL_FORMAT,
-                                     "BACKFILL ID",
-                                     "HALTED",
-                                     "ALL TRIGGERED",
+                                     "BACKFILL_ID",
+                                     "STATE",
+                                     "PROGRESS",
+                                     "PARTITIONS",
+                                     "REMAINING",
                                      "CONCURRENCY",
-                                     "START (INCL)",
-                                     "END (EXCL)",
-                                     "NEXT TRIGGER",
+                                     "START(INCL)",
+                                     "END(EXCL)",
+                                     "NEXT_TRIGGER",
                                      "COMPONENT",
                                      "WORKFLOW"));
   }
