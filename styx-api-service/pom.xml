@@ -4,7 +4,7 @@
   <parent>
     <groupId>com.spotify</groupId>
     <artifactId>styx</artifactId>
-    <version>0.2.32-SNAPSHOT</version>
+    <version>0.2.32</version>
   </parent>
 
   <name>Spotify Styx API Service</name>
@@ -18,12 +18,12 @@
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-common</artifactId>
-      <version>0.2.32-SNAPSHOT</version>
+      <version>0.2.32</version>
     </dependency>
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-test</artifactId>
-      <version>0.2.32-SNAPSHOT</version>
+      <version>0.2.32</version>
       <scope>test</scope>
     </dependency>
 
