@@ -25,6 +25,7 @@ import static com.spotify.styx.cli.CliUtil.formatTimestamp;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
@@ -106,5 +107,13 @@ class PlainCliOutput implements CliOutput {
   @Override
   public void printBackfills(List<BackfillPayload> backfills) {
     backfills.forEach(this::printBackfillPayload);
+  }
+
+  @Override
+  public void printResources(List<Resource> resources) {
+    resources.forEach(resource ->
+                          System.out.println(String.format("%s %s",
+                                                           resource.id(),
+                                                           resource.concurrency())));
   }
 }
