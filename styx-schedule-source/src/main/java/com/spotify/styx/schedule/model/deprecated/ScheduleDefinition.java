@@ -24,13 +24,14 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.deprecated.Schedule;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 /**
- * Mainly a list of {@link Schedule}s
+ * Mainly a list of {@link com.spotify.styx.model.Schedule}s
  */
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -51,6 +52,8 @@ public abstract class ScheduleDefinition {
 
   public static com.spotify.styx.schedule.model.ScheduleDefinition create(
       ScheduleDefinition scheduleDefinition) {
-    return com.spotify.styx.schedule.model.ScheduleDefinition.create(scheduleDefinition.schedules());
+    return com.spotify.styx.schedule.model.ScheduleDefinition
+        .create(scheduleDefinition.schedules().stream().map(Schedule::create).collect(
+            Collectors.toList()));
   }
 }

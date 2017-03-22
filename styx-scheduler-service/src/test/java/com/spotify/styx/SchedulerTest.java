@@ -177,7 +177,7 @@ public class SchedulerTest {
 
     final List<Instant> instants =
         ParameterUtil.rangeOfInstants(BACKFILL_1.start(), BACKFILL_1.end(),
-                                      workflow.schedule().partitioning());
+                                      workflow.schedule().schedule());
 
     instants.stream().limit(concurrency).forEach(
         instant ->
@@ -308,7 +308,7 @@ public class SchedulerTest {
 
     final List<Instant> instants =
         ParameterUtil.rangeOfInstants(BACKFILL_1.start(), BACKFILL_1.end(),
-            workflow.schedule().partitioning());
+            workflow.schedule().schedule());
 
     // Go through each expected trigger sequentially and verify that the next partition is not
     // triggered before the future for the previous partition trigger is completed

@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Locale;
 
+// TODO change class name
 public enum Partitioning {
   HOURS, DAYS, WEEKS, MONTHS;
 

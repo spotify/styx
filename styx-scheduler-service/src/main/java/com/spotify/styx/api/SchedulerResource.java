@@ -124,7 +124,7 @@ public class SchedulerResource {
     // Verifying instant
     final Either<String, Instant> instantResult = instantFromWorkflowInstance(
         workflowInstance,
-        workflow.schedule().partitioning());
+        workflow.schedule().schedule());
 
     if (instantResult.isLeft()) {
       return Response.forStatus(BAD_REQUEST.withReasonPhrase(instantResult.getLeft()));

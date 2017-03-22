@@ -532,8 +532,8 @@ public class StyxScheduler implements AppInit {
         storage.storeWorkflow(workflow);
 
         // update nextNaturalTrigger only when partitioning specification changes.
-        final Partitioning partitioning = workflow.schedule().partitioning();
-        if (optWorkflow.isPresent() && !optWorkflow.get().schedule().partitioning()
+        final Partitioning partitioning = workflow.schedule().schedule();
+        if (optWorkflow.isPresent() && !optWorkflow.get().schedule().schedule()
             .equals(partitioning)) {
           final Instant nextNaturalTrigger =
               incrementInstant(truncateInstant(time.get(), partitioning),

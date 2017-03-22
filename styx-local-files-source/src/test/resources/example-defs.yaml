@@ -1,8 +1,8 @@
 schedules:
   - id: foo
-    partitioning: hours
+    schedule: hours
     docker_args: [foo, bar]
 
   - id: bar
-    partitioning: days
+    schedule: days
     docker_args: [baz, bax]
