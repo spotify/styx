@@ -20,11 +20,11 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
 
 # Group Workflows
 
-## Workflow [/v1/workflows/{component}/{endpoint}]
+## Workflow [/v1/workflows/{component}/{workflow_id}]
 
 + Parameters
     + component: `styx-canary` (string) - Workflow Component
-    + endpoint: `LuigiCanary` (string) - Workflow Endpoint
+    + workflow_id: `LuigiCanary` (string) - Workflow ID
 
 ### Get Workflow [GET]
 
@@ -32,7 +32,7 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
 
         {
             "component_id": "styx-canary",
-            "endpoint_id": "LuigiCanary",
+            "workflow_id": "LuigiCanary",
             "component_uri": "file:///etc/styx/schedule.yaml",
             "schedule": {
                 "partitioning": "hourly",
@@ -46,11 +46,11 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
             }
         }
 
-## Workflow Instances [/v1/workflows/{component}/{endpoint}/instances]
+## Workflow Instances [/v1/workflows/{component}/{workflow_id}/instances]
 
 + Parameters
     + component: `styx-canary` (string) - Workflow Component
-    + endpoint: `LuigiCanary` (string) - Workflow Endpoint
+    + workflow_id: `LuigiCanary` (string) - Workflow ID
 
 ### Get Workflow Instances [GET]
 
@@ -58,9 +58,9 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
 
         [{
             "workflow_instance": {
-              "workflow_id": {
+              "workflow": {
                 "component_id": "styx-canary",
-                "endpoint_id": "LuigiCanary"
+                "workflow_id": "LuigiCanary"
               },
               "parameter": "2016-07-13T08"
             },
@@ -89,11 +89,11 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
             }]
         }]
 
-## Workflow Instance [/v1/workflows/{component}/{endpoint}/instances/{instance}]
+## Workflow Instance [/v1/workflows/{component}/{workflow_id}/instances/{instance}]
 
 + Parameters
     + component: `styx-canary` (string) - Workflow Component
-    + endpoint: `LuigiCanary` (string) - Workflow Endpoint
+    + workflow_id: `LuigiCanary` (string) - Workflow ID
     + instance: `2016-07-13T08` (string) - Worfklow Instance parameter
 
 ### Get Workflow Instance [GET]
@@ -102,9 +102,9 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
 
         {
             "workflow_instance": {
-              "workflow_id": {
+              "workflow": {
                 "component_id": "styx-canary",
-                "endpoint_id": "LuigiCanary"
+                "workflow_id": "LuigiCanary"
               },
               "parameter": "2016-07-13T08"
             },
@@ -133,11 +133,11 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
             }]
         }
 
-## Workflow state [/v1/workflows/{component}/{endpoint}/state]
+## Workflow state [/v1/workflows/{component}/{workflow_id}/state]
 
 + Parameters
     + component: `styx-canary` (string) - Workflow Component
-    + endpoint: `LuigiCanary` (string) - Workflow Endpoint
+    + workflow_id: `LuigiCanary` (string) - Workflow ID
 
 ### Get Workflow state [GET]
 

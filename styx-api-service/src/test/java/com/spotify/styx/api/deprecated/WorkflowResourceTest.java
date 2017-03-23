@@ -87,12 +87,12 @@ public class WorkflowResourceTest extends VersionedApiTest {
     super(WorkflowResource.BASE, version, "workflow-test");
   }
 
-  private static final WorkflowConfiguration DATA_ENDPOINT =
+  private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration
           .create("bar", Partitioning.DAYS, empty(), empty(), empty(), empty(), emptyList());
 
   private static final Workflow WORKFLOW =
-      Workflow.create("foo", URI.create("/hejhej"), DATA_ENDPOINT);
+      Workflow.create("foo", URI.create("/hejhej"), WORKFLOW_CONFIGURATION);
 
   private static final String VALID_SHA = "470a229b49a14e7682af2abfdac3b881a8aacdf9";
   private static final String INVALID_SHA = "XXXXXX9b49a14e7682af2abfdac3b881a8aacdf9";

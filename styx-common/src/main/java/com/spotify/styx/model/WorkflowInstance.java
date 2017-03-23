@@ -39,7 +39,7 @@ public abstract class WorkflowInstance {
 
   /**
    * This property contains the thing needed to turn a general purpose Workflow into something
-   * that satisfies a specific schedule partition. Might be for example
+   * that satisfies a specific workflow instance. Might be for example
    * '-Pdatehour=2016-01-01T08'.
    */
   @JsonProperty
