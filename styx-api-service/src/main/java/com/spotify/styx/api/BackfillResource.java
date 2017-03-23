@@ -250,19 +250,19 @@ public final class BackfillResource {
       if (!workflowOpt.isPresent()) {
         return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("workflow not found"));
       }
-      partitioning = workflowOpt.get().schedule().schedule();
+      partitioning = workflowOpt.get().configuration().schedule();
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }
 
     if (truncateInstant(input.start(), partitioning) != input.start()) {
       return Response.forStatus(
-          Status.BAD_REQUEST.withReasonPhrase("start parameter not aligned with partitioning"));
+          Status.BAD_REQUEST.withReasonPhrase("start parameter not aligned with schedule"));
     }
 
     if (truncateInstant(input.end(), partitioning) != input.end()) {
       return Response.forStatus(
-          Status.BAD_REQUEST.withReasonPhrase("end parameter not aligned with partitioning"));
+          Status.BAD_REQUEST.withReasonPhrase("end parameter not aligned with schedule"));
     }
 
     final List<WorkflowInstance> alreadyActive =
@@ -287,7 +287,7 @@ public final class BackfillResource {
         .concurrency(input.concurrency())
         .start(input.start())
         .end(input.end())
-        .partitioning(partitioning)
+        .schedule(partitioning)
         .nextTrigger(input.start())
         .halted(false);
 
@@ -331,11 +331,11 @@ public final class BackfillResource {
     }
 
     final List<Instant> processedInstants = rangeOfInstants(
-        backfill.start(), backfill.nextTrigger(), backfill.partitioning());
+        backfill.start(), backfill.nextTrigger(), backfill.schedule());
     processedStates = processedInstants.parallelStream()
         .map(instant -> {
           final WorkflowInstance wfi = WorkflowInstance
-              .create(backfill.workflowId(), toParameter(backfill.partitioning(), instant));
+              .create(backfill.workflowId(), toParameter(backfill.schedule(), instant));
           Optional<RunState> restoredStateOpt = ReplayEvents.getBackfillRunState(
               wfi,
               activeWorkflowInstances,
@@ -351,11 +351,11 @@ public final class BackfillResource {
         .collect(toList());
 
     final List<Instant> waitingInstants = rangeOfInstants(
-        backfill.nextTrigger(), backfill.end(), backfill.partitioning());
+        backfill.nextTrigger(), backfill.end(), backfill.schedule());
     waitingStates = waitingInstants.stream()
         .map(instant -> {
           final WorkflowInstance wfi = WorkflowInstance.create(
-              backfill.workflowId(), toParameter(backfill.partitioning(), instant));
+              backfill.workflowId(), toParameter(backfill.schedule(), instant));
           return RunStateData.create(wfi, WAITING, StateData.zero());
         })
         .collect(toList());

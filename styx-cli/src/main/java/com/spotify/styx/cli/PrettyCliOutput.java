@@ -96,7 +96,7 @@ class PrettyCliOutput implements CliOutput {
 
   @Override
   public void printBackfill(Backfill backfill) {
-    final Partitioning partitioning = backfill.partitioning();
+    final Partitioning partitioning = backfill.schedule();
     final WorkflowId workflowId = backfill.workflowId();
 
     System.out.println(String.format(BACKFILL_FORMAT,

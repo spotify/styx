@@ -30,7 +30,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.io.Closer;
 import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.deprecated.Schedule;
 import com.spotify.styx.schedule.ScheduleSource;
 import com.sun.nio.file.SensitivityWatchEventModifier;
 import com.typesafe.config.Config;

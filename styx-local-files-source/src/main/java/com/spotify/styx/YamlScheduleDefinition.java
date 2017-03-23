@@ -24,7 +24,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.WorkflowConfiguration;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -34,14 +34,14 @@ import javax.annotation.Nullable;
 abstract class YamlScheduleDefinition {
 
   @JsonProperty
-  public abstract List<Schedule> schedules();
+  public abstract List<WorkflowConfiguration> schedules();
 
   @JsonCreator
   public static YamlScheduleDefinition create(
-      @JsonProperty("schedules") @Nullable List<Schedule> schedules) {
-    if (schedules == null) {
-      schedules = Collections.emptyList();
+      @JsonProperty("schedules") @Nullable List<WorkflowConfiguration> workflowConfigurations) {
+    if (workflowConfigurations == null) {
+      workflowConfigurations = Collections.emptyList();
     }
-    return new AutoValue_YamlScheduleDefinition(schedules);
+    return new AutoValue_YamlScheduleDefinition(workflowConfigurations);
   }
 }

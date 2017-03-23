@@ -194,7 +194,7 @@ public class InMemStorage implements Storage {
     }
 
     return Optional.ofNullable(workflowStore.get(workflowId))
-        .flatMap(w -> w.schedule().dockerImage());
+        .flatMap(w -> w.configuration().dockerImage());
   }
 
   @Override

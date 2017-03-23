@@ -63,7 +63,7 @@ final class StateInitializingTrigger implements TriggerListener {
       return CompletableFuture.completedFuture(null);
     }
 
-    final String parameter = toParameter(workflow.schedule().schedule(), instant);
+    final String parameter = toParameter(workflow.configuration().schedule(), instant);
     final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), parameter);
     final RunState initialState = stateFactory.apply(workflowInstance);
 

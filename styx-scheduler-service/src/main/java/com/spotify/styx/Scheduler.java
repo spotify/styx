@@ -50,7 +50,6 @@ import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
-import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
@@ -285,7 +284,7 @@ public class Scheduler {
           throw new RuntimeException(e);
         }
 
-        partition = incrementInstant(partition, backfill.partitioning());
+        partition = incrementInstant(partition, backfill.schedule());
         storeBackfill(backfill.builder()
             .nextTrigger(partition)
             .build());
@@ -314,7 +313,7 @@ public class Scheduler {
     globalConcurrency.ifPresent(concurrency -> builder.add(GLOBAL_RESOURCE_ID));
 
     workflowCache.workflow(workflowId)
-        .ifPresent(workflow -> builder.addAll(workflow.schedule().resources()));
+        .ifPresent(workflow -> builder.addAll(workflow.configuration().resources()));
 
     return builder.build();
   }

@@ -33,7 +33,7 @@ import java.util.Optional;
  */
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
-public abstract class Schedule {
+public abstract class WorkflowConfiguration {
 
   @JsonProperty
   public abstract String id();
@@ -64,7 +64,7 @@ public abstract class Schedule {
   public abstract List<String> resources();
 
   @JsonCreator
-  public static Schedule create(
+  public static WorkflowConfiguration create(
       @JsonProperty("id") String id,
       @JsonProperty("schedule") Partitioning schedule,
       @JsonProperty("docker_image") Optional<String> dockerImage,
@@ -73,7 +73,7 @@ public abstract class Schedule {
       @JsonProperty("secret") Optional<Secret> secret,
       @JsonProperty("resources") List<String> resources) {
 
-    return new AutoValue_Schedule(id, schedule, dockerImage, dockerArgs,
+    return new AutoValue_WorkflowConfiguration(id, schedule, dockerImage, dockerArgs,
         dockerTerminationLogging.orElse(false), secret,
         resources == null ? Collections.emptyList() : resources);
   }
@@ -92,7 +92,7 @@ public abstract class Schedule {
     public static Secret create(
         @JsonProperty("name") String name,
         @JsonProperty("mount_path") String mountPath) {
-      return new AutoValue_Schedule_Secret(name, mountPath);
+      return new AutoValue_WorkflowConfiguration_Secret(name, mountPath);
     }
   }
 

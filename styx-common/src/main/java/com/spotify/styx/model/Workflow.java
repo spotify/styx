@@ -40,7 +40,7 @@ public abstract class Workflow {
   public abstract URI componentUri();
 
   @JsonProperty
-  public abstract Schedule schedule();
+  public abstract WorkflowConfiguration configuration();
 
   public WorkflowId id() {
     return WorkflowId.ofWorkflow(this);
@@ -50,7 +50,8 @@ public abstract class Workflow {
   public static Workflow create(
       @JsonProperty("component_id") String componentId,
       @JsonProperty("component_uri") URI componentUri,
-      @JsonProperty("schedule") Schedule schedule) {
-    return new AutoValue_Workflow(componentId, schedule.id(), componentUri, schedule);
+      @JsonProperty("configuration") WorkflowConfiguration workflowConfiguration) {
+    return new AutoValue_Workflow(componentId, workflowConfiguration.id(), componentUri,
+                                  workflowConfiguration);
   }
 }

@@ -37,11 +37,11 @@ public final class WorkflowValidator {
   }
 
   public static boolean hasDockerConfiguration(Workflow workflow) {
-    return workflow.schedule().dockerArgs().isPresent();
+    return workflow.configuration().dockerArgs().isPresent();
   }
 
   public static boolean hasDockerConfiguration(Workflow workflow, Storage storage) {
-    final Optional<List<String>> dockerArgs = workflow.schedule().dockerArgs();
+    final Optional<List<String>> dockerArgs = workflow.configuration().dockerArgs();
     if (!dockerArgs.isPresent()) {
       return false;
     }

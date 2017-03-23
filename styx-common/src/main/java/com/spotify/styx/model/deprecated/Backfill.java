@@ -72,7 +72,7 @@ public interface Backfill {
         .halted(backfill.halted())
         .id(backfill.id())
         .nextTrigger(backfill.nextTrigger())
-        .partitioning(backfill.partitioning())
+        .partitioning(backfill.schedule())
         .start(backfill.start())
         .workflowId(WorkflowId.create(backfill.workflowId()))
         .build();
@@ -86,7 +86,7 @@ public interface Backfill {
         .halted(backfill.halted())
         .id(backfill.id())
         .nextTrigger(backfill.nextTrigger())
-        .partitioning(backfill.partitioning())
+        .schedule(backfill.partitioning())
         .start(backfill.start())
         .workflowId(com.spotify.styx.model.WorkflowId.create(backfill.workflowId().componentId(),
                                                              backfill.workflowId().endpointId()))

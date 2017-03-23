@@ -36,7 +36,7 @@ import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Partitioning;
@@ -55,10 +55,10 @@ import org.junit.Test;
 
 public class SystemTest extends StyxSchedulerServiceFixture {
 
-  private static final Schedule SCHEDULE_HOURLY = Schedule.create(
+  private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_HOURLY = WorkflowConfiguration.create(
       "styx.TestEndpoint", Partitioning.HOURS, of("busybox"), of(asList("--hour", "{}")),
       empty(), empty(), emptyList());
-  private static final Schedule SCHEDULE_DAILY = Schedule.create(
+  private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_DAILY = WorkflowConfiguration.create(
       "styx.TestEndpoint", Partitioning.DAYS, of("busybox"), of(asList("--hour", "{}")),
       empty(), empty(), emptyList());
   private static final String TEST_EXECUTION_ID_1 = "execution_1";
@@ -66,14 +66,14 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   private static final Workflow HOURLY_WORKFLOW = Workflow.create(
       "styx",
       TestData.WORKFLOW_URI,
-      SCHEDULE_HOURLY);
+      WORKFLOW_CONFIGURATION_HOURLY);
   private static final ExecutionDescription TEST_EXECUTION_DESCRIPTION =
       ExecutionDescription.create(
           TEST_DOCKER_IMAGE, Arrays.asList("--date", "{}", "--bar"), false, empty(), empty());
   private static final Workflow DAILY_WORKFLOW = Workflow.create(
       "styx",
       TestData.WORKFLOW_URI,
-      SCHEDULE_DAILY);
+      WORKFLOW_CONFIGURATION_DAILY);
   private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
   private static final Trigger TRIGGER2 = Trigger.unknown("trig2");
   private static final Backfill ONE_DAY_HOURLY_BACKFILL = Backfill.newBuilder()
@@ -83,7 +83,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       .workflowId(WorkflowId.create("styx", "styx.TestEndpoint"))
       .concurrency(2)
       .nextTrigger(Instant.parse("2015-01-01T00:00:00Z"))
-      .partitioning(Partitioning.HOURS)
+      .schedule(Partitioning.HOURS)
       .build();
 
   @Test
@@ -301,9 +301,11 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     workflowChanges(Workflow.create(DAILY_WORKFLOW.componentId(),
                                     DAILY_WORKFLOW.componentUri(),
-                                    Schedule.create(SCHEDULE_DAILY.id(), SCHEDULE_DAILY.schedule(),
-                                                    Optional.of("freebox"), SCHEDULE_DAILY.dockerArgs(), empty(),
-                                                    SCHEDULE_DAILY.secret(), emptyList())));
+                                    WorkflowConfiguration.create(WORKFLOW_CONFIGURATION_DAILY.id(), WORKFLOW_CONFIGURATION_DAILY
+                                                                     .schedule(),
+                                                                 Optional.of("freebox"), WORKFLOW_CONFIGURATION_DAILY
+                                                                     .dockerArgs(), empty(),
+                                                                 WORKFLOW_CONFIGURATION_DAILY.secret(), emptyList())));
     timePasses(StyxScheduler.SCHEDULER_TICK_INTERVAL_SECONDS, SECONDS);
     awaitNumberOfDockerRunsWontChange(1);
 
@@ -349,14 +351,14 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     injectEvent(Event.terminate(workflowInstance, Optional.of(20)));
     awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
-    Schedule changedSchedule = Schedule.create(
-        SCHEDULE_HOURLY.id(), Partitioning.HOURS, of("busybox:v777"),
+    WorkflowConfiguration changedWorkflowConfiguration = WorkflowConfiguration.create(
+        WORKFLOW_CONFIGURATION_HOURLY.id(), Partitioning.HOURS, of("busybox:v777"),
         of(asList("other", "args")), empty(), empty(), emptyList());
 
     Workflow changedWorkflow = Workflow.create(
         HOURLY_WORKFLOW.componentId(),
         TestData.WORKFLOW_URI,
-        changedSchedule);
+        changedWorkflowConfiguration);
 
     workflowChanges(changedWorkflow);
 

@@ -24,7 +24,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableMap;
-import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.testdata.TestData;
 import java.io.IOException;
@@ -42,8 +42,8 @@ public class JsonRoundtripTest {
 
   @Test
   public void testRoundtripSchedule() throws Exception {
-    Schedule before = TestData.FULL_DATA_SCHEDULE;
-    Schedule after = roundtrip(before, Schedule.class);
+    WorkflowConfiguration before = TestData.FULL_DATA_WORKFLOW_CONFIGURATION;
+    WorkflowConfiguration after = roundtrip(before, WorkflowConfiguration.class);
     assertThat(after, is(before));
   }
 
@@ -64,7 +64,7 @@ public class JsonRoundtripTest {
   public void testLegacyPartitioningSupport() throws Exception {
     for (Map.Entry<String, Partitioning> testCase : LEGACY_PARTITIONING_TESTS.entrySet()) {
       String json = "{\"id\":\"styx.TestWeekly\",\"schedule\":\"" + testCase.getKey() + "\"}";
-      Schedule after = roundtrip(json, Schedule.class);
+      WorkflowConfiguration after = roundtrip(json, WorkflowConfiguration.class);
       assertThat(after.schedule(), is(testCase.getValue()));
     }
   }
