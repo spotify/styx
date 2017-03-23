@@ -48,7 +48,7 @@ public interface Backfill {
   Instant nextTrigger();
 
   @JsonProperty
-  Partitioning schedule();
+  Schedule schedule();
 
   @JsonProperty
   boolean allTriggered();

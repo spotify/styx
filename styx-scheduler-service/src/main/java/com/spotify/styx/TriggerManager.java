@@ -26,7 +26,7 @@ import static com.spotify.styx.util.ParameterUtil.truncateInstant;
 import static java.util.Objects.requireNonNull;
 
 import com.google.common.base.Throwables;
-import com.spotify.styx.model.Partitioning;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.monitoring.Stats;
@@ -89,8 +89,8 @@ public class TriggerManager {
     final Instant now = time.get();
     map.entrySet().forEach(entry -> {
       final Workflow workflow = entry.getKey();
-      final Partitioning partitioning = workflow.configuration().schedule();
-      final Instant next = entry.getValue().orElse(truncateInstant(now, partitioning));
+      final Schedule schedule = workflow.configuration().schedule();
+      final Instant next = entry.getValue().orElse(truncateInstant(now, schedule));
 
       if (next.isAfter(now)) {
         return;
@@ -101,7 +101,7 @@ public class TriggerManager {
           final CompletionStage<Void> processed = triggerListener.event(
               workflow,
               Trigger.natural(),
-              decrementInstant(next, partitioning));
+              decrementInstant(next, schedule));
           // Wait for the event to be processed before proceeding to the next trigger
           processed.toCompletableFuture().get();
         } catch (AlreadyInitializedException e) {
@@ -114,7 +114,7 @@ public class TriggerManager {
         stats.naturalTrigger();
       }
 
-      Instant nextNaturalTrigger = incrementInstant(next, partitioning);
+      Instant nextNaturalTrigger = incrementInstant(next, schedule);
       try {
         storage.updateNextNaturalTrigger(workflow.id(), nextNaturalTrigger);
       } catch (IOException e) {

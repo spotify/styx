@@ -47,7 +47,7 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Partitioning;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -240,7 +240,7 @@ public final class BackfillResource {
     final BackfillBuilder builder = Backfill.newBuilder();
 
     final String id = RandomGenerator.DEFAULT.generateUniqueId("backfill");
-    final Partitioning partitioning;
+    final Schedule schedule;
 
     final WorkflowId workflowId = WorkflowId.create(input.component(), input.workflow());
     final Set<WorkflowInstance> activeWorkflowInstances;
@@ -250,24 +250,24 @@ public final class BackfillResource {
       if (!workflowOpt.isPresent()) {
         return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("workflow not found"));
       }
-      partitioning = workflowOpt.get().configuration().schedule();
+      schedule = workflowOpt.get().configuration().schedule();
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }
 
-    if (truncateInstant(input.start(), partitioning) != input.start()) {
+    if (truncateInstant(input.start(), schedule) != input.start()) {
       return Response.forStatus(
           Status.BAD_REQUEST.withReasonPhrase("start parameter not aligned with schedule"));
     }
 
-    if (truncateInstant(input.end(), partitioning) != input.end()) {
+    if (truncateInstant(input.end(), schedule) != input.end()) {
       return Response.forStatus(
           Status.BAD_REQUEST.withReasonPhrase("end parameter not aligned with schedule"));
     }
 
     final List<WorkflowInstance> alreadyActive =
-        rangeOfInstants(input.start(), input.end(), partitioning).stream()
-            .map(instant -> WorkflowInstance.create(workflowId, toParameter(partitioning, instant)))
+        rangeOfInstants(input.start(), input.end(), schedule).stream()
+            .map(instant -> WorkflowInstance.create(workflowId, toParameter(schedule, instant)))
             .filter(activeWorkflowInstances::contains)
             .collect(toList());
 
@@ -287,7 +287,7 @@ public final class BackfillResource {
         .concurrency(input.concurrency())
         .start(input.start())
         .end(input.end())
-        .schedule(partitioning)
+        .schedule(schedule)
         .nextTrigger(input.start())
         .halted(false);
 

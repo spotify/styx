@@ -108,7 +108,7 @@ To define a schedule, simply write a  yaml file to `/etc/styx` (given the above 
 ```yaml
 schedules:
   - id: my-workflow
-    partitioning: hours
+    schedule: hours
     docker_image: my-workflow:0.1
     docker_args: ['./run.sh', '{}']
 ```
@@ -118,7 +118,7 @@ schedules:
 - `schedule[].id` **string**: A unique identifier for the workflow (lower-case-hyphenated)
  - This identifier is used to refer to the workflow through the API.
 
-- `schedule[].partitioning` **string**: How often the workflow should be triggered
+- `schedule[].schedule` **string**: How often the workflow should be triggered
  - Allowed values are `hourly`, `daily`, `weekly`
   - *todo: support more intervals*
   - *todo: support cron syntax*
@@ -132,7 +132,7 @@ container. Any occurrences of the `"{}"` placeholder argument will be replaced w
 partition date or datehour. Note that it must be quoted in the yaml file in order no to be
 interpreted as an object.
 
-Example arguments for the supported partitioning values:
+Example arguments for the supported schedule values:
 ```
 - hourly - 2016-04-01T14, 2016-04-01T15, ... (UTC hours)
 - daily  - 2016-04-01,    2016-04-02,    ...

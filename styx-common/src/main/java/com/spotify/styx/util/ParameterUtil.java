@@ -25,7 +25,7 @@ import static java.time.temporal.ChronoField.MONTH_OF_YEAR;
 import static java.time.temporal.ChronoField.YEAR;
 
 import com.google.common.collect.Lists;
-import com.spotify.styx.model.Partitioning;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import java.time.Instant;
@@ -102,8 +102,8 @@ public final class ParameterUtil {
         ISO_LOCAL_DATE_HOUR.parse(dateHour)).atOffset(ZoneOffset.UTC));
   }
 
-  public static String toParameter(Partitioning partitioning, Instant instant) {
-    switch (partitioning) {
+  public static String toParameter(Schedule schedule, Instant instant) {
+    switch (schedule) {
       case DAYS:
       case WEEKS:
         return ParameterUtil.formatDate(instant);
@@ -113,41 +113,41 @@ public final class ParameterUtil {
         return ParameterUtil.formatMonth(instant);
 
       default:
-        throw new IllegalArgumentException("Unknown partitioning " + partitioning);
+        throw new IllegalArgumentException("Unknown schedule " + schedule);
     }
   }
 
   /**
-   * Given a {@link Workflow} with certain frequency / {@link Partitioning},
+   * Given a {@link Workflow} with certain frequency / {@link Schedule},
    * it returns an instant that is 1 {@link TemporalUnit} less.
-   * e.g. Given an instant '2016-10-10T15:00:000' and hourly {@link Partitioning}, the adjusted
+   * e.g. Given an instant '2016-10-10T15:00:000' and hourly {@link Schedule}, the adjusted
    * instant will return '2016-10-10T14:00:000'.
    *
    * @param instant The instant to adjust.
-   * @param partitioning The frequency unit to adjust the instant for.
+   * @param schedule The frequency unit to adjust the instant for.
    */
-  public static Instant decrementInstant(Instant instant, Partitioning partitioning) {
+  public static Instant decrementInstant(Instant instant, Schedule schedule) {
     LocalDateTime dateTime = LocalDateTime.ofInstant(instant, ZoneId.of(UTC.toString()));
-    dateTime = dateTime.minus(1, partitioningToTemporalUnit(partitioning));
+    dateTime = dateTime.minus(1, scheduleToTemporalUnit(schedule));
     Instant updatedInstant = dateTime.atZone(ZoneId.of(UTC.toString())).toInstant();
     return updatedInstant;
   }
 
   /**
-   * Increments an instant for an amount of 1 {@link Partitioning} unit.
+   * Increments an instant for an amount of 1 {@link Schedule} unit.
    */
-  public static Instant incrementInstant(Instant instant, Partitioning partitioning) {
+  public static Instant incrementInstant(Instant instant, Schedule schedule) {
     LocalDateTime dateTime = LocalDateTime.ofInstant(instant, ZoneId.of(UTC.toString()));
-    dateTime = dateTime.plus(1, partitioningToTemporalUnit(partitioning));
+    dateTime = dateTime.plus(1, scheduleToTemporalUnit(schedule));
     Instant updatedInstant = dateTime.atZone(ZoneId.of(UTC.toString())).toInstant();
     return updatedInstant;
   }
 
   /**
-   * Converts {@link Partitioning} to {@link ChronoUnit}.
+   * Converts {@link Schedule} to {@link ChronoUnit}.
    */
-  public static TemporalUnit partitioningToTemporalUnit(Partitioning partitioning) {
-    switch (partitioning) {
+  public static TemporalUnit scheduleToTemporalUnit(Schedule schedule) {
+    switch (schedule) {
       case HOURS:
         return ChronoUnit.HOURS;
       case DAYS:
@@ -157,16 +157,16 @@ public final class ParameterUtil {
       case MONTHS:
         return ChronoUnit.MONTHS;
       default:
-        throw new IllegalArgumentException("Partitioning not supported: " + partitioning);
+        throw new IllegalArgumentException("Schedule not supported: " + schedule);
     }
   }
 
   /**
-   * Truncates an instant based on partitioning, e.g. '2016-10-10T15:22:111' and partitioning HOURS,
+   * Truncates an instant based on schedule, e.g. '2016-10-10T15:22:111' and schedule HOURS,
    * the result would be '2016-10-10T15:00:000'.
    */
-  public static Instant truncateInstant(Instant instant, Partitioning partitioning) {
-    switch (partitioning) {
+  public static Instant truncateInstant(Instant instant, Schedule schedule) {
+    switch (schedule) {
       case HOURS:
         return instant.truncatedTo(ChronoUnit.HOURS);
       case DAYS:
@@ -181,21 +181,21 @@ public final class ParameterUtil {
         ZonedDateTime truncatedToMonth = instant.atZone(ZoneOffset.UTC).truncatedTo(ChronoUnit.DAYS).withDayOfMonth(1);
         return truncatedToMonth.toInstant();
       default:
-        throw new IllegalArgumentException("Partitioning not supported: " + partitioning);
+        throw new IllegalArgumentException("Schedule not supported: " + schedule);
     }
   }
 
   /**
    * Generates a list of {@link Instant}s obtained by partitioning a time range defined by a
-   * starting and a ending {@link Instant}s, and based on the provided {@link Partitioning}.
+   * starting and a ending {@link Instant}s, and based on the provided {@link Schedule}.
    *
    * @param startInstant              Defines the start of the time range (inclusive)
    * @param endInstant                Defines the end of the time range (exclusive)
-   * @param partitioning              The partitioning unit to split the time range into
+   * @param schedule                  The schedule unit to split the time range into
    * @throws IllegalArgumentException If the starting {@link Instant} is later than the ending
    *                                  {@link Instant}
    */
-  public static List<Instant> rangeOfInstants(Instant startInstant, Instant endInstant, Partitioning partitioning) {
+  public static List<Instant> rangeOfInstants(Instant startInstant, Instant endInstant, Schedule schedule) {
     if (endInstant.isBefore(startInstant)) {
       throw new IllegalArgumentException("End time cannot be earlier the start time");
     }
@@ -204,7 +204,7 @@ public final class ParameterUtil {
     Instant instantToProcess = startInstant;
     while (instantToProcess.isBefore(endInstant)) {
       listOfInstants.add(instantToProcess);
-      instantToProcess = incrementInstant(instantToProcess, partitioning);
+      instantToProcess = incrementInstant(instantToProcess, schedule);
     }
 
     return listOfInstants;
@@ -212,8 +212,8 @@ public final class ParameterUtil {
 
   public static Either<String, Instant> instantFromWorkflowInstance(
       WorkflowInstance workflowInstance,
-      Partitioning partitioning) {
-    switch (partitioning) {
+      Schedule schedule) {
+    switch (schedule) {
       case HOURS:
         try {
           final LocalDateTime localDateTime = LocalDateTime.parse(
@@ -221,7 +221,7 @@ public final class ParameterUtil {
               DateTimeFormatter.ofPattern(HOUR_PATTERN));
           return Either.right(localDateTime.toInstant(UTC));
         } catch (DateTimeParseException e) {
-          return Either.left(parseErrorMessage(partitioning, HOUR_PATTERN));
+          return Either.left(parseErrorMessage(schedule, HOUR_PATTERN));
         }
 
       case DAYS:
@@ -231,7 +231,7 @@ public final class ParameterUtil {
               DateTimeFormatter.ofPattern(DAY_PATTERN));
           return Either.right(localDate.atStartOfDay().toInstant(UTC));
         } catch (DateTimeParseException e) {
-          return Either.left(parseErrorMessage(partitioning, DAY_PATTERN));
+          return Either.left(parseErrorMessage(schedule, DAY_PATTERN));
         }
 
       case WEEKS:
@@ -243,18 +243,18 @@ public final class ParameterUtil {
           localDate = localDate.minusDays(daysToSubtract - 1);
           return Either.right(localDate.atStartOfDay().toInstant(UTC));
         } catch (DateTimeParseException e) {
-          return Either.left(parseErrorMessage(partitioning, DAY_PATTERN));
+          return Either.left(parseErrorMessage(schedule, DAY_PATTERN));
         }
 
       default:
-        return Either.left("Partitioning not supported: " + partitioning);
+        return Either.left("Schedule not supported: " + schedule);
     }
   }
 
-  private static String parseErrorMessage(Partitioning partitioning, String pattern) {
+  private static String parseErrorMessage(Schedule schedule, String pattern) {
     return String.format(
-        "Cannot parse time parameter. Expected partitioning is %s: %s",
-        partitioning,
+        "Cannot parse time parameter. Expected schedule is %s: %s",
+        schedule,
         pattern);
   }
 }

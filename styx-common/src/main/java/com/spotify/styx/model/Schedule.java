@@ -24,8 +24,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Locale;
 
-// TODO change class name
-public enum Partitioning {
+public enum Schedule {
   HOURS, DAYS, WEEKS, MONTHS;
 
   @JsonValue
@@ -34,9 +33,9 @@ public enum Partitioning {
   }
 
   @JsonCreator
-  public static Partitioning fromJson(String json) {
-    final String upperCasePartitioning = json.toUpperCase(Locale.US);
-    switch (upperCasePartitioning) {
+  public static Schedule fromJson(String json) {
+    final String upperCaseSchedule = json.toUpperCase(Locale.US);
+    switch (upperCaseSchedule) {
       case "DAILY":
         return DAYS;
       case "HOURLY":
@@ -47,7 +46,7 @@ public enum Partitioning {
         return MONTHS;
 
       default:
-        return valueOf(upperCasePartitioning);
+        return valueOf(upperCaseSchedule);
     }
   }
 }

@@ -42,8 +42,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -621,7 +621,7 @@ class DatastoreStorage {
         .workflowId(workflowId)
         .concurrency((int) entity.getLong(PROPERTY_CONCURRENCY))
         .nextTrigger(datetimeToInstant(entity.getDateTime(PROPERTY_NEXT_TRIGGER)))
-        .schedule(Partitioning.valueOf(entity.getString(PROPERTY_SCHEDULE)))
+        .schedule(Schedule.valueOf(entity.getString(PROPERTY_SCHEDULE)))
         .allTriggered(entity.getBoolean(PROPERTY_ALL_TRIGGERED))
         .halted(entity.getBoolean(PROPERTY_HALTED))
         .build();

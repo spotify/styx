@@ -35,7 +35,7 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
             "endpoint_id": "LuigiCanary",
             "component_uri": "file:///etc/styx/schedule.yaml",
             "schedule": {
-                "partitioning": "hourly",
+                "schedule": "hourly",
                 "docker_args": [
                   "luigi",
                   "--module",

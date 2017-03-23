@@ -20,10 +20,10 @@
 
 package com.spotify.styx.testdata;
 
-import static com.spotify.styx.model.Partitioning.DAYS;
-import static com.spotify.styx.model.Partitioning.HOURS;
-import static com.spotify.styx.model.Partitioning.MONTHS;
-import static com.spotify.styx.model.Partitioning.WEEKS;
+import static com.spotify.styx.model.Schedule.DAYS;
+import static com.spotify.styx.model.Schedule.HOURS;
+import static com.spotify.styx.model.Schedule.MONTHS;
+import static com.spotify.styx.model.Schedule.WEEKS;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;

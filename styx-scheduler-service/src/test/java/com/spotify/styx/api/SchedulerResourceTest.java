@@ -244,14 +244,14 @@ public class SchedulerResourceTest {
   }
 
   @Test
-  public void testTriggerWorkflowInstanceUnsupportedPartitioning() throws Exception {
+  public void testTriggerWorkflowInstanceUnsupportedSchedule() throws Exception {
     storage.storeWorkflow(MONTHLY_WORKFLOW);
     WorkflowInstance toTrigger = WorkflowInstance.create(MONTHLY_WORKFLOW.id(), "2014-12");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
     assertThat(response.status(),
-               is(Status.BAD_REQUEST.withReasonPhrase("Partitioning not supported: MONTHS")));
+               is(Status.BAD_REQUEST.withReasonPhrase("Schedule not supported: MONTHS")));
     assertThat(triggeredWorkflow, isEmpty());
     assertThat(triggeredInstant, isEmpty());
   }
@@ -278,7 +278,7 @@ public class SchedulerResourceTest {
 
     assertThat(response.status(),
                is(Status.BAD_REQUEST.withReasonPhrase("Cannot parse time parameter. "
-                                                      + "Expected partitioning is HOURS: yyyy-MM-dd'T'HH")));
+                                                      + "Expected schedule is HOURS: yyyy-MM-dd'T'HH")));
     assertThat(triggeredWorkflow, isEmpty());
     assertThat(triggeredInstant, isEmpty());
   }
@@ -292,7 +292,7 @@ public class SchedulerResourceTest {
 
     assertThat(response.status(),
                is(Status.BAD_REQUEST.withReasonPhrase("Cannot parse time parameter. "
-                                                      + "Expected partitioning is DAYS: yyyy-MM-dd")));
+                                                      + "Expected schedule is DAYS: yyyy-MM-dd")));
     assertThat(triggeredWorkflow, isEmpty());
     assertThat(triggeredInstant, isEmpty());
   }

@@ -33,8 +33,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.io.Closer;
 import com.google.common.io.Resources;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.WorkflowConfiguration;
-import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.schedule.ScheduleSource;
 import com.typesafe.config.Config;
@@ -201,7 +201,7 @@ public class LocalFileScheduleSourceTest {
         testPath.toUri(),
         WorkflowConfiguration.create(
             "foo",
-            Partitioning.HOURS,
+            Schedule.HOURS,
             empty(),
             Optional.of(emptyList()),
             empty(),
@@ -216,7 +216,7 @@ public class LocalFileScheduleSourceTest {
         testPath.toUri(),
         WorkflowConfiguration.create(
             "foo",
-            Partitioning.DAYS,
+            Schedule.DAYS,
             empty(),
             Optional.of(singletonList("foo")),
             empty(),
@@ -231,7 +231,7 @@ public class LocalFileScheduleSourceTest {
         testPath.toUri(),
         WorkflowConfiguration.create(
             "foo",
-            Partitioning.HOURS,
+            Schedule.HOURS,
             empty(),
             Optional.of(Arrays.asList("foo", "bar")),
             empty(),
@@ -246,7 +246,7 @@ public class LocalFileScheduleSourceTest {
         testPath.toUri(),
         WorkflowConfiguration.create(
             "bar",
-            Partitioning.DAYS,
+            Schedule.DAYS,
             empty(),
             Optional.of(Arrays.asList("baz", "bax")),
             empty(),

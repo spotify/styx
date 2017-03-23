@@ -24,8 +24,8 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableMap;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.WorkflowConfiguration;
-import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.testdata.TestData;
 import java.io.IOException;
 import java.util.Map;
@@ -47,22 +47,22 @@ public class JsonRoundtripTest {
     assertThat(after, is(before));
   }
 
-  private static final Map<String, Partitioning> LEGACY_PARTITIONING_TESTS =
-      ImmutableMap.<String, Partitioning>builder()
-          .put("hourly", Partitioning.HOURS)
-          .put("HOURLY", Partitioning.HOURS)
-          .put("hOuRlY", Partitioning.HOURS)
-          .put("weekly", Partitioning.WEEKS)
-          .put("WEEKLY", Partitioning.WEEKS)
-          .put("wEeKlY", Partitioning.WEEKS)
-          .put("daily", Partitioning.DAYS)
-          .put("DAILY", Partitioning.DAYS)
-          .put("dAiLy", Partitioning.DAYS)
+  private static final Map<String, Schedule> LEGACY_SCHEDULE_TESTS =
+      ImmutableMap.<String, Schedule>builder()
+          .put("hourly", Schedule.HOURS)
+          .put("HOURLY", Schedule.HOURS)
+          .put("hOuRlY", Schedule.HOURS)
+          .put("weekly", Schedule.WEEKS)
+          .put("WEEKLY", Schedule.WEEKS)
+          .put("wEeKlY", Schedule.WEEKS)
+          .put("daily", Schedule.DAYS)
+          .put("DAILY", Schedule.DAYS)
+          .put("dAiLy", Schedule.DAYS)
           .build();
 
   @Test
-  public void testLegacyPartitioningSupport() throws Exception {
-    for (Map.Entry<String, Partitioning> testCase : LEGACY_PARTITIONING_TESTS.entrySet()) {
+  public void testLegacyScheduleSupport() throws Exception {
+    for (Map.Entry<String, Schedule> testCase : LEGACY_SCHEDULE_TESTS.entrySet()) {
       String json = "{\"id\":\"styx.TestWeekly\",\"schedule\":\"" + testCase.getKey() + "\"}";
       WorkflowConfiguration after = roundtrip(json, WorkflowConfiguration.class);
       assertThat(after.schedule(), is(testCase.getValue()));

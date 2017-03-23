@@ -52,7 +52,7 @@ import com.spotify.apollo.test.response.Responses;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Partitioning;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
@@ -97,7 +97,7 @@ public class BackfillResourceTest extends VersionedApiTest {
       .workflowId(WorkflowId.create("component", "workflow1"))
       .concurrency(1)
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
-      .schedule(Partitioning.HOURS)
+      .schedule(Schedule.HOURS)
       .build();
 
   private static final Backfill BACKFILL_2 = Backfill.newBuilder()
@@ -107,7 +107,7 @@ public class BackfillResourceTest extends VersionedApiTest {
       .workflowId(WorkflowId.create("component", "workflow2"))
       .concurrency(2)
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
-      .schedule(Partitioning.DAYS)
+      .schedule(Schedule.DAYS)
       .build();
 
   private static final Backfill BACKFILL_3 = Backfill.newBuilder()
@@ -117,7 +117,7 @@ public class BackfillResourceTest extends VersionedApiTest {
       .workflowId(WorkflowId.create("other_component", "other_workflow"))
       .concurrency(2)
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
-      .schedule(Partitioning.DAYS)
+      .schedule(Schedule.DAYS)
       .build();
 
   public BackfillResourceTest(Api.Version version) {
@@ -148,17 +148,17 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void setUp() throws Exception {
     storage.storeWorkflow(Workflow.create(
         BACKFILL_1.workflowId().componentId(), URI.create("http://example.com"),
-        WorkflowConfiguration.create(BACKFILL_1.workflowId().id(), Partitioning.HOURS,
+        WorkflowConfiguration.create(BACKFILL_1.workflowId().id(), Schedule.HOURS,
                                      Optional.empty(), Optional.empty(), Optional.empty(),
                                      Optional.empty(), Collections.emptyList())));
     storage.storeWorkflow(Workflow.create(
         BACKFILL_2.workflowId().componentId(), URI.create("http://example.com"),
-        WorkflowConfiguration.create(BACKFILL_2.workflowId().id(), Partitioning.HOURS,
+        WorkflowConfiguration.create(BACKFILL_2.workflowId().id(), Schedule.HOURS,
                                      Optional.empty(), Optional.empty(), Optional.empty(),
                                      Optional.empty(), Collections.emptyList())));
     storage.storeWorkflow(Workflow.create(
         BACKFILL_3.workflowId().componentId(), URI.create("http://example.com"),
-        WorkflowConfiguration.create(BACKFILL_3.workflowId().id(), Partitioning.HOURS,
+        WorkflowConfiguration.create(BACKFILL_3.workflowId().id(), Schedule.HOURS,
                                      Optional.empty(), Optional.empty(), Optional.empty(),
                                      Optional.empty(), Collections.emptyList())));
     storage.storeBackfill(BACKFILL_1);
@@ -347,7 +347,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(postedBackfill.workflowId(), equalTo(WorkflowId.create("component", "workflow2")));
     assertThat(postedBackfill.concurrency(), equalTo(1));
     assertThat(postedBackfill.nextTrigger(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
-    assertThat(postedBackfill.schedule(), equalTo(Partitioning.HOURS));
+    assertThat(postedBackfill.schedule(), equalTo(Schedule.HOURS));
     assertThat(postedBackfill.allTriggered(), equalTo(false));
     assertThat(postedBackfill.halted(), equalTo(false));
   }
