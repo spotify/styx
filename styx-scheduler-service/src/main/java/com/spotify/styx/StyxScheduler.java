@@ -498,7 +498,7 @@ public class StyxScheduler implements AppInit {
     final Gauge<Long> dockerTerminationLoggingEnabledWorkflowsCount =
         () -> workflowCache.all().stream()
             .filter(WorkflowValidator::hasDockerConfiguration)
-            .filter((workflow) -> workflow.schedule().dockerTerminationLogging())
+            .filter((workflow) -> workflow.configuration().dockerTerminationLogging())
             .count();
 
     Arrays.stream(RunState.State.values()).forEach(state -> stats.registerActiveStates(
@@ -532,8 +532,8 @@ public class StyxScheduler implements AppInit {
         storage.storeWorkflow(workflow);
 
         // update nextNaturalTrigger only when partitioning specification changes.
-        final Partitioning partitioning = workflow.schedule().schedule();
-        if (optWorkflow.isPresent() && !optWorkflow.get().schedule().schedule()
+        final Partitioning partitioning = workflow.configuration().schedule();
+        if (optWorkflow.isPresent() && !optWorkflow.get().configuration().schedule()
             .equals(partitioning)) {
           final Instant nextNaturalTrigger =
               incrementInstant(truncateInstant(time.get(), partitioning),

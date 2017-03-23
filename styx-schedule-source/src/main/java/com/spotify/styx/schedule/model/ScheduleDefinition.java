@@ -24,27 +24,27 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.WorkflowConfiguration;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 
 /**
- * Mainly a list of {@link Schedule}s
+ * Mainly a list of {@link WorkflowConfiguration}s
  */
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
 public abstract class ScheduleDefinition {
 
   @JsonProperty
-  public abstract List<Schedule> schedules();
+  public abstract List<WorkflowConfiguration> workflowConfigurations();
 
   @JsonCreator
   public static ScheduleDefinition create(
-      @JsonProperty("workflows") @Nullable List<Schedule> schedules) {
-    if (schedules == null) {
-      schedules = Collections.emptyList();
+      @JsonProperty("workflows") @Nullable List<WorkflowConfiguration> workflowConfigurations) {
+    if (workflowConfigurations == null) {
+      workflowConfigurations = Collections.emptyList();
     }
-    return new AutoValue_ScheduleDefinition(schedules);
+    return new AutoValue_ScheduleDefinition(workflowConfigurations);
   }
 }

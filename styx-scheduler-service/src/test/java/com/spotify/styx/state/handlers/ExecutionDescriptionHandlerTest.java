@@ -32,7 +32,7 @@ import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.Lists;
-import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
@@ -139,8 +139,8 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldHaltIfMissingDockerArgs() throws Exception {
-    Schedule schedule = TestData.DAILY_SCHEDULE;
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
+    WorkflowConfiguration workflowConfiguration = TestData.DAILY_WORKFLOW_CONFIGURATION;
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
@@ -154,8 +154,8 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldHaltIfMissingDockerImage() throws Exception {
-    Schedule schedule = schedule("foo", "bar");
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
+    WorkflowConfiguration workflowConfiguration = schedule("foo", "bar");
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
@@ -169,7 +169,7 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldFallbackToDockerImageInScheduleDefinition() throws Exception {
-    Schedule schedule = Schedule.create(
+    WorkflowConfiguration workflowConfiguration = WorkflowConfiguration.create(
         "styx.TestEndpoint",
         HOURS,
         Optional.of("legacy-docker-image"),
@@ -177,7 +177,7 @@ public class ExecutionDescriptionHandlerTest {
         empty(),
         empty(),
         emptyList());
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
@@ -193,8 +193,8 @@ public class ExecutionDescriptionHandlerTest {
     assertThat(data.executionDescription().get().dockerImage(), is("legacy-docker-image"));
   }
 
-  private Schedule schedule(String... args) {
-    return Schedule.create(
+  private WorkflowConfiguration schedule(String... args) {
+    return WorkflowConfiguration.create(
         "styx.TestEndpoint",
         HOURS,
         Optional.empty(),

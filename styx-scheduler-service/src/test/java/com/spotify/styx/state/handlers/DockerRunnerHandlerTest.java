@@ -40,7 +40,7 @@ import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
-import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Workflow;
@@ -214,8 +214,8 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldPerformCleanupOnFailed() throws Exception {
-    Schedule schedule = schedule("--date", "{}", "--bar");
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
+    WorkflowConfiguration workflowConfiguration = schedule("--date", "{}", "--bar");
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.FAILED,
         StateData.newBuilder().executionId(TEST_EXECUTION_ID).build());
@@ -228,8 +228,8 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldPerformCleanupOnFailedThroughTransitions() throws Exception {
-    Schedule schedule = schedule("--date", "{}", "--bar");
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
+    WorkflowConfiguration workflowConfiguration = schedule("--date", "{}", "--bar");
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.NEW, dockerRunnerHandler);
 
@@ -242,8 +242,8 @@ public class DockerRunnerHandlerTest {
     verify(dockerRunner).cleanup(TEST_EXECUTION_ID);
   }
 
-  private Schedule schedule(String... args) {
-    return Schedule.create(
+  private WorkflowConfiguration schedule(String... args) {
+    return WorkflowConfiguration.create(
         "styx.TestEndpoint",
         HOURS,
         Optional.of(TEST_DOCKER_IMAGE),

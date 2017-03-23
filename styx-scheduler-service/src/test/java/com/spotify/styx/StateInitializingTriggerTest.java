@@ -36,7 +36,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
@@ -74,9 +74,9 @@ public class StateInitializingTriggerTest {
 
   @Test
   public void shouldInitializeWorkflowInstance() throws Exception {
-    Schedule schedule = schedule(HOURS);
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
-    setDockerImage(workflow.id(), workflow.schedule());
+    WorkflowConfiguration workflowConfiguration = schedule(HOURS);
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    setDockerImage(workflow.id(), workflow.configuration());
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
     assertThat(stateManager.activeStatesSize(), is(1));
@@ -84,9 +84,9 @@ public class StateInitializingTriggerTest {
 
   @Test
   public void shouldInjectTriggerExecutionEventWithNaturalTrigger() throws Exception {
-    Schedule schedule = schedule(HOURS);
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
-    setDockerImage(workflow.id(), workflow.schedule());
+    WorkflowConfiguration workflowConfiguration = schedule(HOURS);
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    setDockerImage(workflow.id(), workflow.configuration());
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
     WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(), "2016-01-18T09");
@@ -99,9 +99,9 @@ public class StateInitializingTriggerTest {
 
   @Test
   public void shouldInjectTriggerExecutionEventWithBackfillTrigger() throws Exception {
-    Schedule schedule = schedule(HOURS);
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
-    setDockerImage(workflow.id(), workflow.schedule());
+    WorkflowConfiguration workflowConfiguration = schedule(HOURS);
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    setDockerImage(workflow.id(), workflow.configuration());
     trigger.event(workflow, BACKFILL_TRIGGER, TIME);
 
     WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(), "2016-01-18T09");
@@ -114,8 +114,8 @@ public class StateInitializingTriggerTest {
 
   @Test
   public void shouldDoNothingIfDockerInfoMissing() throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, TestData.DAILY_SCHEDULE);
-    setDockerImage(workflow.id(), workflow.schedule());
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, TestData.DAILY_WORKFLOW_CONFIGURATION);
+    setDockerImage(workflow.id(), workflow.configuration());
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
     assertThat(stateManager.activeStatesSize(), is(0));
@@ -124,9 +124,10 @@ public class StateInitializingTriggerTest {
   @Test
   public void shouldCreateWorkflowInstanceParameter() throws Exception {
     for (Map.Entry<Partitioning, String> partitioningCase : PARTITIONING_ARG_EXPECTS.entrySet()) {
-      Schedule schedule = schedule(partitioningCase.getKey(), "--date", "{}", "--bar");
-      Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule);
-      setDockerImage(workflow.id(), workflow.schedule());
+      WorkflowConfiguration
+          workflowConfiguration = schedule(partitioningCase.getKey(), "--date", "{}", "--bar");
+      Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+      setDockerImage(workflow.id(), workflow.configuration());
       trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
       RunState runState =
@@ -142,8 +143,8 @@ public class StateInitializingTriggerTest {
     assertThat(PARTITIONING_ARG_EXPECTS.keySet(), is(Sets.newHashSet(Partitioning.values())));
   }
 
-  private Schedule schedule(Partitioning partitioning, String... args) {
-    return Schedule.create(
+  private WorkflowConfiguration schedule(Partitioning partitioning, String... args) {
+    return WorkflowConfiguration.create(
         "styx.TestEndpoint",
         partitioning,
         Optional.of("busybox"),
@@ -154,7 +155,7 @@ public class StateInitializingTriggerTest {
   }
 
   // todo: do not use deprecated getDockerImage method
-  private void setDockerImage(WorkflowId workflowId, Schedule schedule) throws IOException {
-    when(storage.getDockerImage(workflowId)).thenReturn(schedule.dockerImage());
+  private void setDockerImage(WorkflowId workflowId, WorkflowConfiguration workflowConfiguration) throws IOException {
+    when(storage.getDockerImage(workflowId)).thenReturn(workflowConfiguration.dockerImage());
   }
 }

@@ -30,8 +30,8 @@ import static java.util.Optional.empty;
 import static java.util.Optional.of;
 
 import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.Schedule;
-import com.spotify.styx.model.Schedule.Secret;
+import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import java.net.URI;
@@ -55,24 +55,24 @@ public final class TestData {
   public static final WorkflowInstance WORKFLOW_INSTANCE =
       WorkflowInstance.create(WORKFLOW_ID, "2016-09-01");
 
-  public static final Schedule HOURLY_SCHEDULE =
-      Schedule.create(
+  public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION =
+      WorkflowConfiguration.create(
           "styx.TestEndpoint", HOURS, empty(), empty(), empty(), empty(), emptyList());
 
-  public static final Schedule DAILY_SCHEDULE =
-      Schedule.create(
+  public static final WorkflowConfiguration DAILY_WORKFLOW_CONFIGURATION =
+      WorkflowConfiguration.create(
           "styx.TestEndpoint", DAYS, empty(), empty(), empty(), empty(), emptyList());
 
-  public static final Schedule WEEKLY_SCHEDULE =
-      Schedule.create(
+  public static final WorkflowConfiguration WEEKLY_WORKFLOW_CONFIGURATION =
+      WorkflowConfiguration.create(
           "styx.TestEndpoint", WEEKS, empty(), empty(), empty(), empty(), emptyList());
 
-  public static final Schedule MONTHLY_SCHEDULE =
-      Schedule.create(
+  public static final WorkflowConfiguration MONTHLY_WORKFLOW_CONFIGURATION =
+      WorkflowConfiguration.create(
           "styx.TestEndpoint", MONTHS, empty(), empty(), empty(), empty(), emptyList());
 
-  public static final Schedule FULL_DATA_SCHEDULE =
-      Schedule.create(
+  public static final WorkflowConfiguration FULL_DATA_WORKFLOW_CONFIGURATION =
+      WorkflowConfiguration.create(
           "styx.TestEndpoint", DAYS, of("busybox"), of(asList("x", "y")), of(false),
           of(Secret.create("name", "/path")), emptyList());
 
@@ -81,6 +81,6 @@ public final class TestData {
           "busybox:1.1",
           Arrays.asList("foo", "bar"),
           false,
-          Optional.of(Schedule.Secret.create("secret", "/dev/null")),
+          Optional.of(WorkflowConfiguration.Secret.create("secret", "/dev/null")),
           Optional.of("00000ef508c1cb905e360590ce3e7e9193f6b370"));
 }

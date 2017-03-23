@@ -35,7 +35,7 @@ import java.util.Optional;
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Deprecated
-public abstract class Schedule {
+public abstract class WorkflowConfiguration {
 
   @JsonProperty
   public abstract String id();
@@ -66,7 +66,7 @@ public abstract class Schedule {
   public abstract List<String> resources();
 
   @JsonCreator
-  public static Schedule create(
+  public static WorkflowConfiguration create(
       @JsonProperty("id") String id,
       @JsonProperty("partitioning") Partitioning partitioning,
       @JsonProperty("docker_image") Optional<String> dockerImage,
@@ -75,26 +75,29 @@ public abstract class Schedule {
       @JsonProperty("secret") Optional<Secret> secret,
       @JsonProperty("resources") List<String> resources) {
 
-    return new AutoValue_Schedule(id, partitioning, dockerImage, dockerArgs,
+    return new AutoValue_WorkflowConfiguration(id, partitioning, dockerImage, dockerArgs,
         dockerTerminationLogging.orElse(false), secret,
         resources == null ? Collections.emptyList() : resources);
   }
 
-  public static com.spotify.styx.model.Schedule create(Schedule schedule) {
-    return com.spotify.styx.model.Schedule.create(schedule.id(), schedule.partitioning(),
-                                                  schedule.dockerImage(), schedule.dockerArgs(),
-                                                  Optional.of(schedule.dockerTerminationLogging()),
-                                                  Secret.create(schedule.secret()),
-                                                  schedule.resources());
+  public static com.spotify.styx.model.WorkflowConfiguration create(WorkflowConfiguration workflowConfiguration) {
+    return com.spotify.styx.model.WorkflowConfiguration
+        .create(workflowConfiguration.id(), workflowConfiguration.partitioning(),
+                workflowConfiguration.dockerImage(), workflowConfiguration.dockerArgs(),
+                Optional.of(workflowConfiguration.dockerTerminationLogging()),
+                Secret.create(workflowConfiguration.secret()),
+                workflowConfiguration.resources());
   }
 
-  public static Schedule create(com.spotify.styx.model.Schedule schedule) {
-    return Schedule.create(schedule.id(), schedule.schedule(),
-                           schedule.dockerImage(), schedule.dockerArgs(),
-                           Optional.of(schedule.dockerTerminationLogging()),
-                           schedule.secret()
-                               .map(s -> Secret.create(s.name(), s.mountPath())),
-                           schedule.resources());
+  public static WorkflowConfiguration create(
+      com.spotify.styx.model.WorkflowConfiguration workflowConfiguration) {
+    return WorkflowConfiguration
+        .create(workflowConfiguration.id(), workflowConfiguration.schedule(),
+                workflowConfiguration.dockerImage(), workflowConfiguration.dockerArgs(),
+                Optional.of(workflowConfiguration.dockerTerminationLogging()),
+                workflowConfiguration.secret()
+                    .map(s -> Secret.create(s.name(), s.mountPath())),
+                workflowConfiguration.resources());
   }
 
   @AutoValue
@@ -111,11 +114,13 @@ public abstract class Schedule {
     public static Secret create(
         @JsonProperty("name") String name,
         @JsonProperty("mount_path") String mountPath) {
-      return new AutoValue_Schedule_Secret(name, mountPath);
+      return new AutoValue_WorkflowConfiguration_Secret(name, mountPath);
     }
 
-    public static Optional<com.spotify.styx.model.Schedule.Secret> create(Optional<Secret> secret) {
-      return secret.map(s -> com.spotify.styx.model.Schedule.Secret.create(s.name(), s.mountPath()));
+    public static Optional<com.spotify.styx.model.WorkflowConfiguration.Secret> create(
+        Optional<Secret> secret) {
+      return secret.map(
+          s -> com.spotify.styx.model.WorkflowConfiguration.Secret.create(s.name(), s.mountPath()));
     }
   }
 }

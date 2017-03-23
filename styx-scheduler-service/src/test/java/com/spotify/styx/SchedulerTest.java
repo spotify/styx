@@ -42,7 +42,7 @@ import static org.mockito.Mockito.when;
 import com.google.api.client.repackaged.com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Resource;
@@ -94,7 +94,7 @@ public class SchedulerTest {
       .end(Instant.parse("2016-12-05T22:00:00Z"))
       .workflowId(WORKFLOW_ID1)
       .concurrency(2)
-      .partitioning(Partitioning.HOURS)
+      .schedule(Partitioning.HOURS)
       .nextTrigger(Instant.parse("2016-12-02T22:00:00Z"))
       .build();
 
@@ -104,7 +104,7 @@ public class SchedulerTest {
       .end(Instant.parse("2016-12-02T03:00:00Z"))
       .workflowId(WORKFLOW_ID1)
       .concurrency(3)
-      .partitioning(Partitioning.HOURS)
+      .schedule(Partitioning.HOURS)
       .nextTrigger(Instant.parse("2016-12-02T00:00:00Z"))
       .build();
 
@@ -160,7 +160,7 @@ public class SchedulerTest {
     return Workflow.create(
         id.componentId(),
         URI.create("http://example.com"),
-        Schedule.create(
+        WorkflowConfiguration.create(
             id.id(), Partitioning.HOURS, empty(), empty(), empty(), empty(),
             Arrays.asList(resources)));
   }
@@ -177,7 +177,7 @@ public class SchedulerTest {
 
     final List<Instant> instants =
         ParameterUtil.rangeOfInstants(BACKFILL_1.start(), BACKFILL_1.end(),
-                                      workflow.schedule().schedule());
+                                      workflow.configuration().schedule());
 
     instants.stream().limit(concurrency).forEach(
         instant ->
@@ -222,7 +222,7 @@ public class SchedulerTest {
     scheduler.tick();
 
     List<Instant> instants =
-        ParameterUtil.rangeOfInstants(BACKFILL_2.start(), BACKFILL_2.end(), BACKFILL_2.partitioning());
+        ParameterUtil.rangeOfInstants(BACKFILL_2.start(), BACKFILL_2.end(), BACKFILL_2.schedule());
     instants.forEach(
         instant ->
             verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_2.id()), instant));
@@ -308,7 +308,7 @@ public class SchedulerTest {
 
     final List<Instant> instants =
         ParameterUtil.rangeOfInstants(BACKFILL_1.start(), BACKFILL_1.end(),
-            workflow.schedule().schedule());
+            workflow.configuration().schedule());
 
     // Go through each expected trigger sequentially and verify that the next partition is not
     // triggered before the future for the previous partition trigger is completed

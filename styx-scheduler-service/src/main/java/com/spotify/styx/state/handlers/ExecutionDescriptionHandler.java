@@ -95,7 +95,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
     final Workflow workflow = workflowOpt.orElseThrow(
         () -> new ResourceNotFoundException(format("Missing %s, halting %s", workflowId, workflowInstance)));
 
-    final Optional<List<String>> dockerArgsOpt = workflow.schedule().dockerArgs();
+    final Optional<List<String>> dockerArgsOpt = workflow.configuration().dockerArgs();
     if (!dockerArgsOpt.isPresent()) {
       throw new ResourceNotFoundException(format("%s has no docker args, halting %s",
                                    workflowId, workflowInstance));
@@ -105,7 +105,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
 
     final Optional<String> dockerImageOpt = workflowState.dockerImage().isPresent()
         ? workflowState.dockerImage()
-        : workflow.schedule().dockerImage(); // backwards compatibility
+        : workflow.configuration().dockerImage(); // backwards compatibility
 
     if (!dockerImageOpt.isPresent()) {
       throw new ResourceNotFoundException(format("%s has no docker image, halting %s",
@@ -115,8 +115,8 @@ public class ExecutionDescriptionHandler implements OutputHandler {
     return ExecutionDescription.create(
         dockerImageOpt.get(),
         dockerArgsOpt.get(),
-        workflow.schedule().dockerTerminationLogging(),
-        workflow.schedule().secret(),
+        workflow.configuration().dockerTerminationLogging(),
+        workflow.configuration().secret(),
         workflowState.commitSha());
   }
 }

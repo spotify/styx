@@ -32,7 +32,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableList;
-import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.testdata.TestData;
 import io.fabric8.kubernetes.api.model.Container;
@@ -171,7 +171,7 @@ public class KubernetesDockerRunnerPodResourceTest {
 
   @Test
   public void shouldConfigureSecretsMount() throws Exception {
-    Schedule.Secret secret = Schedule.Secret.create("my-secret", "/etc/secrets");
+    WorkflowConfiguration.Secret secret = WorkflowConfiguration.Secret.create("my-secret", "/etc/secrets");
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.create(

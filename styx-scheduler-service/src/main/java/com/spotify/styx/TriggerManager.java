@@ -89,7 +89,7 @@ public class TriggerManager {
     final Instant now = time.get();
     map.entrySet().forEach(entry -> {
       final Workflow workflow = entry.getKey();
-      final Partitioning partitioning = workflow.schedule().schedule();
+      final Partitioning partitioning = workflow.configuration().schedule();
       final Instant next = entry.getValue().orElse(truncateInstant(now, partitioning));
 
       if (next.isAfter(now)) {

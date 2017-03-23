@@ -20,7 +20,7 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.testdata.TestData.FULL_DATA_SCHEDULE;
+import static com.spotify.styx.testdata.TestData.FULL_DATA_WORKFLOW_CONFIGURATION;
 import static java.time.temporal.ChronoUnit.DAYS;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -67,7 +67,7 @@ public class TriggerManagerTest {
   private static final Instant MANAGER_TIME_PLUS_DAY_TRUNCATED = Instant.parse("2016-10-11T00:00:00Z");
 
   private static Workflow WORKFLOW_DAILY =
-      Workflow.create("comp", URI.create("http:/foo"), FULL_DATA_SCHEDULE);
+      Workflow.create("comp", URI.create("http:/foo"), FULL_DATA_WORKFLOW_CONFIGURATION);
 
   @Mock
   Storage storage;

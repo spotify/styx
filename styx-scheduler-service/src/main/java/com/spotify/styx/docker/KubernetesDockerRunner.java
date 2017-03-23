@@ -33,7 +33,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Message;
@@ -172,7 +172,7 @@ class KubernetesDockerRunner implements DockerRunner {
             .withEnv(env);
 
     if (runSpec.secret().isPresent()) {
-      final Schedule.Secret secret = runSpec.secret().get();
+      final WorkflowConfiguration.Secret secret = runSpec.secret().get();
       spec = spec.addNewVolume()
           .withName(secret.name())
           .withNewSecret()

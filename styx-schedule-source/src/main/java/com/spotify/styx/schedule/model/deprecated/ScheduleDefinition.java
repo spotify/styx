@@ -24,14 +24,14 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import com.spotify.styx.model.deprecated.Schedule;
+import com.spotify.styx.model.deprecated.WorkflowConfiguration;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 /**
- * Mainly a list of {@link com.spotify.styx.model.Schedule}s
+ * Mainly a list of {@link com.spotify.styx.model.WorkflowConfiguration}s
  */
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -39,21 +39,21 @@ import javax.annotation.Nullable;
 public abstract class ScheduleDefinition {
 
   @JsonProperty
-  public abstract List<Schedule> schedules();
+  public abstract List<WorkflowConfiguration> workflowConfigurations();
 
   @JsonCreator
   public static ScheduleDefinition create(
-      @JsonProperty("data_endpoints") @Nullable List<Schedule> schedules) {
-    if (schedules == null) {
-      schedules = Collections.emptyList();
+      @JsonProperty("data_endpoints") @Nullable List<WorkflowConfiguration> workflowConfigurations) {
+    if (workflowConfigurations == null) {
+      workflowConfigurations = Collections.emptyList();
     }
-    return new AutoValue_ScheduleDefinition(schedules);
+    return new AutoValue_ScheduleDefinition(workflowConfigurations);
   }
 
   public static com.spotify.styx.schedule.model.ScheduleDefinition create(
       ScheduleDefinition scheduleDefinition) {
     return com.spotify.styx.schedule.model.ScheduleDefinition
-        .create(scheduleDefinition.schedules().stream().map(Schedule::create).collect(
+        .create(scheduleDefinition.workflowConfigurations().stream().map(WorkflowConfiguration::create).collect(
             Collectors.toList()));
   }
 }
