@@ -24,7 +24,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import com.spotify.styx.model.Schedule;
 import java.net.URI;
 
 @AutoValue
@@ -53,7 +52,7 @@ public abstract class Workflow {
   }
 
   public static Workflow create(com.spotify.styx.model.Workflow workflow) {
-    return new AutoValue_Workflow(workflow.componentId(), workflow.workflowId(),
-                                  workflow.componentUri(), workflow.schedule());
+    return create(workflow.componentId(), workflow.componentUri(),
+                  Schedule.create(workflow.schedule()));
   }
 }

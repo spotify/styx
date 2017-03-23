@@ -53,7 +53,7 @@ public abstract class WorkflowInstanceExecutionData {
 
   public static WorkflowInstanceExecutionData create(
       com.spotify.styx.model.data.WorkflowInstanceExecutionData workflowInstanceExecutionData) {
-    return new AutoValue_WorkflowInstanceExecutionData(
+    return create(
         WorkflowInstance.create(workflowInstanceExecutionData.workflowInstance()),
         workflowInstanceExecutionData.triggers());
   }

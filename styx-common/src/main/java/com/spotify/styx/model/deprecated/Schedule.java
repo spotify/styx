@@ -88,6 +88,15 @@ public abstract class Schedule {
                                                   schedule.resources());
   }
 
+  public static Schedule create(com.spotify.styx.model.Schedule schedule) {
+    return Schedule.create(schedule.id(), schedule.schedule(),
+                           schedule.dockerImage(), schedule.dockerArgs(),
+                           Optional.of(schedule.dockerTerminationLogging()),
+                           schedule.secret()
+                               .map(s -> Secret.create(s.name(), s.mountPath())),
+                           schedule.resources());
+  }
+
   @AutoValue
   @JsonIgnoreProperties(ignoreUnknown = true)
   public abstract static class Secret {

@@ -56,6 +56,6 @@ public abstract class WorkflowId {
   }
 
   public static WorkflowId create(com.spotify.styx.model.WorkflowId workflowId) {
-    return new AutoValue_WorkflowId(workflowId.componentId(), workflowId.id());
+    return create(workflowId.componentId(), workflowId.id());
   }
 }
