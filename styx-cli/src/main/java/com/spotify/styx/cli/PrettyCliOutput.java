@@ -36,7 +36,7 @@ import com.google.common.collect.Iterables;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.Partitioning;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
@@ -96,7 +96,7 @@ class PrettyCliOutput implements CliOutput {
 
   @Override
   public void printBackfill(Backfill backfill) {
-    final Partitioning partitioning = backfill.schedule();
+    final Schedule schedule = backfill.schedule();
     final WorkflowId workflowId = backfill.workflowId();
 
     System.out.println(String.format(BACKFILL_FORMAT,
@@ -104,9 +104,9 @@ class PrettyCliOutput implements CliOutput {
                                      backfill.halted(),
                                      backfill.allTriggered(),
                                      backfill.concurrency(),
-                                     toParameter(partitioning, backfill.start()),
-                                     toParameter(partitioning, backfill.end()),
-                                     toParameter(partitioning, backfill.nextTrigger()),
+                                     toParameter(schedule, backfill.start()),
+                                     toParameter(schedule, backfill.end()),
+                                     toParameter(schedule, backfill.nextTrigger()),
                                      workflowId.componentId(),
                                      workflowId.id()));
   }

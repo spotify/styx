@@ -39,7 +39,7 @@ public abstract class WorkflowConfiguration {
   public abstract String id();
 
   @JsonProperty
-  public abstract Partitioning schedule();
+  public abstract Schedule schedule();
 
   @JsonProperty
   public abstract Optional<String> dockerImage();
@@ -66,7 +66,7 @@ public abstract class WorkflowConfiguration {
   @JsonCreator
   public static WorkflowConfiguration create(
       @JsonProperty("id") String id,
-      @JsonProperty("schedule") Partitioning schedule,
+      @JsonProperty("schedule") Schedule schedule,
       @JsonProperty("docker_image") Optional<String> dockerImage,
       @JsonProperty("docker_args") Optional<List<String>> dockerArgs,
       @JsonProperty("docker_termination_logging") Optional<Boolean> dockerTerminationLogging,

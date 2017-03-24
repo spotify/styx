@@ -21,10 +21,10 @@
 package com.spotify.styx;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
-import static com.spotify.styx.model.Partitioning.DAYS;
-import static com.spotify.styx.model.Partitioning.HOURS;
-import static com.spotify.styx.model.Partitioning.MONTHS;
-import static com.spotify.styx.model.Partitioning.WEEKS;
+import static com.spotify.styx.model.Schedule.DAYS;
+import static com.spotify.styx.model.Schedule.HOURS;
+import static com.spotify.styx.model.Schedule.MONTHS;
+import static com.spotify.styx.model.Schedule.WEEKS;
 import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.is;
@@ -37,7 +37,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.spotify.styx.model.WorkflowConfiguration;
-import com.spotify.styx.model.Partitioning;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -59,7 +59,7 @@ public class StateInitializingTriggerTest {
   private static final Trigger NATURAL_TRIGGER = Trigger.natural();
   private static final Trigger BACKFILL_TRIGGER = Trigger.backfill("trig");
 
-  private static final Map<Partitioning, String> PARTITIONING_ARG_EXPECTS =
+  private static final Map<Schedule, String> SCHEDULE_ARG_EXPECTS =
       ImmutableMap.of(
           WEEKS, "2016-01-18",
           DAYS, "2016-01-18",
@@ -123,30 +123,30 @@ public class StateInitializingTriggerTest {
 
   @Test
   public void shouldCreateWorkflowInstanceParameter() throws Exception {
-    for (Map.Entry<Partitioning, String> partitioningCase : PARTITIONING_ARG_EXPECTS.entrySet()) {
+    for (Map.Entry<Schedule, String> scheduleCase : SCHEDULE_ARG_EXPECTS.entrySet()) {
       WorkflowConfiguration
-          workflowConfiguration = schedule(partitioningCase.getKey(), "--date", "{}", "--bar");
+          workflowConfiguration = schedule(scheduleCase.getKey(), "--date", "{}", "--bar");
       Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
       setDockerImage(workflow.id(), workflow.configuration());
       trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
       RunState runState =
-          stateManager.get(WorkflowInstance.create(workflow.id(), partitioningCase.getValue()));
+          stateManager.get(WorkflowInstance.create(workflow.id(), scheduleCase.getValue()));
 
       assertThat(runState, is(notNullValue()));
-      assertThat(runState.workflowInstance().parameter(), is(partitioningCase.getValue()));
+      assertThat(runState.workflowInstance().parameter(), is(scheduleCase.getValue()));
     }
   }
 
   @Test
-  public void testsShouldCoverAllPartitioningCases() throws Exception {
-    assertThat(PARTITIONING_ARG_EXPECTS.keySet(), is(Sets.newHashSet(Partitioning.values())));
+  public void testsShouldCoverAllScheduleCases() throws Exception {
+    assertThat(SCHEDULE_ARG_EXPECTS.keySet(), is(Sets.newHashSet(Schedule.values())));
   }
 
-  private WorkflowConfiguration schedule(Partitioning partitioning, String... args) {
+  private WorkflowConfiguration schedule(Schedule schedule, String... args) {
     return WorkflowConfiguration.create(
         "styx.TestEndpoint",
-        partitioning,
+        schedule,
         Optional.of("busybox"),
         Optional.of(Lists.newArrayList(args)),
         empty(),

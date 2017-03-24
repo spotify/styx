@@ -21,8 +21,8 @@
 package com.spotify.styx.storage;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
-import static com.spotify.styx.model.Partitioning.DAYS;
-import static com.spotify.styx.model.Partitioning.HOURS;
+import static com.spotify.styx.model.Schedule.DAYS;
+import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.model.WorkflowState.patchDockerImage;
 import static com.spotify.styx.testdata.TestData.FULL_DATA_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;

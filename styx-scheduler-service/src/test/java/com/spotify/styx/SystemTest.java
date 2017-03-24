@@ -36,10 +36,10 @@ import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.Partitioning;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -56,10 +56,10 @@ import org.junit.Test;
 public class SystemTest extends StyxSchedulerServiceFixture {
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_HOURLY = WorkflowConfiguration.create(
-      "styx.TestEndpoint", Partitioning.HOURS, of("busybox"), of(asList("--hour", "{}")),
+      "styx.TestEndpoint", Schedule.HOURS, of("busybox"), of(asList("--hour", "{}")),
       empty(), empty(), emptyList());
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_DAILY = WorkflowConfiguration.create(
-      "styx.TestEndpoint", Partitioning.DAYS, of("busybox"), of(asList("--hour", "{}")),
+      "styx.TestEndpoint", Schedule.DAYS, of("busybox"), of(asList("--hour", "{}")),
       empty(), empty(), emptyList());
   private static final String TEST_EXECUTION_ID_1 = "execution_1";
   private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
@@ -83,7 +83,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       .workflowId(WorkflowId.create("styx", "styx.TestEndpoint"))
       .concurrency(2)
       .nextTrigger(Instant.parse("2015-01-01T00:00:00Z"))
-      .schedule(Partitioning.HOURS)
+      .schedule(Schedule.HOURS)
       .build();
 
   @Test
@@ -207,7 +207,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @Test
-  public void updatesNextNaturalTriggerWhenWFPartitioningChangesFromFinerToCoarser() throws Exception {
+  public void updatesNextNaturalTriggerWhenWFScheduleChangesFromFinerToCoarser() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
@@ -242,7 +242,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @Test
-  public void updatesNextNaturalTriggerWhenWFPartitioningChangesFromCoarserToFiner() throws Exception {
+  public void updatesNextNaturalTriggerWhenWFScheduleChangesFromCoarserToFiner() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(DAILY_WORKFLOW);
@@ -276,7 +276,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @Test
-  public void doesntUpdateNextNaturalTriggerWhenPartitioningDoesntChange() throws Exception {
+  public void doesntUpdateNextNaturalTriggerWhenScheduleDoesntChange() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(DAILY_WORKFLOW);
@@ -352,7 +352,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
     WorkflowConfiguration changedWorkflowConfiguration = WorkflowConfiguration.create(
-        WORKFLOW_CONFIGURATION_HOURLY.id(), Partitioning.HOURS, of("busybox:v777"),
+        WORKFLOW_CONFIGURATION_HOURLY.id(), Schedule.HOURS, of("busybox:v777"),
         of(asList("other", "args")), empty(), empty(), emptyList());
 
     Workflow changedWorkflow = Workflow.create(

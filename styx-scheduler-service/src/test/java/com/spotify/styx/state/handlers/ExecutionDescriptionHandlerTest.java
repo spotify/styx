@@ -21,7 +21,7 @@
 package com.spotify.styx.state.handlers;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
-import static com.spotify.styx.model.Partitioning.HOURS;
+import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.state.RunState.State.SUBMITTING;
 import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;

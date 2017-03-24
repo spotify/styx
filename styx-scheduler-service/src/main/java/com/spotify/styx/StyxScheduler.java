@@ -54,7 +54,7 @@ import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.WorkflowValidator;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Partitioning;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -531,13 +531,13 @@ public class StyxScheduler implements AppInit {
         Optional<Workflow> optWorkflow = storage.workflow(workflow.id());
         storage.storeWorkflow(workflow);
 
-        // update nextNaturalTrigger only when partitioning specification changes.
-        final Partitioning partitioning = workflow.configuration().schedule();
+        // update nextNaturalTrigger only when schedule specification changes.
+        final Schedule schedule = workflow.configuration().schedule();
         if (optWorkflow.isPresent() && !optWorkflow.get().configuration().schedule()
-            .equals(partitioning)) {
+            .equals(schedule)) {
           final Instant nextNaturalTrigger =
-              incrementInstant(truncateInstant(time.get(), partitioning),
-                  partitioning);
+              incrementInstant(truncateInstant(time.get(), schedule),
+                               schedule);
           storage.patchState(workflow.id(),
               WorkflowState.builder()
                   .nextNaturalTrigger(nextNaturalTrigger)

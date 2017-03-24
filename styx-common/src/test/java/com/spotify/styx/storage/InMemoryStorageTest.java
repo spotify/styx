@@ -20,7 +20,7 @@
 
 package com.spotify.styx.storage;
 
-import static com.spotify.styx.model.Partitioning.HOURS;
+import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
 import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;

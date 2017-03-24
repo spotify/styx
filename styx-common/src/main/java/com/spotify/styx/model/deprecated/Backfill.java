@@ -22,7 +22,7 @@ package com.spotify.styx.model.deprecated;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.spotify.styx.model.Partitioning;
+import com.spotify.styx.model.Schedule;
 import io.norberg.automatter.AutoMatter;
 import java.time.Instant;
 
@@ -50,7 +50,7 @@ public interface Backfill {
   Instant nextTrigger();
 
   @JsonProperty
-  Partitioning partitioning();
+  Schedule partitioning();
 
   @JsonProperty
   boolean allTriggered();

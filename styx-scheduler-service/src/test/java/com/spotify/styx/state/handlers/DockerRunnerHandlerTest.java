@@ -20,7 +20,7 @@
 
 package com.spotify.styx.state.handlers;
 
-import static com.spotify.styx.model.Partitioning.HOURS;
+import static com.spotify.styx.model.Schedule.HOURS;
 import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.contains;
@@ -166,7 +166,7 @@ public class DockerRunnerHandlerTest {
   }
 
   @Test
-  public void shouldInterpolatePartitioningArgument() throws Exception {
+  public void shouldInterpolateScheduleArgument() throws Exception {
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
