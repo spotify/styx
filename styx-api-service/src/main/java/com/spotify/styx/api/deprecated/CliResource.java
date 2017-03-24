@@ -36,6 +36,7 @@ import com.spotify.apollo.entity.JacksonEntityCodec;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
+import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.api.Api;
 import com.spotify.styx.api.EventsPayload;
 import com.spotify.styx.api.StatusResource;
@@ -45,6 +46,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Stream;
 import okio.ByteString;
@@ -113,7 +115,8 @@ public class CliResource {
     try {
       payload = Json.serialize(WorkflowInstance.create(workflowInstance));
     } catch (JsonProcessingException e) {
-      throw Throwables.propagate(e);
+      return CompletableFuture.completedFuture(
+          Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Bad json payload")));
     }
     final Request request = rc.request()
         .withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + TRIGGER_PATH)
