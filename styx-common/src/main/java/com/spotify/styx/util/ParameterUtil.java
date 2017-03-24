@@ -20,17 +20,20 @@
 
 package com.spotify.styx.util;
 
+import static com.spotify.styx.model.Schedule.WellKnown.MONTHLY;
+import static com.spotify.styx.model.Schedule.WellKnown.YEARLY;
+import static java.lang.Integer.parseInt;
 import static java.time.ZoneOffset.UTC;
+import static java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 import static java.time.temporal.ChronoField.MONTH_OF_YEAR;
-import static java.time.temporal.ChronoField.YEAR;
 
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Schedule;
-import com.spotify.styx.model.WorkflowInstance;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
@@ -38,23 +41,53 @@ import java.time.format.SignStyle;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import javaslang.control.Either;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Helpers for working with {@link com.spotify.styx.model.Workflow} parameter handling.
  */
 public final class ParameterUtil {
 
-  public static final String HOUR_PATTERN = "yyyy-MM-dd'T'HH";
-  public static final String DAY_PATTERN = "yyyy-MM-dd";
+  private static final Pattern YEAR_PATTERN = Pattern.compile("(\\d{4})(-\\d{2})?");
+  private static final Pattern YEAR_MONTH_PATTERN = Pattern.compile("(\\d{4})-(\\d{2})");
 
   private ParameterUtil() {
   }
 
   private static final int MIN_YEAR_WIDTH = 4;
   private static final int MAX_YEAR_WIDTH = 10;
+
+  private static final DateTimeFormatter DATE_HOUR_FORMAT = new DateTimeFormatterBuilder()
+      .append(DateTimeFormatter.ISO_LOCAL_DATE)
+      .optionalStart()
+      .appendLiteral('T')
+      .appendValue(ChronoField.HOUR_OF_DAY, 2)
+      .optionalStart()
+      .appendLiteral(':')
+      .appendValue(ChronoField.MINUTE_OF_HOUR, 2)
+      .optionalStart()
+      .appendLiteral(':')
+      .appendValue(ChronoField.SECOND_OF_MINUTE, 2)
+      .optionalStart()
+      .appendLiteral('.')
+      .appendValue(ChronoField.NANO_OF_SECOND, 1, 9, SignStyle.NORMAL)
+      .optionalEnd()
+      .optionalEnd()
+      .optionalEnd()
+      .optionalStart()
+      .appendZoneOrOffsetId()
+      .optionalEnd()
+      .optionalEnd()
+      .toFormatter()
+      .withZone(UTC);
+
+  private static final DateTimeFormatter ISO_LOCAL_YEAR = new DateTimeFormatterBuilder()
+      .appendValue(ChronoField.YEAR, MIN_YEAR_WIDTH, MAX_YEAR_WIDTH, SignStyle.EXCEEDS_PAD)
+      .toFormatter();
+
   private static final DateTimeFormatter ISO_LOCAL_MONTH = new DateTimeFormatterBuilder()
-      .appendValue(YEAR, MIN_YEAR_WIDTH, MAX_YEAR_WIDTH, SignStyle.EXCEEDS_PAD)
+      .appendValue(ChronoField.YEAR, MIN_YEAR_WIDTH, MAX_YEAR_WIDTH, SignStyle.EXCEEDS_PAD)
       .appendLiteral('-')
       .appendValue(MONTH_OF_YEAR, 2)
       .toFormatter();
@@ -85,6 +118,8 @@ public final class ParameterUtil {
         return formatDateHour(instant);
       case MONTHLY:
         return formatMonth(instant);
+      case YEARLY:
+        return formatYear(instant);
 
       default:
         return formatDateTime(instant);
@@ -116,72 +151,69 @@ public final class ParameterUtil {
     return listOfInstants;
   }
 
-  public static Either<String, Instant> instantFromWorkflowInstance(
-      WorkflowInstance workflowInstance,
-      Schedule schedule) {
-    switch (schedule.wellKnown()) {
-      case HOURLY:
-        try {
-          final LocalDateTime localDateTime = LocalDateTime.parse(
-              workflowInstance.parameter(),
-              DateTimeFormatter.ofPattern(HOUR_PATTERN));
-          return Either.right(localDateTime.toInstant(UTC));
-        } catch (DateTimeParseException e) {
-          return Either.left(parseErrorMessage(schedule, HOUR_PATTERN));
-        }
-      case DAILY:
-        try {
-          final LocalDate localDate = LocalDate.parse(
-              workflowInstance.parameter(),
-              DateTimeFormatter.ofPattern(DAY_PATTERN));
-          return Either.right(localDate.atStartOfDay().toInstant(UTC));
-        } catch (DateTimeParseException e) {
-          return Either.left(parseErrorMessage(schedule, DAY_PATTERN));
-        }
-      case WEEKLY:
-        try {
-          LocalDate localDate = LocalDate.parse(
-              workflowInstance.parameter(),
-              DateTimeFormatter.ofPattern(DAY_PATTERN));
-          int daysToSubtract = localDate.getDayOfWeek().getValue();
-          localDate = localDate.minusDays(daysToSubtract - 1);
-          return Either.right(localDate.atStartOfDay().toInstant(UTC));
-        } catch (DateTimeParseException e) {
-          return Either.left(parseErrorMessage(schedule, DAY_PATTERN));
-        }
+  public static Instant parseAlignedInstant(String dateHour, Schedule schedule) {
+    final Schedule.WellKnown wellKnown = schedule.wellKnown();
 
-      default:
-        return Either.left("Schedule not supported: " + schedule);
+    Matcher matcher;
+    ZonedDateTime parsed;
+    if (wellKnown == YEARLY && (matcher = YEAR_PATTERN.matcher(dateHour)).matches()) {
+      parsed = LocalDate.of(parseInt(matcher.group(1)), 1, 1).atStartOfDay(UTC);
+    } else if (wellKnown == MONTHLY && (matcher = YEAR_MONTH_PATTERN.matcher(dateHour)).matches()) {
+      parsed = LocalDate.of(parseInt(matcher.group(1)), parseInt(matcher.group(2)), 1).atStartOfDay(UTC);
+    } else {
+      parsed = tryParseDateHour(dateHour);
+    }
+
+    final Instant instant = parsed.toInstant();
+
+    // test alignment
+    if (!TimeUtil.isAligned(instant, schedule)) {
+      return TimeUtil.lastInstant(instant, schedule);
+    } else {
+      return instant;
     }
   }
 
-  static String formatDateTime(Instant instant) {
-    return DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(
-        instant.truncatedTo(ChronoUnit.SECONDS)
+  private static ZonedDateTime tryParseDateHour(String dateTime) {
+    try {
+      try {
+        return ZonedDateTime.parse(dateTime, DATE_HOUR_FORMAT);
+      } catch (DateTimeParseException ignore) {
+        return LocalDate.parse(dateTime, DATE_HOUR_FORMAT).atStartOfDay(UTC);
+      }
+    } catch (DateTimeParseException e) {
+      throw new IllegalArgumentException(
+          "Cannot parse time parameter " + dateTime + " - " + e.getMessage(),
+          e);
+    }
+  }
+
+  private static String formatDateTime(Instant instant) {
+    return ISO_OFFSET_DATE_TIME.format(
+        instant.truncatedTo(ChronoUnit.MINUTES)
             .atOffset(UTC));
   }
 
-  static String formatDate(Instant instant) {
+  private static String formatDate(Instant instant) {
     return DateTimeFormatter.ISO_LOCAL_DATE.format(
         instant.atOffset(UTC));
   }
 
-  static String formatDateHour(Instant instant) {
+  private static String formatDateHour(Instant instant) {
     return ISO_LOCAL_DATE_HOUR.format(
         instant.truncatedTo(ChronoUnit.HOURS)
             .atOffset(UTC));
   }
 
-  static String formatMonth(Instant instant) {
+  private static String formatMonth(Instant instant) {
     return ISO_LOCAL_MONTH.format(
         instant.truncatedTo(ChronoUnit.DAYS)
             .atOffset(UTC));
   }
 
-  private static String parseErrorMessage(Schedule schedule, String pattern) {
-    return String.format(
-        "Cannot parse time parameter. Expected schedule is %s: %s",
-        schedule,
-        pattern);
+  private static String formatYear(Instant instant) {
+    return ISO_LOCAL_YEAR.format(
+        instant.truncatedTo(ChronoUnit.DAYS)
+            .atOffset(UTC));
   }
 }

@@ -22,7 +22,7 @@ package com.spotify.styx.api;
 
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
-import static com.spotify.styx.util.ParameterUtil.instantFromWorkflowInstance;
+import static com.spotify.styx.util.ParameterUtil.parseAlignedInstant;
 
 import com.spotify.apollo.Response;
 import com.spotify.apollo.entity.EntityMiddleware;
@@ -45,7 +45,6 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
-import javaslang.control.Either;
 import okio.ByteString;
 
 public class SchedulerResource {
@@ -122,14 +121,13 @@ public class SchedulerResource {
     }
 
     // Verifying instant
-    final Either<String, Instant> instantResult = instantFromWorkflowInstance(
-        workflowInstance,
-        workflow.configuration().schedule());
-
-    if (instantResult.isLeft()) {
-      return Response.forStatus(BAD_REQUEST.withReasonPhrase(instantResult.getLeft()));
+    try {
+      instant = parseAlignedInstant(
+          workflowInstance.parameter(),
+          workflow.configuration().schedule());
+    } catch (IllegalArgumentException e) {
+      return Response.forStatus(BAD_REQUEST.withReasonPhrase(e.getMessage()));
     }
-    instant = instantResult.get();
 
     // Verifying active
     if (stateManager.isActiveWorkflowInstance(workflowInstance)) {
