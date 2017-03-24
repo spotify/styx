@@ -43,6 +43,7 @@ import com.spotify.styx.serialization.Json;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Stream;
 import okio.ByteString;
@@ -114,7 +115,7 @@ public class CliResource {
       throw Throwables.propagate(e);
     }
     final Request request =
-        Request.forUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + TRIGGER_PATH)
+        rc.request().withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + TRIGGER_PATH)
             .withPayload(payload);
     return rc.requestScopedClient().send(request).thenApply(response -> {
       final com.spotify.styx.model.WorkflowInstance responsePayload;
