@@ -48,13 +48,13 @@ public class TimeUtil {
 
   /**
    * Gets the last execution instant for a {@link Schedule}, relative to a given instant. If
-   * the given instant is exactly at an execution time of the partitioning, it will be returned
+   * the given instant is exactly at an execution time of the schedule, it will be returned
    * as is.
    *
    * <p>e.g. an hourly schedule has a last execution instant at 13:00 relative to 13:22.
    *
    * @param instant  The instant to calculate the last execution instant relative to
-   * @param schedule The partitioning of executions
+   * @param schedule The schedule of executions
    * @return an instant at the last execution time
    */
   public static Instant lastInstant(Instant instant, Schedule schedule) {
@@ -69,10 +69,10 @@ public class TimeUtil {
   /**
    * Gets the next execution instant for a {@link Schedule}, relative to a given instant.
    *
-   * <p>e.g. an hourly partitioning has a next execution instant at 14:00 relative to 13:22.
+   * <p>e.g. an hourly schedule has a next execution instant at 14:00 relative to 13:22.
    *
    * @param instant  The instant to calculate the next execution instant relative to
-   * @param schedule The partitioning of executions
+   * @param schedule The schedule of executions
    * @return an instant at the next execution time
    */
   public static Instant nextInstant(Instant instant, Schedule schedule) {
@@ -88,7 +88,7 @@ public class TimeUtil {
    *
    * @param instant  The instant to test
    * @param schedule The schedule to test against
-   * @return true if the given instant aligns with the partitioning
+   * @return true if the given instant aligns with the schedule
    */
   public static boolean isAligned(Instant instant, Schedule schedule) {
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));

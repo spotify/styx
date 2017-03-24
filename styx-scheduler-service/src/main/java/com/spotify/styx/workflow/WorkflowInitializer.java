@@ -52,7 +52,7 @@ public class WorkflowInitializer {
       throw Throwables.propagate(e);
     }
 
-    // either the workflow is completely new, or the partitioning has changed
+    // either the workflow is completely new, or the schedule has changed
     final Schedule newSchedule = workflow.configuration().schedule();
     if (!previous.isPresent()
         || !previous.get().configuration().schedule().equals(newSchedule)) {
