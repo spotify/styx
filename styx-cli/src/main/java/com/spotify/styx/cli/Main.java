@@ -73,7 +73,7 @@ public final class Main {
 
   private static final String UTF_8 = "UTF-8";
   private static final String ENV_VAR_PREFIX = "STYX_CLI";
-  private static final String STYX_API_ENDPOINT = "/api/v1";
+  private static final String STYX_API_ENDPOINT = "/api/v2";
   private static final int TTL_REQUEST = 90;
 
   private static final String COMMAND_DEST = "command";
@@ -281,7 +281,7 @@ public final class Main {
   }
 
   private void activeStates() throws IOException, ExecutionException, InterruptedException {
-    String uri = apiUrl("cli", "activeStates");
+    String uri = apiUrl("status", "activeStates");
     final String component = namespace.getString(parser.listComponent.getDest());
     if (component != null) {
       uri += "?component=" + URLEncoder.encode(component, UTF_8);
@@ -300,7 +300,7 @@ public final class Main {
     final String parameter = workflowInstance.parameter();
 
     final ByteString response = send(
-        Request.forUri(apiUrl("cli", "events", component, workflow, parameter))
+        Request.forUri(apiUrl("status", "events", component, workflow, parameter))
             .withTtl(Duration.ofSeconds(TTL_REQUEST)));
 
     final JsonNode jsonNode = OBJECT_MAPPER.readTree(response.toByteArray());
@@ -338,21 +338,21 @@ public final class Main {
       throws ExecutionException, InterruptedException, JsonProcessingException {
     final WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
     final ByteString payload = serialize(workflowInstance);
-    send(Request.forUri(apiUrl("cli", "trigger"), "POST").withPayload(payload));
+    send(Request.forUri(apiUrl("scheduler", "trigger"), "POST").withPayload(payload));
   }
 
   private void haltWorkflowInstance()
       throws ExecutionException, InterruptedException, JsonProcessingException {
     final WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
     final ByteString payload = serialize(Event.halt(workflowInstance));
-    send(Request.forUri(apiUrl("cli", "events"), "POST").withPayload(payload));
+    send(Request.forUri(apiUrl("scheduler", "events"), "POST").withPayload(payload));
   }
 
   private void retryWorkflowInstance()
       throws ExecutionException, InterruptedException, JsonProcessingException {
     final WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
     final ByteString payload = serialize(Event.dequeue(workflowInstance));
-    send(Request.forUri(apiUrl("cli", "events"), "POST").withPayload(payload));
+    send(Request.forUri(apiUrl("scheduler", "events"), "POST").withPayload(payload));
   }
 
   private static WorkflowInstance getWorkflowInstance(Namespace namespace) {
@@ -460,7 +460,7 @@ public final class Main {
       subparser.addArgument(COMPONENT_DEST)
           .help("Component id");
       subparser.addArgument(WORKFLOW_DEST)
-          .help("Workflow id (legacy Endpoint)");
+          .help("Workflow id");
       subparser.addArgument(PARAMETER_DEST)
           .help("Parameter identifying the workflow instance, e.g. '2016-09-14' or '2016-09-14T17'");
       return subparser;
