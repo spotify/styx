@@ -30,11 +30,13 @@ import com.google.api.client.repackaged.com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
+import com.spotify.apollo.Status;
 import com.spotify.apollo.entity.EntityMiddleware;
 import com.spotify.apollo.entity.JacksonEntityCodec;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
+import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.api.Api;
 import com.spotify.styx.api.EventsPayload;
 import com.spotify.styx.api.StatusResource;
@@ -44,6 +46,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Stream;
 import okio.ByteString;
@@ -112,23 +115,21 @@ public class CliResource {
     try {
       payload = Json.serialize(WorkflowInstance.create(workflowInstance));
     } catch (JsonProcessingException e) {
-      throw Throwables.propagate(e);
+      return CompletableFuture.completedFuture(
+          Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Bad json payload")));
     }
-    final Request request =
-        rc.request().withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + TRIGGER_PATH)
-            .withPayload(payload);
-    return rc.requestScopedClient().send(request).thenApply(response -> {
-      final com.spotify.styx.model.WorkflowInstance responsePayload;
-      try {
-        responsePayload = Json.deserialize(response.payload().get(),
-                             com.spotify.styx.model.WorkflowInstance.class);
-      } catch (IOException e) {
-        throw Throwables.propagate(e);
-      }
-      return Response.forStatus(response.status())
-          .withPayload(WorkflowInstance.create(responsePayload))
-          .withHeaders(response.headers());
-    });
+    final Request request = rc.request()
+        .withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + TRIGGER_PATH)
+        .withPayload(payload);
+    return rc.requestScopedClient().send(request).thenApply(response ->
+        response.withPayload(response.payload().map(p -> {
+          try {
+            return WorkflowInstance.create(
+                Json.deserialize(p, com.spotify.styx.model.WorkflowInstance.class));
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }).orElse(null)));
   }
 
   private static String arg(String name, RequestContext rc) {
