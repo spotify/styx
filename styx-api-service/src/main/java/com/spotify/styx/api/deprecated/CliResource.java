@@ -30,6 +30,7 @@ import com.google.api.client.repackaged.com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
+import com.spotify.apollo.Status;
 import com.spotify.apollo.entity.EntityMiddleware;
 import com.spotify.apollo.entity.JacksonEntityCodec;
 import com.spotify.apollo.route.AsyncHandler;
@@ -114,21 +115,18 @@ public class CliResource {
     } catch (JsonProcessingException e) {
       throw Throwables.propagate(e);
     }
-    final Request request =
-        rc.request().withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + TRIGGER_PATH)
-            .withPayload(payload);
-    return rc.requestScopedClient().send(request).thenApply(response -> {
-      final com.spotify.styx.model.WorkflowInstance responsePayload;
-      try {
-        responsePayload = Json.deserialize(response.payload().get(),
-                             com.spotify.styx.model.WorkflowInstance.class);
-      } catch (IOException e) {
-        throw Throwables.propagate(e);
-      }
-      return Response.forStatus(response.status())
-          .withPayload(WorkflowInstance.create(responsePayload))
-          .withHeaders(response.headers());
-    });
+    final Request request = rc.request()
+        .withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + TRIGGER_PATH)
+        .withPayload(payload);
+    return rc.requestScopedClient().send(request).thenApply(response ->
+        response.withPayload(response.payload().map(p -> {
+          try {
+            return WorkflowInstance.create(
+                Json.deserialize(p, com.spotify.styx.model.WorkflowInstance.class));
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }).orElse(null)));
   }
 
   private static String arg(String name, RequestContext rc) {
