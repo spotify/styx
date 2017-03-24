@@ -50,8 +50,8 @@ public abstract class Workflow {
   public static Workflow create(
       @JsonProperty("component_id") String componentId,
       @JsonProperty("component_uri") URI componentUri,
-      @JsonProperty("configuration") WorkflowConfiguration workflowConfiguration) {
-    return new AutoValue_Workflow(componentId, workflowConfiguration.id(), componentUri,
-                                  workflowConfiguration);
+      @JsonProperty("configuration") WorkflowConfiguration configuration) {
+    return new AutoValue_Workflow(componentId, configuration.id(), componentUri,
+                                  configuration);
   }
 }
