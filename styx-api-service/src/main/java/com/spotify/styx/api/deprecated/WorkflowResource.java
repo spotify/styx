@@ -98,11 +98,9 @@ public final class WorkflowResource {
   }
 
   private Response<Workflow> workflow(String componentId, String endpointId) {
-    final Response<com.spotify.styx.model.Workflow> response = workflowResource.workflow(componentId, endpointId);
-    return response.payload()
-        .map(Workflow::create)
-        .map(Response::forPayload)
-        .orElse(Response.forStatus(response.status()));
+    final Response<com.spotify.styx.model.Workflow> response =
+        workflowResource.workflow(componentId, endpointId);
+    return response.withPayload(response.payload().map(Workflow::create).orElse(null));
   }
 
   private Response<WorkflowState> state(String componentId, String endpointId) {
@@ -115,10 +113,11 @@ public final class WorkflowResource {
       Request request) {
     final Response<List<com.spotify.styx.model.data.WorkflowInstanceExecutionData>>
         response = workflowResource.instances(componentId, endpointId, request);
-    return response.payload()
-        .map(l -> l.stream().map(WorkflowInstanceExecutionData::create).collect(Collectors.toList()))
-        .map(Response::forPayload)
-        .orElse(Response.forStatus(response.status()));
+    return response.withPayload(response.payload()
+                                    .map(l -> l.stream()
+                                        .map(WorkflowInstanceExecutionData::create)
+                                        .collect(Collectors.toList()))
+                                    .orElse(null));
   }
 
   private Response<WorkflowInstanceExecutionData> instance(
@@ -127,10 +126,9 @@ public final class WorkflowResource {
       String instanceId) {
     final Response<com.spotify.styx.model.data.WorkflowInstanceExecutionData>
         response = workflowResource.instance(componentId, endpointId, instanceId);
-    return response.payload()
-        .map(WorkflowInstanceExecutionData::create)
-        .map(Response::forPayload)
-        .orElse(Response.forStatus(response.status()));
+    return response.withPayload(response.payload()
+                                    .map(WorkflowInstanceExecutionData::create)
+                                    .orElse(null));
   }
 
   private static String arg(String name, RequestContext rc) {

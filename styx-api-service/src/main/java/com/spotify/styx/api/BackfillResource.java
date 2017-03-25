@@ -102,11 +102,11 @@ public final class BackfillResource {
         Route.with(
             em.serializerResponse(BackfillPayload.class),
             "GET", BASE + "/<bid>",
-            rc -> getBackfill(arg("bid", rc))),
+            rc -> getBackfill(rc.pathArgs().get("bid"))),
         Route.with(
             em.response(Backfill.class),
             "PUT", BASE + "/<bid>",
-            rc -> payload -> updateBackfill(arg("bid", rc), payload))
+            rc -> payload -> updateBackfill(rc.pathArgs().get("bid"), payload))
     )
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
         .collect(toList());
@@ -114,7 +114,7 @@ public final class BackfillResource {
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Collections.singletonList(
         Route.async(
             "DELETE", BASE + "/<bid>",
-            rc -> haltBackfill(arg("bid", rc), rc))
+            rc -> haltBackfill(rc.pathArgs().get("bid"), rc))
     );
 
     return cat(
@@ -361,9 +361,5 @@ public final class BackfillResource {
         .collect(toList());
 
     return Stream.concat(processedStates.stream(), waitingStates.stream()).collect(toList());
-  }
-
-  private static String arg(String name, RequestContext rc) {
-    return rc.pathArgs().get(name);
   }
 }

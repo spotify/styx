@@ -76,13 +76,13 @@ public class StyxConfigResource {
   }
 
   private Response<StyxConfig> patchStyxConfig(Request request) {
-    final Optional<String> query = request.parameter("enabled");
-    if (!query.isPresent()) {
+    final Optional<String> enabledParameter = request.parameter("enabled");
+    if (!enabledParameter.isPresent()) {
       return Response.forStatus(
           Status.BAD_REQUEST.withReasonPhrase("Missing 'enabled' query parameter"));
     }
 
-    final boolean enabled = query.map(Boolean::parseBoolean).get();
+    final boolean enabled = Boolean.parseBoolean(enabledParameter.get());
 
     try {
       storage.setGlobalEnabled(enabled);
