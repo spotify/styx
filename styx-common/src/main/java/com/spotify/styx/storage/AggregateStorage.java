@@ -32,6 +32,7 @@ import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -158,6 +159,11 @@ public class AggregateStorage implements Storage {
   public void updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec triggerSpec)
       throws IOException {
     datastoreStorage.updateNextNaturalTrigger(workflowId, triggerSpec);
+  }
+
+  @Override
+  public void updateNextNaturalTriggerOld(WorkflowId workflowId, Instant instant) throws IOException {
+    datastoreStorage.updateNextNaturalTrigger(workflowId, instant);
   }
 
   @Override

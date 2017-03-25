@@ -52,6 +52,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.util.FnWithException;
 import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Duration;
@@ -258,6 +259,23 @@ class DatastoreStorage {
     }));
   }
 
+  @Deprecated
+  public void updateNextNaturalTrigger(WorkflowId workflowId, Instant instant) throws IOException {
+    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
+      final Key workflowKey = workflowKey(workflowId);
+      final Optional<Entity> workflowOpt = getOpt(transaction, workflowKey);
+      if (!workflowOpt.isPresent()) {
+        throw new ResourceNotFoundException(
+            String.format("%s:%s doesn't exist.", workflowId.componentId(), workflowId.id()));
+      }
+
+      final Entity.Builder builder = Entity
+          .builder(workflowOpt.get())
+          .set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToDatetime(instant));
+      return transaction.put(builder.build());
+    }));
+  }
+
   public Map<Workflow, TriggerInstantSpec> workflowsWithNextNaturalTrigger() throws IOException {
     Map<Workflow, TriggerInstantSpec> map = Maps.newHashMap();
     final EntityQuery query =
@@ -276,11 +294,19 @@ class DatastoreStorage {
 
       if (entity.contains(PROPERTY_NEXT_NATURAL_TRIGGER)) {
         Instant instant = datetimeToInstant(entity.getDateTime(PROPERTY_NEXT_NATURAL_TRIGGER));
+        Instant triggerInstant;
 
-        // todo: this ternary is only needed during a transition period
-        Instant triggerInstant = entity.contains(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER)
-            ? datetimeToInstant(entity.getDateTime(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER))
-            : workflow.configuration().addOffset(instant);
+        // todo: this check is only needed during a transition period
+        if (!entity.contains(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER)) {
+          // instant has to be moved one schedule interval back
+          final Schedule schedule = workflow.configuration().schedule();
+          if (TimeUtil.isAligned(instant, schedule)) {
+            instant = TimeUtil.previousInstant(instant, schedule);
+          }
+          triggerInstant = workflow.configuration().addOffset(instant);
+        } else {
+          triggerInstant = datetimeToInstant(entity.getDateTime(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER));
+        }
 
         map.put(workflow, TriggerInstantSpec.create(instant, triggerInstant));
       }

@@ -178,6 +178,11 @@ public class StyxSchedulerServiceFixture {
     storage.storeWorkflow(workflow);
   }
 
+  void givenNextNaturalTriggerOld(Workflow workflow, String nextNaturalTrigger) throws IOException {
+    Instant next = Instant.parse(nextNaturalTrigger);
+    storage.updateNextNaturalTriggerOld(workflow.id(), next);
+  }
+
   void givenNextNaturalTrigger(Workflow workflow, String nextNaturalTrigger) throws IOException {
     Instant next = Instant.parse(nextNaturalTrigger);
     Instant offset = workflow.configuration().addOffset(next);

@@ -66,6 +66,13 @@ public class TimeUtil {
         : executionTime.lastExecution(utcDateTime).toInstant();
   }
 
+  public static Instant previousInstant(Instant instant, Schedule schedule) {
+    final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
+    final ZonedDateTime utcDateTime = instant.atZone(UTC);
+
+    return executionTime.lastExecution(utcDateTime).toInstant();
+  }
+
   /**
    * Gets the next execution instant for a {@link Schedule}, relative to a given instant.
    *

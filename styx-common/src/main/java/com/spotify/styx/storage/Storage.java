@@ -30,6 +30,7 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -126,6 +127,9 @@ public interface Storage {
    *                    be instantiated.
    */
   void updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec triggerSpec) throws IOException;
+
+  @Deprecated
+  void updateNextNaturalTriggerOld(WorkflowId workflowId, Instant instant) throws IOException;
 
   /**
    * Get all {@link Workflow}s with their respective nextNaturalTrigger,

@@ -36,6 +36,7 @@ import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TriggerInstantSpec;
 import com.spotify.styx.util.WorkflowStateUtil;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -121,6 +122,11 @@ public class InMemStorage implements Storage {
 
   @Override
   public void updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec spec) throws IOException {
+    throw new UnsupportedOperationException("Unsupported Operation!");
+  }
+
+  @Override
+  public void updateNextNaturalTriggerOld(WorkflowId workflowId, Instant instant) throws IOException {
     throw new UnsupportedOperationException("Unsupported Operation!");
   }
 
