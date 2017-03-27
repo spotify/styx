@@ -36,15 +36,8 @@ import com.spotify.apollo.core.Service;
 import com.spotify.apollo.core.Services;
 import com.spotify.apollo.environment.ApolloEnvironmentModule;
 import com.spotify.apollo.http.client.HttpClientModule;
-import com.spotify.styx.api.BackfillPayload;
-import com.spotify.styx.api.BackfillsPayload;
-import com.spotify.styx.api.ResourcesPayload;
 import com.spotify.styx.api.RunStateDataPayload;
-import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.BackfillBuilder;
-import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.util.EventUtil;
@@ -52,11 +45,7 @@ import com.spotify.styx.util.ParameterUtil;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
@@ -80,7 +69,7 @@ public final class Main {
   private static final int TTL_REQUEST = 90;
 
   private static final String COMMAND_DEST = "command";
-  private static final String SUBCOMMAND_DEST = "subcommand";
+  static final String SUBCOMMAND_DEST = "subcommand";
   private static final String COMPONENT_DEST = "component";
   private static final String WORKFLOW_DEST = "workflow";
   private static final String PARAMETER_DEST = "parameter";
@@ -92,11 +81,12 @@ public final class Main {
   private static final String STYX_CLI_VERSION =
       "Styx CLI " + Main.class.getPackage().getImplementationVersion();
 
-  private final StyxCliParser parser;
-  private final Namespace namespace;
+  final StyxCliParser parser;
+  final Namespace namespace;
+  final CliOutput cliOutput;
+
   private final String apiHost;
   private final Service cliService;
-  private final CliOutput cliOutput;
   private Client client;
 
   private Main(
@@ -180,52 +170,11 @@ public final class Main {
           break;
 
         case BACKFILL:
-          final BackfillCommand backfillCommand = namespace.get(SUBCOMMAND_DEST);
-          switch (backfillCommand) {
-            case CREATE:
-              backfillCreate();
-              break;
-            case EDIT:
-              backfillEdit();
-              break;
-            case HALT:
-              backfillHalt();
-              break;
-            case SHOW:
-              backfillShow();
-              break;
-            case LIST:
-              backfillList();
-              break;
-            default:
-              // parsing unknown command will fail so this would only catch non-exhaustive switches
-              throw new ArgumentParserException(
-                  String.format("Unrecognized command: %s %s", command, backfillCommand),
-                  parser.parser);
-          }
+          BackfillCli.runCommand(this, namespace.get(SUBCOMMAND_DEST));
           break;
 
         case RESOURCE:
-          final ResourceCommand resourceCommand = namespace.get(SUBCOMMAND_DEST);
-          switch (resourceCommand) {
-            case CREATE:
-              resourceCreate();
-              break;
-            case EDIT:
-              resourceEdit();
-              break;
-            case SHOW:
-              resourceShow();
-              break;
-            case LIST:
-              resourceList();
-              break;
-            default:
-              // parsing unknown command will fail so this would only catch non-exhaustive switches
-              throw new ArgumentParserException(
-                  String.format("Unrecognized command: %s %s", command, resourceCommand),
-                  parser.parser);
-          }
+          ResourceCli.runCommand(this, namespace.get(SUBCOMMAND_DEST));
           break;
 
         default:
@@ -242,118 +191,6 @@ public final class Main {
       System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage());
       System.exit(EXIT_CODE_API_ERROR);
     }
-  }
-
-  private void backfillCreate() throws ExecutionException, InterruptedException, IOException {
-    final String component = namespace.getString(parser.backfillCreateComponent.getDest());
-    final String workflow = namespace.getString(parser.backfillCreateWorkflow.getDest());
-    final String start = namespace.getString(parser.backfillCreateStart.getDest());
-    final String end = namespace.getString(parser.backfillCreateEnd.getDest());
-    final int concurrency = namespace.getInt(parser.backfillCreateConcurrency.getDest());
-
-    final BackfillInput backfillInput = BackfillInput.create(
-        Instant.parse(start), Instant.parse(end), component, workflow, concurrency);
-
-    final ByteString payload = serialize(backfillInput);
-    final ByteString response = send(
-        Request.forUri(apiUrl("backfills"), "POST").withPayload(payload));
-    final Backfill backfill = deserialize(response, Backfill.class);
-    cliOutput.printBackfill(backfill);
-  }
-
-  private void backfillEdit() throws ExecutionException, InterruptedException, IOException {
-    final Integer concurrency = namespace.getInt(parser.backfillEditConcurrency.getDest());
-    final String id = namespace.getString(parser.backfillEditId.getDest());
-
-    final ByteString getResponse = send(Request.forUri(apiUrl("backfills", id)));
-    final BackfillPayload backfillPayload = deserialize(getResponse, BackfillPayload.class);
-    final BackfillBuilder editedBackfillBuilder = backfillPayload.backfill().builder();
-    if (concurrency != null) {
-      editedBackfillBuilder.concurrency(concurrency);
-    }
-    final ByteString putPayload = serialize(editedBackfillBuilder.build());
-    final ByteString putResponse = send(
-        Request.forUri(apiUrl("backfills", id), "PUT").withPayload(putPayload));
-
-    final Backfill newBackfill = deserialize(putResponse, Backfill.class);
-    cliOutput.printBackfill(newBackfill);
-  }
-
-  private void backfillHalt() throws ExecutionException, InterruptedException {
-    final String id = namespace.getString(parser.backfillHaltId.getDest());
-    send(Request.forUri(apiUrl("backfills", id), "DELETE"));
-  }
-
-  private void backfillShow() throws ExecutionException, InterruptedException, IOException {
-    final String id = namespace.getString(parser.backfillShowId.getDest());
-    final ByteString response = send(Request.forUri(apiUrl("backfills", id)));
-    final BackfillPayload backfillStatus = deserialize(response, BackfillPayload.class);
-    cliOutput.printBackfillPayload(backfillStatus);
-  }
-
-  private void backfillList()
-      throws IOException, ExecutionException, InterruptedException {
-    String uri = apiUrl("backfills");
-    final List<String> queries = new ArrayList<>();
-    if (namespace.getBoolean(parser.backfillListShowAll.getDest())) {
-      queries.add("showAll=true");
-    }
-    final String component = namespace.getString(parser.backfillListComponent.getDest());
-    if (component != null) {
-      queries.add("component=" + URLEncoder.encode(component, UTF_8));
-    }
-    final String workflow = namespace.getString(parser.backfillListWorkflow.getDest());
-    if (workflow != null) {
-      queries.add("workflow=" + URLEncoder.encode(workflow, UTF_8));
-    }
-    if (!queries.isEmpty()) {
-      uri += "?" + String.join("&", queries);
-    }
-    final ByteString response = send(Request.forUri(uri));
-    final BackfillsPayload backfills = deserialize(response, BackfillsPayload.class);
-    cliOutput.printBackfills(backfills.backfills());
-  }
-
-  private void resourceCreate() throws ExecutionException, InterruptedException, IOException {
-    final String id = namespace.getString(parser.resourceCreateId.getDest());
-    final int concurrency = namespace.getInt(parser.resourceCreateConcurrency.getDest());
-
-    final ByteString payload = serialize(Resource.create(id, concurrency));
-    final ByteString response = send(
-        Request.forUri(apiUrl("resources"), "POST").withPayload(payload));
-    final Resource resource = deserialize(response, Resource.class);
-    cliOutput.printResources(Collections.singletonList(resource));
-  }
-
-  private void resourceEdit() throws ExecutionException, InterruptedException, IOException {
-    final String id = namespace.getString(parser.resourceEditId.getDest());
-    final Integer concurrency = namespace.getInt(parser.resourceEditConcurrency.getDest());
-
-    final ByteString getResponse = send(Request.forUri(apiUrl("resources", id)));
-    Resource resource = deserialize(getResponse, Resource.class);
-    if (concurrency != null) {
-      resource = Resource.create(resource.id(), concurrency);
-    }
-    final ByteString putPayload = serialize(resource);
-    final ByteString putResponse = send(
-        Request.forUri(apiUrl("resources", id), "PUT").withPayload(putPayload));
-
-    final Resource newResource = deserialize(putResponse, Resource.class);
-    cliOutput.printResources(Collections.singletonList(newResource));
-  }
-
-  private void resourceShow() throws ExecutionException, InterruptedException, IOException {
-    final String id = namespace.getString(parser.resourceShowId.getDest());
-    final ByteString response = send(Request.forUri(apiUrl("resources", id)));
-    final Resource resource = deserialize(response, Resource.class);
-    cliOutput.printResources(Collections.singletonList(resource));
-  }
-
-  private void resourceList()
-      throws IOException, ExecutionException, InterruptedException {
-    final ByteString response = send(Request.forUri(apiUrl("resources")));
-    final ResourcesPayload resources = deserialize(response, ResourcesPayload.class);
-    cliOutput.printResources(resources.resources());
   }
 
   private void activeStates() throws IOException, ExecutionException, InterruptedException {
@@ -412,22 +249,19 @@ public final class Main {
 
   private void triggerWorkflowInstance()
       throws ExecutionException, InterruptedException, JsonProcessingException {
-    final WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
-    final ByteString payload = serialize(workflowInstance);
+    final ByteString payload = serialize(getWorkflowInstance(namespace));
     send(Request.forUri(apiUrl("scheduler", "trigger"), "POST").withPayload(payload));
   }
 
   private void haltWorkflowInstance()
       throws ExecutionException, InterruptedException, JsonProcessingException {
-    final WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
-    final ByteString payload = serialize(Event.halt(workflowInstance));
+    final ByteString payload = serialize(Event.halt(getWorkflowInstance(namespace)));
     send(Request.forUri(apiUrl("scheduler", "events"), "POST").withPayload(payload));
   }
 
   private void retryWorkflowInstance()
       throws ExecutionException, InterruptedException, JsonProcessingException {
-    final WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
-    final ByteString payload = serialize(Event.dequeue(workflowInstance));
+    final ByteString payload = serialize(Event.dequeue(getWorkflowInstance(namespace)));
     send(Request.forUri(apiUrl("scheduler", "events"), "POST").withPayload(payload));
   }
 
@@ -439,11 +273,11 @@ public final class Main {
         namespace.getString(PARAMETER_DEST));
   }
 
-  private String apiUrl(CharSequence... parts) {
+  String apiUrl(CharSequence... parts) {
     return "http://" + apiHost + STYX_API_ENDPOINT + "/" + String.join("/", parts);
   }
 
-  private ByteString send(Request request) throws ExecutionException, InterruptedException {
+  ByteString send(Request request) throws ExecutionException, InterruptedException {
     final Response<ByteString> response =
         client.send(request.withHeader("User-Agent", STYX_CLI_VERSION)).toCompletableFuture()
             .get();
@@ -459,84 +293,16 @@ public final class Main {
     }
   }
 
-  private static class StyxCliParser {
+  static class StyxCliParser {
 
     final ArgumentParser parser = ArgumentParsers.newArgumentParser("styx")
         .description("Styx CLI")
         .version(STYX_CLI_VERSION);
 
-    final PartitionAction partitionAction = new PartitionAction();
-
     final Subparsers subCommands = parser.addSubparsers().title("commands").metavar(" ");
 
-    final Subparsers backfillParser =
-        Command.BACKFILL.parser(subCommands)
-            .addSubparsers().title("commands").metavar(" ");
-
-    final Subparser backfillShow = BackfillCommand.SHOW.parser(backfillParser);
-    final Argument backfillShowId =
-        backfillShow.addArgument("backfill").help("Backfill ID");
-
-    final Subparser backfillEdit = BackfillCommand.EDIT.parser(backfillParser);
-    final Argument backfillEditId =
-        backfillEdit.addArgument("backfill").help("Backfill ID");
-    final Argument backfillEditConcurrency =
-        backfillEdit.addArgument("--concurrency").help("set the concurrency value for the backfill")
-            .type(Integer.class);
-
-    final Subparser backfillHalt = BackfillCommand.HALT.parser(backfillParser);
-    final Argument backfillHaltId =
-        backfillHalt.addArgument("backfill").help("Backfill ID");
-
-    final Subparser backfillList = BackfillCommand.LIST.parser(backfillParser);
-    final Argument backfillListWorkflow =
-        backfillList.addArgument("-w", "--workflow").help("only show backfills for WORKFLOW");
-    final Argument backfillListComponent =
-        backfillList.addArgument("-c", "--component").help("only show backfills for COMPONENT");
-    final Argument backfillListShowAll =
-        backfillList.addArgument("-a", "--show-all")
-            .setDefault(false)
-            .action(Arguments.storeTrue())
-            .help("show all backfills, even halted and all-triggered ones");
-
-    final Subparser backfillCreate = BackfillCommand.CREATE.parser(backfillParser);
-    final Argument backfillCreateComponent =
-        backfillCreate.addArgument("component").help("Component ID");
-    final Argument backfillCreateWorkflow =
-        backfillCreate.addArgument("workflow").help("Workflow ID");
-    final Argument backfillCreateStart =
-        backfillCreate.addArgument("start").help("Start date/datehour (inclusive)").action(partitionAction);
-    final Argument backfillCreateEnd =
-        backfillCreate.addArgument("end").help("End date/datehour (exclusive)").action(partitionAction);
-    final Argument backfillCreateConcurrency =
-        backfillCreate.addArgument("concurrency").help("The number of jobs to run in parallel").type(Integer.class);
-
-
-    final Subparsers resourceParser =
-        Command.RESOURCE.parser(subCommands)
-            .addSubparsers().title("commands").metavar(" ");
-
-    final Subparser resourceShow = ResourceCommand.SHOW.parser(resourceParser);
-    final Argument resourceShowId =
-        resourceShow.addArgument("id").help("Resource ID");
-
-    final Subparser resourceEdit = ResourceCommand.EDIT.parser(resourceParser);
-    final Argument resourceEditId =
-        resourceEdit.addArgument("id").help("Resource ID");
-    final Argument resourceEditConcurrency =
-        resourceEdit.addArgument("--concurrency")
-            .help("set the concurrency value for the resource")
-            .type(Integer.class);
-
-    final Subparser resourceList = ResourceCommand.LIST.parser(resourceParser);
-
-    final Subparser resourceCreate = ResourceCommand.CREATE.parser(resourceParser);
-    final Argument resourceCreateId =
-        resourceCreate.addArgument("id").help("Resource ID");
-    final Argument resourceCreateConcurrency =
-        resourceCreate.addArgument("concurrency")
-            .help("The concurrency of this resource")
-            .type(Integer.class);
+    final Subparsers backfillCommands = BackfillCli.registerCommands(subCommands);
+    final Subparsers resourceCommands = ResourceCli.registerCommands(subCommands);
 
     final Subparser list = Command.LIST.parser(subCommands);
     final Argument listComponent = list.addArgument("-c", "--component")
@@ -575,7 +341,7 @@ public final class Main {
     }
   }
 
-  private enum Command {
+  enum Command {
     LIST("ls", "List active workflow instances"),
     EVENTS("e", "List events for a workflow instance"),
     HALT("h", "Halt a workflow instance"),
@@ -607,66 +373,7 @@ public final class Main {
     }
   }
 
-  private enum BackfillCommand {
-    LIST("ls", "List active backfills. Use option -a (--show-all) to show all"),
-    CREATE("", "Create a backfill"),
-    EDIT("e", "Edit a backfill"),
-    HALT("h", "Halt a backfill"),
-    SHOW("get", "Show info about a specific backfill");
-
-    private final String alias;
-    private final String description;
-
-    BackfillCommand(String alias, String description) {
-      this.alias = alias;
-      this.description = description;
-    }
-
-    public Subparser parser(Subparsers subCommands) {
-      final Subparser subparser = subCommands
-          .addParser(name().toLowerCase())
-          .setDefault(SUBCOMMAND_DEST, this)
-          .description(description)
-          .help(description);
-
-      if (alias != null && !alias.isEmpty()) {
-        subparser.aliases(alias);
-      }
-
-      return subparser;
-    }
-  }
-
-  private enum ResourceCommand {
-    LIST("ls", "List resources"),
-    CREATE("", "Create a resource"),
-    EDIT("e", "Edit a resource"),
-    SHOW("get", "Show info about a specific resource");
-
-    private final String alias;
-    private final String description;
-
-    ResourceCommand(String alias, String description) {
-      this.alias = alias;
-      this.description = description;
-    }
-
-    public Subparser parser(Subparsers subCommands) {
-      final Subparser subparser = subCommands
-          .addParser(name().toLowerCase())
-          .setDefault(SUBCOMMAND_DEST, this)
-          .description(description)
-          .help(description);
-
-      if (alias != null && !alias.isEmpty()) {
-        subparser.aliases(alias);
-      }
-
-      return subparser;
-    }
-  }
-
-  private static class PartitionAction implements ArgumentAction {
+  static class PartitionAction implements ArgumentAction {
 
     @Override
     public void run(ArgumentParser parser, Argument arg,
