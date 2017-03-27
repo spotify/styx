@@ -20,6 +20,7 @@
 
 package com.spotify.styx.cli;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
@@ -46,8 +47,11 @@ interface CliOutput {
 
   @AutoValue
   abstract class EventInfo {
+    @JsonProperty
     abstract long timestamp();
+    @JsonProperty
     abstract String name();
+    @JsonProperty
     abstract String info();
 
     public static EventInfo create(long ts, String eventName, String eventInfo) {

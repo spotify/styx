@@ -139,7 +139,15 @@ public final class Main {
         .build();
 
     final boolean plainOutput = namespace.getBoolean(parser.plain.getDest());
-    final CliOutput cliOutput = plainOutput ? new PlainCliOutput() : new PrettyCliOutput();
+    final boolean jsonOutput = namespace.getBoolean(parser.json.getDest());
+    final CliOutput cliOutput;
+    if (jsonOutput) {
+      cliOutput = new JsonCliOutput();
+    } else if (plainOutput) {
+      cliOutput = new PlainCliOutput();
+    } else {
+      cliOutput = new PrettyCliOutput();
+    }
 
     new Main(parser, namespace, apiHost, cliService, cliOutput).run();
   }
@@ -543,6 +551,11 @@ public final class Main {
         .help("Styx API host (can also be set with environment variable " + ENV_VAR_PREFIX + "_HOST)")
         .setDefault(System.getenv(ENV_VAR_PREFIX + "_HOST"))
         .action(Arguments.store());
+
+    final Argument json = parser.addArgument("--json")
+        .help("json output")
+        .setDefault(false)
+        .action(Arguments.storeTrue());
 
     final Argument plain = parser.addArgument("-p", "--plain")
         .help("plain output")
