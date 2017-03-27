@@ -2,7 +2,7 @@
 
 This document is written using [api-blueprint]
 
-## usage
+## Usage
 
 1. install [dredd]: `npm install -g dredd`
 1. package project: `mvn package`
@@ -20,7 +20,7 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
 
 # Group Workflows
 
-## Workflow [/v1/workflows/{component}/{workflow_id}]
+## Workflow [/v2/workflows/{component}/{workflow_id}]
 
 + Parameters
     + component: `styx-canary` (string) - Workflow Component
@@ -35,7 +35,7 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
             "workflow_id": "LuigiCanary",
             "component_uri": "file:///etc/styx/schedule.yaml",
             "schedule": {
-                "schedule": "hourly",
+                "schedule": "hours",
                 "docker_args": [
                   "luigi",
                   "--module",
@@ -43,10 +43,13 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
                   "CanaryJob",
                   "--local-scheduler"
                 ]
-            }
+            },
+            "docker_termination_logging": false,
+            "secret": null,
+            "resources": [ ]
         }
 
-## Workflow Instances [/v1/workflows/{component}/{workflow_id}/instances]
+## Workflow Instances [/v2/workflows/{component}/{workflow_id}/instances]
 
 + Parameters
     + component: `styx-canary` (string) - Workflow Component
@@ -89,7 +92,7 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
             }]
         }]
 
-## Workflow Instance [/v1/workflows/{component}/{workflow_id}/instances/{instance}]
+## Workflow Instance [/v2/workflows/{component}/{workflow_id}/instances/{instance}]
 
 + Parameters
     + component: `styx-canary` (string) - Workflow Component
@@ -133,7 +136,7 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
             }]
         }
 
-## Workflow state [/v1/workflows/{component}/{workflow_id}/state]
+## Workflow state [/v2/workflows/{component}/{workflow_id}/state]
 
 + Parameters
     + component: `styx-canary` (string) - Workflow Component
@@ -145,7 +148,9 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
 
         {
             "enabled": "true",
-            "docker_image": "busybox:latest"
+            "docker_image": "luigi-canary-dummy:dummy",
+            "commit_sha": "f043333085fa87738ac24f04d64fb58ecc845111",
+            "next_natural_trigger": "2017-01-01T01:00:00Z"
         }
 
 ### Set Workflow state [PATCH]
@@ -154,17 +159,21 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
 
         {
             "enabled": "false",
-            "docker_image": "busybox:latest"
+            "docker_image": "luigi-canary-dummy:dummy",
+            "commit_sha": "f043333085fa87738ac24f04d64fb58ecc845111",
+            "next_natural_trigger": "2017-01-01T01:00:00Z"
         }
 
 + Response 200 (application/json)
 
         {
             "enabled": "false",
-            "docker_image": "busybox:latest"
+            "docker_image": "luigi-canary-dummy:dummy",
+            "commit_sha": "f043333085fa87738ac24f04d64fb58ecc845111",
+            "next_natural_trigger": "2017-01-01T01:00:00Z"
         }
 
-## Component state [/v1/workflows/{component}/state]
+## Component state [/v2/workflows/{component}/state]
 
 + Parameters
     + component: `styx-canary` (string) - Workflow Component
@@ -174,11 +183,385 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
 + Request (application/json)
 
         {
-            "docker_image": "busybox:latest"
+            "docker_image": "luigi-canary-dummy:dummy",
+            "commit_sha": "f043333085fa87738ac24f04d64fb58ecc845111",
         }
 
 + Response 200 (application/json)
 
         {
-            "docker_image": "busybox:latest"
+            "enabled": null ,
+            "docker_image": "luigi-canary-dummy:dummy",
+            "commit_sha": "f043333085fa87738ac24f04d64fb58ecc845111",
+            "next_natural_trigger": null
+        }
+
+# Group Resources
+
+## Resources [/v2/resources]
+
+### Get Resources [GET]
+
++ Response 200 (application/json)
+
+        {
+            "resources": [{
+                "concurrency": 20,
+                "id": "luigi-canary-resource"
+            }]
+        }
+
+### Create Resource [POST]
+
++ Request (application/json)
+
+        {
+            "concurrency": "20",
+            "id": "luigi-canary-resource"
+        }
+
++ Response 200 (application/json)
+
+        {
+            "concurrency": 20,
+            "id": "luigi-canary-resource"
+        }
+
+## Resource [/v2/resources/{resource}]
+
++ Parameters
+    + resource: `luigi-canary-resource` (string) - Resource ID
+
+### Get Resource [GET]
+
++ Response 200 (application/json)
+
+        {
+            "resources": [{
+                "concurrency": 20,
+                "id": "luigi-canary-resource"
+            }]
+        }
+
+### Delete Resource [DELETE]
+
++ Response 204
+
+### Modify Resource [PUT]
+
++ Request (application/json)
+
+        {
+            "concurrency": "30",
+            "id": "luigi-canary-resource"
+        }
+
++ Response 200 (application/json)
+
+        {
+            "concurrency": 30,
+            "id": "luigi-canary-resource"
+        }
+
+# Group Backfills
+
+## Backfills [/v2/backfills{?component,workflow,status,showAll}]
+
+### Get Backfills [GET]
+
++ Parameters
+    + component: `styx-canary` (optional, string) - Workflow Component to filter with
+    + workflow: `LuigiCanary` (optional, string) - Workflow ID to filter with
+    + status: `true` (optional, boolean) - If to return the status list per backfill
+      + Default: false
+    + showAll: `true` (optional, boolean) - If to return also halted backfills and backfills whose instances have been all triggered
+      + Default: false
+
++ Response 200 (application/json)
+
+        {
+            "backfills": [{
+                "backfill": {
+                    "all_triggered": true,
+                    "concurrency": 10,
+                    "end": "2017-01-01T01:00:00Z",
+                    "halted": false,
+                    "id": "backfill-1489054446085-53384",
+                    "next_trigger": "2017-01-01T01:00:00Z",
+                    "schedule": "hours",
+                    "start": "2017-01-01T00:00:00Z",
+                    "workflow_id": {
+                        "component_id": "styx-canary",
+                        "id": "LuigiCanary"
+                    }
+                },
+                "statuses": {
+                    "active_states": [{
+                        "state": "DONE",
+                        "workflow_instance": {
+                            "parameter": "2017-01-01T00",
+                            "workflow_id": {
+                                "component_id": "styx-canary",
+                                "id": "LuigiCanary"
+                            }
+                        },
+                        "state_data": {
+                            "consecutive_failures": 0,
+                            "execution_description": {
+                                "commit_sha": "f043333085fa87738ac24f04d64fb58ecc845111",
+                                "docker_args": [
+                                    "luigi",
+                                    "--module",
+                                    "canary_job",
+                                    "CanaryJob",
+                                    "--local-scheduler"
+                                ],
+                                "docker_image": "luigi-canary-dummy:dummy",
+                                "docker_termination_logging": false,
+                                "secret": null
+                            },
+                            "execution_id": "styx-run-6b1962c6-23ba-4245-a13b-ec3baa4b2133",
+                            "last_exit": 0,
+                            "messages": [
+                                {
+                                    "level": "INFO",
+                                    "line": "Exit code: 0"
+                                }
+                            ],
+                            "retry_cost": 0.0,
+                            "retry_delay_millis": null,
+                            "tries": 1,
+                            "trigger": {
+                                "@type": "backfill",
+                                "trigger_id": "backfill-1489054446085-53384"
+                            },
+                            "trigger_id": "backfill-1489054446085-53384"
+                        }
+                    }]
+                }
+            }]
+        }
+
+### Create Backfill [POST]
+
++ Request (application/json)
+
+        {
+            "start": "2017-01-01T00:00:00Z",
+            "end": "2017-01-02T00:00:00Z",
+            "component": "styx-canary",
+            "workflow": "LuigiCanary",
+            "concurrency": "10",
+        }
+
++ Response 200 (application/json)
+
+        {
+            "all_triggered": false,
+            "concurrency": 10,
+            "end": "2017-02-00T00:00:00Z",
+            "halted": false,
+            "id": "backfill-1489054446085-52684",
+            "next_trigger": "2017-01-01T00:00:00Z",
+            "schedule": "hours",
+            "start": "2017-01-01T00:00:00Z",
+            "workflow_id": {
+                "component_id": "styx-canary",
+                "id": "LuigiCanary"
+            }
+        }
+
+## Backfill [/v2/backfills/{backfill_id}]
+
++ Parameters
+    + backfill_id: `backfill-1489054446085-52684` (string) - Backfill ID
+
+### Modify Backfill [PUT]
+
++ Request (application/json)
+
+        {
+            "all_triggered": false,
+            "concurrency": 20,
+            "end": "2017-02-00T00:00:00Z",
+            "halted": false,
+            "id": "backfill-1489054446085-52684",
+            "next_trigger": "2017-01-01T00:00:00Z",
+            "schedule": "hours",
+            "start": "2017-01-01T00:00:00Z",
+            "workflow_id": {
+                "component_id": "styx-canary",
+                "id": "LuigiCanary"
+            }
+        }
+
++ Response 200 (application/json)
+
+        {
+            "all_triggered": false,
+            "concurrency": 20,
+            "end": "2017-02-00T00:00:00Z",
+            "halted": false,
+            "id": "backfill-1489054446085-52684",
+            "next_trigger": "2017-01-01T00:00:00Z",
+            "schedule": "hours",
+            "start": "2017-01-01T00:00:00Z",
+            "workflow_id": {
+                "component_id": "styx-canary",
+                "id": "LuigiCanary"
+            }
+        }
+
+### Delete Backfill [DELETE]
+
++ Response 200
+
+# Group Status
+
+## Active States [/v2/status/activeStates]
+
+### Get Active States [GET]
+
++ Response 200 (application/json)
+
+        {
+            "active_states": [{
+                "state": "RUNNING",
+                "workflow_instance": {
+                    "parameter": "2017-01-01T01",
+                    "workflow_id": {
+                        "component_id": "styx-canary",
+                        "id": "LuigiCanary"
+                    }
+                },
+                "state_data": {
+                    "consecutive_failures": 0,
+                    "execution_description": {
+                        "commit_sha": "f043333085fa87738ac24f04d64fb58ecc845111",
+                        "docker_args": [
+                          "luigi",
+                          "--module",
+                          "canary_job",
+                          "CanaryJob",
+                          "--local-scheduler"
+                        ],
+                        "docker_image": "luigi-canary-dummy:dummy",
+                        "docker_termination_logging": false,
+                        "secret": null
+                    },
+                    "execution_id": "styx-run-6b1962c6-23ba-4245-a13b-ec3baa4b21d5",
+                    "last_exit": 20,
+                    "messages": [
+                        {
+                            "level": "WARNING",
+                            "line": "Exit code: 20"
+                        }
+                    ],
+                    "retry_cost": 0.2,
+                    "retry_delay_millis": 600000,
+                    "tries": 2,
+                    "trigger": {
+                        "@type": "natural"
+                    },
+                    "trigger_id": "natural-trigger"
+                }
+            }]
+        }
+
+## Events [/v2/status/events/{component}/{workflow_id}/{instance}]
+
++ Parameters
+    + component: `styx-canary` (string) - Workflow Component
+    + workflow_id: `LuigiCanary` (string) - Workflow ID
+    + instance: `2017-01-01T01` (string) - Worfklow Instance parameter
+
+### Get Workflow Instance events [GET]
+
++ Response 200 (application/json)
+
+        {
+            "events": [{
+                "event": {
+                    "@type": "triggerExecution",
+                    "trigger": {
+                        "@type": "natural"
+                    },
+                    "workflow_instance": "styx-canary/LuigiCanary/2017-01-01T01"
+                },
+                "timestamp": 1483228800000
+            },
+            {
+                "event": {
+                    "@type": "dequeue",
+                    "workflow_instance": "styx-canary/LuigiCanary/2017-01-01T01"
+                },
+                "timestamp": 1483228800005
+            }]
+        }
+
+# Group Scheduler
+
+## Events [/v2/scheduler/events]
+
+### Inject Event [POST]
+
++ Request (application/json)
+
+        {
+            "@type": "dequeue",
+            "workflow_instance": "styx-canary/LuigiCanary/2017-01-01T01"
+        }
+
++ Response 200 (application/json)
+
+        {
+            "@type": "dequeue",
+            "workflow_instance": "styx-canary/LuigiCanary/2017-01-01T01"
+        }
+
+## Trigger [/v2/scheduler/trigger]
+
+### Trigger Workflow Instance [POST]
+
++ Request (application/json)
+
+        {
+            "parameter": "2017-01-01T01",
+            "workflow_id": {
+                "component_id": "styx-canary",
+                "id": "LuigiCanary"
+            }
+        }
+
++ Response 200 (application/json)
+
+        {
+            "parameter": "2017-01-01T01",
+            "workflow_id": {
+                "component_id": "styx-canary",
+                "id": "LuigiCanary"
+            }
+        }
+
+# Group Global Config
+
+## Global Enabled [/v2/config{?enabled}]
+
+### Get Global Enabled [GET]
+
++ Response 200 (application/json)
+
+        {
+            "enabled": "true"
+        }
+
+### Set Global Enabled [POST]
+
++ Parameters
+    + enabled: `true` (required, boolean) - Global enabled value
+
++ Response 200 (application/json)
+
+        {
+            "enabled": "true"
         }
