@@ -37,7 +37,7 @@ public interface Stats {
 
   void registerQueuedEvents(Gauge<Long> queuedEventsCount);
 
-  void registerActiveStates(RunState.State state, Gauge<Long> activeStatesCount);
+  void registerActiveStates(RunState.State state, String triggerName, Gauge<Long> activeStatesCount);
 
   void registerActiveStates(WorkflowId workflowId, Gauge<Long> activeStatesCount);
 
@@ -49,11 +49,11 @@ public interface Stats {
 
   void registerSubmissionRateLimit(Gauge<Double> submissionRateLimit);
 
-  Stats NOOP = new NoopStats();
-
   void terminationLogMissing();
 
   void terminationLogInvalid();
 
   void exitCodeMismatch();
+
+  Stats NOOP = new NoopStats();
 }

@@ -42,8 +42,8 @@ public final class MetricsStats implements Stats {
       .tagged("what", "queued-events-count")
       .tagged("unit", "events");
 
-  private static final MetricId ACTIVE_STATES_PER_RUNSTATE = BASE
-      .tagged("what", "active-states-per-runstate-count")
+  private static final MetricId ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER = BASE
+      .tagged("what", "active-states-per-runstate-per-trigger-count")
       .tagged("unit", "state");
 
   private static final MetricId ACTIVE_STATES_PER_WORKFLOW = BASE
@@ -151,9 +151,10 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
-  public void registerActiveStates(RunState.State state, Gauge<Long> activeStatesCount) {
-    registry.register(ACTIVE_STATES_PER_RUNSTATE.tagged(
-        "state", state.name()), activeStatesCount);
+  public void registerActiveStates(RunState.State state, String triggerName,
+                                   Gauge<Long> activeStatesCount) {
+    registry.register(ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER.tagged(
+        "state", state.name(), "trigger", triggerName), activeStatesCount);
   }
 
   @Override

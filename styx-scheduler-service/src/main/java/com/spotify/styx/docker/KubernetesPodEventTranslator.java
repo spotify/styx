@@ -22,7 +22,6 @@ package com.spotify.styx.docker;
 
 import static com.spotify.styx.docker.DockerRunner.LOG;
 import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_TERMINATION_LOGGING_ANNOTATION;
-import static com.spotify.styx.docker.KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION;
 import static java.util.Collections.emptyList;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
