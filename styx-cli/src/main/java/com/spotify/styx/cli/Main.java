@@ -610,7 +610,7 @@ public final class Main {
     }
 
     public Subparser parser(Subparsers subCommands) {
-      Subparser subparser = subCommands
+      final Subparser subparser = subCommands
           .addParser(name().toLowerCase())
           .setDefault(SUBCOMMAND_DEST, this)
           .description(description)
@@ -639,7 +639,7 @@ public final class Main {
     }
 
     public Subparser parser(Subparsers subCommands) {
-      Subparser subparser = subCommands
+      final Subparser subparser = subCommands
           .addParser(name().toLowerCase())
           .setDefault(SUBCOMMAND_DEST, this)
           .description(description)
@@ -659,23 +659,21 @@ public final class Main {
     public void run(ArgumentParser parser, Argument arg,
                     Map<String, Object> attrs, String flag, Object value)
         throws ArgumentParserException {
-      Instant instant = null;
       try {
-        instant = ParameterUtil.parseDateHour(value.toString());
-      } catch (DateTimeParseException ignored) {
+        attrs.put(arg.getDest(),
+                  ParameterUtil.parseDateHour(value.toString()));
+      } catch (DateTimeParseException dateHourException) {
         try {
-          instant = ParameterUtil.parseDate(value.toString());
-        } catch (Exception ignoredInner) {
+          attrs.put(arg.getDest(),
+                    ParameterUtil.parseDate(value.toString()));
+        } catch (Exception dateException) {
+          throw new ArgumentParserException(
+              String.format(
+                  "could not parse date/datehour for parameter '%s'; if datehour: [%s], if date: [%s]",
+                  arg.textualName(), dateHourException.getMessage(), dateException.getMessage()),
+              parser);
         }
       }
-
-      if (instant == null) {
-        throw new ArgumentParserException(
-            String.format("could not parse date/datehour for parameter '%s'", arg.textualName()),
-            parser);
-      }
-
-      attrs.put(arg.getDest(), instant);
     }
 
     @Override
