@@ -157,18 +157,12 @@ public final class WorkflowResource {
 
   public Response<Workflow> workflow(String componentId, String id) {
     final WorkflowId workflowId = WorkflowId.create(componentId, id);
-    final Optional<Workflow> workflowOpt;
     try {
-      workflowOpt = storage.workflow(workflowId);
+      return storage.workflow(workflowId).map(Response::forPayload)
+          .orElse(Response.forStatus(Status.NOT_FOUND));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
-
-    if (!workflowOpt.isPresent()) {
-      return Response.forStatus(Status.NOT_FOUND);
-    }
-
-    return Response.forPayload(workflowOpt.get());
   }
 
   public Response<WorkflowState> state(String componentId, String id) {

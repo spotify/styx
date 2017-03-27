@@ -69,11 +69,11 @@ public final class BackfillResource {
         Route.with(
             em.serializerResponse(BackfillPayload.class),
             "GET", BASE + "/<bid>",
-            rc -> getBackfill(arg("bid", rc))),
+            rc -> getBackfill(rc.pathArgs().get("bid"))),
         Route.with(
             em.response(Backfill.class),
             "PUT", BASE + "/<bid>",
-            rc -> payload -> updateBackfill(arg("bid", rc), payload))
+            rc -> payload -> updateBackfill(rc.pathArgs().get("bid"), payload))
     )
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
         .collect(toList());
@@ -81,7 +81,7 @@ public final class BackfillResource {
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Collections.singletonList(
         Route.async(
             "DELETE", BASE + "/<bid>",
-            rc -> haltBackfill(arg("bid", rc), rc))
+            rc -> haltBackfill(rc.pathArgs().get("bid"), rc))
     );
 
     return cat(
@@ -96,10 +96,7 @@ public final class BackfillResource {
 
   private Response<BackfillPayload> getBackfill(String id) {
     final Response<com.spotify.styx.api.BackfillPayload> response = backfillResource.getBackfill(id);
-    return backfillResource.getBackfill(id).payload()
-        .map(BackfillPayload::create)
-        .map(Response::forPayload)
-        .orElse(Response.forStatus(response.status()));
+    return response.withPayload(response.payload().map(BackfillPayload::create).orElse(null));
   }
 
   private CompletionStage<Response<ByteString>> haltBackfill(String id, RequestContext rc) {
@@ -108,22 +105,12 @@ public final class BackfillResource {
 
   private Response<Backfill> postBackfill(BackfillInput input) {
     final Response<com.spotify.styx.model.Backfill> response = backfillResource.postBackfill(input);
-    return response.payload()
-        .map(Backfill::create)
-        .map(Response::forPayload)
-        .orElse(Response.forStatus(response.status()));
+    return response.withPayload(response.payload().map(Backfill::create).orElse(null));
   }
 
   private Response<Backfill> updateBackfill(String id, Backfill backfill) {
     final Response<com.spotify.styx.model.Backfill> response =
         backfillResource.updateBackfill(id, Backfill.create(backfill));
-    return response.payload()
-        .map(Backfill::create)
-        .map(Response::forPayload)
-        .orElse(Response.forStatus(response.status()));
-  }
-
-  private static String arg(String name, RequestContext rc) {
-    return rc.pathArgs().get(name);
+    return response.withPayload(response.payload().map(Backfill::create).orElse(null));
   }
 }

@@ -39,7 +39,6 @@ import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Stream;
 import okio.ByteString;
 
@@ -69,15 +68,15 @@ public final class ResourceResource {
         Route.with(
             em.serializerResponse(Resource.class),
             "GET", BASE + "/<rid>",
-            rc -> getResource(arg("rid", rc))),
+            rc -> getResource(rc.pathArgs().get("rid"))),
         Route.with(
             em.serializerResponse(Void.class),
             "DELETE", BASE + "/<rid>",
-            rc -> deleteResource(arg("rid", rc))),
+            rc -> deleteResource(rc.pathArgs().get("rid"))),
         Route.with(
             em.response(Resource.class),
             "PUT", BASE + "/<rid>",
-            rc -> payload -> updateResource(arg("rid", rc), payload))
+            rc -> payload -> updateResource(rc.pathArgs().get("rid"), payload))
     )
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
         .collect(toList());
@@ -95,11 +94,8 @@ public final class ResourceResource {
 
   private Response<Resource> getResource(String id) {
     try {
-      Optional<Resource> resource = storage.resource(id);
-      if (resource.isPresent()) {
-        return Response.forPayload(resource.get());
-      }
-      return Response.forStatus(Status.NOT_FOUND);
+      return storage.resource(id).map(Response::forPayload)
+          .orElse(Response.forStatus(Status.NOT_FOUND));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
@@ -138,9 +134,5 @@ public final class ResourceResource {
     }
 
     return Response.forStatus(Status.OK).withPayload(resource);
-  }
-
-  private static String arg(String name, RequestContext rc) {
-    return rc.pathArgs().get(name);
   }
 }
