@@ -6,3 +6,9 @@ dependencies:
   # compile, since dependency:resolve fails for multi-module builds
   override:
     - mvn dependency:go-offline compile
+
+# taken from https://circleci.com/docs/1.0/test-metadata/#maven-surefire-plugin-for-java-junit-results
+test:
+  post:
+    - mkdir -p $CIRCLE_TEST_REPORTS/junit/
+    - find . -type f -regex ".*/target/surefire-reports/.*xml" -exec cp {} $CIRCLE_TEST_REPORTS/junit/ \;
