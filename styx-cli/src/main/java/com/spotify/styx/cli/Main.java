@@ -38,11 +38,13 @@ import com.spotify.apollo.environment.ApolloEnvironmentModule;
 import com.spotify.apollo.http.client.HttpClientModule;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
+import com.spotify.styx.api.ResourcesPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.util.EventUtil;
@@ -53,6 +55,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -194,6 +197,29 @@ public final class Main {
           }
           break;
 
+        case RESOURCE:
+          final ResourceCommand resourceCommand = namespace.get(SUBCOMMAND_DEST);
+          switch (resourceCommand) {
+            case CREATE:
+              resourceCreate();
+              break;
+            case EDIT:
+              resourceEdit();
+              break;
+            case SHOW:
+              resourceShow();
+              break;
+            case LIST:
+              resourceList();
+              break;
+            default:
+              // parsing unknown command will fail so this would only catch non-exhaustive switches
+              throw new ArgumentParserException(
+                  String.format("Unrecognized command: %s %s", command, resourceCommand),
+                  parser.parser);
+          }
+          break;
+
         default:
           // parsing unknown command will fail so this would only catch non-exhaustive switches
           throw new ArgumentParserException("Unrecognized command: " + command, parser.parser);
@@ -278,6 +304,48 @@ public final class Main {
     final ByteString response = send(Request.forUri(uri));
     final BackfillsPayload backfills = deserialize(response, BackfillsPayload.class);
     cliOutput.printBackfills(backfills.backfills());
+  }
+
+  private void resourceCreate() throws ExecutionException, InterruptedException, IOException {
+    final String id = namespace.getString(parser.resourceCreateId.getDest());
+    final int concurrency = namespace.getInt(parser.resourceCreateConcurrency.getDest());
+
+    final ByteString payload = serialize(Resource.create(id, concurrency));
+    final ByteString response = send(
+        Request.forUri(apiUrl("resources"), "POST").withPayload(payload));
+    final Resource resource = deserialize(response, Resource.class);
+    cliOutput.printResources(Collections.singletonList(resource));
+  }
+
+  private void resourceEdit() throws ExecutionException, InterruptedException, IOException {
+    final String id = namespace.getString(parser.resourceEditId.getDest());
+    final Integer concurrency = namespace.getInt(parser.resourceEditConcurrency.getDest());
+
+    final ByteString getResponse = send(Request.forUri(apiUrl("resources", id)));
+    Resource resource = deserialize(getResponse, Resource.class);
+    if (concurrency != null) {
+      resource = Resource.create(resource.id(), concurrency);
+    }
+    final ByteString putPayload = serialize(resource);
+    final ByteString putResponse = send(
+        Request.forUri(apiUrl("resources", id), "PUT").withPayload(putPayload));
+
+    final Resource newResource = deserialize(putResponse, Resource.class);
+    cliOutput.printResources(Collections.singletonList(newResource));
+  }
+
+  private void resourceShow() throws ExecutionException, InterruptedException, IOException {
+    final String id = namespace.getString(parser.resourceShowId.getDest());
+    final ByteString response = send(Request.forUri(apiUrl("resources", id)));
+    final Resource resource = deserialize(response, Resource.class);
+    cliOutput.printResources(Collections.singletonList(resource));
+  }
+
+  private void resourceList()
+      throws IOException, ExecutionException, InterruptedException {
+    final ByteString response = send(Request.forUri(apiUrl("resources")));
+    final ResourcesPayload resources = deserialize(response, ResourcesPayload.class);
+    cliOutput.printResources(resources.resources());
   }
 
   private void activeStates() throws IOException, ExecutionException, InterruptedException {
@@ -425,15 +493,42 @@ public final class Main {
 
     final Subparser backfillCreate = BackfillCommand.CREATE.parser(backfillParser);
     final Argument backfillCreateComponent =
-        backfillCreate.addArgument(COMPONENT_DEST).help("Component ID");
+        backfillCreate.addArgument("component").help("Component ID");
     final Argument backfillCreateWorkflow =
-        backfillCreate.addArgument(WORKFLOW_DEST).help("Workflow ID");
+        backfillCreate.addArgument("workflow").help("Workflow ID");
     final Argument backfillCreateStart =
         backfillCreate.addArgument("start").help("Start date/datehour (inclusive)").action(partitionAction);
     final Argument backfillCreateEnd =
         backfillCreate.addArgument("end").help("End date/datehour (exclusive)").action(partitionAction);
     final Argument backfillCreateConcurrency =
         backfillCreate.addArgument("concurrency").help("The number of jobs to run in parallel").type(Integer.class);
+
+
+    final Subparsers resourceParser =
+        Command.RESOURCE.parser(subCommands)
+            .addSubparsers().title("commands").metavar(" ");
+
+    final Subparser resourceShow = ResourceCommand.SHOW.parser(resourceParser);
+    final Argument resourceShowId =
+        resourceShow.addArgument("id").help("Resource ID");
+
+    final Subparser resourceEdit = ResourceCommand.EDIT.parser(resourceParser);
+    final Argument resourceEditId =
+        resourceEdit.addArgument("id").help("Resource ID");
+    final Argument resourceEditConcurrency =
+        resourceEdit.addArgument("--concurrency")
+            .help("set the concurrency value for the resource")
+            .type(Integer.class);
+
+    final Subparser resourceList = ResourceCommand.LIST.parser(resourceParser);
+
+    final Subparser resourceCreate = ResourceCommand.CREATE.parser(resourceParser);
+    final Argument resourceCreateId =
+        resourceCreate.addArgument("id").help("Resource ID");
+    final Argument resourceCreateConcurrency =
+        resourceCreate.addArgument("concurrency")
+            .help("The concurrency of this resource")
+            .type(Integer.class);
 
     final Subparser list = Command.LIST.parser(subCommands);
     final Argument listComponent = list.addArgument("-c", "--component")
@@ -473,6 +568,7 @@ public final class Main {
     HALT("h", "Halt a workflow instance"),
     TRIGGER("t", "Trigger a completed workflow instance"),
     RETRY("r", "Retry a workflow instance that is in a waiting state"),
+    RESOURCE(null, "Commands related to resources"),
     BACKFILL(null, "Commands related to backfills");
 
     private final String alias;
@@ -514,7 +610,36 @@ public final class Main {
     }
 
     public Subparser parser(Subparsers subCommands) {
-      Subparser subparser = subCommands
+      final Subparser subparser = subCommands
+          .addParser(name().toLowerCase())
+          .setDefault(SUBCOMMAND_DEST, this)
+          .description(description)
+          .help(description);
+
+      if (alias != null && !alias.isEmpty()) {
+        subparser.aliases(alias);
+      }
+
+      return subparser;
+    }
+  }
+
+  private enum ResourceCommand {
+    LIST("ls", "List resources"),
+    CREATE("", "Create a resource"),
+    EDIT("e", "Edit a resource"),
+    SHOW("get", "Show info about a specific resource");
+
+    private final String alias;
+    private final String description;
+
+    ResourceCommand(String alias, String description) {
+      this.alias = alias;
+      this.description = description;
+    }
+
+    public Subparser parser(Subparsers subCommands) {
+      final Subparser subparser = subCommands
           .addParser(name().toLowerCase())
           .setDefault(SUBCOMMAND_DEST, this)
           .description(description)
@@ -534,23 +659,21 @@ public final class Main {
     public void run(ArgumentParser parser, Argument arg,
                     Map<String, Object> attrs, String flag, Object value)
         throws ArgumentParserException {
-      Instant instant = null;
       try {
-        instant = ParameterUtil.parseDateHour(value.toString());
-      } catch (DateTimeParseException ignored) {
+        attrs.put(arg.getDest(),
+                  ParameterUtil.parseDateHour(value.toString()));
+      } catch (DateTimeParseException dateHourException) {
         try {
-          instant = ParameterUtil.parseDate(value.toString());
-        } catch (Exception ignoredInner) {
+          attrs.put(arg.getDest(),
+                    ParameterUtil.parseDate(value.toString()));
+        } catch (Exception dateException) {
+          throw new ArgumentParserException(
+              String.format(
+                  "could not parse date/datehour for parameter '%s'; if datehour: [%s], if date: [%s]",
+                  arg.textualName(), dateHourException.getMessage(), dateException.getMessage()),
+              parser);
         }
       }
-
-      if (instant == null) {
-        throw new ArgumentParserException(
-            String.format("could not parse date/datehour for parameter '%s'", arg.textualName()),
-            parser);
-      }
-
-      attrs.put(arg.getDest(), instant);
     }
 
     @Override

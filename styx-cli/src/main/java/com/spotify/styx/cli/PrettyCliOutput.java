@@ -36,6 +36,7 @@ import com.google.common.collect.Iterables;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.Message;
@@ -148,6 +149,15 @@ class PrettyCliOutput implements CliOutput {
         printStates(backfillPayload.statuses().get());
       }
     }
+  }
+
+
+  @Override
+  public void printResources(List<Resource> resources) {
+    final String format = "%50s %12s";
+    System.out.println(String.format(format, "RESOURCE", "CONCURRENCY"));
+    resources.forEach(resource -> System.out.println(
+        String.format(format, resource.id(), resource.concurrency())));
   }
 
   private Ansi getAnsiForState(RunStateDataPayload.RunStateData RunStateData) {

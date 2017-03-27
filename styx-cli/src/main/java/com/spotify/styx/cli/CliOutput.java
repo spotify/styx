@@ -24,6 +24,7 @@ import com.google.auto.value.AutoValue;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.Resource;
 import java.util.List;
 
 /**
@@ -40,6 +41,8 @@ interface CliOutput {
   void printBackfillPayload(BackfillPayload backfillPayload);
 
   void printBackfills(List<BackfillPayload> backfills);
+
+  void printResources(List<Resource> resources);
 
   @AutoValue
   abstract class EventInfo {
