@@ -34,17 +34,23 @@ This whole process follows this state graph:
 
 #### State NEW
 
-This is the entry state for a workflow instance. 
+This is the entry state for a workflow instance.
+
+#### State QUEUED
+
+Workflow instances in this state are awaiting for the next execution to start.
+Delays for retries or resource limits are possible criteria to determine
+if a workflow instance should be in the QUEUED state.
 
 #### State PREPARE
 
 This state looks up metadata about the workflow instance and stores it
-within the state machine. Metadata is information such as docker image, 
+within the state machine. Metadata is information such as docker image,
 source code repository, etc.
 
 #### State SUBMITTING
 
-This state submits a new pod to GKE and waits until GKE has accepted it. 
+This state submits a new pod to GKE and waits until GKE has accepted it.
 
 #### State SUBMITTED
 
@@ -53,22 +59,12 @@ for GKE to report back that the pod has started.
 
 #### State RUNNING
 
-The pod has started and the container is running. Styx is 
+The pod has started and the container is running. Styx is
 waiting for the workflow instance to finish.
 
 #### State TERMINATED
 
 The container within the pod is done and the pod has terminated.
-
-#### State AWAITING_RETRY
-
-Exit code from the pod was not 0 and Styx is waiting to schedule another
-try.
-
-#### State FAILED
-
-Submission of job failed and Styx tries to determine if the job shall
-be rescheduled for a retry or not.
 
 #### State DONE
 
@@ -76,4 +72,9 @@ A workflow instance has succeed and is done.
 
 #### State ERROR
 
-A workflow instance has permanently failed. No more retries will be done.
+A workflow instance has permanently failed. No more retries will be executed.
+
+#### State FAILED
+
+Submission of job failed and Styx tries to determine if the job shall
+be rescheduled for a retry or not.
