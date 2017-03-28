@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-
-DIR=$(dirname $0)
-JAR=${JAR:-${DIR}/../target/styx-cli.jar}
-
-java -jar ${JAR} "$@"
