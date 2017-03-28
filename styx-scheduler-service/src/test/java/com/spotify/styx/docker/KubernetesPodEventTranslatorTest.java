@@ -50,7 +50,7 @@ public class KubernetesPodEventTranslatorTest {
   private static final WorkflowInstance WFI =
       WorkflowInstance.create(TestData.WORKFLOW_ID, "foo");
   private static final DockerRunner.RunSpec RUN_SPEC =
-      DockerRunner.RunSpec.create("busybox", ImmutableList.of(), false, Optional.empty());
+      DockerRunner.RunSpec.simple("busybox");
   private static String MESSAGE_FORMAT = "{\"rfu\":{\"dum\":\"my\"},\"component_id\":\"dummy\",\"workflow_id\":\"dummy\",\"parameter\":\"dummy\",\"execution_id\":\"dummy\",\"event\":\"dummy\",\"exit_code\":%d}\n";
 
   Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC);
@@ -332,6 +332,6 @@ public class KubernetesPodEventTranslatorTest {
   private Pod podWithTerminationLogging() {
     return KubernetesDockerRunner.createPod(
         WFI,
-        DockerRunner.RunSpec.create("busybox", ImmutableList.of(), true, Optional.empty()));
+        DockerRunner.RunSpec.create("busybox", ImmutableList.of(), true, Optional.empty(), Optional.empty()));
   }
 }

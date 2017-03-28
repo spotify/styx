@@ -25,23 +25,23 @@ processes that transform data periodically. It's initial use case is to run jobs
 with some simple bash scripts.
 
 Styx was built to function smoothly on Google Cloud Platform, thus it makes use of Google products
-such as Google Cloud Datastore, Google Cloud Bigtable and Google Container Engine. However, the 
-integrations with these products are all done through clear interfaces and other backends can 
+such as Google Cloud Datastore, Google Cloud Bigtable and Google Container Engine. However, the
+integrations with these products are all done through clear interfaces and other backends can
 easily be added.
 
 ## Key concepts
 
 The key type of information that Styx concerns itself with are Workflows. A Workflow is either
-enabled or disabled and has a Schedule. A Schedule specifies how often a Workflow should be 
+enabled or disabled and has a Schedule. A Schedule specifies how often a Workflow should be
 triggered, which docker image to run and which arguments to pass to it on each execution. Each time
-a Workflow is triggered, a Workflow Instance is created. The Workflow instance is tracked as 
+a Workflow is triggered, a Workflow Instance is created. The Workflow instance is tracked as
 'active' until at least on execution of the docker image returns with a 0 exit code. Styx will keep
 track of Workflow Instance executions and provides information about them via the API.
 
 ## Development status
 Styx is in Alpha and is actively being developed. It is deployed internally at Spotify and is
 being used to run around 1500 different production workflows. Because of how we build and integrate
-infrastructure components at Spotify, this repository does not contain a GUI at the time of 
+infrastructure components at Spotify, this repository does not contain a GUI at the time of
 writing, while we do have one internally. The goal is to break out more of these components into
 open source projects that complement each other.
 
@@ -56,7 +56,7 @@ open source projects that complement each other.
 
 ### Setup
 
-A fully functional Service can be found in [styx-standalone-service](./styx-standalone-service). 
+A fully functional Service can be found in [styx-standalone-service](./styx-standalone-service).
 This packaging contains both the API and Scheduler service in one artifact. This is how you build
 and run it.
 
@@ -186,7 +186,7 @@ For each execution, Styx will inject a set of environment variables into the con
 | `STYX_COMPONENT_ID` | The component id of the workflow that is being executed. This will be the filename of the file which defines the workflow schedule. |
 | `STYX_WORKFLOW_ID` | The workflow id of the workflow that is being executed. This is the `id` field specified in the workflow schedule. |
 | `STYX_PARAMETER` | The parameter argument. See section about `docker_args` above. |
-| `STYX_TRIGGER_ID` | **to be implemented** - The trigger which is being executed. |
+| `STYX_TRIGGER_ID` | The trigger which is being executed. |
 | `STYX_EXECUTION_ID` | A unique identifier for the execution. This is the execution id used to identify execution attempts of a trigger. |
 | `STYX_EXECUTION_COUNTER` | **to be implemented** - A counter indicating which execution this is. Goes from 0..N per trigger. |
 

@@ -70,16 +70,19 @@ public interface DockerRunner extends Closeable {
 
     public abstract Optional<WorkflowConfiguration.Secret> secret();
 
+    public abstract Optional<String> triggerId();
+
     public static RunSpec create(
         String imageName,
         ImmutableList<String> args,
         boolean terminationLogging,
-        Optional<WorkflowConfiguration.Secret> secret) {
-      return new AutoValue_DockerRunner_RunSpec(imageName, args, terminationLogging, secret);
+        Optional<WorkflowConfiguration.Secret> secret,
+        Optional<String> triggerId) {
+      return new AutoValue_DockerRunner_RunSpec(imageName, args, terminationLogging, secret, triggerId);
     }
 
     public static RunSpec simple(String imageName, String... args) {
-      return new AutoValue_DockerRunner_RunSpec(imageName, ImmutableList.copyOf(args), false, empty());
+      return new AutoValue_DockerRunner_RunSpec(imageName, ImmutableList.copyOf(args), false, empty(), empty());
     }
   }
 
