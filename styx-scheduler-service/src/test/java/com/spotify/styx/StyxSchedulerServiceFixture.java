@@ -51,6 +51,7 @@ import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
+import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -172,11 +173,22 @@ public class StyxSchedulerServiceFixture {
 
   void givenWorkflow(Workflow workflow) throws IOException {
     workflows.add(workflow);
+
+    // storing before start causes the WorkflowInitializer not to do anything
     storage.storeWorkflow(workflow);
   }
 
+  void givenNextNaturalTriggerOld(Workflow workflow, String nextNaturalTrigger) throws IOException {
+    Instant next = Instant.parse(nextNaturalTrigger);
+    storage.updateNextNaturalTriggerOld(workflow.id(), next);
+  }
+
   void givenNextNaturalTrigger(Workflow workflow, String nextNaturalTrigger) throws IOException {
-    storage.updateNextNaturalTrigger(workflow.id(), Instant.parse(nextNaturalTrigger));
+    Instant next = Instant.parse(nextNaturalTrigger);
+    Instant offset = workflow.configuration().addOffset(next);
+    TriggerInstantSpec spec = TriggerInstantSpec.create(next, offset);
+
+    storage.updateNextNaturalTrigger(workflow.id(), spec);
   }
 
   void givenBackfill(Backfill backfill) throws IOException {

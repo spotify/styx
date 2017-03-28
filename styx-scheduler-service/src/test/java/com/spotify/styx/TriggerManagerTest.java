@@ -20,8 +20,8 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.testdata.TestData.FULL_DATA_WORKFLOW_CONFIGURATION;
-import static java.time.temporal.ChronoUnit.DAYS;
+import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
+import static java.time.Instant.parse;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -39,10 +39,10 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.FutureUtil;
 import com.spotify.styx.util.Time;
+import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -58,16 +58,8 @@ public class TriggerManagerTest {
 
   private static final Trigger NATURAL_TRIGGER = Trigger.natural();
 
-  private static final Instant NEXT_EXECUTION = Instant.parse("2016-10-01T00:00:00Z");
-  private static final Instant NEXT_EXECUTION_PLUS_DAY = Instant.parse("2016-10-02T00:00:00Z");
-  private static final Instant NEXT_EXECUTION_MINUS_DAY = Instant.parse("2016-09-30T00:00:00Z");
-
-  private static final Instant MANAGER_TIME_TRUNCATED = Instant.parse("2016-10-10T00:00:00Z");
-  private static final Instant MANAGER_TIME_MINUS_DAY_TRUNCATED = Instant.parse("2016-10-09T00:00:00Z");
-  private static final Instant MANAGER_TIME_PLUS_DAY_TRUNCATED = Instant.parse("2016-10-11T00:00:00Z");
-
   private static Workflow WORKFLOW_DAILY =
-      Workflow.create("comp", URI.create("http:/foo"), FULL_DATA_WORKFLOW_CONFIGURATION);
+      Workflow.create("comp", URI.create("http:/foo"), FULL_WORKFLOW_CONFIGURATION);
 
   @Mock
   Storage storage;
@@ -75,7 +67,7 @@ public class TriggerManagerTest {
   TriggerListener triggerListener;
 
   private TriggerManager triggerManager;
-  private final Time MANAGER_TIME = () -> Instant.parse("2016-10-10T13:11:11Z");
+  private final Time MANAGER_TIME = () -> parse("2016-10-10T13:11:11Z");
 
   private final ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -93,68 +85,60 @@ public class TriggerManagerTest {
 
   @Test
   public void shouldNotUpdateNextNaturalTriggerUntilTriggerExecutionIsComplete() throws Exception {
-    setupWithNextNaturalTrigger(true, NEXT_EXECUTION);
+    setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"));
     final CompletableFuture<Void> triggerExecutionFuture = new CompletableFuture<>();
     when(triggerListener.event(any(Workflow.class), any(Trigger.class), any(Instant.class)))
         .thenReturn(triggerExecutionFuture);
     executor.execute(triggerManager::tick);
     verify(triggerListener, timeout(60_000)).event(
-        WORKFLOW_DAILY, NATURAL_TRIGGER, NEXT_EXECUTION_MINUS_DAY);
+        WORKFLOW_DAILY, NATURAL_TRIGGER, parse("2016-10-01T00:00:00Z"));
     // HACK: Sleep to avoid racily missing an undesired invocation of updateNextNaturalTrigger
     Thread.sleep(5000);
-    verify(storage, never()).updateNextNaturalTrigger(any(WorkflowId.class), any(Instant.class));
+    verify(storage, never()).updateNextNaturalTrigger(any(WorkflowId.class), any(TriggerInstantSpec.class));
     triggerExecutionFuture.complete(null);
     verify(storage, timeout(60_000)).updateNextNaturalTrigger(
-        WORKFLOW_DAILY.id(), NEXT_EXECUTION_PLUS_DAY);
+        WORKFLOW_DAILY.id(),
+        TriggerInstantSpec.create(parse("2016-10-02T00:00:00Z"), parse("2016-10-03T00:00:00Z")));
   }
 
   @Test
   public void shouldNotUpdateNextNaturalTriggerIfTriggerExecutionFails() throws Exception {
-    setupWithNextNaturalTrigger(true, NEXT_EXECUTION);
+    setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"));
     when(triggerListener.event(any(Workflow.class), any(Trigger.class), any(Instant.class)))
         .thenReturn(FutureUtil.exceptionallyCompletedFuture(
             new RuntimeException("trigger execution failure!")));
     triggerManager.tick();
-    verify(triggerListener).event(WORKFLOW_DAILY, NATURAL_TRIGGER, NEXT_EXECUTION_MINUS_DAY);
-    verify(storage, never()).updateNextNaturalTrigger(any(WorkflowId.class), any(Instant.class));
+    verify(triggerListener).event(WORKFLOW_DAILY, NATURAL_TRIGGER, parse("2016-10-01T00:00:00Z"));
+    verify(storage, never()).updateNextNaturalTrigger(any(WorkflowId.class), any(TriggerInstantSpec.class));
   }
 
   @Test
   public void shouldTriggerExecutionOnEnabledWithNextNaturalTrigger() throws IOException {
-    setupWithNextNaturalTrigger(true, NEXT_EXECUTION);
+    setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"));
     triggerManager.tick();
-    verify(triggerListener).event(WORKFLOW_DAILY, NATURAL_TRIGGER, NEXT_EXECUTION_MINUS_DAY);
-    verify(storage).updateNextNaturalTrigger(WORKFLOW_DAILY.id(), NEXT_EXECUTION_PLUS_DAY);
-  }
 
-  @Test
-  public void shouldTriggerExecutionOnEnabledWithoutNextNaturalTrigger() throws IOException {
-    setupWithoutNextNaturalTrigger(true);
-    triggerManager.tick();
-    verify(triggerListener).event(WORKFLOW_DAILY, NATURAL_TRIGGER, MANAGER_TIME_MINUS_DAY_TRUNCATED);
-    verify(storage).updateNextNaturalTrigger(WORKFLOW_DAILY.id(), MANAGER_TIME_PLUS_DAY_TRUNCATED);
+    verify(triggerListener).event(WORKFLOW_DAILY, NATURAL_TRIGGER, parse("2016-10-01T00:00:00Z"));
+    verify(storage).updateNextNaturalTrigger(
+        WORKFLOW_DAILY.id(),
+        TriggerInstantSpec.create(parse("2016-10-02T00:00:00Z"), parse("2016-10-03T00:00:00Z")));
   }
 
   @Test
   public void shouldNotTriggerExecutionOnDisabledWorkflowWithNextNaturalTrigger() throws IOException {
-    setupWithNextNaturalTrigger(false, MANAGER_TIME_TRUNCATED);
+    setupWithNextNaturalTrigger(false, parse("2016-10-09T00:00:00Z"));
     triggerManager.tick();
-    verify(triggerListener, never()).event(any(), any(), any());
-    verify(storage).updateNextNaturalTrigger(WORKFLOW_DAILY.id(), MANAGER_TIME_PLUS_DAY_TRUNCATED);
-  }
 
-  @Test
-  public void shouldNotTriggerExecutionOnDisabledWorkflowWithoutNextNaturalTrigger() throws IOException {
-    setupWithoutNextNaturalTrigger(false);
-    triggerManager.tick();
     verify(triggerListener, never()).event(any(), any(), any());
-    verify(storage).updateNextNaturalTrigger(WORKFLOW_DAILY.id(), MANAGER_TIME_PLUS_DAY_TRUNCATED);
+    verify(storage).updateNextNaturalTrigger(
+        WORKFLOW_DAILY.id(),
+        TriggerInstantSpec.create(parse("2016-10-10T00:00:00Z"), parse("2016-10-11T00:00:00Z")));
   }
 
   @Test
   public void shouldNotTriggerExecutionIfNextNaturalTriggerAfterManagerTime() throws IOException {
-    setupWithNextNaturalTrigger(true, MANAGER_TIME_TRUNCATED.plus(1, DAYS));
+    setupWithNextNaturalTrigger(true, parse("2016-10-11T00:00:00Z"));
     triggerManager.tick();
+
     verify(triggerListener, never()).event(any(), any(), any());
     verify(storage, never()).updateNextNaturalTrigger(any(), any());
   }
@@ -169,18 +153,22 @@ public class TriggerManagerTest {
 
   @Test
   public void shouldNotUpdateNextNaturalTriggerIfTriggerListenerThrows() throws Exception {
-    setupWithNextNaturalTrigger(true, NEXT_EXECUTION);
+    setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"));
     doThrow(new RuntimeException()).when(triggerListener).event(any(), any(), any());
     triggerManager.tick();
+
     verify(storage, never()).updateNextNaturalTrigger(any(), any());
   }
 
   @Test
   public void shouldUpdateNextNaturalTriggerIfAlreadyInitialized() throws Exception {
-    setupWithNextNaturalTrigger(true, NEXT_EXECUTION);
+    setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"));
     doThrow(new AlreadyInitializedException("")).when(triggerListener).event(any(), any(), any());
     triggerManager.tick();
-    verify(storage).updateNextNaturalTrigger(WORKFLOW_DAILY.id(), NEXT_EXECUTION_PLUS_DAY);
+
+    verify(storage).updateNextNaturalTrigger(
+        WORKFLOW_DAILY.id(),
+        TriggerInstantSpec.create(parse("2016-10-02T00:00:00Z"), parse("2016-10-03T00:00:00Z")));
   }
 
   private void setupWithNextNaturalTrigger(boolean enabled, Instant nextNaturalTrigger) throws IOException {
@@ -190,20 +178,11 @@ public class TriggerManagerTest {
     } else {
       when(storage.enabled()).thenReturn(ImmutableSet.of());
     }
-    when(storage.workflowsWithNextNaturalTrigger()).thenReturn(
-        ImmutableMap.of(WORKFLOW_DAILY,
-                        Optional.of(nextNaturalTrigger)));
-  }
 
-  private void setupWithoutNextNaturalTrigger(boolean enabled) throws IOException {
-    when(storage.globalEnabled()).thenReturn(true);
-    if (enabled) {
-      when(storage.enabled()).thenReturn(ImmutableSet.of(WORKFLOW_DAILY.id()));
-    } else {
-      when(storage.enabled()).thenReturn(ImmutableSet.of());
-    }
-    when(storage.workflowsWithNextNaturalTrigger()).thenReturn(
-        ImmutableMap.of(WORKFLOW_DAILY,
-                        Optional.empty()));
+    Instant offset = WORKFLOW_DAILY.configuration().addOffset(nextNaturalTrigger);
+    TriggerInstantSpec spec = TriggerInstantSpec.create(nextNaturalTrigger, offset);
+
+    when(storage.workflowsWithNextNaturalTrigger())
+        .thenReturn(ImmutableMap.of(WORKFLOW_DAILY, spec));
   }
 }

@@ -36,9 +36,9 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
@@ -147,6 +147,7 @@ public class StateInitializingTriggerTest {
     return WorkflowConfiguration.create(
         "styx.TestEndpoint",
         schedule,
+        empty(),
         Optional.of("busybox"),
         Optional.of(Lists.newArrayList(args)),
         empty(),

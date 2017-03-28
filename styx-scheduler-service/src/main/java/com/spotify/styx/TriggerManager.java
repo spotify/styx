@@ -20,9 +20,7 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.util.ParameterUtil.decrementInstant;
-import static com.spotify.styx.util.ParameterUtil.incrementInstant;
-import static com.spotify.styx.util.ParameterUtil.truncateInstant;
+import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.Objects.requireNonNull;
 
 import com.google.common.base.Throwables;
@@ -34,10 +32,10 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
+import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import org.slf4j.Logger;
@@ -76,7 +74,7 @@ public class TriggerManager {
       return ;
     }
 
-    final Map<Workflow, Optional<Instant>> map;
+    final Map<Workflow, TriggerInstantSpec> map;
     final Set<WorkflowId> enabled;
     try {
       map = storage.workflowsWithNextNaturalTrigger();
@@ -90,9 +88,9 @@ public class TriggerManager {
     map.entrySet().forEach(entry -> {
       final Workflow workflow = entry.getKey();
       final Schedule schedule = workflow.configuration().schedule();
-      final Instant next = entry.getValue().orElse(truncateInstant(now, schedule));
+      final TriggerInstantSpec instantSpec = entry.getValue();
 
-      if (next.isAfter(now)) {
+      if (now.isBefore(instantSpec.offsetInstant())) {
         return;
       }
 
@@ -101,7 +99,7 @@ public class TriggerManager {
           final CompletionStage<Void> processed = triggerListener.event(
               workflow,
               Trigger.natural(),
-              decrementInstant(next, schedule));
+              instantSpec.instant());
           // Wait for the event to be processed before proceeding to the next trigger
           processed.toCompletableFuture().get();
         } catch (AlreadyInitializedException e) {
@@ -114,13 +112,16 @@ public class TriggerManager {
         stats.naturalTrigger();
       }
 
-      Instant nextNaturalTrigger = incrementInstant(next, schedule);
+      final Instant nextTrigger = nextInstant(instantSpec.instant(), schedule);
+      final Instant nextWithOffset = workflow.configuration().addOffset(nextTrigger);
+      final TriggerInstantSpec nextSpec = TriggerInstantSpec.create(nextTrigger, nextWithOffset);
+
       try {
-        storage.updateNextNaturalTrigger(workflow.id(), nextNaturalTrigger);
+        storage.updateNextNaturalTrigger(workflow.id(), nextSpec);
       } catch (IOException e) {
         LOG.error(
             "Sent trigger for workflow {}, but didn't succeed storing next scheduled run {}.",
-            workflow.id(), nextNaturalTrigger);
+            workflow.id(), nextTrigger);
         throw Throwables.propagate(e);
       }
     });

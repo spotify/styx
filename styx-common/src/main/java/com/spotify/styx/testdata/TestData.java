@@ -57,23 +57,23 @@ public final class TestData {
 
   public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.create(
-          "styx.TestEndpoint", HOURS, empty(), empty(), empty(), empty(), emptyList());
+          "styx.TestEndpoint", HOURS, empty(), empty(), empty(), empty(), empty(), emptyList());
 
   public static final WorkflowConfiguration DAILY_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.create(
-          "styx.TestEndpoint", DAYS, empty(), empty(), empty(), empty(), emptyList());
+          "styx.TestEndpoint", DAYS, empty(), empty(), empty(), empty(), empty(), emptyList());
 
   public static final WorkflowConfiguration WEEKLY_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.create(
-          "styx.TestEndpoint", WEEKS, empty(), empty(), empty(), empty(), emptyList());
+          "styx.TestEndpoint", WEEKS, empty(), empty(), empty(), empty(), empty(), emptyList());
 
   public static final WorkflowConfiguration MONTHLY_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.create(
-          "styx.TestEndpoint", MONTHS, empty(), empty(), empty(), empty(), emptyList());
+          "styx.TestEndpoint", MONTHS, empty(), empty(), empty(), empty(), empty(), emptyList());
 
-  public static final WorkflowConfiguration FULL_DATA_WORKFLOW_CONFIGURATION =
+  public static final WorkflowConfiguration FULL_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.create(
-          "styx.TestEndpoint", DAYS, of("busybox"), of(asList("x", "y")), of(false),
+          "styx.TestEndpoint", DAYS, empty(), of("busybox"), of(asList("x", "y")), of(false),
           of(Secret.create("name", "/path")), emptyList());
 
   public static final ExecutionDescription EXECUTION_DESCRIPTION =

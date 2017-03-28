@@ -42,11 +42,11 @@ import static org.mockito.Mockito.when;
 import com.google.api.client.repackaged.com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.Schedule;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
@@ -161,7 +161,7 @@ public class SchedulerTest {
         id.componentId(),
         URI.create("http://example.com"),
         WorkflowConfiguration.create(
-            id.id(), Schedule.HOURS, empty(), empty(), empty(), empty(),
+            id.id(), Schedule.HOURS, empty(), empty(), empty(), empty(), empty(),
             Arrays.asList(resources)));
   }
 

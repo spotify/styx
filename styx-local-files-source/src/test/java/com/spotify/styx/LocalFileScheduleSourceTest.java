@@ -34,8 +34,8 @@ import com.google.common.collect.Maps;
 import com.google.common.io.Closer;
 import com.google.common.io.Resources;
 import com.spotify.styx.model.Schedule;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.schedule.ScheduleSource;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
@@ -203,6 +203,7 @@ public class LocalFileScheduleSourceTest {
             "foo",
             Schedule.HOURS,
             empty(),
+            empty(),
             Optional.of(emptyList()),
             empty(),
             empty(),
@@ -217,6 +218,7 @@ public class LocalFileScheduleSourceTest {
         WorkflowConfiguration.create(
             "foo",
             Schedule.DAYS,
+            empty(),
             empty(),
             Optional.of(singletonList("foo")),
             empty(),
@@ -233,6 +235,7 @@ public class LocalFileScheduleSourceTest {
             "foo",
             Schedule.HOURS,
             empty(),
+            empty(),
             Optional.of(Arrays.asList("foo", "bar")),
             empty(),
             empty(),
@@ -247,6 +250,7 @@ public class LocalFileScheduleSourceTest {
         WorkflowConfiguration.create(
             "bar",
             Schedule.DAYS,
+            empty(),
             empty(),
             Optional.of(Arrays.asList("baz", "bax")),
             empty(),

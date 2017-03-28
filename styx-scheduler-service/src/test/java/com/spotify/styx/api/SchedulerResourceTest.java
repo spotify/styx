@@ -246,14 +246,13 @@ public class SchedulerResourceTest {
   @Test
   public void testTriggerWorkflowInstanceUnsupportedSchedule() throws Exception {
     storage.storeWorkflow(MONTHLY_WORKFLOW);
-    WorkflowInstance toTrigger = WorkflowInstance.create(MONTHLY_WORKFLOW.id(), "2014-12");
+    WorkflowInstance toTrigger = WorkflowInstance.create(MONTHLY_WORKFLOW.id(), "2014-12-01");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
-    assertThat(response.status(),
-               is(Status.BAD_REQUEST.withReasonPhrase("Schedule not supported: MONTHS")));
-    assertThat(triggeredWorkflow, isEmpty());
-    assertThat(triggeredInstant, isEmpty());
+    assertThat(response.status(), is(Status.OK));
+    assertThat(triggeredInstant, hasValue(Instant.parse("2014-12-01T00:00:00.000Z")));
+    assertThat(triggeredWorkflow, hasValue(MONTHLY_WORKFLOW));
   }
 
   @Test
@@ -270,29 +269,27 @@ public class SchedulerResourceTest {
   }
 
   @Test
-  public void testTriggerWorkflowInstanceParseDayforHourly() throws Exception {
+  public void testTriggerWorkflowInstanceParseDayForHourly() throws Exception {
     storage.storeWorkflow(HOURLY_WORKFLOW);
     WorkflowInstance toTrigger = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2015-12-31");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
-    assertThat(response.status(),
-               is(Status.BAD_REQUEST.withReasonPhrase("Cannot parse time parameter. "
-                                                      + "Expected schedule is HOURS: yyyy-MM-dd'T'HH")));
-    assertThat(triggeredWorkflow, isEmpty());
-    assertThat(triggeredInstant, isEmpty());
+    assertThat(response.status(), is(Status.OK));
+    assertThat(triggeredInstant, hasValue(Instant.parse("2015-12-31T00:00:00.000Z")));
+    assertThat(triggeredWorkflow, hasValue(HOURLY_WORKFLOW));
   }
 
   @Test
-  public void testTriggerWorkflowInstanceParseHourforDaily() throws Exception {
-    storage.storeWorkflow(DAILY_WORKFLOW);
-    WorkflowInstance toTrigger = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2015-12-31T00");
+  public void testTriggerWorkflowInstanceParseFailure() throws Exception {
+    storage.storeWorkflow(HOURLY_WORKFLOW);
+    WorkflowInstance toTrigger = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2015");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
     assertThat(response.status(),
-               is(Status.BAD_REQUEST.withReasonPhrase("Cannot parse time parameter. "
-                                                      + "Expected schedule is DAYS: yyyy-MM-dd")));
+               is(Status.BAD_REQUEST.withReasonPhrase("Cannot parse time parameter 2015 - "
+                                                      + "Text '2015' could not be parsed at index 4")));
     assertThat(triggeredWorkflow, isEmpty());
     assertThat(triggeredInstant, isEmpty());
   }

@@ -25,7 +25,6 @@ import static com.spotify.styx.api.Api.Version.V2;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.util.ParameterUtil.rangeOfInstants;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
-import static com.spotify.styx.util.ParameterUtil.truncateInstant;
 import static com.spotify.styx.util.StreamUtil.cat;
 import static java.util.stream.Collectors.toList;
 
@@ -57,6 +56,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.ReplayEvents;
+import com.spotify.styx.util.TimeUtil;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
@@ -255,12 +255,12 @@ public final class BackfillResource {
       throw Throwables.propagate(e);
     }
 
-    if (truncateInstant(input.start(), schedule) != input.start()) {
+    if (!TimeUtil.isAligned(input.start(), schedule)) {
       return Response.forStatus(
           Status.BAD_REQUEST.withReasonPhrase("start parameter not aligned with schedule"));
     }
 
-    if (truncateInstant(input.end(), schedule) != input.end()) {
+    if (!TimeUtil.isAligned(input.end(), schedule)) {
       return Response.forStatus(
           Status.BAD_REQUEST.withReasonPhrase("end parameter not aligned with schedule"));
     }

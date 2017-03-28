@@ -20,7 +20,7 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.util.ParameterUtil.incrementInstant;
+import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
@@ -284,7 +284,7 @@ public class Scheduler {
           throw new RuntimeException(e);
         }
 
-        partition = incrementInstant(partition, backfill.schedule());
+        partition = nextInstant(partition, backfill.schedule());
         storeBackfill(backfill.builder()
             .nextTrigger(partition)
             .build());

@@ -25,9 +25,9 @@ import static com.spotify.styx.serialization.Json.serialize;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;

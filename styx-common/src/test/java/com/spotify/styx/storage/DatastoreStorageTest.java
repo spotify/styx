@@ -24,7 +24,7 @@ import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.model.WorkflowState.patchDockerImage;
-import static com.spotify.styx.testdata.TestData.FULL_DATA_WORKFLOW_CONFIGURATION;
+import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
@@ -47,15 +47,17 @@ import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.TriggerInstantSpec;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -82,14 +84,16 @@ public class DatastoreStorageTest {
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_EMPTY_CONF =
       WorkflowConfiguration.create(
-          WORKFLOW_ID_NO_DOCKER_IMG.id(), DAYS, empty(), empty(), empty(), empty(), emptyList());
+          WORKFLOW_ID_NO_DOCKER_IMG.id(), DAYS, empty(), empty(), empty(), empty(), empty(),
+          emptyList());
   private static final Optional<String> DOCKER_IMAGE = of("busybox");
   private static final String DOCKER_IMAGE_COMPONENT = "busybox:component";
   private static final String DOCKER_IMAGE_WORKFLOW = "busybox:workflow";
   private static final String COMMIT_SHA = "dcee675978b4d89e291bb695d0ca7deaf05d2a32";
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_WITH_DOCKER_IMAGE =
       WorkflowConfiguration.create(
-          WORKFLOW_ID_WITH_DOCKER_IMG.id(), DAYS, DOCKER_IMAGE, empty(), empty(), empty(), emptyList());
+          WORKFLOW_ID_WITH_DOCKER_IMG.id(), DAYS, empty(), DOCKER_IMAGE, empty(), empty(), empty(),
+          emptyList());
   private static final Workflow
       WORKFLOW_NO_DOCKER_IMAGE =
       Workflow.create(WORKFLOW_ID_NO_DOCKER_IMG.componentId(), URI.create("http://foo"),
@@ -102,8 +106,6 @@ public class DatastoreStorageTest {
       WORKFLOW_WITH_DOCKER_IMAGE =
       Workflow.create(WORKFLOW_ID_WITH_DOCKER_IMG.componentId(), URI.create("http://foo"),
                       WORKFLOW_CONFIGURATION_WITH_DOCKER_IMAGE);
-
-  private static final Instant NEXT_EXECUTION = Instant.parse("2016-03-14T14:00:00Z");
 
   private static LocalDatastoreHelper helper;
   private DatastoreStorage storage;
@@ -141,7 +143,7 @@ public class DatastoreStorageTest {
   @Test
   public void shouldPersistWorkflows() throws Exception {
     Workflow workflow = Workflow.create("test", URI.create("http://foo"),
-                                        FULL_DATA_WORKFLOW_CONFIGURATION);
+        FULL_WORKFLOW_CONFIGURATION);
     storage.store(workflow);
     Optional<Workflow> retrieved = storage.workflow(workflow.id());
 
@@ -161,29 +163,31 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldPersistNextScheduledRun() throws Exception {
-    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
-    storage.updateNextNaturalTrigger(WORKFLOW_WITH_DOCKER_IMAGE.id(), NEXT_EXECUTION);
+    Instant instant = Instant.parse("2016-03-14T14:00:00Z");
+    Instant offset = instant.plus(1, ChronoUnit.DAYS);
+    TriggerInstantSpec spec = TriggerInstantSpec.create(instant, offset);
 
-    final Map<Workflow, Optional<Instant>>
-        result =
-        storage.workflowsWithNextNaturalTrigger();
+    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
+    storage.updateNextNaturalTrigger(WORKFLOW_WITH_DOCKER_IMAGE.id(), spec);
+
+    final Map<Workflow, TriggerInstantSpec> result = storage.workflowsWithNextNaturalTrigger();
     assertThat(result.values().size(), is(1));
-    assertThat(result, hasEntry(WORKFLOW_WITH_DOCKER_IMAGE, Optional.of(NEXT_EXECUTION)));
+    assertThat(result, hasEntry(WORKFLOW_WITH_DOCKER_IMAGE, spec));
   }
 
   @Test
   public void shouldNotRemoveWorkflowWhenSettingDockerImage() throws Exception {
     Workflow workflow = Workflow.create("test", URI.create("http://foo"),
-                                        FULL_DATA_WORKFLOW_CONFIGURATION);
+        FULL_WORKFLOW_CONFIGURATION);
     storage.store(workflow);
     Optional<Workflow> retrieved = storage.workflow(workflow.id());
     assertThat(retrieved, is(Optional.of(workflow)));
 
     storage.patchState(workflow.id(), patchDockerImage(
-        FULL_DATA_WORKFLOW_CONFIGURATION.dockerImage().get()));
+        FULL_WORKFLOW_CONFIGURATION.dockerImage().get()));
     Optional<String> dockerImg = storage.getDockerImage(workflow.id());
     retrieved = storage.workflow(workflow.id());
-    assertThat(dockerImg, is(FULL_DATA_WORKFLOW_CONFIGURATION.dockerImage()));
+    assertThat(dockerImg, is(FULL_WORKFLOW_CONFIGURATION.dockerImage()));
     assertThat(retrieved, is(Optional.of(workflow)));
   }
 
@@ -232,7 +236,7 @@ public class DatastoreStorageTest {
         WORKFLOW_ID1.componentId(),
         URI.create("http://foo"),
         WorkflowConfiguration
-            .create(WORKFLOW_ID1.id(), DAYS, empty(), empty(), empty(), empty(), emptyList())));
+            .create(WORKFLOW_ID1.id(), DAYS, empty(), empty(), empty(), empty(), empty(), emptyList())));
     storage.patchState(WORKFLOW_ID1, patchDockerImage(DOCKER_IMAGE_WORKFLOW));
     Optional<String> retrieved = storage.getDockerImage(WORKFLOW_ID1);
 
@@ -245,7 +249,7 @@ public class DatastoreStorageTest {
         WORKFLOW_ID1.componentId(),
         URI.create("http://foo"),
         WorkflowConfiguration
-            .create(WORKFLOW_ID1.id(), DAYS, empty(), empty(), empty(), empty(), emptyList())));
+            .create(WORKFLOW_ID1.id(), DAYS, empty(), empty(), empty(), empty(), empty(), emptyList())));
     storage.patchState(WORKFLOW_ID1, WorkflowState.builder().commitSha(COMMIT_SHA).build());
     WorkflowState retrieved = storage.workflowState(WORKFLOW_ID1);
 
@@ -497,7 +501,7 @@ public class DatastoreStorageTest {
         WORKFLOW_ID1.componentId(),
         URI.create("http://not/important"),
         WorkflowConfiguration
-            .create(WORKFLOW_ID1.id(), DAYS, empty(), empty(), empty(), empty(), emptyList())));
+            .create(WORKFLOW_ID1.id(), DAYS, empty(), empty(), empty(), empty(), empty(), emptyList())));
     WorkflowState state = WorkflowState.builder()
         .enabled(true)
         .dockerImage(DOCKER_IMAGE.get())
@@ -558,6 +562,6 @@ public class DatastoreStorageTest {
         workflowId.componentId(),
         URI.create("http://foo"),
         WorkflowConfiguration
-            .create(workflowId.id(), HOURS, empty(), empty(), empty(), empty(), emptyList()));
+            .create(workflowId.id(), HOURS, empty(), empty(), empty(), empty(), empty(), emptyList()));
   }
 }

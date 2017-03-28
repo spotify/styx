@@ -29,8 +29,8 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.util.TriggerUtil;
 import java.util.Arrays;

@@ -108,26 +108,25 @@ To define a schedule, simply write a  yaml file to `/etc/styx` (given the above 
 ```yaml
 schedules:
   - id: my-workflow
-    schedule: hours
+    schedule: @hourly
     docker_image: my-workflow:0.1
     docker_args: ['./run.sh', '{}']
 ```
 
-- `schedules` **[schedule]**: The main key, containing a list of schedules
+#### `schedules` **[schedule]**
+The main key, containing a list of schedules.
 
-- `schedule[].id` **string**: A unique identifier for the workflow (lower-case-hyphenated)
- - This identifier is used to refer to the workflow through the API.
+#### `schedule[].id` **string**
+A unique identifier for the workflow (lower-case-hyphenated). This identifier is used to refer to
+ the workflow through the API.
 
-- `schedule[].schedule` **string**: How often the workflow should be triggered
- - Allowed values are `hourly`, `daily`, `weekly`
-  - *todo: support more intervals*
-  - *todo: support cron syntax*
+#### `schedule[].docker_image` **string**:
+The docker image that should be executed.
 
-- `schedule[].docker_image` **string**: The docker image that should be executed
- - The docker image that contains the workflow
+#### `schedule[].docker_args` **[string]**
+The arguments passed to the docker image.
 
-- `schedule[].docker_args` **[string]**: The arguments passed to the docker image
- - This list should only contain strings. These will be passed as the arguments to the docker
+This list should only contain strings. These will be passed as the arguments to the docker
 container. Any occurrences of the `"{}"` placeholder argument will be replaced with the current
 partition date or datehour. Note that it must be quoted in the yaml file in order no to be
 interpreted as an object.
@@ -138,6 +137,33 @@ Example arguments for the supported schedule values:
 - daily  - 2016-04-01,    2016-04-02,    ...
 - weekly - 2016-04-04,    2016-04-11,    ... (Mondays)
 ```
+
+#### `schedule[].schedule` **string**
+How often the workflow should be triggered.
+
+Supports [cron] syntax, along with a set of human readable aliases:
+```
+@hourly,   hourly  = 0 * * * *
+@daily`,   daily   = 0 0 * * *
+@weekly,   weekly  = 0 0 * * MON
+@monthly,  monthly = 0 0 1 * *
+@yearly,   yearly  = 0 0 1 1 *
+@annually, annualy = 0 0 1 1 *
+```
+
+#### `schedule[].offset` **string**
+An [ISO 8601 Duration] specification for offsetting the cron schedule.
+
+This is useful for when setting up a schedule that needs to be offset in time relative to the
+schedule timestamps. For instance, an hourly schedule that needs to process a bucket of data
+for each hour will not be able to run until at the end of that hour. We can then use an offset
+value of `PT1H`. The injected placeholder would reflect the logical time of the schedule (00,
+01, 02, ...), but it would actually run one hour later (01, 02, 03, ...). This is specially
+useful for irregular schedules.
+
+In fact, it is so common that we need to use a "last hour" parameter in jobs that we've set the
+default offset for all the well known (aliased) schedules to +1 period. E.g for an `@hourly`
+schedule, the default offset is `PT1H`, and for a `@daily` schedule the offset is `P1D`
 
 ### Triggering and executions
 
@@ -173,3 +199,5 @@ expected to honor this code.
 [Apollo]: https://spotify.github.io/apollo/
 [Luigi]: https://github.com/spotify/luigi
 [code-of-conduct]: https://github.com/spotify/code-of-conduct/blob/master/code-of-conduct.md
+[cron]: https://en.wikipedia.org/wiki/Cron
+[ISO 8601 Duration]: https://en.wikipedia.org/wiki/ISO_8601#Durations

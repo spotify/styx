@@ -32,9 +32,9 @@ import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.Lists;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
@@ -172,6 +172,7 @@ public class ExecutionDescriptionHandlerTest {
     WorkflowConfiguration workflowConfiguration = WorkflowConfiguration.create(
         "styx.TestEndpoint",
         HOURS,
+        empty(),
         Optional.of("legacy-docker-image"),
         Optional.of(Lists.newArrayList("foo", "bar")),
         empty(),
@@ -197,6 +198,7 @@ public class ExecutionDescriptionHandlerTest {
     return WorkflowConfiguration.create(
         "styx.TestEndpoint",
         HOURS,
+        empty(),
         Optional.empty(),
         Optional.of(Lists.newArrayList(args)),
         empty(),

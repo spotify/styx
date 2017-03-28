@@ -40,10 +40,10 @@ import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
@@ -246,6 +246,7 @@ public class DockerRunnerHandlerTest {
     return WorkflowConfiguration.create(
         "styx.TestEndpoint",
         HOURS,
+        empty(),
         Optional.of(TEST_DOCKER_IMAGE),
         Optional.of(Lists.newArrayList(args)),
         empty(),

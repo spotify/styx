@@ -82,7 +82,7 @@ public abstract class WorkflowConfiguration {
 
   public static com.spotify.styx.model.WorkflowConfiguration create(WorkflowConfiguration workflowConfiguration) {
     return com.spotify.styx.model.WorkflowConfiguration
-        .create(workflowConfiguration.id(), workflowConfiguration.partitioning(),
+        .create(workflowConfiguration.id(), workflowConfiguration.partitioning(), Optional.empty(),
                 workflowConfiguration.dockerImage(), workflowConfiguration.dockerArgs(),
                 Optional.of(workflowConfiguration.dockerTerminationLogging()),
                 Secret.create(workflowConfiguration.secret()),

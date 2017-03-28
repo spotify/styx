@@ -51,8 +51,8 @@ import com.spotify.styx.api.Api;
 import com.spotify.styx.api.VersionedApiTest;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Schedule;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.state.Trigger;
@@ -89,7 +89,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration
-          .create("bar", Schedule.DAYS, empty(), empty(), empty(), empty(), emptyList());
+          .create("bar", Schedule.DAYS, empty(), empty(), empty(), empty(), empty(), emptyList());
 
   private static final Workflow WORKFLOW =
       Workflow.create("foo", URI.create("/hejhej"), WORKFLOW_CONFIGURATION);
