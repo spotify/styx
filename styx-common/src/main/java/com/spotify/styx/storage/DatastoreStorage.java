@@ -260,6 +260,7 @@ class DatastoreStorage {
   }
 
   @Deprecated
+  @VisibleForTesting
   public void updateNextNaturalTrigger(WorkflowId workflowId, Instant instant) throws IOException {
     storeWithRetries(() -> datastore.runInTransaction(transaction -> {
       final Key workflowKey = workflowKey(workflowId);
@@ -277,14 +278,14 @@ class DatastoreStorage {
   }
 
   public Map<Workflow, TriggerInstantSpec> workflowsWithNextNaturalTrigger() throws IOException {
-    Map<Workflow, TriggerInstantSpec> map = Maps.newHashMap();
+    final Map<Workflow, TriggerInstantSpec> map = Maps.newHashMap();
     final EntityQuery query =
         Query.entityQueryBuilder().kind(KIND_WORKFLOW).build();
     final QueryResults<Entity> result = datastore.run(query);
 
     while (result.hasNext()) {
       final Entity entity = result.next();
-      Workflow workflow;
+      final Workflow workflow;
       try {
         workflow = OBJECT_MAPPER.readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
       } catch (IOException e) {
@@ -294,7 +295,7 @@ class DatastoreStorage {
 
       if (entity.contains(PROPERTY_NEXT_NATURAL_TRIGGER)) {
         Instant instant = datetimeToInstant(entity.getDateTime(PROPERTY_NEXT_NATURAL_TRIGGER));
-        Instant triggerInstant;
+        final Instant triggerInstant;
 
         // todo: this check is only needed during a transition period
         if (!entity.contains(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER)) {
@@ -310,7 +311,6 @@ class DatastoreStorage {
 
         map.put(workflow, TriggerInstantSpec.create(instant, triggerInstant));
       }
-
     }
     return map;
   }

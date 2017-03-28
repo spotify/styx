@@ -39,7 +39,7 @@ public abstract class TriggerInstantSpec {
   public abstract Instant instant();
 
   /**
-   * The actual instant at which the Workflow will be instantiated, with respect to the
+   * The actual instant at which the Workflow will be triggered, with respect to the
    * {@link WorkflowConfiguration#schedule()}.
    */
   public abstract Instant offsetInstant();

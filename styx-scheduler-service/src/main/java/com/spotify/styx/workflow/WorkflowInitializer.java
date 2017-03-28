@@ -22,7 +22,6 @@ package com.spotify.styx.workflow;
 
 import static com.spotify.styx.util.TimeUtil.lastInstant;
 
-import com.google.common.base.Throwables;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.storage.Storage;
@@ -49,7 +48,7 @@ public class WorkflowInitializer {
       previous = storage.workflow(workflow.id());
       storage.storeWorkflow(workflow);
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
 
     // either the workflow is completely new, or the schedule has changed
@@ -70,7 +69,7 @@ public class WorkflowInitializer {
     try {
       storage.updateNextNaturalTrigger(workflow.id(), nextSpec);
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
   }
 }

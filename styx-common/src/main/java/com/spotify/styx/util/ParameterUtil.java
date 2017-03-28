@@ -155,7 +155,7 @@ public final class ParameterUtil {
     final Schedule.WellKnown wellKnown = schedule.wellKnown();
 
     Matcher matcher;
-    ZonedDateTime parsed;
+    final ZonedDateTime parsed;
     if (wellKnown == YEARLY && (matcher = YEAR_PATTERN.matcher(dateHour)).matches()) {
       parsed = LocalDate.of(parseInt(matcher.group(1)), 1, 1).atStartOfDay(UTC);
     } else if (wellKnown == MONTHLY && (matcher = YEAR_MONTH_PATTERN.matcher(dateHour)).matches()) {

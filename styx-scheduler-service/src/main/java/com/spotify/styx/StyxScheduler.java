@@ -308,7 +308,7 @@ public class StyxScheduler implements AppInit {
     final DockerRunner dockerRunner = instrument(DockerRunner.class, routingDockerRunner, stats, time);
     final Publisher publisher = publisherFactory.apply(environment);
 
-    RateLimiter submissionRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
+    final RateLimiter submissionRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
 
     final OutputHandler[] outputHandlers = new OutputHandler[] {
         transitionLogger(""),

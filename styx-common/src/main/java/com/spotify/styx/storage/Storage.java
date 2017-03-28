@@ -20,6 +20,7 @@
 
 package com.spotify.styx.storage;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
@@ -129,6 +130,7 @@ public interface Storage {
   void updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec triggerSpec) throws IOException;
 
   @Deprecated
+  @VisibleForTesting
   void updateNextNaturalTriggerOld(WorkflowId workflowId, Instant instant) throws IOException;
 
   /**
