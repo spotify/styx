@@ -33,14 +33,12 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.ResourceNotFoundException;
-import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -139,13 +137,12 @@ public class DockerRunnerHandler implements OutputHandler {
     final List<String> dockerArgs = executionDescription.dockerArgs();
     final String parameter = workflowInstance.parameter();
     final List<String> command = argsReplace(dockerArgs, parameter);
-    final Optional<String> triggerId = state.data().trigger().map(TriggerUtil::triggerId);
     final DockerRunner.RunSpec runSpec = DockerRunner.RunSpec.create(
         dockerImage,
         ImmutableList.copyOf(command),
         executionDescription.dockerTerminationLogging(),
         executionDescription.secret(),
-        triggerId);
+        state.data().trigger());
 
     LOG.info("running:{} image:{} args:{} termination_logging:{}", workflowInstance.toKey(),
         runSpec.imageName(), runSpec.args(), runSpec.terminationLogging());

@@ -28,6 +28,7 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.Trigger;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import java.io.Closeable;
 import java.io.IOException;
@@ -70,15 +71,15 @@ public interface DockerRunner extends Closeable {
 
     public abstract Optional<WorkflowConfiguration.Secret> secret();
 
-    public abstract Optional<String> triggerId();
+    public abstract Optional<Trigger> trigger();
 
     public static RunSpec create(
         String imageName,
         ImmutableList<String> args,
         boolean terminationLogging,
         Optional<WorkflowConfiguration.Secret> secret,
-        Optional<String> triggerId) {
-      return new AutoValue_DockerRunner_RunSpec(imageName, args, terminationLogging, secret, triggerId);
+        Optional<Trigger> trigger) {
+      return new AutoValue_DockerRunner_RunSpec(imageName, args, terminationLogging, secret, trigger);
     }
 
     public static RunSpec simple(String imageName, String... args) {
