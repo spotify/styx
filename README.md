@@ -39,11 +39,11 @@ a Workflow is triggered, a Workflow Instance is created. The Workflow instance i
 track of Workflow Instance executions and provides information about them via the API.
 
 ## Development status
-Styx is in Alpha and is actively being developed. It is deployed internally at Spotify and is
-being used to run around 1500 different production workflows. Because of how we build and integrate
-infrastructure components at Spotify, this repository does not contain a GUI at the time of
-writing, while we do have one internally. The goal is to break out more of these components into
-open source projects that complement each other.
+Styx is actively being developed and deployed internally at Spotify where it is being used to run
+around 2200 production workflows. Because of how we build and integrate infrastructure components
+at Spotify, this repository does not contain a GUI at the time of writing, while we do have one
+internally. The goal is to break out more of these components into open source projects that
+complement each other.
 
 ### More docs
 
