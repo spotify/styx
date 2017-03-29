@@ -81,6 +81,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String PARAMETER = "STYX_PARAMETER";
   static final String EXECUTION_ID = "STYX_EXECUTION_ID";
   static final String TERMINATION_LOG = "STYX_TERMINATION_LOG";
+  static final String TRIGGER_ID = "STYX_TRIGGER_ID";
   static final int POLL_PODS_INTERVAL_SECONDS = 60;
 
   private static final ScheduledExecutorService EXECUTOR =
@@ -154,6 +155,10 @@ class KubernetesDockerRunner implements DockerRunner {
     env.add(new EnvVarBuilder()
         .withName(TERMINATION_LOG)
         .withValue("/dev/termination-log")
+        .build());
+    env.add(new EnvVarBuilder()
+        .withName(TRIGGER_ID)
+        .withValue(runSpec.triggerId().orElse(null))
         .build());
 
     PodBuilder podBuilder = new PodBuilder()

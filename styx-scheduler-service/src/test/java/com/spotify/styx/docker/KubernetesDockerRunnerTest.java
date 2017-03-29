@@ -73,7 +73,7 @@ public class KubernetesDockerRunnerTest {
 
   private static final String POD_NAME = "test-pod-1";
   private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(TestData.WORKFLOW_ID, "foo");
-  private static final RunSpec RUN_SPEC = RunSpec.create("busybox", ImmutableList.of(), false, Optional.empty());
+  private static final RunSpec RUN_SPEC = RunSpec.simple("busybox");
 
   @Mock KubernetesClient k8sClient;
 

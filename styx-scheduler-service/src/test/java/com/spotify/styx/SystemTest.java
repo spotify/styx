@@ -34,6 +34,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 
+import com.google.common.collect.ImmutableList;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
@@ -47,10 +48,12 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.TriggerUtil;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Optional;
+
 import org.junit.Test;
 
 public class SystemTest extends StyxSchedulerServiceFixture {
@@ -85,6 +88,14 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       .nextTrigger(Instant.parse("2015-01-01T00:00:00Z"))
       .schedule(Schedule.HOURS)
       .build();
+
+  private static RunSpec naturalRunSpec(String imageName, ImmutableList<String> args) {
+    return runSpec(imageName, args, TriggerUtil.NATURAL_TRIGGER_ID);
+  }
+
+  private static RunSpec runSpec(String imageName, ImmutableList<String> args, String triggerId) {
+    return RunSpec.create(imageName, args, false, empty(), Optional.of(triggerId));
+  }
 
   @Test
   public void shouldRunCustomWorkflowSchedule() throws Exception {
@@ -338,7 +349,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
-    assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T15")));
+    assertThat(runSpec, is(runSpec("busybox", ImmutableList.of("--hour", "2016-03-14T15"), TriggerUtil.NATURAL_TRIGGER_ID)));
   }
 
   @Test
@@ -356,7 +367,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
-    assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T15")));
+    assertThat(runSpec, is(naturalRunSpec("busybox", ImmutableList.of("--hour", "2016-03-14T15"))));
 
     injectEvent(Event.started(workflowInstance));
     injectEvent(Event.terminate(workflowInstance, Optional.of(20)));
@@ -383,7 +394,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance2 = dockerRuns.get(1)._1;
     RunSpec runSpec2 = dockerRuns.get(1)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
-    assertThat(runSpec2, is(RunSpec.simple("busybox:v777", "other", "args")));
+    assertThat(runSpec2, is(naturalRunSpec("busybox:v777", ImmutableList.of("other", "args"))));
   }
 
   @Test
@@ -460,14 +471,15 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    givenStoredEvent(Event.timeTrigger(workflowInstance),               0L);
-    givenStoredEvent(Event.started(workflowInstance),                   1L);
-    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(20)),2L);
-    givenStoredEvent(Event.retry(workflowInstance),                     3L);
-    givenStoredEvent(Event.started(workflowInstance),                   4L);
-    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(20)),5L);
-    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),         6L);
-    givenActiveStateAtSequenceCount(workflowInstance,                   6L);
+    givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER1),                       0L);
+    givenStoredEvent(Event.created(workflowInstance, TEST_EXECUTION_ID_1, TEST_DOCKER_IMAGE),  1L);
+    givenStoredEvent(Event.started(workflowInstance),                                          2L);
+    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(20)),                       3L);
+    givenStoredEvent(Event.retry(workflowInstance),                                            4L);
+    givenStoredEvent(Event.started(workflowInstance),                                          5L);
+    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(20)),                       6L);
+    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                                7L);
+    givenActiveStateAtSequenceCount(workflowInstance,                                          7L);
 
     styxStarts();
 
@@ -477,7 +489,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance2 = dockerRuns.get(0)._1;
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
-    assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T14")));
+    assertThat(runSpec, is(
+            runSpec("busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig1")));
   }
 
   @Test
@@ -513,7 +526,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance2 = dockerRuns.get(0)._1;
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
-    assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T14")));
+    assertThat(runSpec, is(
+            runSpec("busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig2")));
   }
 
   @Test
@@ -556,6 +570,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance2 = dockerRuns.get(0)._1;
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
-    assertThat(runSpec, is(RunSpec.simple("busybox", "--hour", "2016-03-14T14")));
+    assertThat(runSpec, is(
+            runSpec("busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig2")));
   }
 }
