@@ -83,7 +83,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String EXECUTION_ID = "STYX_EXECUTION_ID";
   static final String TERMINATION_LOG = "STYX_TERMINATION_LOG";
   static final String TRIGGER_ID = "STYX_TRIGGER_ID";
-  static final String TRIGGER_NAME = "STYX_TRIGGER_NAME";
+  static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
   static final int POLL_PODS_INTERVAL_SECONDS = 60;
 
   private static final ScheduledExecutorService EXECUTOR =
@@ -163,8 +163,8 @@ class KubernetesDockerRunner implements DockerRunner {
         .withValue(runSpec.trigger().map(TriggerUtil::triggerId).orElse(null))
         .build());
     env.add(new EnvVarBuilder()
-        .withName(TRIGGER_NAME)
-        .withValue(runSpec.trigger().map(TriggerUtil::name).orElse(null))
+        .withName(TRIGGER_TYPE)
+        .withValue(runSpec.trigger().map(TriggerUtil::triggerType).orElse(null))
         .build());
 
     PodBuilder podBuilder = new PodBuilder()

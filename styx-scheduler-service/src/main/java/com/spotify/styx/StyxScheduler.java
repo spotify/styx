@@ -500,14 +500,14 @@ public class StyxScheduler implements AppInit {
             .count();
 
     Arrays.stream(RunState.State.values()).forEach(state -> {
-      TriggerUtil.triggerTypesList().forEach(triggerTypeName ->
+      TriggerUtil.triggerTypesList().forEach(triggerType ->
           stats.registerActiveStates(
               state,
-              triggerTypeName,
+              triggerType,
               () -> stateManager.activeStates().values().stream()
                   .filter(runState -> runState.state().equals(state))
-                  .filter(runState -> runState.data().trigger().isPresent() && triggerTypeName
-                      .equals(TriggerUtil.name(runState.data().trigger().get())))
+                  .filter(runState -> runState.data().trigger().isPresent() && triggerType
+                      .equals(TriggerUtil.triggerType(runState.data().trigger().get())))
                   .count()));
       stats.registerActiveStates(
           state,

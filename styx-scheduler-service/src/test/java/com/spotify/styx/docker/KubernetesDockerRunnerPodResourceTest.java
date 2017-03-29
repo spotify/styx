@@ -212,7 +212,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     triggerId.setName(KubernetesDockerRunner.TRIGGER_ID);
     triggerId.setValue("trigger-id");
     EnvVar triggerName = new EnvVar();
-    triggerName.setName(KubernetesDockerRunner.TRIGGER_NAME);
+    triggerName.setName(KubernetesDockerRunner.TRIGGER_TYPE);
     triggerName.setValue("unknown");
 
     assertThat(envVars.size(), is(8));
