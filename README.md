@@ -49,7 +49,7 @@ open source projects that complement each other.
 
 * [Styx design](doc/design-overview.md)
 * [External services](doc/external-services.md)
-* [API Specification](doc/api.apib)
+* [API Specification](doc/api.apib) - [HTML version](https://spotify.github.io/styx/api.html)
 
 
 ## Usage
