@@ -224,15 +224,7 @@ class DatastoreStorage {
     final Key workflowKey = workflowKey(workflowId);
     return getOpt(datastore, workflowKey)
         .filter(e -> e.contains(PROPERTY_WORKFLOW_JSON))
-        .map(e -> {
-          try {
-            return OBJECT_MAPPER
-                .readValue(e.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
-          } catch (IOException e1) {
-            LOG.info("Failed to read workflow for {}, {}", workflowId.componentId(), workflowId.id());
-          }
-          return null;
-        });
+        .map(e -> parseWorkflowJson(e, workflowId));
   }
 
   void delete(WorkflowId workflowId) throws IOException {
@@ -381,6 +373,8 @@ class DatastoreStorage {
       state.commitSha().ifPresent(x -> builder.set(PROPERTY_COMMIT_SHA, x));
       state.nextNaturalTrigger()
           .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToDatetime(x)));
+      state.nextNaturalOffsetTrigger()
+          .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, instantToDatetime(x)));
       return transaction.put(builder.build());
     }));
   }
@@ -402,8 +396,8 @@ class DatastoreStorage {
   }
 
   Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
-    final Key workflowKey = workflowKey(workflowId);
-    Optional<String> dockerImage = getOptStringProperty(datastore, workflowKey, PROPERTY_DOCKER_IMAGE);
+    final Optional<Entity> workflowEntity = getOpt(datastore, workflowKey(workflowId));
+    Optional<String> dockerImage = getOptStringProperty(workflowEntity, PROPERTY_DOCKER_IMAGE);
     if (dockerImage.isPresent()) {
       return dockerImage;
     }
@@ -414,33 +408,47 @@ class DatastoreStorage {
       return dockerImage;
     }
 
-    return workflow(workflowId).flatMap(wf -> wf.configuration().dockerImage());
+    return workflowEntity.map(w -> parseWorkflowJson(w, workflowId))
+        .flatMap(wf -> wf.configuration().dockerImage());
   }
 
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
-    WorkflowState.Builder builder = WorkflowState.builder().enabled(enabled(workflowId));
-    getDockerImage(workflowId).ifPresent(builder::dockerImage);
-    getCommitSha(workflowId).ifPresent(builder::commitSha);
-    getNextNaturalTrigger(workflowId).ifPresent(builder::nextNaturalTrigger);
-    return builder.build();
-  }
+    final WorkflowState.Builder builder = WorkflowState.builder();
+    final Optional<Entity> workflowEntity = getOpt(datastore, workflowKey(workflowId));
 
-  private Optional<String> getCommitSha(WorkflowId workflowId) {
-    final Key workflowKey = workflowKey(workflowId);
-    Optional<String> commitSha = getOptStringProperty(datastore, workflowKey, PROPERTY_COMMIT_SHA);
-    if (commitSha.isPresent()) {
-      return commitSha;
+    builder.enabled(workflowEntity.filter(w -> w.contains(PROPERTY_WORKFLOW_ENABLED))
+                        .map(workflow -> workflow.getBoolean(PROPERTY_WORKFLOW_ENABLED))
+                        .orElse(DEFAULT_WORKFLOW_ENABLED));
+    workflowEntity.filter(w -> w.contains(PROPERTY_NEXT_NATURAL_TRIGGER))
+        .map(workflow -> datetimeToInstant(workflow.getDateTime(PROPERTY_NEXT_NATURAL_TRIGGER)))
+        .ifPresent(builder::nextNaturalTrigger);
+    workflowEntity.filter(w -> w.contains(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER))
+        .map(workflow -> datetimeToInstant(workflow.getDateTime(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER)))
+        .ifPresent(builder::nextNaturalOffsetTrigger);
+
+    Optional<String> dockerImage = getOptStringProperty(workflowEntity, PROPERTY_DOCKER_IMAGE);
+    Optional<String> commitSha = getOptStringProperty(workflowEntity, PROPERTY_COMMIT_SHA);
+
+    if (!dockerImage.isPresent() || !commitSha.isPresent()) {
+      final Optional<Entity> componentEntity =
+          getOpt(datastore, componentKeyFactory.newKey(workflowId.componentId()));
+
+      if (!dockerImage.isPresent()) {
+        dockerImage = getOptStringProperty(componentEntity, PROPERTY_DOCKER_IMAGE);
+        if (!dockerImage.isPresent()) {
+          dockerImage = workflowEntity.map(w -> parseWorkflowJson(w, workflowId))
+              .flatMap(wf -> wf.configuration().dockerImage());
+        }
+      }
+
+      if (!commitSha.isPresent()) {
+        commitSha = getOptStringProperty(componentEntity, PROPERTY_COMMIT_SHA);
+      }
     }
+    dockerImage.ifPresent(builder::dockerImage);
+    commitSha.ifPresent(builder::commitSha);
 
-    final Key componentKey = componentKeyFactory.newKey(workflowId.componentId());
-    return getOptStringProperty(datastore, componentKey, PROPERTY_COMMIT_SHA);
-  }
-
-  private Optional<Instant> getNextNaturalTrigger(WorkflowId workflowId) {
-    final Key workflowKey = workflowKey(workflowId);
-    return getOpt(datastore, workflowKey)
-        .filter(w -> w.contains(PROPERTY_NEXT_NATURAL_TRIGGER))
-        .map(workflow -> datetimeToInstant(workflow.getDateTime(PROPERTY_NEXT_NATURAL_TRIGGER)));
+    return builder.build();
   }
 
   private <T> T storeWithRetries(FnWithException<T, IOException> storingOperation) throws IOException {
@@ -501,6 +509,16 @@ class DatastoreStorage {
     return WorkflowId.create(componentId, id);
   }
 
+  private Workflow parseWorkflowJson(Entity entity, WorkflowId workflowId) {
+    try {
+      return OBJECT_MAPPER
+          .readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
+    } catch (IOException e1) {
+      LOG.info("Failed to read workflow for {}, {}", workflowId.componentId(), workflowId.id());
+      return null;
+    }
+  }
+
   /**
    * Optionally get an {@link Entity} from a {@link DatastoreReader}.
    *
@@ -520,6 +538,18 @@ class DatastoreStorage {
   private Optional<String> getOptStringProperty(DatastoreReader datastoreReader, Key key,
                                                 String property) {
     return getOpt(datastoreReader, key)
+        .filter(e -> e.contains(property))
+        .map(e -> e.getString(property));
+  }
+
+  /**
+   * Optionally get a value for an {@link Entity}'s property.
+   *
+   * @return an optional containing the property value if it existed, empty otherwise.
+   */
+  private Optional<String> getOptStringProperty(Optional<Entity> entity,
+                                                String property) {
+    return entity
         .filter(e -> e.contains(property))
         .map(e -> e.getString(property));
   }

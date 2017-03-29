@@ -100,7 +100,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private static final ByteString STATEPAYLOAD_FULL =
       ByteString.encodeUtf8("{\"enabled\":\"true\", \"docker_image\":\"cherry:image\", "
                             + "\"commit_sha\":\"" + VALID_SHA
-                            + "\", \"next_natural_trigger\":\"2016-08-10T07:00:01Z\"}");
+                            + "\", \"next_natural_trigger\":\"2016-08-10T07:00:01Z\", "
+                            + "\"next_natural_offset_trigger\":\"2016-08-10T08:00:01Z\"}");
 
   private static final ByteString STATEPAYLOAD_ENABLED =
       ByteString.encodeUtf8("{\"enabled\":\"true\"}");
@@ -178,6 +179,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "docker_image", equalTo("cherry:image"));
     assertJson(response, "commit_sha", equalTo(VALID_SHA));
     assertJson(response, "next_natural_trigger", equalTo("2016-08-10T07:00:01Z"));
+    assertJson(response, "next_natural_offset_trigger", equalTo("2016-08-10T08:00:01Z"));
 
     assertThat(storage.enabled(WORKFLOW.id()), is(true));
     assertThat(storage.workflowState(WORKFLOW.id()).dockerImage().get(), is("cherry:image"));

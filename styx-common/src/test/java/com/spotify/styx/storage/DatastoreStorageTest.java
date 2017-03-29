@@ -511,6 +511,7 @@ public class DatastoreStorageTest {
         .dockerImage(DOCKER_IMAGE.get())
         .commitSha(COMMIT_SHA)
         .nextNaturalTrigger(instant)
+        .nextNaturalOffsetTrigger(offset)
         .build();
     storage.patchState(WORKFLOW_ID1, state);
 

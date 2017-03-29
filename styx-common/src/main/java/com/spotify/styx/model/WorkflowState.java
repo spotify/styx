@@ -43,9 +43,11 @@ public abstract class WorkflowState {
   @JsonProperty
   public abstract Optional<String> commitSha();
 
-  // todo: update to TriggerInstantSpec
   @JsonProperty
   public abstract Optional<Instant> nextNaturalTrigger();
+
+  @JsonProperty
+  public abstract Optional<Instant> nextNaturalOffsetTrigger();
 
   public abstract Builder toBuilder();
 
@@ -60,6 +62,7 @@ public abstract class WorkflowState {
     public abstract Builder dockerImage(String dockerImage);
     public abstract Builder commitSha(String commitSha);
     public abstract Builder nextNaturalTrigger(Instant nextNaturalTrigger);
+    public abstract Builder nextNaturalOffsetTrigger(Instant nextNaturalOffsetTrigger);
 
     public abstract WorkflowState build();
   }
@@ -69,12 +72,14 @@ public abstract class WorkflowState {
       @JsonProperty("enabled") Optional<Boolean> enabled,
       @JsonProperty("docker_image") Optional<String> dockerImage,
       @JsonProperty("commit_sha") Optional<String> commitSha,
-      @JsonProperty("next_natural_trigger") Optional<Instant> nextNaturalTrigger) {
+      @JsonProperty("next_natural_trigger") Optional<Instant> nextNaturalTrigger,
+      @JsonProperty("next_natural_offset_trigger") Optional<Instant> nextNaturalOffsetTrigger) {
     Builder builder = builder();
     enabled.ifPresent(builder::enabled);
     dockerImage.ifPresent(builder::dockerImage);
     commitSha.ifPresent(builder::commitSha);
     nextNaturalTrigger.ifPresent(builder::nextNaturalTrigger);
+    nextNaturalOffsetTrigger.ifPresent(builder::nextNaturalOffsetTrigger);
     return builder.build();
   }
 
