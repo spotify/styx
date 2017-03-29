@@ -187,7 +187,7 @@ For each execution, Styx will inject a set of environment variables into the con
 | `STYX_WORKFLOW_ID` | The workflow id of the workflow that is being executed. This is the `id` field specified in the workflow schedule. |
 | `STYX_PARAMETER` | The parameter argument. See section about `docker_args` above. |
 | `STYX_TRIGGER_ID` | The ID of the trigger which is being executed. |
-| `STYX_TRIGGER_NAME` | The name of the trigger which is being executed. |
+| `STYX_TRIGGER_TYPE` | The type of the trigger which is being executed. Possible values are: `natural`, `adhoc`, `backfill` and `unknown` |
 | `STYX_EXECUTION_ID` | A unique identifier for the execution. This is the execution id used to identify execution attempts of a trigger. |
 | `STYX_EXECUTION_COUNTER` | **to be implemented** - A counter indicating which execution this is. Goes from 0..N per trigger. |
 
