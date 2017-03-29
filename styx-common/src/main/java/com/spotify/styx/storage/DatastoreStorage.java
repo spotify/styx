@@ -421,6 +421,7 @@ class DatastoreStorage {
     WorkflowState.Builder builder = WorkflowState.builder().enabled(enabled(workflowId));
     getDockerImage(workflowId).ifPresent(builder::dockerImage);
     getCommitSha(workflowId).ifPresent(builder::commitSha);
+    getNextNaturalTrigger(workflowId).ifPresent(builder::nextNaturalTrigger);
     return builder.build();
   }
 
@@ -433,6 +434,13 @@ class DatastoreStorage {
 
     final Key componentKey = componentKeyFactory.newKey(workflowId.componentId());
     return getOptStringProperty(datastore, componentKey, PROPERTY_COMMIT_SHA);
+  }
+
+  private Optional<Instant> getNextNaturalTrigger(WorkflowId workflowId) {
+    final Key workflowKey = workflowKey(workflowId);
+    return getOpt(datastore, workflowKey)
+        .filter(w -> w.contains(PROPERTY_NEXT_NATURAL_TRIGGER))
+        .map(workflow -> datetimeToInstant(workflow.getDateTime(PROPERTY_NEXT_NATURAL_TRIGGER)));
   }
 
   private <T> T storeWithRetries(FnWithException<T, IOException> storingOperation) throws IOException {
