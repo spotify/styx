@@ -402,8 +402,9 @@ class DatastoreStorage {
       return dockerImage;
     }
 
-    final Key componentKey = componentKeyFactory.newKey(workflowId.componentId());
-    dockerImage = getOptStringProperty(datastore, componentKey, PROPERTY_DOCKER_IMAGE);
+    dockerImage = getOptStringProperty(datastore,
+                                       componentKeyFactory.newKey(workflowId.componentId()),
+                                       PROPERTY_DOCKER_IMAGE);
     if (dockerImage.isPresent()) {
       return dockerImage;
     }
@@ -419,11 +420,9 @@ class DatastoreStorage {
     builder.enabled(workflowEntity.filter(w -> w.contains(PROPERTY_WORKFLOW_ENABLED))
                         .map(workflow -> workflow.getBoolean(PROPERTY_WORKFLOW_ENABLED))
                         .orElse(DEFAULT_WORKFLOW_ENABLED));
-    workflowEntity.filter(w -> w.contains(PROPERTY_NEXT_NATURAL_TRIGGER))
-        .map(workflow -> datetimeToInstant(workflow.getDateTime(PROPERTY_NEXT_NATURAL_TRIGGER)))
+    getOptInstantProperty(workflowEntity, PROPERTY_NEXT_NATURAL_TRIGGER)
         .ifPresent(builder::nextNaturalTrigger);
-    workflowEntity.filter(w -> w.contains(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER))
-        .map(workflow -> datetimeToInstant(workflow.getDateTime(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER)))
+    getOptInstantProperty(workflowEntity, PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER)
         .ifPresent(builder::nextNaturalOffsetTrigger);
 
     Optional<String> dockerImage = getOptStringProperty(workflowEntity, PROPERTY_DOCKER_IMAGE);
@@ -531,7 +530,7 @@ class DatastoreStorage {
   }
 
   /**
-   * Optionally get a value for an {@link Entity}'s property from a {@link DatastoreReader}.
+   * Optionally get a string value for an {@link Entity}'s property from a {@link DatastoreReader}.
    *
    * @return an optional containing the property value if it existed, empty otherwise.
    */
@@ -543,7 +542,7 @@ class DatastoreStorage {
   }
 
   /**
-   * Optionally get a value for an {@link Entity}'s property.
+   * Optionally get a string value for an {@link Entity}'s property.
    *
    * @return an optional containing the property value if it existed, empty otherwise.
    */
@@ -552,6 +551,18 @@ class DatastoreStorage {
     return entity
         .filter(e -> e.contains(property))
         .map(e -> e.getString(property));
+  }
+
+  /**
+   * Optionally get an {@link Instant} value for an {@link Entity}'s property.
+   *
+   * @return an optional containing the property value if it existed, empty otherwise.
+   */
+  private Optional<Instant> getOptInstantProperty(Optional<Entity> entity,
+                                                String property) {
+    return entity
+        .filter(w -> w.contains(property))
+        .map(workflow -> datetimeToInstant(workflow.getDateTime(property)));
   }
 
   /**
