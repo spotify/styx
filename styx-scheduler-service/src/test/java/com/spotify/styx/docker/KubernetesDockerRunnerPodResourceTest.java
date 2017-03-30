@@ -34,6 +34,7 @@ import static org.junit.Assert.assertThat;
 import com.google.common.collect.ImmutableList;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
 import io.fabric8.kubernetes.api.model.Container;
 import io.fabric8.kubernetes.api.model.EnvVar;
@@ -193,7 +194,9 @@ public class KubernetesDockerRunnerPodResourceTest {
   public void shouldConfigureEnvironmentVariables() throws Exception {
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec.create("busybox", ImmutableList.of(), false, empty(), Optional.of("trigger-id")));
+        DockerRunner.RunSpec
+            .create("busybox", ImmutableList.of(), false, empty(),
+                    Optional.of(Trigger.unknown("trigger-id"))));
     List<EnvVar> envVars = pod.getSpec().getContainers().get(0).getEnv();
 
     EnvVar workflow = new EnvVar();
@@ -208,13 +211,18 @@ public class KubernetesDockerRunnerPodResourceTest {
     EnvVar triggerId = new EnvVar();
     triggerId.setName(KubernetesDockerRunner.TRIGGER_ID);
     triggerId.setValue("trigger-id");
-    EnvVar execution = envVars.get(4);
+    EnvVar triggerName = new EnvVar();
+    triggerName.setName(KubernetesDockerRunner.TRIGGER_TYPE);
+    triggerName.setValue("unknown");
 
-    assertThat(envVars.size(), is(7));
+    assertThat(envVars.size(), is(8));
     assertThat(envVars, hasItem(component));
     assertThat(envVars, hasItem(workflow));
     assertThat(envVars, hasItem(parameter));
     assertThat(envVars, hasItem(triggerId));
+    assertThat(envVars, hasItem(triggerName));
+
+    EnvVar execution = envVars.get(4);
     assertThat(execution.getName(),is(KubernetesDockerRunner.EXECUTION_ID));
     assertThat(execution.getValue(),
         matchesPattern(KubernetesDockerRunner.STYX_RUN + "-" + UUID_REGEX));

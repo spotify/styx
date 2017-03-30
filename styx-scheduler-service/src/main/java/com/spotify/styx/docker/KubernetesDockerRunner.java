@@ -40,6 +40,7 @@ import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.util.TriggerUtil;
 import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.EnvVarBuilder;
 import io.fabric8.kubernetes.api.model.Pod;
@@ -82,6 +83,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String EXECUTION_ID = "STYX_EXECUTION_ID";
   static final String TERMINATION_LOG = "STYX_TERMINATION_LOG";
   static final String TRIGGER_ID = "STYX_TRIGGER_ID";
+  static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
   static final int POLL_PODS_INTERVAL_SECONDS = 60;
 
   private static final ScheduledExecutorService EXECUTOR =
@@ -158,7 +160,11 @@ class KubernetesDockerRunner implements DockerRunner {
         .build());
     env.add(new EnvVarBuilder()
         .withName(TRIGGER_ID)
-        .withValue(runSpec.triggerId().orElse(null))
+        .withValue(runSpec.trigger().map(TriggerUtil::triggerId).orElse(null))
+        .build());
+    env.add(new EnvVarBuilder()
+        .withName(TRIGGER_TYPE)
+        .withValue(runSpec.trigger().map(TriggerUtil::triggerType).orElse(null))
         .build());
 
     PodBuilder podBuilder = new PodBuilder()

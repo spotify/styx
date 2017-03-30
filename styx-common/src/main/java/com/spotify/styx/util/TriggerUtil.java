@@ -41,8 +41,8 @@ public class TriggerUtil {
     return trigger.accept(TriggerIsBackfillVisitor.INSTANCE);
   }
 
-  public static String name(Trigger trigger) {
-    return trigger.accept(TriggerNameVisitor.INSTANCE);
+  public static String triggerType(Trigger trigger) {
+    return trigger.accept(TriggerTypeVisitor.INSTANCE);
   }
 
   public static String triggerId(Trigger trigger) {
@@ -80,9 +80,9 @@ public class TriggerUtil {
   }
 
   /**
-   * A {@link TriggerVisitor} for extracting the name of a {@link Trigger}.
+   * A {@link TriggerVisitor} for extracting the type of a {@link Trigger}.
    */
-  private enum TriggerNameVisitor implements TriggerVisitor<String> {
+  private enum TriggerTypeVisitor implements TriggerVisitor<String> {
     INSTANCE;
 
     @Override

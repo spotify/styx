@@ -48,12 +48,10 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.testdata.TestData;
-import com.spotify.styx.util.TriggerUtil;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Optional;
-
 import org.junit.Test;
 
 public class SystemTest extends StyxSchedulerServiceFixture {
@@ -90,11 +88,14 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       .build();
 
   private static RunSpec naturalRunSpec(String imageName, ImmutableList<String> args) {
-    return runSpec(imageName, args, TriggerUtil.NATURAL_TRIGGER_ID);
+    return RunSpec.create(imageName, args, false, empty(),
+                          Optional.of(Trigger.natural()));
   }
 
-  private static RunSpec runSpec(String imageName, ImmutableList<String> args, String triggerId) {
-    return RunSpec.create(imageName, args, false, empty(), Optional.of(triggerId));
+  private static RunSpec unknownRunSpec(String imageName, ImmutableList<String> args,
+                                        String triggerId) {
+    return RunSpec.create(imageName, args, false, empty(),
+                          Optional.of(Trigger.unknown(triggerId)));
   }
 
   @Test
@@ -349,7 +350,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
-    assertThat(runSpec, is(runSpec("busybox", ImmutableList.of("--hour", "2016-03-14T15"), TriggerUtil.NATURAL_TRIGGER_ID)));
+    assertThat(runSpec, is(naturalRunSpec("busybox", ImmutableList.of("--hour", "2016-03-14T15"))));
   }
 
   @Test
@@ -490,7 +491,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(
-            runSpec("busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig1")));
+        unknownRunSpec("busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig1")));
   }
 
   @Test
@@ -527,7 +528,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(
-            runSpec("busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig2")));
+        unknownRunSpec("busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig2")));
   }
 
   @Test
@@ -571,6 +572,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(
-            runSpec("busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig2")));
+        unknownRunSpec("busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig2")));
   }
 }
