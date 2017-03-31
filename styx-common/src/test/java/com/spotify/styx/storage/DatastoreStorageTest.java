@@ -502,10 +502,16 @@ public class DatastoreStorageTest {
         URI.create("http://not/important"),
         WorkflowConfiguration
             .create(WORKFLOW_ID1.id(), DAYS, empty(), empty(), empty(), empty(), empty(), emptyList())));
+    Instant instant = Instant.parse("2016-03-14T14:00:00Z");
+    Instant offset = instant.plus(1, ChronoUnit.DAYS);
+    TriggerInstantSpec spec = TriggerInstantSpec.create(instant, offset);
+    storage.updateNextNaturalTrigger(WORKFLOW_ID1, spec);
     WorkflowState state = WorkflowState.builder()
         .enabled(true)
         .dockerImage(DOCKER_IMAGE.get())
         .commitSha(COMMIT_SHA)
+        .nextNaturalTrigger(instant)
+        .nextNaturalOffsetTrigger(offset)
         .build();
     storage.patchState(WORKFLOW_ID1, state);
 
