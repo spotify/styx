@@ -35,7 +35,6 @@ public final class MetricsStats implements Stats {
 
   private static final String UNIT_SECOND = "s";
   private static final String UNIT_MILLISECOND = "ms";
-  private static final String UNIT_FREQUENCY = "Hz";
   private static final MetricId BASE = MetricId.build("styx");
 
   private static final MetricId QUEUED_EVENTS = BASE
@@ -60,15 +59,15 @@ public final class MetricsStats implements Stats {
 
   private static final MetricId STORAGE_RATE = BASE
       .tagged("what", "storage-operation-rate")
-      .tagged("unit", UNIT_FREQUENCY);
+      .tagged("unit", "operation");
 
   private static final MetricId DOCKER_DURATION = BASE
       .tagged("what", "docker-operation-duration")
-      .tagged("unit", UNIT_MILLISECOND);
+      .tagged("unit", "operation");
 
   private static final MetricId DOCKER_RATE = BASE
       .tagged("what", "docker-operation-rate")
-      .tagged("unit", UNIT_FREQUENCY);
+      .tagged("unit", "operation");
 
   private static final MetricId TRANSITIONING_DURATION = BASE
       .tagged("what", "time-transitioning-between-submitted-running")
@@ -76,27 +75,24 @@ public final class MetricsStats implements Stats {
 
   private static final MetricId PULL_IMAGE_ERROR_RATE = BASE
       .tagged("what", "pull-image-error-rate")
-      .tagged("unit", UNIT_FREQUENCY);
+      .tagged("unit", "error");
 
   private static final MetricId NATURAL_TRIGGER_RATE = BASE
       .tagged("what", "natural-trigger-rate")
-      .tagged("unit", UNIT_FREQUENCY);
+      .tagged("unit", "trigger");
 
   private static final MetricId TERMINATION_LOG_MISSING = BASE
-      .tagged("what", "termination-log-missing")
-      .tagged("unit", UNIT_FREQUENCY);
+      .tagged("what", "termination-log-missing");
 
   private static final MetricId TERMINATION_LOG_INVALID = BASE
-      .tagged("what", "termination-log-invalid")
-      .tagged("unit", UNIT_FREQUENCY);
+      .tagged("what", "termination-log-invalid");
 
   private static final MetricId EXIT_CODE_MISMATCH = BASE
-      .tagged("what", "exit-code-mismatch")
-      .tagged("unit", UNIT_FREQUENCY);
+      .tagged("what", "exit-code-mismatch");
 
   private static final MetricId SUBMISSION_RATE_LIMIT = BASE
       .tagged("what", "submission-rate-limit")
-      .tagged("unit", UNIT_FREQUENCY);
+      .tagged("unit", "submission/s");
 
   private final SemanticMetricRegistry registry;
 
