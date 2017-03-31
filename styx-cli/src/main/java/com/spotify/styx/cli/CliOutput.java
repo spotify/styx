@@ -45,6 +45,8 @@ interface CliOutput {
 
   void printResources(List<Resource> resources);
 
+  void printMessage(String message);
+
   @AutoValue
   abstract class EventInfo {
     @JsonProperty
