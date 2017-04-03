@@ -71,4 +71,9 @@ class JsonCliOutput implements CliOutput {
   public void printResources(List<Resource> resources) {
     printJson(resources);
   }
+
+  @Override
+  public void printMessage(String message) {
+    printJson(message);
+  }
 }

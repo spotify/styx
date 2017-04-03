@@ -160,6 +160,11 @@ class PrettyCliOutput implements CliOutput {
         String.format(format, resource.id(), resource.concurrency())));
   }
 
+  @Override
+  public void printMessage(String message) {
+    System.out.println(message);
+  }
+
   private Ansi getAnsiForState(RunStateDataPayload.RunStateData RunStateData) {
     final String state = RunStateData.state();
     switch (state) {

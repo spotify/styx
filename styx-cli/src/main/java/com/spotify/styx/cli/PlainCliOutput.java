@@ -116,4 +116,9 @@ class PlainCliOutput implements CliOutput {
                                                            resource.id(),
                                                            resource.concurrency())));
   }
+
+  @Override
+  public void printMessage(String message) {
+    System.out.println(message);
+  }
 }

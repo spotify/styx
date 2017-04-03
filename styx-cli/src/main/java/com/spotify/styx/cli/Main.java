@@ -415,6 +415,9 @@ public final class Main {
     final WorkflowInstance workflowInstance = getWorkflowInstance(namespace);
     final ByteString payload = serialize(workflowInstance);
     send(Request.forUri(apiUrl("scheduler", "trigger"), "POST").withPayload(payload));
+    cliOutput.printMessage(
+        "Triggered! Use `styx ls -c " + workflowInstance.workflowId().componentId()
+        + "` to check active workflow instances.");
   }
 
   private void haltWorkflowInstance()
