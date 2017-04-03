@@ -31,7 +31,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
-import com.spotify.apollo.Response;
 import com.spotify.apollo.core.Service;
 import com.spotify.apollo.core.Services;
 import com.spotify.apollo.environment.ApolloEnvironmentModule;
@@ -45,9 +44,12 @@ import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.util.EventUtil;
+import com.spotify.styx.util.FutureUtil;
 import com.spotify.styx.util.ParameterUtil;
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -59,6 +61,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.impl.Arguments;
@@ -228,6 +232,20 @@ public final class Main {
           }
           break;
 
+        case WORKFLOW:
+          final WorkflowCommand workflowCommand = namespace.get(SUBCOMMAND_DEST);
+          switch (workflowCommand) {
+            case SHOW:
+              workflowShow();
+              break;
+            default:
+              // parsing unknown command will fail so this would only catch non-exhaustive switches
+              throw new ArgumentParserException(
+                  String.format("Unrecognized command: %s %s", command, workflowCommand),
+                  parser.parser);
+          }
+          break;
+
         default:
           // parsing unknown command will fail so this would only catch non-exhaustive switches
           throw new ArgumentParserException("Unrecognized command: " + command, parser.parser);
@@ -356,6 +374,25 @@ public final class Main {
     cliOutput.printResources(resources.resources());
   }
 
+  private void workflowShow() throws ExecutionException, InterruptedException, IOException {
+    final String cid = namespace.getString(parser.workflowShowComponentId.getDest());
+    final String wid = namespace.getString(parser.workflowShowWorkflowId.getDest());
+
+    // Fetch config and state in parallel
+    final CompletableFuture<ByteString> workflowResponse =
+        sendAsync(Request.forUri(apiUrl("workflows", cid, wid))).toCompletableFuture();
+    final CompletableFuture<ByteString> stateResponse =
+        sendAsync(Request.forUri(apiUrl("workflows", cid, wid, "state"))).toCompletableFuture();
+
+    // Wait for both responses
+    CompletableFuture.allOf(workflowResponse, stateResponse).get();
+
+    final Workflow workflow = deserialize(workflowResponse.get(), Workflow.class);
+    final WorkflowState workflowState = deserialize(stateResponse.get(), WorkflowState.class);
+
+    cliOutput.printWorkflow(workflow, workflowState);
+  }
+
   private void activeStates() throws IOException, ExecutionException, InterruptedException {
     String uri = apiUrl("status", "activeStates");
     final String component = namespace.getString(parser.listComponent.getDest());
@@ -447,19 +484,22 @@ public final class Main {
   }
 
   private ByteString send(Request request) throws ExecutionException, InterruptedException {
-    final Response<ByteString> response =
-        client.send(request.withHeader("User-Agent", STYX_CLI_VERSION)).toCompletableFuture()
-            .get();
+    return sendAsync(request).toCompletableFuture().get();
+  }
 
-    switch (response.status().family()) {
-      case SUCCESSFUL:
-        return response.payload().orElse(ByteString.EMPTY);
-      default:
-        throw new RuntimeException(
-            String.format("API error: %d %s",
-                          response.status().code(),
-                          response.status().reasonPhrase()));
-    }
+  private CompletionStage<ByteString> sendAsync(Request request)
+      throws ExecutionException, InterruptedException {
+    return client.send(request.withHeader("User-Agent", STYX_CLI_VERSION)).thenCompose(response -> {
+      switch (response.status().family()) {
+        case SUCCESSFUL:
+          return CompletableFuture.completedFuture(response.payload().orElse(ByteString.EMPTY));
+        default:
+          return FutureUtil.exceptionallyCompletedFuture(new RuntimeException(
+              String.format("API error: %d %s",
+                  response.status().code(),
+                  response.status().reasonPhrase())));
+      }
+    });
   }
 
   private static class StyxCliParser {
@@ -541,6 +581,16 @@ public final class Main {
             .help("The concurrency of this resource")
             .type(Integer.class);
 
+    final Subparsers workflowParser =
+        Command.WORKFLOW.parser(subCommands)
+            .addSubparsers().title("commands").metavar(" ");
+
+    final Subparser workflowShow = WorkflowCommand.SHOW.parser(workflowParser);
+    final Argument workflowShowComponentId =
+        workflowShow.addArgument("component").help("Component ID");
+    final Argument workflowShowWorkflowId =
+        workflowShow.addArgument("workflow").help("Workflow ID");
+
     final Subparser list = Command.LIST.parser(subCommands);
     final Argument listComponent = list.addArgument("-c", "--component")
         .help("only show instances for COMPONENT");
@@ -585,7 +635,8 @@ public final class Main {
     TRIGGER("t", "Trigger a completed workflow instance"),
     RETRY("r", "Retry a workflow instance that is in a waiting state"),
     RESOURCE(null, "Commands related to resources"),
-    BACKFILL(null, "Commands related to backfills");
+    BACKFILL(null, "Commands related to backfills"),
+    WORKFLOW(null, "Commands related to workflows");
 
     private final String alias;
     private final String description;
@@ -650,6 +701,32 @@ public final class Main {
     private final String description;
 
     ResourceCommand(String alias, String description) {
+      this.alias = alias;
+      this.description = description;
+    }
+
+    public Subparser parser(Subparsers subCommands) {
+      final Subparser subparser = subCommands
+          .addParser(name().toLowerCase())
+          .setDefault(SUBCOMMAND_DEST, this)
+          .description(description)
+          .help(description);
+
+      if (alias != null && !alias.isEmpty()) {
+        subparser.aliases(alias);
+      }
+
+      return subparser;
+    }
+  }
+
+  private enum WorkflowCommand {
+    SHOW("get", "Show info about a specific workflow");
+
+    private final String alias;
+    private final String description;
+
+    WorkflowCommand(String alias, String description) {
       this.alias = alias;
       this.description = description;
     }

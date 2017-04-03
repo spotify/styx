@@ -22,10 +22,13 @@ package com.spotify.styx.cli;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.serialization.Json;
 import java.util.List;
 
@@ -75,5 +78,10 @@ class JsonCliOutput implements CliOutput {
   @Override
   public void printMessage(String message) {
     printJson(message);
+  }
+
+  @Override
+  public void printWorkflow(Workflow workflow, WorkflowState state) {
+    printJson(ImmutableMap.of("workflow", workflow, "state", state));
   }
 }
