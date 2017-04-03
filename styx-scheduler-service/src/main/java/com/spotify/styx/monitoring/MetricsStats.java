@@ -63,7 +63,7 @@ public final class MetricsStats implements Stats {
 
   private static final MetricId DOCKER_DURATION = BASE
       .tagged("what", "docker-operation-duration")
-      .tagged("unit", "operation");
+      .tagged("unit", UNIT_MILLISECOND);
 
   private static final MetricId DOCKER_RATE = BASE
       .tagged("what", "docker-operation-rate")
