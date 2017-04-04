@@ -38,9 +38,12 @@ import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
+import java.util.Collections;
 import java.util.List;
 import org.fusesource.jansi.Ansi;
 
@@ -151,7 +154,6 @@ class PrettyCliOutput implements CliOutput {
     }
   }
 
-
   @Override
   public void printResources(List<Resource> resources) {
     final String format = "%50s %12s";
@@ -163,6 +165,19 @@ class PrettyCliOutput implements CliOutput {
   @Override
   public void printMessage(String message) {
     System.out.println(message);
+  }
+
+  @Override
+  public void printWorkflow(Workflow wf, WorkflowState state) {
+    final String image = state.dockerImage().orElseGet(() ->
+        wf.configuration().dockerImage().orElse(""));
+    System.out.println("Component: " + wf.componentId());
+    System.out.println(" Workflow: " + wf.id().id());
+    System.out.println("  Enabled: " + state.enabled().map(Object::toString).orElse(""));
+    System.out.println(" Schedule: " + wf.configuration().schedule());
+    System.out.println("   Commit: " + state.commitSha().orElse(""));
+    System.out.println("    Image: " + image);
+    System.out.println("     Args: " + wf.configuration().dockerArgs().orElse(Collections.emptyList()));
   }
 
   private Ansi getAnsiForState(RunStateDataPayload.RunStateData RunStateData) {

@@ -26,6 +26,8 @@ import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowState;
 import java.util.List;
 
 /**
@@ -46,6 +48,8 @@ interface CliOutput {
   void printResources(List<Resource> resources);
 
   void printMessage(String message);
+
+  void printWorkflow(Workflow workflow, WorkflowState state);
 
   @AutoValue
   abstract class EventInfo {
