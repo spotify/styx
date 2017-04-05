@@ -31,6 +31,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
+import com.spotify.apollo.Response;
 import com.spotify.apollo.core.Service;
 import com.spotify.apollo.core.Services;
 import com.spotify.apollo.environment.ApolloEnvironmentModule;
@@ -49,7 +50,6 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.util.EventUtil;
-import com.spotify.styx.util.FutureUtil;
 import com.spotify.styx.util.ParameterUtil;
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -379,16 +379,21 @@ public final class Main {
     final String wid = namespace.getString(parser.workflowShowWorkflowId.getDest());
 
     // Fetch config and state in parallel
-    final CompletableFuture<ByteString> workflowResponse =
+    final CompletableFuture<Response<ByteString>> workflowResponse =
         sendAsync(Request.forUri(apiUrl("workflows", cid, wid))).toCompletableFuture();
-    final CompletableFuture<ByteString> stateResponse =
+    final CompletableFuture<Response<ByteString>> stateResponse =
         sendAsync(Request.forUri(apiUrl("workflows", cid, wid, "state"))).toCompletableFuture();
 
     // Wait for both responses
     CompletableFuture.allOf(workflowResponse, stateResponse).get();
 
-    final Workflow workflow = deserialize(workflowResponse.get(), Workflow.class);
-    final WorkflowState workflowState = deserialize(stateResponse.get(), WorkflowState.class);
+    final ByteString workflowPayload = requireSuccess(workflowResponse.get())
+        .payload().orElse(ByteString.EMPTY);
+    final ByteString statePayload = requireSuccess(stateResponse.get())
+        .payload().orElse(ByteString.EMPTY);
+
+    final Workflow workflow = deserialize(workflowPayload, Workflow.class);
+    final WorkflowState workflowState = deserialize(statePayload, WorkflowState.class);
 
     cliOutput.printWorkflow(workflow, workflowState);
   }
@@ -484,22 +489,26 @@ public final class Main {
   }
 
   private ByteString send(Request request) throws ExecutionException, InterruptedException {
-    return sendAsync(request).toCompletableFuture().get();
+    // TODO: Move requireSuccess use into callers of send()
+    return requireSuccess(sendAsync(request).toCompletableFuture().get())
+        .payload().orElse(ByteString.EMPTY);
   }
 
-  private CompletionStage<ByteString> sendAsync(Request request)
+  private static <T> Response<T> requireSuccess(Response<T> response) {
+    switch (response.status().family()) {
+      case SUCCESSFUL:
+        return response;
+      default:
+        throw new RuntimeException(
+            String.format("API error: %d %s",
+                response.status().code(),
+                response.status().reasonPhrase()));
+    }
+  }
+
+  private CompletionStage<Response<ByteString>> sendAsync(Request request)
       throws ExecutionException, InterruptedException {
-    return client.send(request.withHeader("User-Agent", STYX_CLI_VERSION)).thenCompose(response -> {
-      switch (response.status().family()) {
-        case SUCCESSFUL:
-          return CompletableFuture.completedFuture(response.payload().orElse(ByteString.EMPTY));
-        default:
-          return FutureUtil.exceptionallyCompletedFuture(new RuntimeException(
-              String.format("API error: %d %s",
-                  response.status().code(),
-                  response.status().reasonPhrase())));
-      }
-    });
+    return client.send(request.withHeader("User-Agent", STYX_CLI_VERSION));
   }
 
   private static class StyxCliParser {
