@@ -37,6 +37,7 @@ import io.fabric8.kubernetes.api.model.DoneablePod;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.dsl.ClientMixedOperation;
 import io.fabric8.kubernetes.client.dsl.ClientPodResource;
 import java.util.Arrays;
@@ -61,7 +62,7 @@ public class KubernetesDockerRunnerPodPollerTest {
       DockerRunner.RunSpec.simple("busybox");
 
   @Mock
-  KubernetesClient k8sClient;
+  NamespacedKubernetesClient k8sClient;
   @Mock
   ClientMixedOperation<Pod, PodList, DoneablePod, ClientPodResource<Pod, DoneablePod>> pods;
   PodList podList;
