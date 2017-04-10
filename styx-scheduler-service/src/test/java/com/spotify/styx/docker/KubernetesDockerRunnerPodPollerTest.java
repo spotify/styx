@@ -36,10 +36,9 @@ import com.spotify.styx.testdata.TestData;
 import io.fabric8.kubernetes.api.model.DoneablePod;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodList;
-import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
-import io.fabric8.kubernetes.client.dsl.ClientMixedOperation;
-import io.fabric8.kubernetes.client.dsl.ClientPodResource;
+import io.fabric8.kubernetes.client.dsl.MixedOperation;
+import io.fabric8.kubernetes.client.dsl.PodResource;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -64,7 +63,7 @@ public class KubernetesDockerRunnerPodPollerTest {
   @Mock
   NamespacedKubernetesClient k8sClient;
   @Mock
-  ClientMixedOperation<Pod, PodList, DoneablePod, ClientPodResource<Pod, DoneablePod>> pods;
+  MixedOperation<Pod, PodList, DoneablePod, PodResource<Pod, DoneablePod>> pods;
   PodList podList;
 
   @Mock
