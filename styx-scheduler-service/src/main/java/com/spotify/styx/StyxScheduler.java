@@ -489,7 +489,7 @@ public class StyxScheduler implements AppInit {
             .filter((workflow) -> enabledWorkflowsSet.contains(WorkflowId.ofWorkflow(workflow)))
             .count();
       } catch (IOException e) {
-        LOG.error("Failed to read enabled status from BigTable", e);
+        LOG.error("Failed to read enabled status from storage", e);
         return 0L;
       }
     };
