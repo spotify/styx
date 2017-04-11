@@ -56,6 +56,10 @@ final class NoopStats implements Stats {
   }
 
   @Override
+  public void exitCode(WorkflowId workflowId, int exitCode) {
+  }
+
+  @Override
   public void pullImageError() {
   }
 

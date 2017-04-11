@@ -30,6 +30,8 @@ import com.spotify.styx.state.RunState;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import javaslang.Tuple;
+import javaslang.Tuple2;
 
 public final class MetricsStats implements Stats {
 
@@ -52,6 +54,9 @@ public final class MetricsStats implements Stats {
   private static final MetricId WORKFLOW_COUNT = BASE
       .tagged("what", "workflow-count")
       .tagged("unit", "workflow");
+
+  private static final MetricId EXIT_CODE_RATE = BASE
+      .tagged("what", "exit-code-rate");
 
   private static final MetricId STORAGE_DURATION = BASE
       .tagged("what", "storage-operation-duration")
@@ -106,7 +111,8 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Meter> storageOperationMeters;
   private final ConcurrentMap<String, Histogram> dockerOperationHistograms;
   private final ConcurrentMap<String, Meter> dockerOperationMeters;
-  private final ConcurrentHashMap<WorkflowId, Gauge> activeStatesPerWorkflowGauges;
+  private final ConcurrentMap<WorkflowId, Gauge> activeStatesPerWorkflowGauges;
+  private final ConcurrentMap<Tuple2<WorkflowId, Integer>, Meter> exitCodePerWorkflowMeters;
 
   public MetricsStats(SemanticMetricRegistry registry) {
     this.registry = Objects.requireNonNull(registry);
@@ -122,6 +128,7 @@ public final class MetricsStats implements Stats {
     this.dockerOperationHistograms = new ConcurrentHashMap<>();
     this.dockerOperationMeters = new ConcurrentHashMap<>();
     this.activeStatesPerWorkflowGauges = new ConcurrentHashMap<>();
+    this.exitCodePerWorkflowMeters = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -168,6 +175,11 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
+  public void exitCode(WorkflowId workflowId, int exitCode) {
+    exitCodeMeter(workflowId, exitCode).mark();
+  }
+
+  @Override
   public void registerSubmissionRateLimit(Gauge<Double> submissionRateLimit) {
     registry.register(SUBMISSION_RATE_LIMIT, submissionRateLimit);
   }
@@ -195,6 +207,16 @@ public final class MetricsStats implements Stats {
   @Override
   public void pullImageError() {
     pullImageErrorMeter.mark();
+  }
+
+
+  private Meter exitCodeMeter(WorkflowId workflowId, int exitCode) {
+    return exitCodePerWorkflowMeters
+        .computeIfAbsent(Tuple.of(workflowId, exitCode), (tuple) ->
+            registry.meter(EXIT_CODE_RATE.tagged(
+                "component-id", tuple._1.componentId(),
+                "workflow-id", tuple._1.id(),
+                "exit-code", String.valueOf(tuple._2))));
   }
 
   private Histogram storageOpHistogram(String operation) {
