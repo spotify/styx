@@ -53,6 +53,12 @@ public class MonitoringHandler implements OutputHandler {
         map.put(state.workflowInstance().toKey(), submittedTime);
         break;
 
+      case TERMINATED:
+        if (state.data().lastExit().isPresent()) {
+          stats.exitCode(state.workflowInstance().workflowId(), state.data().lastExit().get());
+        }
+        break;
+
       case RUNNING:
         final Instant a = time.get();
         final Instant b = map.remove(state.workflowInstance().toKey());
