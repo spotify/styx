@@ -33,7 +33,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
@@ -55,7 +54,6 @@ import io.fabric8.kubernetes.client.dsl.ClientPodResource;
 import io.fabric8.kubernetes.client.dsl.Watchable;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
