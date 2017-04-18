@@ -23,7 +23,6 @@ package com.spotify.styx.storage;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
 import com.google.cloud.datastore.Datastore;
-import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.DatastoreReader;
 import com.google.cloud.datastore.DateTime;
 import com.google.cloud.datastore.Entity;
@@ -37,7 +36,6 @@ import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
 import com.google.cloud.datastore.StructuredQuery.Filter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -50,12 +48,10 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.util.FnWithException;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
@@ -112,18 +108,14 @@ class DatastoreStorage {
   public static final boolean DEFAULT_WORKFLOW_ENABLED = false;
   public static final boolean DEFAULT_DEBUG_ENABLED = false;
 
-  public static final int MAX_RETRIES = 100;
-
   private final Datastore datastore;
-  private final Duration retryBaseDelay;
   private final KeyFactory componentKeyFactory;
 
   @VisibleForTesting
   final Key globalConfigKey;
 
-  DatastoreStorage(Datastore datastore, Duration retryBaseDelay) {
+  DatastoreStorage(Datastore datastore) {
     this.datastore = Objects.requireNonNull(datastore);
-    this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
 
     this.componentKeyFactory = datastore.newKeyFactory().kind(KIND_COMPONENT);
     this.globalConfigKey = datastore.newKeyFactory().kind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
@@ -151,12 +143,12 @@ class DatastoreStorage {
     return readConfigBoolean(PROPERTY_DEBUG_ENABLED, DEFAULT_DEBUG_ENABLED);
   }
 
-  public String globalDockerRunnerId() {
+  String globalDockerRunnerId() {
     return readConfigString(PROPERTY_CONFIG_DOCKER_RUNNER_ID, DEFAULT_CONFIG_DOCKER_RUNNER_ID);
   }
 
   boolean setGlobalEnabled(boolean globalEnabled) throws IOException {
-    return storeWithRetries(() -> datastore.runInTransaction(transaction -> {
+    return datastore.runInTransaction(transaction -> {
       final Optional<Entity> configOpt = getOpt(transaction, globalConfigKey);
       final Entity.Builder config = asBuilderOrNew(configOpt, globalConfigKey);
       final boolean oldValue = configOpt
@@ -168,7 +160,7 @@ class DatastoreStorage {
       transaction.put(config.build());
 
       return oldValue;
-    }));
+    });
   }
 
   boolean enabled(WorkflowId workflowId) throws IOException {
@@ -201,7 +193,7 @@ class DatastoreStorage {
   }
 
   void store(Workflow workflow) throws IOException {
-    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
+    datastore.runInTransaction(transaction -> {
       final String json = OBJECT_MAPPER.writeValueAsString(workflow);
       final Key componentKey = componentKeyFactory.newKey(workflow.componentId());
 
@@ -217,7 +209,7 @@ class DatastoreStorage {
           .build();
 
       return transaction.put(workflowEntity);
-    }));
+    });
   }
 
   Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
@@ -228,14 +220,11 @@ class DatastoreStorage {
   }
 
   void delete(WorkflowId workflowId) throws IOException {
-    storeWithRetries(() -> {
-      datastore.delete(workflowKey(workflowId));
-      return null;
-    });
+    datastore.delete(workflowKey(workflowId));
   }
 
-  public void updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec triggerSpec) throws IOException {
-    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
+  void updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec triggerSpec) throws IOException {
+    datastore.runInTransaction(transaction -> {
       final Key workflowKey = workflowKey(workflowId);
       final Optional<Entity> workflowOpt = getOpt(transaction, workflowKey);
       if (!workflowOpt.isPresent()) {
@@ -248,13 +237,13 @@ class DatastoreStorage {
           .set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToDatetime(triggerSpec.instant()))
           .set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, instantToDatetime(triggerSpec.offsetInstant()));
       return transaction.put(builder.build());
-    }));
+    });
   }
 
   @Deprecated
   @VisibleForTesting
   public void updateNextNaturalTrigger(WorkflowId workflowId, Instant instant) throws IOException {
-    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
+    datastore.runInTransaction(transaction -> {
       final Key workflowKey = workflowKey(workflowId);
       final Optional<Entity> workflowOpt = getOpt(transaction, workflowKey);
       if (!workflowOpt.isPresent()) {
@@ -266,10 +255,10 @@ class DatastoreStorage {
           .builder(workflowOpt.get())
           .set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToDatetime(instant));
       return transaction.put(builder.build());
-    }));
+    });
   }
 
-  public Map<Workflow, TriggerInstantSpec> workflowsWithNextNaturalTrigger() throws IOException {
+  Map<Workflow, TriggerInstantSpec> workflowsWithNextNaturalTrigger() throws IOException {
     final Map<Workflow, TriggerInstantSpec> map = Maps.newHashMap();
     final EntityQuery query =
         Query.entityQueryBuilder().kind(KIND_WORKFLOW).build();
@@ -338,28 +327,23 @@ class DatastoreStorage {
   }
 
   void writeActiveState(WorkflowInstance workflowInstance, long counter) throws IOException {
-    storeWithRetries(() -> {
-      final Key key = activeWorkflowInstanceKey(workflowInstance);
-      final Entity entity = Entity.builder(key)
-          .set(PROPERTY_COMPONENT, workflowInstance.workflowId().componentId())
-          .set(PROPERTY_WORKFLOW, workflowInstance.workflowId().id())
-          .set(PROPERTY_PARAMETER, workflowInstance.parameter())
-          .set(PROPERTY_COUNTER, counter)
-          .build();
+    final Key key = activeWorkflowInstanceKey(workflowInstance);
+    final Entity entity = Entity.builder(key)
+        .set(PROPERTY_COMPONENT, workflowInstance.workflowId().componentId())
+        .set(PROPERTY_WORKFLOW, workflowInstance.workflowId().id())
+        .set(PROPERTY_PARAMETER, workflowInstance.parameter())
+        .set(PROPERTY_COUNTER, counter)
+        .build();
 
-      return datastore.put(entity);
-    });
+    datastore.put(entity);
   }
 
   void deleteActiveState(WorkflowInstance workflowInstance) throws IOException {
-    storeWithRetries(() -> {
-      datastore.delete(activeWorkflowInstanceKey(workflowInstance));
-      return null;
-    });
+    datastore.delete(activeWorkflowInstanceKey(workflowInstance));
   }
 
   void patchState(WorkflowId workflowId, WorkflowState state) throws IOException {
-    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
+    datastore.runInTransaction(transaction -> {
       final Key workflowKey = workflowKey(workflowId);
       final Optional<Entity> workflowOpt = getOpt(transaction, workflowKey);
       if (!workflowOpt.isPresent()) {
@@ -376,11 +360,11 @@ class DatastoreStorage {
       state.nextNaturalOffsetTrigger()
           .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, instantToDatetime(x)));
       return transaction.put(builder.build());
-    }));
+    });
   }
 
   void patchState(String componentId, WorkflowState state) throws IOException {
-    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
+    datastore.runInTransaction(transaction -> {
       final Key componentKey = componentKeyFactory.newKey(componentId);
       final Optional<Entity> componentOpt = getOpt(transaction, componentKey);
       if (!componentOpt.isPresent()) {
@@ -392,7 +376,7 @@ class DatastoreStorage {
       state.commitSha().ifPresent(x -> builder.set(PROPERTY_COMMIT_SHA, x));
 
       return transaction.put(builder.build());
-    }));
+    });
   }
 
   Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
@@ -450,36 +434,6 @@ class DatastoreStorage {
     return builder.build();
   }
 
-  private <T> T storeWithRetries(FnWithException<T, IOException> storingOperation) throws IOException {
-    int storeRetries = 0;
-
-    while (storeRetries < MAX_RETRIES) {
-      try {
-        return storingOperation.apply();
-      } catch (ResourceNotFoundException e) {
-        throw e;
-      } catch (DatastoreException | IOException e) {
-        if (e.getCause() instanceof ResourceNotFoundException) {
-          throw (ResourceNotFoundException) e.getCause();
-        }
-
-        storeRetries++;
-        if (storeRetries == MAX_RETRIES) {
-          throw e;
-        }
-
-        LOG.warn(String.format("Failed to read/write from/to Datastore (attempt #%d)", storeRetries), e);
-        try {
-          Thread.sleep(retryBaseDelay.toMillis());
-        } catch (InterruptedException e1) {
-          throw Throwables.propagate(e1);
-        }
-      }
-    }
-
-    throw new IOException("This should never happen");
-  }
-
   private Key workflowKey(WorkflowId workflowId) {
     return datastore.newKeyFactory()
         .ancestors(PathElement.of(KIND_COMPONENT, workflowId.componentId()))
@@ -510,8 +464,7 @@ class DatastoreStorage {
 
   private Workflow parseWorkflowJson(Entity entity, WorkflowId workflowId) {
     try {
-      return OBJECT_MAPPER
-          .readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
+      return OBJECT_MAPPER.readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
     } catch (IOException e1) {
       LOG.info("Failed to read workflow for {}, {}", workflowId.componentId(), workflowId.id());
       return null;
@@ -599,7 +552,7 @@ class DatastoreStorage {
   }
 
   void postResource(Resource resource) throws IOException {
-    storeWithRetries(() -> datastore.put(resourceToEntity(resource)));
+    datastore.put(resourceToEntity(resource));
   }
 
   List<Resource> getResources() {
@@ -625,10 +578,7 @@ class DatastoreStorage {
 
   void deleteResource(String id) throws IOException {
     final Key key = datastore.newKeyFactory().kind(KIND_RESOURCE).newKey(id);
-    storeWithRetries(() -> {
-      datastore.delete(key);
-      return null;
-    });
+    datastore.delete(key);
   }
 
   Optional<Backfill> getBackfill(String id) {
@@ -713,7 +663,7 @@ class DatastoreStorage {
   }
 
   void storeBackfill(Backfill backfill) throws IOException {
-    storeWithRetries(() -> datastore.put(backfillToEntity(backfill)));
+    datastore.put(backfillToEntity(backfill));
   }
 
   private Entity backfillToEntity(Backfill backfill) {

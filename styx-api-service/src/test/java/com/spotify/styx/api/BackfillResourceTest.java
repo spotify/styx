@@ -67,7 +67,6 @@ import com.spotify.styx.storage.BigtableStorage;
 import com.spotify.styx.testdata.TestData;
 import java.io.IOException;
 import java.net.URI;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import okio.ByteString;
@@ -87,8 +86,8 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   private AggregateStorage storage = new AggregateStorage(
       bigtable,
-      localDatastore.options().service(),
-      Duration.ZERO);
+      localDatastore.options().service()
+  );
 
   private static final Backfill BACKFILL_1 = Backfill.newBuilder()
       .id("backfill-1")
@@ -525,7 +524,6 @@ public class BackfillResourceTest extends VersionedApiTest {
     Connection bigtable = mock(Connection.class);
     try {
       new BigtableMocker(bigtable)
-          .setNumFailures(0)
           .setupTable(BigtableStorage.EVENTS_TABLE_NAME)
           .finalizeMocking();
     } catch (IOException e) {

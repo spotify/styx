@@ -53,8 +53,6 @@ public class BigtableMocker {
 
   private final Connection bigtable;
 
-  private int numFailures = 0; //Default does not throw exceptions
-
   private final Map<TableName, List<Cell>> tableCells = Maps.newHashMap();
 
   public BigtableMocker(Connection bigtable) {
@@ -108,10 +106,6 @@ public class BigtableMocker {
       when(table.getScanner(any(Scan.class)))
           .thenAnswer(invocation -> resultOfScan(cells, invocation.getArgumentAt(0, Scan.class)));
       doAnswer(invocation -> {
-        if (numFailures > 0) {
-          numFailures--;
-          throw new IOException("Something went wrong in performing put operation");
-        }
         Put put = invocation.getArgumentAt(0, Put.class);
         List<Cell> list = Lists.newArrayList();
 
@@ -125,10 +119,6 @@ public class BigtableMocker {
         return null;
       }).when(table).put(any(Put.class));
       doAnswer(invocation -> {
-        if (numFailures > 0) {
-          numFailures--;
-          throw new IOException("Something went wrong in performing delete operation");
-        }
         Delete delete = invocation.getArgumentAt(0, Delete.class);
         List<Cell> list = Lists.newArrayList();
 
@@ -216,11 +206,5 @@ public class BigtableMocker {
     when(resultScanner.iterator()).thenReturn(inRangeResults.iterator());
 
     return resultScanner;
-  }
-
-  public BigtableMocker setNumFailures(int numFailures) {
-    this.numFailures = numFailures;
-
-    return this;
   }
 }

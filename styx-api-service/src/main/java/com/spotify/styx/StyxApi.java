@@ -41,7 +41,6 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.StorageFactory;
 import com.typesafe.config.Config;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -59,8 +58,6 @@ public class StyxApi implements AppInit {
 
   public static final String SCHEDULER_SERVICE_BASE_URL = "styx.scheduler.base-url";
   public static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
-
-  public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxApi.class);
 
@@ -146,6 +143,6 @@ public class StyxApi implements AppInit {
 
     final Connection bigTable = closer.register(createBigTableConnection(config));
     final Datastore datastore = createDatastore(config);
-    return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
+    return new AggregateStorage(bigTable, datastore);
   }
 }

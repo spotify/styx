@@ -23,7 +23,6 @@ package com.spotify.styx.storage;
 import static com.spotify.styx.serialization.Json.deserializeEvent;
 import static com.spotify.styx.serialization.Json.serialize;
 
-import com.google.cloud.datastore.DatastoreException;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Sets;
@@ -32,10 +31,7 @@ import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
-import com.spotify.styx.util.ResourceNotFoundException;
-import com.spotify.styx.util.RunnableWithException;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -53,29 +49,21 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A backend for {@link AggregateStorage} backed by Google Bigtable
  */
 public class BigtableStorage {
 
-  private static final Logger LOG = LoggerFactory.getLogger(BigtableStorage.class);
-
   public static final TableName EVENTS_TABLE_NAME = TableName.valueOf("styx_events");
 
   public static final byte[] EVENT_CF = Bytes.toBytes("event");
   public static final byte[] EVENT_QUALIFIER = Bytes.toBytes("event");
 
-  public static final int MAX_BIGTABLE_RETRIES = 100;
-
   private final Connection connection;
-  private final Duration retryBaseDelay;
 
-  BigtableStorage(Connection connection, Duration retryBaseDelay) {
+  BigtableStorage(Connection connection) {
     this.connection = Objects.requireNonNull(connection);
-    this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
   }
 
   SortedSet<SequenceEvent> readEvents(WorkflowInstance workflowInstance) throws IOException {
@@ -93,18 +81,16 @@ public class BigtableStorage {
   }
 
   void writeEvent(SequenceEvent sequenceEvent) throws IOException {
-    storeWithRetries(() -> {
-      try (final Table eventsTable = connection.getTable(EVENTS_TABLE_NAME)) {
-        final String workflowInstanceKey = sequenceEvent.event().workflowInstance().toKey();
-        final String keyString = String.format("%s#%08d", workflowInstanceKey, sequenceEvent.counter());
-        final byte[] key = Bytes.toBytes(keyString);
-        final Put put = new Put(key, sequenceEvent.timestamp());
+    final String workflowInstanceKey = sequenceEvent.event().workflowInstance().toKey();
+    final String keyString = String.format("%s#%08d", workflowInstanceKey, sequenceEvent.counter());
+    final byte[] key = Bytes.toBytes(keyString);
+    final Put put = new Put(key, sequenceEvent.timestamp());
 
-        final byte[] eventBytes = serialize(sequenceEvent.event()).toByteArray();
-        put.addColumn(EVENT_CF, EVENT_QUALIFIER, eventBytes);
-        eventsTable.put(put);
-      }
-    });
+    try (final Table eventsTable = connection.getTable(EVENTS_TABLE_NAME)) {
+      final byte[] eventBytes = serialize(sequenceEvent.event()).toByteArray();
+      put.addColumn(EVENT_CF, EVENT_QUALIFIER, eventBytes);
+      eventsTable.put(put);
+    }
   }
 
   List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String offset, int limit)
@@ -153,11 +139,7 @@ public class BigtableStorage {
       throws IOException {
     final Set<SequenceEvent> storedEvents = readEvents(workflowInstance);
     final Optional<SequenceEvent> lastStoredEvent = storedEvents.stream().reduce((a, b) -> b);
-    if (lastStoredEvent.isPresent()) {
-      return Optional.of(lastStoredEvent.get().counter());
-    } else {
-      return Optional.empty();
-    }
+    return lastStoredEvent.map(SequenceEvent::counter);
   }
 
   WorkflowInstanceExecutionData executionData(WorkflowInstance workflowInstance) throws IOException {
@@ -175,31 +157,6 @@ public class BigtableStorage {
     final byte[] value = r.getValue(EVENT_CF, EVENT_QUALIFIER);
     final Event event = deserializeEvent(ByteString.of(value));
     return SequenceEvent.parseKey(key, event, timestamp);
-  }
-
-  private void storeWithRetries(RunnableWithException<IOException> storingOperation) throws IOException {
-    int storeRetries = 0;
-    boolean succeeded = false;
-
-    while (storeRetries < MAX_BIGTABLE_RETRIES && !succeeded) {
-      try {
-        storingOperation.run();
-        succeeded = true;
-      } catch (ResourceNotFoundException e) {
-        throw e;
-      } catch (DatastoreException | IOException e) {
-        storeRetries++;
-        if (storeRetries == MAX_BIGTABLE_RETRIES) {
-          throw e;
-        }
-        LOG.warn(String.format("Failed to read/write from/to Bigtable (attempt #%d)", storeRetries), e);
-        try {
-          Thread.sleep(retryBaseDelay.toMillis());
-        } catch (InterruptedException e1) {
-          throw Throwables.propagate(e1);
-        }
-      }
-    }
   }
 
   private static TreeSet<SequenceEvent> newSortedEventSet() {
