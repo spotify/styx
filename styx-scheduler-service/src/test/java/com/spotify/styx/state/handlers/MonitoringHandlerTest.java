@@ -20,9 +20,13 @@
 
 package com.spotify.styx.state.handlers;
 
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyInt;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.MonitoringHandler;
 import com.spotify.styx.monitoring.Stats;
@@ -30,9 +34,11 @@ import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Time;
 import java.time.Instant;
+import java.util.Optional;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Matchers;
@@ -68,6 +74,36 @@ public class MonitoringHandlerTest {
     stateManager.receive(Event.started(state.workflowInstance()));
 
     verify(stats).submitToRunningTime(Matchers.eq(2L));
+  }
+
+  @Test
+  public void shouldMarkExitCode() throws Exception {
+    RunState state = RunState.create(WORKFLOW_INSTANCE, RunState.State.NEW, time, outputHandler);
+    stateManager.initialize(state);
+
+    stateManager.receive(Event.triggerExecution(state.workflowInstance(), Trigger.natural()));
+    stateManager.receive(Event.dequeue(state.workflowInstance()));
+    stateManager.receive(Event.submit(state.workflowInstance(), TestData.EXECUTION_DESCRIPTION));
+    stateManager.receive(Event.submitted(state.workflowInstance(), "exec-1"));
+    stateManager.receive(Event.started(state.workflowInstance()));
+    stateManager.receive(Event.terminate(state.workflowInstance(), Optional.of(20)));
+
+    verify(stats).exitCode(state.workflowInstance().workflowId(), 20);
+  }
+
+  @Test
+  public void shouldNotMarkExitCodeIfNotPresent() throws Exception {
+    RunState state = RunState.create(WORKFLOW_INSTANCE, RunState.State.NEW, time, outputHandler);
+    stateManager.initialize(state);
+
+    stateManager.receive(Event.triggerExecution(state.workflowInstance(), Trigger.natural()));
+    stateManager.receive(Event.dequeue(state.workflowInstance()));
+    stateManager.receive(Event.submit(state.workflowInstance(), TestData.EXECUTION_DESCRIPTION));
+    stateManager.receive(Event.submitted(state.workflowInstance(), "exec-1"));
+    stateManager.receive(Event.started(state.workflowInstance()));
+    stateManager.receive(Event.terminate(state.workflowInstance(), Optional.empty()));
+
+    verify(stats, never()).exitCode(any(WorkflowId.class), anyInt());
   }
 
   @Test

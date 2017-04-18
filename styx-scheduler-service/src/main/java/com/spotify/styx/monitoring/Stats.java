@@ -43,6 +43,8 @@ public interface Stats {
 
   void registerWorkflowCount(String status, Gauge<Long> workflowCount);
 
+  void exitCode(WorkflowId workflowId, int exitCode);
+
   void pullImageError();
 
   void naturalTrigger();

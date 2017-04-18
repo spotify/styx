@@ -25,7 +25,6 @@ import static com.spotify.styx.api.Api.Version.V2;
 import static java.util.stream.Collectors.toList;
 
 import com.google.common.base.Throwables;
-import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.entity.EntityMiddleware;
