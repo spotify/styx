@@ -20,7 +20,6 @@
 
 package com.spotify.styx.util;
 
-import com.google.cloud.RetryParams;
 import com.google.cloud.bigtable.hbase.BigtableConfiguration;
 import com.google.cloud.bigtable.hbase.BigtableOptionsFactory;
 import com.google.cloud.datastore.Datastore;
@@ -56,7 +55,6 @@ public final class Connections {
     return DatastoreOptions.builder()
         .namespace(namespace)
         .projectId(projectId)
-        .retryParams(RetryParams.defaultInstance())
         .build()
         .service();
   }
