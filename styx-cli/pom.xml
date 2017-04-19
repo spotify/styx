@@ -16,6 +16,11 @@
       <artifactId>styx-common</artifactId>
       <version>1.0.8-SNAPSHOT</version>
     </dependency>
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>styx-client</artifactId>
+      <version>1.0.8-SNAPSHOT</version>
+    </dependency>
 
     <dependency>
       <groupId>com.spotify</groupId>
@@ -69,6 +74,7 @@
       <artifactId>jackson-annotations</artifactId>
       <version>${jackson.version}</version>
     </dependency>
+
   </dependencies>
 
   <build>
