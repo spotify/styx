@@ -25,6 +25,7 @@ import static com.spotify.styx.serialization.Json.serialize;
 
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
+import com.google.common.collect.Iterators;
 import com.google.common.collect.Sets;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
@@ -37,7 +38,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
-import java.util.TreeSet;
 import java.util.stream.Collectors;
 import okio.ByteString;
 import org.apache.hadoop.hbase.TableName;
@@ -71,7 +71,7 @@ public class BigtableStorage {
       final Scan scan = new Scan()
           .setRowPrefixFilter(Bytes.toBytes(workflowInstance.toKey() + '#'));
 
-      final SortedSet<SequenceEvent> set = newSortedEventSet();
+      final SortedSet<SequenceEvent> set = Sets.newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
 
       for (Result result : eventsTable.getScanner(scan)) {
         set.add(parseEventResult(result));
@@ -138,8 +138,7 @@ public class BigtableStorage {
   Optional<Long> getLatestStoredCounter(WorkflowInstance workflowInstance)
       throws IOException {
     final Set<SequenceEvent> storedEvents = readEvents(workflowInstance);
-    final Optional<SequenceEvent> lastStoredEvent = storedEvents.stream().reduce((a, b) -> b);
-    return lastStoredEvent.map(SequenceEvent::counter);
+    return Optional.ofNullable(Iterators.getLast(storedEvents.iterator(), null)).map(SequenceEvent::counter);
   }
 
   WorkflowInstanceExecutionData executionData(WorkflowInstance workflowInstance) throws IOException {
@@ -159,7 +158,4 @@ public class BigtableStorage {
     return SequenceEvent.parseKey(key, event, timestamp);
   }
 
-  private static TreeSet<SequenceEvent> newSortedEventSet() {
-    return Sets.newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
-  }
 }
