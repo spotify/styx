@@ -29,6 +29,7 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.serialization.Json;
 import java.util.List;
 

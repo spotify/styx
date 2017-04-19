@@ -49,6 +49,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.ParameterUtil;
 import java.io.IOException;
@@ -429,7 +430,7 @@ public final class Main {
 
     final ObjectNode json = (ObjectNode) jsonNode;
     final ArrayNode events = json.withArray("events");
-    final ImmutableList.Builder<CliOutput.EventInfo> eventInfos = ImmutableList.builder();
+    final ImmutableList.Builder<EventInfo> eventInfos = ImmutableList.builder();
     for (JsonNode eventWithTimestamp : events) {
       final long ts = eventWithTimestamp.get("timestamp").asLong();
       final JsonNode event = eventWithTimestamp.get("event");
@@ -439,14 +440,14 @@ public final class Main {
       try {
         Event typedEvent = OBJECT_MAPPER.convertValue(event, Event.class);
         eventName = EventUtil.name(typedEvent);
-        eventInfo = CliUtil.info(typedEvent);
+        eventInfo = EventUtil.info(typedEvent);
       } catch (IllegalArgumentException e) {
         // fall back to just inspecting the json
         eventName = event.get("@type").asText();
         eventInfo = "";
       }
 
-      eventInfos.add(CliOutput.EventInfo.create(ts, eventName, eventInfo));
+      eventInfos.add(EventInfo.create(ts, eventName, eventInfo));
     }
 
     cliOutput.printEvents(eventInfos.build());

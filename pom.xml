@@ -26,6 +26,7 @@
     <module>styx-schedule-source</module>
     <module>styx-local-files-source</module>
     <module>styx-cli</module>
+    <module>styx-client</module>
     <module>styx-common</module>
     <module>styx-test</module>
     <module>styx-standalone-service</module>

@@ -30,6 +30,7 @@ import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
 import java.util.Collections;
