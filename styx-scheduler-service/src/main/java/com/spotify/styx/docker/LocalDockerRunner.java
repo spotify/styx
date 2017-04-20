@@ -74,6 +74,13 @@ class LocalDockerRunner implements DockerRunner {
   }
 
   @Override
+  public void restore() {
+    // TODO: a meaningful implementation of this method needs LocalDockerRunner to list the
+    //       local docker containers using the docker api and emit events for them similar to
+    //       KubernetesDockerRunner.
+  }
+
+  @Override
   public String start(WorkflowInstance workflowInstance, RunSpec runSpec) {
     final String imageTag = runSpec.imageName().contains(":")
         ? runSpec.imageName()

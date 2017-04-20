@@ -319,6 +319,10 @@ public class StyxSchedulerServiceFixture {
   private DockerRunner fakeDockerRunner() {
     return new DockerRunner() {
       @Override
+      public void restore() {
+      }
+
+      @Override
       public String start(WorkflowInstance workflowInstance, RunSpec runSpec) {
         dockerRuns.add(Tuple.of(workflowInstance, runSpec));
         return TEST_EXECUTION_ID;

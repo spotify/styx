@@ -47,6 +47,11 @@ class RoutingDockerRunner implements DockerRunner {
   }
 
   @Override
+  public void restore() {
+    runner().restore();
+  }
+
+  @Override
   public String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
     return runner().start(workflowInstance, runSpec);
   }

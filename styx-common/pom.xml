@@ -39,6 +39,10 @@
       <artifactId>guava</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.github.rholder</groupId>
+      <artifactId>guava-retrying</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.javaslang</groupId>
       <artifactId>javaslang</artifactId>
     </dependency>

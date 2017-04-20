@@ -26,6 +26,11 @@ import static com.spotify.styx.state.RunState.State.RUNNING;
 import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.github.rholder.retry.RetryException;
+import com.github.rholder.retry.Retryer;
+import com.github.rholder.retry.RetryerBuilder;
+import com.github.rholder.retry.StopStrategies;
+import com.github.rholder.retry.WaitStrategies;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
@@ -62,6 +67,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -215,6 +221,21 @@ class KubernetesDockerRunner implements DockerRunner {
     }
   }
 
+  @Override
+  public void restore() {
+    final Retryer<Object> retryer = RetryerBuilder.newBuilder()
+        .retryIfException()
+        .withWaitStrategy(WaitStrategies.exponentialWait())
+        .withStopStrategy(StopStrategies.stopAfterAttempt(3))
+        .build();
+
+    try {
+      retryer.call(Executors.callable(this::tryPollPods));
+    } catch (ExecutionException | RetryException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public void init() {
     EXECUTOR.scheduleWithFixedDelay(
         this::pollPods,
@@ -251,17 +272,21 @@ class KubernetesDockerRunner implements DockerRunner {
   @VisibleForTesting
   void pollPods() {
     try {
-      final PodList list = client.pods().list();
-      examineRunningWFISandAssociatedPods(list);
-
-      final int resourceVersion = Integer.parseInt(list.getMetadata().getResourceVersion());
-
-      for (Pod pod : list.getItems()) {
-        logEvent(Watcher.Action.MODIFIED, pod, resourceVersion, true);
-        inspectPod(Watcher.Action.MODIFIED, pod);
-      }
+      tryPollPods();
     } catch (Throwable t) {
       LOG.warn("Error while polling pods", t);
+    }
+  }
+
+  private synchronized void tryPollPods() {
+    final PodList list = client.pods().list();
+    examineRunningWFISandAssociatedPods(list);
+
+    final int resourceVersion = Integer.parseInt(list.getMetadata().getResourceVersion());
+
+    for (Pod pod : list.getItems()) {
+      logEvent(Watcher.Action.MODIFIED, pod, resourceVersion, true);
+      inspectPod(Watcher.Action.MODIFIED, pod);
     }
   }
 
