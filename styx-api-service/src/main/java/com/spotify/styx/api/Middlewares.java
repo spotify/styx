@@ -24,6 +24,7 @@ import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
+import com.spotify.apollo.Request;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
@@ -35,6 +36,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 import okio.ByteString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A collection of static methods implementing the apollo Middleware interface, useful for
@@ -42,6 +45,8 @@ import okio.ByteString;
  * strings.
  */
 public final class Middlewares {
+
+  private static final Logger LOG = LoggerFactory.getLogger(Middlewares.class);
 
   private Middlewares() {
   }
@@ -89,6 +94,24 @@ public final class Middlewares {
         // noinspection unchecked
         return (CompletionStage<Response<ByteString>>) innerHandler.invoke(requestContext);
       }
+    };
+  }
+
+  public static Middleware<AsyncHandler<? extends Response<?>>,
+      AsyncHandler<? extends Response<ByteString>>> auditLogging() {
+    return innerHandler -> requestContext -> {
+      final Request request = requestContext.request();
+      if (!"GET".equals(request.method())) {
+        LOG.info("[AUDIT] {} {} with headers {} parameters {} and payload {}",
+                 request.method(),
+                 request.uri(),
+                 request.headers(),
+                 request.parameters(),
+                 request.payload().map(ByteString::utf8).orElse("")
+                     .replaceAll("\n", " "));
+      }
+      // noinspection unchecked
+      return (CompletionStage<Response<ByteString>>) innerHandler.invoke(requestContext);
     };
   }
 }
