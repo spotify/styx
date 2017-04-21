@@ -65,6 +65,7 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import javax.ws.rs.HEAD;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
