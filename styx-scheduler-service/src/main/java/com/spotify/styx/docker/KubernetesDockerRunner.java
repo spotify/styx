@@ -111,8 +111,13 @@ class KubernetesDockerRunner implements DockerRunner {
       runSpec.secret().ifPresent(specSecret -> {
         final Secret secret = client.secrets().withName(specSecret.name()).get();
         if (secret == null) {
+          LOG.error("[AUDIT] Workflow {} refers to a non-existent secret {}",
+                    workflowInstance.workflowId(), specSecret.name());
           throw new InvalidExecutionException(
               "Referenced secret '" + specSecret.name() + "' was not found");
+        } else {
+          LOG.info("[AUDIT] Workflow {} refers to secret {}",
+                   workflowInstance.workflowId(), specSecret.name());
         }
       });
 
@@ -264,7 +269,7 @@ class KubernetesDockerRunner implements DockerRunner {
     final Map<String, String> annotations = pod.getMetadata().getAnnotations();
     final String podName = pod.getMetadata().getName();
     if (!annotations.containsKey(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION)) {
-      LOG.warn("Got pod without workflow instance annotation {}", podName);
+      LOG.warn("[AUDIT] Got pod without workflow instance annotation {}", podName);
       return;
     }
 
