@@ -111,12 +111,12 @@ class KubernetesDockerRunner implements DockerRunner {
       runSpec.secret().ifPresent(specSecret -> {
         final Secret secret = client.secrets().withName(specSecret.name()).get();
         if (secret == null) {
-          LOG.error("[AUDIT] workflow {} refers to a non-existent secret {}",
+          LOG.error("[AUDIT] Workflow {} refers to a non-existent secret {}",
                     workflowInstance.workflowId(), specSecret.name());
           throw new InvalidExecutionException(
               "Referenced secret '" + specSecret.name() + "' was not found");
         } else {
-          LOG.info("[AUDIT] workflow {} refers to secret {}",
+          LOG.info("[AUDIT] Workflow {} refers to secret {}",
                    workflowInstance.workflowId(), specSecret.name());
         }
       });
