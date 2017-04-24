@@ -23,6 +23,7 @@ package com.spotify.styx;
 import static com.spotify.styx.monitoring.MeteredProxy.instrument;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
+import static com.spotify.styx.util.Connections.createFallbackBigTableConnection;
 import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static com.spotify.styx.util.ReplayEvents.transitionLogger;
 import static java.util.Objects.requireNonNull;
@@ -91,6 +92,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -573,8 +575,10 @@ public class StyxScheduler implements AppInit {
     final Closer closer = environment.closer();
 
     final Connection bigTable = closer.register(createBigTableConnection(config));
+    final Optional<Connection> fallback = createFallbackBigTableConnection(config);
+    fallback.ifPresent(closer::register);
     final Datastore datastore = createDatastore(config);
-    return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
+    return new AggregateStorage(bigTable, fallback, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
   }
 
   private static DockerRunner createDockerRunner(

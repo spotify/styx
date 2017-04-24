@@ -45,6 +45,7 @@ import com.spotify.apollo.StatusType;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.AggregateStorage;
 import java.time.Duration;
+import java.util.Optional;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -59,6 +60,7 @@ public class ResourceResourceTest extends VersionedApiTest {
 
   private AggregateStorage storage = new AggregateStorage(
       mock(Connection.class),
+      Optional.empty(),
       localDatastore.options().service(),
       Duration.ZERO);
 

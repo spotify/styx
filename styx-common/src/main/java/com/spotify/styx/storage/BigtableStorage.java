@@ -36,6 +36,7 @@ import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.RunnableWithException;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -72,14 +73,25 @@ public class BigtableStorage {
 
   private final Connection connection;
   private final Duration retryBaseDelay;
+  private final Optional<Connection> fallback;
 
-  BigtableStorage(Connection connection, Duration retryBaseDelay) {
+  BigtableStorage(Connection connection, Duration retryBaseDelay, Optional<Connection> fallback) {
     this.connection = Objects.requireNonNull(connection);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
+    this.fallback = fallback;
   }
 
   SortedSet<SequenceEvent> readEvents(WorkflowInstance workflowInstance) throws IOException {
-    try (final Table eventsTable = connection.getTable(EVENTS_TABLE_NAME)) {
+    SortedSet<SequenceEvent> events = readEvents(workflowInstance, connection);
+    if (fallback.isPresent()) {
+      events.addAll(readEvents(workflowInstance, fallback.get()));
+    }
+    return events;
+  }
+
+  private static SortedSet<SequenceEvent> readEvents(WorkflowInstance workflowInstance, Connection c)
+      throws IOException {
+    try (final Table eventsTable = c.getTable(EVENTS_TABLE_NAME)) {
       final Scan scan = new Scan()
           .setRowPrefixFilter(Bytes.toBytes(workflowInstance.toKey() + '#'));
 
@@ -109,6 +121,30 @@ public class BigtableStorage {
 
   List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String offset, int limit)
       throws IOException {
+    final Set<WorkflowInstance> workflowInstances = Sets.newHashSet();
+    workflowInstances(workflowId, offset, limit, connection, workflowInstances);
+    if (fallback.isPresent()) {
+      workflowInstances(workflowId, offset, limit, fallback.get(), workflowInstances);
+    }
+    return executionData(workflowInstances);
+  }
+
+  private List<WorkflowInstanceExecutionData> executionData(
+      Collection<WorkflowInstance> workflowInstancesSet) {
+    return workflowInstancesSet.parallelStream()
+        .map(workflowInstance -> {
+          try {
+            return executionData(workflowInstance);
+          } catch (IOException e) {
+            throw Throwables.propagate(e);
+          }
+        })
+        .sorted(WorkflowInstanceExecutionData.COMPARATOR)
+        .collect(Collectors.toList());
+  }
+
+  private static void workflowInstances(WorkflowId workflowId, String offset, int limit,
+      Connection connection, Set<WorkflowInstance> workflowInstances) throws IOException {
     try (final Table eventsTable = connection.getTable(EVENTS_TABLE_NAME)) {
       final Scan scan = new Scan()
           .setRowPrefixFilter(Bytes.toBytes(workflowId.toKey() + '#'))
@@ -119,7 +155,6 @@ public class BigtableStorage {
         scan.setStartRow(Bytes.toBytes(offsetInstance.toKey() + '#'));
       }
 
-      final Set<WorkflowInstance> workflowInstancesSet = Sets.newHashSet();
       try (ResultScanner scanner = eventsTable.getScanner(scan)) {
         Result result = scanner.next();
         while (result != null) {
@@ -127,25 +162,14 @@ public class BigtableStorage {
           final int lastHash = key.lastIndexOf('#');
 
           final WorkflowInstance wfi = WorkflowInstance.parseKey(key.substring(0, lastHash));
-          workflowInstancesSet.add(wfi);
-          if (workflowInstancesSet.size() == limit) {
+          workflowInstances.add(wfi);
+          if (workflowInstances.size() == limit) {
             break;
           }
 
           result = scanner.next();
         }
       }
-
-      return workflowInstancesSet.parallelStream()
-          .map(workflowInstance -> {
-            try {
-              return executionData(workflowInstance);
-            } catch (IOException e) {
-              throw Throwables.propagate(e);
-            }
-          })
-          .sorted(WorkflowInstanceExecutionData.COMPARATOR)
-          .collect(Collectors.toList());
     }
   }
 
@@ -169,7 +193,7 @@ public class BigtableStorage {
     return WorkflowInstanceExecutionData.fromEvents(events);
   }
 
-  private SequenceEvent parseEventResult(Result r) throws IOException {
+  private static SequenceEvent parseEventResult(Result r) throws IOException {
     final String key = new String(r.getRow());
     final long timestamp = r.getColumnLatestCell(EVENT_CF, EVENT_QUALIFIER).getTimestamp();
     final byte[] value = r.getValue(EVENT_CF, EVENT_QUALIFIER);

@@ -48,8 +48,10 @@ public class AggregateStorage implements Storage {
   private final BigtableStorage bigtableStorage;
   private final DatastoreStorage datastoreStorage;
 
-  public AggregateStorage(Connection connection, Datastore datastore, Duration retryBaseDelay) {
-    this.bigtableStorage = new BigtableStorage(connection, retryBaseDelay);
+  public AggregateStorage(Connection connection, Optional<Connection> fallback, Datastore datastore,
+      Duration retryBaseDelay) {
+    // TODO: inject BigtableStorage and DatastoreStorage instead
+    this.bigtableStorage = new BigtableStorage(connection, retryBaseDelay, fallback);
     this.datastoreStorage = new DatastoreStorage(datastore, retryBaseDelay);
   }
 

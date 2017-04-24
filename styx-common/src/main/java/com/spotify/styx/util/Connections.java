@@ -24,6 +24,7 @@ import com.google.cloud.bigtable.hbase.BigtableConfiguration;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreOptions;
 import com.typesafe.config.Config;
+import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Connection;
 import org.slf4j.Logger;
@@ -40,6 +41,8 @@ public final class Connections {
   public static final String DATASTORE_NAMESPACE = "styx.datastore.namespace";
   public static final String BIGTABLE_PROJECT_ID = "styx.bigtable.project-id";
   public static final String BIGTABLE_INSTANCE_ID = "styx.bigtable.instance-id";
+  public static final String BIGTABLE_FALLBACK_PROJECT_ID = "styx.bigtable.fallback-project-id";
+  public static final String BIGTABLE_FALLBACK_INSTANCE_ID = "styx.bigtable.fallback-instance-id";
 
   private Connections() {
   }
@@ -61,7 +64,21 @@ public final class Connections {
   public static Connection createBigTableConnection(Config config) {
     final String projectId = config.getString(BIGTABLE_PROJECT_ID);
     final String instanceId = config.getString(BIGTABLE_INSTANCE_ID);
+    return createBigTableConnection(projectId, instanceId);
+  }
 
+  public static Optional<Connection> createFallbackBigTableConnection(Config config) {
+    if (!config.hasPath(BIGTABLE_FALLBACK_PROJECT_ID)) {
+      return Optional.empty();
+    }
+
+    final String projectId = config.getString(BIGTABLE_FALLBACK_PROJECT_ID);
+    final String instanceId = config.getString(BIGTABLE_FALLBACK_INSTANCE_ID);
+
+    return Optional.ofNullable(createBigTableConnection(projectId, instanceId));
+  }
+
+  private static Connection createBigTableConnection(String projectId, String instanceId) {
     LOG.info("Creating Bigtable connection for project:{}, instance:{}",
              projectId, instanceId);
 
@@ -72,5 +89,4 @@ public final class Connections {
 
     return BigtableConfiguration.connect(bigtableConfiguration);
   }
-
 }
