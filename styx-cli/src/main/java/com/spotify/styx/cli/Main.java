@@ -25,20 +25,29 @@ import com.spotify.apollo.core.Service;
 import com.spotify.apollo.core.Services;
 import com.spotify.apollo.environment.ApolloEnvironmentModule;
 import com.spotify.apollo.http.client.HttpClientModule;
+import com.spotify.styx.api.BackfillPayload;
+import com.spotify.styx.api.BackfillsPayload;
+import com.spotify.styx.api.ResourcesPayload;
+import com.spotify.styx.api.RunStateDataPayload;
+import com.spotify.styx.client.ApiErrorException;
 import com.spotify.styx.client.StyxApolloClient;
-import com.spotify.styx.client.util.ApiErrorException;
+import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.util.ParameterUtil;
 import java.io.IOException;
 import java.time.format.DateTimeParseException;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiConsumer;
+import java.util.concurrent.ExecutionException;
 import javaslang.Tuple;
+import javaslang.Tuple2;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.inf.Argument;
@@ -73,18 +82,6 @@ public final class Main {
   private final Service cliService;
   private final CliOutput cliOutput;
   private StyxApolloClient styxClient;
-  private final BiConsumer<Object, Throwable> throwableChecker = (response, throwable) -> {
-    if (throwable != null) {
-      if (throwable instanceof ApiErrorException) {
-        System.err.println("API error: " + throwable.getMessage());
-      } else if (throwable.getCause() == null) {
-        System.err.println(throwable.toString());
-      } else {
-        System.err.println(throwable.getCause().getMessage());
-      }
-      System.exit(EXIT_CODE_CLIENT_ERROR);
-    }
-  };
 
   private Main(
       StyxCliParser parser,
@@ -143,7 +140,6 @@ public final class Main {
     final Command command = namespace.get(COMMAND_DEST);
 
     try (Service.Instance instance = cliService.start()) {
-      final Service.Signaller signaller = instance.getSignaller();
       final Client client = ApolloEnvironmentModule.environment(instance).environment().client();
       styxClient = new StyxApolloClient(client, apiHost);
 
@@ -235,103 +231,108 @@ public final class Main {
           // parsing unknown command will fail so this would only catch non-exhaustive switches
           throw new ArgumentParserException("Unrecognized command: " + command, parser.parser);
       }
-      signaller.signalShutdown();
     } catch (ArgumentParserException e) {
       parser.parser.handleError(e);
       System.exit(EXIT_CODE_ARGUMENT_ERROR);
-    } catch (IOException e) {
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof ApiErrorException) {
+        System.err.println("API error: " + cause.getMessage());
+      } else {
+        cause.printStackTrace();
+      }
+      System.exit(EXIT_CODE_CLIENT_ERROR);
+    } catch (InterruptedException | IOException e) {
       e.printStackTrace();
       System.exit(EXIT_CODE_UNKNOWN_ERROR);
     }
   }
 
-  private void backfillCreate() {
+  private void backfillCreate() throws ExecutionException, InterruptedException {
     final String component = namespace.getString(parser.backfillCreateComponent.getDest());
     final String workflow = namespace.getString(parser.backfillCreateWorkflow.getDest());
     final String start = namespace.getString(parser.backfillCreateStart.getDest());
     final String end = namespace.getString(parser.backfillCreateEnd.getDest());
     final int concurrency = namespace.getInt(parser.backfillCreateConcurrency.getDest());
 
-    styxClient.backfillCreate(component, workflow, start, end, concurrency)
-        .whenComplete(throwableChecker)
-        .whenComplete((backfill, throwable) -> cliOutput.printBackfill(backfill));
+    final Backfill backfill =
+        styxClient.backfillCreate(component, workflow, start, end, concurrency)
+            .toCompletableFuture().get();
+    cliOutput.printBackfill(backfill);
   }
 
-  private void backfillEdit() {
+  private void backfillEdit() throws ExecutionException, InterruptedException {
     final Integer concurrency = namespace.getInt(parser.backfillEditConcurrency.getDest());
     final String id = namespace.getString(parser.backfillEditId.getDest());
 
     if (concurrency != null) {
-      styxClient.backfillEditConcurrency(id, concurrency)
-          .whenComplete(throwableChecker)
-          .whenComplete((backfill, throwable) -> cliOutput.printBackfill(backfill));
+      final Backfill backfill =
+          styxClient.backfillEditConcurrency(id, concurrency).toCompletableFuture().get();
+      cliOutput.printBackfill(backfill);
     }
   }
 
-  private void backfillHalt() {
+  private void backfillHalt() throws ExecutionException, InterruptedException {
     final String id = namespace.getString(parser.backfillHaltId.getDest());
 
-    styxClient.backfillHalt(id)
-        .whenComplete(throwableChecker)
-        .whenComplete((none, throwable) -> cliOutput.printMessage(
-            "Backfill halted! Use `styx backfill show " + id + "` to check the backfill status."));
+    styxClient.backfillHalt(id).toCompletableFuture().get();
+    cliOutput.printMessage("Backfill halted! Use `styx backfill show " + id
+                           + "` to check the backfill status.");
   }
 
-  private void backfillShow() {
+  private void backfillShow() throws ExecutionException, InterruptedException {
     final String id = namespace.getString(parser.backfillShowId.getDest());
 
-    styxClient.backfill(id)
-        .whenComplete(throwableChecker)
-        .whenComplete((backfillPayload, throwable) -> cliOutput.printBackfillPayload(backfillPayload));
+    final BackfillPayload backfillPayload = styxClient.backfill(id).toCompletableFuture().get();
+    cliOutput.printBackfillPayload(backfillPayload);
   }
 
-  private void backfillList() {
+  private void backfillList() throws ExecutionException, InterruptedException {
     final Optional<String> component =
         Optional.ofNullable(namespace.getString(parser.backfillListComponent.getDest()));
     final Optional<String> workflow =
         Optional.ofNullable(namespace.getString(parser.backfillListWorkflow.getDest()));
     final boolean showAll = namespace.getBoolean(parser.backfillListShowAll.getDest());
 
-    styxClient.backfillList(component, workflow, showAll, false)
-        .whenComplete(throwableChecker)
-        .whenComplete((backfillsPayload, throwable) -> cliOutput.printBackfills(backfillsPayload.backfills()));
+    final BackfillsPayload backfillsPayload =
+        styxClient.backfillList(component, workflow, showAll, false)
+            .toCompletableFuture().get();
+    cliOutput.printBackfills(backfillsPayload.backfills());
   }
 
-  private void resourceCreate() {
+  private void resourceCreate() throws ExecutionException, InterruptedException {
     final String id = namespace.getString(parser.resourceCreateId.getDest());
     final int concurrency = namespace.getInt(parser.resourceCreateConcurrency.getDest());
 
-    styxClient.resourceCreate(id, concurrency)
-        .whenComplete(throwableChecker)
-        .whenComplete((resource, throwable) -> cliOutput.printResources(Collections.singletonList(resource)));
+    final Resource resource =
+        styxClient.resourceCreate(id, concurrency).toCompletableFuture().get();
+    cliOutput.printResources(Collections.singletonList(resource));
   }
 
-  private void resourceEdit() {
+  private void resourceEdit() throws ExecutionException, InterruptedException {
     final String id = namespace.getString(parser.resourceEditId.getDest());
     final Integer concurrency = namespace.getInt(parser.resourceEditConcurrency.getDest());
 
     if (concurrency != null) {
-      styxClient.resourceEdit(id, concurrency)
-          .whenComplete(throwableChecker)
-          .whenComplete((resource, throwable) -> cliOutput.printResources(Collections.singletonList(resource)));
+      Resource resource = styxClient.resourceEdit(id, concurrency).toCompletableFuture().get();
+      cliOutput.printResources(Collections.singletonList(resource));
     }
   }
 
-  private void resourceShow() {
+  private void resourceShow() throws ExecutionException, InterruptedException {
     final String id = namespace.getString(parser.resourceShowId.getDest());
 
-    styxClient.resource(id)
-        .whenComplete(throwableChecker)
-        .whenComplete((resource, throwable) -> cliOutput.printResources(Collections.singletonList(resource)));
+    final Resource resource = styxClient.resource(id).toCompletableFuture().get();
+    cliOutput.printResources(Collections.singletonList(resource));
   }
 
-  private void resourceList() {
-    styxClient.resourceList()
-        .whenComplete(throwableChecker)
-        .whenComplete((resourcesPayload, throwable) -> cliOutput.printResources(resourcesPayload.resources()));
+  private void resourceList() throws ExecutionException, InterruptedException {
+    final ResourcesPayload resourcesPayload =
+        styxClient.resourceList().toCompletableFuture().get();
+    cliOutput.printResources(resourcesPayload.resources());
   }
 
-  private void workflowShow() {
+  private void workflowShow() throws ExecutionException, InterruptedException {
     final String component = namespace.getString(parser.workflowShowComponentId.getDest());
     final String workflow = namespace.getString(parser.workflowShowWorkflowId.getDest());
 
@@ -340,62 +341,59 @@ public final class Main {
     final CompletableFuture<WorkflowState> workflowStateFuture =
         styxClient.workflowState(component, workflow).toCompletableFuture();
 
-    workflowFuture.thenCombine(workflowStateFuture, Tuple::of)
-        .whenComplete(throwableChecker)
-        .whenComplete((tuple, throwable) -> cliOutput.printWorkflow(tuple._1, tuple._2));
+    final Tuple2<Workflow, WorkflowState> tuple =
+        workflowFuture.thenCombine(workflowStateFuture, Tuple::of).toCompletableFuture().get();
+    cliOutput.printWorkflow(tuple._1, tuple._2);
   }
 
-  private void activeStates() {
+  private void activeStates() throws ExecutionException, InterruptedException {
     final Optional<String> component =
         Optional.ofNullable(namespace.getString(parser.listComponent.getDest()));
 
-    styxClient.activeStates(component)
-        .whenComplete(throwableChecker)
-        .whenComplete((runStateDataPayload, throwable) -> cliOutput.printStates(runStateDataPayload));
+    final RunStateDataPayload runStateDataPayload =
+        styxClient.activeStates(component).toCompletableFuture().get();
+    cliOutput.printStates(runStateDataPayload);
   }
 
-  private void eventsForWorkflowInstance() {
+  private void eventsForWorkflowInstance() throws ExecutionException, InterruptedException {
     final String component = namespace.getString(COMPONENT_DEST);
     final String workflow = namespace.getString(WORKFLOW_DEST);
     final String parameter = namespace.getString(PARAMETER_DEST);
 
-    styxClient.eventsForWorkflowInstance(component, workflow, parameter)
-        .whenComplete(throwableChecker)
-        .whenComplete((list, throwable) -> cliOutput.printEvents(list));
+    final List<EventInfo> eventInfos =
+        styxClient.eventsForWorkflowInstance(component, workflow, parameter)
+            .toCompletableFuture().get();
+    cliOutput.printEvents(eventInfos);
   }
 
-  private void triggerWorkflowInstance() {
+  private void triggerWorkflowInstance() throws ExecutionException, InterruptedException {
     final String component = namespace.getString(COMPONENT_DEST);
     final String workflow = namespace.getString(WORKFLOW_DEST);
     final String parameter = namespace.getString(PARAMETER_DEST);
 
-    styxClient.triggerWorkflowInstance(component, workflow, parameter)
-        .whenComplete(throwableChecker)
-        .whenComplete((none, throwable) -> cliOutput.printMessage(
-            "Triggered! Use `styx ls -c " + component + "` to check active workflow instances."));
+    styxClient.triggerWorkflowInstance(component, workflow, parameter).toCompletableFuture().get();
+    cliOutput.printMessage("Triggered! Use `styx ls -c " + component
+                           + "` to check active workflow instances.");
   }
 
-  private void haltWorkflowInstance() {
+  private void haltWorkflowInstance() throws ExecutionException, InterruptedException {
     final String component = namespace.getString(COMPONENT_DEST);
     final String workflow = namespace.getString(WORKFLOW_DEST);
     final String parameter = namespace.getString(PARAMETER_DEST);
 
-    styxClient.haltWorkflowInstance(component, workflow, parameter)
-        .whenComplete(throwableChecker)
-        .whenComplete((none, throwable) -> cliOutput.printMessage(
-            "Halted! Use `styx events " + component + " " + workflow + " " + parameter + "` "
-            + "to verify."));
+    styxClient.haltWorkflowInstance(component, workflow, parameter).toCompletableFuture().get();
+    cliOutput.printMessage("Halted! Use `styx events " + component + " " + workflow + " "
+                           + parameter + "` to verify.");
   }
 
-  private void retryWorkflowInstance() {
+  private void retryWorkflowInstance() throws ExecutionException, InterruptedException {
     final String component = namespace.getString(COMPONENT_DEST);
     final String workflow = namespace.getString(WORKFLOW_DEST);
     final String parameter = namespace.getString(PARAMETER_DEST);
 
-    styxClient.retryWorkflowInstance(component, workflow, parameter)
-        .whenComplete(throwableChecker)
-        .whenComplete((none, throwable) -> cliOutput.printMessage(
-            "Retrying! Use `styx ls -c " + component + "` to check active workflow instances."));
+    styxClient.retryWorkflowInstance(component, workflow, parameter).toCompletableFuture().get();
+    cliOutput.printMessage("Retrying! Use `styx ls -c " + component
+                           + "` to check active workflow instances.");
   }
 
   private static class StyxCliParser {
