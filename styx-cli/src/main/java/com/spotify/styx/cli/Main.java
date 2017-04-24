@@ -26,6 +26,7 @@ import com.spotify.apollo.core.Services;
 import com.spotify.apollo.environment.ApolloEnvironmentModule;
 import com.spotify.apollo.http.client.HttpClientModule;
 import com.spotify.styx.client.StyxApolloClient;
+import com.spotify.styx.client.util.ApiErrorException;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.util.ParameterUtil;
@@ -74,7 +75,9 @@ public final class Main {
   private StyxApolloClient styxClient;
   private final BiConsumer<Object, Throwable> throwableChecker = (response, throwable) -> {
     if (throwable != null) {
-      if (throwable.getCause() == null) {
+      if (throwable instanceof ApiErrorException) {
+        System.err.println("API error: " + throwable.getMessage());
+      } else if (throwable.getCause() == null) {
         System.err.println(throwable.toString());
       } else {
         System.err.println(throwable.getCause().getMessage());
