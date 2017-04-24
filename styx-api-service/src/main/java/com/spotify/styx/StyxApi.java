@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.api.Middlewares.auditLogging;
 import static com.spotify.styx.api.Middlewares.clientValidator;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
@@ -124,20 +125,42 @@ public class StyxApi implements AppInit {
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
         // TODO remove deprecated resources
-        .registerRoutes(deprecatedWorkflowResource.routes())
+        .registerRoutes(deprecatedWorkflowResource.routes()
+                            .map(r -> r
+                                .withMiddleware(clientValidator(clientBlacklistSupplier))
+                                .withMiddleware(auditLogging())))
         .registerRoutes(deprecatedBackfillResource.routes()
-                            .map(r -> r.withMiddleware(clientValidator(clientBlacklistSupplier))))
+                            .map(r -> r
+                                .withMiddleware(clientValidator(clientBlacklistSupplier))
+                                .withMiddleware(auditLogging())))
         .registerRoutes(deprecatedCliResource.routes()
-                            .map(r -> r.withMiddleware(clientValidator(clientBlacklistSupplier))))
-        .registerRoutes(workflowResource.routes())
+                            .map(r -> r
+                                .withMiddleware(clientValidator(clientBlacklistSupplier))
+                                .withMiddleware(auditLogging())))
+        .registerRoutes(workflowResource.routes()
+                            .map(r -> r
+                                .withMiddleware(clientValidator(clientBlacklistSupplier))
+                                .withMiddleware(auditLogging())))
         .registerRoutes(backfillResource.routes()
-                            .map(r -> r.withMiddleware(clientValidator(clientBlacklistSupplier))))
-        .registerRoutes(resourceResource.routes())
-        .registerRoutes(styxConfigResource.routes())
+                            .map(r -> r
+                                .withMiddleware(clientValidator(clientBlacklistSupplier))
+                                .withMiddleware(auditLogging())))
+        .registerRoutes(resourceResource.routes()
+                            .map(r -> r
+                                .withMiddleware(clientValidator(clientBlacklistSupplier))
+                                .withMiddleware(auditLogging())))
+        .registerRoutes(styxConfigResource.routes()
+                            .map(r -> r
+                                .withMiddleware(clientValidator(clientBlacklistSupplier))
+                                .withMiddleware(auditLogging())))
         .registerRoutes(statusResource.routes()
-                            .map(r -> r.withMiddleware(clientValidator(clientBlacklistSupplier))))
+                            .map(r -> r
+                                .withMiddleware(clientValidator(clientBlacklistSupplier))
+                                .withMiddleware(auditLogging())))
         .registerRoutes(schedulerResource.routes()
-                            .map(r -> r.withMiddleware(clientValidator(clientBlacklistSupplier))));
+                            .map(r -> r
+                                .withMiddleware(clientValidator(clientBlacklistSupplier))
+                                .withMiddleware(auditLogging())));
   }
 
   private static AggregateStorage storage(Environment environment) {

@@ -202,6 +202,33 @@ public class MiddlewaresTest {
         is(Status.Family.CLIENT_ERROR));
   }
 
+  @Test
+  public void testAuditLoggingForGet() {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = mock(Request.class);
+    when(request.method()).thenReturn("GET");
+    when(requestContext.request()).thenReturn(request);
+    CompletionStage completionStage =
+        CompletableFuture.completedFuture(Response.forStatus(Status.OK.withReasonPhrase("")));
+    assertThat(Middlewares.auditLogging()
+                   .apply(mockInnerHandler(requestContext, completionStage)).invoke(requestContext),
+               equalTo(completionStage));
+  }
+
+  @Test
+  public void testAuditLoggingForPut() {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = mock(Request.class);
+    when(request.method()).thenReturn("PUT");
+    when(request.payload()).thenReturn(Optional.of(ByteString.encodeUtf8("hello")));
+    when(requestContext.request()).thenReturn(request);
+    CompletionStage completionStage =
+        CompletableFuture.completedFuture(Response.forStatus(Status.OK.withReasonPhrase("")));
+    assertThat(Middlewares.auditLogging()
+                   .apply(mockInnerHandler(requestContext, completionStage)).invoke(requestContext),
+               equalTo(completionStage));
+  }
+
   @AutoValue
   public static abstract class TestStruct {
 
