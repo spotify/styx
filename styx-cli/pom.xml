@@ -42,7 +42,6 @@
     <dependency>
       <groupId>net.sourceforge.argparse4j</groupId>
       <artifactId>argparse4j</artifactId>
-      <version>0.7.0</version>
     </dependency>
 
     <dependency>
@@ -72,7 +71,6 @@
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
-      <version>${jackson.version}</version>
     </dependency>
 
   </dependencies>
