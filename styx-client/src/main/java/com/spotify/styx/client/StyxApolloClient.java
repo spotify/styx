@@ -64,9 +64,7 @@ import okio.ByteString;
  * {@link CompletionStage} will be of kind {@link ApiErrorException}. Other errors will be treated
  * as {@link RuntimeException} instead.
  */
-public class StyxApolloClient
-    implements StyxWorkflowClient, StyxBackfillClient, StyxResourceClient,
-               StyxSchedulerClient, StyxStatusClient {
+class StyxApolloClient implements StyxClient {
   private static final String STYX_API_ENDPOINT = "/api/v2";
   private static final String UTF_8 = "UTF-8";
   private static final String STYX_CLIENT_VERSION =
@@ -76,8 +74,8 @@ public class StyxApolloClient
   private final String apiHost;
   private final Client client;
 
-  public StyxApolloClient(final Client client,
-                          final String apiHost) {
+  StyxApolloClient(final Client client,
+                   final String apiHost) {
     this.apiHost = apiHost;
     this.client = client;
   }

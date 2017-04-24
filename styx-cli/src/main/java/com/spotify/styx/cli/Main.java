@@ -30,7 +30,8 @@ import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.ResourcesPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.client.ApiErrorException;
-import com.spotify.styx.client.StyxApolloClient;
+import com.spotify.styx.client.StyxClient;
+import com.spotify.styx.client.StyxClientFactory;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
@@ -81,7 +82,7 @@ public final class Main {
   private final String apiHost;
   private final Service cliService;
   private final CliOutput cliOutput;
-  private StyxApolloClient styxClient;
+  private StyxClient styxClient;
 
   private Main(
       StyxCliParser parser,
@@ -141,7 +142,7 @@ public final class Main {
 
     try (Service.Instance instance = cliService.start()) {
       final Client client = ApolloEnvironmentModule.environment(instance).environment().client();
-      styxClient = new StyxApolloClient(client, apiHost);
+      styxClient = StyxClientFactory.create(client, apiHost);
 
       switch (command) {
         case LIST:
