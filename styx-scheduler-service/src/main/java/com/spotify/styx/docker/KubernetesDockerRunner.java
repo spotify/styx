@@ -216,12 +216,12 @@ class KubernetesDockerRunner implements DockerRunner {
           .withSecretName(secret.name())
           .endSecret()
           .endVolume();
-      VolumeMount volumeMount = new VolumeMountBuilder()
+      final VolumeMount secretMount = new VolumeMountBuilder()
           .withMountPath(secret.mountPath())
           .withName(secret.name())
           .withReadOnly(true)
           .build();
-      container = container.addToVolumeMounts(volumeMount);
+      container = container.addToVolumeMounts(secretMount);
     }
     container.endContainer();
 
