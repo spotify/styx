@@ -108,7 +108,7 @@ To define a schedule, simply write a  yaml file to `/etc/styx` (given the above 
 ```yaml
 schedules:
   - id: my-workflow
-    schedule: @hourly
+    schedule: hourly
     docker_image: my-workflow:0.1
     docker_args: ['./run.sh', '{}']
 ```
