@@ -203,7 +203,6 @@
         <groupId>io.netty</groupId>
         <artifactId>netty-tcnative-boringssl-static</artifactId>
         <version>1.1.33.Fork19</version>
-        <classifier>${os.detected.classifier}</classifier>
       </dependency>
 
       <!-- test libs -->
@@ -346,15 +345,6 @@
   </dependencyManagement>
 
   <build>
-    <extensions>
-      <!-- Use os-maven-plugin to initialize the "os.detected" properties -->
-      <extension>
-        <groupId>kr.motd.maven</groupId>
-        <artifactId>os-maven-plugin</artifactId>
-        <version>1.4.0.Final</version>
-      </extension>
-    </extensions>
-
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
