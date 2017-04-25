@@ -33,7 +33,7 @@ import com.spotify.apollo.Environment;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.BackfillResource;
 import com.spotify.styx.api.ResourceResource;
-import com.spotify.styx.api.SchedulerResource;
+import com.spotify.styx.api.SchedulerProxyResource;
 import com.spotify.styx.api.StatusResource;
 import com.spotify.styx.api.StyxConfigResource;
 import com.spotify.styx.api.WorkflowResource;
@@ -107,7 +107,7 @@ public class StyxApi implements AppInit {
     final ResourceResource resourceResource = new ResourceResource(storage);
     final StyxConfigResource styxConfigResource = new StyxConfigResource(storage);
     final StatusResource statusResource = new StatusResource(storage);
-    final SchedulerResource schedulerResource = new SchedulerResource(schedulerServiceBaseUrl);
+    final SchedulerProxyResource schedulerProxyResource = new SchedulerProxyResource(schedulerServiceBaseUrl);
 
     final com.spotify.styx.api.deprecated.WorkflowResource
         deprecatedWorkflowResource =
@@ -157,7 +157,7 @@ public class StyxApi implements AppInit {
                             .map(r -> r
                                 .withMiddleware(clientValidator(clientBlacklistSupplier))
                                 .withMiddleware(auditLogging())))
-        .registerRoutes(schedulerResource.routes()
+        .registerRoutes(schedulerProxyResource.routes()
                             .map(r -> r
                                 .withMiddleware(clientValidator(clientBlacklistSupplier))
                                 .withMiddleware(auditLogging())));
