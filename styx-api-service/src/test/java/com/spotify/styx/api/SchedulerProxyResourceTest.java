@@ -30,19 +30,19 @@ import com.spotify.apollo.Status;
 import okio.ByteString;
 import org.junit.Test;
 
-public class SchedulerResourceTest extends VersionedApiTest {
+public class SchedulerProxyResourceTest extends VersionedApiTest {
 
   private static final String SCHEDULER_BASE = "http://localhost:8080";
 
-  public SchedulerResourceTest(Api.Version version) {
-    super(SchedulerResource.BASE, version);
+  public SchedulerProxyResourceTest(Api.Version version) {
+    super(SchedulerProxyResource.BASE, version);
   }
 
   @Override
   protected void init(Environment environment) {
-    final SchedulerResource schedulerResource = new SchedulerResource(SCHEDULER_BASE);
+    final SchedulerProxyResource schedulerProxyResource = new SchedulerProxyResource(SCHEDULER_BASE);
 
-    environment.routingEngine().registerRoutes(schedulerResource.routes());
+    environment.routingEngine().registerRoutes(schedulerProxyResource.routes());
   }
 
   @Test

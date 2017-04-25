@@ -36,14 +36,14 @@ import okio.ByteString;
 /**
  * API endpoints for scheduler
  */
-public class SchedulerResource {
+public class SchedulerProxyResource {
 
   static final String BASE = "/scheduler";
   private static final String SCHEDULER_BASE_PATH = "/api/v0";
 
   private final String schedulerServiceBaseUrl;
 
-  public SchedulerResource(String schedulerServiceBaseUrl) {
+  public SchedulerProxyResource(String schedulerServiceBaseUrl) {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
   }
 
