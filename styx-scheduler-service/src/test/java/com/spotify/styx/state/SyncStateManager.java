@@ -28,6 +28,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * An implementation of {@link StateManager} that process all events synchronously on the thread
@@ -37,7 +38,7 @@ import java.util.concurrent.CompletionStage;
  */
 public class SyncStateManager implements StateManager {
 
-  private final Map<WorkflowInstance, RunState> states = Maps.newHashMap();
+  private final Map<WorkflowInstance, RunState> states = new ConcurrentHashMap<>();
 
   @Override
   public void initialize(RunState runState) {

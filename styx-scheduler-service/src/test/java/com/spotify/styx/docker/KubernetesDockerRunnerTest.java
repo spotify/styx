@@ -28,11 +28,13 @@ import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.waiting;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
@@ -54,6 +56,7 @@ import io.fabric8.kubernetes.client.dsl.ClientPodResource;
 import io.fabric8.kubernetes.client.dsl.Watchable;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -87,7 +90,7 @@ public class KubernetesDockerRunnerTest {
   public ExpectedException exception = ExpectedException.none();
 
   Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC);
-  StateManager stateManager = new SyncStateManager();
+  StateManager stateManager = Mockito.spy(new SyncStateManager());
   Stats stats = Mockito.mock(Stats.class);
 
   KubernetesDockerRunner kdr;
@@ -100,6 +103,7 @@ public class KubernetesDockerRunnerTest {
 
     // pods().list().getMetadata().getResourceVersion()
     when(pods.list()).thenReturn(podList);
+    when(podList.getItems()).thenReturn(ImmutableList.of(createdPod));
     when(podList.getMetadata()).thenReturn(listMeta);
     when(listMeta.getResourceVersion()).thenReturn("1000");
 
@@ -108,6 +112,7 @@ public class KubernetesDockerRunnerTest {
 
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats);
     kdr.init();
+    kdr.restore();
 
     podWatcher = watchCaptor.getValue();
 
@@ -219,5 +224,42 @@ public class KubernetesDockerRunnerTest {
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
     assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.RUNNING));
+  }
+
+  @Test
+  public void shouldPollPodStatusAndEmitEventsOnRestore() throws Exception {
+    // Stop the runner and change the pod status to terminated while styx is "down"
+    kdr.close();
+    createdPod.setStatus(terminated("Succeeded", 20, null));
+
+    // Start a new runner
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats);
+    kdr.init();
+
+    // Make the runner poll states for all pods
+    kdr.restore();
+
+    // Verify that the runner polled and found out that the pods is terminated
+    verify(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)));
+    assertThat(stateManager.get(WORKFLOW_INSTANCE).data().lastExit(), hasValue(20));
+  }
+
+  @Test
+  public void shouldRegularlyPollPodStatusAndEmitEvents() throws Exception {
+    createdPod.setStatus(running(/* ready= */ true));
+
+    // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
+    kdr.close();
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, 1);
+    kdr.init();
+    kdr.restore();
+
+    // Change the pod status to terminated without notifying the runner through the pod watcher
+    createdPod.setStatus(terminated("Succeeded", 20, null));
+    when(podList.getItems()).thenReturn(ImmutableList.of(createdPod));
+
+    // Verify that the runner eventually polls and finds out that the pod is terminated
+    verify(stateManager, timeout(30_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)));
+    assertThat(stateManager.get(WORKFLOW_INSTANCE).data().lastExit(), hasValue(20));
   }
 }
