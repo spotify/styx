@@ -20,6 +20,7 @@
 
 package com.spotify.styx.model.data;
 
+import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
@@ -35,7 +36,6 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import org.junit.Test;
 
 public class WFIExecutionBuilderTest {
@@ -52,7 +52,7 @@ public class WFIExecutionBuilderTest {
 
   private ExecutionDescription desc(String dockerImage) {
     return ExecutionDescription.create(
-        dockerImage, Collections.emptyList(), false, Optional.empty(), Optional.empty());
+        dockerImage, Collections.emptyList(), false, empty(), empty(), empty());
   }
 
   @Test

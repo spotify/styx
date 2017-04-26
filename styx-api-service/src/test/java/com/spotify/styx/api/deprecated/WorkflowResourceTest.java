@@ -89,7 +89,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration
-          .create("bar", Schedule.DAYS, empty(), empty(), empty(), empty(), empty(), emptyList());
+          .create("bar", Schedule.DAYS, empty(), empty(), empty(), empty(), empty(), empty(),
+                  emptyList());
 
   private static final Workflow WORKFLOW =
       Workflow.create("foo", URI.create("/hejhej"), WORKFLOW_CONFIGURATION);

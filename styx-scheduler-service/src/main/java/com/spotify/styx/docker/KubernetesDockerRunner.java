@@ -34,6 +34,7 @@ import com.github.rholder.retry.WaitStrategies;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
@@ -54,6 +55,7 @@ import io.fabric8.kubernetes.api.model.PodFluent;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.PodSpecFluent;
 import io.fabric8.kubernetes.api.model.Secret;
+import io.fabric8.kubernetes.api.model.SecretBuilder;
 import io.fabric8.kubernetes.api.model.VolumeMount;
 import io.fabric8.kubernetes.api.model.VolumeMountBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
@@ -98,6 +100,11 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String TRIGGER_ID = "STYX_TRIGGER_ID";
   static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
   static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
+  private static final String STYX_MANAGED_WORKFLOW_SA_SECRET = "styx-managed-workflow-sa-secret";
+  private static final String STYX_MANAGED_WORKFLOW_SA_JSON_KEY = STYX_MANAGED_WORKFLOW_SA_SECRET + ".json";
+  private static final String STYX_MANAGED_WORKFLOW_SA_P12_KEY = STYX_MANAGED_WORKFLOW_SA_SECRET + ".p12";
+  private static final String STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH = "/etc/gcp-secret/styx-managed/";
+
 
   private static final ThreadFactory THREAD_FACTORY = new ThreadFactoryBuilder()
       .setDaemon(true)
@@ -129,6 +136,22 @@ class KubernetesDockerRunner implements DockerRunner {
   @Override
   public String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
     try {
+      runSpec.serviceAccount().ifPresent(serviceAccount -> {
+        // TODO: create keys calling GCP API, base64 already
+        final String jsonKey = "";
+        final String p12Key = "";
+        final Map<String, String> keys = Maps.newHashMap();
+        keys.put(STYX_MANAGED_WORKFLOW_SA_JSON_KEY, jsonKey);
+        keys.put(STYX_MANAGED_WORKFLOW_SA_P12_KEY, p12Key);
+        client.secrets().create(new SecretBuilder()
+                                    .withType("generic")
+                                    .withNewMetadata()
+                                    .withName(STYX_MANAGED_WORKFLOW_SA_SECRET)
+                                    .endMetadata()
+                                    .withData(keys)
+                                    .build());
+      });
+
       runSpec.secret().ifPresent(specSecret -> {
         final Secret secret = client.secrets().withName(specSecret.name()).get();
         if (secret == null) {
@@ -208,7 +231,21 @@ class KubernetesDockerRunner implements DockerRunner {
             .withArgs(runSpec.args())
             .withEnv(env);
 
-    if (runSpec.secret().isPresent()) {
+    if (runSpec.serviceAccount().isPresent()) {
+      spec = spec.addNewVolume()
+          .withName(STYX_MANAGED_WORKFLOW_SA_SECRET)
+          .withNewSecret()
+          .withSecretName(STYX_MANAGED_WORKFLOW_SA_SECRET)
+          .endSecret()
+          .endVolume();
+      container = container.addToVolumeMounts(
+          new VolumeMount(STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH,
+                          STYX_MANAGED_WORKFLOW_SA_SECRET, true))
+          .addToEnv(new EnvVarBuilder()
+                        .withName("GOOGLE_APPLICATION_CREDENTIALS")
+                        .withValue(STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH + STYX_MANAGED_WORKFLOW_SA_JSON_KEY)
+                        .build());
+    } else if (runSpec.secret().isPresent()) {
       final WorkflowConfiguration.Secret secret = runSpec.secret().get();
       spec = spec.addNewVolume()
           .withName(secret.name())

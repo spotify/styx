@@ -117,6 +117,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         dockerArgsOpt.get(),
         workflow.configuration().dockerTerminationLogging(),
         workflow.configuration().secret(),
+        workflow.configuration().serviceAccount(),
         workflowState.commitSha());
   }
 }

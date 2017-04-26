@@ -47,6 +47,9 @@ public abstract class ExecutionDescription {
   public abstract Optional<WorkflowConfiguration.Secret> secret();
 
   @JsonProperty
+  public abstract Optional<String> serviceAccount();
+
+  @JsonProperty
   public abstract Optional<String> commitSha();
 
   @JsonCreator
@@ -55,11 +58,14 @@ public abstract class ExecutionDescription {
       @JsonProperty("docker_args") List<String> dockerArgs,
       @JsonProperty("docker_termination_logging") boolean dockerTerminationLogging,
       @JsonProperty("secret") Optional<WorkflowConfiguration.Secret> secret,
+      @JsonProperty("service_account") Optional<String> serviceAccount,
       @JsonProperty("commit_sha") Optional<String> commitSha) {
-    return new AutoValue_ExecutionDescription(dockerImage, dockerArgs, dockerTerminationLogging, secret, commitSha);
+    return new AutoValue_ExecutionDescription(dockerImage, dockerArgs, dockerTerminationLogging,
+                                              secret, serviceAccount, commitSha);
   }
 
   public static ExecutionDescription forImage(String dockerImage) {
-    return new AutoValue_ExecutionDescription(dockerImage, emptyList(), false, empty(), empty());
+    return new AutoValue_ExecutionDescription(dockerImage, emptyList(), false, empty(), empty(),
+                                              empty());
   }
 }
