@@ -108,7 +108,7 @@ To define a schedule, simply write a  yaml file to `/etc/styx` (given the above 
 ```yaml
 schedules:
   - id: my-workflow
-    schedule: @hourly
+    schedule: hourly
     docker_image: my-workflow:0.1
     docker_args: ['./run.sh', '{}']
 ```
@@ -144,7 +144,7 @@ How often the workflow should be triggered.
 Supports [cron] syntax, along with a set of human readable aliases:
 ```
 @hourly,   hourly   = 0 * * * *
-@daily`,   daily    = 0 0 * * *
+@daily,    daily    = 0 0 * * *
 @weekly,   weekly   = 0 0 * * MON
 @monthly,  monthly  = 0 0 1 * *
 @yearly,   yearly   = 0 0 1 1 *
