@@ -58,6 +58,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import javaslang.Tuple;
 import javaslang.Tuple2;
@@ -95,6 +96,7 @@ public class StyxSchedulerServiceFixture {
   // captured fields from fakes
   List<Tuple2<WorkflowInstance, DockerRunner.RunSpec>> dockerRuns = Lists.newArrayList();
   List<String> dockerCleans = Lists.newArrayList();
+  AtomicInteger dockerRestores = new AtomicInteger();
 
   // service and helper
   private StyxScheduler styxScheduler;
@@ -320,6 +322,7 @@ public class StyxSchedulerServiceFixture {
     return new DockerRunner() {
       @Override
       public void restore() {
+        dockerRestores.incrementAndGet();
       }
 
       @Override
