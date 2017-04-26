@@ -122,7 +122,7 @@ class KubernetesDockerRunner implements DockerRunner {
     this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
   }
 
-  KubernetesDockerRunner(KubernetesClient client, StateManager stateManager, Stats stats) {
+  KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats) {
     this(client, stateManager, stats, DEFAULT_POLL_PODS_INTERVAL_SECONDS);
   }
 
