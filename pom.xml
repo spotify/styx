@@ -26,6 +26,7 @@
     <module>styx-schedule-source</module>
     <module>styx-local-files-source</module>
     <module>styx-cli</module>
+    <module>styx-client</module>
     <module>styx-common</module>
     <module>styx-test</module>
     <module>styx-standalone-service</module>
@@ -178,7 +179,14 @@
         <version>0.7.0</version>
       </dependency>
 
-      <!-- client libs -->
+      <!-- styx client libs -->
+      <dependency>
+        <groupId>com.squareup.okhttp3</groupId>
+        <artifactId>okhttp</artifactId>
+        <version>3.7.0</version>
+      </dependency>
+
+      <!-- external clients libs -->
       <dependency>
         <groupId>com.spotify</groupId>
         <artifactId>docker-client</artifactId>
@@ -345,6 +353,11 @@
         <groupId>com.google.code.findbugs</groupId>
         <artifactId>jsr305</artifactId>
         <version>3.0.1</version>
+      </dependency>
+      <dependency>
+        <groupId>com.squareup.okio</groupId>
+        <artifactId>okio</artifactId>
+        <version>1.12.0</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

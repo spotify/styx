@@ -27,6 +27,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Utility for getting information about {@link Event}s
@@ -38,6 +39,97 @@ public final class EventUtil {
 
   public static String name(Event event) {
     return event.accept(EventNameVisitor.INSTANCE);
+  }
+
+  public static String info(Event event) {
+    return event.accept(EventInfoVisitor.INSTANCE);
+  }
+
+  /**
+   * An {@link EventVisitor} for extracting the info of an {@link Event}.
+   */
+  private enum EventInfoVisitor implements EventVisitor<String> {
+    INSTANCE;
+
+    @Override
+    public String timeTrigger(WorkflowInstance workflowInstance) {
+      return "";
+    }
+
+    @Override
+    public String triggerExecution(WorkflowInstance workflowInstance, Trigger trigger) {
+      return String.format("Trigger id: %s", TriggerUtil.triggerId(trigger));
+    }
+
+    @Override
+    public String info(WorkflowInstance workflowInstance, Message message) {
+      return message.line();
+    }
+
+    @Override
+    public String created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
+      return String.format("Execution id: %s, Docker image: %s", executionId, dockerImage);
+    }
+
+    @Override
+    public String dequeue(WorkflowInstance workflowInstance) {
+      return "";
+    }
+
+    @Override
+    public String started(WorkflowInstance workflowInstance) {
+      return "";
+    }
+
+    @Override
+    public String terminate(WorkflowInstance workflowInstance, Optional<Integer> exitCode) {
+      return "Exit code: " + exitCode.map(String::valueOf).orElse("-");
+    }
+
+    @Override
+    public String runError(WorkflowInstance workflowInstance, String message) {
+      return "Error message: " + message;
+    }
+
+    @Override
+    public String success(WorkflowInstance workflowInstance) {
+      return "";
+    }
+
+    @Override
+    public String retryAfter(WorkflowInstance workflowInstance, long delayMillis) {
+      return String.format("Delay (seconds): %d", TimeUnit.MILLISECONDS.toSeconds(delayMillis));
+    }
+
+    @Override
+    public String retry(WorkflowInstance workflowInstance) {
+      return "";
+    }
+
+    @Override
+    public String stop(WorkflowInstance workflowInstance) {
+      return "";
+    }
+
+    @Override
+    public String timeout(WorkflowInstance workflowInstance) {
+      return "";
+    }
+
+    @Override
+    public String halt(WorkflowInstance workflowInstance) {
+      return "";
+    }
+
+    @Override
+    public String submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) {
+      return String.format("Execution description: %s", executionDescription);
+    }
+
+    @Override
+    public String submitted(WorkflowInstance workflowInstance, String executionId) {
+      return String.format("Execution id: %s", executionId);
+    }
   }
 
   /**

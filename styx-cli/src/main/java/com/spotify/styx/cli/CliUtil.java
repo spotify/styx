@@ -27,24 +27,15 @@ import static org.fusesource.jansi.Ansi.ansi;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
-import com.spotify.styx.model.Event;
-import com.spotify.styx.model.EventVisitor;
-import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowId;
-import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.state.Message;
-import com.spotify.styx.state.Trigger;
-import com.spotify.styx.util.TriggerUtil;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Optional;
 import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.TimeUnit;
 import org.fusesource.jansi.Ansi;
 
 class CliUtil {
@@ -84,93 +75,5 @@ class CliUtil {
         .atZone(ZoneId.of("UTC"))
         .toLocalDateTime()
         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
-  }
-
-  public static String info(Event event) {
-    return event.accept(EventInfoVisitor.INSTANCE);
-  }
-
-  private enum EventInfoVisitor implements EventVisitor<String> {
-    INSTANCE;
-
-    @Override
-    public String timeTrigger(WorkflowInstance workflowInstance) {
-      return "";
-    }
-
-    @Override
-    public String triggerExecution(WorkflowInstance workflowInstance, Trigger trigger) {
-      return String.format("Trigger id: %s", TriggerUtil.triggerId(trigger));
-    }
-
-    @Override
-    public String info(WorkflowInstance workflowInstance, Message message) {
-      return message.line();
-    }
-
-    @Override
-    public String created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
-      return String.format("Execution id: %s, Docker image: %s", executionId, dockerImage);
-    }
-
-    @Override
-    public String dequeue(WorkflowInstance workflowInstance) {
-      return "";
-    }
-
-    @Override
-    public String started(WorkflowInstance workflowInstance) {
-      return "";
-    }
-
-    @Override
-    public String terminate(WorkflowInstance workflowInstance, Optional<Integer> exitCode) {
-      return "Exit code: " + exitCode.map(String::valueOf).orElse("-");
-    }
-
-    @Override
-    public String runError(WorkflowInstance workflowInstance, String message) {
-      return "Error message: " + message;
-    }
-
-    @Override
-    public String success(WorkflowInstance workflowInstance) {
-      return "";
-    }
-
-    @Override
-    public String retryAfter(WorkflowInstance workflowInstance, long delayMillis) {
-      return String.format("Delay (seconds): %d", TimeUnit.MILLISECONDS.toSeconds(delayMillis));
-    }
-
-    @Override
-    public String retry(WorkflowInstance workflowInstance) {
-      return "";
-    }
-
-    @Override
-    public String stop(WorkflowInstance workflowInstance) {
-      return "";
-    }
-
-    @Override
-    public String timeout(WorkflowInstance workflowInstance) {
-      return "";
-    }
-
-    @Override
-    public String halt(WorkflowInstance workflowInstance) {
-      return "";
-    }
-
-    @Override
-    public String submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) {
-      return String.format("Execution description: %s", executionDescription);
-    }
-
-    @Override
-    public String submitted(WorkflowInstance workflowInstance, String executionId) {
-      return String.format("Execution id: %s", executionId);
-    }
   }
 }

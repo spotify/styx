@@ -20,14 +20,13 @@
 
 package com.spotify.styx.cli;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.auto.value.AutoValue;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.data.EventInfo;
 import java.util.List;
 
 /**
@@ -50,18 +49,4 @@ interface CliOutput {
   void printMessage(String message);
 
   void printWorkflow(Workflow workflow, WorkflowState state);
-
-  @AutoValue
-  abstract class EventInfo {
-    @JsonProperty
-    abstract long timestamp();
-    @JsonProperty
-    abstract String name();
-    @JsonProperty
-    abstract String info();
-
-    public static EventInfo create(long ts, String eventName, String eventInfo) {
-      return new AutoValue_CliOutput_EventInfo(ts, eventName, eventInfo);
-    }
-  }
 }

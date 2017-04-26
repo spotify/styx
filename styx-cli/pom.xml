@@ -16,6 +16,11 @@
       <artifactId>styx-common</artifactId>
       <version>1.0.9-SNAPSHOT</version>
     </dependency>
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>styx-client</artifactId>
+      <version>1.0.8-SNAPSHOT</version>
+    </dependency>
 
     <dependency>
       <groupId>com.spotify</groupId>
@@ -37,7 +42,6 @@
     <dependency>
       <groupId>net.sourceforge.argparse4j</groupId>
       <artifactId>argparse4j</artifactId>
-      <version>0.7.0</version>
     </dependency>
 
     <dependency>
@@ -67,8 +71,8 @@
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
-      <version>${jackson.version}</version>
     </dependency>
+
   </dependencies>
 
   <build>
