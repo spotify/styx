@@ -58,10 +58,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_HOURLY = WorkflowConfiguration.create(
       "styx.TestEndpoint", Schedule.HOURS, empty(), of("busybox"), of(asList("--hour", "{}")),
-      empty(), empty(), emptyList());
+      empty(), empty(), empty(), emptyList());
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_DAILY = WorkflowConfiguration.create(
       "styx.TestEndpoint", Schedule.DAYS, empty(), of("busybox"), of(asList("--hour", "{}")),
-      empty(), empty(), emptyList());
+      empty(), empty(), empty(), emptyList());
   private static final String TEST_EXECUTION_ID_1 = "execution_1";
   private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
   private static final Workflow HOURLY_WORKFLOW = Workflow.create(
@@ -70,7 +70,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       WORKFLOW_CONFIGURATION_HOURLY);
   private static final ExecutionDescription TEST_EXECUTION_DESCRIPTION =
       ExecutionDescription.create(
-          TEST_DOCKER_IMAGE, Arrays.asList("--date", "{}", "--bar"), false, empty(), empty());
+          TEST_DOCKER_IMAGE, Arrays.asList("--date", "{}", "--bar"),
+          false, empty(), empty(), empty());
   private static final Workflow DAILY_WORKFLOW = Workflow.create(
       "styx",
       TestData.WORKFLOW_URI,
@@ -88,13 +89,13 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       .build();
 
   private static RunSpec naturalRunSpec(String imageName, ImmutableList<String> args) {
-    return RunSpec.create(imageName, args, false, empty(),
+    return RunSpec.create(imageName, args, false, empty(), empty(),
                           Optional.of(Trigger.natural()));
   }
 
   private static RunSpec unknownRunSpec(String imageName, ImmutableList<String> args,
                                         String triggerId) {
-    return RunSpec.create(imageName, args, false, empty(),
+    return RunSpec.create(imageName, args, false, empty(), empty(),
                           Optional.of(Trigger.unknown(triggerId)));
   }
 
@@ -106,7 +107,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
         WorkflowConfiguration.create(
             "styx.TestEndpoint",
             Schedule.parse("15,45 12,15 * * *"),
-            empty(), of("busybox"), of(emptyList()), empty(), empty(), emptyList()));
+            empty(), of("busybox"), of(emptyList()), empty(), empty(), empty(), emptyList()));
 
     givenTheTimeIs("2016-03-14T15:30:00Z");
     givenTheGlobalEnableFlagIs(true);
@@ -376,7 +377,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     WorkflowConfiguration changedWorkflowConfiguration = WorkflowConfiguration.create(
         WORKFLOW_CONFIGURATION_HOURLY.id(), Schedule.HOURS, empty(), of("busybox:v777"),
-        of(asList("other", "args")), empty(), empty(), emptyList());
+        of(asList("other", "args")), empty(), empty(), empty(), emptyList());
 
     Workflow changedWorkflow = Workflow.create(
         HOURLY_WORKFLOW.componentId(),

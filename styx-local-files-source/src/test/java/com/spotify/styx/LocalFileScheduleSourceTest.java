@@ -207,6 +207,7 @@ public class LocalFileScheduleSourceTest {
             Optional.of(emptyList()),
             empty(),
             empty(),
+            empty(),
             emptyList()));
   }
 
@@ -221,6 +222,7 @@ public class LocalFileScheduleSourceTest {
             empty(),
             empty(),
             Optional.of(singletonList("foo")),
+            empty(),
             empty(),
             empty(),
             emptyList()));
@@ -239,6 +241,7 @@ public class LocalFileScheduleSourceTest {
             Optional.of(Arrays.asList("foo", "bar")),
             empty(),
             empty(),
+            empty(),
             emptyList()));
   }
 
@@ -253,6 +256,7 @@ public class LocalFileScheduleSourceTest {
             empty(),
             empty(),
             Optional.of(Arrays.asList("baz", "bax")),
+            empty(),
             empty(),
             empty(),
             emptyList()));

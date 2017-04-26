@@ -67,6 +67,9 @@ public abstract class WorkflowConfiguration {
   public abstract Optional<Secret> secret();
 
   @JsonProperty
+  public abstract Optional<String> serviceAccount();
+
+  @JsonProperty
   public abstract List<String> resources();
 
   @JsonCreator
@@ -78,11 +81,12 @@ public abstract class WorkflowConfiguration {
       @JsonProperty("docker_args") Optional<List<String>> dockerArgs,
       @JsonProperty("docker_termination_logging") Optional<Boolean> dockerTerminationLogging,
       @JsonProperty("secret") Optional<Secret> secret,
+      @JsonProperty("service_account") Optional<String> serviceAccount,
       @JsonProperty("resources") List<String> resources) {
 
     return new AutoValue_WorkflowConfiguration(
         id, schedule, offset, dockerImage, dockerArgs,
-        dockerTerminationLogging.orElse(false), secret,
+        dockerTerminationLogging.orElse(false), secret, serviceAccount,
         resources == null ? Collections.emptyList() : resources);
   }
 

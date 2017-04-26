@@ -332,6 +332,7 @@ public class KubernetesPodEventTranslatorTest {
   private Pod podWithTerminationLogging() {
     return KubernetesDockerRunner.createPod(
         WFI,
-        DockerRunner.RunSpec.create("busybox", ImmutableList.of(), true, Optional.empty(), Optional.empty()));
+        DockerRunner.RunSpec.create("busybox", ImmutableList.of(), true,
+                                    Optional.empty(), Optional.empty(), Optional.empty()));
   }
 }

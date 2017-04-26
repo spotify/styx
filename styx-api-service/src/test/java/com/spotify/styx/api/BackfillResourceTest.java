@@ -150,17 +150,17 @@ public class BackfillResourceTest extends VersionedApiTest {
         BACKFILL_1.workflowId().componentId(), URI.create("http://example.com"),
         WorkflowConfiguration.create(BACKFILL_1.workflowId().id(), Schedule.HOURS,
                                      empty(), empty(), empty(), empty(),
-                                     empty(), Collections.emptyList())));
+                                     empty(), empty(), Collections.emptyList())));
     storage.storeWorkflow(Workflow.create(
         BACKFILL_2.workflowId().componentId(), URI.create("http://example.com"),
         WorkflowConfiguration.create(BACKFILL_2.workflowId().id(), Schedule.HOURS,
                                      empty(), empty(), empty(), empty(),
-                                     empty(), Collections.emptyList())));
+                                     empty(), empty(), Collections.emptyList())));
     storage.storeWorkflow(Workflow.create(
         BACKFILL_3.workflowId().componentId(), URI.create("http://example.com"),
         WorkflowConfiguration.create(BACKFILL_3.workflowId().id(), Schedule.HOURS,
                                      empty(), empty(), empty(), empty(),
-                                     empty(), Collections.emptyList())));
+                                     empty(), empty(), Collections.emptyList())));
     storage.storeBackfill(BACKFILL_1);
   }
 

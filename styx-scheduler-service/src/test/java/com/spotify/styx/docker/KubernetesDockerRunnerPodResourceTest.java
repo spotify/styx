@@ -127,7 +127,8 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
             DockerRunner.RunSpec.create(
-                "busybox", ImmutableList.of(), true, empty(), empty()));
+                "busybox", ImmutableList.of(), true,
+                empty(), empty(), empty()));
 
     Map<String, String> annotations = pod.getMetadata().getAnnotations();
     assertThat(annotations.get(DOCKER_TERMINATION_LOGGING_ANNOTATION), is("true"));
@@ -169,7 +170,8 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.create(
-            "busybox", ImmutableList.of(), false, Optional.of(secret), empty()));
+            "busybox", ImmutableList.of(), false, Optional.of(secret),
+            empty(), empty()));
 
     List<Volume> volumes = pod.getSpec().getVolumes();
     List<Container> containers = pod.getSpec().getContainers();
@@ -196,7 +198,7 @@ public class KubernetesDockerRunnerPodResourceTest {
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec
             .create("busybox", ImmutableList.of(), false, empty(),
-                    Optional.of(Trigger.unknown("trigger-id"))));
+                    empty(), Optional.of(Trigger.unknown("trigger-id"))));
     List<EnvVar> envVars = pod.getSpec().getContainers().get(0).getEnv();
 
     EnvVar workflow = new EnvVar();

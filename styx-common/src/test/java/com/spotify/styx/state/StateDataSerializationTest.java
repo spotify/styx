@@ -109,6 +109,7 @@ public class StateDataSerializationTest {
               Arrays.asList("echo", "hello", "world"),
               false,
               Optional.of(WorkflowConfiguration.Secret.create("pipeline-core-secret", "/etc/keys")),
+              Optional.empty(),
               Optional.of("474339ec18d3d04d5d513856bc8ca1d4f1aed03f")
           )
       )
