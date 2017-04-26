@@ -144,7 +144,7 @@ How often the workflow should be triggered.
 Supports [cron] syntax, along with a set of human readable aliases:
 ```
 @hourly,   hourly   = 0 * * * *
-@daily`,   daily    = 0 0 * * *
+@daily,    daily    = 0 0 * * *
 @weekly,   weekly   = 0 0 * * MON
 @monthly,  monthly  = 0 0 1 * *
 @yearly,   yearly   = 0 0 1 1 *
