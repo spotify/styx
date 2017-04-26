@@ -26,6 +26,11 @@ import static com.spotify.styx.state.RunState.State.RUNNING;
 import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.github.rholder.retry.RetryException;
+import com.github.rholder.retry.Retryer;
+import com.github.rholder.retry.RetryerBuilder;
+import com.github.rholder.retry.StopStrategies;
+import com.github.rholder.retry.WaitStrategies;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
@@ -62,14 +67,20 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
  */
 class KubernetesDockerRunner implements DockerRunner {
+
+  private static final Logger logger = LoggerFactory.getLogger(KubernetesDockerRunner.class);
 
   static final String NAMESPACE = "default";
   static final String STYX_RUN = "styx-run";
@@ -84,25 +95,33 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String TERMINATION_LOG = "STYX_TERMINATION_LOG";
   static final String TRIGGER_ID = "STYX_TRIGGER_ID";
   static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
-  static final int POLL_PODS_INTERVAL_SECONDS = 60;
+  static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
 
-  private static final ScheduledExecutorService EXECUTOR =
-      Executors.newSingleThreadScheduledExecutor(
-          new ThreadFactoryBuilder()
-              .setDaemon(true)
-              .setNameFormat("k8s-scheduler-thread-%d")
-              .build());
+  private static final ThreadFactory THREAD_FACTORY = new ThreadFactoryBuilder()
+      .setDaemon(true)
+      .setNameFormat("k8s-scheduler-thread-%d")
+      .build();
+
+  private final ScheduledExecutorService executor =
+      Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY);
 
   private final KubernetesClient client;
   private final StateManager stateManager;
   private final Stats stats;
+  private final int pollPodsIntervalSeconds;
 
   private Watch watch;
 
-  KubernetesDockerRunner(KubernetesClient client, StateManager stateManager, Stats stats) {
+  KubernetesDockerRunner(KubernetesClient client, StateManager stateManager, Stats stats,
+      int pollPodsIntervalSeconds) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client).inNamespace(NAMESPACE);
     this.stats = Objects.requireNonNull(stats);
+    this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
+  }
+
+  KubernetesDockerRunner(KubernetesClient client, StateManager stateManager, Stats stats) {
+    this(client, stateManager, stats, DEFAULT_POLL_PODS_INTERVAL_SECONDS);
   }
 
   @Override
@@ -213,13 +232,34 @@ class KubernetesDockerRunner implements DockerRunner {
     if (watch != null) {
       watch.close();
     }
+    executor.shutdown();
+    try {
+      executor.awaitTermination(30, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      logger.warn("Failed to terminate executor", e);
+    }
+  }
+
+  @Override
+  public void restore() {
+    final Retryer<Object> retryer = RetryerBuilder.newBuilder()
+        .retryIfException()
+        .withWaitStrategy(WaitStrategies.exponentialWait())
+        .withStopStrategy(StopStrategies.stopAfterAttempt(3))
+        .build();
+
+    try {
+      retryer.call(Executors.callable(this::tryPollPods));
+    } catch (ExecutionException | RetryException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public void init() {
-    EXECUTOR.scheduleWithFixedDelay(
+    executor.scheduleWithFixedDelay(
         this::pollPods,
-        POLL_PODS_INTERVAL_SECONDS,
-        POLL_PODS_INTERVAL_SECONDS,
+        pollPodsIntervalSeconds,
+        pollPodsIntervalSeconds,
         TimeUnit.SECONDS);
 
     final String resourceVersion = client.pods().list().getMetadata().getResourceVersion();
@@ -251,17 +291,21 @@ class KubernetesDockerRunner implements DockerRunner {
   @VisibleForTesting
   void pollPods() {
     try {
-      final PodList list = client.pods().list();
-      examineRunningWFISandAssociatedPods(list);
-
-      final int resourceVersion = Integer.parseInt(list.getMetadata().getResourceVersion());
-
-      for (Pod pod : list.getItems()) {
-        logEvent(Watcher.Action.MODIFIED, pod, resourceVersion, true);
-        inspectPod(Watcher.Action.MODIFIED, pod);
-      }
+      tryPollPods();
     } catch (Throwable t) {
       LOG.warn("Error while polling pods", t);
+    }
+  }
+
+  private synchronized void tryPollPods() {
+    final PodList list = client.pods().list();
+    examineRunningWFISandAssociatedPods(list);
+
+    final int resourceVersion = Integer.parseInt(list.getMetadata().getResourceVersion());
+
+    for (Pod pod : list.getItems()) {
+      logEvent(Watcher.Action.MODIFIED, pod, resourceVersion, true);
+      inspectPod(Watcher.Action.MODIFIED, pod);
     }
   }
 
@@ -371,7 +415,7 @@ class KubernetesDockerRunner implements DockerRunner {
     }
 
     private void scheduleReconnect() {
-      EXECUTOR.schedule(this::reconnect, RECONNECT_DELAY_SECONDS, TimeUnit.SECONDS);
+      executor.schedule(this::reconnect, RECONNECT_DELAY_SECONDS, TimeUnit.SECONDS);
     }
 
     @Override

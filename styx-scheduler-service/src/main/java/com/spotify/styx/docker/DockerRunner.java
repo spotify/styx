@@ -47,6 +47,12 @@ public interface DockerRunner extends Closeable {
   Logger LOG = LoggerFactory.getLogger(DockerRunner.class);
 
   /**
+   * Fetch workflow instance state from execution engine and emit events as needed. For use when
+   * when booting in order to recover executions that completed while styx was offline.
+   */
+  void restore();
+
+  /**
    * Starts a workflow instance asynchronously.
    * @param workflowInstance The workflow instance that the run belongs to
    * @param runSpec          Specification of what to run

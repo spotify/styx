@@ -334,7 +334,7 @@ public class StyxScheduler implements AppInit {
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
         storage, trigger);
 
-    restoreState(storage, outputHandlers, stateManager);
+    restoreState(storage, outputHandlers, stateManager, dockerRunner);
     startTriggerManager(triggerManager, executor);
     startScheduleSources(environment, executor, workflowChangeListener, workflowRemoveListener);
     startScheduler(scheduler, executor);
@@ -384,7 +384,8 @@ public class StyxScheduler implements AppInit {
   private void restoreState(
       Storage storage,
       OutputHandler[] outputHandlers,
-      StateManager stateManager) {
+      StateManager stateManager,
+      DockerRunner dockerRunner) {
     try {
       final Map<WorkflowInstance, Long> activeInstances =
           storage.readActiveWorkflowInstances();
@@ -400,6 +401,10 @@ public class StyxScheduler implements AppInit {
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
+
+    // Eagerly fetch container state before starting the scheduler in order to recover executions
+    // that completed while styx was offline and avoiding re-running WFIs due to state timeouts.
+    dockerRunner.restore();
   }
 
   private void startScheduleSources(

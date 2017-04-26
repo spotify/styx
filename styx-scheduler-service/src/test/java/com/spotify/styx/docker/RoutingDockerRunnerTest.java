@@ -77,6 +77,15 @@ public class RoutingDockerRunnerTest {
   }
 
   @Test
+  public void testUsesDefaultRunnerOnRestore() throws Exception {
+    when(dockerId.get()).thenReturn("default");
+    dockerRunner.restore();
+
+    assertThat(createdRunners, hasKey("default"));
+    verify(createdRunners.get("default")).restore();
+  }
+
+  @Test
   public void testCreatesOnlyOneRunnerPerDockerId() throws Exception {
     when(dockerId.get()).thenReturn("default");
     dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);

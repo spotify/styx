@@ -574,4 +574,31 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(runSpec, is(
         unknownRunSpec("busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig2")));
   }
+
+  @Test
+  public void restoresContainerStateWhenStarting() throws Exception {
+    WorkflowInstance workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
+
+    givenTheTimeIs("2016-03-14T15:17:45Z");
+    givenWorkflow(HOURLY_WORKFLOW);
+    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
+    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
+
+    givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER1),                       0L);
+    givenStoredEvent(Event.created(workflowInstance, TEST_EXECUTION_ID_1, TEST_DOCKER_IMAGE),  1L);
+    givenStoredEvent(Event.started(workflowInstance),                                          2L);
+    givenActiveStateAtSequenceCount(workflowInstance,                                          2L);
+
+    styxStarts();
+
+    // Verify that styx tells the runner to restore container state
+    assertThat(dockerRestores.get(), is(1));
+
+    // Simulate the runner emitting a successful termination event
+    injectEvent(Event.terminate(workflowInstance, Optional.of(0)));
+
+    awaitWorkflowInstanceCompletion(workflowInstance);
+    tickScheduler();
+    assertThat(getState(workflowInstance), is(nullValue()));
+  }
 }
