@@ -151,14 +151,18 @@ class KubernetesDockerRunner implements DockerRunner {
       final String secretName = buildSecretName(runSpec.serviceAccount().get());
       final Secret secret = client.secrets().withName(secretName).get();
       if (secret == null) {
+        final String serviceAccount = runSpec.serviceAccount().get();
+
         // TODO: create keys calling GCP API, base64 already
         final String jsonKey = "";
         final String p12Key = "";
+
         final Map<String, String> keys = Maps.newHashMap();
         keys.put(STYX_WORKFLOW_SA_JSON_KEY, jsonKey);
         keys.put(STYX_MANAGED_WORKFLOW_SA_P12_KEY, p12Key);
         final Map<String, String> annotations = Maps.newHashMap();
-        annotations.put(STYX_WORKFLOW_SA_SECRET_ANNOTATION, runSpec.serviceAccount().get());
+        // TODO: add key names returned by GCP API to as annotations
+        annotations.put(STYX_WORKFLOW_SA_SECRET_ANNOTATION, serviceAccount);
         client.secrets().create(new SecretBuilder()
                                     .withNewMetadata()
                                     .withName(secretName)
@@ -166,6 +170,7 @@ class KubernetesDockerRunner implements DockerRunner {
                                     .endMetadata()
                                     .withData(keys)
                                     .build());
+        LOG.info("[AUDIT] Secret {} created for service account {}", secretName, serviceAccount);
       }
     } else if (runSpec.secret().isPresent()) {
       WorkflowConfiguration.Secret specSecret = runSpec.secret().get();
@@ -253,9 +258,10 @@ class KubernetesDockerRunner implements DockerRunner {
           .withSecretName(buildSecretName(runSpec.serviceAccount().get()))
           .endSecret()
           .endVolume();
-      container = container.addToVolumeMounts(
-          new VolumeMount(STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH,
-                          STYX_WORKFLOW_SA_SECRET_NAME, true))
+      container = container
+          .addToVolumeMounts(new VolumeMount(STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH,
+                                             STYX_WORKFLOW_SA_SECRET_NAME, true))
+          // TODO: do we need set this env as default value?
           .addToEnv(new EnvVarBuilder()
                         .withName("GOOGLE_APPLICATION_CREDENTIALS")
                         .withValue(STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH + STYX_WORKFLOW_SA_JSON_KEY)
