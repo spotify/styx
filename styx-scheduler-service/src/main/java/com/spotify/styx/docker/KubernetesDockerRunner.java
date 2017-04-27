@@ -35,6 +35,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.hash.Hashing;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
@@ -65,7 +66,7 @@ import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import java.io.IOException;
 import java.net.ProtocolException;
-import java.util.Base64;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -101,17 +102,17 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String TRIGGER_ID = "STYX_TRIGGER_ID";
   static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
   static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
+  private static final String STYX_WORKFLOW_SA_SECRET_ANNOTATION = "styx-wf-sa";
   private static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
   private static final String STYX_WORKFLOW_SA_JSON_KEY = "styx-wf-sa.json";
   private static final String STYX_MANAGED_WORKFLOW_SA_P12_KEY = "styx-wf-sa.p12";
-  private static final String STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH = "/etc/" + STYX_WORKFLOW_SA_SECRET_NAME;
-
+  private static final String STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH =
+      "/etc/" + STYX_WORKFLOW_SA_SECRET_NAME + "/";
 
   private static final ThreadFactory THREAD_FACTORY = new ThreadFactoryBuilder()
       .setDaemon(true)
       .setNameFormat("k8s-scheduler-thread-%d")
       .build();
-
   private final ScheduledExecutorService executor =
       Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY);
 
@@ -136,8 +137,8 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @Override
   public String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
+    prepareSecret(workflowInstance, runSpec);
     try {
-      prepareSecret(workflowInstance, runSpec);
       final Pod pod = client.pods().create(createPod(workflowInstance, runSpec));
       return pod.getMetadata().getName();
     } catch (KubernetesClientException kce) {
@@ -156,10 +157,12 @@ class KubernetesDockerRunner implements DockerRunner {
         final Map<String, String> keys = Maps.newHashMap();
         keys.put(STYX_WORKFLOW_SA_JSON_KEY, jsonKey);
         keys.put(STYX_MANAGED_WORKFLOW_SA_P12_KEY, p12Key);
+        final Map<String, String> annotations = Maps.newHashMap();
+        annotations.put(STYX_WORKFLOW_SA_SECRET_ANNOTATION, runSpec.serviceAccount().get());
         client.secrets().create(new SecretBuilder()
-                                    .withType("generic")
                                     .withNewMetadata()
                                     .withName(secretName)
+                                    .withAnnotations(annotations)
                                     .endMetadata()
                                     .withData(keys)
                                     .build());
@@ -180,8 +183,8 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private String buildSecretName(String serviceAccount) {
-    return STYX_WORKFLOW_SA_SECRET_NAME + '-' + Base64
-        .getEncoder().encodeToString(serviceAccount.getBytes());
+    return STYX_WORKFLOW_SA_SECRET_NAME + '-' + Hashing
+        .sha256().hashString(serviceAccount, StandardCharsets.UTF_8);
   }
 
   @VisibleForTesting
@@ -247,7 +250,7 @@ class KubernetesDockerRunner implements DockerRunner {
       spec = spec.addNewVolume()
           .withName(STYX_WORKFLOW_SA_SECRET_NAME)
           .withNewSecret()
-          .withSecretName(STYX_WORKFLOW_SA_SECRET_NAME)
+          .withSecretName(STYX_WORKFLOW_SA_SECRET_NAME) // FIXME
           .endSecret()
           .endVolume();
       container = container.addToVolumeMounts(
