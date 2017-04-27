@@ -182,7 +182,7 @@ class KubernetesDockerRunner implements DockerRunner {
     }
   }
 
-  private String buildSecretName(String serviceAccount) {
+   static String buildSecretName(String serviceAccount) {
     return STYX_WORKFLOW_SA_SECRET_NAME + '-' + Hashing
         .sha256().hashString(serviceAccount, StandardCharsets.UTF_8);
   }
@@ -250,7 +250,7 @@ class KubernetesDockerRunner implements DockerRunner {
       spec = spec.addNewVolume()
           .withName(STYX_WORKFLOW_SA_SECRET_NAME)
           .withNewSecret()
-          .withSecretName(STYX_WORKFLOW_SA_SECRET_NAME) // FIXME
+          .withSecretName(buildSecretName(runSpec.serviceAccount().get()))
           .endSecret()
           .endVolume();
       container = container.addToVolumeMounts(
