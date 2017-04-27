@@ -86,20 +86,20 @@ class KubernetesDockerRunner implements DockerRunner {
 
   private static final Logger logger = LoggerFactory.getLogger(KubernetesDockerRunner.class);
 
-  static final String NAMESPACE = "default";
+  private static final String NAMESPACE = "default";
   static final String STYX_RUN = "styx-run";
   static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
   static final String DOCKER_TERMINATION_LOGGING_ANNOTATION = "styx-docker-termination-logging";
   static final String COMPONENT_ID = "STYX_COMPONENT_ID";
   // TODO: for backward compatibility, delete later
-  static final String ENDPOINT_ID = "STYX_ENDPOINT_ID";
+  private static final String ENDPOINT_ID = "STYX_ENDPOINT_ID";
   static final String WORKFLOW_ID = "STYX_WORKFLOW_ID";
   static final String PARAMETER = "STYX_PARAMETER";
   static final String EXECUTION_ID = "STYX_EXECUTION_ID";
   static final String TERMINATION_LOG = "STYX_TERMINATION_LOG";
   static final String TRIGGER_ID = "STYX_TRIGGER_ID";
   static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
-  static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
+  private static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
   private static final String STYX_WORKFLOW_SA_SECRET_ANNOTATION = "styx-wf-sa";
   private static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
   private static final String STYX_WORKFLOW_SA_JSON_KEY = "styx-wf-sa.json";
@@ -111,6 +111,7 @@ class KubernetesDockerRunner implements DockerRunner {
       .setDaemon(true)
       .setNameFormat("k8s-scheduler-thread-%d")
       .build();
+
   private final ScheduledExecutorService executor =
       Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY);
 
@@ -135,7 +136,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @Override
   public String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
-    prepareSecret(workflowInstance, runSpec);
+    ensureSecret(workflowInstance, runSpec);
     try {
       final Pod pod = client.pods().create(createPod(workflowInstance, runSpec));
       return pod.getMetadata().getName();
@@ -144,7 +145,7 @@ class KubernetesDockerRunner implements DockerRunner {
     }
   }
 
-  private void prepareSecret(WorkflowInstance workflowInstance, RunSpec runSpec) {
+  private void ensureSecret(WorkflowInstance workflowInstance, RunSpec runSpec) {
     if (runSpec.serviceAccount().isPresent()) {
       final String secretName = buildSecretName(runSpec.serviceAccount().get());
       final Secret secret = client.secrets().withName(secretName).get();
@@ -159,7 +160,7 @@ class KubernetesDockerRunner implements DockerRunner {
         keys.put(STYX_WORKFLOW_SA_JSON_KEY, jsonKey);
         keys.put(STYX_MANAGED_WORKFLOW_SA_P12_KEY, p12Key);
         final Map<String, String> annotations = Maps.newHashMap();
-        // TODO: add key names returned by GCP API to as annotations
+        // TODO: add key names returned by GCP API as annotations
         annotations.put(STYX_WORKFLOW_SA_SECRET_ANNOTATION, serviceAccount);
         client.secrets().create(new SecretBuilder()
                                     .withNewMetadata()
@@ -171,7 +172,7 @@ class KubernetesDockerRunner implements DockerRunner {
         LOG.info("[AUDIT] Secret {} created for service account {}", secretName, serviceAccount);
       }
     } else if (runSpec.secret().isPresent()) {
-      WorkflowConfiguration.Secret specSecret = runSpec.secret().get();
+      final WorkflowConfiguration.Secret specSecret = runSpec.secret().get();
       final Secret secret = client.secrets().withName(specSecret.name()).get();
       if (secret == null) {
         LOG.error("[AUDIT] Workflow {} refers to a non-existent secret {}",
@@ -185,7 +186,7 @@ class KubernetesDockerRunner implements DockerRunner {
     }
   }
 
-  static String buildSecretName(String serviceAccount) {
+  private static String buildSecretName(String serviceAccount) {
     return STYX_WORKFLOW_SA_SECRET_NAME + '-' + Hashing
         .sha256().hashString(serviceAccount, StandardCharsets.UTF_8);
   }
@@ -197,44 +198,9 @@ class KubernetesDockerRunner implements DockerRunner {
         : runSpec.imageName() + ":latest";
 
     final String podName = STYX_RUN + "-" + UUID.randomUUID().toString();
+    final List<EnvVar> env = buildEnv(workflowInstance, runSpec, podName);
 
-    // inject environment variables
-    List<EnvVar> env = Lists.newArrayList();
-    env.add(new EnvVarBuilder()
-        .withName(COMPONENT_ID)
-        .withValue(workflowInstance.workflowId().componentId())
-        .build());
-    // TODO: for backward compatibility, delete later
-    env.add(new EnvVarBuilder()
-        .withName(ENDPOINT_ID)
-        .withValue(workflowInstance.workflowId().id())
-        .build());
-    env.add(new EnvVarBuilder()
-        .withName(WORKFLOW_ID)
-        .withValue(workflowInstance.workflowId().id())
-        .build());
-    env.add(new EnvVarBuilder()
-        .withName(PARAMETER)
-        .withValue(workflowInstance.parameter())
-        .build());
-    env.add(new EnvVarBuilder()
-        .withName(EXECUTION_ID)
-        .withValue(podName)
-        .build());
-    env.add(new EnvVarBuilder()
-        .withName(TERMINATION_LOG)
-        .withValue("/dev/termination-log")
-        .build());
-    env.add(new EnvVarBuilder()
-        .withName(TRIGGER_ID)
-        .withValue(runSpec.trigger().map(TriggerUtil::triggerId).orElse(null))
-        .build());
-    env.add(new EnvVarBuilder()
-        .withName(TRIGGER_TYPE)
-        .withValue(runSpec.trigger().map(TriggerUtil::triggerType).orElse(null))
-        .build());
-
-    PodBuilder podBuilder = new PodBuilder()
+    final PodBuilder podBuilder = new PodBuilder()
         .withNewMetadata()
         .withName(podName)
         .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
@@ -278,6 +244,46 @@ class KubernetesDockerRunner implements DockerRunner {
     container.endContainer();
 
     return spec.endSpec().build();
+  }
+
+  private static List<EnvVar> buildEnv(WorkflowInstance workflowInstance,
+                                       RunSpec runSpec, String podName) {
+    // inject environment variables
+    final List<EnvVar> env = Lists.newArrayList();
+    env.add(new EnvVarBuilder()
+        .withName(COMPONENT_ID)
+        .withValue(workflowInstance.workflowId().componentId())
+        .build());
+    // TODO: for backward compatibility, delete later
+    env.add(new EnvVarBuilder()
+        .withName(ENDPOINT_ID)
+        .withValue(workflowInstance.workflowId().id())
+        .build());
+    env.add(new EnvVarBuilder()
+        .withName(WORKFLOW_ID)
+        .withValue(workflowInstance.workflowId().id())
+        .build());
+    env.add(new EnvVarBuilder()
+        .withName(PARAMETER)
+        .withValue(workflowInstance.parameter())
+        .build());
+    env.add(new EnvVarBuilder()
+        .withName(EXECUTION_ID)
+        .withValue(podName)
+        .build());
+    env.add(new EnvVarBuilder()
+        .withName(TERMINATION_LOG)
+        .withValue("/dev/termination-log")
+        .build());
+    env.add(new EnvVarBuilder()
+        .withName(TRIGGER_ID)
+        .withValue(runSpec.trigger().map(TriggerUtil::triggerId).orElse(null))
+        .build());
+    env.add(new EnvVarBuilder()
+        .withName(TRIGGER_TYPE)
+        .withValue(runSpec.trigger().map(TriggerUtil::triggerType).orElse(null))
+        .build());
+    return env;
   }
 
   @Override
