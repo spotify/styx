@@ -65,6 +65,7 @@ import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import java.io.IOException;
 import java.net.ProtocolException;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -100,10 +101,10 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String TRIGGER_ID = "STYX_TRIGGER_ID";
   static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
   static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
-  private static final String STYX_MANAGED_WORKFLOW_SA_SECRET = "styx-managed-workflow-sa-secret";
-  private static final String STYX_MANAGED_WORKFLOW_SA_JSON_KEY = STYX_MANAGED_WORKFLOW_SA_SECRET + ".json";
-  private static final String STYX_MANAGED_WORKFLOW_SA_P12_KEY = STYX_MANAGED_WORKFLOW_SA_SECRET + ".p12";
-  private static final String STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH = "/etc/gcp-secret/styx-managed/";
+  private static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
+  private static final String STYX_WORKFLOW_SA_JSON_KEY = "styx-wf-sa.json";
+  private static final String STYX_MANAGED_WORKFLOW_SA_P12_KEY = "styx-wf-sa.p12";
+  private static final String STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH = "/etc/" + STYX_WORKFLOW_SA_SECRET_NAME;
 
 
   private static final ThreadFactory THREAD_FACTORY = new ThreadFactoryBuilder()
@@ -136,40 +137,51 @@ class KubernetesDockerRunner implements DockerRunner {
   @Override
   public String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
     try {
-      runSpec.serviceAccount().ifPresent(serviceAccount -> {
-        // TODO: create keys calling GCP API, base64 already
-        final String jsonKey = "";
-        final String p12Key = "";
-        final Map<String, String> keys = Maps.newHashMap();
-        keys.put(STYX_MANAGED_WORKFLOW_SA_JSON_KEY, jsonKey);
-        keys.put(STYX_MANAGED_WORKFLOW_SA_P12_KEY, p12Key);
-        client.secrets().create(new SecretBuilder()
-                                    .withType("generic")
-                                    .withNewMetadata()
-                                    .withName(STYX_MANAGED_WORKFLOW_SA_SECRET)
-                                    .endMetadata()
-                                    .withData(keys)
-                                    .build());
-      });
-
-      runSpec.secret().ifPresent(specSecret -> {
-        final Secret secret = client.secrets().withName(specSecret.name()).get();
-        if (secret == null) {
-          LOG.error("[AUDIT] Workflow {} refers to a non-existent secret {}",
-                    workflowInstance.workflowId(), specSecret.name());
-          throw new InvalidExecutionException(
-              "Referenced secret '" + specSecret.name() + "' was not found");
-        } else {
-          LOG.info("[AUDIT] Workflow {} refers to secret {}",
-                   workflowInstance.workflowId(), specSecret.name());
-        }
-      });
-
+      prepareSecret(workflowInstance, runSpec);
       final Pod pod = client.pods().create(createPod(workflowInstance, runSpec));
       return pod.getMetadata().getName();
     } catch (KubernetesClientException kce) {
       throw new IOException("Failed to create Kubernetes pod", kce);
     }
+  }
+
+  private void prepareSecret(WorkflowInstance workflowInstance, RunSpec runSpec) {
+    if (runSpec.serviceAccount().isPresent()) {
+      final String secretName = buildSecretName(runSpec.serviceAccount().get());
+      final Secret secret = client.secrets().withName(secretName).get();
+      if (secret == null) {
+        // TODO: create keys calling GCP API, base64 already
+        final String jsonKey = "";
+        final String p12Key = "";
+        final Map<String, String> keys = Maps.newHashMap();
+        keys.put(STYX_WORKFLOW_SA_JSON_KEY, jsonKey);
+        keys.put(STYX_MANAGED_WORKFLOW_SA_P12_KEY, p12Key);
+        client.secrets().create(new SecretBuilder()
+                                    .withType("generic")
+                                    .withNewMetadata()
+                                    .withName(secretName)
+                                    .endMetadata()
+                                    .withData(keys)
+                                    .build());
+      }
+    } else if (runSpec.secret().isPresent()) {
+      WorkflowConfiguration.Secret specSecret = runSpec.secret().get();
+      final Secret secret = client.secrets().withName(specSecret.name()).get();
+      if (secret == null) {
+        LOG.error("[AUDIT] Workflow {} refers to a non-existent secret {}",
+                  workflowInstance.workflowId(), specSecret.name());
+        throw new InvalidExecutionException(
+            "Referenced secret '" + specSecret.name() + "' was not found");
+      } else {
+        LOG.info("[AUDIT] Workflow {} refers to secret {}",
+                 workflowInstance.workflowId(), specSecret.name());
+      }
+    }
+  }
+
+  private String buildSecretName(String serviceAccount) {
+    return STYX_WORKFLOW_SA_SECRET_NAME + '-' + Base64
+        .getEncoder().encodeToString(serviceAccount.getBytes());
   }
 
   @VisibleForTesting
@@ -233,17 +245,17 @@ class KubernetesDockerRunner implements DockerRunner {
 
     if (runSpec.serviceAccount().isPresent()) {
       spec = spec.addNewVolume()
-          .withName(STYX_MANAGED_WORKFLOW_SA_SECRET)
+          .withName(STYX_WORKFLOW_SA_SECRET_NAME)
           .withNewSecret()
-          .withSecretName(STYX_MANAGED_WORKFLOW_SA_SECRET)
+          .withSecretName(STYX_WORKFLOW_SA_SECRET_NAME)
           .endSecret()
           .endVolume();
       container = container.addToVolumeMounts(
           new VolumeMount(STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH,
-                          STYX_MANAGED_WORKFLOW_SA_SECRET, true))
+                          STYX_WORKFLOW_SA_SECRET_NAME, true))
           .addToEnv(new EnvVarBuilder()
                         .withName("GOOGLE_APPLICATION_CREDENTIALS")
-                        .withValue(STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH + STYX_MANAGED_WORKFLOW_SA_JSON_KEY)
+                        .withValue(STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH + STYX_WORKFLOW_SA_JSON_KEY)
                         .build());
     } else if (runSpec.secret().isPresent()) {
       final WorkflowConfiguration.Secret secret = runSpec.secret().get();
