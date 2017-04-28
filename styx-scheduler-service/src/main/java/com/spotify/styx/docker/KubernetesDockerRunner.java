@@ -156,11 +156,10 @@ class KubernetesDockerRunner implements DockerRunner {
 
   private void ensureSecrets(WorkflowInstance workflowInstance, RunSpec runSpec) {
     if (runSpec.serviceAccount().isPresent()) {
-      final String secretName = buildSecretName(runSpec.serviceAccount().get());
+      final String serviceAccount = runSpec.serviceAccount().get();
+      final String secretName = buildSecretName(serviceAccount);
       final Secret secret = client.secrets().withName(secretName).get();
       if (secret == null) {
-        final String serviceAccount = runSpec.serviceAccount().get();
-
         final ServiceAccountKey jsonKey;
         final ServiceAccountKey p12Key;
         try {
@@ -189,7 +188,11 @@ class KubernetesDockerRunner implements DockerRunner {
                                     .endMetadata()
                                     .withData(keys)
                                     .build());
-        LOG.info("[AUDIT] Secret {} created for service account {}", secretName, serviceAccount);
+        LOG.info("[AUDIT] Secret {} created for {} referred to by workflow {}", secretName,
+                 serviceAccount, workflowInstance.workflowId());
+      } else {
+        LOG.info("[AUDIT] Workflow {} refers to secret {} of {}", workflowInstance.workflowId(),
+                 secretName, serviceAccount);
       }
     }
 
