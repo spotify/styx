@@ -415,7 +415,8 @@
             <exclude>com/spotify/styx/model/Event.class</exclude>
             <exclude>com/spotify/styx/state/Trigger.class</exclude>
           </excludes>
-        </configuration>        <executions>
+        </configuration>
+        <executions>
           <execution>
             <id>default-prepare-agent</id>
             <goals>
