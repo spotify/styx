@@ -160,14 +160,11 @@ class KubernetesDockerRunner implements DockerRunner {
       if (secret == null) {
         final String serviceAccount = runSpec.serviceAccount().get();
 
-        // TODO: need gcp project of the service account
-        final String project = "TODO";
-
         final ServiceAccountKey jsonKey;
         final ServiceAccountKey p12Key;
         try {
-          jsonKey = serviceAccountKeyManager.createJsonKey(project, serviceAccount);
-          p12Key = serviceAccountKeyManager.createP12Key(project, serviceAccount);
+          jsonKey = serviceAccountKeyManager.createJsonKey(serviceAccount);
+          p12Key = serviceAccountKeyManager.createP12Key(serviceAccount);
         } catch (IOException e) {
           logger.error("Failed to create service account keys", e);
           throw new RuntimeException(e);

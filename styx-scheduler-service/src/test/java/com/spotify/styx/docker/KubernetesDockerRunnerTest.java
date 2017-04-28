@@ -140,8 +140,8 @@ public class KubernetesDockerRunnerTest {
     when(pods.withResourceVersion("1000")).thenReturn(podWatchable);
     when(podWatchable.watch(watchCaptor.capture())).thenReturn(watch);
 
-    when(serviceAccountKeyManager.createJsonKey(anyString(), anyString())).thenReturn(serviceAccountJsonKey);
-    when(serviceAccountKeyManager.createJsonKey(anyString(), anyString())).thenReturn(serviceAccountP12Key);
+    when(serviceAccountKeyManager.createJsonKey(anyString())).thenReturn(serviceAccountJsonKey);
+    when(serviceAccountKeyManager.createJsonKey(anyString())).thenReturn(serviceAccountP12Key);
 
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
     kdr.init();

@@ -13,25 +13,22 @@ public class ServiceAccountKeyManager {
     this.iam = iam;
   }
 
-  public ServiceAccountKey createJsonKey(String project, String serviceAccount) throws IOException {
-    return createKey(project, serviceAccount, new CreateServiceAccountKeyRequest()
+  public ServiceAccountKey createJsonKey(String serviceAccount) throws IOException {
+    return createKey(serviceAccount, new CreateServiceAccountKeyRequest()
         .setPrivateKeyType("TYPE_GOOGLE_CREDENTIALS_FILE"));
   }
 
-  public ServiceAccountKey createP12Key(String project, String serviceAccount) throws IOException {
-    return createKey(project, serviceAccount, new CreateServiceAccountKeyRequest()
+  public ServiceAccountKey createP12Key(String serviceAccount) throws IOException {
+    return createKey(serviceAccount, new CreateServiceAccountKeyRequest()
         .setPrivateKeyType("TYPE_PKCS12_FILE"));
   }
 
-  private ServiceAccountKey createKey(String project, String serviceAccount,
+  private ServiceAccountKey createKey(String serviceAccount,
       CreateServiceAccountKeyRequest request)
       throws IOException {
     return iam.projects().serviceAccounts().keys()
-        .create(serviceAccountName(project, serviceAccount), request)
+        .create("projects/-/serviceAccounts/" + serviceAccount, request)
         .execute();
   }
 
-  static String serviceAccountName(String project, String serviceAccount) {
-    return "projects/" + project + "/serviceAccounts/" + serviceAccount;
-  }
 }
