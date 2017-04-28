@@ -38,6 +38,8 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.services.container.Container;
 import com.google.api.services.container.ContainerScopes;
 import com.google.api.services.container.model.Cluster;
+import com.google.api.services.iam.v1.Iam;
+import com.google.api.services.iam.v1.IamScopes;
 import com.google.cloud.datastore.Datastore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
@@ -596,7 +598,26 @@ public class StyxScheduler implements AppInit {
       return closer.register(DockerRunner.local(scheduler, stateManager));
     } else {
       final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(config, id));
-      return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats));
+      final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
+      return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats,
+          serviceAccountKeyManager));
+    }
+  }
+
+  private static ServiceAccountKeyManager createServiceAccountKeyManager() {
+    try {
+      final HttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+      final JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
+      final GoogleCredential credential = GoogleCredential
+          .getApplicationDefault(httpTransport, jsonFactory)
+          .createScoped(IamScopes.all());
+      final Iam iam = new Iam.Builder(
+          httpTransport, jsonFactory, credential)
+          .setApplicationName(SERVICE_NAME)
+          .build();
+      return new ServiceAccountKeyManager(iam);
+    } catch (GeneralSecurityException | IOException e) {
+      throw new RuntimeException(e);
     }
   }
 

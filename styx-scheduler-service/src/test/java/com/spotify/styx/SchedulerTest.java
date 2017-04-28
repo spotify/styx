@@ -161,7 +161,7 @@ public class SchedulerTest {
         id.componentId(),
         URI.create("http://example.com"),
         WorkflowConfiguration.create(
-            id.id(), Schedule.HOURS, empty(), empty(), empty(), empty(), empty(),
+            id.id(), Schedule.HOURS, empty(), empty(), empty(), empty(), empty(), empty(),
             Arrays.asList(resources)));
   }
 

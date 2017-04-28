@@ -177,6 +177,7 @@ public class ExecutionDescriptionHandlerTest {
         Optional.of(Lists.newArrayList("foo", "bar")),
         empty(),
         empty(),
+        empty(),
         emptyList());
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
@@ -201,6 +202,7 @@ public class ExecutionDescriptionHandlerTest {
         empty(),
         Optional.empty(),
         Optional.of(Lists.newArrayList(args)),
+        empty(),
         empty(),
         empty(),
         emptyList());

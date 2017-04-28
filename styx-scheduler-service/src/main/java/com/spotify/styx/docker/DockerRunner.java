@@ -24,6 +24,7 @@ import static java.util.Optional.empty;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
+import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
@@ -78,6 +79,8 @@ public interface DockerRunner extends Closeable {
 
     public abstract Optional<WorkflowConfiguration.Secret> secret();
 
+    public abstract Optional<String> serviceAccount();
+
     public abstract Optional<Trigger> trigger();
 
     public static RunSpec create(
@@ -85,12 +88,15 @@ public interface DockerRunner extends Closeable {
         ImmutableList<String> args,
         boolean terminationLogging,
         Optional<WorkflowConfiguration.Secret> secret,
+        Optional<String> serviceAccount,
         Optional<Trigger> trigger) {
-      return new AutoValue_DockerRunner_RunSpec(imageName, args, terminationLogging, secret, trigger);
+      return new AutoValue_DockerRunner_RunSpec(imageName, args, terminationLogging, secret,
+                                                serviceAccount, trigger);
     }
 
     public static RunSpec simple(String imageName, String... args) {
-      return new AutoValue_DockerRunner_RunSpec(imageName, ImmutableList.copyOf(args), false, empty(), empty());
+      return new AutoValue_DockerRunner_RunSpec(imageName, ImmutableList.copyOf(args),
+                                                false, empty(), empty(), empty());
     }
   }
 
@@ -103,9 +109,10 @@ public interface DockerRunner extends Closeable {
     return new LocalDockerRunner(executorService, stateManager);
   }
 
-  static DockerRunner kubernetes(NamespacedKubernetesClient kubernetesClient, StateManager stateManager, Stats stats) {
+  static DockerRunner kubernetes(NamespacedKubernetesClient kubernetesClient, StateManager stateManager,
+      Stats stats, ServiceAccountKeyManager serviceAccountKeyManager) {
     final KubernetesDockerRunner dockerRunner =
-        new KubernetesDockerRunner(kubernetesClient, stateManager, stats);
+        new KubernetesDockerRunner(kubernetesClient, stateManager, stats, serviceAccountKeyManager);
 
     dockerRunner.init();
 

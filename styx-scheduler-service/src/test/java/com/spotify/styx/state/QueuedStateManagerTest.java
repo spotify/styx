@@ -328,7 +328,8 @@ public class QueuedStateManagerTest {
     Consumer<WorkflowInstance> sendEvents = instance -> {
       try {
         stateManager.receive(Event.submit(instance, ExecutionDescription.create(
-            "", Collections.emptyList(), false, Optional.empty(), Optional.empty())));
+            "", Collections.emptyList(), false, Optional.empty(),
+            Optional.empty(), Optional.empty())));
         stateManager.receive(Event.submitted(instance, "id"));
         stateManager.receive(Event.started(instance));
         stateManager.receive(Event.terminate(instance, Optional.of(20)));

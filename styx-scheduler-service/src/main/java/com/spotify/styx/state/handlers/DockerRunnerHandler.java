@@ -142,6 +142,7 @@ public class DockerRunnerHandler implements OutputHandler {
         ImmutableList.copyOf(command),
         executionDescription.dockerTerminationLogging(),
         executionDescription.secret(),
+        executionDescription.serviceAccount(),
         state.data().trigger());
 
     LOG.info("running:{} image:{} args:{} termination_logging:{}", workflowInstance.toKey(),

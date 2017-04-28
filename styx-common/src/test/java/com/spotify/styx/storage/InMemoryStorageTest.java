@@ -79,6 +79,7 @@ public class InMemoryStorageTest {
         workflowId.componentId(),
         URI.create("http://foo"),
         WorkflowConfiguration
-            .create(workflowId.id(), HOURS, empty(), empty(), empty(), empty(), empty(), emptyList()));
+            .create(workflowId.id(), HOURS, empty(), empty(), empty(), empty(), empty(), empty(),
+                    emptyList()));
   }
 }

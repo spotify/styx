@@ -57,24 +57,28 @@ public final class TestData {
 
   public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.create(
-          "styx.TestEndpoint", HOURS, empty(), empty(), empty(), empty(), empty(), emptyList());
+          "styx.TestEndpoint", HOURS, empty(), empty(), empty(), empty(), empty(), empty(),
+          emptyList());
 
   public static final WorkflowConfiguration DAILY_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.create(
-          "styx.TestEndpoint", DAYS, empty(), empty(), empty(), empty(), empty(), emptyList());
+          "styx.TestEndpoint", DAYS, empty(), empty(), empty(), empty(), empty(), empty(),
+          emptyList());
 
   public static final WorkflowConfiguration WEEKLY_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.create(
-          "styx.TestEndpoint", WEEKS, empty(), empty(), empty(), empty(), empty(), emptyList());
+          "styx.TestEndpoint", WEEKS, empty(), empty(), empty(), empty(), empty(), empty(),
+          emptyList());
 
   public static final WorkflowConfiguration MONTHLY_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.create(
-          "styx.TestEndpoint", MONTHS, empty(), empty(), empty(), empty(), empty(), emptyList());
+          "styx.TestEndpoint", MONTHS, empty(), empty(), empty(), empty(), empty(), empty(),
+          emptyList());
 
   public static final WorkflowConfiguration FULL_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.create(
           "styx.TestEndpoint", DAYS, empty(), of("busybox"), of(asList("x", "y")), of(false),
-          of(Secret.create("name", "/path")), emptyList());
+          of(Secret.create("name", "/path")), empty(), emptyList());
 
   public static final ExecutionDescription EXECUTION_DESCRIPTION =
       ExecutionDescription.create(
@@ -82,5 +86,6 @@ public final class TestData {
           Arrays.asList("foo", "bar"),
           false,
           Optional.of(WorkflowConfiguration.Secret.create("secret", "/dev/null")),
+          empty(),
           Optional.of("00000ef508c1cb905e360590ce3e7e9193f6b370"));
 }

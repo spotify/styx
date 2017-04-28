@@ -152,6 +152,7 @@ public class StateInitializingTriggerTest {
         Optional.of(Lists.newArrayList(args)),
         empty(),
         empty(),
+        empty(),
         emptyList());
   }
 

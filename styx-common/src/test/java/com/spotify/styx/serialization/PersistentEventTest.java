@@ -56,6 +56,7 @@ public class PersistentEventTest {
       Arrays.asList("foo", "bar"),
       false,
       Optional.of(WorkflowConfiguration.Secret.create("secret", "/dev/null")),
+      Optional.empty(),
       Optional.of(COMMIT_SHA));
 
   @Test
