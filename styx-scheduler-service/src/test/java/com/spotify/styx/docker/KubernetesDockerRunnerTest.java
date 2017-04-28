@@ -47,6 +47,7 @@ import com.spotify.styx.testdata.TestData;
 import io.fabric8.kubernetes.api.model.DoneablePod;
 import io.fabric8.kubernetes.api.model.ListMeta;
 import io.fabric8.kubernetes.api.model.Pod;
+import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
@@ -255,8 +256,10 @@ public class KubernetesDockerRunnerTest {
     kdr.restore();
 
     // Change the pod status to terminated without notifying the runner through the pod watcher
-    createdPod.setStatus(terminated("Succeeded", 20, null));
-    when(podList.getItems()).thenReturn(ImmutableList.of(createdPod));
+    final Pod terminatedPod = new PodBuilder(createdPod)
+        .withStatus(terminated("Succeeded", 20, null))
+        .build();
+    when(podList.getItems()).thenReturn(ImmutableList.of(terminatedPod));
 
     // Verify that the runner eventually polls and finds out that the pod is terminated
     verify(stateManager, timeout(30_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)));
