@@ -30,7 +30,6 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
-import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import java.io.Closeable;
 import java.io.IOException;
