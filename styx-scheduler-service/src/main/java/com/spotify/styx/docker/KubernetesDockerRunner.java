@@ -155,7 +155,6 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private void ensureSecrets(WorkflowInstance workflowInstance, RunSpec runSpec) {
-
     if (runSpec.serviceAccount().isPresent()) {
       final String secretName = buildSecretName(runSpec.serviceAccount().get());
       final Secret secret = client.secrets().withName(secretName).get();
@@ -168,13 +167,13 @@ class KubernetesDockerRunner implements DockerRunner {
           jsonKey = serviceAccountKeyManager.createJsonKey(serviceAccount);
           p12Key = serviceAccountKeyManager.createP12Key(serviceAccount);
         } catch (IOException e) {
-          logger.error("Failed to create service account keys", e);
+          logger.error("[AUDIT] Failed to create keys for service account {}", serviceAccount, e);
           throw new RuntimeException(e);
         }
 
         final Map<String, String> keys = ImmutableMap.of(
-            STYX_WORKFLOW_SA_JSON_KEY, jsonKey.toString(),
-            STYX_MANAGED_WORKFLOW_SA_P12_KEY, p12Key.toString()
+            STYX_WORKFLOW_SA_JSON_KEY, jsonKey.getPrivateKeyData(),
+            STYX_MANAGED_WORKFLOW_SA_P12_KEY, p12Key.getPrivateKeyData()
         );
 
         final Map<String, String> annotations = ImmutableMap.of(
