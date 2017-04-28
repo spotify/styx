@@ -109,8 +109,8 @@ class KubernetesDockerRunner implements DockerRunner {
   private static final String STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION = "styx-wf-sa-p12-key-name";
   private static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
   private static final String STYX_WORKFLOW_SA_JSON_KEY = "styx-wf-sa.json";
-  private static final String STYX_MANAGED_WORKFLOW_SA_P12_KEY = "styx-wf-sa.p12";
-  private static final String STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH =
+  private static final String STYX_WORKFLOW_SA_P12_KEY = "styx-wf-sa.p12";
+  private static final String STYX_WORKFLOW_SA_SECRET_MOUNT_PATH =
       "/etc/" + STYX_WORKFLOW_SA_SECRET_NAME + "/";
 
   private static final ThreadFactory THREAD_FACTORY = new ThreadFactoryBuilder()
@@ -173,7 +173,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
         final Map<String, String> keys = ImmutableMap.of(
             STYX_WORKFLOW_SA_JSON_KEY, jsonKey.getPrivateKeyData(),
-            STYX_MANAGED_WORKFLOW_SA_P12_KEY, p12Key.getPrivateKeyData()
+            STYX_WORKFLOW_SA_P12_KEY, p12Key.getPrivateKeyData()
         );
 
         final Map<String, String> annotations = ImmutableMap.of(
@@ -245,14 +245,14 @@ class KubernetesDockerRunner implements DockerRunner {
           .endVolume();
       container
           .addToVolumeMounts(new VolumeMountBuilder()
-              .withMountPath(STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH)
+              .withMountPath(STYX_WORKFLOW_SA_SECRET_MOUNT_PATH)
               .withName(STYX_WORKFLOW_SA_SECRET_NAME)
               .withReadOnly(true)
               .build())
           // TODO: do we need set this env as default value?
           .addToEnv(
               envVar("GOOGLE_APPLICATION_CREDENTIALS",
-                     STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH + STYX_WORKFLOW_SA_JSON_KEY));
+                     STYX_WORKFLOW_SA_SECRET_MOUNT_PATH + STYX_WORKFLOW_SA_JSON_KEY));
     }
 
     if (runSpec.secret().isPresent()) {
