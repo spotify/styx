@@ -196,14 +196,14 @@ For each execution, Styx will inject a set of environment variables into the con
 
 ### Code Coverage
 
-Circle-CI builds submit code coverage reports to [coveralls.io](https://coveralls.io/github/spotify/styx).
-
-When building locally, an aggregate code coverage report for the entire project is created by the `report` submodule.
+An aggregate code coverage report for the entire project is created by the `report` submodule.
 
 ```bash
 > mvn clean verify
 > open report/target/site/jacoco-aggregate/index.html
 ```
+
+CircleCI builds submit code coverage reports to [coveralls.io](https://coveralls.io/github/spotify/styx). In addition, the aggregate jacoco report can be viewed under the Artifacts tab in the Circle-CI build view.
 
 ---
 
