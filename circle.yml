@@ -10,7 +10,7 @@ dependencies:
 # taken from https://circleci.com/docs/1.0/test-metadata/#maven-surefire-plugin-for-java-junit-results
 test:
   override:
-    - mvn integration-test jacoco:report coveralls:report -Dcoveralls.token=${COVERALLS_TOKEN}
+    - mvn verify coveralls:report -Dcoveralls.token=${COVERALLS_TOKEN}
   post:
     - mkdir -p $CIRCLE_TEST_REPORTS/junit/
     - find . -type f -regex ".*/target/surefire-reports/.*xml" -exec cp {} $CIRCLE_TEST_REPORTS/junit/ \;
