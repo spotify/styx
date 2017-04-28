@@ -104,10 +104,11 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String TRIGGER_ID = "STYX_TRIGGER_ID";
   static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
   private static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
+  static final String STYX_WORKFLOW_SA_ENV_VARIABLE = "GOOGLE_APPLICATION_CREDENTIALS";
   private static final String STYX_WORKFLOW_SA_SECRET_ANNOTATION = "styx-wf-sa";
   private static final String STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION = "styx-wf-sa-json-key-name";
   private static final String STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION = "styx-wf-sa-p12-key-name";
-  private static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
+  static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
   private static final String STYX_WORKFLOW_SA_JSON_KEY = "styx-wf-sa.json";
   private static final String STYX_WORKFLOW_SA_P12_KEY = "styx-wf-sa.p12";
   private static final String STYX_WORKFLOW_SA_SECRET_MOUNT_PATH =
@@ -254,7 +255,7 @@ class KubernetesDockerRunner implements DockerRunner {
               .build())
           // TODO: do we need set this env as default value?
           .addToEnv(
-              envVar("GOOGLE_APPLICATION_CREDENTIALS",
+              envVar(STYX_WORKFLOW_SA_ENV_VARIABLE,
                      STYX_WORKFLOW_SA_SECRET_MOUNT_PATH + STYX_WORKFLOW_SA_JSON_KEY));
     }
 
