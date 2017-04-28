@@ -24,6 +24,7 @@ import static java.util.Optional.empty;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
+import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
@@ -108,9 +109,10 @@ public interface DockerRunner extends Closeable {
     return new LocalDockerRunner(executorService, stateManager);
   }
 
-  static DockerRunner kubernetes(NamespacedKubernetesClient kubernetesClient, StateManager stateManager, Stats stats) {
+  static DockerRunner kubernetes(NamespacedKubernetesClient kubernetesClient, StateManager stateManager,
+      Stats stats, ServiceAccountKeyManager serviceAccountKeyManager) {
     final KubernetesDockerRunner dockerRunner =
-        new KubernetesDockerRunner(kubernetesClient, stateManager, stats);
+        new KubernetesDockerRunner(kubernetesClient, stateManager, stats, serviceAccountKeyManager);
 
     dockerRunner.init();
 

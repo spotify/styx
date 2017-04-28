@@ -31,12 +31,14 @@ import com.github.rholder.retry.Retryer;
 import com.github.rholder.retry.RetryerBuilder;
 import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.WaitStrategies;
+import com.google.api.services.iam.v1.model.ServiceAccountKey;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.hash.Hashing;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
@@ -103,6 +105,8 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
   private static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
   private static final String STYX_WORKFLOW_SA_SECRET_ANNOTATION = "styx-wf-sa";
+  private static final String STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION = "styx-wf-sa-json-key-name";
+  private static final String STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION = "styx-wf-sa-p12-key-name";
   private static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
   private static final String STYX_WORKFLOW_SA_JSON_KEY = "styx-wf-sa.json";
   private static final String STYX_MANAGED_WORKFLOW_SA_P12_KEY = "styx-wf-sa.p12";
@@ -121,24 +125,27 @@ class KubernetesDockerRunner implements DockerRunner {
   private final StateManager stateManager;
   private final Stats stats;
   private final int pollPodsIntervalSeconds;
+  private final ServiceAccountKeyManager serviceAccountKeyManager;
 
   private Watch watch;
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
-      int pollPodsIntervalSeconds) {
+      ServiceAccountKeyManager serviceAccountKeyManager, int pollPodsIntervalSeconds) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client).inNamespace(NAMESPACE);
     this.stats = Objects.requireNonNull(stats);
     this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
+    this.serviceAccountKeyManager = serviceAccountKeyManager;
   }
 
-  KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats) {
-    this(client, stateManager, stats, DEFAULT_POLL_PODS_INTERVAL_SECONDS);
+  KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
+      ServiceAccountKeyManager serviceAccountKeyManager) {
+    this(client, stateManager, stats, serviceAccountKeyManager, DEFAULT_POLL_PODS_INTERVAL_SECONDS);
   }
 
   @Override
   public String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
-    ensureSecret(workflowInstance, runSpec);
+    ensureSecrets(workflowInstance, runSpec);
     try {
       final Pod pod = client.pods().create(createPod(workflowInstance, runSpec));
       return pod.getMetadata().getName();
@@ -147,23 +154,35 @@ class KubernetesDockerRunner implements DockerRunner {
     }
   }
 
-  private void ensureSecret(WorkflowInstance workflowInstance, RunSpec runSpec) {
+  private void ensureSecrets(WorkflowInstance workflowInstance, RunSpec runSpec) {
+
     if (runSpec.serviceAccount().isPresent()) {
       final String secretName = buildSecretName(runSpec.serviceAccount().get());
       final Secret secret = client.secrets().withName(secretName).get();
       if (secret == null) {
         final String serviceAccount = runSpec.serviceAccount().get();
 
-        // TODO: create keys calling GCP API, base64 already
-        final String jsonKey = "";
-        final String p12Key = "";
+        final ServiceAccountKey jsonKey;
+        final ServiceAccountKey p12Key;
+        try {
+          jsonKey = serviceAccountKeyManager.createJsonKey(serviceAccount);
+          p12Key = serviceAccountKeyManager.createP12Key(serviceAccount);
+        } catch (IOException e) {
+          logger.error("Failed to create service account keys", e);
+          throw new RuntimeException(e);
+        }
 
-        final Map<String, String> keys = Maps.newHashMap();
-        keys.put(STYX_WORKFLOW_SA_JSON_KEY, jsonKey);
-        keys.put(STYX_MANAGED_WORKFLOW_SA_P12_KEY, p12Key);
-        final Map<String, String> annotations = Maps.newHashMap();
-        // TODO: add key names returned by GCP API as annotations
-        annotations.put(STYX_WORKFLOW_SA_SECRET_ANNOTATION, serviceAccount);
+        final Map<String, String> keys = ImmutableMap.of(
+            STYX_WORKFLOW_SA_JSON_KEY, jsonKey.toString(),
+            STYX_MANAGED_WORKFLOW_SA_P12_KEY, p12Key.toString()
+        );
+
+        final Map<String, String> annotations = ImmutableMap.of(
+            STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION, jsonKey.getName(),
+            STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION, p12Key.getName(),
+            STYX_WORKFLOW_SA_SECRET_ANNOTATION, serviceAccount
+        );
+
         client.secrets().create(new SecretBuilder()
                                     .withNewMetadata()
                                     .withName(secretName)
@@ -173,7 +192,9 @@ class KubernetesDockerRunner implements DockerRunner {
                                     .build());
         LOG.info("[AUDIT] Secret {} created for service account {}", secretName, serviceAccount);
       }
-    } else if (runSpec.secret().isPresent()) {
+    }
+
+    if (runSpec.secret().isPresent()) {
       final WorkflowConfiguration.Secret specSecret = runSpec.secret().get();
       final Secret secret = client.secrets().withName(specSecret.name()).get();
       if (secret == null) {
@@ -232,7 +253,9 @@ class KubernetesDockerRunner implements DockerRunner {
                         .withName("GOOGLE_APPLICATION_CREDENTIALS")
                         .withValue(STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH + STYX_WORKFLOW_SA_JSON_KEY)
                         .build());
-    } else if (runSpec.secret().isPresent()) {
+    }
+
+    if (runSpec.secret().isPresent()) {
       final WorkflowConfiguration.Secret secret = runSpec.secret().get();
       spec = spec.addNewVolume()
           .withName(secret.name())
