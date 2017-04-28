@@ -35,7 +35,6 @@ import com.google.api.services.iam.v1.model.ServiceAccountKey;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import com.google.common.hash.Hashing;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.ServiceAccountKeyManager;
@@ -69,6 +68,7 @@ import io.fabric8.kubernetes.client.Watcher;
 import java.io.IOException;
 import java.net.ProtocolException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -155,7 +155,6 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private void ensureSecrets(WorkflowInstance workflowInstance, RunSpec runSpec) {
-
     if (runSpec.serviceAccount().isPresent()) {
       final String secretName = buildSecretName(runSpec.serviceAccount().get());
       final Secret secret = client.secrets().withName(secretName).get();
@@ -210,8 +209,8 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private static String buildSecretName(String serviceAccount) {
-    return STYX_WORKFLOW_SA_SECRET_NAME + '-' + Hashing
-        .sha256().hashString(serviceAccount, StandardCharsets.UTF_8);
+    return STYX_WORKFLOW_SA_SECRET_NAME + '-' +
+           Hashing.sha256().hashString(serviceAccount, StandardCharsets.UTF_8);
   }
 
   @VisibleForTesting
@@ -229,9 +228,8 @@ class KubernetesDockerRunner implements DockerRunner {
         .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
         .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION, String.valueOf(runSpec.terminationLogging()))
         .endMetadata();
-    PodFluent.SpecNested<PodBuilder> spec = podBuilder.withNewSpec()
-        .withRestartPolicy("Never");
-    PodSpecFluent.ContainersNested<PodFluent.SpecNested<PodBuilder>> container = spec
+    final PodFluent.SpecNested<PodBuilder> spec = podBuilder.withNewSpec().withRestartPolicy("Never");
+    final PodSpecFluent.ContainersNested<PodFluent.SpecNested<PodBuilder>> container = spec
         .addNewContainer()
             .withName(STYX_RUN)
             .withImage(imageWithTag)
@@ -239,28 +237,27 @@ class KubernetesDockerRunner implements DockerRunner {
             .withEnv(env);
 
     if (runSpec.serviceAccount().isPresent()) {
-      spec = spec.addNewVolume()
+      spec.addNewVolume()
           .withName(STYX_WORKFLOW_SA_SECRET_NAME)
           .withNewSecret()
           .withSecretName(buildSecretName(runSpec.serviceAccount().get()))
           .endSecret()
           .endVolume();
-      container = container
+      container
           .addToVolumeMounts(new VolumeMountBuilder()
               .withMountPath(STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH)
               .withName(STYX_WORKFLOW_SA_SECRET_NAME)
               .withReadOnly(true)
               .build())
           // TODO: do we need set this env as default value?
-          .addToEnv(new EnvVarBuilder()
-                        .withName("GOOGLE_APPLICATION_CREDENTIALS")
-                        .withValue(STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH + STYX_WORKFLOW_SA_JSON_KEY)
-                        .build());
+          .addToEnv(
+              envVar("GOOGLE_APPLICATION_CREDENTIALS",
+                     STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH + STYX_WORKFLOW_SA_JSON_KEY));
     }
 
     if (runSpec.secret().isPresent()) {
       final WorkflowConfiguration.Secret secret = runSpec.secret().get();
-      spec = spec.addNewVolume()
+      spec.addNewVolume()
           .withName(secret.name())
           .withNewSecret()
           .withSecretName(secret.name())
@@ -271,51 +268,30 @@ class KubernetesDockerRunner implements DockerRunner {
           .withName(secret.name())
           .withReadOnly(true)
           .build();
-      container = container.addToVolumeMounts(secretMount);
+      container.addToVolumeMounts(secretMount);
     }
     container.endContainer();
 
     return spec.endSpec().build();
   }
 
+  private static EnvVar envVar(String name, String value) {
+    return new EnvVarBuilder().withName(name).withValue(value).build();
+  }
+
   private static List<EnvVar> buildEnv(WorkflowInstance workflowInstance,
                                        RunSpec runSpec, String podName) {
-    // inject environment variables
-    final List<EnvVar> env = Lists.newArrayList();
-    env.add(new EnvVarBuilder()
-        .withName(COMPONENT_ID)
-        .withValue(workflowInstance.workflowId().componentId())
-        .build());
-    // TODO: for backward compatibility, delete later
-    env.add(new EnvVarBuilder()
-        .withName(ENDPOINT_ID)
-        .withValue(workflowInstance.workflowId().id())
-        .build());
-    env.add(new EnvVarBuilder()
-        .withName(WORKFLOW_ID)
-        .withValue(workflowInstance.workflowId().id())
-        .build());
-    env.add(new EnvVarBuilder()
-        .withName(PARAMETER)
-        .withValue(workflowInstance.parameter())
-        .build());
-    env.add(new EnvVarBuilder()
-        .withName(EXECUTION_ID)
-        .withValue(podName)
-        .build());
-    env.add(new EnvVarBuilder()
-        .withName(TERMINATION_LOG)
-        .withValue("/dev/termination-log")
-        .build());
-    env.add(new EnvVarBuilder()
-        .withName(TRIGGER_ID)
-        .withValue(runSpec.trigger().map(TriggerUtil::triggerId).orElse(null))
-        .build());
-    env.add(new EnvVarBuilder()
-        .withName(TRIGGER_TYPE)
-        .withValue(runSpec.trigger().map(TriggerUtil::triggerType).orElse(null))
-        .build());
-    return env;
+    return Arrays.asList(
+        envVar(COMPONENT_ID,    workflowInstance.workflowId().componentId()),
+        // TODO: for backward compatibility, delete later
+        envVar(ENDPOINT_ID,     workflowInstance.workflowId().id()),
+        envVar(WORKFLOW_ID,     workflowInstance.workflowId().id()),
+        envVar(PARAMETER,       workflowInstance.parameter()),
+        envVar(EXECUTION_ID,    podName),
+        envVar(TERMINATION_LOG, "/dev/termination-log"),
+        envVar(TRIGGER_ID,      runSpec.trigger().map(TriggerUtil::triggerId).orElse(null)),
+        envVar(TRIGGER_TYPE,    runSpec.trigger().map(TriggerUtil::triggerType).orElse(null))
+    );
   }
 
   @Override
