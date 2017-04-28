@@ -38,6 +38,8 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.services.container.Container;
 import com.google.api.services.container.ContainerScopes;
 import com.google.api.services.container.model.Cluster;
+import com.google.api.services.iam.v1.Iam;
+import com.google.api.services.iam.v1.IamScopes;
 import com.google.cloud.datastore.Datastore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
@@ -158,7 +160,7 @@ public class StyxScheduler implements AppInit {
     private Time time = Instant::now;
     private StorageFactory storageFactory = storage(StyxScheduler::storage);
     private DockerRunnerFactory dockerRunnerFactory = (id, environment, stateManager1, scheduler1, stats) -> createDockerRunner(
-        id, environment, stateManager1, scheduler1, stats, serviceAccountKeyManager);
+        id, environment, stateManager1, scheduler1, stats);
     private ScheduleSources scheduleSources = () -> ServiceLoader.load(ScheduleSourceFactory.class);
     private StatsFactory statsFactory = StyxScheduler::stats;
     private ExecutorFactory executorFactory = Executors::newScheduledThreadPool;
@@ -588,10 +590,11 @@ public class StyxScheduler implements AppInit {
       Environment environment,
       StateManager stateManager,
       ScheduledExecutorService scheduler,
-      Stats stats,
-      ServiceAccountKeyManager serviceAccountKeyManager) {
+      Stats stats) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
+
+    final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
 
     if (isDevMode(config)) {
       LOG.info("Creating LocalDockerRunner");
@@ -600,6 +603,23 @@ public class StyxScheduler implements AppInit {
       final KubernetesClient kubernetes = closer.register(getKubernetesClient(config, id));
       return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats,
           serviceAccountKeyManager));
+    }
+  }
+
+  private static ServiceAccountKeyManager createServiceAccountKeyManager() {
+    try {
+      final HttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+      final JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
+      final GoogleCredential credential = GoogleCredential
+          .getApplicationDefault(httpTransport, jsonFactory)
+          .createScoped(IamScopes.all());
+      final Iam iam = new Iam.Builder(
+          httpTransport, jsonFactory, credential)
+          .setApplicationName(SERVICE_NAME)
+          .build();
+      return new ServiceAccountKeyManager(iam);
+    } catch (GeneralSecurityException | IOException e) {
+      throw new RuntimeException(e);
     }
   }
 
