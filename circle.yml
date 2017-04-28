@@ -14,3 +14,5 @@ test:
   post:
     - mkdir -p $CIRCLE_TEST_REPORTS/junit/
     - find . -type f -regex ".*/target/surefire-reports/.*xml" -exec cp {} $CIRCLE_TEST_REPORTS/junit/ \;
+    - cp -r report/target/site/jacoco-aggregate/ $CIRCLE_ARTIFACTS/jacoco-aggregate/
+
