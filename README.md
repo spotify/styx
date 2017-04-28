@@ -191,6 +191,20 @@ For each execution, Styx will inject a set of environment variables into the con
 | `STYX_EXECUTION_ID` | A unique identifier for the execution. This is the execution id used to identify execution attempts of a trigger. |
 | `STYX_EXECUTION_COUNTER` | **to be implemented** - A counter indicating which execution this is. Goes from 0..N per trigger. |
 
+
+## Development
+
+### Code Coverage
+
+Circle-CI builds submit code coverage reports to [coveralls.io](https://coveralls.io/github/spotify/styx).
+
+When building locally, an aggregate code coverage report for the entire project is created by the `report` submodule.
+
+```bash
+> mvn clean verify
+> open report/target/site/jacoco-aggregate/index.html
+```
+
 ---
 
 This project adheres to the [Open Code of Conduct][code-of-conduct]. By participating, you are
