@@ -30,6 +30,7 @@
     <module>styx-common</module>
     <module>styx-test</module>
     <module>styx-standalone-service</module>
+    <module>report</module>
   </modules>
 
   <licenses>
@@ -379,7 +380,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>2.19.1</version>
         <configuration>
-          <argLine>-Xmx256m</argLine>
+          <argLine>-Xmx256m ${argLine}</argLine>
         </configuration>
       </plugin>
 
@@ -411,6 +412,45 @@
 
       <plugin>
         <artifactId>maven-failsafe-plugin</artifactId>
+      </plugin>
+
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.7.9</version>
+        <configuration>
+          <excludes>
+            <exclude>**/AutoValue_*.class</exclude>
+            <exclude>**/*Builder.class</exclude>
+            <exclude>**/*$*.class</exclude>
+            <exclude>com/spotify/styx/model/Event.class</exclude>
+            <exclude>com/spotify/styx/state/Trigger.class</exclude>
+          </excludes>
+        </configuration>
+        <executions>
+          <execution>
+            <id>default-prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.eluder.coveralls</groupId>
+        <artifactId>coveralls-maven-plugin</artifactId>
+        <version>4.3.0</version>
+        <configuration>
+          <repoToken>${coveralls.token}</repoToken>
+        </configuration>
       </plugin>
     </plugins>
   </build>
