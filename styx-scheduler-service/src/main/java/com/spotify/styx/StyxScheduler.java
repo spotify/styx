@@ -157,7 +157,8 @@ public class StyxScheduler implements AppInit {
 
     private Time time = Instant::now;
     private StorageFactory storageFactory = storage(StyxScheduler::storage);
-    private DockerRunnerFactory dockerRunnerFactory = StyxScheduler::createDockerRunner;
+    private DockerRunnerFactory dockerRunnerFactory = (id, environment, stateManager1, scheduler1, stats) -> createDockerRunner(
+        id, environment, stateManager1, scheduler1, stats, serviceAccountKeyManager);
     private ScheduleSources scheduleSources = () -> ServiceLoader.load(ScheduleSourceFactory.class);
     private StatsFactory statsFactory = StyxScheduler::stats;
     private ExecutorFactory executorFactory = Executors::newScheduledThreadPool;
@@ -587,7 +588,8 @@ public class StyxScheduler implements AppInit {
       Environment environment,
       StateManager stateManager,
       ScheduledExecutorService scheduler,
-      Stats stats) {
+      Stats stats,
+      ServiceAccountKeyManager serviceAccountKeyManager) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
 
@@ -596,7 +598,8 @@ public class StyxScheduler implements AppInit {
       return closer.register(DockerRunner.local(scheduler, stateManager));
     } else {
       final KubernetesClient kubernetes = closer.register(getKubernetesClient(config, id));
-      return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats));
+      return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats,
+          serviceAccountKeyManager));
     }
   }
 
