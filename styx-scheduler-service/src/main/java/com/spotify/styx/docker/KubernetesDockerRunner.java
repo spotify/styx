@@ -209,8 +209,8 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private static String buildSecretName(String serviceAccount) {
-    return STYX_WORKFLOW_SA_SECRET_NAME + '-' + Hashing
-        .sha256().hashString(serviceAccount, StandardCharsets.UTF_8);
+    return STYX_WORKFLOW_SA_SECRET_NAME + '-'
+           + Hashing.sha256().hashString(serviceAccount, StandardCharsets.UTF_8);
   }
 
   @VisibleForTesting
