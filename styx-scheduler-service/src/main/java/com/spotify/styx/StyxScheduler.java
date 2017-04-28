@@ -593,13 +593,12 @@ public class StyxScheduler implements AppInit {
     final Config config = environment.config();
     final Closer closer = environment.closer();
 
-    final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
-
     if (isDevMode(config)) {
       LOG.info("Creating LocalDockerRunner");
       return closer.register(DockerRunner.local(scheduler, stateManager));
     } else {
       final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(config, id));
+      final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
       return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats,
           serviceAccountKeyManager));
     }
