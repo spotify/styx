@@ -228,9 +228,8 @@ class KubernetesDockerRunner implements DockerRunner {
         .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
         .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION, String.valueOf(runSpec.terminationLogging()))
         .endMetadata();
-    PodFluent.SpecNested<PodBuilder> spec = podBuilder.withNewSpec()
-        .withRestartPolicy("Never");
-    PodSpecFluent.ContainersNested<PodFluent.SpecNested<PodBuilder>> container = spec
+    final PodFluent.SpecNested<PodBuilder> spec = podBuilder.withNewSpec().withRestartPolicy("Never");
+    final PodSpecFluent.ContainersNested<PodFluent.SpecNested<PodBuilder>> container = spec
         .addNewContainer()
             .withName(STYX_RUN)
             .withImage(imageWithTag)
@@ -238,13 +237,13 @@ class KubernetesDockerRunner implements DockerRunner {
             .withEnv(env);
 
     if (runSpec.serviceAccount().isPresent()) {
-      spec = spec.addNewVolume()
+      spec.addNewVolume()
           .withName(STYX_WORKFLOW_SA_SECRET_NAME)
           .withNewSecret()
           .withSecretName(buildSecretName(runSpec.serviceAccount().get()))
           .endSecret()
           .endVolume();
-      container = container
+      container
           .addToVolumeMounts(new VolumeMountBuilder()
               .withMountPath(STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH)
               .withName(STYX_WORKFLOW_SA_SECRET_NAME)
@@ -259,7 +258,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
     if (runSpec.secret().isPresent()) {
       final WorkflowConfiguration.Secret secret = runSpec.secret().get();
-      spec = spec.addNewVolume()
+      spec.addNewVolume()
           .withName(secret.name())
           .withNewSecret()
           .withSecretName(secret.name())
@@ -270,7 +269,7 @@ class KubernetesDockerRunner implements DockerRunner {
           .withName(secret.name())
           .withReadOnly(true)
           .build();
-      container = container.addToVolumeMounts(secretMount);
+      container.addToVolumeMounts(secretMount);
     }
     container.endContainer();
 
