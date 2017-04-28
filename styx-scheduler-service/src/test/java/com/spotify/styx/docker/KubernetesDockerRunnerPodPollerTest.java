@@ -26,6 +26,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
@@ -71,6 +72,8 @@ public class KubernetesDockerRunnerPodPollerTest {
   @Mock
   Stats stats;
 
+  @Mock ServiceAccountKeyManager serviceAccountKeyManager;
+
   KubernetesDockerRunner kdr;
 
   @Before
@@ -78,7 +81,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(k8sClient.inNamespace(any(String.class))).thenReturn(k8sClient);
     when(k8sClient.pods()).thenReturn(pods);
 
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
     podList = new PodList();
   }
 
