@@ -25,6 +25,8 @@ import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.podStatus
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.running;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminated;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.waiting;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
@@ -58,6 +60,7 @@ import io.fabric8.kubernetes.client.dsl.Watchable;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -263,6 +266,7 @@ public class KubernetesDockerRunnerTest {
 
     // Verify that the runner eventually polls and finds out that the pod is terminated
     verify(stateManager, timeout(30_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)));
-    assertThat(stateManager.get(WORKFLOW_INSTANCE).data().lastExit(), hasValue(20));
+    await().timeout(30, SECONDS).until(() ->
+        assertThat(stateManager.get(WORKFLOW_INSTANCE).data().lastExit(), hasValue(20)));
   }
 }
