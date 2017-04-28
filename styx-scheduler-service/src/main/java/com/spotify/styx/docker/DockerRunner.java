@@ -30,6 +30,7 @@ import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Optional;
@@ -102,7 +103,7 @@ public interface DockerRunner extends Closeable {
     return new LocalDockerRunner(executorService, stateManager);
   }
 
-  static DockerRunner kubernetes(KubernetesClient kubernetesClient, StateManager stateManager, Stats stats) {
+  static DockerRunner kubernetes(NamespacedKubernetesClient kubernetesClient, StateManager stateManager, Stats stats) {
     final KubernetesDockerRunner dockerRunner =
         new KubernetesDockerRunner(kubernetesClient, stateManager, stats);
 

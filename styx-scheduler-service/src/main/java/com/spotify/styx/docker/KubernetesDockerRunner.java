@@ -55,8 +55,10 @@ import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.PodSpecFluent;
 import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.VolumeMount;
+import io.fabric8.kubernetes.api.model.VolumeMountBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientException;
+import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import java.io.IOException;
@@ -112,7 +114,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
   private Watch watch;
 
-  KubernetesDockerRunner(KubernetesClient client, StateManager stateManager, Stats stats,
+  KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
       int pollPodsIntervalSeconds) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client).inNamespace(NAMESPACE);
@@ -120,7 +122,7 @@ class KubernetesDockerRunner implements DockerRunner {
     this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
   }
 
-  KubernetesDockerRunner(KubernetesClient client, StateManager stateManager, Stats stats) {
+  KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats) {
     this(client, stateManager, stats, DEFAULT_POLL_PODS_INTERVAL_SECONDS);
   }
 
@@ -214,8 +216,12 @@ class KubernetesDockerRunner implements DockerRunner {
           .withSecretName(secret.name())
           .endSecret()
           .endVolume();
-      container =
-          container.addToVolumeMounts(new VolumeMount(secret.mountPath(), secret.name(), true));
+      final VolumeMount secretMount = new VolumeMountBuilder()
+          .withMountPath(secret.mountPath())
+          .withName(secret.name())
+          .withReadOnly(true)
+          .build();
+      container = container.addToVolumeMounts(secretMount);
     }
     container.endContainer();
 

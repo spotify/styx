@@ -82,7 +82,7 @@ import com.spotify.styx.workflow.WorkflowInitializer;
 import com.typesafe.config.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
-import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import java.io.Closeable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -595,12 +595,12 @@ public class StyxScheduler implements AppInit {
       LOG.info("Creating LocalDockerRunner");
       return closer.register(DockerRunner.local(scheduler, stateManager));
     } else {
-      final KubernetesClient kubernetes = closer.register(getKubernetesClient(config, id));
+      final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(config, id));
       return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats));
     }
   }
 
-  private static KubernetesClient getKubernetesClient(Config config, String id) {
+  private static NamespacedKubernetesClient getKubernetesClient(Config config, String id) {
     try {
       final HttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
       final JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
