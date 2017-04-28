@@ -246,8 +246,11 @@ class KubernetesDockerRunner implements DockerRunner {
           .endSecret()
           .endVolume();
       container = container
-          .addToVolumeMounts(new VolumeMount(STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH,
-                                             STYX_WORKFLOW_SA_SECRET_NAME, true))
+          .addToVolumeMounts(new VolumeMountBuilder()
+              .withMountPath(STYX_MANAGED_WORKFLOW_SA_SECRET_MOUNT_PATH)
+              .withName(STYX_WORKFLOW_SA_SECRET_NAME)
+              .withReadOnly(true)
+              .build())
           // TODO: do we need set this env as default value?
           .addToEnv(new EnvVarBuilder()
                         .withName("GOOGLE_APPLICATION_CREDENTIALS")
