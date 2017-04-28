@@ -167,8 +167,8 @@ class KubernetesDockerRunner implements DockerRunner {
           jsonKey = serviceAccountKeyManager.createJsonKey(serviceAccount);
           p12Key = serviceAccountKeyManager.createP12Key(serviceAccount);
         } catch (IOException e) {
-          logger.error("[AUDIT] Failed to create keys for service account {}", serviceAccount, e);
-          throw new RuntimeException(e);
+          logger.error("[AUDIT] Failed to create keys for {}", serviceAccount, e);
+          throw new InvalidExecutionException("Failed to create keys for " + serviceAccount);
         }
 
         final Map<String, String> keys = ImmutableMap.of(
