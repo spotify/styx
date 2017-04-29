@@ -51,6 +51,7 @@ complement each other.
 * [Styx design](doc/design-overview.md)
 * [External services]
 * [API Specification](doc/api.apib) - [HTML version](https://spotify.github.io/styx/api.html)
+* [API Specification (deprecated)](doc/api-deprecated.apib) - [HTML version](https://spotify.github.io/styx/api-deprecated.html)
 
 
 ## Usage
