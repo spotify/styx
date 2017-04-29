@@ -14,7 +14,7 @@
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-common</artifactId>
-      <version>1.0.12-SNAPSHOT</version>
+      <version>${project.version}</version>
     </dependency>
 
     <dependency>
