@@ -110,7 +110,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
   private static final String STYX_WORKFLOW_SA_JSON_KEY = "styx-wf-sa.json";
   private static final String STYX_WORKFLOW_SA_P12_KEY = "styx-wf-sa.p12";
-  private static final String STYX_WORKFLOW_SA_SECRET_MOUNT_PATH =
+  static final String STYX_WORKFLOW_SA_SECRET_MOUNT_PATH =
       "/etc/" + STYX_WORKFLOW_SA_SECRET_NAME + "/";
 
   private static final ThreadFactory THREAD_FACTORY = new ThreadFactoryBuilder()
@@ -155,6 +155,28 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private void ensureSecrets(WorkflowInstance workflowInstance, RunSpec runSpec) {
+    if (runSpec.secret().isPresent()) {
+      final WorkflowConfiguration.Secret specSecret = runSpec.secret().get();
+      // if it ever happens, that feels more like a hack than pure luck so let's be paranoid
+      if (STYX_WORKFLOW_SA_SECRET_MOUNT_PATH.equals(specSecret.mountPath())) {
+        LOG.error("[AUDIT] Workflow {} tries to mount secret {} to the reserved path",
+                  workflowInstance.workflowId(), specSecret.name());
+        throw new InvalidExecutionException(
+            STYX_WORKFLOW_SA_SECRET_MOUNT_PATH + " is a reserved mount path");
+      }
+
+      final Secret secret = client.secrets().withName(specSecret.name()).get();
+      if (secret == null) {
+        LOG.error("[AUDIT] Workflow {} refers to a non-existent secret {}",
+                  workflowInstance.workflowId(), specSecret.name());
+        throw new InvalidExecutionException(
+            "Referenced secret '" + specSecret.name() + "' was not found");
+      } else {
+        LOG.info("[AUDIT] Workflow {} refers to secret {}",
+                 workflowInstance.workflowId(), specSecret.name());
+      }
+    }
+
     if (runSpec.serviceAccount().isPresent()) {
       final String serviceAccount = runSpec.serviceAccount().get();
       final String secretName = buildSecretName(serviceAccount);
@@ -195,20 +217,6 @@ class KubernetesDockerRunner implements DockerRunner {
                  secretName, serviceAccount);
       }
     }
-
-    if (runSpec.secret().isPresent()) {
-      final WorkflowConfiguration.Secret specSecret = runSpec.secret().get();
-      final Secret secret = client.secrets().withName(specSecret.name()).get();
-      if (secret == null) {
-        LOG.error("[AUDIT] Workflow {} refers to a non-existent secret {}",
-                  workflowInstance.workflowId(), specSecret.name());
-        throw new InvalidExecutionException(
-            "Referenced secret '" + specSecret.name() + "' was not found");
-      } else {
-        LOG.info("[AUDIT] Workflow {} refers to secret {}",
-                 workflowInstance.workflowId(), specSecret.name());
-      }
-    }
   }
 
   private static String buildSecretName(String serviceAccount) {
@@ -239,6 +247,22 @@ class KubernetesDockerRunner implements DockerRunner {
             .withArgs(runSpec.args())
             .withEnv(env);
 
+    if (runSpec.secret().isPresent()) {
+      final WorkflowConfiguration.Secret secret = runSpec.secret().get();
+      spec.addNewVolume()
+          .withName(secret.name())
+          .withNewSecret()
+          .withSecretName(secret.name())
+          .endSecret()
+          .endVolume();
+      final VolumeMount secretMount = new VolumeMountBuilder()
+          .withMountPath(secret.mountPath())
+          .withName(secret.name())
+          .withReadOnly(true)
+          .build();
+      container.addToVolumeMounts(secretMount);
+    }
+
     if (runSpec.serviceAccount().isPresent()) {
       spec.addNewVolume()
           .withName(STYX_WORKFLOW_SA_SECRET_NAME)
@@ -258,21 +282,6 @@ class KubernetesDockerRunner implements DockerRunner {
                      STYX_WORKFLOW_SA_SECRET_MOUNT_PATH + STYX_WORKFLOW_SA_JSON_KEY));
     }
 
-    if (runSpec.secret().isPresent()) {
-      final WorkflowConfiguration.Secret secret = runSpec.secret().get();
-      spec.addNewVolume()
-          .withName(secret.name())
-          .withNewSecret()
-          .withSecretName(secret.name())
-          .endSecret()
-          .endVolume();
-      final VolumeMount secretMount = new VolumeMountBuilder()
-          .withMountPath(secret.mountPath())
-          .withName(secret.name())
-          .withReadOnly(true)
-          .build();
-      container.addToVolumeMounts(secretMount);
-    }
     container.endContainer();
 
     return spec.endSpec().build();
@@ -343,7 +352,7 @@ class KubernetesDockerRunner implements DockerRunner {
         .watch(new PodWatcher(Integer.parseInt(resourceVersion)));
   }
 
-  void examineRunningWFISandAssociatedPods(PodList podList) {
+  private void examineRunningWFISandAssociatedPods(PodList podList) {
     final Set<WorkflowInstance> runningWorkflowInstances = stateManager.activeStates()
         .values()
         .stream()
