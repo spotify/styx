@@ -22,7 +22,6 @@ package com.spotify.styx;
 
 import static com.spotify.styx.model.WorkflowInstance.create;
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
 import static java.util.concurrent.TimeUnit.DAYS;
@@ -56,12 +55,20 @@ import org.junit.Test;
 
 public class SystemTest extends StyxSchedulerServiceFixture {
 
-  private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_HOURLY = WorkflowConfiguration.create(
-      "styx.TestEndpoint", Schedule.HOURS, empty(), of("busybox"), of(asList("--hour", "{}")),
-      empty(), empty(), empty(), emptyList());
-  private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_DAILY = WorkflowConfiguration.create(
-      "styx.TestEndpoint", Schedule.DAYS, empty(), of("busybox"), of(asList("--hour", "{}")),
-      empty(), empty(), empty(), emptyList());
+  private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_HOURLY =
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .schedule(Schedule.HOURS)
+          .dockerImage("busybox")
+          .dockerArgs(asList("--hour", "{}"))
+          .build();
+  private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_DAILY =
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .schedule(Schedule.DAYS)
+          .dockerImage("busybox")
+          .dockerArgs(asList("--hour", "{}"))
+          .build();
   private static final String TEST_EXECUTION_ID_1 = "execution_1";
   private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
   private static final Workflow HOURLY_WORKFLOW = Workflow.create(
@@ -104,10 +111,12 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     Workflow customWorkflow = Workflow.create(
         "styx",
         TestData.WORKFLOW_URI,
-        WorkflowConfiguration.create(
-            "styx.TestEndpoint",
-            Schedule.parse("15,45 12,15 * * *"),
-            empty(), of("busybox"), of(emptyList()), empty(), empty(), empty(), emptyList()));
+        WorkflowConfiguration.builder()
+            .id("styx.TestEndpoint")
+            .schedule(Schedule.parse("15,45 12,15 * * *"))
+            .dockerImage("busybox")
+            .dockerArgs(ImmutableList.of())
+            .build());
 
     givenTheTimeIs("2016-03-14T15:30:00Z");
     givenTheGlobalEnableFlagIs(true);
@@ -375,9 +384,12 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     injectEvent(Event.terminate(workflowInstance, Optional.of(20)));
     awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
-    WorkflowConfiguration changedWorkflowConfiguration = WorkflowConfiguration.create(
-        WORKFLOW_CONFIGURATION_HOURLY.id(), Schedule.HOURS, empty(), of("busybox:v777"),
-        of(asList("other", "args")), empty(), empty(), empty(), emptyList());
+    WorkflowConfiguration changedWorkflowConfiguration = WorkflowConfiguration.builder()
+        .id(WORKFLOW_CONFIGURATION_HOURLY.id())
+        .schedule(Schedule.HOURS)
+        .dockerImage("busybox:v777")
+        .dockerArgs(asList("other", "args"))
+        .build();
 
     Workflow changedWorkflow = Workflow.create(
         HOURLY_WORKFLOW.componentId(),

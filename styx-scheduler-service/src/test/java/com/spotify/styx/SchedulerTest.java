@@ -22,7 +22,6 @@ package com.spotify.styx;
 
 import static com.spotify.styx.state.TimeoutConfig.createWithDefaultTtl;
 import static java.time.Duration.ofSeconds;
-import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.sameInstance;
@@ -63,7 +62,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -160,9 +158,11 @@ public class SchedulerTest {
     return Workflow.create(
         id.componentId(),
         URI.create("http://example.com"),
-        WorkflowConfiguration.create(
-            id.id(), Schedule.HOURS, empty(), empty(), empty(), empty(), empty(), empty(),
-            Arrays.asList(resources)));
+        WorkflowConfiguration.builder()
+            .id(id.id())
+            .schedule(Schedule.HOURS)
+            .resources(resources)
+            .build());
   }
 
   @Test

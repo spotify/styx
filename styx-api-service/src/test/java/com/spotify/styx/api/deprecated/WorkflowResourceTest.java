@@ -29,8 +29,6 @@ import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.api.JsonMatchers.assertNoJson;
 import static com.spotify.styx.model.SequenceEvent.create;
 import static com.spotify.styx.model.WorkflowState.patchDockerImage;
-import static java.util.Collections.emptyList;
-import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
@@ -88,9 +86,10 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
-      WorkflowConfiguration
-          .create("bar", Schedule.DAYS, empty(), empty(), empty(), empty(), empty(), empty(),
-                  emptyList());
+      WorkflowConfiguration.builder()
+          .id("bar")
+          .schedule(Schedule.DAYS)
+          .build();
 
   private static final Workflow WORKFLOW =
       Workflow.create("foo", URI.create("/hejhej"), WORKFLOW_CONFIGURATION);

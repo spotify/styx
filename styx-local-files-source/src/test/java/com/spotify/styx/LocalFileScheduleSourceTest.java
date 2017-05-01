@@ -20,15 +20,13 @@
 
 package com.spotify.styx;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
-import static java.util.Optional.empty;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.io.Closer;
@@ -46,9 +44,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -199,16 +195,11 @@ public class LocalFileScheduleSourceTest {
     return Workflow.create(
         "test-file.yaml",
         testPath.toUri(),
-        WorkflowConfiguration.create(
-            "foo",
-            Schedule.HOURS,
-            empty(),
-            empty(),
-            Optional.of(emptyList()),
-            empty(),
-            empty(),
-            empty(),
-            emptyList()));
+        WorkflowConfiguration.builder()
+            .id("foo")
+            .schedule(Schedule.HOURS)
+            .dockerArgs(ImmutableList.of())
+            .build());
   }
 
   // matching different-def.yaml
@@ -216,16 +207,11 @@ public class LocalFileScheduleSourceTest {
     return Workflow.create(
         "test-file.yaml",
         testPath.toUri(),
-        WorkflowConfiguration.create(
-            "foo",
-            Schedule.DAYS,
-            empty(),
-            empty(),
-            Optional.of(singletonList("foo")),
-            empty(),
-            empty(),
-            empty(),
-            emptyList()));
+        WorkflowConfiguration.builder()
+            .id("foo")
+            .schedule(Schedule.DAYS)
+            .dockerArgs(ImmutableList.of("foo"))
+            .build());
   }
 
   // matching first def from example-defs.yaml
@@ -233,16 +219,11 @@ public class LocalFileScheduleSourceTest {
     return Workflow.create(
         "test-file.yaml",
         testPath.toUri(),
-        WorkflowConfiguration.create(
-            "foo",
-            Schedule.HOURS,
-            empty(),
-            empty(),
-            Optional.of(Arrays.asList("foo", "bar")),
-            empty(),
-            empty(),
-            empty(),
-            emptyList()));
+        WorkflowConfiguration.builder()
+            .id("foo")
+            .schedule(Schedule.HOURS)
+            .dockerArgs(ImmutableList.of("foo", "bar"))
+            .build());
   }
 
   // matching second def from example-defs.yaml
@@ -250,15 +231,10 @@ public class LocalFileScheduleSourceTest {
     return Workflow.create(
         "test-file.yaml",
         testPath.toUri(),
-        WorkflowConfiguration.create(
-            "bar",
-            Schedule.DAYS,
-            empty(),
-            empty(),
-            Optional.of(Arrays.asList("baz", "bax")),
-            empty(),
-            empty(),
-            empty(),
-            emptyList()));
+        WorkflowConfiguration.builder()
+            .id("bar")
+            .schedule(Schedule.DAYS)
+            .dockerArgs(ImmutableList.of("baz", "bax"))
+            .build());
   }
 }

@@ -25,16 +25,14 @@ import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.model.Schedule.MONTHS;
 import static com.spotify.styx.model.Schedule.WEEKS;
-import static java.util.Collections.emptyList;
-import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
@@ -144,16 +142,12 @@ public class StateInitializingTriggerTest {
   }
 
   private WorkflowConfiguration schedule(Schedule schedule, String... args) {
-    return WorkflowConfiguration.create(
-        "styx.TestEndpoint",
-        schedule,
-        empty(),
-        Optional.of("busybox"),
-        Optional.of(Lists.newArrayList(args)),
-        empty(),
-        empty(),
-        empty(),
-        emptyList());
+    return WorkflowConfiguration.builder()
+        .id("styx.TestEndpoint")
+        .schedule(schedule)
+        .dockerImage("busybox")
+        .dockerArgs(ImmutableList.copyOf(args))
+        .build();
   }
 
   // todo: do not use deprecated getDockerImage method
