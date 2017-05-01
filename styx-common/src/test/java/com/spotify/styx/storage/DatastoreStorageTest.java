@@ -119,7 +119,11 @@ public class DatastoreStorageTest {
   @AfterClass
   public static void tearDownClass() throws Exception {
     if (helper != null) {
-      helper.stop(org.threeten.bp.Duration.ofSeconds(30));
+      try {
+        helper.stop(org.threeten.bp.Duration.ofSeconds(30));
+      } catch (Throwable e) {
+        e.printStackTrace();
+      }
     }
   }
 

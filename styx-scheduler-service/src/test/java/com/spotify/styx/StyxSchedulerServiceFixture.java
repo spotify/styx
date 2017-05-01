@@ -111,7 +111,11 @@ public class StyxSchedulerServiceFixture {
   @AfterClass
   public static void tearDownClass() throws Exception {
     if (localDatastore != null) {
-      localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
+      try {
+        localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
+      } catch (Throwable e) {
+        e.printStackTrace();
+      }
     }
   }
 
