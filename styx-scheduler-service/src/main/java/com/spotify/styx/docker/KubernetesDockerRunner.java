@@ -199,6 +199,12 @@ class KubernetesDockerRunner implements DockerRunner {
 
     if (runSpec.secret().isPresent()) {
       final WorkflowConfiguration.Secret specSecret = runSpec.secret().get();
+      if (specSecret.name().startsWith(STYX_WORKFLOW_SA_SECRET_NAME)) {
+        LOG.info("[AUDIT] Workflow {} refers to secret {} in the managed service account key namespace, "
+            + "denying execution", specSecret.name());
+        throw new InvalidExecutionException(
+            "Referenced secret '" + specSecret.name() + "' is in the managed service account key namespace");
+      }
       final Secret secret = client.secrets().withName(specSecret.name()).get();
       if (secret == null) {
         LOG.error("[AUDIT] Workflow {} refers to a non-existent secret {}",
