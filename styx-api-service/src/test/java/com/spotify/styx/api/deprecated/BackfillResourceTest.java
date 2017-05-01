@@ -90,7 +90,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   private AggregateStorage storage = new AggregateStorage(
       bigtable,
-      localDatastore.options().service(),
+      localDatastore.getOptions().getService(),
       Duration.ZERO);
 
   private static final Backfill BACKFILL_1 = Backfill.newBuilder()
@@ -144,7 +144,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   @AfterClass
   public static void tearDownClass() throws Exception {
     if (localDatastore != null) {
-      localDatastore.stop();
+      localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
     }
   }
 
@@ -171,8 +171,8 @@ public class BackfillResourceTest extends VersionedApiTest {
   @After
   public void tearDown() throws Exception {
     // clear datastore after each test
-    Datastore datastore = localDatastore.options().service();
-    KeyQuery query = Query.keyQueryBuilder().build();
+    Datastore datastore = localDatastore.getOptions().getService();
+    KeyQuery query = Query.newKeyQueryBuilder().build();
     final QueryResults<Key> keys = datastore.run(query);
     while (keys.hasNext()) {
       datastore.delete(keys.next());
