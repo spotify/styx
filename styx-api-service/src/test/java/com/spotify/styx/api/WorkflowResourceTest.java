@@ -60,7 +60,6 @@ import com.spotify.styx.storage.BigtableStorage;
 import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.net.URI;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import okio.ByteString;
@@ -78,7 +77,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   private Datastore datastore = localDatastore.options().service();
   private Connection bigtable = setupBigTableMockTable();
-  private AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
+  private AggregateStorage storage = new AggregateStorage(bigtable, datastore);
 
   public WorkflowResourceTest(Api.Version version) {
     super(WorkflowResource.BASE, version, "workflow-test");
@@ -489,7 +488,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
     Connection bigtable = mock(Connection.class);
     try {
       new BigtableMocker(bigtable)
-          .setNumFailures(0)
           .setupTable(BigtableStorage.EVENTS_TABLE_NAME)
           .finalizeMocking();
     } catch (IOException e) {

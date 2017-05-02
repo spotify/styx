@@ -20,7 +20,6 @@
 
 package com.spotify.styx.storage;
 
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
@@ -33,10 +32,10 @@ import com.spotify.styx.model.data.ExecStatus;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.state.Trigger;
 import java.io.IOException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import org.apache.hadoop.hbase.client.Connection;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -62,15 +61,15 @@ public class BigTableStorageTest {
 
   private BigtableStorage storage;
 
-  public void setUp(int numFailures) throws Exception {
-    Connection bigtable = setupBigTableMockTable(numFailures);
-    storage = new BigtableStorage(bigtable, Duration.ZERO);
+  @Before
+  public void setUp() throws Exception {
+    Connection bigtable = setupBigTableMockTable();
+    storage = new BigtableStorage(bigtable);
   }
 
-  private Connection setupBigTableMockTable(int numFailures) throws IOException {
+  private Connection setupBigTableMockTable() throws IOException {
     Connection bigtable = mock(Connection.class);
     new BigtableMocker(bigtable)
-        .setNumFailures(numFailures)
         .setupTable(BigtableStorage.EVENTS_TABLE_NAME)
         .finalizeMocking();
     return bigtable;
@@ -78,7 +77,6 @@ public class BigTableStorageTest {
 
   @Test
   public void shouldReturnExecutionDataForWorkflowInstance() throws Exception {
-    setUp(0);
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER), 0L, 0L));
     storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId", "img"), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI1), 2L, 2L));
@@ -95,7 +93,6 @@ public class BigTableStorageTest {
 
   @Test
   public void shouldReturnExecutionDataForWorkflow() throws Exception {
-    setUp(0);
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1), 0L, 0L));
     storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId1", "img1"), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI1), 2L, 2L));
@@ -127,7 +124,6 @@ public class BigTableStorageTest {
 
   @Test
   public void shouldPaginateExecutionDataForWorkflow() throws Exception {
-    setUp(0);
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1), 0L, 0L));
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2), 0L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI3, TRIGGER3), 0L, 3L));
@@ -141,7 +137,6 @@ public class BigTableStorageTest {
 
   @Test
   public void shouldLimitExecutionDataForWorkflow() throws Exception {
-    setUp(0);
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1), 0L, 0L));
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2), 0L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI3, TRIGGER3), 0L, 3L));
@@ -151,22 +146,5 @@ public class BigTableStorageTest {
 
     assertThat(workflowInstanceExecutionData.size(), is(1));
     assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).triggerId(), is("triggerId1"));
-  }
-
-  @Test
-  public void shouldProduceIOExceptionIfTooManyPutRetries() throws Exception {
-    setUp(BigtableStorage.MAX_BIGTABLE_RETRIES);
-
-    thrown.expect(IOException.class);
-    thrown.expectMessage(containsString("Something went wrong in performing put operation"));
-
-    storage.writeEvent(SequenceEvent.create(Event.success(WFI1), 1, 0));
-  }
-
-  @Test
-  public void shouldNotProduceIOExceptionIfPutRetrySucceeds() throws Exception {
-    setUp(BigtableStorage.MAX_BIGTABLE_RETRIES - 1);
-
-    storage.writeEvent(SequenceEvent.create(Event.success(WFI1), 1, 0));
   }
 }

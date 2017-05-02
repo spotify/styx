@@ -53,7 +53,6 @@ import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -83,8 +82,8 @@ public class StyxSchedulerServiceFixture {
   private static LocalDatastoreHelper localDatastore;
 
   private Datastore datastore = localDatastore.options().service();
-  private Connection bigtable = setupBigTableMockTable(0);
-  private AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
+  private Connection bigtable = setupBigTableMockTable();
+  private AggregateStorage storage = new AggregateStorage(bigtable, datastore);
   private DeterministicScheduler executor = new QuietDeterministicScheduler();
   private Consumer<Workflow> workflowChangeListener;
   private Consumer<Workflow> workflowRemoveListener;
@@ -342,11 +341,10 @@ public class StyxSchedulerServiceFixture {
     };
   }
 
-  private Connection setupBigTableMockTable(int numFailures) {
+  private Connection setupBigTableMockTable() {
     Connection bigtable = mock(Connection.class);
     try {
       new BigtableMocker(bigtable)
-          .setNumFailures(numFailures)
           .setupTable(BigtableStorage.EVENTS_TABLE_NAME)
           .finalizeMocking();
     } catch (IOException e) {

@@ -39,6 +39,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.bigtable.repackaged.com.google.common.collect.ImmutableList;
 import com.google.cloud.datastore.Datastore;
+import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
@@ -52,10 +53,8 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.net.URI;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -126,7 +125,7 @@ public class DatastoreStorageTest {
   @Before
   public void setUp() throws Exception {
     Datastore datastore = helper.options().service();
-    storage = new DatastoreStorage(datastore, Duration.ZERO);
+    storage = new DatastoreStorage(datastore);
   }
 
   @After
@@ -313,13 +312,13 @@ public class DatastoreStorageTest {
     assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
   }
 
-  @Test(expected = ResourceNotFoundException.class)
+  @Test(expected = DatastoreException.class)
   public void shouldNotSetDockerImageWhenComponentDoesNotExist() throws Exception {
     WorkflowState state = patchDockerImage(DOCKER_IMAGE_COMPONENT);
     storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id().componentId(), state);
   }
 
-  @Test(expected = ResourceNotFoundException.class)
+  @Test(expected = DatastoreException.class)
   public void shouldNotSetDockerImageWhenWorkflowDoesNotExist() throws Exception {
     storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id(), patchDockerImage(DOCKER_IMAGE_WORKFLOW));
   }

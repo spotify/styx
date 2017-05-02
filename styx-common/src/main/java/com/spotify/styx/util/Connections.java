@@ -21,6 +21,7 @@
 package com.spotify.styx.util;
 
 import com.google.cloud.bigtable.hbase.BigtableConfiguration;
+import com.google.cloud.bigtable.hbase.BigtableOptionsFactory;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreOptions;
 import com.typesafe.config.Config;
@@ -65,10 +66,8 @@ public final class Connections {
     LOG.info("Creating Bigtable connection for project:{}, instance:{}",
              projectId, instanceId);
 
-    final Configuration bigtableConfiguration = new Configuration();
-    bigtableConfiguration.set("google.bigtable.project.id", projectId);
-    bigtableConfiguration.set("google.bigtable.instance.id", instanceId);
-    bigtableConfiguration.setBoolean("google.bigtable.rpc.use.timeouts", true);
+    final Configuration bigtableConfiguration = BigtableConfiguration.configure(projectId, instanceId);
+    bigtableConfiguration.setBoolean(BigtableOptionsFactory.BIGTABLE_USE_TIMEOUTS_KEY, true);
 
     return BigtableConfiguration.connect(bigtableConfiguration);
   }
