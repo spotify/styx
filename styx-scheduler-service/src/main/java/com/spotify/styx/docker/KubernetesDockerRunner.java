@@ -49,15 +49,19 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.TriggerUtil;
+import io.fabric8.kubernetes.api.model.ContainerBuilder;
 import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.EnvVarBuilder;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
-import io.fabric8.kubernetes.api.model.PodFluent;
 import io.fabric8.kubernetes.api.model.PodList;
-import io.fabric8.kubernetes.api.model.PodSpecFluent;
+import io.fabric8.kubernetes.api.model.PodSpecBuilder;
 import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.SecretBuilder;
+import io.fabric8.kubernetes.api.model.SecretVolumeSource;
+import io.fabric8.kubernetes.api.model.SecretVolumeSourceBuilder;
+import io.fabric8.kubernetes.api.model.Volume;
+import io.fabric8.kubernetes.api.model.VolumeBuilder;
 import io.fabric8.kubernetes.api.model.VolumeMount;
 import io.fabric8.kubernetes.api.model.VolumeMountBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
@@ -224,59 +228,67 @@ class KubernetesDockerRunner implements DockerRunner {
         : runSpec.imageName() + ":latest";
 
     final String podName = STYX_RUN + "-" + UUID.randomUUID().toString();
-    final List<EnvVar> env = buildEnv(workflowInstance, runSpec, podName);
 
     final PodBuilder podBuilder = new PodBuilder()
         .withNewMetadata()
         .withName(podName)
         .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
-        .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION, String.valueOf(runSpec.terminationLogging()))
+        .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION,
+                          String.valueOf(runSpec.terminationLogging()))
         .endMetadata();
-    final PodFluent.SpecNested<PodBuilder> spec = podBuilder.withNewSpec().withRestartPolicy("Never");
-    final PodSpecFluent.ContainersNested<PodFluent.SpecNested<PodBuilder>> container = spec
-        .addNewContainer()
-            .withName(STYX_RUN)
-            .withImage(imageWithTag)
-            .withArgs(runSpec.args())
-            .withEnv(env);
+
+    final PodSpecBuilder specBuilder = new PodSpecBuilder()
+        .withRestartPolicy("Never");
+
+    final ContainerBuilder containerBuilder = new ContainerBuilder()
+        .withName(STYX_RUN)
+        .withImage(imageWithTag)
+        .withArgs(runSpec.args())
+        .withEnv(buildEnv(workflowInstance, runSpec, podName));
 
     if (runSpec.serviceAccount().isPresent()) {
-      spec.addNewVolume()
-          .withName(STYX_WORKFLOW_SA_SECRET_NAME)
-          .withNewSecret()
+      final SecretVolumeSource saVolumeSource = new SecretVolumeSourceBuilder()
           .withSecretName(buildSecretName(runSpec.serviceAccount().get()))
-          .endSecret()
-          .endVolume();
-      container
-          .addToVolumeMounts(new VolumeMountBuilder()
-              .withMountPath(STYX_WORKFLOW_SA_SECRET_MOUNT_PATH)
-              .withName(STYX_WORKFLOW_SA_SECRET_NAME)
-              .withReadOnly(true)
-              .build())
-          // TODO: do we need set this env as default value?
-          .addToEnv(
-              envVar(STYX_WORKFLOW_SA_ENV_VARIABLE,
-                     STYX_WORKFLOW_SA_SECRET_MOUNT_PATH + STYX_WORKFLOW_SA_JSON_KEY));
+          .build();
+      final Volume saVolume = new VolumeBuilder()
+          .withName(STYX_WORKFLOW_SA_SECRET_NAME)
+          .withSecret(saVolumeSource)
+          .build();
+      specBuilder.addToVolumes(saVolume);
+
+      final VolumeMount saMount = new VolumeMountBuilder()
+          .withMountPath(STYX_WORKFLOW_SA_SECRET_MOUNT_PATH)
+          .withName(saVolume.getName())
+          .withReadOnly(true)
+          .build();
+      containerBuilder.addToVolumeMounts(saMount);
+      // TODO: do we need set this env as default value?
+      containerBuilder.addToEnv(envVar(STYX_WORKFLOW_SA_ENV_VARIABLE,
+                                       saMount.getMountPath() + STYX_WORKFLOW_SA_JSON_KEY));
     }
 
     if (runSpec.secret().isPresent()) {
       final WorkflowConfiguration.Secret secret = runSpec.secret().get();
-      spec.addNewVolume()
-          .withName(secret.name())
-          .withNewSecret()
+      final SecretVolumeSource secretVolumeSource = new SecretVolumeSourceBuilder()
           .withSecretName(secret.name())
-          .endSecret()
-          .endVolume();
+          .build();
+      final Volume secretVolume = new VolumeBuilder()
+          .withName(secret.name())
+          .withSecret(secretVolumeSource)
+          .build();
+      specBuilder.addToVolumes(secretVolume);
+
       final VolumeMount secretMount = new VolumeMountBuilder()
           .withMountPath(secret.mountPath())
           .withName(secret.name())
           .withReadOnly(true)
           .build();
-      container.addToVolumeMounts(secretMount);
+      containerBuilder.addToVolumeMounts(secretMount);
     }
-    container.endContainer();
+    specBuilder.addToContainers(containerBuilder.build());
+    podBuilder.withSpec(specBuilder.build());
 
-    return spec.endSpec().build();
+    return podBuilder.build();
   }
 
   private static EnvVar envVar(String name, String value) {
