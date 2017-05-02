@@ -179,6 +179,8 @@ class PrettyCliOutput implements CliOutput {
     System.out.println("   Commit: " + state.commitSha().orElse(""));
     System.out.println("    Image: " + image);
     System.out.println("     Args: " + wf.configuration().dockerArgs().orElse(Collections.emptyList()));
+    System.out.println("   Secret: " + wf.configuration().secret().map(s -> s.name() + ':' + s.mountPath()).orElse(""));
+    System.out.println(" Svc Acct: " + wf.configuration().serviceAccount().orElse(""));
   }
 
   private Ansi getAnsiForState(RunStateDataPayload.RunStateData RunStateData) {
