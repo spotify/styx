@@ -87,7 +87,7 @@
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-test</artifactId>
-      <version>1.0.12-SNAPSHOT</version>
+      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>

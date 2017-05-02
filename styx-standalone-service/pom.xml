@@ -19,17 +19,17 @@
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-api-service</artifactId>
-      <version>1.0.12-SNAPSHOT</version>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-scheduler-service</artifactId>
-      <version>1.0.12-SNAPSHOT</version>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-local-files-source</artifactId>
-      <version>1.0.12-SNAPSHOT</version>
+      <version>${project.version}</version>
     </dependency>
 
     <dependency>
