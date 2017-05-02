@@ -192,6 +192,32 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
+  public void shouldMountSecret() throws IOException, StateManager.IsClosed {
+    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET);
+    assertThat(pod.getSpec().getVolumes().size(), is(1));
+    assertThat(pod.getSpec().getVolumes().get(0).getName(),
+               is(RUN_SPEC_WITH_SECRET.secret().get().name()));
+    assertThat(pod.getSpec().getContainers().get(0).getVolumeMounts().get(0).getMountPath(),
+               is(RUN_SPEC_WITH_SECRET.secret().get().mountPath()));
+    assertThat(pod.getSpec().getContainers().get(0).getVolumeMounts().get(0).getName(),
+               is(RUN_SPEC_WITH_SECRET.secret().get().name()));
+  }
+
+  @Test
+  public void shouldMountServiceAccount() throws IOException, StateManager.IsClosed {
+    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
+    assertThat(pod.getSpec().getVolumes().size(), is(1));
+    assertThat(pod.getSpec().getVolumes().get(0).getName(),
+               is(KubernetesDockerRunner.STYX_WORKFLOW_SA_SECRET_NAME));
+    assertThat(pod.getSpec().getContainers().size(), is(1));
+    assertThat(
+        pod.getSpec().getContainers().get(0).getEnv().stream()
+            .anyMatch(e -> e.getName()
+                .equals(KubernetesDockerRunner.STYX_WORKFLOW_SA_ENV_VARIABLE)),
+        is(true));
+  }
+
+  @Test
   public void shouldRunIfSecretExists() throws IOException, StateManager.IsClosed {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(new SecretBuilder().build());
