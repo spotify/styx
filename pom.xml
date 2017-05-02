@@ -215,18 +215,23 @@
       </dependency>
       <dependency>
         <groupId>com.google.cloud</groupId>
-        <artifactId>gcloud-java-datastore</artifactId>
-        <version>0.2.8</version>
+        <artifactId>google-cloud-datastore</artifactId>
+        <version>1.0.0</version>
       </dependency>
       <dependency>
         <groupId>com.google.cloud.bigtable</groupId>
-        <artifactId>bigtable-hbase-1.1</artifactId>
-        <version>0.9.5.1</version>
+        <artifactId>bigtable-hbase-1.2</artifactId>
+        <version>0.9.6.2</version>
       </dependency>
       <dependency>
         <groupId>io.netty</groupId>
         <artifactId>netty-tcnative-boringssl-static</artifactId>
         <version>1.1.33.Fork19</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.api</groupId>
+        <artifactId>api-common</artifactId>
+        <version>1.0.0</version>
       </dependency>
 
       <!-- test libs -->
@@ -338,12 +343,12 @@
       <dependency>
         <groupId>com.google.auth</groupId>
         <artifactId>google-auth-library-credentials</artifactId>
-        <version>0.4.0</version>
+        <version>0.6.1</version>
       </dependency>
       <dependency>
         <groupId>com.google.auth</groupId>
         <artifactId>google-auth-library-oauth2-http</artifactId>
-        <version>0.4.0</version>
+        <version>0.6.1</version>
       </dependency>
       <dependency>
         <groupId>com.google.http-client</groupId>
@@ -353,17 +358,17 @@
       <dependency>
         <groupId>org.json</groupId>
         <artifactId>json</artifactId>
-        <version>20151123</version>
+        <version>20160810</version>
       </dependency>
       <dependency>
         <groupId>com.google.protobuf</groupId>
         <artifactId>protobuf-java</artifactId>
-        <version>3.0.2</version>
+        <version>3.2.0</version>
       </dependency>
       <dependency>
         <groupId>com.google.api</groupId>
         <artifactId>gax</artifactId>
-        <version>0.0.16</version>
+        <version>1.0.0</version>
       </dependency>
       <dependency>
         <groupId>com.google.code.findbugs</groupId>

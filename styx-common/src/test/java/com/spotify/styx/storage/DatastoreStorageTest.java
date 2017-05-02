@@ -119,21 +119,25 @@ public class DatastoreStorageTest {
   @AfterClass
   public static void tearDownClass() throws Exception {
     if (helper != null) {
-      helper.stop();
+      try {
+        helper.stop(org.threeten.bp.Duration.ofSeconds(30));
+      } catch (Throwable e) {
+        e.printStackTrace();
+      }
     }
   }
 
   @Before
   public void setUp() throws Exception {
-    Datastore datastore = helper.options().service();
+    Datastore datastore = helper.getOptions().getService();
     storage = new DatastoreStorage(datastore, Duration.ZERO);
   }
 
   @After
   public void tearDown() throws Exception {
     // clear datastore after each test
-    Datastore datastore = helper.options().service();
-    KeyQuery query = Query.keyQueryBuilder().build();
+    Datastore datastore = helper.getOptions().getService();
+    KeyQuery query = Query.newKeyQueryBuilder().build();
     final QueryResults<Key> keys = datastore.run(query);
     while (keys.hasNext()) {
       datastore.delete(keys.next());
@@ -487,8 +491,8 @@ public class DatastoreStorageTest {
   }
 
   private List<Entity> entitiesOfKind(String kind) {
-    Datastore datastore = helper.options().service();
-    EntityQuery query = Query.entityQueryBuilder().kind(kind).build();
+    Datastore datastore = helper.getOptions().getService();
+    EntityQuery query = Query.newEntityQueryBuilder().setKind(kind).build();
     QueryResults<Entity> keys = datastore.run(query);
     List<Entity> entities = new ArrayList<>();
     while (keys.hasNext()) {
@@ -530,10 +534,10 @@ public class DatastoreStorageTest {
 
   @Test
   public void getsGlobalDockerRunnerId() throws Exception {
-    Entity config = Entity.builder(storage.globalConfigKey)
+    Entity config = Entity.newBuilder(storage.globalConfigKey)
         .set(DatastoreStorage.PROPERTY_CONFIG_DOCKER_RUNNER_ID, "foobar")
         .build();
-    helper.options().service().put(config);
+    helper.getOptions().getService().put(config);
 
     assertThat(storage.globalDockerRunnerId(), is("foobar"));
   }
@@ -545,20 +549,20 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldReturnEmptyClientBlacklist() {
-    Entity config = Entity.builder(storage.globalConfigKey)
+    Entity config = Entity.newBuilder(storage.globalConfigKey)
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
             ImmutableList.of()).build();
-    helper.options().service().put(config);
+    helper.getOptions().getService().put(config);
     assertTrue(storage.clientBlacklist().get().isEmpty());
   }
 
   @Test
   public void shouldReturnClientBlacklist() {
-    Entity config = Entity.builder(storage.globalConfigKey)
+    Entity config = Entity.newBuilder(storage.globalConfigKey)
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
             ImmutableList.of(StringValue.of("v1"), StringValue.of("v2"), StringValue.of("v3")))
         .build();
-    helper.options().service().put(config);
+    helper.getOptions().getService().put(config);
     List<String> blacklist = storage.clientBlacklist().get();
     assertThat(blacklist.size(), is(3));
     assertThat(blacklist.get(0), is("v1"));

@@ -22,10 +22,10 @@ package com.spotify.styx.storage;
 
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
+import com.google.cloud.Timestamp;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.DatastoreReader;
-import com.google.cloud.datastore.DateTime;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
@@ -125,8 +125,8 @@ class DatastoreStorage {
     this.datastore = Objects.requireNonNull(datastore);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
 
-    this.componentKeyFactory = datastore.newKeyFactory().kind(KIND_COMPONENT);
-    this.globalConfigKey = datastore.newKeyFactory().kind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
+    this.componentKeyFactory = datastore.newKeyFactory().setKind(KIND_COMPONENT);
+    this.globalConfigKey = datastore.newKeyFactory().setKind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
   }
 
   private String readConfigString(String property, String defaultValue) {
@@ -181,7 +181,7 @@ class DatastoreStorage {
   }
 
   Set<WorkflowId> enabled() throws IOException {
-    final EntityQuery queryWorkflows = EntityQuery.entityQueryBuilder().kind(KIND_WORKFLOW).build();
+    final EntityQuery queryWorkflows = EntityQuery.newEntityQueryBuilder().setKind(KIND_WORKFLOW).build();
     final QueryResults<Entity> result = datastore.run(queryWorkflows);
 
     final Set<WorkflowId> enabledWorkflows = Sets.newHashSet();
@@ -207,7 +207,7 @@ class DatastoreStorage {
 
       final Entity retrievedComponent = transaction.get(componentKey);
       if (retrievedComponent == null) {
-        transaction.put(Entity.builder(componentKey).build());
+        transaction.put(Entity.newBuilder(componentKey).build());
       }
 
       final Key workflowKey = workflowKey(workflow.id());
@@ -244,9 +244,9 @@ class DatastoreStorage {
       }
 
       final Entity.Builder builder = Entity
-          .builder(workflowOpt.get())
-          .set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToDatetime(triggerSpec.instant()))
-          .set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, instantToDatetime(triggerSpec.offsetInstant()));
+          .newBuilder(workflowOpt.get())
+          .set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToTimestamp(triggerSpec.instant()))
+          .set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, instantToTimestamp(triggerSpec.offsetInstant()));
       return transaction.put(builder.build());
     }));
   }
@@ -263,8 +263,8 @@ class DatastoreStorage {
       }
 
       final Entity.Builder builder = Entity
-          .builder(workflowOpt.get())
-          .set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToDatetime(instant));
+          .newBuilder(workflowOpt.get())
+          .set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToTimestamp(instant));
       return transaction.put(builder.build());
     }));
   }
@@ -272,7 +272,7 @@ class DatastoreStorage {
   public Map<Workflow, TriggerInstantSpec> workflowsWithNextNaturalTrigger() throws IOException {
     final Map<Workflow, TriggerInstantSpec> map = Maps.newHashMap();
     final EntityQuery query =
-        Query.entityQueryBuilder().kind(KIND_WORKFLOW).build();
+        Query.newEntityQueryBuilder().setKind(KIND_WORKFLOW).build();
     final QueryResults<Entity> result = datastore.run(query);
 
     while (result.hasNext()) {
@@ -281,12 +281,12 @@ class DatastoreStorage {
       try {
         workflow = OBJECT_MAPPER.readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
       } catch (IOException e) {
-        LOG.warn("Failed to read workflow {}.", entity.key());
+        LOG.warn("Failed to read workflow {}.", entity.getKey());
         continue;
       }
 
       if (entity.contains(PROPERTY_NEXT_NATURAL_TRIGGER)) {
-        Instant instant = datetimeToInstant(entity.getDateTime(PROPERTY_NEXT_NATURAL_TRIGGER));
+        Instant instant = timestampToInstant(entity.getTimestamp(PROPERTY_NEXT_NATURAL_TRIGGER));
         final Instant triggerInstant;
 
         // todo: this check is only needed during a transition period
@@ -298,7 +298,7 @@ class DatastoreStorage {
           }
           triggerInstant = workflow.configuration().addOffset(instant);
         } else {
-          triggerInstant = datetimeToInstant(entity.getDateTime(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER));
+          triggerInstant = timestampToInstant(entity.getTimestamp(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER));
         }
 
         map.put(workflow, TriggerInstantSpec.create(instant, triggerInstant));
@@ -309,15 +309,15 @@ class DatastoreStorage {
 
   Map<WorkflowInstance, Long> allActiveStates() throws IOException {
     final EntityQuery query =
-        Query.entityQueryBuilder().kind(KIND_ACTIVE_WORKFLOW_INSTANCE).build();
+        Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE).build();
 
     return queryActiveStates(query);
   }
 
   Map<WorkflowInstance, Long> activeStates(String componentId) throws IOException {
     final EntityQuery query =
-        Query.entityQueryBuilder().kind(KIND_ACTIVE_WORKFLOW_INSTANCE)
-            .filter(PropertyFilter.eq(PROPERTY_COMPONENT, componentId))
+        Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE)
+            .setFilter(PropertyFilter.eq(PROPERTY_COMPONENT, componentId))
             .build();
 
     return queryActiveStates(query);
@@ -340,7 +340,7 @@ class DatastoreStorage {
   void writeActiveState(WorkflowInstance workflowInstance, long counter) throws IOException {
     storeWithRetries(() -> {
       final Key key = activeWorkflowInstanceKey(workflowInstance);
-      final Entity entity = Entity.builder(key)
+      final Entity entity = Entity.newBuilder(key)
           .set(PROPERTY_COMPONENT, workflowInstance.workflowId().componentId())
           .set(PROPERTY_WORKFLOW, workflowInstance.workflowId().id())
           .set(PROPERTY_PARAMETER, workflowInstance.parameter())
@@ -367,14 +367,14 @@ class DatastoreStorage {
             String.format("%s:%s doesn't exist.", workflowId.componentId(), workflowId.id()));
       }
 
-      final Entity.Builder builder = Entity.builder(workflowOpt.get());
+      final Entity.Builder builder = Entity.newBuilder(workflowOpt.get());
       state.enabled().ifPresent(x -> builder.set(PROPERTY_WORKFLOW_ENABLED, x));
       state.dockerImage().ifPresent(x -> builder.set(PROPERTY_DOCKER_IMAGE, x));
       state.commitSha().ifPresent(x -> builder.set(PROPERTY_COMMIT_SHA, x));
       state.nextNaturalTrigger()
-          .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToDatetime(x)));
+          .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToTimestamp(x)));
       state.nextNaturalOffsetTrigger()
-          .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, instantToDatetime(x)));
+          .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, instantToTimestamp(x)));
       return transaction.put(builder.build());
     }));
   }
@@ -387,7 +387,7 @@ class DatastoreStorage {
         throw new ResourceNotFoundException(String.format("%s doesn't exist.", componentId));
       }
 
-      final Entity.Builder builder = Entity.builder(componentOpt.get());
+      final Entity.Builder builder = Entity.newBuilder(componentOpt.get());
       state.dockerImage().ifPresent(x -> builder.set(PROPERTY_DOCKER_IMAGE, x));
       state.commitSha().ifPresent(x -> builder.set(PROPERTY_COMMIT_SHA, x));
 
@@ -482,14 +482,14 @@ class DatastoreStorage {
 
   private Key workflowKey(WorkflowId workflowId) {
     return datastore.newKeyFactory()
-        .ancestors(PathElement.of(KIND_COMPONENT, workflowId.componentId()))
-        .kind(KIND_WORKFLOW)
+        .addAncestor(PathElement.of(KIND_COMPONENT, workflowId.componentId()))
+        .setKind(KIND_WORKFLOW)
         .newKey(workflowId.id());
   }
 
   private Key activeWorkflowInstanceKey(WorkflowInstance workflowInstance) {
     return datastore.newKeyFactory()
-        .kind(KIND_ACTIVE_WORKFLOW_INSTANCE)
+        .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE)
         .newKey(workflowInstance.toKey());
   }
 
@@ -502,8 +502,8 @@ class DatastoreStorage {
   }
 
   private WorkflowId parseWorkflowId(Entity workflow) {
-    final String componentId = workflow.key().ancestors().get(0).name();
-    final String id = workflow.key().name();
+    final String componentId = workflow.getKey().getAncestors().get(0).getName();
+    final String id = workflow.getKey().getName();
 
     return WorkflowId.create(componentId, id);
   }
@@ -562,7 +562,7 @@ class DatastoreStorage {
                                                 String property) {
     return entity
         .filter(w -> w.contains(property))
-        .map(workflow -> datetimeToInstant(workflow.getDateTime(property)));
+        .map(workflow -> timestampToInstant(workflow.getTimestamp(property)));
   }
 
   /**
@@ -574,24 +574,24 @@ class DatastoreStorage {
    */
   private Entity.Builder asBuilderOrNew(Optional<Entity> entityOpt, Key key) {
     return entityOpt
-        .map(c -> Entity.builder(c))
-        .orElse(Entity.builder(key));
+        .map(c -> Entity.newBuilder(c))
+        .orElse(Entity.newBuilder(key));
   }
 
   void setEnabled(WorkflowId workflowId1, boolean enabled) throws IOException {
     patchState(workflowId1, WorkflowState.patchEnabled(enabled));
   }
 
-  private static DateTime instantToDatetime(Instant instant) {
-    return DateTime.copyFrom(Date.from(instant));
+  private static Timestamp instantToTimestamp(Instant instant) {
+    return Timestamp.of(Date.from(instant));
   }
 
-  private static Instant datetimeToInstant(DateTime dateTime) {
-    return dateTime.toDate().toInstant();
+  private static Instant timestampToInstant(Timestamp ts) {
+    return Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos());
   }
 
   Optional<Resource> getResource(String id) {
-    Entity entity = datastore.get(datastore.newKeyFactory().kind(KIND_RESOURCE).newKey(id));
+    Entity entity = datastore.get(datastore.newKeyFactory().setKind(KIND_RESOURCE).newKey(id));
     if (entity == null) {
       return Optional.empty();
     }
@@ -603,7 +603,7 @@ class DatastoreStorage {
   }
 
   List<Resource> getResources() {
-    final EntityQuery query = Query.entityQueryBuilder().kind(KIND_RESOURCE).build();
+    final EntityQuery query = Query.newEntityQueryBuilder().setKind(KIND_RESOURCE).build();
     final QueryResults<Entity> results = datastore.run(query);
     final ImmutableList.Builder<Resource> resources = ImmutableList.builder();
     while (results.hasNext()) {
@@ -613,18 +613,18 @@ class DatastoreStorage {
   }
 
   private Resource entityToResource(Entity entity) {
-    return Resource.create(entity.key().name(), entity.getLong(PROPERTY_CONCURRENCY));
+    return Resource.create(entity.getKey().getName(), entity.getLong(PROPERTY_CONCURRENCY));
   }
 
   private Entity resourceToEntity(Resource resource) {
-    final Key key = datastore.newKeyFactory().kind(KIND_RESOURCE).newKey(resource.id());
-    return Entity.builder(key)
+    final Key key = datastore.newKeyFactory().setKind(KIND_RESOURCE).newKey(resource.id());
+    return Entity.newBuilder(key)
         .set(PROPERTY_CONCURRENCY, resource.concurrency())
         .build();
   }
 
   void deleteResource(String id) throws IOException {
-    final Key key = datastore.newKeyFactory().kind(KIND_RESOURCE).newKey(id);
+    final Key key = datastore.newKeyFactory().setKind(KIND_RESOURCE).newKey(id);
     storeWithRetries(() -> {
       datastore.delete(key);
       return null;
@@ -632,7 +632,7 @@ class DatastoreStorage {
   }
 
   Optional<Backfill> getBackfill(String id) {
-    final Entity entity = datastore.get(datastore.newKeyFactory().kind(KIND_BACKFILL).newKey(id));
+    final Entity entity = datastore.get(datastore.newKeyFactory().setKind(KIND_BACKFILL).newKey(id));
     if (entity == null) {
       return Optional.empty();
     }
@@ -640,7 +640,7 @@ class DatastoreStorage {
   }
 
   private EntityQuery.Builder backfillQueryBuilder(boolean showAll, Filter... filters) {
-    final EntityQuery.Builder queryBuilder = Query.entityQueryBuilder().kind(KIND_BACKFILL);
+    final EntityQuery.Builder queryBuilder = Query.newEntityQueryBuilder().setKind(KIND_BACKFILL);
 
     final List<Filter> andedFilters = Lists.newArrayList(filters);
 
@@ -652,7 +652,7 @@ class DatastoreStorage {
     if (!andedFilters.isEmpty()) {
       final Filter head = andedFilters.get(0);
       final Filter[] tail = andedFilters.stream().skip(1).toArray(Filter[]::new);
-      queryBuilder.filter(CompositeFilter.and(head, tail));
+      queryBuilder.setFilter(CompositeFilter.and(head, tail));
     }
 
     return queryBuilder;
@@ -700,12 +700,12 @@ class DatastoreStorage {
                                                     entity.getString(PROPERTY_WORKFLOW));
 
     return Backfill.newBuilder()
-        .id(entity.key().name())
-        .start(datetimeToInstant(entity.getDateTime(PROPERTY_START)))
-        .end(datetimeToInstant(entity.getDateTime(PROPERTY_END)))
+        .id(entity.getKey().getName())
+        .start(timestampToInstant(entity.getTimestamp(PROPERTY_START)))
+        .end(timestampToInstant(entity.getTimestamp(PROPERTY_END)))
         .workflowId(workflowId)
         .concurrency((int) entity.getLong(PROPERTY_CONCURRENCY))
-        .nextTrigger(datetimeToInstant(entity.getDateTime(PROPERTY_NEXT_TRIGGER)))
+        .nextTrigger(timestampToInstant(entity.getTimestamp(PROPERTY_NEXT_TRIGGER)))
         .schedule(Schedule.parse(entity.getString(PROPERTY_SCHEDULE)))
         .allTriggered(entity.getBoolean(PROPERTY_ALL_TRIGGERED))
         .halted(entity.getBoolean(PROPERTY_HALTED))
@@ -717,16 +717,16 @@ class DatastoreStorage {
   }
 
   private Entity backfillToEntity(Backfill backfill) {
-    final Key key = datastore.newKeyFactory().kind(KIND_BACKFILL).newKey(backfill.id());
+    final Key key = datastore.newKeyFactory().setKind(KIND_BACKFILL).newKey(backfill.id());
 
-    Entity.Builder builder = Entity.builder(key)
+    Entity.Builder builder = Entity.newBuilder(key)
         .set(PROPERTY_CONCURRENCY, backfill.concurrency())
-        .set(PROPERTY_START, instantToDatetime(backfill.start()))
-        .set(PROPERTY_END, instantToDatetime(backfill.end()))
+        .set(PROPERTY_START, instantToTimestamp(backfill.start()))
+        .set(PROPERTY_END, instantToTimestamp(backfill.end()))
         .set(PROPERTY_COMPONENT, backfill.workflowId().componentId())
         .set(PROPERTY_WORKFLOW, backfill.workflowId().id())
         .set(PROPERTY_SCHEDULE, backfill.schedule().toString())
-        .set(PROPERTY_NEXT_TRIGGER, instantToDatetime(backfill.nextTrigger()))
+        .set(PROPERTY_NEXT_TRIGGER, instantToTimestamp(backfill.nextTrigger()))
         .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())
         .set(PROPERTY_HALTED, backfill.halted());
 

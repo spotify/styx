@@ -82,7 +82,7 @@ public class StyxSchedulerServiceFixture {
 
   private static LocalDatastoreHelper localDatastore;
 
-  private Datastore datastore = localDatastore.options().service();
+  private Datastore datastore = localDatastore.getOptions().getService();
   private Connection bigtable = setupBigTableMockTable(0);
   private AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
   private DeterministicScheduler executor = new QuietDeterministicScheduler();
@@ -111,7 +111,11 @@ public class StyxSchedulerServiceFixture {
   @AfterClass
   public static void tearDownClass() throws Exception {
     if (localDatastore != null) {
-      localDatastore.stop();
+      try {
+        localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
+      } catch (Throwable e) {
+        e.printStackTrace();
+      }
     }
   }
 
@@ -144,8 +148,8 @@ public class StyxSchedulerServiceFixture {
     serviceHelper.close();
 
     // clear datastore after each test
-    Datastore datastore = localDatastore.options().service();
-    KeyQuery query = Query.keyQueryBuilder().build();
+    Datastore datastore = localDatastore.getOptions().getService();
+    KeyQuery query = Query.newKeyQueryBuilder().build();
     final QueryResults<Key> keys = datastore.run(query);
     while (keys.hasNext()) {
       datastore.delete(keys.next());

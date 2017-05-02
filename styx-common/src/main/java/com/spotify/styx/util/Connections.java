@@ -51,11 +51,11 @@ public final class Connections {
     LOG.info("Creating Datastore connection for project:{}, namespace:{}",
              projectId, namespace);
 
-    return DatastoreOptions.builder()
-        .namespace(namespace)
-        .projectId(projectId)
+    return DatastoreOptions.newBuilder()
+        .setNamespace(namespace)
+        .setProjectId(projectId)
         .build()
-        .service();
+        .getService();
   }
 
   public static Connection createBigTableConnection(Config config) {
