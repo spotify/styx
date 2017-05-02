@@ -24,6 +24,7 @@ import static com.spotify.styx.api.Middlewares.auditLogging;
 import static com.spotify.styx.api.Middlewares.clientValidator;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
+import static com.spotify.styx.util.Connections.createFallbackBigTableConnection;
 import static java.util.Objects.requireNonNull;
 
 import com.google.cloud.datastore.Datastore;
@@ -168,7 +169,9 @@ public class StyxApi implements AppInit {
     final Closer closer = environment.closer();
 
     final Connection bigTable = closer.register(createBigTableConnection(config));
+    final Optional<Connection> fallback = createFallbackBigTableConnection(config);
+    fallback.ifPresent(closer::register);
     final Datastore datastore = createDatastore(config);
-    return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
+    return new AggregateStorage(bigTable, fallback, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
   }
 }

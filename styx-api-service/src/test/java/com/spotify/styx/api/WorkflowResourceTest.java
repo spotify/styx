@@ -78,7 +78,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   private Datastore datastore = localDatastore.options().service();
   private Connection bigtable = setupBigTableMockTable();
-  private AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
+  private AggregateStorage storage = new AggregateStorage(bigtable, empty(), datastore, Duration.ZERO);
 
   public WorkflowResourceTest(Api.Version version) {
     super(WorkflowResource.BASE, version, "workflow-test");

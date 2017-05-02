@@ -87,6 +87,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   private AggregateStorage storage = new AggregateStorage(
       bigtable,
+      empty(),
       localDatastore.options().service(),
       Duration.ZERO);
 
