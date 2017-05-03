@@ -32,6 +32,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -289,6 +290,32 @@ public class KubernetesDockerRunnerTest {
     kdr.init();
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
     stateManager.receive(Event.started(WORKFLOW_INSTANCE));
+  }
+
+  @Test
+  public void shouldNotRunIfSecretHasManagedServiceAccountKeySecretNamePrefix() throws StateManager.IsClosed, IOException {
+    stateManager.receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)));
+    stateManager.receive(Event.success(WORKFLOW_INSTANCE));
+    kdr.close();
+
+    // Start a new runner
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
+    StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
+    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
+    kdr.init();
+
+    final String secret = "styx-wf-sa-keys-foo";
+
+    exception.expect(InvalidExecutionException.class);
+    exception.expectMessage("Referenced secret '" + secret + "' has the managed service account key secret name prefix");
+    kdr.start(WORKFLOW_INSTANCE, RunSpec.create("busybox",
+        ImmutableList.of(),
+        false,
+        Optional.of(WorkflowConfiguration.Secret.create(secret, "/foo/bar")),
+        Optional.empty(),
+        empty()));
+
+    verify(pods, never()).create(any(Pod.class));
   }
 
   @Test
