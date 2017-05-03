@@ -89,6 +89,7 @@ public abstract class WorkflowConfiguration {
         .dockerArgs(workflowConfiguration.dockerArgs())
         .dockerTerminationLogging(workflowConfiguration.dockerTerminationLogging())
         .secret(Secret.create(workflowConfiguration.secret()))
+        .resources(workflowConfiguration.resources())
         .build();
   }
 
