@@ -80,14 +80,16 @@ public abstract class WorkflowConfiguration {
         resources == null ? Collections.emptyList() : resources);
   }
 
-  public static com.spotify.styx.model.WorkflowConfiguration create(WorkflowConfiguration workflowConfiguration) {
-    return com.spotify.styx.model.WorkflowConfiguration
-        .create(workflowConfiguration.id(), workflowConfiguration.partitioning(), Optional.empty(),
-                workflowConfiguration.dockerImage(), workflowConfiguration.dockerArgs(),
-                Optional.of(workflowConfiguration.dockerTerminationLogging()),
-                Secret.create(workflowConfiguration.secret()),
-                Optional.empty(),
-                workflowConfiguration.resources());
+  public static com.spotify.styx.model.WorkflowConfiguration create(
+      WorkflowConfiguration workflowConfiguration) {
+    return com.spotify.styx.model.WorkflowConfiguration.builder()
+        .id(workflowConfiguration.id())
+        .schedule(workflowConfiguration.partitioning())
+        .dockerImage(workflowConfiguration.dockerImage())
+        .dockerArgs(workflowConfiguration.dockerArgs())
+        .dockerTerminationLogging(workflowConfiguration.dockerTerminationLogging())
+        .secret(Secret.create(workflowConfiguration.secret()))
+        .build();
   }
 
   public static WorkflowConfiguration create(
@@ -118,10 +120,15 @@ public abstract class WorkflowConfiguration {
       return new AutoValue_WorkflowConfiguration_Secret(name, mountPath);
     }
 
+    public static com.spotify.styx.model.WorkflowConfiguration.Secret create(
+        Secret secret) {
+      return com.spotify.styx.model.WorkflowConfiguration.Secret.create(
+          secret.name(), secret.mountPath());
+    }
+
     public static Optional<com.spotify.styx.model.WorkflowConfiguration.Secret> create(
         Optional<Secret> secret) {
-      return secret.map(
-          s -> com.spotify.styx.model.WorkflowConfiguration.Secret.create(s.name(), s.mountPath()));
+      return secret.map(Secret::create);
     }
   }
 }

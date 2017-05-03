@@ -23,14 +23,13 @@ package com.spotify.styx.state.handlers;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.state.RunState.State.SUBMITTING;
-import static java.util.Collections.emptyList;
-import static java.util.Optional.empty;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
@@ -169,16 +168,12 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldFallbackToDockerImageInScheduleDefinition() throws Exception {
-    WorkflowConfiguration workflowConfiguration = WorkflowConfiguration.create(
-        "styx.TestEndpoint",
-        HOURS,
-        empty(),
-        Optional.of("legacy-docker-image"),
-        Optional.of(Lists.newArrayList("foo", "bar")),
-        empty(),
-        empty(),
-        empty(),
-        emptyList());
+    WorkflowConfiguration workflowConfiguration = WorkflowConfiguration.builder()
+        .id("styx.TestEndpoint")
+        .schedule(HOURS)
+        .dockerImage("legacy-docker-image")
+        .dockerArgs(ImmutableList.of("foo", "bar"))
+        .build();
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
@@ -196,15 +191,10 @@ public class ExecutionDescriptionHandlerTest {
   }
 
   private WorkflowConfiguration schedule(String... args) {
-    return WorkflowConfiguration.create(
-        "styx.TestEndpoint",
-        HOURS,
-        empty(),
-        Optional.empty(),
-        Optional.of(Lists.newArrayList(args)),
-        empty(),
-        empty(),
-        empty(),
-        emptyList());
+    return WorkflowConfiguration.builder()
+        .id("styx.TestEndpoint")
+        .schedule(HOURS)
+        .dockerArgs(ImmutableList.copyOf(args))
+        .build();
   }
 }

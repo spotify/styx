@@ -20,38 +20,32 @@
 
 package com.spotify.styx.model;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.auto.value.AutoValue;
+import com.spotify.styx.model.Schedule.WellKnown;
 import com.spotify.styx.util.TimeUtil;
+import io.norberg.automatter.AutoMatter;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import org.codehaus.jackson.annotate.JsonIgnore;
 
 /**
  * A specification of a scheduled workflow
  */
-@AutoValue
+@AutoMatter
 @JsonIgnoreProperties(ignoreUnknown = true)
-public abstract class WorkflowConfiguration {
+public interface WorkflowConfiguration {
 
-  @JsonProperty
-  public abstract String id();
+  String id();
 
-  @JsonProperty
-  public abstract Schedule schedule();
+  Schedule schedule();
 
-  @JsonProperty
-  public abstract Optional<String> offset();
+  Optional<String> offset();
 
-  @JsonProperty
-  public abstract Optional<String> dockerImage();
+  Optional<String> dockerImage();
 
-  @JsonProperty
-  public abstract Optional<List<String>> dockerArgs();
+  Optional<List<String>> dockerArgs();
 
   /**
    * Toggles behavior to reliably report exit status from the Docker container, via
@@ -60,44 +54,30 @@ public abstract class WorkflowConfiguration {
    * <p>Ideally this should be unneeded, but mere exitCode is known to sometimes spuriously
    * return 0 when in fact the container has been killed. See https://github.com/kubernetes/kubernetes/issues/41516
    */
-  @JsonProperty
-  public abstract boolean dockerTerminationLogging();
+  boolean dockerTerminationLogging();
 
-  @JsonProperty
-  public abstract Optional<Secret> secret();
+  Optional<Secret> secret();
 
-  @JsonProperty
-  public abstract Optional<String> serviceAccount();
+  Optional<String> serviceAccount();
 
-  @JsonProperty
-  public abstract List<String> resources();
+  List<String> resources();
 
-  @JsonCreator
-  public static WorkflowConfiguration create(
-      @JsonProperty("id") String id,
-      @JsonProperty("schedule") Schedule schedule,
-      @JsonProperty("offset") Optional<String> offset,
-      @JsonProperty("docker_image") Optional<String> dockerImage,
-      @JsonProperty("docker_args") Optional<List<String>> dockerArgs,
-      @JsonProperty("docker_termination_logging") Optional<Boolean> dockerTerminationLogging,
-      @JsonProperty("secret") Optional<Secret> secret,
-      @JsonProperty("service_account") Optional<String> serviceAccount,
-      @JsonProperty("resources") List<String> resources) {
-
-    return new AutoValue_WorkflowConfiguration(
-        id, schedule, offset, dockerImage, dockerArgs,
-        dockerTerminationLogging.orElse(false), secret, serviceAccount,
-        resources == null ? Collections.emptyList() : resources);
-  }
-
-  public Instant addOffset(Instant next) {
+  default Instant addOffset(Instant next) {
     final String offset = offset().orElseGet(this::defaultOffset);
 
     return TimeUtil.addOffset(next.atZone(ZoneOffset.UTC), offset).toInstant();
   }
 
-  private String defaultOffset() {
-    switch (schedule().wellKnown()) {
+  default String defaultOffset() {
+    return defaultOffset(schedule());
+  }
+
+  default String defaultOffset(Schedule schedule) {
+    return defaultOffset(schedule.wellKnown());
+  }
+
+  default String defaultOffset(WellKnown schedule) {
+    switch (schedule) {
       case HOURLY:
         return "PT1H";
       case DAILY:
@@ -114,22 +94,28 @@ public abstract class WorkflowConfiguration {
     }
   }
 
-  @AutoValue
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  public abstract static class Secret {
-
-    @JsonProperty
-    public abstract String name();
-
-    @JsonProperty
-    public abstract String mountPath();
-
-    @JsonCreator
-    public static Secret create(
-        @JsonProperty("name") String name,
-        @JsonProperty("mount_path") String mountPath) {
-      return new AutoValue_WorkflowConfiguration_Secret(name, mountPath);
-    }
+  static WorkflowConfigurationBuilder builder() {
+    return new WorkflowConfigurationBuilder();
   }
 
+  @AutoMatter
+  interface Secret {
+
+    String name();
+
+    String mountPath();
+
+    static Secret create(
+        String name,
+        String mountPath) {
+      return builder()
+          .name(name)
+          .mountPath(mountPath)
+          .build();
+    }
+
+    static SecretBuilder builder() {
+      return new SecretBuilder();
+    }
+  }
 }

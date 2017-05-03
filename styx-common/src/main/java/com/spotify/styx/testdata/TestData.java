@@ -24,11 +24,9 @@ import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.model.Schedule.MONTHS;
 import static com.spotify.styx.model.Schedule.WEEKS;
-import static java.util.Arrays.asList;
-import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
-import static java.util.Optional.of;
 
+import com.google.common.collect.ImmutableList;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
@@ -56,29 +54,38 @@ public final class TestData {
       WorkflowInstance.create(WORKFLOW_ID, "2016-09-01");
 
   public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION =
-      WorkflowConfiguration.create(
-          "styx.TestEndpoint", HOURS, empty(), empty(), empty(), empty(), empty(), empty(),
-          emptyList());
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .schedule(HOURS)
+          .build();
 
   public static final WorkflowConfiguration DAILY_WORKFLOW_CONFIGURATION =
-      WorkflowConfiguration.create(
-          "styx.TestEndpoint", DAYS, empty(), empty(), empty(), empty(), empty(), empty(),
-          emptyList());
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .schedule(DAYS)
+          .build();
 
   public static final WorkflowConfiguration WEEKLY_WORKFLOW_CONFIGURATION =
-      WorkflowConfiguration.create(
-          "styx.TestEndpoint", WEEKS, empty(), empty(), empty(), empty(), empty(), empty(),
-          emptyList());
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .schedule(WEEKS)
+          .build();
 
   public static final WorkflowConfiguration MONTHLY_WORKFLOW_CONFIGURATION =
-      WorkflowConfiguration.create(
-          "styx.TestEndpoint", MONTHS, empty(), empty(), empty(), empty(), empty(), empty(),
-          emptyList());
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .schedule(MONTHS)
+          .build();
+
 
   public static final WorkflowConfiguration FULL_WORKFLOW_CONFIGURATION =
-      WorkflowConfiguration.create(
-          "styx.TestEndpoint", DAYS, empty(), of("busybox"), of(asList("x", "y")), of(false),
-          of(Secret.create("name", "/path")), empty(), emptyList());
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .schedule(DAYS)
+          .dockerImage("busybox")
+          .dockerArgs(ImmutableList.of("x", "y"))
+          .secret(Secret.create("name", "/path"))
+          .build();
 
   public static final ExecutionDescription EXECUTION_DESCRIPTION =
       ExecutionDescription.create(

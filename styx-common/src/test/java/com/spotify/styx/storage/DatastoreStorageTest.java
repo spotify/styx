@@ -26,7 +26,6 @@ import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.model.WorkflowState.patchDockerImage;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
-import static java.util.Collections.emptyList;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -83,19 +82,21 @@ public class DatastoreStorageTest {
   private static final WorkflowId WORKFLOW_ID_WITH_DOCKER_IMG = WorkflowId.create("dockerComp", "dockerEndpoint");
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_EMPTY_CONF =
-      WorkflowConfiguration.create(
-          WORKFLOW_ID_NO_DOCKER_IMG.id(), DAYS, empty(), empty(), empty(), empty(), empty(), empty(),
-          emptyList());
+      WorkflowConfiguration.builder()
+          .id(WORKFLOW_ID_NO_DOCKER_IMG.id())
+          .schedule(DAYS)
+          .build();
+
   private static final Optional<String> DOCKER_IMAGE = of("busybox");
   private static final String DOCKER_IMAGE_COMPONENT = "busybox:component";
   private static final String DOCKER_IMAGE_WORKFLOW = "busybox:workflow";
   private static final String COMMIT_SHA = "dcee675978b4d89e291bb695d0ca7deaf05d2a32";
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_WITH_DOCKER_IMAGE =
-      WorkflowConfiguration.create(
-          WORKFLOW_ID_WITH_DOCKER_IMG.id(), DAYS, empty(), DOCKER_IMAGE, empty(), empty(), empty(),
-          empty(), emptyList());
-  private static final Workflow
-      WORKFLOW_NO_DOCKER_IMAGE =
+      WorkflowConfiguration.builder()
+          .id(WORKFLOW_ID_WITH_DOCKER_IMG.id())
+          .schedule(DAYS)
+          .build();
+  private static final Workflow WORKFLOW_NO_DOCKER_IMAGE =
       Workflow.create(WORKFLOW_ID_NO_DOCKER_IMG.componentId(), URI.create("http://foo"),
                       WORKFLOW_CONFIGURATION_EMPTY_CONF);
   private static final Workflow
@@ -239,9 +240,10 @@ public class DatastoreStorageTest {
     storage.store(Workflow.create(
         WORKFLOW_ID1.componentId(),
         URI.create("http://foo"),
-        WorkflowConfiguration
-            .create(WORKFLOW_ID1.id(), DAYS, empty(), empty(), empty(), empty(), empty(), empty(),
-                    emptyList())));
+        WorkflowConfiguration.builder()
+            .id(WORKFLOW_ID1.id())
+            .schedule(DAYS)
+            .build()));
     storage.patchState(WORKFLOW_ID1, patchDockerImage(DOCKER_IMAGE_WORKFLOW));
     Optional<String> retrieved = storage.getDockerImage(WORKFLOW_ID1);
 
@@ -253,9 +255,10 @@ public class DatastoreStorageTest {
     storage.store(Workflow.create(
         WORKFLOW_ID1.componentId(),
         URI.create("http://foo"),
-        WorkflowConfiguration
-            .create(WORKFLOW_ID1.id(), DAYS, empty(), empty(), empty(), empty(), empty(), empty(),
-                    emptyList())));
+        WorkflowConfiguration.builder()
+            .id(WORKFLOW_ID1.id())
+            .schedule(DAYS)
+            .build()));
     storage.patchState(WORKFLOW_ID1, WorkflowState.builder().commitSha(COMMIT_SHA).build());
     WorkflowState retrieved = storage.workflowState(WORKFLOW_ID1);
 
@@ -506,9 +509,10 @@ public class DatastoreStorageTest {
     storage.store(Workflow.create(
         WORKFLOW_ID1.componentId(),
         URI.create("http://not/important"),
-        WorkflowConfiguration
-            .create(WORKFLOW_ID1.id(), DAYS, empty(), empty(), empty(), empty(), empty(), empty(),
-                    emptyList())));
+        WorkflowConfiguration.builder()
+            .id(WORKFLOW_ID1.id())
+            .schedule(DAYS)
+            .build()));
     Instant instant = Instant.parse("2016-03-14T14:00:00Z");
     Instant offset = instant.plus(1, ChronoUnit.DAYS);
     TriggerInstantSpec spec = TriggerInstantSpec.create(instant, offset);
@@ -574,8 +578,9 @@ public class DatastoreStorageTest {
     return Workflow.create(
         workflowId.componentId(),
         URI.create("http://foo"),
-        WorkflowConfiguration
-            .create(workflowId.id(), HOURS, empty(), empty(), empty(), empty(), empty(), empty(),
-                    emptyList()));
+        WorkflowConfiguration.builder()
+            .id(workflowId.id())
+            .schedule(HOURS)
+            .build());
   }
 }

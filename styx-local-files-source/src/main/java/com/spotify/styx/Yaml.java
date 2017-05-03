@@ -27,6 +27,7 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.norberg.automatter.jackson.AutoMatterModule;
 import java.io.IOException;
 
 class Yaml {
@@ -35,7 +36,8 @@ class Yaml {
       .setPropertyNamingStrategy(PropertyNamingStrategy.SNAKE_CASE)
       .enable(ACCEPT_SINGLE_VALUE_AS_ARRAY)
       .registerModule(new Jdk8Module())
-      .registerModule(new JavaTimeModule());
+      .registerModule(new JavaTimeModule())
+      .registerModule(new AutoMatterModule());
 
   private Yaml() {
   }

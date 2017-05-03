@@ -24,7 +24,6 @@ import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.belongsToFamily;
 import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.api.JsonMatchers.assertNoJson;
-import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
@@ -71,7 +70,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collections;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -156,19 +154,22 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void setUp() throws Exception {
     storage.storeWorkflow(Workflow.create(
         BACKFILL_1.workflowId().componentId(), URI.create("http://example.com"),
-        WorkflowConfiguration.create(BACKFILL_1.workflowId().id(), Schedule.HOURS,
-                                     empty(), empty(), empty(), empty(),
-                                     empty(), empty(), Collections.emptyList())));
+        WorkflowConfiguration.builder()
+            .id(BACKFILL_1.workflowId().id())
+            .schedule(Schedule.HOURS)
+            .build()));
     storage.storeWorkflow(Workflow.create(
         BACKFILL_2.workflowId().componentId(), URI.create("http://example.com"),
-        WorkflowConfiguration.create(BACKFILL_2.workflowId().id(), Schedule.HOURS,
-                                     empty(), empty(), empty(), empty(),
-                                     empty(), empty(), Collections.emptyList())));
+        WorkflowConfiguration.builder()
+            .id(BACKFILL_2.workflowId().id())
+            .schedule(Schedule.HOURS)
+            .build()));
     storage.storeWorkflow(Workflow.create(
         BACKFILL_3.workflowId().componentId(), URI.create("http://example.com"),
-        WorkflowConfiguration.create(BACKFILL_3.workflowId().id(), Schedule.HOURS,
-                                     empty(), empty(), empty(), empty(),
-                                     empty(), empty(), Collections.emptyList())));
+        WorkflowConfiguration.builder()
+            .id(BACKFILL_3.workflowId().id())
+            .schedule(Schedule.HOURS)
+            .build()));
     storage.storeBackfill(BACKFILL_1);
   }
 
