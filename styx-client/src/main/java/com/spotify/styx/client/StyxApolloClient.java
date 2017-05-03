@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableList;
+import com.google.common.net.HostAndPort;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.Response;
@@ -51,6 +52,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import okio.ByteString;
@@ -66,13 +68,13 @@ class StyxApolloClient implements StyxClient {
       "Styx Client " + StyxApolloClient.class.getPackage().getImplementationVersion();
   private static final int TTL_SECONDS = 90;
 
-  private final String apiHost;
+  private final HostAndPort apiHost;
   private final Client client;
 
   StyxApolloClient(final Client client,
                    final String apiHost) {
-    this.apiHost = apiHost;
-    this.client = client;
+    this.apiHost = HostAndPort.fromString(apiHost).withDefaultPort(80);
+    this.client = Objects.requireNonNull(client, "client");
   }
 
   @Override
@@ -351,7 +353,8 @@ class StyxApolloClient implements StyxClient {
   private HttpUrl.Builder getUrlBuilder() {
     return new HttpUrl.Builder()
         .scheme("http")
-        .host(apiHost)
+        .host(apiHost.getHostText())
+        .port(apiHost.getPort())
         .addPathSegment("api")
         .addPathSegment(STYX_API_VERSION);
   }
