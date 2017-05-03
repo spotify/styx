@@ -293,7 +293,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldNotRunIfSecretReferencesServiceAccountKeyNamespace() throws StateManager.IsClosed, IOException {
+  public void shouldNotRunIfSecretHasManagedServiceAccountKeySecretNamePrefix() throws StateManager.IsClosed, IOException {
     stateManager.receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)));
     stateManager.receive(Event.success(WORKFLOW_INSTANCE));
     kdr.close();
@@ -304,12 +304,14 @@ public class KubernetesDockerRunnerTest {
     stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
     kdr.init();
 
+    final String secret = "styx-wf-sa-keys-foo";
+
     exception.expect(InvalidExecutionException.class);
-    exception.expectMessage("Referenced secret 'styx-wf-sa-keys-foo' is in the managed service account key namespace");
+    exception.expectMessage("Referenced secret '" + secret + "' has the managed service account key secret name prefix");
     kdr.start(WORKFLOW_INSTANCE, RunSpec.create("busybox",
         ImmutableList.of(),
         false,
-        Optional.of(WorkflowConfiguration.Secret.create("styx-wf-sa-keys-foo", "/foo/bar")),
+        Optional.of(WorkflowConfiguration.Secret.create(secret, "/foo/bar")),
         Optional.empty(),
         empty()));
 
