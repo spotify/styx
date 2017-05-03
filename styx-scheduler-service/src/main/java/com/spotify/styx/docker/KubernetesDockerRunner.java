@@ -107,7 +107,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
   private static final String STYX_WORKFLOW_SA_JSON_KEY = "styx-wf-sa.json";
   private static final String STYX_WORKFLOW_SA_P12_KEY = "styx-wf-sa.p12";
-  private static final String STYX_WORKFLOW_SA_SECRET_MOUNT_PATH =
+  static final String STYX_WORKFLOW_SA_SECRET_MOUNT_PATH =
       "/etc/" + STYX_WORKFLOW_SA_SECRET_NAME + "/";
 
   private static final ThreadFactory THREAD_FACTORY = new ThreadFactoryBuilder()
@@ -166,6 +166,15 @@ class KubernetesDockerRunner implements DockerRunner {
         throw new InvalidExecutionException(
             "Referenced secret '" + specSecret.name() + "' has the managed service account key secret name prefix");
       }
+
+      // if it ever happens, that feels more like a hack than pure luck so let's be paranoid
+      if (STYX_WORKFLOW_SA_SECRET_MOUNT_PATH.equals(specSecret.mountPath())) {
+        LOG.error("[AUDIT] Workflow {} tries to mount secret {} to the reserved path",
+                  workflowInstance.workflowId(), specSecret.name());
+        throw new InvalidExecutionException(
+            STYX_WORKFLOW_SA_SECRET_MOUNT_PATH + " is a reserved mount path");
+      }
+
       final Secret secret = client.secrets().withName(specSecret.name()).get();
       if (secret == null) {
         LOG.error("[AUDIT] Workflow {} refers to a non-existent secret {}",
@@ -187,8 +196,8 @@ class KubernetesDockerRunner implements DockerRunner {
     final String serviceAccount = runSpec.serviceAccount().get();
 
     // Check that the service account exists
-    final boolean serviceAccountExists = !serviceAccountKeyManager.serviceAccountExists(serviceAccount);
-    if (serviceAccountExists) {
+    final boolean serviceAccountExists = serviceAccountKeyManager.serviceAccountExists(serviceAccount);
+    if (!serviceAccountExists) {
       LOG.error("[AUDIT] Workflow {} refers to non-existent service account {}", workflowInstance.workflowId(),
           serviceAccount);
       throw new InvalidExecutionException("Referenced service account '" + serviceAccount + "' was not found");
