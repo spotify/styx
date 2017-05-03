@@ -102,6 +102,12 @@ public class KubernetesDockerRunnerTest {
                                                                  empty(),
                                                                  Optional.of(SERVICE_ACCOUNT),
                                                                  empty());
+  private static final RunSpec RUN_SPEC_WITH_SECRET_AND_SA = RunSpec.create("busybox",
+                                                                            ImmutableList.copyOf(new String[0]),
+                                                                            false,
+                                                                            Optional.of(WorkflowConfiguration.Secret.create("secret1", KubernetesDockerRunner.STYX_WORKFLOW_SA_SECRET_MOUNT_PATH)),
+                                                                            Optional.of(SERVICE_ACCOUNT),
+                                                                            empty());
 
   @Mock NamespacedKubernetesClient k8sClient;
 
@@ -189,6 +195,24 @@ public class KubernetesDockerRunnerTest {
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
     kdr.init();
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET);
+  }
+
+  @Test(expected = InvalidExecutionException.class)
+  public void shouldThrowIfMountToReservedPath() throws IOException, StateManager.IsClosed {
+    when(secrets.withName(any(String.class))).thenReturn(namedResource);
+    when(namedResource.get()).thenReturn(null);
+    when(k8sClient.secrets()).thenReturn(secrets);
+    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET_AND_SA);
+    when(pods.create(any(Pod.class))).thenReturn(createdPod);
+
+    stateManager.receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)));
+    stateManager.receive(Event.success(WORKFLOW_INSTANCE));
+    kdr.close();
+
+    // Start a new runner
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
+    kdr.init();
+    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET_AND_SA);
   }
 
   @Test
