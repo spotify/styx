@@ -172,7 +172,8 @@ class KubernetesDockerRunner implements DockerRunner {
         LOG.error("[AUDIT] Workflow {} tries to mount secret {} to the reserved path",
                   workflowInstance.workflowId(), specSecret.name());
         throw new InvalidExecutionException(
-            STYX_WORKFLOW_SA_SECRET_MOUNT_PATH + " is a reserved mount path");
+            "Referenced secret '" + specSecret.name() + "' has the mount path "
+            + STYX_WORKFLOW_SA_SECRET_MOUNT_PATH + " defined that is reserved");
       }
 
       final Secret secret = client.secrets().withName(specSecret.name()).get();
@@ -200,7 +201,7 @@ class KubernetesDockerRunner implements DockerRunner {
     if (!serviceAccountExists) {
       LOG.error("[AUDIT] Workflow {} refers to non-existent service account {}", workflowInstance.workflowId(),
           serviceAccount);
-      throw new InvalidExecutionException("Referenced service account '" + serviceAccount + "' was not found");
+      throw new InvalidExecutionException("Referenced service account " + serviceAccount + " was not found");
     }
 
     final String secretName = buildSecretName(serviceAccount);
