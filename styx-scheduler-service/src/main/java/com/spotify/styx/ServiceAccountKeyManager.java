@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.model.CreateServiceAccountKeyRequest;
 import com.google.api.services.iam.v1.model.ServiceAccountKey;
@@ -41,6 +42,33 @@ public class ServiceAccountKeyManager {
   public ServiceAccountKey createP12Key(String serviceAccount) throws IOException {
     return createKey(serviceAccount, new CreateServiceAccountKeyRequest()
         .setPrivateKeyType("TYPE_PKCS12_FILE"));
+  }
+
+  public boolean serviceAccountExists(String serviceAccount) throws IOException {
+    try {
+      iam.projects().serviceAccounts().get("projects/-/serviceAccounts/" + serviceAccount)
+          .execute();
+      return true;
+    } catch (GoogleJsonResponseException e) {
+      if (e.getStatusCode() == 404) {
+        return false;
+      }
+      throw e;
+    }
+  }
+
+  public boolean keyExists(String keyName) throws IOException {
+    try {
+      iam.projects().serviceAccounts().keys()
+          .get(keyName)
+          .execute();
+      return true;
+    } catch (GoogleJsonResponseException e) {
+      if (e.getStatusCode() == 404) {
+        return false;
+      }
+      throw e;
+    }
   }
 
   private ServiceAccountKey createKey(String serviceAccount,
