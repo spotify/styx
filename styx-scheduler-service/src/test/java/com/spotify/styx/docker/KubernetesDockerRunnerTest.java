@@ -375,7 +375,7 @@ public class KubernetesDockerRunnerTest {
     kdr.init();
 
     exception.expect(InvalidExecutionException.class);
-    exception.expectMessage("Referenced service account '" + SERVICE_ACCOUNT + "' was not found");
+    exception.expectMessage("Referenced service account " + SERVICE_ACCOUNT + " was not found");
 
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
   }
