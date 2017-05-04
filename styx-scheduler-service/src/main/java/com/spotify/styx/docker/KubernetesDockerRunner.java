@@ -101,7 +101,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
   private static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
   static final String STYX_WORKFLOW_SA_ENV_VARIABLE = "GOOGLE_APPLICATION_CREDENTIALS";
-  private static final String STYX_WORKFLOW_SA_SECRET_ANNOTATION = "styx-wf-sa";
+  private static final String STYX_WORKFLOW_SA_ID_ANNOTATION = "styx-wf-sa";
   private static final String STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION = "styx-wf-sa-json-key-name";
   private static final String STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION = "styx-wf-sa-p12-key-name";
   static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
@@ -206,8 +206,8 @@ class KubernetesDockerRunner implements DockerRunner {
 
     final String secretName = buildSecretName(serviceAccount);
 
-    LOG.info("[AUDIT] Workflow {} refers to secret {} of {}", workflowInstance.workflowId(), secretName,
-        serviceAccount);
+    LOG.info("[AUDIT] Workflow {} refers to secret {} storing keys of {}",
+             workflowInstance.workflowId(), secretName, serviceAccount);
 
     // TODO: shard locking to regain concurrency
     synchronized (secretMutationLock) {
@@ -215,12 +215,11 @@ class KubernetesDockerRunner implements DockerRunner {
       // Check if we have a valid service account key secret already
       final Secret existingSecret = client.secrets().withName(secretName).get();
       if (existingSecret != null) {
-
         if (serviceAccountKeysExist(existingSecret)) {
           return;
         }
 
-        LOG.warn("[AUDIT] Service account keys have been deleted for {}, recreating",
+        LOG.info("[AUDIT] Service account keys have been deleted for {}, recreating",
             serviceAccount);
 
         // Need to delete this secret before creating a new one
@@ -246,7 +245,7 @@ class KubernetesDockerRunner implements DockerRunner {
       final Map<String, String> annotations = ImmutableMap.of(
           STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION, jsonKey.getName(),
           STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION, p12Key.getName(),
-          STYX_WORKFLOW_SA_SECRET_ANNOTATION, serviceAccount
+          STYX_WORKFLOW_SA_ID_ANNOTATION, serviceAccount
       );
 
       final Secret newSecret = new SecretBuilder()
@@ -259,11 +258,10 @@ class KubernetesDockerRunner implements DockerRunner {
 
       client.secrets().create(newSecret);
 
-      LOG.info("[AUDIT] Secret {} created for {} referred to by workflow {}",
+      LOG.info("[AUDIT] Secret {} created to store keys of {} referred by workflow {}",
           secretName, serviceAccount, workflowInstance.workflowId());
     }
   }
-
 
   private boolean serviceAccountKeysExist(Secret secret) {
     final Map<String, String> annotations = secret.getMetadata().getAnnotations();
