@@ -43,9 +43,12 @@ import static org.mockito.Mockito.when;
 import com.google.api.services.iam.v1.model.ServiceAccountKey;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
@@ -74,6 +77,7 @@ import io.fabric8.kubernetes.client.dsl.PodResource;
 import io.fabric8.kubernetes.client.dsl.Resource;
 import io.fabric8.kubernetes.client.dsl.Watchable;
 import java.io.IOException;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -122,6 +126,7 @@ public class KubernetesDockerRunnerTest {
   @Mock MixedOperation<Pod, PodList, DoneablePod, PodResource<Pod, DoneablePod>> pods;
   @Mock MixedOperation<Secret, SecretList, DoneableSecret, Resource<Secret, DoneableSecret>> secrets;
   @Mock Resource<Secret, DoneableSecret> namedResource;
+  @Mock SecretList secretList;
 
   @Mock PodList podList;
   @Mock ListMeta listMeta;
@@ -267,6 +272,52 @@ public class KubernetesDockerRunnerTest {
     kdr.init();
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET);
     stateManager.receive(Event.started(WORKFLOW_INSTANCE));
+  }
+
+  @Test
+  public void shouldCleanupServiceAccountSecrets() throws Exception {
+    final String jsonKeyId = "json-key";
+    final String p12KeyId = "p12-key";
+
+    final String jsonKeyName = keyName(SERVICE_ACCOUNT, jsonKeyId);
+    final String p12KeyName = keyName(SERVICE_ACCOUNT, p12KeyId);
+
+    final String jsonKeyData = "json-private-key-data";
+    final String p12KeyData = "p12-private-key-data";
+
+    final ObjectMeta metadata = new ObjectMeta();
+    metadata.setName("styx-wf-sa-keys");
+    metadata.setAnnotations(ImmutableMap.of(
+        "styx-wf-sa", SERVICE_ACCOUNT,
+        "styx-wf-sa-json-key-name", jsonKeyName,
+        "styx-wf-sa-p12-key-name", p12KeyName));
+
+    final Secret secret = new SecretBuilder()
+        .withMetadata(metadata)
+        .withData(ImmutableMap.of(
+            "styx-wf-sa.json", jsonKeyData,
+            "styx-wf-sa.p12", p12KeyData))
+        .build();
+
+    when(k8sClient.secrets()).thenReturn(secrets);
+    when(secrets.list()).thenReturn(secretList);
+    when(secretList.getItems()).thenReturn(ImmutableList.of(secret));
+
+    // Verify that a service account key secret in use is not deleted
+    kdr.cleanup(ImmutableSet.of(Workflow.create("cid", URI.create("http://foo/component"),
+        WorkflowConfiguration.builder()
+            .id("test")
+            .schedule(Schedule.DAYS)
+            .serviceAccount(SERVICE_ACCOUNT)
+            .build())));
+    verify(serviceAccountKeyManager, never()).deleteKey(anyString());
+    verify(secrets, never()).delete(any(Secret.class));
+
+    // Verify that an unused service account key secret is deleted
+    kdr.cleanup(ImmutableSet.of());
+    verify(serviceAccountKeyManager).deleteKey(jsonKeyName);
+    verify(serviceAccountKeyManager).deleteKey(p12KeyName);
+    verify(secrets).delete(secret);
   }
 
   @Test

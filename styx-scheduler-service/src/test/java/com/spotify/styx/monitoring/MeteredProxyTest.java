@@ -21,6 +21,7 @@
 package com.spotify.styx.monitoring;
 
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -75,7 +76,7 @@ public class MeteredProxyTest {
     DockerRunner mock = mock(DockerRunner.class);
     DockerRunner proxy = MeteredProxy.instrument(DockerRunner.class, mock, stats, time);
 
-    doThrow(new RuntimeException("with message")).when(mock).cleanup(any());
+    doThrow(new RuntimeException("with message")).when(mock).cleanup(anyString());
 
     expect.expect(RuntimeException.class);
     expect.expectMessage("with message");

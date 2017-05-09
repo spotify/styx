@@ -122,6 +122,7 @@ public class StyxScheduler implements AppInit {
 
   public static final int SCHEDULER_TICK_INTERVAL_SECONDS = 2;
   public static final int TRIGGER_MANAGER_TICK_INTERVAL_SECONDS = 1;
+  public static final int CLEANER_TICK_INTERVAL_SECONDS = 30;
   public static final int RUNTIME_CONFIG_UPDATE_INTERVAL_SECONDS = 5;
   public static final Duration DEFAULT_RETRY_BASE_DELAY = Duration.ofMinutes(3);
   public static final int DEFAULT_RETRY_MAX_EXPONENT = 4;
@@ -336,11 +337,14 @@ public class StyxScheduler implements AppInit {
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
         storage, trigger);
 
+    final Cleaner cleaner = new Cleaner(workflowCache, dockerRunner);
+
     restoreState(storage, outputHandlers, stateManager, dockerRunner);
     startTriggerManager(triggerManager, executor);
     startScheduleSources(environment, executor, workflowChangeListener, workflowRemoveListener);
     startScheduler(scheduler, executor);
     startRuntimeConfigUpdate(storage, executor, submissionRateLimiter);
+    startCleaner(cleaner, executor);
     setupMetrics(stateManager, workflowCache, storage, submissionRateLimiter, stats);
 
     final SchedulerResource schedulerResource = new SchedulerResource(stateManager, trigger,
@@ -426,8 +430,16 @@ public class StyxScheduler implements AppInit {
     }
   }
 
-  private static void startTriggerManager(TriggerManager triggerManager, ScheduledExecutorService exec) {
+  private static void startCleaner(Cleaner cleaner, ScheduledExecutorService exec) {
     exec.scheduleAtFixedRate(
+        guard(cleaner::tick),
+        CLEANER_TICK_INTERVAL_SECONDS,
+        CLEANER_TICK_INTERVAL_SECONDS,
+        TimeUnit.SECONDS);
+  }
+
+  private static void startTriggerManager(TriggerManager triggerManager, ScheduledExecutorService exec) {
+    exec.scheduleWithFixedDelay(
         guard(triggerManager::tick),
         TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
         TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,

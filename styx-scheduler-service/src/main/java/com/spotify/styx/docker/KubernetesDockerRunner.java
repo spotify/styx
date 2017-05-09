@@ -42,7 +42,9 @@ import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Message;
@@ -59,6 +61,7 @@ import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.PodSpecBuilder;
 import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.SecretBuilder;
+import io.fabric8.kubernetes.api.model.SecretList;
 import io.fabric8.kubernetes.api.model.SecretVolumeSource;
 import io.fabric8.kubernetes.api.model.SecretVolumeSourceBuilder;
 import io.fabric8.kubernetes.api.model.Volume;
@@ -84,6 +87,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
@@ -154,6 +159,38 @@ class KubernetesDockerRunner implements DockerRunner {
       return pod.getMetadata().getName();
     } catch (KubernetesClientException kce) {
       throw new IOException("Failed to create Kubernetes pod", kce);
+    }
+  }
+
+  @Override
+  public void cleanup(Set<Workflow> workflows) throws IOException {
+
+    final Set<String> activeServiceAccountEmails = workflows.stream()
+        .map(wf -> wf.configuration().serviceAccount())
+        .filter(Optional::isPresent).map(Optional::get)
+        .collect(toSet());
+
+    synchronized (secretMutationLock) {
+      final SecretList secrets = client.secrets().list();
+      final List<Secret> unusedServiceAccountKeySecrets = secrets.getItems().stream()
+          .filter(secret -> secret.getMetadata().getName().startsWith(STYX_WORKFLOW_SA_SECRET_NAME))
+          .filter(secret -> !activeServiceAccountEmails.contains(
+              secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_ID_ANNOTATION)))
+          .collect(Collectors.toList());
+
+      for (Secret secret : unusedServiceAccountKeySecrets) {
+        final String jsonKeyName = secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION);
+        final String p12KeyName = secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION);
+
+        LOG.info("[AUDIT] Deleting unused secret account key: {}", jsonKeyName);
+        serviceAccountKeyManager.deleteKey(jsonKeyName);
+
+        LOG.info("[AUDIT] Deleting unused secret account key: {}", p12KeyName);
+        serviceAccountKeyManager.deleteKey(p12KeyName);
+
+        LOG.info("[AUDIT] Deleting unused secret account key secret: {}", secret.getMetadata().getName());
+        client.secrets().delete(secret);
+      }
     }
   }
 
