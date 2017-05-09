@@ -53,7 +53,9 @@ public class KubernetesPodEventTranslatorTest {
       DockerRunner.RunSpec.simple("busybox");
   private static String MESSAGE_FORMAT = "{\"rfu\":{\"dum\":\"my\"},\"component_id\":\"dummy\",\"workflow_id\":\"dummy\",\"parameter\":\"dummy\",\"execution_id\":\"dummy\",\"event\":\"dummy\",\"exit_code\":%d}\n";
 
-  Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC);
+  private final static String SECRET_EPOCH = "4711";
+
+  Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC, SECRET_EPOCH);
 
   @Test
   public void terminateOnSuccessfulTermination() throws Exception {
@@ -333,6 +335,6 @@ public class KubernetesPodEventTranslatorTest {
     return KubernetesDockerRunner.createPod(
         WFI,
         DockerRunner.RunSpec.create("busybox", ImmutableList.of(), true,
-                                    Optional.empty(), Optional.empty(), Optional.empty()));
+                                    Optional.empty(), Optional.empty(), Optional.empty()), SECRET_EPOCH);
   }
 }

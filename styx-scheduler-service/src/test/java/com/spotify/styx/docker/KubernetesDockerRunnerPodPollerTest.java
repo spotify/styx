@@ -60,6 +60,7 @@ public class KubernetesDockerRunnerPodPollerTest {
       WorkflowInstance.create(TestData.WORKFLOW_ID_2, "bar");
   private static final DockerRunner.RunSpec RUN_SPEC =
       DockerRunner.RunSpec.simple("busybox");
+  private final static String SECRET_EPOCH = "4711";
 
   @Mock
   NamespacedKubernetesClient k8sClient;
@@ -87,7 +88,7 @@ public class KubernetesDockerRunnerPodPollerTest {
 
   @Test
   public void shouldSendRunErrorWhenPodForRunningWFIDoesntExist() throws Exception {
-    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC);
+    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_EPOCH);
     podList.setItems(Arrays.asList(createdPod));
     when(k8sClient.pods().list()).thenReturn(podList);
     setupActiveInstances(RunState.State.RUNNING);
@@ -100,8 +101,8 @@ public class KubernetesDockerRunnerPodPollerTest {
 
   @Test
   public void shouldNotSendRunErrorWhenPodForRunningWFIExists() throws Exception {
-    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC);
-    Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC);
+    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_EPOCH);
+    Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_EPOCH);
     podList.setItems(Arrays.asList(createdPod, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
     setupActiveInstances(RunState.State.RUNNING);
