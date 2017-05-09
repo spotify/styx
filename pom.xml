@@ -67,6 +67,11 @@
       <email>dano@spotify.com</email>
       <name>Daniel Norberg</name>
     </developer>
+    <developer>
+      <id>honnix</id>
+      <email>honnix@spotify.com</email>
+      <name>Hongxin Liang</name>
+    </developer>
   </developers>
 
   <scm>
