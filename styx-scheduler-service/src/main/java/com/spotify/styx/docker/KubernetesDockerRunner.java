@@ -182,8 +182,9 @@ class KubernetesDockerRunner implements DockerRunner {
         final String serviceAcountEmail = serviceAccountEmail(secret);
 
         try {
-          final String jsonKeyName = secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION);
-          final String p12KeyName = secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION);
+          final Map<String, String> annotations = secret.getMetadata().getAnnotations();
+          final String jsonKeyName = annotations.get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION);
+          final String p12KeyName = annotations.get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION);
 
           LOG.info("[AUDIT] Deleting unused service account key: {}", jsonKeyName);
           tryDeleteServiceAccountKey(jsonKeyName);
