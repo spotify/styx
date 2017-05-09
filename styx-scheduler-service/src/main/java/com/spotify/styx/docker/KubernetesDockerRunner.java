@@ -194,7 +194,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
           LOG.info("[AUDIT] Deleting unused service account {} secret {}", serviceAcountEmail, name);
           client.secrets().delete(secret);
-        } catch (IOException e) {
+        } catch (IOException | KubernetesClientException e) {
           LOG.warn("[AUDIT] Failed to delete unused service account {} keys and/or secret {}",
               serviceAcountEmail, name);
         }
