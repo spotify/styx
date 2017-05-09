@@ -134,8 +134,8 @@ public interface Storage {
   void updateNextNaturalTriggerOld(WorkflowId workflowId, Instant instant) throws IOException;
 
   /**
-   * Get all {@link Workflow}s with their respective nextNaturalTrigger,
-   * which is empty if it hasn't been initialized before.
+   * Get {@link Workflow}s with their respective nextNaturalTrigger. Only workflows that have a nextNaturalTrigger
+   * will be returned.
    */
   Map<Workflow, TriggerInstantSpec> workflowsWithNextNaturalTrigger() throws IOException;
 
