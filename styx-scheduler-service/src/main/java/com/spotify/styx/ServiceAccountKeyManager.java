@@ -79,4 +79,16 @@ public class ServiceAccountKeyManager {
         .execute();
   }
 
+  public void deleteKey(String keyName) throws IOException {
+    try {
+      iam.projects().serviceAccounts().keys()
+          .delete(keyName)
+          .execute();
+    } catch (GoogleJsonResponseException e) {
+      if (e.getStatusCode() == 404) {
+        return;
+      }
+      throw e;
+    }
+  }
 }
