@@ -25,6 +25,7 @@ import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.podStatus
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.running;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminated;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.waiting;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Optional.empty;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
@@ -48,12 +49,10 @@ import com.google.api.client.http.HttpResponseException.Builder;
 import com.google.api.services.iam.v1.model.ServiceAccountKey;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.hash.Hashing;
 import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Schedule;
-import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
@@ -83,7 +82,6 @@ import io.fabric8.kubernetes.client.dsl.PodResource;
 import io.fabric8.kubernetes.client.dsl.Resource;
 import io.fabric8.kubernetes.client.dsl.Watchable;
 import java.io.IOException;
-import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -289,17 +287,15 @@ public class KubernetesDockerRunnerTest {
     when(secretList.getItems()).thenReturn(ImmutableList.of(secret));
 
     // Verify that a service account key secret in use is not deleted
-    kdr.cleanup(ImmutableSet.of(Workflow.create("cid", URI.create("http://foo/component"),
-        WorkflowConfiguration.builder()
-            .id("test")
-            .schedule(Schedule.DAYS)
-            .serviceAccount(SERVICE_ACCOUNT)
-            .build())));
+    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
+    when(podList.getItems()).thenReturn(ImmutableList.of(pod));
+    kdr.cleanup();
     verify(serviceAccountKeyManager, never()).deleteKey(anyString());
     verify(secrets, never()).delete(any(Secret.class));
 
     // Verify that an unused service account key secret is deleted
-    kdr.cleanup(ImmutableSet.of());
+    when(podList.getItems()).thenReturn(ImmutableList.of());
+    kdr.cleanup();
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key"));
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key"));
     verify(secrets).delete(secret);
@@ -309,6 +305,7 @@ public class KubernetesDockerRunnerTest {
   public void shouldHandlePermissionDeniedErrorsWhenDeletingServiceAccountKeys() throws Exception {
     final Secret secret = fakeServiceAccountKeySecret(SERVICE_ACCOUNT, "json-key", "p12-key");
 
+    when(podList.getItems()).thenReturn(ImmutableList.of());
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
     when(secretList.getItems()).thenReturn(ImmutableList.of(secret));
@@ -319,7 +316,7 @@ public class KubernetesDockerRunnerTest {
         .set("status", "PERMISSION_DENIED"));
     doThrow(permissionDenied).when(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key"));
     doThrow(permissionDenied).when(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key"));
-    kdr.cleanup(ImmutableSet.of());
+    kdr.cleanup();
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key"));
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key"));
     verify(secrets).delete(secret);
@@ -331,6 +328,7 @@ public class KubernetesDockerRunnerTest {
     final Secret secret2 = fakeServiceAccountKeySecret(SERVICE_ACCOUNT, "json-key-2", "p12-key-2");
     final Secret secret3 = fakeServiceAccountKeySecret(SERVICE_ACCOUNT, "json-key-3", "p12-key-3");
 
+    when(podList.getItems()).thenReturn(ImmutableList.of());
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
     when(secretList.getItems()).thenReturn(ImmutableList.of(secret1, secret2, secret3));
@@ -339,7 +337,7 @@ public class KubernetesDockerRunnerTest {
     doThrow(new IOException("fail delete json-key-2")).when(serviceAccountKeyManager).deleteKey("json-key-2");
     doThrow(new IOException("fail delete p12-key-2")).when(serviceAccountKeyManager).deleteKey("p12-key-2");
 
-    kdr.cleanup(ImmutableSet.of());
+    kdr.cleanup();
 
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key-1"));
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key-1"));
@@ -359,7 +357,7 @@ public class KubernetesDockerRunnerTest {
     final String p12KeyName = keyName(serviceAccount, p12KeyId);
 
     final ObjectMeta metadata = new ObjectMeta();
-    metadata.setName("styx-wf-sa-keys");
+    metadata.setName("styx-wf-sa-keys-" + Hashing.sha256().hashString(serviceAccount, UTF_8));
     metadata.setAnnotations(ImmutableMap.of(
         "styx-wf-sa", serviceAccount,
         "styx-wf-sa-json-key-name", jsonKeyName,

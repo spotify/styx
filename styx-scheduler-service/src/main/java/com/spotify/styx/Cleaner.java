@@ -39,7 +39,7 @@ class Cleaner {
 
   void tick() {
     try {
-      dockerRunner.cleanup(workflowCache.all());
+      dockerRunner.cleanup();
     } catch (IOException e) {
       logger.warn("Docker runner cleanup failed", e);
     }

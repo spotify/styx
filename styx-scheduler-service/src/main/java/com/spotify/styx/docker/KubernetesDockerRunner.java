@@ -43,7 +43,6 @@ import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
@@ -54,6 +53,7 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.GcpUtil;
 import com.spotify.styx.util.TriggerUtil;
 import io.fabric8.kubernetes.api.model.ContainerBuilder;
+import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.EnvVarBuilder;
 import io.fabric8.kubernetes.api.model.Pod;
@@ -163,21 +163,25 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   @Override
-  public void cleanup(Set<Workflow> workflows) throws IOException {
-
-    final Set<String> activeServiceAccountEmails = workflows.stream()
-        .map(wf -> wf.configuration().serviceAccount())
-        .filter(Optional::isPresent).map(Optional::get)
-        .collect(toSet());
-
+  public void cleanup() throws IOException {
     synchronized (secretMutationLock) {
+
+      // Enumerate all secrets currently used by pods
+      final PodList pods = client.pods().list();
+      final Set<String> activeSecrets = pods.getItems().stream()
+          .flatMap(pod -> pod.getSpec().getVolumes().stream())
+          .map(volume -> volume.getSecret().getSecretName())
+          .collect(Collectors.toSet());
+
+      // Enumerate all service account secrets that are not in active use
       final SecretList secrets = client.secrets().list();
-      final List<Secret> unusedServiceAccountKeySecrets = secrets.getItems().stream()
+      final List<Secret> inactiveServiceAccountSecrets = secrets.getItems().stream()
           .filter(secret -> secret.getMetadata().getName().startsWith(STYX_WORKFLOW_SA_SECRET_NAME))
-          .filter(secret -> !activeServiceAccountEmails.contains(serviceAccountEmail(secret)))
+          .filter(secret -> !activeSecrets.contains(secret.getMetadata().getName()))
           .collect(Collectors.toList());
 
-      for (Secret secret : unusedServiceAccountKeySecrets) {
+      // Delete keys and secrets for all inactive service accounts and let them be recreated by future executions
+      for (Secret secret : inactiveServiceAccountSecrets) {
         final String name = secret.getMetadata().getName();
         final String serviceAcountEmail = serviceAccountEmail(secret);
 
@@ -186,16 +190,16 @@ class KubernetesDockerRunner implements DockerRunner {
           final String jsonKeyName = annotations.get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION);
           final String p12KeyName = annotations.get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION);
 
-          LOG.info("[AUDIT] Deleting unused service account key: {}", jsonKeyName);
+          LOG.info("[AUDIT] Deleting service account key: {}", jsonKeyName);
           tryDeleteServiceAccountKey(jsonKeyName);
 
-          LOG.info("[AUDIT] Deleting unused service account key: {}", p12KeyName);
+          LOG.info("[AUDIT] Deleting service account key: {}", p12KeyName);
           tryDeleteServiceAccountKey(p12KeyName);
 
-          LOG.info("[AUDIT] Deleting unused service account {} secret {}", serviceAcountEmail, name);
+          LOG.info("[AUDIT] Deleting service account {} secret {}", serviceAcountEmail, name);
           client.secrets().delete(secret);
         } catch (IOException | KubernetesClientException e) {
-          LOG.warn("[AUDIT] Failed to delete unused service account {} keys and/or secret {}",
+          LOG.warn("[AUDIT] Failed to delete service account {} keys and/or secret {}",
               serviceAcountEmail, name);
         }
       }
