@@ -359,7 +359,6 @@ public class KubernetesDockerRunnerTest {
     final GoogleJsonResponseException permissionDenied = new GoogleJsonResponseException(
         new Builder(403, "Forbidden", new HttpHeaders()), new GoogleJsonError()
         .set("status", "PERMISSION_DENIED"));
-    assertThat(GcpUtil.isPermissionDenied(permissionDenied), is(true));
     doThrow(permissionDenied).when(serviceAccountKeyManager).deleteKey(jsonKeyName);
     doThrow(permissionDenied).when(serviceAccountKeyManager).deleteKey(p12KeyName);
     kdr.cleanup(ImmutableSet.of());
