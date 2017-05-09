@@ -25,6 +25,7 @@ import static java.util.Optional.empty;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.spotify.styx.ServiceAccountKeyManager;
+import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
@@ -34,6 +35,7 @@ import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -60,6 +62,14 @@ public interface DockerRunner extends Closeable {
    * @return The execution id for the started workflow instance
    */
   String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException;
+
+  /**
+   * Perform cleanup for resources such as secrets etc. Resources that are not in use by any currently live workflows
+   * should be removed.
+   * @param workflows All currently live workflows.
+   */
+  default void cleanup(Set<Workflow> workflows) throws IOException {
+  }
 
   /**
    * Execute cleanup operations for when an execution finishes.
