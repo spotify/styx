@@ -32,6 +32,7 @@ import com.github.rholder.retry.Retryer;
 import com.github.rholder.retry.RetryerBuilder;
 import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.WaitStrategies;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.services.iam.v1.model.ServiceAccountKey;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
@@ -44,13 +45,13 @@ import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
-import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.util.GcpUtil;
 import com.spotify.styx.util.TriggerUtil;
 import io.fabric8.kubernetes.api.model.ContainerBuilder;
 import io.fabric8.kubernetes.api.model.EnvVar;
@@ -87,7 +88,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -174,24 +174,51 @@ class KubernetesDockerRunner implements DockerRunner {
       final SecretList secrets = client.secrets().list();
       final List<Secret> unusedServiceAccountKeySecrets = secrets.getItems().stream()
           .filter(secret -> secret.getMetadata().getName().startsWith(STYX_WORKFLOW_SA_SECRET_NAME))
-          .filter(secret -> !activeServiceAccountEmails.contains(
-              secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_ID_ANNOTATION)))
+          .filter(secret -> !activeServiceAccountEmails.contains(serviceAccountEmail(secret)))
           .collect(Collectors.toList());
 
       for (Secret secret : unusedServiceAccountKeySecrets) {
-        final String jsonKeyName = secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION);
-        final String p12KeyName = secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION);
+        final String name = secret.getMetadata().getName();
+        final String serviceAcountEmail = serviceAccountEmail(secret);
 
-        LOG.info("[AUDIT] Deleting unused secret account key: {}", jsonKeyName);
-        serviceAccountKeyManager.deleteKey(jsonKeyName);
+        try {
+          final String jsonKeyName = secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION);
+          final String p12KeyName = secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION);
 
-        LOG.info("[AUDIT] Deleting unused secret account key: {}", p12KeyName);
-        serviceAccountKeyManager.deleteKey(p12KeyName);
+          LOG.info("[AUDIT] Deleting unused service account key: {}", jsonKeyName);
+          tryDeleteServiceAccountKey(jsonKeyName);
 
-        LOG.info("[AUDIT] Deleting unused secret account key secret: {}", secret.getMetadata().getName());
-        client.secrets().delete(secret);
+          LOG.info("[AUDIT] Deleting unused service account key: {}", p12KeyName);
+          tryDeleteServiceAccountKey(p12KeyName);
+
+          LOG.info("[AUDIT] Deleting unused service account {} secret {}", serviceAcountEmail, name);
+          client.secrets().delete(secret);
+        } catch (IOException e) {
+          LOG.warn("[AUDIT] Failed to delete unused service account {} keys and/or secret {}",
+              serviceAcountEmail, name);
+        }
       }
     }
+  }
+
+  /**
+   * Try to delete a service account key, giving up with a warning if permission was denied.
+   * @param keyName The fully qualified name of the key to delete.
+   */
+  private void tryDeleteServiceAccountKey(String keyName) throws IOException {
+    try {
+      serviceAccountKeyManager.deleteKey(keyName);
+    } catch (GoogleJsonResponseException e) {
+      if (GcpUtil.isPermissionDenied(e)) {
+        LOG.warn("[AUDIT] Permission denied when trying to delete unused service account key {}");
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  private String serviceAccountEmail(Secret secret) {
+    return secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_ID_ANNOTATION);
   }
 
   private void ensureSecrets(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {

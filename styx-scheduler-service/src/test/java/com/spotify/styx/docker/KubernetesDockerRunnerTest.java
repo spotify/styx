@@ -33,6 +33,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
@@ -40,6 +41,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import com.google.api.client.googleapis.json.GoogleJsonError;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpHeaders;
+import com.google.api.client.http.HttpResponseException.Builder;
 import com.google.api.services.iam.v1.model.ServiceAccountKey;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -59,6 +64,7 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.StateManager.IsClosed;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.GcpUtil;
 import io.fabric8.kubernetes.api.model.DoneablePod;
 import io.fabric8.kubernetes.api.model.DoneableSecret;
 import io.fabric8.kubernetes.api.model.ListMeta;
@@ -314,6 +320,48 @@ public class KubernetesDockerRunnerTest {
     verify(secrets, never()).delete(any(Secret.class));
 
     // Verify that an unused service account key secret is deleted
+    kdr.cleanup(ImmutableSet.of());
+    verify(serviceAccountKeyManager).deleteKey(jsonKeyName);
+    verify(serviceAccountKeyManager).deleteKey(p12KeyName);
+    verify(secrets).delete(secret);
+  }
+
+  @Test
+  public void shouldHandlePermissionDeniedErrorsWhenDeletingServiceAccountKeys() throws Exception {
+    final String jsonKeyId = "json-key";
+    final String p12KeyId = "p12-key";
+
+    final String jsonKeyName = keyName(SERVICE_ACCOUNT, jsonKeyId);
+    final String p12KeyName = keyName(SERVICE_ACCOUNT, p12KeyId);
+
+    final String jsonKeyData = "json-private-key-data";
+    final String p12KeyData = "p12-private-key-data";
+
+    final ObjectMeta metadata = new ObjectMeta();
+    metadata.setName("styx-wf-sa-keys");
+    metadata.setAnnotations(ImmutableMap.of(
+        "styx-wf-sa", SERVICE_ACCOUNT,
+        "styx-wf-sa-json-key-name", jsonKeyName,
+        "styx-wf-sa-p12-key-name", p12KeyName));
+
+    final Secret secret = new SecretBuilder()
+        .withMetadata(metadata)
+        .withData(ImmutableMap.of(
+            "styx-wf-sa.json", jsonKeyData,
+            "styx-wf-sa.p12", p12KeyData))
+        .build();
+
+    when(k8sClient.secrets()).thenReturn(secrets);
+    when(secrets.list()).thenReturn(secretList);
+    when(secretList.getItems()).thenReturn(ImmutableList.of(secret));
+
+    // Verify that the secret is delete even if we get permission denied errors on deleting the keys
+    final GoogleJsonResponseException permissionDenied = new GoogleJsonResponseException(
+        new Builder(403, "Forbidden", new HttpHeaders()), new GoogleJsonError()
+        .set("status", "PERMISSION_DENIED"));
+    assertThat(GcpUtil.isPermissionDenied(permissionDenied), is(true));
+    doThrow(permissionDenied).when(serviceAccountKeyManager).deleteKey(jsonKeyName);
+    doThrow(permissionDenied).when(serviceAccountKeyManager).deleteKey(p12KeyName);
     kdr.cleanup(ImmutableSet.of());
     verify(serviceAccountKeyManager).deleteKey(jsonKeyName);
     verify(serviceAccountKeyManager).deleteKey(p12KeyName);
