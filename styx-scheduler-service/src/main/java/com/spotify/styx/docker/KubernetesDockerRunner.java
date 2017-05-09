@@ -32,6 +32,7 @@ import com.github.rholder.retry.Retryer;
 import com.github.rholder.retry.RetryerBuilder;
 import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.WaitStrategies;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.services.iam.v1.model.ServiceAccountKey;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
@@ -49,8 +50,10 @@ import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.util.GcpUtil;
 import com.spotify.styx.util.TriggerUtil;
 import io.fabric8.kubernetes.api.model.ContainerBuilder;
+import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.EnvVarBuilder;
 import io.fabric8.kubernetes.api.model.Pod;
@@ -59,6 +62,7 @@ import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.PodSpecBuilder;
 import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.SecretBuilder;
+import io.fabric8.kubernetes.api.model.SecretList;
 import io.fabric8.kubernetes.api.model.SecretVolumeSource;
 import io.fabric8.kubernetes.api.model.SecretVolumeSourceBuilder;
 import io.fabric8.kubernetes.api.model.Volume;
@@ -84,6 +88,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
@@ -155,6 +160,70 @@ class KubernetesDockerRunner implements DockerRunner {
     } catch (KubernetesClientException kce) {
       throw new IOException("Failed to create Kubernetes pod", kce);
     }
+  }
+
+  @Override
+  public void cleanup() throws IOException {
+    synchronized (secretMutationLock) {
+
+      // Enumerate all secrets currently used by pods
+      final PodList pods = client.pods().list();
+      final Set<String> activeSecrets = pods.getItems().stream()
+          .flatMap(pod -> pod.getSpec().getVolumes().stream())
+          .map(volume -> volume.getSecret().getSecretName())
+          .collect(Collectors.toSet());
+
+      // Enumerate all service account secrets that are not in active use
+      final SecretList secrets = client.secrets().list();
+      final List<Secret> inactiveServiceAccountSecrets = secrets.getItems().stream()
+          .filter(secret -> secret.getMetadata().getName().startsWith(STYX_WORKFLOW_SA_SECRET_NAME))
+          .filter(secret -> !activeSecrets.contains(secret.getMetadata().getName()))
+          .collect(Collectors.toList());
+
+      // Delete keys and secrets for all inactive service accounts and let them be recreated by future executions
+      for (Secret secret : inactiveServiceAccountSecrets) {
+        final String name = secret.getMetadata().getName();
+        final String serviceAcountEmail = serviceAccountEmail(secret);
+
+        try {
+          final Map<String, String> annotations = secret.getMetadata().getAnnotations();
+          final String jsonKeyName = annotations.get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION);
+          final String p12KeyName = annotations.get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION);
+
+          LOG.info("[AUDIT] Deleting service account key: {}", jsonKeyName);
+          tryDeleteServiceAccountKey(jsonKeyName);
+
+          LOG.info("[AUDIT] Deleting service account key: {}", p12KeyName);
+          tryDeleteServiceAccountKey(p12KeyName);
+
+          LOG.info("[AUDIT] Deleting service account {} secret {}", serviceAcountEmail, name);
+          client.secrets().delete(secret);
+        } catch (IOException | KubernetesClientException e) {
+          LOG.warn("[AUDIT] Failed to delete service account {} keys and/or secret {}",
+              serviceAcountEmail, name);
+        }
+      }
+    }
+  }
+
+  /**
+   * Try to delete a service account key, giving up with a warning if permission was denied.
+   * @param keyName The fully qualified name of the key to delete.
+   */
+  private void tryDeleteServiceAccountKey(String keyName) throws IOException {
+    try {
+      serviceAccountKeyManager.deleteKey(keyName);
+    } catch (GoogleJsonResponseException e) {
+      if (GcpUtil.isPermissionDenied(e)) {
+        LOG.warn("[AUDIT] Permission denied when trying to delete unused service account key {}");
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  private String serviceAccountEmail(Secret secret) {
+    return secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_ID_ANNOTATION);
   }
 
   private void ensureSecrets(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {

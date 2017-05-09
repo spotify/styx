@@ -62,6 +62,13 @@ public interface DockerRunner extends Closeable {
   String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException;
 
   /**
+   * Perform cleanup for resources such as secrets etc. Resources that are not in use by any currently live workflows
+   * should be removed.
+   */
+  default void cleanup() throws IOException {
+  }
+
+  /**
    * Execute cleanup operations for when an execution finishes.
    * @param executionId The execution id for which the cleanup code is called
    */

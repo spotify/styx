@@ -140,6 +140,11 @@ public interface Storage {
   Map<Workflow, TriggerInstantSpec> workflowsWithNextNaturalTrigger() throws IOException;
 
   /**
+   * Get all {@link Workflow}s.
+   */
+  Map<WorkflowId, Workflow> workflows() throws IOException;
+
+  /**
    * Stores information about an active {@link WorkflowInstance} to be tracked.
    *
    * @param workflowInstance  The {@link WorkflowInstance} that entered an active state
