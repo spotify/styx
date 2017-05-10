@@ -205,7 +205,7 @@ class KubernetesDockerRunner implements DockerRunner {
     // Delete keys and secrets for all inactive service accounts and let them be recreated by future executions
     for (Secret secret : inactiveServiceAccountSecrets) {
       final String name = secret.getMetadata().getName();
-      final String serviceAcountEmail = serviceAccountEmail(secret);
+      final String serviceAcount = secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_ID_ANNOTATION);
 
       try {
         final Map<String, String> annotations = secret.getMetadata().getAnnotations();
@@ -218,11 +218,11 @@ class KubernetesDockerRunner implements DockerRunner {
         LOG.info("[AUDIT] Deleting service account key: {}", p12KeyName);
         tryDeleteServiceAccountKey(p12KeyName);
 
-        LOG.info("[AUDIT] Deleting service account {} secret {}", serviceAcountEmail, name);
+        LOG.info("[AUDIT] Deleting service account {} secret {}", serviceAcount, name);
         client.secrets().delete(secret);
       } catch (IOException | KubernetesClientException e) {
         LOG.warn("[AUDIT] Failed to delete service account {} keys and/or secret {}",
-            serviceAcountEmail, name);
+            serviceAcount, name);
       }
     }
   }
@@ -241,10 +241,6 @@ class KubernetesDockerRunner implements DockerRunner {
         throw e;
       }
     }
-  }
-
-  private String serviceAccountEmail(Secret secret) {
-    return secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_ID_ANNOTATION);
   }
 
   private void ensureSecrets(WorkflowInstance workflowInstance, RunSpec runSpec, String secretEpoch)
