@@ -237,7 +237,6 @@ class KubernetesDockerRunner implements DockerRunner {
           .withReadOnly(true)
           .build();
       containerBuilder.addToVolumeMounts(saMount);
-      // TODO: do we need set this env as default value?
       containerBuilder.addToEnv(envVar(STYX_WORKFLOW_SA_ENV_VARIABLE,
                                        saMount.getMountPath() + STYX_WORKFLOW_SA_JSON_KEY));
     });
