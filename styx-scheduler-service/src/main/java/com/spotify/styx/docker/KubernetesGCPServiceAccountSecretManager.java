@@ -24,10 +24,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.services.iam.v1.model.ServiceAccountKey;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hashing;
 import com.spotify.styx.ServiceAccountKeyManager;
-import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.util.GcpUtil;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.Secret;
@@ -45,7 +45,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,8 +61,8 @@ class KubernetesGCPServiceAccountSecretManager  {
   private static final String STYX_WORKFLOW_SA_JSON_KEY = "styx-wf-sa.json";
   private static final String STYX_WORKFLOW_SA_P12_KEY = "styx-wf-sa.p12";
 
-  private static final Supplier<String> DEFAULT_SECRET_EPOCH_PROVIDER =
-      KubernetesGCPServiceAccountSecretManager::utcNoonSecretEpoch;
+  private static final EpochProvider DEFAULT_SECRET_EPOCH_PROVIDER =
+      KubernetesGCPServiceAccountSecretManager::smearedDailyEpoch;
 
   private static final Clock DEFAULT_CLOCK = Clock.systemUTC();
 
@@ -71,7 +70,7 @@ class KubernetesGCPServiceAccountSecretManager  {
 
   private final KubernetesClient client;
   private final ServiceAccountKeyManager serviceAccountKeyManager;
-  private final Supplier<String> secretEpochProvider;
+  private final EpochProvider epochProvider;
   private final Clock clock;
 
   private final Object secretMutationLock = new Object() {};
@@ -79,10 +78,11 @@ class KubernetesGCPServiceAccountSecretManager  {
   KubernetesGCPServiceAccountSecretManager(
       NamespacedKubernetesClient client,
       ServiceAccountKeyManager serviceAccountKeyManager,
-      Supplier<String> secretEpochProvider, Clock clock) {
+      EpochProvider epochProvider,
+      Clock clock) {
     this.client = Objects.requireNonNull(client).inNamespace("default");
     this.serviceAccountKeyManager = Objects.requireNonNull(serviceAccountKeyManager);
-    this.secretEpochProvider = Objects.requireNonNull(secretEpochProvider);
+    this.epochProvider = Objects.requireNonNull(epochProvider);
     this.clock = Objects.requireNonNull(clock);
   }
 
@@ -94,7 +94,7 @@ class KubernetesGCPServiceAccountSecretManager  {
   public String ensureServiceAccountKeySecret(String workflowId,
       String serviceAccount) throws IOException {
 
-    final String secretEpoch = secretEpochProvider.get();
+    final long epoch = epochProvider.epoch(clock.millis(), serviceAccount);
 
     // Check that the service account exists
     final boolean serviceAccountExists = serviceAccountKeyManager.serviceAccountExists(serviceAccount);
@@ -103,7 +103,7 @@ class KubernetesGCPServiceAccountSecretManager  {
       throw new InvalidExecutionException("Referenced service account " + serviceAccount + " was not found");
     }
 
-    final String secretName = buildSecretName(serviceAccount, secretEpoch);
+    final String secretName = buildSecretName(serviceAccount, epoch);
 
     logger.info("[AUDIT] Workflow {} refers to secret {} storing keys of {}",
              workflowId, secretName, serviceAccount);
@@ -145,7 +145,7 @@ class KubernetesGCPServiceAccountSecretManager  {
           STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION, jsonKey.getName(),
           STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION, p12Key.getName(),
           STYX_WORKFLOW_SA_ID_ANNOTATION, serviceAccount,
-          STYX_WORKFLOW_SA_EPOCH_ANNOTATION, secretEpoch
+          STYX_WORKFLOW_SA_EPOCH_ANNOTATION, Long.toString(epoch)
       );
 
       final Secret newSecret = new SecretBuilder()
@@ -175,14 +175,15 @@ class KubernetesGCPServiceAccountSecretManager  {
         .collect(Collectors.toSet());
 
     // Enumerate service account secrets to delete
-    final String epoch = secretEpochProvider.get();
+    final long nowMillis = clock.millis();
     final Instant creationDeadline = clock.instant().minus(SECRET_GC_GRACE_PERIOD);
     final SecretList secrets = client.secrets().list();
     final List<Secret> inactiveServiceAccountSecrets = secrets.getItems().stream()
         // Only include service account secrets
         .filter(secret -> secret.getMetadata().getName().startsWith(STYX_WORKFLOW_SA_SECRET_NAME))
         // Exclude secrets in the current epoch
-        .filter(secret -> !epoch.equals(secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_EPOCH_ANNOTATION)))
+        .filter(secret -> !Long.toString(epochProvider.epoch(nowMillis, serviceAccount(secret)))
+            .equals(secretEpoch(secret)))
         // Exclude recently created secrets to mitigate races with secret creation around epoch switch
         .filter(secret -> Instant.parse(secret.getMetadata().getCreationTimestamp()).isBefore(creationDeadline))
         // Exclude secrets currently in use by pods
@@ -192,7 +193,7 @@ class KubernetesGCPServiceAccountSecretManager  {
     // Delete keys and secrets for all inactive service accounts and let them be recreated by future executions
     for (Secret secret : inactiveServiceAccountSecrets) {
       final String name = secret.getMetadata().getName();
-      final String serviceAcount = secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_ID_ANNOTATION);
+      final String serviceAcount = serviceAccount(secret);
 
       try {
         final Map<String, String> annotations = secret.getMetadata().getAnnotations();
@@ -212,6 +213,14 @@ class KubernetesGCPServiceAccountSecretManager  {
             serviceAcount, name);
       }
     }
+  }
+
+  private String secretEpoch(Secret secret) {
+    return secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_EPOCH_ANNOTATION);
+  }
+
+  private String serviceAccount(Secret secret) {
+    return secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_ID_ANNOTATION);
   }
 
   /**
@@ -243,12 +252,18 @@ class KubernetesGCPServiceAccountSecretManager  {
     }
   }
 
-  private static String buildSecretName(String serviceAccount, String epoch) {
+  private static String buildSecretName(String serviceAccount, long epoch) {
     return STYX_WORKFLOW_SA_SECRET_NAME + '-' + epoch + '-'
            + Hashing.sha256().hashString(serviceAccount, UTF_8);
   }
 
-  private static String utcNoonSecretEpoch() {
-    return Long.toString((System.currentTimeMillis() + TimeUnit.HOURS.toMillis(12)) / TimeUnit.HOURS.toMillis(24));
+  @VisibleForTesting
+  static long smearedDailyEpoch(long nowMillis, String serviceAccount) {
+    final long offset = Math.abs(serviceAccount.hashCode()) % TimeUnit.DAYS.toMillis(1);
+    return (nowMillis + offset) / TimeUnit.HOURS.toMillis(24);
+  }
+
+  interface EpochProvider {
+    long epoch(long nowMillis, String serviceAccount);
   }
 }

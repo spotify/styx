@@ -23,8 +23,10 @@ package com.spotify.styx.docker;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_ID;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Optional.empty;
+import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.lessThan;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
@@ -64,7 +66,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.IntSummaryStatistics;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -81,9 +86,9 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   @Rule public ExpectedException exception = ExpectedException.none();
 
   private static final String SERVICE_ACCOUNT = "sa@example.com";
-  private static final String SERVICE_ACCOUNT_SECRET = "sa-secret";
 
-  private final static String SECRET_EPOCH = "4711";
+  private final static long SECRET_EPOCH = 4711;
+  private final static long PAST_SECRET_EPOCH = 4710;
 
   private final static Clock CLOCK = Clock.fixed(Instant.now(), ZoneOffset.UTC);
 
@@ -95,11 +100,6 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
       empty(),
       Optional.of(SERVICE_ACCOUNT),
       empty());
-
-  private static final KubernetesSecretSpec SECRET_SPEC_WITH_SA = KubernetesSecretSpec.builder()
-      .serviceAccountSecret(SERVICE_ACCOUNT_SECRET)
-      .build();
-
 
   @Mock NamespacedKubernetesClient k8sClient;
 
@@ -126,7 +126,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     when(namedResource.get()).thenReturn(null);
     when(k8sClient.secrets()).thenReturn(secrets);
 
-    sut = new KubernetesGCPServiceAccountSecretManager(k8sClient, serviceAccountKeyManager, () -> SECRET_EPOCH, CLOCK);
+    sut = new KubernetesGCPServiceAccountSecretManager(
+        k8sClient, serviceAccountKeyManager, (now, sa) -> SECRET_EPOCH, CLOCK);
   }
 
   @Test
@@ -198,7 +199,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   public void shouldRemoveServiceAccountSecretsInPastEpoch() throws Exception {
     final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(1)).toString();
     final Secret secret = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, "pre-" + SECRET_EPOCH, "old-json-key", "old-p12-key", creationTimestamp);
+        SERVICE_ACCOUNT, PAST_SECRET_EPOCH, "old-json-key", "old-p12-key", creationTimestamp);
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
@@ -216,7 +217,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   public void shouldNotRemoveRecentlyCreatedServiceAccountSecrets() throws Exception {
     final String creationTimestamp = CLOCK.instant().toString();
     final Secret secret1 = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, "pre-" + SECRET_EPOCH, "json-key-1", "p12-key-1", creationTimestamp);
+        SERVICE_ACCOUNT, PAST_SECRET_EPOCH, "json-key-1", "p12-key-1", creationTimestamp);
     final Secret secret2 = fakeServiceAccountKeySecret(
         SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-2", "p12-key-2", creationTimestamp);
 
@@ -372,7 +373,29 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     assertThat(createdSecret.getData(), hasEntry("styx-wf-sa.p12", newP12Key.getPrivateKeyData()));
   }
 
-  private static Secret fakeServiceAccountKeySecret(String serviceAccount, String epoch, String jsonKeyId,
+  @Test
+  public void shouldSmearRotation() throws Exception {
+    final int[] rotationsPerHour = new int[24];
+    final int n = 1000;
+    for (int i = 0; i < n; i++) {
+      long prevEpoch = 0;
+      for (int hour = 0; hour < 24; hour++) {
+        final long nowMillis = TimeUnit.HOURS.toMillis(hour);
+        final long epoch = KubernetesGCPServiceAccountSecretManager.smearedDailyEpoch(
+            nowMillis, "sa" + i + "@example.com");
+        if (prevEpoch != epoch) {
+          prevEpoch = epoch;
+          rotationsPerHour[hour]++;
+        }
+      }
+    }
+    final IntSummaryStatistics stats = IntStream.of(rotationsPerHour).summaryStatistics();
+    final double expectedMeanRotationsPerHour = n / 24;
+    assertThat(stats.getAverage(), is(closeTo(expectedMeanRotationsPerHour, expectedMeanRotationsPerHour / 2)));
+    assertThat((double) stats.getMax(), is(lessThan(expectedMeanRotationsPerHour * 2)));
+  }
+
+  private static Secret fakeServiceAccountKeySecret(String serviceAccount, long epoch, String jsonKeyId,
       String p12KeyId, String creationTimestamp) {
     final String jsonKeyName = keyName(serviceAccount, jsonKeyId);
     final String p12KeyName = keyName(serviceAccount, p12KeyId);
