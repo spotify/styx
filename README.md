@@ -49,7 +49,7 @@ complement each other.
 ### More docs
 
 * [Styx design](doc/design-overview.md)
-* [External services](doc/external-services.md)
+* [External services]
 * [API Specification](doc/api.apib) - [HTML version](https://spotify.github.io/styx/api.html)
 
 
@@ -109,19 +109,24 @@ To define a schedule, simply write a  yaml file to `/etc/styx` (given the above 
 ```yaml
 schedules:
   - id: my-workflow
-    schedule: hourly
     docker_image: my-workflow:0.1
     docker_args: ['./run.sh', '{}']
+    schedule: hourly
+    offset: PT1H
+    secret:
+      name: my-secret
+      mount_path: /etc/my-keys
+    service_account: my-service-account@my-project.iam.gserviceaccount.com
 ```
 
 #### `schedules` **[schedule]**
 The main key, containing a list of schedules.
 
-#### `schedule[].id` **string**
+#### `schedule[].id` **[string]**
 A unique identifier for the workflow (lower-case-hyphenated). This identifier is used to refer to
  the workflow through the API.
 
-#### `schedule[].docker_image` **string**:
+#### `schedule[].docker_image` **[string]**:
 The docker image that should be executed.
 
 #### `schedule[].docker_args` **[string]**
@@ -139,7 +144,7 @@ Example arguments for the supported schedule values:
 - weekly - 2016-04-04,    2016-04-11,    ... (Mondays)
 ```
 
-#### `schedule[].schedule` **string**
+#### `schedule[].schedule` **[string]**
 How often the workflow should be triggered.
 
 Supports [cron] syntax, along with a set of human readable aliases:
@@ -152,7 +157,7 @@ Supports [cron] syntax, along with a set of human readable aliases:
 @annually, annually = 0 0 1 1 *
 ```
 
-#### `schedule[].offset` **string**
+#### `schedule[].offset` **[string]**
 An [ISO 8601 Duration] specification for offsetting the cron schedule.
 
 This is useful for when setting up a schedule that needs to be offset in time relative to the
@@ -165,6 +170,39 @@ useful for irregular schedules.
 In fact, it is so common that we need to use a "last hour" parameter in jobs that we've set the
 default offset for all the well known (aliased) schedules to +1 period. E.g for an `@hourly`
 schedule, the default offset is `PT1H`, and for a `@daily` schedule the offset is `P1D`
+
+#### `schedule[].secret` **[secret]**
+Secret is used to mount keys stored in [Kubernetes Secrets] into the container.
+
+* `.name` **[string]**
+
+  Name of the secret stored in Kubernetes
+
+* `.mount_path` **[string]**
+
+  Where the keys of the secret will be appearing in the container
+
+#### `schedule[].service_account` **[email address]**
+The [Service Account] email address belonging to a project in [Google Cloud Platform].
+
+If the workflow intends to use keys of a [Service Account],
+Styx will create both JSON and p12 keys for the specified `service_account`, rotate keys on daily basis,
+and garbage collect unused keys.
+
+Styx stores the created keys in [Kubernetes Secrets] and mounts them under `/etc/styx-wf-sa-keys/`
+in the container.
+
+Styx injects an environment variable to the container named as `GOOGLE_APPLICATION_CREDENTIALS` pointing
+to the JSON key file.
+
+It is allowed and perfectly fine to have both `secret` and `service_account` configured for a workflow.
+However users need to make sure `secret.mount_path` doesn't point to `/etc/styx-wf-sa-keys/`; otherwise
+Styx will refuse to trigger the workflow.
+
+In order for Styx to be able to create/delete keys for the `service_account`,
+[Service Account] that used by Styx to communicate with [External services] should be granted with
+`Service Account Key Admin` role for the `service_account`. This step can be done by following
+[Granting Roles to Service Accounts].
 
 ### Triggering and executions
 
@@ -204,7 +242,7 @@ An aggregate code coverage report for the entire project is created by the `repo
 > open report/target/site/jacoco-aggregate/index.html
 ```
 
-CircleCI builds submit code coverage reports to [codecov.io](https://codecov.io/gh/spotify/styx). In addition, the aggregate
+CircleCI builds submit code coverage reports to [codecov.io]. In addition, the aggregate
 jacoco report can be viewed under the Artifacts tab in the Circle-CI build view.
 
 ---
@@ -212,9 +250,15 @@ jacoco report can be viewed under the Artifacts tab in the Circle-CI build view.
 This project adheres to the [Open Code of Conduct][code-of-conduct]. By participating, you are
 expected to honor this code.
 
+[External services]: doc/external-services.md
 [Kubernetes]: http://kubernetes.io/
 [Apollo]: https://spotify.github.io/apollo/
 [Luigi]: https://github.com/spotify/luigi
 [code-of-conduct]: https://github.com/spotify/code-of-conduct/blob/master/code-of-conduct.md
 [cron]: https://en.wikipedia.org/wiki/Cron
 [ISO 8601 Duration]: https://en.wikipedia.org/wiki/ISO_8601#Durations
+[Kubernetes Secrets]: https://kubernetes.io/docs/concepts/configuration/secret/
+[Service Account]: https://cloud.google.com/compute/docs/access/service-accounts
+[Google Cloud Platform]: https://cloud.google.com/
+[Granting Roles to Service Accounts]: https://cloud.google.com/iam/docs/granting-roles-to-service-accounts
+[codecov.io]: https://codecov.io/gh/spotify/styx
