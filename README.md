@@ -204,7 +204,8 @@ An aggregate code coverage report for the entire project is created by the `repo
 > open report/target/site/jacoco-aggregate/index.html
 ```
 
-CircleCI builds submit code coverage reports to [coveralls.io](https://coveralls.io/github/spotify/styx). In addition, the aggregate jacoco report can be viewed under the Artifacts tab in the Circle-CI build view.
+CircleCI builds submit code coverage reports to [codecov.io](https://codecov.io/gh/spotify/styx). In addition, the aggregate
+jacoco report can be viewed under the Artifacts tab in the Circle-CI build view.
 
 ---
 
