@@ -661,7 +661,8 @@ public class StyxScheduler implements AppInit {
           .withClientKeyData(cluster.getMasterAuth().getClientKey())
           .build();
 
-      return new DefaultKubernetesClient(kubeConfig);
+      return new DefaultKubernetesClient(kubeConfig)
+          .inNamespace("default");
     } catch (GeneralSecurityException | IOException e) {
       throw Throwables.propagate(e);
     }

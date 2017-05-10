@@ -80,7 +80,7 @@ class KubernetesGCPServiceAccountSecretManager  {
       ServiceAccountKeyManager serviceAccountKeyManager,
       EpochProvider epochProvider,
       Clock clock) {
-    this.client = Objects.requireNonNull(client).inNamespace("default");
+    this.client = Objects.requireNonNull(client);
     this.serviceAccountKeyManager = Objects.requireNonNull(serviceAccountKeyManager);
     this.epochProvider = Objects.requireNonNull(epochProvider);
     this.clock = Objects.requireNonNull(clock);

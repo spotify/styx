@@ -85,7 +85,6 @@ import java.util.concurrent.TimeUnit;
  */
 class KubernetesDockerRunner implements DockerRunner {
 
-  private static final String NAMESPACE = "default";
   static final String STYX_RUN = "styx-run";
   static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
   static final String DOCKER_TERMINATION_LOGGING_ANNOTATION = "styx-docker-termination-logging";
@@ -124,7 +123,7 @@ class KubernetesDockerRunner implements DockerRunner {
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
       KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager, int pollPodsIntervalSeconds) {
     this.stateManager = Objects.requireNonNull(stateManager);
-    this.client = Objects.requireNonNull(client).inNamespace(NAMESPACE);
+    this.client = Objects.requireNonNull(client);
     this.stats = Objects.requireNonNull(stats);
     this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
     this.serviceAccountSecretManager = Objects.requireNonNull(serviceAccountSecretManager);
@@ -253,7 +252,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
       final VolumeMount secretMount = new VolumeMountBuilder()
           .withMountPath(secret.mountPath())
-          .withName(secret.name())
+          .withName(secretVolume.getName())
           .withReadOnly(true)
           .build();
       containerBuilder.addToVolumeMounts(secretMount);
