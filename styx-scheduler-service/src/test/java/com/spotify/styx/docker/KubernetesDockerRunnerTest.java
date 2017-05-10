@@ -82,6 +82,10 @@ import io.fabric8.kubernetes.client.dsl.PodResource;
 import io.fabric8.kubernetes.client.dsl.Resource;
 import io.fabric8.kubernetes.client.dsl.Watchable;
 import java.io.IOException;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -124,6 +128,8 @@ public class KubernetesDockerRunnerTest {
                                                                             empty());
 
   private final static String SECRET_EPOCH = "4711";
+
+  private final static Clock CLOCK = Clock.fixed(Instant.now(), ZoneOffset.UTC);
 
   @Mock NamespacedKubernetesClient k8sClient;
 
@@ -171,7 +177,8 @@ public class KubernetesDockerRunnerTest {
     when(serviceAccountKeyManager.createJsonKey(anyString())).thenReturn(serviceAccountJsonKey);
     when(serviceAccountKeyManager.createJsonKey(anyString())).thenReturn(serviceAccountP12Key);
 
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager, 60, () -> SECRET_EPOCH,
+        CLOCK);
     kdr.init();
     kdr.restore();
 
@@ -282,7 +289,9 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldCleanupServiceAccountSecrets() throws Exception {
-    final Secret secret = fakeServiceAccountKeySecret(SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key");
+    final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(1)).toString();
+    final Secret secret = fakeServiceAccountKeySecret(
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", creationTimestamp);
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
@@ -305,8 +314,9 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldRemoveServiceAccountSecretsInPastEpoch() throws Exception {
+    final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(1)).toString();
     final Secret secret = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, "pre-" + SECRET_EPOCH, "old-json-key", "old-p12-key");
+        SERVICE_ACCOUNT, "pre-" + SECRET_EPOCH, "old-json-key", "old-p12-key", creationTimestamp);
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
@@ -321,8 +331,29 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
+  public void shouldNotRemoveRecentlyCreatedServiceAccountSecrets() throws Exception {
+    final String creationTimestamp = CLOCK.instant().toString();
+    final Secret secret1 = fakeServiceAccountKeySecret(
+        SERVICE_ACCOUNT, "pre-" + SECRET_EPOCH, "json-key-1", "p12-key-1", creationTimestamp);
+    final Secret secret2 = fakeServiceAccountKeySecret(
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-2", "p12-key-2", creationTimestamp);
+
+    when(k8sClient.secrets()).thenReturn(secrets);
+    when(secrets.list()).thenReturn(secretList);
+    when(secretList.getItems()).thenReturn(ImmutableList.of(secret1, secret2));
+
+    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, SECRET_EPOCH);
+    when(podList.getItems()).thenReturn(ImmutableList.of(pod));
+    kdr.cleanup();
+    verify(serviceAccountKeyManager, never()).deleteKey(anyString());
+    verify(secrets, never()).delete(any(Secret.class));
+  }
+
+  @Test
   public void shouldHandlePermissionDeniedErrorsWhenDeletingServiceAccountKeys() throws Exception {
-    final Secret secret = fakeServiceAccountKeySecret(SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key");
+    final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(1)).toString();
+    final Secret secret = fakeServiceAccountKeySecret(
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", creationTimestamp);
 
     when(podList.getItems()).thenReturn(ImmutableList.of());
     when(k8sClient.secrets()).thenReturn(secrets);
@@ -343,9 +374,13 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldHandleErrorsWhenDeletingServiceAccountKeys() throws Exception {
-    final Secret secret1 = fakeServiceAccountKeySecret(SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-1", "p12-key-1");
-    final Secret secret2 = fakeServiceAccountKeySecret(SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-2", "p12-key-2");
-    final Secret secret3 = fakeServiceAccountKeySecret(SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-3", "p12-key-3");
+    final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(1)).toString();
+    final Secret secret1 = fakeServiceAccountKeySecret(
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-1", "p12-key-1", creationTimestamp);
+    final Secret secret2 = fakeServiceAccountKeySecret(
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-2", "p12-key-2", creationTimestamp);
+    final Secret secret3 = fakeServiceAccountKeySecret(
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-3", "p12-key-3", creationTimestamp);
 
     when(podList.getItems()).thenReturn(ImmutableList.of());
     when(k8sClient.secrets()).thenReturn(secrets);
@@ -371,11 +406,13 @@ public class KubernetesDockerRunnerTest {
     verify(secrets).delete(secret3);
   }
 
-  private static Secret fakeServiceAccountKeySecret(String serviceAccount, String epoch, String jsonKeyId, String p12KeyId) {
+  private static Secret fakeServiceAccountKeySecret(String serviceAccount, String epoch, String jsonKeyId,
+      String p12KeyId, String creationTimestamp) {
     final String jsonKeyName = keyName(serviceAccount, jsonKeyId);
     final String p12KeyName = keyName(serviceAccount, p12KeyId);
 
     final ObjectMeta metadata = new ObjectMeta();
+    metadata.setCreationTimestamp(creationTimestamp);
     metadata.setName("styx-wf-sa-keys-" + epoch + "-" + Hashing.sha256().hashString(serviceAccount, UTF_8));
     metadata.setAnnotations(ImmutableMap.of(
         "styx-wf-sa", serviceAccount,
@@ -707,7 +744,8 @@ public class KubernetesDockerRunnerTest {
 
     // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
     kdr.close();
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager, 1, () -> SECRET_EPOCH);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager, 1, () -> SECRET_EPOCH,
+        CLOCK);
     kdr.init();
     kdr.restore();
 
