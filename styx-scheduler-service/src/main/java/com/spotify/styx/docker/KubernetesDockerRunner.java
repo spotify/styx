@@ -23,7 +23,6 @@ package com.spotify.styx.docker;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.state.RunState.State.RUNNING;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -32,13 +31,9 @@ import com.github.rholder.retry.Retryer;
 import com.github.rholder.retry.RetryerBuilder;
 import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.WaitStrategies;
-import com.google.api.services.iam.v1.model.ServiceAccountKey;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.hash.Hashing;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
@@ -58,7 +53,6 @@ import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.PodSpecBuilder;
 import io.fabric8.kubernetes.api.model.Secret;
-import io.fabric8.kubernetes.api.model.SecretBuilder;
 import io.fabric8.kubernetes.api.model.SecretVolumeSource;
 import io.fabric8.kubernetes.api.model.SecretVolumeSourceBuilder;
 import io.fabric8.kubernetes.api.model.Volume;
@@ -70,6 +64,7 @@ import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
+import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
 import java.net.ProtocolException;
 import java.util.Arrays;
@@ -90,7 +85,6 @@ import java.util.concurrent.TimeUnit;
  */
 class KubernetesDockerRunner implements DockerRunner {
 
-  private static final String NAMESPACE = "default";
   static final String STYX_RUN = "styx-run";
   static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
   static final String DOCKER_TERMINATION_LOGGING_ANNOTATION = "styx-docker-termination-logging";
@@ -105,12 +99,8 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
   private static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
   static final String STYX_WORKFLOW_SA_ENV_VARIABLE = "GOOGLE_APPLICATION_CREDENTIALS";
-  private static final String STYX_WORKFLOW_SA_ID_ANNOTATION = "styx-wf-sa";
-  private static final String STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION = "styx-wf-sa-json-key-name";
-  private static final String STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION = "styx-wf-sa-p12-key-name";
   static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
   private static final String STYX_WORKFLOW_SA_JSON_KEY = "styx-wf-sa.json";
-  private static final String STYX_WORKFLOW_SA_P12_KEY = "styx-wf-sa.p12";
   static final String STYX_WORKFLOW_SA_SECRET_MOUNT_PATH =
       "/etc/" + STYX_WORKFLOW_SA_SECRET_NAME + "/";
 
@@ -126,44 +116,54 @@ class KubernetesDockerRunner implements DockerRunner {
   private final StateManager stateManager;
   private final Stats stats;
   private final int pollPodsIntervalSeconds;
-  private final ServiceAccountKeyManager serviceAccountKeyManager;
+  private final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
 
   private Watch watch;
 
-  private final Object secretMutationLock = new Object() {};
-
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
-      ServiceAccountKeyManager serviceAccountKeyManager, int pollPodsIntervalSeconds) {
+      KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager, int pollPodsIntervalSeconds) {
     this.stateManager = Objects.requireNonNull(stateManager);
-    this.client = Objects.requireNonNull(client).inNamespace(NAMESPACE);
+    this.client = Objects.requireNonNull(client);
     this.stats = Objects.requireNonNull(stats);
     this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
-    this.serviceAccountKeyManager = serviceAccountKeyManager;
+    this.serviceAccountSecretManager = Objects.requireNonNull(serviceAccountSecretManager);
   }
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
-      ServiceAccountKeyManager serviceAccountKeyManager) {
-    this(client, stateManager, stats, serviceAccountKeyManager, DEFAULT_POLL_PODS_INTERVAL_SECONDS);
+      KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager) {
+    this(client, stateManager, stats, serviceAccountSecretManager, DEFAULT_POLL_PODS_INTERVAL_SECONDS);
   }
 
   @Override
   public String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
-    ensureSecrets(workflowInstance, runSpec);
+    final KubernetesSecretSpec secretSpec = ensureSecrets(workflowInstance, runSpec);
     try {
-      final Pod pod = client.pods().create(createPod(workflowInstance, runSpec));
+      final Pod pod = client.pods().create(createPod(workflowInstance, runSpec, secretSpec));
       return pod.getMetadata().getName();
     } catch (KubernetesClientException kce) {
       throw new IOException("Failed to create Kubernetes pod", kce);
     }
   }
 
-  private void ensureSecrets(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
-    ensureServiceAccountKeySecret(workflowInstance, runSpec);
-    ensureCustomSecret(workflowInstance, runSpec);
+  @Override
+  public void cleanup() throws IOException {
+    serviceAccountSecretManager.cleanup();
   }
 
-  private void ensureCustomSecret(WorkflowInstance workflowInstance, RunSpec runSpec) {
-    runSpec.secret().ifPresent(specSecret -> {
+  private KubernetesSecretSpec ensureSecrets(WorkflowInstance workflowInstance, RunSpec runSpec)
+      throws IOException {
+    return KubernetesSecretSpec.builder()
+        .customSecret(ensureCustomSecret(workflowInstance, runSpec))
+        .serviceAccountSecret(runSpec.serviceAccount().isPresent()
+            ? Optional.of(serviceAccountSecretManager.ensureServiceAccountKeySecret(
+                workflowInstance.workflowId().toString(), runSpec.serviceAccount().get()))
+            : Optional.empty())
+        .build();
+  }
+
+  private Optional<WorkflowConfiguration.Secret> ensureCustomSecret(
+      WorkflowInstance workflowInstance, RunSpec runSpec) {
+    return runSpec.secret().map(specSecret -> {
       if (specSecret.name().startsWith(STYX_WORKFLOW_SA_SECRET_NAME)) {
         LOG.warn("[AUDIT] Workflow {} refers to secret {} with managed service account key secret name prefix, "
             + "denying execution", specSecret.name());
@@ -190,103 +190,13 @@ class KubernetesDockerRunner implements DockerRunner {
         LOG.info("[AUDIT] Workflow {} refers to secret {}",
                  workflowInstance.workflowId(), specSecret.name());
       }
+
+      return specSecret;
     });
   }
 
-  private void ensureServiceAccountKeySecret(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
-    if (!runSpec.serviceAccount().isPresent()) {
-      return;
-    }
-
-    final String serviceAccount = runSpec.serviceAccount().get();
-
-    // Check that the service account exists
-    final boolean serviceAccountExists = serviceAccountKeyManager.serviceAccountExists(serviceAccount);
-    if (!serviceAccountExists) {
-      LOG.error("[AUDIT] Workflow {} refers to non-existent service account {}", workflowInstance.workflowId(),
-          serviceAccount);
-      throw new InvalidExecutionException("Referenced service account " + serviceAccount + " was not found");
-    }
-
-    final String secretName = buildSecretName(serviceAccount);
-
-    LOG.info("[AUDIT] Workflow {} refers to secret {} storing keys of {}",
-             workflowInstance.workflowId(), secretName, serviceAccount);
-
-    // TODO: shard locking to regain concurrency
-    synchronized (secretMutationLock) {
-
-      // Check if we have a valid service account key secret already
-      final Secret existingSecret = client.secrets().withName(secretName).get();
-      if (existingSecret != null) {
-        if (serviceAccountKeysExist(existingSecret)) {
-          return;
-        }
-
-        LOG.info("[AUDIT] Service account keys have been deleted for {}, recreating",
-            serviceAccount);
-
-        // Need to delete this secret before creating a new one
-        client.secrets().delete(existingSecret);
-      }
-
-      // Create service account keys and secret
-      final ServiceAccountKey jsonKey;
-      final ServiceAccountKey p12Key;
-      try {
-        jsonKey = serviceAccountKeyManager.createJsonKey(serviceAccount);
-        p12Key = serviceAccountKeyManager.createP12Key(serviceAccount);
-      } catch (IOException e) {
-        LOG.error("[AUDIT] Failed to create keys for {}", serviceAccount, e);
-        throw e;
-      }
-
-      final Map<String, String> keys = ImmutableMap.of(
-          STYX_WORKFLOW_SA_JSON_KEY, jsonKey.getPrivateKeyData(),
-          STYX_WORKFLOW_SA_P12_KEY, p12Key.getPrivateKeyData()
-      );
-
-      final Map<String, String> annotations = ImmutableMap.of(
-          STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION, jsonKey.getName(),
-          STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION, p12Key.getName(),
-          STYX_WORKFLOW_SA_ID_ANNOTATION, serviceAccount
-      );
-
-      final Secret newSecret = new SecretBuilder()
-          .withNewMetadata()
-          .withName(secretName)
-          .withAnnotations(annotations)
-          .endMetadata()
-          .withData(keys)
-          .build();
-
-      client.secrets().create(newSecret);
-
-      LOG.info("[AUDIT] Secret {} created to store keys of {} referred by workflow {}",
-          secretName, serviceAccount, workflowInstance.workflowId());
-    }
-  }
-
-  private boolean serviceAccountKeysExist(Secret secret) {
-    final Map<String, String> annotations = secret.getMetadata().getAnnotations();
-    final String jsonKeyName = annotations.get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION);
-    final String p12KeyName = annotations.get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION);
-
-    try {
-      return serviceAccountKeyManager.keyExists(jsonKeyName)
-          && serviceAccountKeyManager.keyExists(p12KeyName);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private static String buildSecretName(String serviceAccount) {
-    return STYX_WORKFLOW_SA_SECRET_NAME + '-'
-           + Hashing.sha256().hashString(serviceAccount, UTF_8);
-  }
-
   @VisibleForTesting
-  static Pod createPod(WorkflowInstance workflowInstance, RunSpec runSpec) {
+  static Pod createPod(WorkflowInstance workflowInstance, RunSpec runSpec, KubernetesSecretSpec secretSpec) {
     final String imageWithTag = runSpec.imageName().contains(":")
         ? runSpec.imageName()
         : runSpec.imageName() + ":latest";
@@ -310,9 +220,9 @@ class KubernetesDockerRunner implements DockerRunner {
         .withArgs(runSpec.args())
         .withEnv(buildEnv(workflowInstance, runSpec, podName));
 
-    if (runSpec.serviceAccount().isPresent()) {
+    secretSpec.serviceAccountSecret().ifPresent(serviceAccountSecret -> {
       final SecretVolumeSource saVolumeSource = new SecretVolumeSourceBuilder()
-          .withSecretName(buildSecretName(runSpec.serviceAccount().get()))
+          .withSecretName(serviceAccountSecret)
           .build();
       final Volume saVolume = new VolumeBuilder()
           .withName(STYX_WORKFLOW_SA_SECRET_NAME)
@@ -326,13 +236,11 @@ class KubernetesDockerRunner implements DockerRunner {
           .withReadOnly(true)
           .build();
       containerBuilder.addToVolumeMounts(saMount);
-      // TODO: do we need set this env as default value?
       containerBuilder.addToEnv(envVar(STYX_WORKFLOW_SA_ENV_VARIABLE,
                                        saMount.getMountPath() + STYX_WORKFLOW_SA_JSON_KEY));
-    }
+    });
 
-    if (runSpec.secret().isPresent()) {
-      final WorkflowConfiguration.Secret secret = runSpec.secret().get();
+    secretSpec.customSecret().ifPresent(secret -> {
       final SecretVolumeSource secretVolumeSource = new SecretVolumeSourceBuilder()
           .withSecretName(secret.name())
           .build();
@@ -344,11 +252,12 @@ class KubernetesDockerRunner implements DockerRunner {
 
       final VolumeMount secretMount = new VolumeMountBuilder()
           .withMountPath(secret.mountPath())
-          .withName(secret.name())
+          .withName(secretVolume.getName())
           .withReadOnly(true)
           .build();
       containerBuilder.addToVolumeMounts(secretMount);
-    }
+    });
+
     specBuilder.addToContainers(containerBuilder.build());
     podBuilder.withSpec(specBuilder.build());
 
@@ -666,6 +575,16 @@ class KubernetesDockerRunner implements DockerRunner {
     @Override
     public Boolean halt(WorkflowInstance workflowInstance) {
       return false;
+    }
+  }
+
+  @AutoMatter
+  interface KubernetesSecretSpec {
+    Optional<WorkflowConfiguration.Secret> customSecret();
+    Optional<String> serviceAccountSecret();
+
+    static KubernetesSecretSpecBuilder builder() {
+      return new KubernetesSecretSpecBuilder();
     }
   }
 }

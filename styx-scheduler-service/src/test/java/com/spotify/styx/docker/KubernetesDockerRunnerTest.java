@@ -28,11 +28,9 @@ import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.waiting;
 import static java.util.Optional.empty;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
-import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
@@ -40,32 +38,29 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import com.google.api.services.iam.v1.model.ServiceAccountKey;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
+import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
-import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
-import com.spotify.styx.state.StateManager.IsClosed;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.testdata.TestData;
 import io.fabric8.kubernetes.api.model.DoneablePod;
 import io.fabric8.kubernetes.api.model.DoneableSecret;
 import io.fabric8.kubernetes.api.model.ListMeta;
-import io.fabric8.kubernetes.api.model.ObjectMeta;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.SecretBuilder;
 import io.fabric8.kubernetes.api.model.SecretList;
+import io.fabric8.kubernetes.api.model.SecretVolumeSource;
+import io.fabric8.kubernetes.api.model.Volume;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
@@ -76,6 +71,7 @@ import io.fabric8.kubernetes.client.dsl.Watchable;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.junit.After;
 import org.junit.Before;
@@ -94,6 +90,7 @@ public class KubernetesDockerRunnerTest {
 
   private static final String POD_NAME = "test-pod-1";
   private static final String SERVICE_ACCOUNT = "sa@example.com";
+  private static final String SERVICE_ACCOUNT_SECRET = "sa-secret";
   private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(TestData.WORKFLOW_ID, "foo");
   private static final RunSpec RUN_SPEC = RunSpec.simple("busybox");
   private static final RunSpec RUN_SPEC_WITH_SECRET = RunSpec.create("busybox",
@@ -108,6 +105,18 @@ public class KubernetesDockerRunnerTest {
                                                                  empty(),
                                                                  Optional.of(SERVICE_ACCOUNT),
                                                                  empty());
+
+  private static final KubernetesSecretSpec SECRET_SPEC_WITH_SA = KubernetesSecretSpec.builder()
+      .serviceAccountSecret(SERVICE_ACCOUNT_SECRET)
+      .build();
+
+  private static final KubernetesSecretSpec SECRET_SPEC_WITH_CUSTOM_SECRET = KubernetesSecretSpec.builder()
+      .customSecret(RUN_SPEC_WITH_SECRET.secret())
+      .build();
+
+  private static final KubernetesSecretSpec EMPTY_SECRET_SPEC = KubernetesSecretSpec.builder()
+      .build();
+
   private static final RunSpec RUN_SPEC_WITH_SECRET_AND_SA = RunSpec.create("busybox",
                                                                             ImmutableList.copyOf(new String[0]),
                                                                             false,
@@ -117,7 +126,7 @@ public class KubernetesDockerRunnerTest {
 
   @Mock NamespacedKubernetesClient k8sClient;
 
-  @Mock ServiceAccountKeyManager serviceAccountKeyManager;
+  @Mock KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
 
   @Mock MixedOperation<Pod, PodList, DoneablePod, PodResource<Pod, DoneablePod>> pods;
   @Mock MixedOperation<Secret, SecretList, DoneableSecret, Resource<Secret, DoneableSecret>> secrets;
@@ -128,15 +137,11 @@ public class KubernetesDockerRunnerTest {
   @Mock Watchable<Watch, Watcher<Pod>> podWatchable;
   @Mock Watch watch;
   @Captor ArgumentCaptor<Watcher<Pod>> watchCaptor;
-  @Captor ArgumentCaptor<Secret> secretCaptor;
+  @Captor ArgumentCaptor<Pod> podCaptor;
 
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
+  @Rule public ExpectedException exception = ExpectedException.none();
 
-  ServiceAccountKey serviceAccountJsonKey = new ServiceAccountKey();
-  ServiceAccountKey serviceAccountP12Key = new ServiceAccountKey();
-
-  Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC);
+  Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, EMPTY_SECRET_SPEC);
   StateManager stateManager = Mockito.spy(new SyncStateManager());
   Stats stats = Mockito.mock(Stats.class);
 
@@ -157,10 +162,11 @@ public class KubernetesDockerRunnerTest {
     when(pods.withResourceVersion("1000")).thenReturn(podWatchable);
     when(podWatchable.watch(watchCaptor.capture())).thenReturn(watch);
 
-    when(serviceAccountKeyManager.createJsonKey(anyString())).thenReturn(serviceAccountJsonKey);
-    when(serviceAccountKeyManager.createJsonKey(anyString())).thenReturn(serviceAccountP12Key);
+    when(serviceAccountSecretManager.ensureServiceAccountKeySecret(
+        WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT))
+        .thenReturn(SERVICE_ACCOUNT_SECRET);
 
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, 60);
     kdr.init();
     kdr.restore();
 
@@ -175,10 +181,7 @@ public class KubernetesDockerRunnerTest {
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
     stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
 
-    when(pods.create(any(Pod.class))).thenReturn(createdPod);
-
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
-    stateManager.receive(Event.started(WORKFLOW_INSTANCE));
+    when(pods.create(podCaptor.capture())).thenReturn(createdPod);
   }
 
   @After
@@ -191,16 +194,10 @@ public class KubernetesDockerRunnerTest {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(null);
     when(k8sClient.secrets()).thenReturn(secrets);
-    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET);
+    Pod createdPod = KubernetesDockerRunner.createPod(
+        WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET, SECRET_SPEC_WITH_CUSTOM_SECRET);
     when(pods.create(any(Pod.class))).thenReturn(createdPod);
 
-    stateManager.receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)));
-    stateManager.receive(Event.success(WORKFLOW_INSTANCE));
-    kdr.close();
-
-    // Start a new runner
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
-    kdr.init();
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET);
   }
 
@@ -209,22 +206,17 @@ public class KubernetesDockerRunnerTest {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(null);
     when(k8sClient.secrets()).thenReturn(secrets);
-    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET_AND_SA);
+    Pod createdPod = KubernetesDockerRunner.createPod(
+        WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET_AND_SA, SECRET_SPEC_WITH_CUSTOM_SECRET);
     when(pods.create(any(Pod.class))).thenReturn(createdPod);
 
-    stateManager.receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)));
-    stateManager.receive(Event.success(WORKFLOW_INSTANCE));
-    kdr.close();
-
-    // Start a new runner
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
-    kdr.init();
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET_AND_SA);
   }
 
   @Test
   public void shouldMountSecret() throws IOException, StateManager.IsClosed {
-    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET);
+    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET,
+        SECRET_SPEC_WITH_CUSTOM_SECRET);
     assertThat(pod.getSpec().getVolumes().size(), is(1));
     assertThat(pod.getSpec().getVolumes().get(0).getName(),
                is(RUN_SPEC_WITH_SECRET.secret().get().name()));
@@ -236,7 +228,7 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldMountServiceAccount() throws IOException, StateManager.IsClosed {
-    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
+    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, SECRET_SPEC_WITH_SA);
     assertThat(pod.getSpec().getVolumes().size(), is(1));
     assertThat(pod.getSpec().getVolumes().get(0).getName(),
                is(KubernetesDockerRunner.STYX_WORKFLOW_SA_SECRET_NAME));
@@ -253,211 +245,67 @@ public class KubernetesDockerRunnerTest {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(new SecretBuilder().build());
     when(k8sClient.secrets()).thenReturn(secrets);
-    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET);
+    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET,
+        SECRET_SPEC_WITH_CUSTOM_SECRET);
     when(pods.create(any(Pod.class))).thenReturn(createdPod);
 
-    stateManager.receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)));
-    stateManager.receive(Event.success(WORKFLOW_INSTANCE));
-    kdr.close();
-
-    // Start a new runner
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
-    StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
-    kdr.init();
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET);
-    stateManager.receive(Event.started(WORKFLOW_INSTANCE));
+
+    verify(pods).create(podCaptor.capture());
   }
 
   @Test
-  public void shouldCreateSASecret() throws StateManager.IsClosed, IOException {
+  public void shouldCleanupServiceAccountSecrets() throws Exception {
+    kdr.cleanup();
+    verify(serviceAccountSecretManager).cleanup();
+  }
+
+  @Test
+  public void shouldEnsureAndMountServiceAccountSecret() throws StateManager.IsClosed, IOException {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(null);
     when(k8sClient.secrets()).thenReturn(secrets);
 
-    when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(true);
-
-    ServiceAccountKey jsonKey = new ServiceAccountKey();
-    jsonKey.setName("key.json");
-    jsonKey.setPrivateKeyData("json-private-key-data");
-    ServiceAccountKey p12Key = new ServiceAccountKey();
-    p12Key.setName("key.p12");
-    p12Key.setPrivateKeyData("p12-private-key-data");
-    when(serviceAccountKeyManager.createJsonKey(any(String.class))).thenReturn(jsonKey);
-    when(serviceAccountKeyManager.createP12Key(any(String.class))).thenReturn(p12Key);
-
-    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
+    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, SECRET_SPEC_WITH_SA);
     when(pods.create(any(Pod.class))).thenReturn(createdPod);
 
-    stateManager.receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)));
-    stateManager.receive(Event.success(WORKFLOW_INSTANCE));
-    kdr.close();
+    when(serviceAccountSecretManager.ensureServiceAccountKeySecret(
+        WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT)).thenReturn(SERVICE_ACCOUNT_SECRET);
 
-    // Start a new runner
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
     stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
-    kdr.init();
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
-    verify(secrets).create(secretCaptor.capture());
 
-    final Secret createdSecret = secretCaptor.getValue();
-    assertThat(createdSecret.getMetadata().getAnnotations(), hasEntry("styx-wf-sa", SERVICE_ACCOUNT));
-    assertThat(createdSecret.getData(), hasEntry("styx-wf-sa.json", jsonKey.getPrivateKeyData()));
-    assertThat(createdSecret.getData(), hasEntry("styx-wf-sa.p12", p12Key.getPrivateKeyData()));
+    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
+
+    verify(serviceAccountSecretManager).ensureServiceAccountKeySecret(
+        WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT);
+
+    verify(pods).create(podCaptor.capture());
+
+    final Pod pod = podCaptor.getValue();
+
+    final Optional<SecretVolumeSource> serviceAccountSecretVolume = pod.getSpec().getVolumes().stream()
+        .map(Volume::getSecret)
+        .filter(Objects::nonNull)
+        .filter(v -> SERVICE_ACCOUNT_SECRET.equals(v.getSecretName()))
+        .findAny();
+
+    assertThat(serviceAccountSecretVolume.isPresent(), is(true));
   }
 
   @Test
-  public void shouldRunIfSASecretExists() throws StateManager.IsClosed, IOException {
-    stateManager.receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)));
-    stateManager.receive(Event.success(WORKFLOW_INSTANCE));
-    kdr.close();
+  public void shouldNotRunIfServiceAccountSecretEnsureFails() throws StateManager.IsClosed, IOException {
+    final InvalidExecutionException error = new InvalidExecutionException("SA not found");
+    when(serviceAccountSecretManager.ensureServiceAccountKeySecret(
+        WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT)).thenThrow(error);
 
-    final String jsonKeyId = "json-key";
-    final String p12KeyId = "p12-key";
-
-    final String jsonKeyName = keyName(SERVICE_ACCOUNT, jsonKeyId);
-    final String p12KeyName = keyName(SERVICE_ACCOUNT, p12KeyId);
-
-    final String jsonKeyData = "json-private-key-data";
-    final String p12KeyData = "p12-private-key-data";
-
-    final ObjectMeta metadata = new ObjectMeta();
-    metadata.setAnnotations(ImmutableMap.of(
-        "styx-wf-sa", SERVICE_ACCOUNT,
-        "styx-wf-sa-json-key-name", jsonKeyName,
-        "styx-wf-sa-p12-key-name", p12KeyName));
-
-    final Secret secret = new SecretBuilder()
-        .withMetadata(metadata)
-        .withData(ImmutableMap.of(
-            "styx-wf-sa.json", jsonKeyData,
-            "styx-wf-sa.p12", p12KeyData))
-        .build();
-
-    when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(true);
-    when(serviceAccountKeyManager.keyExists(jsonKeyName)).thenReturn(true);
-    when(serviceAccountKeyManager.keyExists(p12KeyName)).thenReturn(true);
-
-    when(secrets.withName(any(String.class))).thenReturn(namedResource);
-    when(namedResource.get()).thenReturn(secret);
-
-    when(k8sClient.secrets()).thenReturn(secrets);
-    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
-    when(pods.create(any(Pod.class))).thenReturn(createdPod);
-
-    // Start a new runner
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
-    StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
-    kdr.init();
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
-
-    verify(secrets, never()).create(any(Secret.class));
-  }
-
-  public String keyName(String serviceAccount, String keyId) {
-    return "projects/-/serviceAccounts/" + serviceAccount + "/keys/" + keyId;
-  }
-
-  @Test
-  public void shouldNotRunIfServiceAccountDoesNotExist() throws StateManager.IsClosed, IOException {
-    stateManager.receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)));
-    stateManager.receive(Event.success(WORKFLOW_INSTANCE));
-    kdr.close();
-
-    when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(false);
-
-    // Start a new runner
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
-    StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
-    kdr.init();
-
-    exception.expect(InvalidExecutionException.class);
-    exception.expectMessage("Referenced service account " + SERVICE_ACCOUNT + " was not found");
+    exception.expect(is(error));
 
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
-  }
-
-  @Test
-  public void shouldCreateNewServiceAccountKeysIfKeysAreDeleted() throws IOException, IsClosed {
-    stateManager.receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)));
-    stateManager.receive(Event.success(WORKFLOW_INSTANCE));
-    kdr.close();
-
-    final ObjectMeta metadata = new ObjectMeta();
-    metadata.setAnnotations(ImmutableMap.of("styx-wf-sa", SERVICE_ACCOUNT));
-
-    final String jsonKeyName = "json-key";
-    final String p12KeyName = "p12-key";
-    final String newJsonKeyName = "new-json-key";
-    final String newP12KeyName = "new-p12-key";
-
-    final ServiceAccountKey jsonKey = new ServiceAccountKey()
-        .setName(jsonKeyName)
-        .setPrivateKeyData("json-private-key-data");
-
-    final ServiceAccountKey p12Key = new ServiceAccountKey()
-        .setName(p12KeyName)
-        .setPrivateKeyData("p12-private-key-data");
-
-    final ServiceAccountKey newJsonKey = new ServiceAccountKey()
-        .setName(newJsonKeyName)
-        .setPrivateKeyData("new-json-private-key-data");
-
-    final ServiceAccountKey newP12Key = new ServiceAccountKey()
-        .setName(newP12KeyName)
-        .setPrivateKeyData("new-p12-private-key-data");
-
-
-    when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(true);
-    when(serviceAccountKeyManager.keyExists(keyName(SERVICE_ACCOUNT, jsonKeyName))).thenReturn(false);
-    when(serviceAccountKeyManager.keyExists(keyName(SERVICE_ACCOUNT, p12KeyName))).thenReturn(false);
-
-    when(serviceAccountKeyManager.createJsonKey(any(String.class))).thenReturn(newJsonKey);
-    when(serviceAccountKeyManager.createP12Key(any(String.class))).thenReturn(newP12Key);
-
-    when(secrets.withName(any(String.class))).thenReturn(namedResource);
-    when(namedResource.get()).thenReturn(new SecretBuilder()
-        .withMetadata(metadata)
-        .withData(ImmutableMap.of(
-            "styx-wf-sa.json", Json.OBJECT_MAPPER.writeValueAsString(jsonKey),
-            "styx-wf-sa.p12", Json.OBJECT_MAPPER.writeValueAsString(p12Key)))
-        .build());
-
-    when(k8sClient.secrets()).thenReturn(secrets);
-    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
-    when(pods.create(any(Pod.class))).thenReturn(createdPod);
-
-    // Start a new runner
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
-    StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
-    kdr.init();
-
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
-
-    verify(secrets).create(secretCaptor.capture());
-
-    final Secret createdSecret = secretCaptor.getValue();
-    assertThat(createdSecret.getMetadata().getAnnotations(), hasEntry("styx-wf-sa", SERVICE_ACCOUNT));
-    assertThat(createdSecret.getData(), hasEntry("styx-wf-sa.json", newJsonKey.getPrivateKeyData()));
-    assertThat(createdSecret.getData(), hasEntry("styx-wf-sa.p12", newP12Key.getPrivateKeyData()));
   }
 
   @Test
   public void shouldNotRunIfSecretHasManagedServiceAccountKeySecretNamePrefix() throws StateManager.IsClosed, IOException {
-    stateManager.receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)));
-    stateManager.receive(Event.success(WORKFLOW_INSTANCE));
-    kdr.close();
-
-    // Start a new runner
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
-    StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
-    kdr.init();
-
     final String secret = "styx-wf-sa-keys-foo";
 
     exception.expect(InvalidExecutionException.class);
@@ -516,6 +364,9 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldIgnoreDeletedEvents() throws Exception {
+    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    stateManager.receive(Event.started(WORKFLOW_INSTANCE));
+
     podWatcher.eventReceived(Watcher.Action.DELETED, createdPod);
 
     assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.RUNNING));
@@ -553,6 +404,9 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldDiscardChangesForOldExecutions() throws Exception {
+    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    stateManager.receive(Event.started(WORKFLOW_INSTANCE));
+
     // simulate event from different pod, but still with the same workflow instance annotation
     createdPod.getMetadata().setName(POD_NAME + "-other");
     createdPod.setStatus(terminated("Succeeded", 20, null));
@@ -569,7 +423,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(terminated("Succeeded", 20, null));
 
     // Start a new runner
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager);
     kdr.init();
 
     // Make the runner poll states for all pods
@@ -586,7 +440,7 @@ public class KubernetesDockerRunnerTest {
 
     // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
     kdr.close();
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager, 1);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, 1);
     kdr.init();
     kdr.restore();
 

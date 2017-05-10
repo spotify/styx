@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.spotify.styx.ServiceAccountKeyManager;
+import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
@@ -60,6 +61,7 @@ public class KubernetesDockerRunnerPodPollerTest {
       WorkflowInstance.create(TestData.WORKFLOW_ID_2, "bar");
   private static final DockerRunner.RunSpec RUN_SPEC =
       DockerRunner.RunSpec.simple("busybox");
+  private final static KubernetesSecretSpec SECRET_SPEC = KubernetesSecretSpec.builder().build();
 
   @Mock
   NamespacedKubernetesClient k8sClient;
@@ -72,7 +74,7 @@ public class KubernetesDockerRunnerPodPollerTest {
   @Mock
   Stats stats;
 
-  @Mock ServiceAccountKeyManager serviceAccountKeyManager;
+  @Mock KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
 
   KubernetesDockerRunner kdr;
 
@@ -81,13 +83,13 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(k8sClient.inNamespace(any(String.class))).thenReturn(k8sClient);
     when(k8sClient.pods()).thenReturn(pods);
 
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountKeyManager);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager);
     podList = new PodList();
   }
 
   @Test
   public void shouldSendRunErrorWhenPodForRunningWFIDoesntExist() throws Exception {
-    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC);
+    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
     podList.setItems(Arrays.asList(createdPod));
     when(k8sClient.pods().list()).thenReturn(podList);
     setupActiveInstances(RunState.State.RUNNING);
@@ -100,8 +102,8 @@ public class KubernetesDockerRunnerPodPollerTest {
 
   @Test
   public void shouldNotSendRunErrorWhenPodForRunningWFIExists() throws Exception {
-    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC);
-    Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC);
+    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
+    Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
     podList.setItems(Arrays.asList(createdPod, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
     setupActiveInstances(RunState.State.RUNNING);

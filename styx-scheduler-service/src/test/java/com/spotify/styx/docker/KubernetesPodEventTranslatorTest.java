@@ -28,6 +28,7 @@ import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
@@ -51,9 +52,10 @@ public class KubernetesPodEventTranslatorTest {
       WorkflowInstance.create(TestData.WORKFLOW_ID, "foo");
   private static final DockerRunner.RunSpec RUN_SPEC =
       DockerRunner.RunSpec.simple("busybox");
-  private static String MESSAGE_FORMAT = "{\"rfu\":{\"dum\":\"my\"},\"component_id\":\"dummy\",\"workflow_id\":\"dummy\",\"parameter\":\"dummy\",\"execution_id\":\"dummy\",\"event\":\"dummy\",\"exit_code\":%d}\n";
+  private static final String MESSAGE_FORMAT = "{\"rfu\":{\"dum\":\"my\"},\"component_id\":\"dummy\",\"workflow_id\":\"dummy\",\"parameter\":\"dummy\",\"execution_id\":\"dummy\",\"event\":\"dummy\",\"exit_code\":%d}\n";
+  private static final KubernetesSecretSpec SECRET_SPEC = KubernetesSecretSpec.builder().build();
 
-  Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC);
+  Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC, SECRET_SPEC);
 
   @Test
   public void terminateOnSuccessfulTermination() throws Exception {
@@ -333,6 +335,6 @@ public class KubernetesPodEventTranslatorTest {
     return KubernetesDockerRunner.createPod(
         WFI,
         DockerRunner.RunSpec.create("busybox", ImmutableList.of(), true,
-                                    Optional.empty(), Optional.empty(), Optional.empty()));
+            Optional.empty(), Optional.empty(), Optional.empty()), SECRET_SPEC);
   }
 }

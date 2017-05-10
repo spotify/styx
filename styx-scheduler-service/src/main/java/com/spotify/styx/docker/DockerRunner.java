@@ -62,6 +62,13 @@ public interface DockerRunner extends Closeable {
   String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException;
 
   /**
+   * Perform cleanup for resources such as secrets etc. Resources that are not in use by any currently live workflows
+   * should be removed.
+   */
+  default void cleanup() throws IOException {
+  }
+
+  /**
    * Execute cleanup operations for when an execution finishes.
    * @param executionId The execution id for which the cleanup code is called
    */
@@ -110,8 +117,10 @@ public interface DockerRunner extends Closeable {
 
   static DockerRunner kubernetes(NamespacedKubernetesClient kubernetesClient, StateManager stateManager,
       Stats stats, ServiceAccountKeyManager serviceAccountKeyManager) {
+    final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager =
+        new KubernetesGCPServiceAccountSecretManager(kubernetesClient, serviceAccountKeyManager);
     final KubernetesDockerRunner dockerRunner =
-        new KubernetesDockerRunner(kubernetesClient, stateManager, stats, serviceAccountKeyManager);
+        new KubernetesDockerRunner(kubernetesClient, stateManager, stats, serviceAccountSecretManager);
 
     dockerRunner.init();
 
