@@ -26,6 +26,7 @@ import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static com.spotify.styx.util.ReplayEvents.transitionLogger;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toMap;
 
@@ -122,7 +123,7 @@ public class StyxScheduler implements AppInit {
 
   public static final int SCHEDULER_TICK_INTERVAL_SECONDS = 2;
   public static final int TRIGGER_MANAGER_TICK_INTERVAL_SECONDS = 1;
-  public static final int CLEANER_TICK_INTERVAL_SECONDS = 30;
+  public static final long CLEANER_TICK_INTERVAL_SECONDS = MINUTES.toSeconds(30);
   public static final int RUNTIME_CONFIG_UPDATE_INTERVAL_SECONDS = 5;
   public static final Duration DEFAULT_RETRY_BASE_DELAY = Duration.ofMinutes(3);
   public static final int DEFAULT_RETRY_MAX_EXPONENT = 4;
