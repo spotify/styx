@@ -14,7 +14,7 @@ jobs:
           paths:
             - ~/.m2
       - run: mvn verify
-      - run: bash <(curl -s https://codecov.io/bash -f '!**/jacoco-aggregate/jacoco.xml')
+      - run: bash <(curl -s https://codecov.io/bash -f '!./report/target/site/jacoco-aggregate/jacoco.xml')
       - run: |
           mkdir test-reports
           find . -type f -regex ".*/target/surefire-reports/.*xml" -exec cp {} test-reports/ \;
