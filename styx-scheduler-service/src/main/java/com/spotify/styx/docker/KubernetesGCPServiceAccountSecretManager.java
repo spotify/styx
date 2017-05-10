@@ -108,6 +108,7 @@ class KubernetesGCPServiceAccountSecretManager  {
     logger.info("[AUDIT] Workflow {} refers to secret {} storing keys of {}",
              workflowId, secretName, serviceAccount);
 
+    // TODO: shard locking to regain concurrency
     synchronized (secretMutationLock) {
 
       // Check if we have a valid service account key secret already
