@@ -75,6 +75,9 @@ import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import java.io.IOException;
 import java.net.ProtocolException;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -111,7 +114,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
   static final String STYX_WORKFLOW_SA_ENV_VARIABLE = "GOOGLE_APPLICATION_CREDENTIALS";
   private static final String STYX_WORKFLOW_SA_ID_ANNOTATION = "styx-wf-sa";
-  private static final String STYX_WORKFLOW_SA_SECRET_EPOCH_ANNOTATION = "styx-wf-sa-epoch";
+  private static final String STYX_WORKFLOW_SA_EPOCH_ANNOTATION = "styx-wf-sa-epoch";
   private static final String STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION = "styx-wf-sa-json-key-name";
   private static final String STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION = "styx-wf-sa-p12-key-name";
   static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
@@ -127,6 +130,8 @@ class KubernetesDockerRunner implements DockerRunner {
 
   private static final Supplier<String> DEFAULT_SECRET_EPOCH_PROVIDER = KubernetesDockerRunner::utcNoonSecretEpoch;
 
+  private static final Duration SECRET_GC_GRACE_PERIOD = Duration.ofMinutes(30);
+
   private final ScheduledExecutorService executor =
       Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY);
 
@@ -136,6 +141,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private final int pollPodsIntervalSeconds;
   private final ServiceAccountKeyManager serviceAccountKeyManager;
   private final Supplier<String> secretEpochProvider;
+  private final Clock clock;
 
   private Watch watch;
 
@@ -143,75 +149,80 @@ class KubernetesDockerRunner implements DockerRunner {
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
       ServiceAccountKeyManager serviceAccountKeyManager, int pollPodsIntervalSeconds,
-      Supplier<String> secretEpochProvider) {
+      Supplier<String> secretEpochProvider, Clock clock) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client).inNamespace(NAMESPACE);
     this.stats = Objects.requireNonNull(stats);
     this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
     this.serviceAccountKeyManager = Objects.requireNonNull(serviceAccountKeyManager);
     this.secretEpochProvider = Objects.requireNonNull(secretEpochProvider);
+    this.clock = Objects.requireNonNull(clock);
   }
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
       ServiceAccountKeyManager serviceAccountKeyManager) {
     this(client, stateManager, stats, serviceAccountKeyManager, DEFAULT_POLL_PODS_INTERVAL_SECONDS,
-        DEFAULT_SECRET_EPOCH_PROVIDER);
+        DEFAULT_SECRET_EPOCH_PROVIDER, Clock.systemUTC());
   }
 
   @Override
   public String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
     final String secretEpoch = secretEpochProvider.get();
-    synchronized (secretMutationLock) {
-      ensureSecrets(workflowInstance, runSpec, secretEpoch);
-      try {
-        final Pod pod = client.pods().create(createPod(workflowInstance, runSpec, secretEpoch));
-        return pod.getMetadata().getName();
-      } catch (KubernetesClientException kce) {
-        throw new IOException("Failed to create Kubernetes pod", kce);
-      }
+    ensureSecrets(workflowInstance, runSpec, secretEpoch);
+    try {
+      final Pod pod = client.pods().create(createPod(workflowInstance, runSpec, secretEpoch));
+      return pod.getMetadata().getName();
+    } catch (KubernetesClientException kce) {
+      throw new IOException("Failed to create Kubernetes pod", kce);
     }
   }
 
   @Override
   public void cleanup() throws IOException {
-    synchronized (secretMutationLock) {
 
-      // Enumerate all secrets currently used by pods
-      final PodList pods = client.pods().list();
-      final Set<String> activeSecrets = pods.getItems().stream()
-          .flatMap(pod -> pod.getSpec().getVolumes().stream())
-          .map(volume -> volume.getSecret().getSecretName())
-          .collect(Collectors.toSet());
+    // Enumerate all secrets currently used by pods
+    final PodList pods = client.pods().list();
+    final Set<String> activeSecrets = pods.getItems().stream()
+        .flatMap(pod -> pod.getSpec().getVolumes().stream())
+        .map(volume -> volume.getSecret().getSecretName())
+        .collect(Collectors.toSet());
 
-      // Enumerate all service account secrets that are not in active use
-      final SecretList secrets = client.secrets().list();
-      final List<Secret> inactiveServiceAccountSecrets = secrets.getItems().stream()
-          .filter(secret -> secret.getMetadata().getName().startsWith(STYX_WORKFLOW_SA_SECRET_NAME))
-          .filter(secret -> !activeSecrets.contains(secret.getMetadata().getName()))
-          .collect(Collectors.toList());
+    // Enumerate service account secrets to delete
+    final String epoch = secretEpochProvider.get();
+    final Instant creationDeadline = Instant.now().minus(SECRET_GC_GRACE_PERIOD);
+    final SecretList secrets = client.secrets().list();
+    final List<Secret> inactiveServiceAccountSecrets = secrets.getItems().stream()
+        // Only include service account secrets
+        .filter(secret -> secret.getMetadata().getName().startsWith(STYX_WORKFLOW_SA_SECRET_NAME))
+        // Exclude secrets in the current epoch
+        .filter(secret -> !epoch.equals(secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_EPOCH_ANNOTATION)))
+        // Exclude recently created secrets to mitigate races with secret creation around epoch switch
+        .filter(secret -> Instant.parse(secret.getMetadata().getCreationTimestamp()).isBefore(creationDeadline))
+        // Exclude secrets currently in use by pods
+        .filter(secret -> !activeSecrets.contains(secret.getMetadata().getName()))
+        .collect(Collectors.toList());
 
-      // Delete keys and secrets for all inactive service accounts and let them be recreated by future executions
-      for (Secret secret : inactiveServiceAccountSecrets) {
-        final String name = secret.getMetadata().getName();
-        final String serviceAcountEmail = serviceAccountEmail(secret);
+    // Delete keys and secrets for all inactive service accounts and let them be recreated by future executions
+    for (Secret secret : inactiveServiceAccountSecrets) {
+      final String name = secret.getMetadata().getName();
+      final String serviceAcountEmail = serviceAccountEmail(secret);
 
-        try {
-          final Map<String, String> annotations = secret.getMetadata().getAnnotations();
-          final String jsonKeyName = annotations.get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION);
-          final String p12KeyName = annotations.get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION);
+      try {
+        final Map<String, String> annotations = secret.getMetadata().getAnnotations();
+        final String jsonKeyName = annotations.get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION);
+        final String p12KeyName = annotations.get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION);
 
-          LOG.info("[AUDIT] Deleting service account key: {}", jsonKeyName);
-          tryDeleteServiceAccountKey(jsonKeyName);
+        LOG.info("[AUDIT] Deleting service account key: {}", jsonKeyName);
+        tryDeleteServiceAccountKey(jsonKeyName);
 
-          LOG.info("[AUDIT] Deleting service account key: {}", p12KeyName);
-          tryDeleteServiceAccountKey(p12KeyName);
+        LOG.info("[AUDIT] Deleting service account key: {}", p12KeyName);
+        tryDeleteServiceAccountKey(p12KeyName);
 
-          LOG.info("[AUDIT] Deleting service account {} secret {}", serviceAcountEmail, name);
-          client.secrets().delete(secret);
-        } catch (IOException | KubernetesClientException e) {
-          LOG.warn("[AUDIT] Failed to delete service account {} keys and/or secret {}",
-              serviceAcountEmail, name);
-        }
+        LOG.info("[AUDIT] Deleting service account {} secret {}", serviceAcountEmail, name);
+        client.secrets().delete(secret);
+      } catch (IOException | KubernetesClientException e) {
+        LOG.warn("[AUDIT] Failed to delete service account {} keys and/or secret {}",
+            serviceAcountEmail, name);
       }
     }
   }
@@ -294,55 +305,58 @@ class KubernetesDockerRunner implements DockerRunner {
     LOG.info("[AUDIT] Workflow {} refers to secret {} storing keys of {}",
              workflowInstance.workflowId(), secretName, serviceAccount);
 
-    // Check if we have a valid service account key secret already
-    final Secret existingSecret = client.secrets().withName(secretName).get();
-    if (existingSecret != null) {
-      if (serviceAccountKeysExist(existingSecret)) {
-        return;
+    synchronized (secretMutationLock) {
+
+      // Check if we have a valid service account key secret already
+      final Secret existingSecret = client.secrets().withName(secretName).get();
+      if (existingSecret != null) {
+        if (serviceAccountKeysExist(existingSecret)) {
+          return;
+        }
+
+        LOG.info("[AUDIT] Service account keys have been deleted for {}, recreating",
+            serviceAccount);
+
+        // Need to delete this secret before creating a new one
+        client.secrets().delete(existingSecret);
       }
 
-      LOG.info("[AUDIT] Service account keys have been deleted for {}, recreating",
-          serviceAccount);
+      // Create service account keys and secret
+      final ServiceAccountKey jsonKey;
+      final ServiceAccountKey p12Key;
+      try {
+        jsonKey = serviceAccountKeyManager.createJsonKey(serviceAccount);
+        p12Key = serviceAccountKeyManager.createP12Key(serviceAccount);
+      } catch (IOException e) {
+        LOG.error("[AUDIT] Failed to create keys for {}", serviceAccount, e);
+        throw e;
+      }
 
-      // Need to delete this secret before creating a new one
-      client.secrets().delete(existingSecret);
+      final Map<String, String> keys = ImmutableMap.of(
+          STYX_WORKFLOW_SA_JSON_KEY, jsonKey.getPrivateKeyData(),
+          STYX_WORKFLOW_SA_P12_KEY, p12Key.getPrivateKeyData()
+      );
+
+      final Map<String, String> annotations = ImmutableMap.of(
+          STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION, jsonKey.getName(),
+          STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION, p12Key.getName(),
+          STYX_WORKFLOW_SA_ID_ANNOTATION, serviceAccount,
+          STYX_WORKFLOW_SA_EPOCH_ANNOTATION, secretEpoch
+      );
+
+      final Secret newSecret = new SecretBuilder()
+          .withNewMetadata()
+          .withName(secretName)
+          .withAnnotations(annotations)
+          .endMetadata()
+          .withData(keys)
+          .build();
+
+      client.secrets().create(newSecret);
+
+      LOG.info("[AUDIT] Secret {} created to store keys of {} referred by workflow {}",
+          secretName, serviceAccount, workflowInstance.workflowId());
     }
-
-    // Create service account keys and secret
-    final ServiceAccountKey jsonKey;
-    final ServiceAccountKey p12Key;
-    try {
-      jsonKey = serviceAccountKeyManager.createJsonKey(serviceAccount);
-      p12Key = serviceAccountKeyManager.createP12Key(serviceAccount);
-    } catch (IOException e) {
-      LOG.error("[AUDIT] Failed to create keys for {}", serviceAccount, e);
-      throw e;
-    }
-
-    final Map<String, String> keys = ImmutableMap.of(
-        STYX_WORKFLOW_SA_JSON_KEY, jsonKey.getPrivateKeyData(),
-        STYX_WORKFLOW_SA_P12_KEY, p12Key.getPrivateKeyData()
-    );
-
-    final Map<String, String> annotations = ImmutableMap.of(
-        STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION, jsonKey.getName(),
-        STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION, p12Key.getName(),
-        STYX_WORKFLOW_SA_ID_ANNOTATION, serviceAccount,
-        STYX_WORKFLOW_SA_SECRET_EPOCH_ANNOTATION, secretEpoch
-    );
-
-    final Secret newSecret = new SecretBuilder()
-        .withNewMetadata()
-        .withName(secretName)
-        .withAnnotations(annotations)
-        .endMetadata()
-        .withData(keys)
-        .build();
-
-    client.secrets().create(newSecret);
-
-    LOG.info("[AUDIT] Secret {} created to store keys of {} referred by workflow {}",
-        secretName, serviceAccount, workflowInstance.workflowId());
   }
 
   private boolean serviceAccountKeysExist(Secret secret) {
