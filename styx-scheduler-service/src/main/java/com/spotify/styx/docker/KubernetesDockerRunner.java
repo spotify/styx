@@ -189,7 +189,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
     // Enumerate service account secrets to delete
     final String epoch = secretEpochProvider.get();
-    final Instant creationDeadline = Instant.now().minus(SECRET_GC_GRACE_PERIOD);
+    final Instant creationDeadline = clock.instant().minus(SECRET_GC_GRACE_PERIOD);
     final SecretList secrets = client.secrets().list();
     final List<Secret> inactiveServiceAccountSecrets = secrets.getItems().stream()
         // Only include service account secrets
