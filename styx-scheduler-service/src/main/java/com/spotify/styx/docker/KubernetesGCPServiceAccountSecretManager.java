@@ -46,10 +46,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import javax.activity.InvalidActivityException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -99,9 +97,7 @@ class KubernetesGCPServiceAccountSecretManager {
 
   String ensureServiceAccountKeySecret(String workflowId,
       String serviceAccount) throws IOException {
-
     final long epoch = epochProvider.epoch(clock.millis(), serviceAccount);
-
     final String secretName = buildSecretName(serviceAccount, epoch);
 
     logger.info("[AUDIT] Workflow {} refers to secret {} storing keys of {}",
@@ -109,7 +105,7 @@ class KubernetesGCPServiceAccountSecretManager {
 
     try {
       return serviceAccountSecretCache.get(serviceAccount, () ->
-          createServiceAccountKeySecret(workflowId, serviceAccount, epoch, secretName));
+          getOrCreateServiceAccountKeySecret(workflowId, serviceAccount, epoch, secretName));
     } catch (Exception e) {
       if (e.getCause() instanceof InvalidExecutionException) {
         throw (InvalidExecutionException) e.getCause();
@@ -119,9 +115,8 @@ class KubernetesGCPServiceAccountSecretManager {
     }
   }
 
-  private String createServiceAccountKeySecret(String workflowId, String serviceAccount, long epoch, String secretName)
-      throws IOException {
-
+  private String getOrCreateServiceAccountKeySecret(
+      String workflowId, String serviceAccount, long epoch, String secretName) throws IOException {
     // Check that the service account exists
     final boolean serviceAccountExists = serviceAccountKeyManager.serviceAccountExists(serviceAccount);
     if (!serviceAccountExists) {
@@ -181,7 +176,6 @@ class KubernetesGCPServiceAccountSecretManager {
   }
 
   public void cleanup() throws IOException {
-
     // Enumerate all secrets currently used by pods
     final PodList pods = client.pods().list();
     final Set<String> activeSecrets = pods.getItems().stream()
