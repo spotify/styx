@@ -10,7 +10,12 @@ coverage:
         enabled: yes
         target: auto
         threshold: 0.1
-    patch: true
+    patch:
+      default:
+        enabled: yes
+        target: auto
+        threshold: 0.1
+
     changes: false
 
 comment:
