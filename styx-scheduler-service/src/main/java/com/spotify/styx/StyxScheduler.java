@@ -432,9 +432,9 @@ public class StyxScheduler implements AppInit {
   }
 
   private static void startCleaner(Cleaner cleaner, ScheduledExecutorService exec) {
-    exec.scheduleAtFixedRate(
+    exec.scheduleWithFixedDelay(
         guard(cleaner::tick),
-        CLEANER_TICK_INTERVAL_SECONDS,
+        0,
         CLEANER_TICK_INTERVAL_SECONDS,
         TimeUnit.SECONDS);
   }
