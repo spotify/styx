@@ -22,12 +22,13 @@ package com.spotify.styx.publisher;
 
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
+import java.io.Closeable;
 import java.io.IOException;
 
 /**
  * An interface for publishing events.
  */
-public interface Publisher {
+public interface Publisher extends Closeable {
 
   void deploying(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) throws IOException;
 
