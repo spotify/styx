@@ -382,7 +382,7 @@ public class StyxScheduler implements AppInit {
 
   private void warmUpCache(WorkflowCache cache, Storage storage) {
     try {
-      storage.workflowsWithNextNaturalTrigger().keySet().forEach(cache::store);
+      storage.workflows().values().forEach(cache::store);
     } catch (IOException e) {
       LOG.warn("Failed to get workflows from storage", e);
     }

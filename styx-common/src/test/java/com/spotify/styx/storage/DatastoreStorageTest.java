@@ -574,6 +574,30 @@ public class DatastoreStorageTest {
     assertThat(blacklist.get(2), is("v3"));
   }
 
+  @Test
+  public void shouldReturnAllWorkflows() throws Exception {
+    assertThat(storage.workflows().isEmpty(), is(true));
+
+    Workflow workflow1 = workflow(WORKFLOW_ID1);
+    Workflow workflow2 = workflow(WORKFLOW_ID2);
+    Workflow workflow3 = workflow(WORKFLOW_ID3);
+
+    Instant now = Instant.now();
+
+    storage.store(workflow1);
+    storage.store(workflow2);
+    storage.store(workflow3);
+
+    storage.setEnabled(WORKFLOW_ID1, true);
+    storage.setEnabled(WORKFLOW_ID2, false);
+    storage.updateNextNaturalTrigger(WORKFLOW_ID3, TriggerInstantSpec.create(now, now.plus(Duration.ofHours(1))));
+
+    assertThat(storage.workflows().size(), is(3));
+    assertThat(storage.workflows(), hasEntry(WORKFLOW_ID1, workflow1));
+    assertThat(storage.workflows(), hasEntry(WORKFLOW_ID2, workflow2));
+    assertThat(storage.workflows(), hasEntry(WORKFLOW_ID3, workflow3));
+  }
+
   private Workflow workflow(WorkflowId workflowId) {
     return Workflow.create(
         workflowId.componentId(),
