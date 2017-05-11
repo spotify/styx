@@ -68,12 +68,21 @@ public class RoutingDockerRunnerTest {
   }
 
   @Test
-  public void testUsesDefaultRunnerOnCleanup() throws Exception {
+  public void testUsesDefaultRunnerOnWorkflowCleanup() throws Exception {
     when(dockerId.get()).thenReturn("default");
     dockerRunner.cleanup(MOCK_EXEC_ID);
 
     assertThat(createdRunners, hasKey("default"));
     verify(createdRunners.get("default")).cleanup(MOCK_EXEC_ID);
+  }
+
+  @Test
+  public void testUsesDefaultRunnerOnCleanup() throws Exception {
+    when(dockerId.get()).thenReturn("default");
+    dockerRunner.cleanup();
+
+    assertThat(createdRunners, hasKey("default"));
+    verify(createdRunners.get("default")).cleanup();
   }
 
   @Test
