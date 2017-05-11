@@ -57,6 +57,11 @@ class RoutingDockerRunner implements DockerRunner {
   }
 
   @Override
+  public void cleanup() throws IOException {
+    runner().cleanup();
+  }
+
+  @Override
   public void cleanup(String executionId) {
     runner().cleanup(executionId);
   }

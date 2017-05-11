@@ -336,6 +336,10 @@ public class StyxSchedulerServiceFixture {
       }
 
       @Override
+      public void cleanup() throws IOException {
+      }
+
+      @Override
       public void cleanup(String executionId) {
         dockerCleans.add(executionId);
       }
