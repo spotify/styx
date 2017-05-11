@@ -150,5 +150,9 @@ public class PublisherHandlerTest {
       }
       delegate.deployed(workflowInstance, executionDescription);
     }
+
+    @Override
+    public void close() throws IOException {
+    }
   }
 }

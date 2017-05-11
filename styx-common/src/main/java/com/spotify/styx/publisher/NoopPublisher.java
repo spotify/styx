@@ -37,4 +37,8 @@ class NoopPublisher implements Publisher {
       WorkflowInstance workflowInstance, ExecutionDescription executionDescription)
       throws IOException {
   }
+
+  @Override
+  public void close() throws IOException {
+  }
 }

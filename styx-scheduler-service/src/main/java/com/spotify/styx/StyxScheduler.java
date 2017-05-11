@@ -286,6 +286,9 @@ public class StyxScheduler implements AppInit {
         .setUncaughtExceptionHandler(uncaughtExceptionHandler)
         .build();
 
+    final Publisher publisher = publisherFactory.apply(environment);
+    closer.register(publisher);
+
     final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
     final ExecutorService eventWorker = Executors.newFixedThreadPool(16, eventTf);
     final ExecutorService dockerRunnerExecutor = Executors.newSingleThreadExecutor(dockerRunnerTf);
@@ -310,7 +313,6 @@ public class StyxScheduler implements AppInit {
         id -> dockerRunnerFactory.create(id, environment, stateManager, executor, stats),
         dockerId);
     final DockerRunner dockerRunner = instrument(DockerRunner.class, routingDockerRunner, stats, time);
-    final Publisher publisher = publisherFactory.apply(environment);
 
     final RateLimiter submissionRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
 
