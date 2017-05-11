@@ -113,6 +113,10 @@ class LocalDockerRunner implements DockerRunner {
   }
 
   @Override
+  public void cleanup() throws IOException {
+  }
+
+  @Override
   public void cleanup(String executionId) {
   }
 

@@ -65,8 +65,7 @@ public interface DockerRunner extends Closeable {
    * Perform cleanup for resources such as secrets etc. Resources that are not in use by any currently live workflows
    * should be removed.
    */
-  default void cleanup() throws IOException {
-  }
+  void cleanup() throws IOException;
 
   /**
    * Execute cleanup operations for when an execution finishes.
