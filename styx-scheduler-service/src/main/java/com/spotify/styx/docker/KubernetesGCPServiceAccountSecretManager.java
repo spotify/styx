@@ -25,6 +25,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.services.iam.v1.model.ServiceAccountKey;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hashing;
 import com.spotify.styx.ServiceAccountKeyManager;
@@ -44,12 +46,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.activity.InvalidActivityException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-class KubernetesGCPServiceAccountSecretManager  {
+class KubernetesGCPServiceAccountSecretManager {
 
   private static final Logger logger = LoggerFactory.getLogger(KubernetesGCPServiceAccountSecretManager.class);
 
@@ -73,7 +77,9 @@ class KubernetesGCPServiceAccountSecretManager  {
   private final EpochProvider epochProvider;
   private final Clock clock;
 
-  private final Object secretMutationLock = new Object() {};
+  private final Cache<String, String> serviceAccountSecretCache = CacheBuilder.newBuilder()
+      .expireAfterWrite(30, TimeUnit.SECONDS)
+      .build();
 
   KubernetesGCPServiceAccountSecretManager(
       NamespacedKubernetesClient client,
@@ -86,15 +92,35 @@ class KubernetesGCPServiceAccountSecretManager  {
     this.clock = Objects.requireNonNull(clock);
   }
 
-  public KubernetesGCPServiceAccountSecretManager(NamespacedKubernetesClient client,
+  KubernetesGCPServiceAccountSecretManager(NamespacedKubernetesClient client,
       ServiceAccountKeyManager serviceAccountKeyManager) {
     this(client, serviceAccountKeyManager, DEFAULT_SECRET_EPOCH_PROVIDER, DEFAULT_CLOCK);
   }
 
-  public String ensureServiceAccountKeySecret(String workflowId,
+  String ensureServiceAccountKeySecret(String workflowId,
       String serviceAccount) throws IOException {
 
     final long epoch = epochProvider.epoch(clock.millis(), serviceAccount);
+
+    final String secretName = buildSecretName(serviceAccount, epoch);
+
+    logger.info("[AUDIT] Workflow {} refers to secret {} storing keys of {}",
+             workflowId, secretName, serviceAccount);
+
+    try {
+      return serviceAccountSecretCache.get(serviceAccount, () ->
+          createServiceAccountKeySecret(workflowId, serviceAccount, epoch, secretName));
+    } catch (Exception e) {
+      if (e.getCause() instanceof InvalidExecutionException) {
+        throw (InvalidExecutionException) e.getCause();
+      } else {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  private String createServiceAccountKeySecret(String workflowId, String serviceAccount, long epoch, String secretName)
+      throws IOException {
 
     // Check that the service account exists
     final boolean serviceAccountExists = serviceAccountKeyManager.serviceAccountExists(serviceAccount);
@@ -103,66 +129,55 @@ class KubernetesGCPServiceAccountSecretManager  {
       throw new InvalidExecutionException("Referenced service account " + serviceAccount + " was not found");
     }
 
-    final String secretName = buildSecretName(serviceAccount, epoch);
-
-    logger.info("[AUDIT] Workflow {} refers to secret {} storing keys of {}",
-             workflowId, secretName, serviceAccount);
-
-    // TODO: shard locking to regain concurrency
-    synchronized (secretMutationLock) {
-
-      // Check if we have a valid service account key secret already
-      final Secret existingSecret = client.secrets().withName(secretName).get();
-      if (existingSecret != null) {
-        if (serviceAccountKeysExist(existingSecret)) {
-          return secretName;
-        }
-
-        logger.info("[AUDIT] Service account keys have been deleted for {}, recreating",
-            serviceAccount);
-
-        // Need to delete this secret before creating a new one
-        client.secrets().delete(existingSecret);
+    final Secret existingSecret = client.secrets().withName(secretName).get();
+    if (existingSecret != null) {
+      if (serviceAccountKeysExist(existingSecret)) {
+        return secretName;
       }
 
-      // Create service account keys and secret
-      final ServiceAccountKey jsonKey;
-      final ServiceAccountKey p12Key;
-      try {
-        jsonKey = serviceAccountKeyManager.createJsonKey(serviceAccount);
-        p12Key = serviceAccountKeyManager.createP12Key(serviceAccount);
-      } catch (IOException e) {
-        logger.error("[AUDIT] Failed to create keys for {}", serviceAccount, e);
-        throw e;
-      }
+      logger.info("[AUDIT] Service account keys have been deleted for {}, recreating", serviceAccount);
 
-      final Map<String, String> keys = ImmutableMap.of(
-          STYX_WORKFLOW_SA_JSON_KEY, jsonKey.getPrivateKeyData(),
-          STYX_WORKFLOW_SA_P12_KEY, p12Key.getPrivateKeyData()
-      );
-
-      final Map<String, String> annotations = ImmutableMap.of(
-          STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION, jsonKey.getName(),
-          STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION, p12Key.getName(),
-          STYX_WORKFLOW_SA_ID_ANNOTATION, serviceAccount,
-          STYX_WORKFLOW_SA_EPOCH_ANNOTATION, Long.toString(epoch)
-      );
-
-      final Secret newSecret = new SecretBuilder()
-          .withNewMetadata()
-          .withName(secretName)
-          .withAnnotations(annotations)
-          .endMetadata()
-          .withData(keys)
-          .build();
-
-      client.secrets().create(newSecret);
-
-      logger.info("[AUDIT] Secret {} created to store keys of {} referred by workflow {}",
-          secretName, serviceAccount, workflowId);
-
-      return secretName;
+      // Need to delete this secret before creating a new one
+      client.secrets().delete(existingSecret);
     }
+
+    // Create service account keys and secret
+    final ServiceAccountKey jsonKey;
+    final ServiceAccountKey p12Key;
+    try {
+      jsonKey = serviceAccountKeyManager.createJsonKey(serviceAccount);
+      p12Key = serviceAccountKeyManager.createP12Key(serviceAccount);
+    } catch (IOException e) {
+      logger.error("[AUDIT] Failed to create keys for {}", serviceAccount, e);
+      throw e;
+    }
+
+    final Map<String, String> keys = ImmutableMap.of(
+        STYX_WORKFLOW_SA_JSON_KEY, jsonKey.getPrivateKeyData(),
+        STYX_WORKFLOW_SA_P12_KEY, p12Key.getPrivateKeyData()
+    );
+
+    final Map<String, String> annotations = ImmutableMap.of(
+        STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION, jsonKey.getName(),
+        STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION, p12Key.getName(),
+        STYX_WORKFLOW_SA_ID_ANNOTATION, serviceAccount,
+        STYX_WORKFLOW_SA_EPOCH_ANNOTATION, Long.toString(epoch)
+    );
+
+    final Secret newSecret = new SecretBuilder()
+        .withNewMetadata()
+        .withName(secretName)
+        .withAnnotations(annotations)
+        .endMetadata()
+        .withData(keys)
+        .build();
+
+    client.secrets().create(newSecret);
+
+    logger.info("[AUDIT] Secret {} created to store keys of {} referred by workflow {}",
+        secretName, serviceAccount, workflowId);
+
+    return secretName;
   }
 
   public void cleanup() throws IOException {
