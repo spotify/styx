@@ -1,7 +1,8 @@
 # Styx API specification
 
 This specification is for deprecated API versions. Users are recommended to use
-[latest version] if backward compatibility is not an issue.
+[latest version] if backward compatibility is not an issue. In this document,
+`endpoint` is interchangeable with `workflow` when describing a workflow.
 
 This document is written using [api-blueprint]
 
@@ -25,11 +26,15 @@ aglio -i doc/api-deprecated.apib -o api-deprecated.html --theme-template triple 
 
 Resources related to the Workflows registered in Styx.
 
-## Workflow [/v2/workflows/{component}/{workflow_id}]
+## Workflow [/{version}/workflows/{component_id}/{endpoint_id}]
 
 + Parameters
-    + component: `styx-canary` (string) - Workflow Component
-    + workflow_id: `LuigiCanary` (string) - Workflow ID
+    + version: `v0` (enum[string]) - API version
+        + Members
+            + `v0`
+            + `v1`
+    + component_id: `styx-canary` (string) - Workflow Component
+    + endpoint_id: `StyxCanary` (string) - Endpoint ID
 
 ### Get Workflow [GET]
 
@@ -37,28 +42,30 @@ Resources related to the Workflows registered in Styx.
 
         {
             "component_id": "styx-canary",
-            "workflow_id": "LuigiCanary",
+            "endpoint_id": "StyxCanary",
             "component_uri": "file:///etc/styx/schedule.yaml",
             "schedule": {
-                "schedule": "hours",
+                "id": "StyxCanary",
+                "partitioning": "hours",
+                "docker_image": null,
                 "docker_args": [
                   "luigi",
                   "--module",
                   "canary_job",
                   "CanaryJob",
                   "--local-scheduler"
-                ]
-            },
-            "docker_termination_logging": false,
-            "secret": null,
-            "resources": [ ]
+                ],
+                "docker_termination_logging": false,
+                "secret": null,
+                "resources": []
+            }
         }
 
-## Workflow Instances [/v2/workflows/{component}/{workflow_id}/instances]
+## Workflow Instances [/v1/workflows/{component_id}/{endpoint_id}/instances]
 
 + Parameters
-    + component: `styx-canary` (string) - Workflow Component
-    + workflow_id: `LuigiCanary` (string) - Workflow ID
+    + component_id: `styx-canary` (string) - Workflow Component
+    + endpoint_id: `StyxCanary` (string) - Endpoint ID
 
 ### Get Workflow Instances [GET]
 
@@ -66,9 +73,9 @@ Resources related to the Workflows registered in Styx.
 
         [{
             "workflow_instance": {
-              "workflow": {
+              "workflow_id": {
                 "component_id": "styx-canary",
-                "workflow_id": "LuigiCanary"
+                "endpoint_id": "StyxCanary"
               },
               "parameter": "2016-07-13T08"
             },
@@ -97,11 +104,11 @@ Resources related to the Workflows registered in Styx.
             }]
         }]
 
-## Workflow Instance [/v2/workflows/{component}/{workflow_id}/instances/{instance}]
+## Workflow Instance [/v1/workflows/{component_id}/{endpoint_id}/instances/{instance}]
 
 + Parameters
-    + component: `styx-canary` (string) - Workflow Component
-    + workflow_id: `LuigiCanary` (string) - Workflow ID
+    + component_id: `styx-canary` (string) - Workflow Component
+    + endpoint_id: `StyxCanary` (string) - Endpoint ID
     + instance: `2016-07-13T08` (string) - Worfklow Instance parameter
 
 ### Get Workflow Instance [GET]
@@ -110,9 +117,9 @@ Resources related to the Workflows registered in Styx.
 
         {
             "workflow_instance": {
-              "workflow": {
+              "workflow_id": {
                 "component_id": "styx-canary",
-                "workflow_id": "LuigiCanary"
+                "endpoint_id": "StyxCanary"
               },
               "parameter": "2016-07-13T08"
             },
@@ -141,11 +148,15 @@ Resources related to the Workflows registered in Styx.
             }]
         }
 
-## Workflow state [/v2/workflows/{component}/{workflow_id}/state]
+## Workflow state [/{version}/workflows/{component_id}/{endpoint_id}/state]
 
 + Parameters
-    + component: `styx-canary` (string) - Workflow Component
-    + workflow_id: `LuigiCanary` (string) - Workflow ID
+    + version: `v0` (enum[string]) - API version
+        + Members
+            + `v0`
+            + `v1`
+    + component_id: `styx-canary` (string) - Workflow Component
+    + endpoint_id: `StyxCanary` (string) - Endpoint ID
 
 ### Get Workflow state [GET]
 
@@ -181,10 +192,14 @@ Resources related to the Workflows registered in Styx.
             "next_natural_offset_trigger": "2017-01-01T02:00:00Z"
         }
 
-## Component state [/v2/workflows/{component}/state]
+## Component state [/{version}/workflows/{component_id}/state]
 
 + Parameters
-    + component: `styx-canary` (string) - Workflow Component
+    + version: `v0` (enum[string]) - API version
+        + Members
+            + `v0`
+            + `v1`
+    + component_id: `styx-canary` (string) - Workflow Component
 
 ### Set Component state [PATCH]
 
@@ -205,89 +220,19 @@ Resources related to the Workflows registered in Styx.
             "next_natural_offset_trigger": null
         }
 
-# Group Resources
-
-Resources related to Styx Resources registered in the scheduler. Styx Resources
-can be used to limit the maximum concurrent executions for certain Workflows.
-
-## Resources [/v2/resources]
-
-### Get Resources [GET]
-
-+ Response 200 (application/json)
-
-        {
-            "resources": [{
-                "concurrency": 20,
-                "id": "luigi-canary-resource"
-            }]
-        }
-
-### Create Resource [POST]
-
-+ Request (application/json)
-
-        {
-            "concurrency": "20",
-            "id": "luigi-canary-resource"
-        }
-
-+ Response 200 (application/json)
-
-        {
-            "concurrency": 20,
-            "id": "luigi-canary-resource"
-        }
-
-## Resource [/v2/resources/{resource}]
-
-+ Parameters
-    + resource: `luigi-canary-resource` (string) - Resource ID
-
-### Get Resource [GET]
-
-+ Response 200 (application/json)
-
-        {
-            "resources": [{
-                "concurrency": 20,
-                "id": "luigi-canary-resource"
-            }]
-        }
-
-### Delete Resource [DELETE]
-
-+ Response 204
-
-### Modify Resource [PUT]
-
-+ Request (application/json)
-
-        {
-            "concurrency": "30",
-            "id": "luigi-canary-resource"
-        }
-
-+ Response 200 (application/json)
-
-        {
-            "concurrency": 30,
-            "id": "luigi-canary-resource"
-        }
-
 # Group Backfills
 
 Resources related to the Backfills in Styx. This group allows to operate on
 Backfill entities registered in Styx and check detailed status of each single
 Workflow Instance belonging to a Backfill entity.
 
-## Backfills [/v2/backfills{?component,workflow,status,showAll}]
+## Backfills [/v1/backfills{?component,workflow,status,showAll}]
 
 ### Get Backfills [GET]
 
 + Parameters
     + component: `styx-canary` (optional, string) - Workflow Component to filter with
-    + workflow: `LuigiCanary` (optional, string) - Workflow ID to filter with
+    + workflow: `StyxCanary` (optional, string) - Workflow ID to filter with
     + status: `true` (optional, boolean) - If to return the status list per backfill
       + Default: false
     + showAll: `true` (optional, boolean) - If to return also halted backfills and backfills whose instances have been all triggered
@@ -304,11 +249,11 @@ Workflow Instance belonging to a Backfill entity.
                     "halted": false,
                     "id": "backfill-1489054446085-53384",
                     "next_trigger": "2017-01-01T01:00:00Z",
-                    "schedule": "hours",
+                    "partitioning": "hours",
                     "start": "2017-01-01T00:00:00Z",
                     "workflow_id": {
                         "component_id": "styx-canary",
-                        "id": "LuigiCanary"
+                        "endpoint_id": "StyxCanary"
                     }
                 },
                 "statuses": {
@@ -318,7 +263,7 @@ Workflow Instance belonging to a Backfill entity.
                             "parameter": "2017-01-01T00",
                             "workflow_id": {
                                 "component_id": "styx-canary",
-                                "id": "LuigiCanary"
+                                "endpoint_id": "StyxCanary"
                             }
                         },
                         "state_data": {
@@ -366,7 +311,7 @@ Workflow Instance belonging to a Backfill entity.
             "start": "2017-01-01T00:00:00Z",
             "end": "2017-01-02T00:00:00Z",
             "component": "styx-canary",
-            "workflow": "LuigiCanary",
+            "workflow": "StyxCanary",
             "concurrency": "10",
         }
 
@@ -379,15 +324,15 @@ Workflow Instance belonging to a Backfill entity.
             "halted": false,
             "id": "backfill-1489054446085-52684",
             "next_trigger": "2017-01-01T00:00:00Z",
-            "schedule": "hours",
+            "partitioning": "hours",
             "start": "2017-01-01T00:00:00Z",
             "workflow_id": {
                 "component_id": "styx-canary",
-                "id": "LuigiCanary"
+                "endpoint_id": "StyxCanary"
             }
         }
 
-## Backfill [/v2/backfills/{backfill_id}]
+## Backfill [/v1/backfills/{backfill_id}]
 
 + Parameters
     + backfill_id: `backfill-1489054446085-52684` (string) - Backfill ID
@@ -403,11 +348,11 @@ Workflow Instance belonging to a Backfill entity.
             "halted": false,
             "id": "backfill-1489054446085-52684",
             "next_trigger": "2017-01-01T00:00:00Z",
-            "schedule": "hours",
+            "partitioning": "hours",
             "start": "2017-01-01T00:00:00Z",
             "workflow_id": {
                 "component_id": "styx-canary",
-                "id": "LuigiCanary"
+                "endpoint_id": "StyxCanary"
             }
         }
 
@@ -420,11 +365,11 @@ Workflow Instance belonging to a Backfill entity.
             "halted": false,
             "id": "backfill-1489054446085-52684",
             "next_trigger": "2017-01-01T00:00:00Z",
-            "schedule": "hours",
+            "partitioning": "hours",
             "start": "2017-01-01T00:00:00Z",
             "workflow_id": {
                 "component_id": "styx-canary",
-                "id": "LuigiCanary"
+                "endpoint_id": "StyxCanary"
             }
         }
 
@@ -432,11 +377,17 @@ Workflow Instance belonging to a Backfill entity.
 
 + Response 200
 
-# Group Status
+# Group Cli
 
 Resources related to inspect detailed status of Workflow Instances.
 
-## Active States [/v2/status/activeStates]
+## Active States [/{version}/cli/activeStates]
+
++ Parameters
+    + version: `v0` (enum[string]) - API version
+        + Members
+            + `v0`
+            + `v1`
 
 ### Get Active States [GET]
 
@@ -449,7 +400,7 @@ Resources related to inspect detailed status of Workflow Instances.
                     "parameter": "2017-01-01T01",
                     "workflow_id": {
                         "component_id": "styx-canary",
-                        "id": "LuigiCanary"
+                        "endpoint_id": "StyxCanary"
                     }
                 },
                 "state_data": {
@@ -486,11 +437,15 @@ Resources related to inspect detailed status of Workflow Instances.
             }]
         }
 
-## Events [/v2/status/events/{component}/{workflow_id}/{instance}]
+## Events [/{version}/cli/events/{component_id}/{endpoint_id}/{instance}]
 
 + Parameters
-    + component: `styx-canary` (string) - Workflow Component
-    + workflow_id: `LuigiCanary` (string) - Workflow ID
+    + version: `v0` (enum[string]) - API version
+        + Members
+            + `v0`
+            + `v1`
+    + component_id: `styx-canary` (string) - Workflow Component
+    + endpoint_id: `StyxCanary` (string) - Endpoint ID
     + instance: `2017-01-01T01` (string) - Worfklow Instance parameter
 
 ### Get Workflow Instance events [GET]
@@ -504,24 +459,26 @@ Resources related to inspect detailed status of Workflow Instances.
                     "trigger": {
                         "@type": "natural"
                     },
-                    "workflow_instance": "styx-canary/LuigiCanary/2017-01-01T01"
+                    "workflow_instance": "styx-canary/StyxCanary/2017-01-01T01"
                 },
                 "timestamp": 1483228800000
             },
             {
                 "event": {
                     "@type": "dequeue",
-                    "workflow_instance": "styx-canary/LuigiCanary/2017-01-01T01"
+                    "workflow_instance": "styx-canary/StyxCanary/2017-01-01T01"
                 },
                 "timestamp": 1483228800005
             }]
         }
 
-# Group Scheduler
+## Events [/{version}/cli/events]
 
-Resources related to operations that act on the current state of the scheduler.
-
-## Events [/v2/scheduler/events]
++ Parameters
+    + version: `v0` (enum[string]) - API version
+        + Members
+            + `v0`
+            + `v1`
 
 ### Inject Event [POST]
 
@@ -529,17 +486,23 @@ Resources related to operations that act on the current state of the scheduler.
 
         {
             "@type": "dequeue",
-            "workflow_instance": "styx-canary/LuigiCanary/2017-01-01T01"
+            "workflow_instance": "styx-canary/StyxCanary/2017-01-01T01"
         }
 
 + Response 200 (application/json)
 
         {
             "@type": "dequeue",
-            "workflow_instance": "styx-canary/LuigiCanary/2017-01-01T01"
+            "workflow_instance": "styx-canary/StyxCanary/2017-01-01T01"
         }
 
-## Trigger [/v2/scheduler/trigger]
+## Trigger [/{version}/cli/trigger]
+
++ Parameters
+    + version: `v0` (enum[string]) - API version
+        + Members
+            + `v0`
+            + `v1`
 
 ### Trigger Workflow Instance [POST]
 
@@ -549,7 +512,7 @@ Resources related to operations that act on the current state of the scheduler.
             "parameter": "2017-01-01T01",
             "workflow_id": {
                 "component_id": "styx-canary",
-                "id": "LuigiCanary"
+                "endpoint_id": "StyxCanary"
             }
         }
 
@@ -559,7 +522,7 @@ Resources related to operations that act on the current state of the scheduler.
             "parameter": "2017-01-01T01",
             "workflow_id": {
                 "component_id": "styx-canary",
-                "id": "LuigiCanary"
+                "endpoint_id": "StyxCanary"
             }
         }
 
@@ -567,7 +530,13 @@ Resources related to operations that act on the current state of the scheduler.
 
 Resources related to global configurations for the scheduler.
 
-## Global Enabled [/v2/config{?enabled}]
+## Global Enabled [/{version}/config{?enabled}]
+
++ Parameters
+    + version: `v0` (enum[string]) - API version
+        + Members
+            + `v0`
+            + `v1`
 
 ### Get Global Enabled [GET]
 
