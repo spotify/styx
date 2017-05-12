@@ -21,12 +21,12 @@
 package com.spotify.styx.docker;
 
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyListOf;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
@@ -36,6 +36,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.testdata.TestData;
 import io.fabric8.kubernetes.api.model.DoneablePod;
+import io.fabric8.kubernetes.api.model.ListMeta;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
@@ -55,6 +56,7 @@ public class KubernetesDockerRunnerPodPollerTest {
 
   private static final String POD_NAME = "test-pod-1";
   private static final String POD_NAME_2 = "test-pod-2";
+
   private static final WorkflowInstance WORKFLOW_INSTANCE =
       WorkflowInstance.create(TestData.WORKFLOW_ID, "foo");
   private static final WorkflowInstance WORKFLOW_INSTANCE_2 =
@@ -85,6 +87,8 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager);
     podList = new PodList();
+    podList.setMetadata(new ListMeta());
+    podList.getMetadata().setResourceVersion("4711");
   }
 
   @Test
@@ -92,7 +96,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
     podList.setItems(Arrays.asList(createdPod));
     when(k8sClient.pods().list()).thenReturn(podList);
-    setupActiveInstances(RunState.State.RUNNING);
+    setupActiveInstances(RunState.State.RUNNING, POD_NAME, POD_NAME_2);
 
     kdr.pollPods();
 
@@ -106,7 +110,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
     podList.setItems(Arrays.asList(createdPod, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
-    setupActiveInstances(RunState.State.RUNNING);
+    setupActiveInstances(RunState.State.RUNNING, POD_NAME, POD_NAME_2);
 
     kdr.pollPods();
 
@@ -119,7 +123,7 @@ public class KubernetesDockerRunnerPodPollerTest {
   @Test
   public void shouldHandleEmptyPodList() throws Exception {
     when(k8sClient.pods().list()).thenReturn(podList);
-    setupActiveInstances(RunState.State.RUNNING);
+    setupActiveInstances(RunState.State.RUNNING, POD_NAME, POD_NAME_2);
 
     kdr.pollPods();
 
@@ -132,7 +136,7 @@ public class KubernetesDockerRunnerPodPollerTest {
   @Test
   public void shouldNotSendErrorEventForInstancesNotInRunningState() throws Exception {
     when(k8sClient.pods().list()).thenReturn(podList);
-    setupActiveInstances(RunState.State.SUBMITTED);
+    setupActiveInstances(RunState.State.SUBMITTED, POD_NAME, POD_NAME_2);
 
     kdr.pollPods();
 
@@ -142,15 +146,47 @@ public class KubernetesDockerRunnerPodPollerTest {
         Event.runError(WORKFLOW_INSTANCE_2, "No pod associated with this instance"));
   }
 
-  private void setupActiveInstances(RunState.State state) {
-    StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
-    StateData stateData2 = StateData.newBuilder().executionId(POD_NAME_2).build();
-    Map<WorkflowInstance, RunState> map = new HashMap<>();
-    map.put(WORKFLOW_INSTANCE,
-        RunState.create(WORKFLOW_INSTANCE, state, stateData));
-    map.put(WORKFLOW_INSTANCE_2,
-        RunState.create(WORKFLOW_INSTANCE_2, state, stateData2));
+  @Test
+  public void shouldDeleteUnwantedStyxPods() throws Exception {
+    Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
+    Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    podList.setItems(Arrays.asList(createdPod1, createdPod2));
+    when(k8sClient.pods().list()).thenReturn(podList);
 
+    kdr.pollPods();
+
+    verify(k8sClient.pods()).delete(createdPod1);
+    verify(k8sClient.pods()).delete(createdPod2);
+  }
+
+  @Test
+  public void shouldNotDeleteWantedStyxPods() throws Exception {
+    Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
+    Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    podList.setItems(Arrays.asList(createdPod1, createdPod2));
+    when(k8sClient.pods().list()).thenReturn(podList);
+    String podName1 = createdPod1.getMetadata().getName();
+    String podName2 = createdPod2.getMetadata().getName();
+    setupActiveInstances(RunState.State.RUNNING, podName1, podName2);
+
+    kdr.pollPods();
+
+    verify(k8sClient.pods(), never()).delete(any(Pod.class));
+    verify(k8sClient.pods(), never()).delete(any(Pod[].class));
+    verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
+    verify(k8sClient.pods(), never()).delete();
+  }
+
+  private void setupActiveInstances(RunState.State state, String podName1, String podName2) {
+    StateData stateData = StateData.newBuilder().executionId(podName1).build();
+    StateData stateData2 = StateData.newBuilder().executionId(podName2).build();
+    Map<WorkflowInstance, RunState> map = new HashMap<>();
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, state, stateData);
+    RunState runState2 = RunState.create(WORKFLOW_INSTANCE_2, state, stateData2);
+    map.put(WORKFLOW_INSTANCE, runState);
+    map.put(WORKFLOW_INSTANCE_2, runState2);
+    when(stateManager.get(WORKFLOW_INSTANCE)).thenReturn(runState);
+    when(stateManager.get(WORKFLOW_INSTANCE_2)).thenReturn(runState2);
     when(stateManager.activeStates()).thenReturn(map);
   }
 }

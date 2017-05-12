@@ -64,6 +64,7 @@ import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
+import io.fabric8.kubernetes.client.Watcher.Action;
 import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
 import java.net.ProtocolException;
@@ -365,17 +366,24 @@ class KubernetesDockerRunner implements DockerRunner {
     final int resourceVersion = Integer.parseInt(list.getMetadata().getResourceVersion());
 
     for (Pod pod : list.getItems()) {
+      // Emit events
       logEvent(Watcher.Action.MODIFIED, pod, resourceVersion, true);
-      inspectPod(Watcher.Action.MODIFIED, pod);
+      final boolean isUnwantedPod = inspectPod(Watcher.Action.MODIFIED, pod);
+      final boolean isStyxPod = pod.getMetadata().getName().startsWith(STYX_RUN);
+
+      if (isUnwantedPod && isStyxPod) {
+        LOG.info("Deleting unwanted pod {}", pod.getMetadata().getName());
+        client.pods().delete(pod);
+      }
     }
   }
 
-  private void inspectPod(Watcher.Action action, Pod pod) {
+  private boolean inspectPod(Action action, Pod pod) {
     final Map<String, String> annotations = pod.getMetadata().getAnnotations();
     final String podName = pod.getMetadata().getName();
     if (!annotations.containsKey(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION)) {
       LOG.warn("[AUDIT] Got pod without workflow instance annotation {}", podName);
-      return;
+      return true;
     }
 
     final WorkflowInstance workflowInstance = WorkflowInstance.parseKey(
@@ -384,20 +392,20 @@ class KubernetesDockerRunner implements DockerRunner {
     final RunState runState = stateManager.get(workflowInstance);
     if (runState == null) {
       LOG.warn("Pod event for unknown or inactive workflow instance {}", workflowInstance);
-      return;
+      return true;
     }
 
     final Optional<String> executionIdOpt = runState.data().executionId();
     if (!executionIdOpt.isPresent()) {
       LOG.warn("Pod event for state with no current executionId: {}", podName);
-      return;
+      return true;
     }
 
     final String executionId = executionIdOpt.get();
     if (!podName.equals(executionId)) {
       LOG.warn("Pod event not matching current exec id, current:{} != pod:{}",
           executionId, podName);
-      return;
+      return true;
     }
 
     final List<Event> events = translate(workflowInstance, runState, action, pod, stats);
@@ -414,6 +422,8 @@ class KubernetesDockerRunner implements DockerRunner {
         throw Throwables.propagate(isClosed);
       }
     }
+
+    return false;
   }
 
   private void logEvent(Watcher.Action action, Pod pod, int resourceVersion,
