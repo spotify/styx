@@ -55,6 +55,7 @@ import io.fabric8.kubernetes.api.model.DoneableSecret;
 import io.fabric8.kubernetes.api.model.ObjectMeta;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodList;
+import io.fabric8.kubernetes.api.model.PodStatus;
 import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.SecretBuilder;
 import io.fabric8.kubernetes.api.model.SecretList;
@@ -77,6 +78,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
+import junitparams.JUnitParamsRunner;
+import junitparams.Parameters;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -86,9 +89,9 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.MockitoAnnotations;
 
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(JUnitParamsRunner.class)
 public class KubernetesGCPServiceAccountSecretManagerTest {
 
   @Rule public ExpectedException exception = ExpectedException.none();
@@ -127,6 +130,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   @Before
   public void setUp() throws Exception {
+    MockitoAnnotations.initMocks(this);
+
     executor = Executors.newCachedThreadPool();
 
     when(k8sClient.inNamespace(any(String.class))).thenReturn(k8sClient);
@@ -249,6 +254,32 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test
+  @Parameters({"Failed", "Succeeded"})
+  public void shouldRemoveServiceAccountSecretsAndKeysUsedByTerminatedPods(String phase) throws Exception {
+    final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(1)).toString();
+    final Secret secret = fakeServiceAccountKeySecret(
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", creationTimestamp);
+
+    when(k8sClient.secrets()).thenReturn(secrets);
+    when(secrets.list()).thenReturn(secretList);
+    when(secretList.getItems()).thenReturn(ImmutableList.of(secret));
+
+    final KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
+        .serviceAccountSecret(secret.getMetadata().getName())
+        .build();
+    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
+
+    final PodStatus podStatus = podStatus(phase);
+    pod.setStatus(podStatus);
+
+    when(podList.getItems()).thenReturn(ImmutableList.of());
+    sut.cleanup();
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key"));
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key"));
+    verify(secrets).delete(secret);
+  }
+
+  @Test
   public void shouldNotRemoveServiceAccountSecretsAndKeysInUse() throws Exception {
     final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(1)).toString();
     final Secret secret = fakeServiceAccountKeySecret(
@@ -262,6 +293,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
         .serviceAccountSecret(secret.getMetadata().getName())
         .build();
     final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
+    pod.setStatus(podStatus("Running"));
     when(podList.getItems()).thenReturn(ImmutableList.of(pod));
     sut.cleanup();
     verify(serviceAccountKeyManager, never()).deleteKey(anyString());
@@ -491,5 +523,11 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   private static String keyName(String serviceAccount, String keyId) {
     return "projects/-/serviceAccounts/" + serviceAccount + "/keys/" + keyId;
+  }
+
+  private static PodStatus podStatus(String phase) {
+    final PodStatus podStatus = new PodStatus();
+    podStatus.setPhase(phase);
+    return podStatus;
   }
 }

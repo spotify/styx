@@ -31,6 +31,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hashing;
 import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.util.GcpUtil;
+import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.SecretBuilder;
@@ -176,9 +177,10 @@ class KubernetesGCPServiceAccountSecretManager {
   }
 
   public void cleanup() throws IOException {
-    // Enumerate all secrets currently used by pods
+    // Enumerate all secrets currently used by non-terminated pods
     final PodList pods = client.pods().list();
     final Set<String> activeSecrets = pods.getItems().stream()
+        .filter(pod -> !isTerminatedPod(pod))
         .flatMap(pod -> pod.getSpec().getVolumes().stream())
         .map(volume -> volume.getSecret().getSecretName())
         .collect(Collectors.toSet());
@@ -221,6 +223,16 @@ class KubernetesGCPServiceAccountSecretManager {
         logger.warn("[AUDIT] Failed to delete service account {} keys and/or secret {}",
             serviceAcount, name);
       }
+    }
+  }
+
+  private boolean isTerminatedPod(Pod pod) {
+    switch (pod.getStatus().getPhase()) {
+      case "Succeeded":
+      case "Failed":
+        return true;
+      default:
+        return false;
     }
   }
 
