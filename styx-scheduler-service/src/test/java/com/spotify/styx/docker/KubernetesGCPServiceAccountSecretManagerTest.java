@@ -32,6 +32,8 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -68,8 +70,14 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.IntSummaryStatistics;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -101,6 +109,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
       Optional.of(SERVICE_ACCOUNT),
       empty());
 
+  private ExecutorService executor;
+
   @Mock NamespacedKubernetesClient k8sClient;
 
   @Mock ServiceAccountKeyManager serviceAccountKeyManager;
@@ -117,6 +127,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   @Before
   public void setUp() throws Exception {
+    executor = Executors.newCachedThreadPool();
+
     when(k8sClient.inNamespace(any(String.class))).thenReturn(k8sClient);
     when(k8sClient.pods()).thenReturn(pods);
     when(pods.list()).thenReturn(podList);
@@ -128,6 +140,11 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
     sut = new KubernetesGCPServiceAccountSecretManager(
         k8sClient, serviceAccountKeyManager, (now, sa) -> SECRET_EPOCH, CLOCK);
+  }
+
+  @After
+  public void tearDown() throws Exception {
+    executor.shutdownNow();
   }
 
   @Test
@@ -154,6 +171,62 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     assertThat(createdSecret.getMetadata().getAnnotations(), hasEntry("styx-wf-sa", SERVICE_ACCOUNT));
     assertThat(createdSecret.getData(), hasEntry("styx-wf-sa.json", jsonKey.getPrivateKeyData()));
     assertThat(createdSecret.getData(), hasEntry("styx-wf-sa.p12", p12Key.getPrivateKeyData()));
+  }
+
+  @Test
+  public void shouldNotConcurrentlyCreateServiceAccountKeysAndSecrets()
+      throws StateManager.IsClosed, IOException, ExecutionException, InterruptedException {
+
+    final ServiceAccountKey jsonKey = new ServiceAccountKey();
+    jsonKey.setName("key.json");
+    jsonKey.setPrivateKeyData("json-private-key-data");
+    final ServiceAccountKey p12Key = new ServiceAccountKey();
+    p12Key.setName("key.p12");
+    p12Key.setPrivateKeyData("p12-private-key-data");
+
+    when(namedResource.get()).thenReturn(null);
+
+    CompletableFuture<Boolean> accountExistsFuture = new CompletableFuture<>();
+
+    // Make the service account existence check block
+    when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenAnswer(a -> accountExistsFuture.get());
+
+    when(serviceAccountKeyManager.createJsonKey(any(String.class))).thenReturn(jsonKey);
+    when(serviceAccountKeyManager.createP12Key(any(String.class))).thenReturn(p12Key);
+
+    // Run two concurrent requests for the same service account secret
+    final Future<String> f1 = executor.submit(
+        () -> sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(), SERVICE_ACCOUNT));
+
+    final Future<String> f2 = executor.submit(
+        () -> sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(), SERVICE_ACCOUNT));
+
+    // Wait for a call to the blocking service account existence method
+    verify(serviceAccountKeyManager, timeout(30_000)).serviceAccountExists(SERVICE_ACCOUNT);
+
+    Thread.sleep(5000);
+
+    // Verify that we only got one call
+    verify(serviceAccountKeyManager, times(1)).serviceAccountExists(SERVICE_ACCOUNT);
+
+    // Unblock the calling thread
+    accountExistsFuture.complete(true);
+
+    // Wait for both requests to finish
+    final String secret1 = f1.get();
+    final String secret2 = f2.get();
+
+    // Check that only one secret was created
+    verify(secrets, times(1)).create(secretCaptor.capture());
+    final Secret createdSecret = secretCaptor.getValue();
+
+    // Check that both requests returned the same secret name
+    assertThat(secret1, is(createdSecret.getMetadata().getName()));
+    assertThat(secret2, is(createdSecret.getMetadata().getName()));
+
+    // Check that only one json and one p12 keys were created
+    verify(serviceAccountKeyManager, times(1)).createJsonKey(SERVICE_ACCOUNT);
+    verify(serviceAccountKeyManager, times(1)).createP12Key(SERVICE_ACCOUNT);
   }
 
 
