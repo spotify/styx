@@ -435,6 +435,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
     sut.ensureServiceAccountKeySecret(WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT);
 
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, jsonKeyId));
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, p12KeyId));
     verify(serviceAccountKeyManager).createJsonKey(SERVICE_ACCOUNT);
     verify(serviceAccountKeyManager).createP12Key(SERVICE_ACCOUNT);
     verify(secrets).delete(secret);
