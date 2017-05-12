@@ -23,6 +23,7 @@ package com.spotify.styx.docker;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.state.RunState.State.RUNNING;
+import static java.net.HttpURLConnection.HTTP_GONE;
 import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -66,7 +67,6 @@ import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
-import java.net.ProtocolException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -484,7 +484,9 @@ class KubernetesDockerRunner implements DockerRunner {
       LOG.warn("Watch closed", e);
 
       // kube seems to gc old resource versions
-      if (e != null && e.getCause() instanceof ProtocolException) {
+      // according to WatchConnectionManager L222, HTTP_GONE indicates
+      // resource version no long exists
+      if (e != null && e.getCode() == HTTP_GONE) {
         // todo: this is racy : more events can be purged while we're playing catch up
         lastResourceVersion++;
         reconnect();
