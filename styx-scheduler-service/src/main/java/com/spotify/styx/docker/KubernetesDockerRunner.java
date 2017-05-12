@@ -64,7 +64,6 @@ import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
-import io.fabric8.kubernetes.client.Watcher.Action;
 import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
 import java.net.ProtocolException;
@@ -378,7 +377,7 @@ class KubernetesDockerRunner implements DockerRunner {
     }
   }
 
-  private boolean inspectPod(Action action, Pod pod) {
+  private boolean inspectPod(Watcher.Action action, Pod pod) {
     final Map<String, String> annotations = pod.getMetadata().getAnnotations();
     final String podName = pod.getMetadata().getName();
     if (!annotations.containsKey(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION)) {
