@@ -365,7 +365,6 @@ class KubernetesDockerRunner implements DockerRunner {
     final int resourceVersion = Integer.parseInt(list.getMetadata().getResourceVersion());
 
     for (Pod pod : list.getItems()) {
-      // Emit events
       logEvent(Watcher.Action.MODIFIED, pod, resourceVersion, true);
       final Optional<WorkflowInstance> workflowInstance = readPodWorkflowInstance(pod);
       if (!workflowInstance.isPresent()) {
