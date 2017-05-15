@@ -375,7 +375,7 @@ class KubernetesDockerRunner implements DockerRunner {
       final Optional<RunState> runState = lookupPodRunState(pod, workflowInstance.get());
       if (runState.isPresent()) {
         emitPodEvents(Action.MODIFIED, pod, runState.get());
-      } else      {
+      } else {
         LOG.info("Deleting unwanted pod {}", pod.getMetadata().getName());
         client.pods().delete(pod);
       }
