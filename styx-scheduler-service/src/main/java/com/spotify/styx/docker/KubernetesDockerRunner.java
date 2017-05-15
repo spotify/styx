@@ -368,7 +368,7 @@ class KubernetesDockerRunner implements DockerRunner {
     for (Pod pod : list.getItems()) {
       // Emit events
       logEvent(Watcher.Action.MODIFIED, pod, resourceVersion, true);
-      final Optional<WorkflowInstance> workflowInstance = lookupPodWorkflowInstance(pod);
+      final Optional<WorkflowInstance> workflowInstance = readPodWorkflowInstance(pod);
       if (!workflowInstance.isPresent()) {
         continue;
       }
@@ -382,7 +382,7 @@ class KubernetesDockerRunner implements DockerRunner {
     }
   }
 
-  private Optional<WorkflowInstance> lookupPodWorkflowInstance(Pod pod) {
+  private Optional<WorkflowInstance> readPodWorkflowInstance(Pod pod) {
     final Map<String, String> annotations = pod.getMetadata().getAnnotations();
     final String podName = pod.getMetadata().getName();
     if (!annotations.containsKey(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION)) {
@@ -476,7 +476,7 @@ class KubernetesDockerRunner implements DockerRunner {
       logEvent(action, pod, lastResourceVersion, false);
 
       try {
-        lookupPodWorkflowInstance(pod)
+        readPodWorkflowInstance(pod)
             .flatMap(workflowInstance -> lookupPodRunState(pod, workflowInstance))
             .ifPresent(runState -> emitPodEvents(action, pod, runState));
       } finally {
