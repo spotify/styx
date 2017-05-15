@@ -64,7 +64,6 @@ import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
-import io.fabric8.kubernetes.client.Watcher.Action;
 import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
 import java.net.ProtocolException;
@@ -374,7 +373,7 @@ class KubernetesDockerRunner implements DockerRunner {
       }
       final Optional<RunState> runState = lookupPodRunState(pod, workflowInstance.get());
       if (runState.isPresent()) {
-        emitPodEvents(Action.MODIFIED, pod, runState.get());
+        emitPodEvents(Watcher.Action.MODIFIED, pod, runState.get());
       } else {
         LOG.info("Deleting unwanted pod {}", pod.getMetadata().getName());
         client.pods().delete(pod);
