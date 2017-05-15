@@ -149,7 +149,8 @@ class KubernetesGCPServiceAccountSecretManager {
     return secretName;
   }
 
-  private void createSecret(String workflowId, String serviceAccount, long epoch, String secretName) throws IOException {
+  private void createSecret(String workflowId, String serviceAccount, long epoch, String secretName)
+      throws IOException {
     final ServiceAccountKey jsonKey;
     final ServiceAccountKey p12Key;
     try {
