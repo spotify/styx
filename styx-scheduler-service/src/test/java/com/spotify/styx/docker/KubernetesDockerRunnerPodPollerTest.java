@@ -163,8 +163,8 @@ public class KubernetesDockerRunnerPodPollerTest {
   public void shouldNotDeleteUnwantedNonStyxPods() throws Exception {
     Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
     Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
-    createdPod1.getMetadata().setName("test-1");
-    createdPod2.getMetadata().setName("test-2");
+    createdPod1.getMetadata().getAnnotations().remove("styx-workflow-instance");
+    createdPod2.getMetadata().getAnnotations().remove("styx-workflow-instance");
     podList.setItems(Arrays.asList(createdPod1, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
 

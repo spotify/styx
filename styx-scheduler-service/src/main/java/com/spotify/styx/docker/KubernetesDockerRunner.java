@@ -368,17 +368,21 @@ class KubernetesDockerRunner implements DockerRunner {
     for (Pod pod : list.getItems()) {
       // Emit events
       logEvent(Watcher.Action.MODIFIED, pod, resourceVersion, true);
-      final Optional<RunState> runState = lookupPodRunState(pod);
+      final Optional<WorkflowInstance> workflowInstance = lookupPodWorkflowInstance(pod);
+      if (!workflowInstance.isPresent()) {
+        continue;
+      }
+      final Optional<RunState> runState = lookupPodRunState(pod, workflowInstance.get());
       if (runState.isPresent()) {
-        inspectPod(Action.MODIFIED, pod, runState.get());
-      } else {
+        emitPodEvents(Action.MODIFIED, pod, runState.get());
+      } else      {
         LOG.info("Deleting unwanted pod {}", pod.getMetadata().getName());
         client.pods().delete(pod);
       }
     }
   }
 
-  private Optional<RunState> lookupPodRunState(Pod pod) {
+  private Optional<WorkflowInstance> lookupPodWorkflowInstance(Pod pod) {
     final Map<String, String> annotations = pod.getMetadata().getAnnotations();
     final String podName = pod.getMetadata().getName();
     if (!annotations.containsKey(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION)) {
@@ -388,6 +392,12 @@ class KubernetesDockerRunner implements DockerRunner {
 
     final WorkflowInstance workflowInstance = WorkflowInstance.parseKey(
         annotations.get(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION));
+
+    return Optional.of(workflowInstance);
+  }
+
+  private Optional<RunState> lookupPodRunState(Pod pod, WorkflowInstance workflowInstance) {
+    final String podName = pod.getMetadata().getName();
 
     final RunState runState = stateManager.get(workflowInstance);
     if (runState == null) {
@@ -411,7 +421,7 @@ class KubernetesDockerRunner implements DockerRunner {
     return Optional.of(runState);
   }
 
-  private void inspectPod(Watcher.Action action, Pod pod, RunState runState) {
+  private void emitPodEvents(Watcher.Action action, Pod pod, RunState runState) {
     final List<Event> events = translate(runState.workflowInstance(), runState, action, pod, stats);
 
     for (Event event : events) {
@@ -466,8 +476,9 @@ class KubernetesDockerRunner implements DockerRunner {
       logEvent(action, pod, lastResourceVersion, false);
 
       try {
-        lookupPodRunState(pod)
-            .ifPresent(runState -> inspectPod(action, pod, runState));
+        lookupPodWorkflowInstance(pod)
+            .flatMap(workflowInstance -> lookupPodRunState(pod, workflowInstance))
+            .ifPresent(runState -> emitPodEvents(action, pod, runState));
       } finally {
         // fixme: this breaks the kubernetes api convention of not interpreting the resource version
         // https://github.com/kubernetes/kubernetes/blob/release-1.2/docs/devel/api-conventions.md#metadata
