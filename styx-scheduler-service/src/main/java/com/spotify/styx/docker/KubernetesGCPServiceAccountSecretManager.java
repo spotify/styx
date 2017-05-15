@@ -105,7 +105,7 @@ class KubernetesGCPServiceAccountSecretManager {
 
     try {
       return serviceAccountSecretCache.get(serviceAccount, () ->
-          getOrCreateServiceAccountKeySecret(workflowId, serviceAccount, epoch, secretName));
+          getOrCreateSecret(workflowId, serviceAccount, epoch, secretName));
     } catch (Exception e) {
       if (e.getCause() instanceof InvalidExecutionException) {
         throw (InvalidExecutionException) e.getCause();
@@ -115,8 +115,8 @@ class KubernetesGCPServiceAccountSecretManager {
     }
   }
 
-  private String getOrCreateServiceAccountKeySecret(
-      String workflowId, String serviceAccount, long epoch, String secretName) throws IOException {
+  private String getOrCreateSecret(String workflowId, String serviceAccount, long epoch, String secretName)
+      throws IOException {
     // Check that the service account exists
     final boolean serviceAccountExists = keyManager.serviceAccountExists(serviceAccount);
     if (!serviceAccountExists) {
@@ -124,6 +124,7 @@ class KubernetesGCPServiceAccountSecretManager {
       throw new InvalidExecutionException("Referenced service account " + serviceAccount + " was not found");
     }
 
+    // Check for existing secret
     final Secret existingSecret = client.secrets().withName(secretName).get();
     if (existingSecret != null) {
       final Map<String, String> annotations = existingSecret.getMetadata().getAnnotations();
@@ -139,10 +140,16 @@ class KubernetesGCPServiceAccountSecretManager {
       // Delete secret and any lingering key before creating new keys
       keyManager.deleteKey(jsonKeyName);
       keyManager.deleteKey(p12KeyName);
-      client.secrets().delete(existingSecret);
+      client.secrets().withName(secretName).delete();
     }
 
     // Create service account keys and secret
+    createSecret(workflowId, serviceAccount, epoch, secretName);
+
+    return secretName;
+  }
+
+  private void createSecret(String workflowId, String serviceAccount, long epoch, String secretName) throws IOException {
     final ServiceAccountKey jsonKey;
     final ServiceAccountKey p12Key;
     try {
@@ -177,8 +184,6 @@ class KubernetesGCPServiceAccountSecretManager {
 
     logger.info("[AUDIT] Secret {} created to store keys of {} referred by workflow {}",
         secretName, serviceAccount, workflowId);
-
-    return secretName;
   }
 
   private boolean keyExists(String jsonKeyName) {
