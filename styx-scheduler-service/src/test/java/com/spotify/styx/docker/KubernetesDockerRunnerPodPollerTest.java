@@ -164,6 +164,23 @@ public class KubernetesDockerRunnerPodPollerTest {
   }
 
   @Test
+  public void shouldNotDeleteUnwantedStyxPodsIfDebugEnabled() throws Exception {
+    when(debug.get()).thenReturn(true);
+
+    Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
+    Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    podList.setItems(Arrays.asList(createdPod1, createdPod2));
+    when(k8sClient.pods().list()).thenReturn(podList);
+
+    kdr.pollPods();
+
+    verify(k8sClient.pods(), never()).delete(any(Pod.class));
+    verify(k8sClient.pods(), never()).delete(any(Pod[].class));
+    verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
+    verify(k8sClient.pods(), never()).delete();
+  }
+
+  @Test
   public void shouldNotDeleteUnwantedNonStyxPods() throws Exception {
     Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
     Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
