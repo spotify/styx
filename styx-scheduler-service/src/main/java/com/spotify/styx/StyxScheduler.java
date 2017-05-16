@@ -343,7 +343,7 @@ public class StyxScheduler implements AppInit {
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
         storage, trigger);
 
-    final Cleaner cleaner = new Cleaner(workflowCache, dockerRunner);
+    final Cleaner cleaner = new Cleaner(dockerRunner);
 
     restoreState(storage, outputHandlers, stateManager, dockerRunner);
     startTriggerManager(triggerManager, executor);
