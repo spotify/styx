@@ -20,27 +20,40 @@
 
 package com.spotify.styx;
 
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+
 import com.spotify.styx.docker.DockerRunner;
 import java.io.IOException;
-import java.util.Objects;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.runners.MockitoJUnitRunner;
 
-class Cleaner {
+@RunWith(MockitoJUnitRunner.class)
+public class CleanerTest {
 
-  private static final Logger logger = LoggerFactory.getLogger(Cleaner.class);
+  @Mock
+  private DockerRunner dockerRunner;
 
-  private final DockerRunner dockerRunner;
+  private Cleaner cleaner;
 
-  Cleaner(DockerRunner dockerRunner) {
-    this.dockerRunner = Objects.requireNonNull(dockerRunner);
+  @Before
+  public void setUp() {
+    cleaner = new Cleaner(dockerRunner);
   }
 
-  void tick() {
-    try {
-      dockerRunner.cleanup();
-    } catch (IOException e) {
-      logger.warn("Docker runner cleanup failed", e);
-    }
+  @Test
+  public void shouldCleanup() throws IOException {
+    cleaner.tick();
+    verify(dockerRunner).cleanup();
+  }
+
+  @Test
+  public void shouldSwallowException() throws IOException {
+    doThrow(new IOException()).when(dockerRunner).cleanup();
+    cleaner.tick();
+    verify(dockerRunner).cleanup();
   }
 }
