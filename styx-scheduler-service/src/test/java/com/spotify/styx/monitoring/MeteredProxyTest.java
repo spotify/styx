@@ -83,7 +83,7 @@ public class MeteredProxyTest {
     DockerRunner mock = mock(DockerRunner.class);
     DockerRunner proxy = MeteredProxy.instrument(DockerRunner.class, mock, stats, time);
 
-    doThrow(new RuntimeException("with message")).when(mock).cleanup(workflowInstance, anyString());
+    doThrow(new RuntimeException("with message")).when(mock).cleanup(any(WorkflowInstance.class), anyString());
 
     expect.expect(RuntimeException.class);
     expect.expectMessage("with message");
