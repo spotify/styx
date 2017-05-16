@@ -300,10 +300,10 @@ class KubernetesDockerRunner implements DockerRunner {
         workflowInstance -> {
           if (!debug.get()) {
             LOG.info("Cleaning up {} pod: {}", workflowInstance.toKey(), name);
+            client.pods().delete(pod);
           } else {
             LOG.info("Keeping {} pod: {}", workflowInstance.toKey(), name);
           }
-          client.pods().delete(pod);
         }
     );
   }
