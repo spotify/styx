@@ -50,6 +50,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.Debug;
 import io.fabric8.kubernetes.api.model.DoneablePod;
 import io.fabric8.kubernetes.api.model.DoneableSecret;
 import io.fabric8.kubernetes.api.model.ListMeta;
@@ -136,6 +137,8 @@ public class KubernetesDockerRunnerTest {
   @Mock ListMeta listMeta;
   @Mock Watchable<Watch, Watcher<Pod>> podWatchable;
   @Mock Watch watch;
+  @Mock Debug debug;
+
   @Captor ArgumentCaptor<Watcher<Pod>> watchCaptor;
   @Captor ArgumentCaptor<Pod> podCaptor;
 
@@ -150,6 +153,8 @@ public class KubernetesDockerRunnerTest {
 
   @Before
   public void setUp() throws Exception {
+    when(debug.get()).thenReturn(false);
+
     when(k8sClient.inNamespace(any(String.class))).thenReturn(k8sClient);
     when(k8sClient.pods()).thenReturn(pods);
 
@@ -166,7 +171,7 @@ public class KubernetesDockerRunnerTest {
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT))
         .thenReturn(SERVICE_ACCOUNT_SECRET);
 
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, 60);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug, 60);
     kdr.init();
     kdr.restore();
 
@@ -423,7 +428,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(terminated("Succeeded", 20, null));
 
     // Start a new runner
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug);
     kdr.init();
 
     // Make the runner poll states for all pods
@@ -440,7 +445,7 @@ public class KubernetesDockerRunnerTest {
 
     // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
     kdr.close();
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, 1);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug, 1);
     kdr.init();
     kdr.restore();
 
