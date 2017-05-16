@@ -62,8 +62,8 @@ class RoutingDockerRunner implements DockerRunner {
   }
 
   @Override
-  public void cleanup(String executionId) {
-    runner().cleanup(executionId);
+  public void cleanup(WorkflowInstance workflowInstance, String executionId) {
+    runner().cleanup(workflowInstance, executionId);
   }
 
   @Override

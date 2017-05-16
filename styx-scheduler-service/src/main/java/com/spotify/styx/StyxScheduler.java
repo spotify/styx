@@ -77,6 +77,7 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
+import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
@@ -147,7 +148,8 @@ public class StyxScheduler implements AppInit {
         Environment environment,
         StateManager stateManager,
         ScheduledExecutorService scheduler,
-        Stats stats);
+        Stats stats,
+        Debug debug);
   }
 
   @FunctionalInterface
@@ -309,8 +311,9 @@ public class StyxScheduler implements AppInit {
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
 
     final Supplier<String> dockerId = new CachedSupplier<>(storage::globalDockerRunnerId, time);
+    final Debug debug = new CachedSupplier<>(storage::debugEnabled, time)::get;
     final DockerRunner routingDockerRunner = DockerRunner.routing(
-        id -> dockerRunnerFactory.create(id, environment, stateManager, executor, stats),
+        id -> dockerRunnerFactory.create(id, environment, stateManager, executor, stats, debug),
         dockerId);
     final DockerRunner dockerRunner = instrument(DockerRunner.class, routingDockerRunner, stats, time);
 
@@ -319,7 +322,7 @@ public class StyxScheduler implements AppInit {
     final OutputHandler[] outputHandlers = new OutputHandler[] {
         transitionLogger(""),
         new DockerRunnerHandler(
-            dockerRunner, stateManager, storage, submissionRateLimiter, dockerRunnerExecutor),
+            dockerRunner, stateManager, submissionRateLimiter, dockerRunnerExecutor),
         new TerminationHandler(retryUtil, stateManager),
         new MonitoringHandler(time, stats),
         new PublisherHandler(publisher),
@@ -604,7 +607,8 @@ public class StyxScheduler implements AppInit {
       Environment environment,
       StateManager stateManager,
       ScheduledExecutorService scheduler,
-      Stats stats) {
+      Stats stats,
+      Debug debug) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
 
@@ -615,7 +619,7 @@ public class StyxScheduler implements AppInit {
       final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(config, id));
       final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
       return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats,
-          serviceAccountKeyManager));
+          serviceAccountKeyManager, debug));
     }
   }
 

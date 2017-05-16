@@ -128,7 +128,7 @@ public class StyxSchedulerServiceFixture {
     StyxScheduler.ExecutorFactory executorFactory = (ts, tf) -> executor;
     StyxScheduler.PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
     StyxScheduler.DockerRunnerFactory dockerRunnerFactory =
-        (id, env, states, exec, stats) -> fakeDockerRunner();
+        (id, env, states, exec, stats, debug) -> fakeDockerRunner();
 
     styxScheduler = StyxScheduler.newBuilder()
         .setTime(time)
@@ -340,7 +340,7 @@ public class StyxSchedulerServiceFixture {
       }
 
       @Override
-      public void cleanup(String executionId) {
+      public void cleanup(WorkflowInstance workflowInstance, String executionId) {
         dockerCleans.add(executionId);
       }
 

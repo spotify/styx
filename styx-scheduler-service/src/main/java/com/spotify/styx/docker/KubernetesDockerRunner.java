@@ -45,6 +45,7 @@ import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.TriggerUtil;
 import io.fabric8.kubernetes.api.model.ContainerBuilder;
 import io.fabric8.kubernetes.api.model.EnvVar;
@@ -115,23 +116,25 @@ class KubernetesDockerRunner implements DockerRunner {
   private final KubernetesClient client;
   private final StateManager stateManager;
   private final Stats stats;
-  private final int pollPodsIntervalSeconds;
   private final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
+  private final Debug debug;
+  private final int pollPodsIntervalSeconds;
 
   private Watch watch;
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
-      KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager, int pollPodsIntervalSeconds) {
+      KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager, Debug debug, int pollPodsIntervalSeconds) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client);
     this.stats = Objects.requireNonNull(stats);
-    this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
     this.serviceAccountSecretManager = Objects.requireNonNull(serviceAccountSecretManager);
+    this.debug = debug;
+    this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
   }
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
-      KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager) {
-    this(client, stateManager, stats, serviceAccountSecretManager, DEFAULT_POLL_PODS_INTERVAL_SECONDS);
+      KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager, Debug debug) {
+    this(client, stateManager, stats, serviceAccountSecretManager, debug, DEFAULT_POLL_PODS_INTERVAL_SECONDS);
   }
 
   @Override
@@ -284,8 +287,13 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   @Override
-  public void cleanup(String executionId) {
-    client.pods().withName(executionId).delete();
+  public void cleanup(WorkflowInstance workflowInstance, String executionId) {
+    if (!debug.get()) {
+      LOG.info("Cleaning up {} pod: {}", workflowInstance.toKey(), executionId);
+      client.pods().withName(executionId).delete();
+    } else {
+      LOG.info("Keeping {} pod: {}", workflowInstance.toKey(), executionId);
+    }
   }
 
   @Override
@@ -366,41 +374,60 @@ class KubernetesDockerRunner implements DockerRunner {
 
     for (Pod pod : list.getItems()) {
       logEvent(Watcher.Action.MODIFIED, pod, resourceVersion, true);
-      inspectPod(Watcher.Action.MODIFIED, pod);
+      final Optional<WorkflowInstance> workflowInstance = readPodWorkflowInstance(pod);
+      if (!workflowInstance.isPresent()) {
+        continue;
+      }
+      final Optional<RunState> runState = lookupPodRunState(pod, workflowInstance.get());
+      if (runState.isPresent()) {
+        emitPodEvents(Watcher.Action.MODIFIED, pod, runState.get());
+      } else {
+        cleanup(workflowInstance.get(), pod.getMetadata().getName());
+      }
     }
   }
 
-  private void inspectPod(Watcher.Action action, Pod pod) {
+  private Optional<WorkflowInstance> readPodWorkflowInstance(Pod pod) {
     final Map<String, String> annotations = pod.getMetadata().getAnnotations();
     final String podName = pod.getMetadata().getName();
     if (!annotations.containsKey(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION)) {
       LOG.warn("[AUDIT] Got pod without workflow instance annotation {}", podName);
-      return;
+      return Optional.empty();
     }
 
     final WorkflowInstance workflowInstance = WorkflowInstance.parseKey(
         annotations.get(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION));
 
+    return Optional.of(workflowInstance);
+  }
+
+  private Optional<RunState> lookupPodRunState(Pod pod, WorkflowInstance workflowInstance) {
+    final String podName = pod.getMetadata().getName();
+
     final RunState runState = stateManager.get(workflowInstance);
     if (runState == null) {
       LOG.warn("Pod event for unknown or inactive workflow instance {}", workflowInstance);
-      return;
+      return Optional.empty();
     }
 
     final Optional<String> executionIdOpt = runState.data().executionId();
     if (!executionIdOpt.isPresent()) {
       LOG.warn("Pod event for state with no current executionId: {}", podName);
-      return;
+      return Optional.empty();
     }
 
     final String executionId = executionIdOpt.get();
     if (!podName.equals(executionId)) {
       LOG.warn("Pod event not matching current exec id, current:{} != pod:{}",
           executionId, podName);
-      return;
+      return Optional.empty();
     }
 
-    final List<Event> events = translate(workflowInstance, runState, action, pod, stats);
+    return Optional.of(runState);
+  }
+
+  private void emitPodEvents(Watcher.Action action, Pod pod, RunState runState) {
+    final List<Event> events = translate(runState.workflowInstance(), runState, action, pod, stats);
 
     for (Event event : events) {
       if (event.accept(new PullImageErrorMatcher())) {
@@ -454,7 +481,9 @@ class KubernetesDockerRunner implements DockerRunner {
       logEvent(action, pod, lastResourceVersion, false);
 
       try {
-        inspectPod(action, pod);
+        readPodWorkflowInstance(pod)
+            .flatMap(workflowInstance -> lookupPodRunState(pod, workflowInstance))
+            .ifPresent(runState -> emitPodEvents(action, pod, runState));
       } finally {
         // fixme: this breaks the kubernetes api convention of not interpreting the resource version
         // https://github.com/kubernetes/kubernetes/blob/release-1.2/docs/devel/api-conventions.md#metadata

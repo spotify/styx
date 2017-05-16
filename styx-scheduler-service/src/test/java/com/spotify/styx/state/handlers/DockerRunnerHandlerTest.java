@@ -49,11 +49,9 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.Trigger;
-import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
@@ -68,14 +66,13 @@ import org.mockito.runners.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class DockerRunnerHandlerTest {
 
-  private Storage storage = Mockito.mock(Storage.class);
   private RateLimiter rateLimiter = Mockito.mock(RateLimiter.class);
   private ExecutorService executor = Executors.newCachedThreadPool();
 
   private StateManager stateManager = Mockito.spy(new SyncStateManager());
   private DockerRunner dockerRunner = Mockito.mock(DockerRunner.class);
   private DockerRunnerHandler dockerRunnerHandler = new DockerRunnerHandler(
-      dockerRunner, stateManager, storage, rateLimiter, executor);
+      dockerRunner, stateManager, rateLimiter, executor);
 
   private static final String TEST_EXECUTION_ID = "execution_1";
   private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
@@ -223,7 +220,7 @@ public class DockerRunnerHandlerTest {
     stateManager.initialize(runState);
     dockerRunnerHandler.transitionInto(runState);
 
-    verify(dockerRunner, timeout(60_000)).cleanup(TEST_EXECUTION_ID);
+    verify(dockerRunner, timeout(60_000)).cleanup(workflowInstance, TEST_EXECUTION_ID);
   }
 
   @Test
@@ -239,7 +236,7 @@ public class DockerRunnerHandlerTest {
     stateManager.receive(Event.submit(workflowInstance, EXECUTION_DESCRIPTION));
     verify(stateManager, timeout(60_000)).receive(Event.submitted(workflowInstance, TEST_EXECUTION_ID));
     stateManager.receive(Event.runError(workflowInstance, ""));
-    verify(dockerRunner).cleanup(TEST_EXECUTION_ID);
+    verify(dockerRunner).cleanup(workflowInstance, TEST_EXECUTION_ID);
   }
 
   private WorkflowConfiguration configuration(String... args) {
