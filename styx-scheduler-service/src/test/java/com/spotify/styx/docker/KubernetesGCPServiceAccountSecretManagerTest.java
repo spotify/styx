@@ -257,9 +257,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   @Test
   @Parameters({"Failed", "Succeeded"})
   public void shouldRemoveServiceAccountSecretsAndKeysUsedByTerminatedPods(String phase) throws Exception {
-    final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(1)).toString();
     final Secret secret = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", creationTimestamp);
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", EXPIRED_CREATION_TIMESTAMP.toString());
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
