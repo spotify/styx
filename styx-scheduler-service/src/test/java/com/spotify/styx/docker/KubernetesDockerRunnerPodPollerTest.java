@@ -71,6 +71,8 @@ public class KubernetesDockerRunnerPodPollerTest {
   @Mock
   MixedOperation<Pod, PodList, DoneablePod, PodResource<Pod, DoneablePod>> pods;
   PodList podList;
+  @Mock PodResource<Pod, DoneablePod> namedPod1;
+  @Mock PodResource<Pod, DoneablePod> namedPod2;
 
   @Mock
   StateManager stateManager;
@@ -152,25 +154,35 @@ public class KubernetesDockerRunnerPodPollerTest {
 
   @Test
   public void shouldDeleteUnwantedStyxPods() throws Exception {
-    Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
-    Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
+    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    final String podName1 = createdPod1.getMetadata().getName();
+    final String podName2 = createdPod2.getMetadata().getName();
+
     podList.setItems(Arrays.asList(createdPod1, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
+    when(k8sClient.pods().withName(podName1)).thenReturn(namedPod1);
+    when(k8sClient.pods().withName(podName2)).thenReturn(namedPod2);
 
     kdr.pollPods();
 
-    verify(k8sClient.pods()).delete(createdPod1);
-    verify(k8sClient.pods()).delete(createdPod2);
+    verify(namedPod1).delete();
+    verify(namedPod2).delete();
   }
 
   @Test
   public void shouldNotDeleteUnwantedStyxPodsIfDebugEnabled() throws Exception {
     when(debug.get()).thenReturn(true);
 
-    Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
-    Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
+    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    final String podName1 = createdPod1.getMetadata().getName();
+    final String podName2 = createdPod2.getMetadata().getName();
+
     podList.setItems(Arrays.asList(createdPod1, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
+    when(k8sClient.pods().withName(podName1)).thenReturn(namedPod1);
+    when(k8sClient.pods().withName(podName2)).thenReturn(namedPod2);
 
     kdr.pollPods();
 
@@ -178,16 +190,24 @@ public class KubernetesDockerRunnerPodPollerTest {
     verify(k8sClient.pods(), never()).delete(any(Pod[].class));
     verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
     verify(k8sClient.pods(), never()).delete();
+    verify(namedPod1, never()).delete();
+    verify(namedPod2, never()).delete();
   }
 
   @Test
   public void shouldNotDeleteUnwantedNonStyxPods() throws Exception {
-    Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
-    Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
+    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    final String podName1 = createdPod1.getMetadata().getName();
+    final String podName2 = createdPod2.getMetadata().getName();
+
     createdPod1.getMetadata().getAnnotations().remove("styx-workflow-instance");
     createdPod2.getMetadata().getAnnotations().remove("styx-workflow-instance");
+
     podList.setItems(Arrays.asList(createdPod1, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
+    when(k8sClient.pods().withName(podName1)).thenReturn(namedPod1);
+    when(k8sClient.pods().withName(podName2)).thenReturn(namedPod2);
 
     kdr.pollPods();
 
@@ -195,16 +215,22 @@ public class KubernetesDockerRunnerPodPollerTest {
     verify(k8sClient.pods(), never()).delete(any(Pod[].class));
     verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
     verify(k8sClient.pods(), never()).delete();
+    verify(namedPod1, never()).delete();
+    verify(namedPod2, never()).delete();
   }
 
   @Test
   public void shouldNotDeleteWantedStyxPods() throws Exception {
-    Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
-    Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
+    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    final String podName1 = createdPod1.getMetadata().getName();
+    final String podName2 = createdPod2.getMetadata().getName();
+
     podList.setItems(Arrays.asList(createdPod1, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
-    String podName1 = createdPod1.getMetadata().getName();
-    String podName2 = createdPod2.getMetadata().getName();
+    when(k8sClient.pods().withName(podName1)).thenReturn(namedPod1);
+    when(k8sClient.pods().withName(podName2)).thenReturn(namedPod2);
+
     setupActiveInstances(RunState.State.RUNNING, podName1, podName2);
 
     kdr.pollPods();

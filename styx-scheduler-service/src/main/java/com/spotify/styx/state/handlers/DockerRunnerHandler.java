@@ -31,8 +31,6 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
-import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -101,7 +99,7 @@ public class DockerRunnerHandler implements OutputHandler {
       case ERROR:
         if (state.data().executionId().isPresent()) {
           final String executionId = state.data().executionId().get();
-          dockerRunner.cleanup(executionId);
+          dockerRunner.cleanup(state.workflowInstance(), executionId);
         }
         break;
 

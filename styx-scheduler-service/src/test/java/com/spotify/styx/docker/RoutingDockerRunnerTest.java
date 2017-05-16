@@ -70,10 +70,10 @@ public class RoutingDockerRunnerTest {
   @Test
   public void testUsesDefaultRunnerOnWorkflowCleanup() throws Exception {
     when(dockerId.get()).thenReturn("default");
-    dockerRunner.cleanup(MOCK_EXEC_ID);
+    dockerRunner.cleanup(WORKFLOW_INSTANCE, MOCK_EXEC_ID);
 
     assertThat(createdRunners, hasKey("default"));
-    verify(createdRunners.get("default")).cleanup(MOCK_EXEC_ID);
+    verify(createdRunners.get("default")).cleanup(WORKFLOW_INSTANCE, MOCK_EXEC_ID);
   }
 
   @Test
@@ -99,8 +99,8 @@ public class RoutingDockerRunnerTest {
     when(dockerId.get()).thenReturn("default");
     dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
     dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
-    dockerRunner.cleanup(MOCK_EXEC_ID);
-    dockerRunner.cleanup(MOCK_EXEC_ID);
+    dockerRunner.cleanup(WORKFLOW_INSTANCE, MOCK_EXEC_ID);
+    dockerRunner.cleanup(WORKFLOW_INSTANCE, MOCK_EXEC_ID);
 
     assertThat(createCounter, is(1));
     assertThat(createdRunners.keySet(), hasSize(1));

@@ -25,7 +25,6 @@ import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.podStatus
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.running;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminated;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.waiting;
-import static java.lang.Integer.MAX_VALUE;
 import static java.util.Optional.empty;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
@@ -203,8 +202,8 @@ public class KubernetesDockerRunnerTest {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
     when(namedPod.get()).thenReturn(createdPod);
-    kdr.cleanup(name);
-    verify(k8sClient.pods()).delete(createdPod);
+    kdr.cleanup(WORKFLOW_INSTANCE, name);
+    verify(namedPod).delete();
   }
 
   @Test
@@ -213,11 +212,12 @@ public class KubernetesDockerRunnerTest {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
     when(namedPod.get()).thenReturn(createdPod);
-    kdr.cleanup(name);
+    kdr.cleanup(WORKFLOW_INSTANCE, name);
     verify(k8sClient.pods(), never()).delete(any(Pod.class));
     verify(k8sClient.pods(), never()).delete(any(Pod[].class));
     verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
     verify(k8sClient.pods(), never()).delete();
+    verify(namedPod, never()).delete();
   }
 
   @Test(expected = InvalidExecutionException.class)

@@ -340,7 +340,7 @@ public class StyxSchedulerServiceFixture {
       }
 
       @Override
-      public void cleanup(String executionId) {
+      public void cleanup(WorkflowInstance workflowInstance, String executionId) {
         dockerCleans.add(executionId);
       }
 

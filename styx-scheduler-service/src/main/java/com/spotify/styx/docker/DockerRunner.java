@@ -70,9 +70,10 @@ public interface DockerRunner extends Closeable {
 
   /**
    * Execute cleanup operations for when an execution finishes.
+   * @param workflowInstance The workflow instance for which cleanup is called
    * @param executionId The execution id for which the cleanup code is called
    */
-  void cleanup(String executionId);
+  void cleanup(WorkflowInstance workflowInstance, String executionId);
 
   @AutoValue
   abstract class RunSpec {

@@ -117,7 +117,7 @@ class LocalDockerRunner implements DockerRunner {
   }
 
   @Override
-  public void cleanup(String executionId) {
+  public void cleanup(WorkflowInstance workflowInstance, String executionId) {
   }
 
   private void checkStatuses() {

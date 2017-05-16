@@ -287,25 +287,13 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   @Override
-  public void cleanup(String executionId) {
-    final Pod pod = client.pods().withName(executionId).get();
-    if (pod != null) {
-      cleanup(pod);
+  public void cleanup(WorkflowInstance workflowInstance, String executionId) {
+    if (!debug.get()) {
+      LOG.info("Cleaning up {} pod: {}", workflowInstance.toKey(), executionId);
+      client.pods().withName(executionId).delete();
+    } else {
+      LOG.info("Keeping {} pod: {}", workflowInstance.toKey(), executionId);
     }
-  }
-
-  private void cleanup(Pod pod) {
-    final String name = pod.getMetadata().getName();
-    readPodWorkflowInstance(pod).ifPresent(
-        workflowInstance -> {
-          if (!debug.get()) {
-            LOG.info("Cleaning up {} pod: {}", workflowInstance.toKey(), name);
-            client.pods().delete(pod);
-          } else {
-            LOG.info("Keeping {} pod: {}", workflowInstance.toKey(), name);
-          }
-        }
-    );
   }
 
   @Override
@@ -394,7 +382,7 @@ class KubernetesDockerRunner implements DockerRunner {
       if (runState.isPresent()) {
         emitPodEvents(Watcher.Action.MODIFIED, pod, runState.get());
       } else {
-        cleanup(pod);
+        cleanup(workflowInstance.get(), pod.getMetadata().getName());
       }
     }
   }
