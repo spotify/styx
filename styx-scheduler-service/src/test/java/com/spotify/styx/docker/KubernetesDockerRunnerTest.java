@@ -25,12 +25,14 @@ import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.podStatus
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.running;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminated;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.waiting;
+import static java.lang.Integer.MAX_VALUE;
 import static java.util.Optional.empty;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyListOf;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
@@ -125,6 +127,8 @@ public class KubernetesDockerRunnerTest {
                                                                             Optional.of(SERVICE_ACCOUNT),
                                                                             empty());
 
+  private static final int NO_POLL = Integer.MAX_VALUE;
+
   @Mock NamespacedKubernetesClient k8sClient;
 
   @Mock KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
@@ -132,6 +136,7 @@ public class KubernetesDockerRunnerTest {
   @Mock MixedOperation<Pod, PodList, DoneablePod, PodResource<Pod, DoneablePod>> pods;
   @Mock MixedOperation<Secret, SecretList, DoneableSecret, Resource<Secret, DoneableSecret>> secrets;
   @Mock Resource<Secret, DoneableSecret> namedResource;
+  @Mock PodResource<Pod, DoneablePod> namedPod;
 
   @Mock PodList podList;
   @Mock ListMeta listMeta;
@@ -171,9 +176,8 @@ public class KubernetesDockerRunnerTest {
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT))
         .thenReturn(SERVICE_ACCOUNT_SECRET);
 
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug, 60);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug, NO_POLL);
     kdr.init();
-    kdr.restore();
 
     podWatcher = watchCaptor.getValue();
 
@@ -192,6 +196,28 @@ public class KubernetesDockerRunnerTest {
   @After
   public void tearDown() throws Exception {
     kdr.close();
+  }
+
+  @Test
+  public void shouldCleanupPod() throws Exception {
+    final String name = createdPod.getMetadata().getName();
+    when(k8sClient.pods().withName(name)).thenReturn(namedPod);
+    when(namedPod.get()).thenReturn(createdPod);
+    kdr.cleanup(name);
+    verify(k8sClient.pods()).delete(createdPod);
+  }
+
+  @Test
+  public void shouldNotCleanupPodIfDebugEnabled() throws Exception {
+    when(debug.get()).thenReturn(true);
+    final String name = createdPod.getMetadata().getName();
+    when(k8sClient.pods().withName(name)).thenReturn(namedPod);
+    when(namedPod.get()).thenReturn(createdPod);
+    kdr.cleanup(name);
+    verify(k8sClient.pods(), never()).delete(any(Pod.class));
+    verify(k8sClient.pods(), never()).delete(any(Pod[].class));
+    verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
+    verify(k8sClient.pods(), never()).delete();
   }
 
   @Test(expected = InvalidExecutionException.class)
@@ -428,7 +454,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(terminated("Succeeded", 20, null));
 
     // Start a new runner
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug, NO_POLL);
     kdr.init();
 
     // Make the runner poll states for all pods
