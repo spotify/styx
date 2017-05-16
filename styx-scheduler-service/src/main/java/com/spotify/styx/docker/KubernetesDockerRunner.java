@@ -44,6 +44,7 @@ import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.TriggerUtil;
 import io.fabric8.kubernetes.api.model.ContainerBuilder;
 import io.fabric8.kubernetes.api.model.EnvVar;
@@ -115,23 +116,25 @@ class KubernetesDockerRunner implements DockerRunner {
   private final KubernetesClient client;
   private final StateManager stateManager;
   private final Stats stats;
-  private final int pollPodsIntervalSeconds;
   private final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
+  private final Debug debug;
+  private final int pollPodsIntervalSeconds;
 
   private Watch watch;
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
-      KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager, int pollPodsIntervalSeconds) {
+      KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager, Debug debug, int pollPodsIntervalSeconds) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client);
     this.stats = Objects.requireNonNull(stats);
-    this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
     this.serviceAccountSecretManager = Objects.requireNonNull(serviceAccountSecretManager);
+    this.debug = debug;
+    this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
   }
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
-      KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager) {
-    this(client, stateManager, stats, serviceAccountSecretManager, DEFAULT_POLL_PODS_INTERVAL_SECONDS);
+      KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager, Debug debug) {
+    this(client, stateManager, stats, serviceAccountSecretManager, debug, DEFAULT_POLL_PODS_INTERVAL_SECONDS);
   }
 
   @Override
@@ -285,7 +288,24 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @Override
   public void cleanup(String executionId) {
-    client.pods().withName(executionId).delete();
+    final Pod pod = client.pods().withName(executionId).get();
+    if (pod != null) {
+      cleanup(pod);
+    }
+  }
+
+  private void cleanup(Pod pod) {
+    final String name = pod.getMetadata().getName();
+    readPodWorkflowInstance(pod).ifPresent(
+        workflowInstance -> {
+          if (!debug.get()) {
+            LOG.info("Cleaning up {} pod: {}", workflowInstance.toKey(), name);
+          } else {
+            LOG.info("Keeping {} pod: {}", workflowInstance.toKey(), name);
+          }
+          client.pods().delete(pod);
+        }
+    );
   }
 
   @Override
@@ -374,8 +394,7 @@ class KubernetesDockerRunner implements DockerRunner {
       if (runState.isPresent()) {
         emitPodEvents(Watcher.Action.MODIFIED, pod, runState.get());
       } else {
-        LOG.info("Deleting unwanted pod {}", pod.getMetadata().getName());
-        client.pods().delete(pod);
+        cleanup(pod);
       }
     }
   }

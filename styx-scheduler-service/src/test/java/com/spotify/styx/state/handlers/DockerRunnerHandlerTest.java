@@ -51,6 +51,7 @@ import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.Debug;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Optional;
@@ -68,14 +69,13 @@ import org.mockito.runners.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class DockerRunnerHandlerTest {
 
-  private Storage storage = Mockito.mock(Storage.class);
   private RateLimiter rateLimiter = Mockito.mock(RateLimiter.class);
   private ExecutorService executor = Executors.newCachedThreadPool();
 
   private StateManager stateManager = Mockito.spy(new SyncStateManager());
   private DockerRunner dockerRunner = Mockito.mock(DockerRunner.class);
   private DockerRunnerHandler dockerRunnerHandler = new DockerRunnerHandler(
-      dockerRunner, stateManager, storage, rateLimiter, executor);
+      dockerRunner, stateManager, rateLimiter, executor);
 
   private static final String TEST_EXECUTION_ID = "execution_1";
   private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
