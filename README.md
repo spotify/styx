@@ -187,7 +187,7 @@ The [Service Account] email address belonging to a project in [Google Cloud Plat
 
 If the workflow intends to use keys of a [Service Account],
 Styx will create both JSON and p12 keys for the specified `service_account`, rotate keys on daily basis,
-and garbage collect unused keys.
+and garbage collect unused keys older than 48h.
 
 Styx stores the created keys in [Kubernetes Secrets] and mounts them under `/etc/styx-wf-sa-keys/`
 in the container.

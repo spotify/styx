@@ -69,7 +69,7 @@ class KubernetesGCPServiceAccountSecretManager {
 
   private static final Clock DEFAULT_CLOCK = Clock.systemUTC();
 
-  private static final Duration SECRET_GC_GRACE_PERIOD = Duration.ofMinutes(30);
+  private static final Duration SECRET_GC_GRACE_PERIOD = Duration.ofHours(48);
 
   private final KubernetesClient client;
   private final ServiceAccountKeyManager keyManager;

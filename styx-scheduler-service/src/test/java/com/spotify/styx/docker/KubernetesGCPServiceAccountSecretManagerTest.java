@@ -103,6 +103,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   private final static Clock CLOCK = Clock.fixed(Instant.now(), ZoneOffset.UTC);
 
+  private static final Instant EXPIRED_CREATION_TIMESTAMP = CLOCK.instant().minus(Duration.ofHours(48).plusSeconds(1));
+
   private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(WORKFLOW_ID, "foo");
 
   private static final RunSpec RUN_SPEC_WITH_SA = RunSpec.create("busybox",
@@ -237,9 +239,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   @Test
   public void shouldRemoveServiceAccountSecretsAndKeys() throws Exception {
-    final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(1)).toString();
     final Secret secret = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", creationTimestamp);
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", EXPIRED_CREATION_TIMESTAMP.toString());
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
@@ -256,9 +257,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   @Test
   @Parameters({"Failed", "Succeeded"})
   public void shouldRemoveServiceAccountSecretsAndKeysUsedByTerminatedPods(String phase) throws Exception {
-    final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(1)).toString();
     final Secret secret = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", creationTimestamp);
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", EXPIRED_CREATION_TIMESTAMP.toString());
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
@@ -281,9 +281,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   @Test
   public void shouldNotRemoveServiceAccountSecretsAndKeysInUse() throws Exception {
-    final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(1)).toString();
     final Secret secret = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", creationTimestamp);
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", EXPIRED_CREATION_TIMESTAMP.toString());
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
@@ -302,9 +301,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   @Test
   public void shouldRemoveServiceAccountSecretsInPastEpoch() throws Exception {
-    final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(1)).toString();
     final Secret secret = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, PAST_SECRET_EPOCH, "old-json-key", "old-p12-key", creationTimestamp);
+        SERVICE_ACCOUNT, PAST_SECRET_EPOCH, "old-json-key", "old-p12-key", EXPIRED_CREATION_TIMESTAMP.toString());
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
@@ -319,8 +317,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test
-  public void shouldNotRemoveRecentlyCreatedServiceAccountSecrets() throws Exception {
-    final String creationTimestamp = CLOCK.instant().toString();
+  public void shouldNotRemoveServiceAccountSecretsCreatedWithin48Hours() throws Exception {
+    final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(48)).toString();
     final Secret secret1 = fakeServiceAccountKeySecret(
         SERVICE_ACCOUNT, PAST_SECRET_EPOCH, "json-key-1", "p12-key-1", creationTimestamp);
     final Secret secret2 = fakeServiceAccountKeySecret(
@@ -338,9 +336,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   @Test
   public void shouldHandlePermissionDeniedErrorsWhenDeletingServiceAccountKeys() throws Exception {
-    final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(1)).toString();
     final Secret secret = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", creationTimestamp);
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", EXPIRED_CREATION_TIMESTAMP.toString());
 
     when(podList.getItems()).thenReturn(ImmutableList.of());
     when(k8sClient.secrets()).thenReturn(secrets);
@@ -363,13 +360,12 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   @Test
   public void shouldHandleErrorsWhenDeletingServiceAccountKeys() throws Exception {
-    final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(1)).toString();
     final Secret secret1 = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-1", "p12-key-1", creationTimestamp);
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-1", "p12-key-1", EXPIRED_CREATION_TIMESTAMP.toString());
     final Secret secret2 = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-2", "p12-key-2", creationTimestamp);
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-2", "p12-key-2", EXPIRED_CREATION_TIMESTAMP.toString());
     final Secret secret3 = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-3", "p12-key-3", creationTimestamp);
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-3", "p12-key-3", EXPIRED_CREATION_TIMESTAMP.toString());
 
     when(podList.getItems()).thenReturn(ImmutableList.of());
     when(k8sClient.secrets()).thenReturn(secrets);
@@ -401,9 +397,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     final String jsonKeyId = "json-key";
     final String p12KeyId = "p12-key";
 
-    final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(1)).toString();
     final Secret secret = fakeServiceAccountKeySecret(SERVICE_ACCOUNT, SECRET_EPOCH, jsonKeyId, p12KeyId,
-        creationTimestamp);
+        EXPIRED_CREATION_TIMESTAMP.toString());
 
     when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(true);
     when(serviceAccountKeyManager.keyExists(keyName(SERVICE_ACCOUNT, jsonKeyId))).thenReturn(true);
