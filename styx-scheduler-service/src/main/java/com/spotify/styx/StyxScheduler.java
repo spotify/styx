@@ -245,6 +245,7 @@ public class StyxScheduler implements AppInit {
   private StateManager stateManager;
   private Scheduler scheduler;
   private TriggerManager triggerManager;
+  private BackfillTriggerManager backfillTriggerManager;
 
   private StyxScheduler(
       Time time,
@@ -334,6 +335,8 @@ public class StyxScheduler implements AppInit {
     final TriggerListener trigger =
         new StateInitializingTrigger(stateFactory, stateManager, storage);
     final TriggerManager triggerManager = new TriggerManager(trigger, time, storage, stats);
+    final BackfillTriggerManager backfillTriggerManager =
+        new BackfillTriggerManager(stateManager, workflowCache, storage, trigger);
 
     final WorkflowInitializer workflowInitializer = new WorkflowInitializer(storage, time);
     final Consumer<Workflow> workflowRemoveListener = workflowRemoved(storage);
@@ -341,12 +344,13 @@ public class StyxScheduler implements AppInit {
         workflowChanged(workflowCache, workflowInitializer, stats, stateManager);
 
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
-        storage, trigger);
+                                              storage);
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
     restoreState(storage, outputHandlers, stateManager, dockerRunner);
     startTriggerManager(triggerManager, executor);
+    startBackfillTriggerManager(backfillTriggerManager, executor);
     startScheduleSources(environment, executor, workflowChangeListener, workflowRemoveListener);
     startScheduler(scheduler, executor);
     startRuntimeConfigUpdate(storage, executor, submissionRateLimiter);
@@ -363,6 +367,7 @@ public class StyxScheduler implements AppInit {
     this.stateManager = stateManager;
     this.scheduler = scheduler;
     this.triggerManager = triggerManager;
+    this.backfillTriggerManager = backfillTriggerManager;
   }
 
   @VisibleForTesting
@@ -383,6 +388,11 @@ public class StyxScheduler implements AppInit {
   @VisibleForTesting
   void tickTriggerManager() {
     triggerManager.tick();
+  }
+
+  @VisibleForTesting
+  void tickBackfillTriggerManager() {
+    backfillTriggerManager.tick();
   }
 
   private void warmUpCache(WorkflowCache cache, Storage storage) {
@@ -447,6 +457,15 @@ public class StyxScheduler implements AppInit {
   private static void startTriggerManager(TriggerManager triggerManager, ScheduledExecutorService exec) {
     exec.scheduleWithFixedDelay(
         guard(triggerManager::tick),
+        TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
+        TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
+        TimeUnit.SECONDS);
+  }
+
+  private static void startBackfillTriggerManager(BackfillTriggerManager backfillTriggerManager,
+                                                  ScheduledExecutorService exec) {
+    exec.scheduleWithFixedDelay(
+        guard(backfillTriggerManager::tick),
         TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
         TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
         TimeUnit.SECONDS);

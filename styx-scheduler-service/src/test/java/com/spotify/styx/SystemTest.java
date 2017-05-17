@@ -23,7 +23,6 @@ package com.spotify.styx;
 import static com.spotify.styx.model.WorkflowInstance.create;
 import static java.util.Arrays.asList;
 import static java.util.Optional.empty;
-import static java.util.Optional.of;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -217,7 +216,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenBackfill(ONE_DAY_HOURLY_BACKFILL);
 
     styxStarts();
-    tickScheduler();
+    tickBackfillTriggerManager();
     awaitWorkflowInstanceState(
         WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2015-01-01T00"),
         RunState.State.QUEUED);
@@ -240,7 +239,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenBackfill(singleHourBackfill);
 
     styxStarts();
-    tickScheduler();
+    tickBackfillTriggerManager();
     awaitWorkflowInstanceState(
         WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2015-01-01T00"),
         RunState.State.QUEUED);

@@ -172,6 +172,10 @@ public class StyxSchedulerServiceFixture {
     styxScheduler.tickTriggerManager();
   }
 
+  void tickBackfillTriggerManager() {
+    styxScheduler.tickBackfillTriggerManager();
+  }
+
   void givenTheTimeIs(String time) {
     now = Instant.parse(time);
     printTime();

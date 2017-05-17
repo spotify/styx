@@ -20,11 +20,9 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
-import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.groupingByConcurrent;
 import static java.util.stream.Collectors.toCollection;
 import static java.util.stream.Collectors.toList;
@@ -35,8 +33,6 @@ import com.google.auto.value.AutoValue;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
@@ -47,24 +43,17 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
-import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
-import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
@@ -96,16 +85,14 @@ public class Scheduler {
   private final StateManager stateManager;
   private final WorkflowCache workflowCache;
   private final Storage storage;
-  private final TriggerListener triggerListener;
 
   public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager,
-                   WorkflowCache workflowCache, Storage storage, TriggerListener triggerListener) {
+                   WorkflowCache workflowCache, Storage storage) {
     this.time = Objects.requireNonNull(time);
     this.ttls = Objects.requireNonNull(ttls);
     this.stateManager = Objects.requireNonNull(stateManager);
     this.workflowCache = Objects.requireNonNull(workflowCache);
     this.storage = Objects.requireNonNull(storage);
-    this.triggerListener = Objects.requireNonNull(triggerListener);
   }
 
   void tick() {
@@ -174,8 +161,6 @@ public class Scheduler {
 
     timedOutInstances.forEach(this::sendTimeout);
     eligibleInstances.forEach(limitAndDequeue);
-
-    triggerBackfills(activeStates);
   }
 
   private void evaluateResourcesForDequeue(
@@ -227,85 +212,6 @@ public class Scheduler {
         .map(resource -> ResourceWithInstance.create(resource, instanceState));
   }
 
-  @VisibleForTesting
-  private void triggerBackfills(Collection<InstanceState> activeStates) {
-    final List<Backfill> backfills;
-    try {
-      backfills = storage.backfills(false);
-    } catch (IOException e) {
-      LOG.warn("Failed to get backfills", e);
-      return;
-    }
-
-    final Map<String, Long> backfillStates = activeStates.stream()
-        .map(state -> state.runState().data().trigger())
-        .filter(Optional::isPresent)
-        .map(Optional::get)
-        .filter(TriggerUtil::isBackfill)
-        .collect(groupingBy(
-            TriggerUtil::triggerId,
-            HashMap::new,
-            counting()));
-
-    backfills.forEach(backfill -> {
-      final Optional<Workflow> workflowOpt = workflowCache.workflow(backfill.workflowId());
-
-      if (!workflowOpt.isPresent()) {
-        LOG.warn("workflow not found for backfill, skipping rest of triggers: {}", backfill);
-        final BackfillBuilder builder = backfill.builder();
-        builder.halted(true);
-        storeBackfill(builder.build());
-        return;
-      }
-
-      final Workflow workflow = workflowOpt.get();
-
-      final int remainingCapacity =
-          backfill.concurrency() - backfillStates.getOrDefault(backfill.id(), 0L).intValue();
-
-      Instant partition = backfill.nextTrigger();
-
-      for (int i = 0; i < remainingCapacity && partition.isBefore(backfill.end()); i++) {
-        try {
-          CompletableFuture<Void> processed = triggerListener
-              .event(workflow, Trigger.backfill(backfill.id()), partition)
-              .toCompletableFuture();
-          // Wait for the trigger execution to complete before proceeding to the next partition
-          processed.get();
-        } catch (AlreadyInitializedException e) {
-          LOG.warn("tried to trigger backfill for already active state [{}]: {}",
-              partition, backfill);
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new RuntimeException(e);
-        } catch (ExecutionException e) {
-          LOG.error("failed to trigger backfill for state [{}]: {}",
-              partition, backfill);
-          throw new RuntimeException(e);
-        }
-
-        partition = nextInstant(partition, backfill.schedule());
-        storeBackfill(backfill.builder()
-            .nextTrigger(partition)
-            .build());
-      }
-
-      if (partition.equals(backfill.end())) {
-        storeBackfill(backfill.builder()
-            .nextTrigger(backfill.end())
-            .allTriggered(true)
-            .build());
-      }
-    });
-  }
-
-  private void storeBackfill(Backfill backfill) {
-    try {
-      storage.storeBackfill(backfill);
-    } catch (IOException e) {
-      LOG.warn("Failed to store updated backfill", e);
-    }
-  }
 
   private Set<String> workflowResources(Optional<Long> globalConcurrency, WorkflowId workflowId) {
     final ImmutableSet.Builder<String> builder = ImmutableSet.builder();
@@ -359,16 +265,6 @@ public class Scheduler {
   private void sendTimeout(WorkflowInstance workflowInstance) {
     LOG.info("Found stale state, issuing timeout for {}", workflowInstance);
     stateManager.receiveIgnoreClosed(Event.timeout(workflowInstance));
-  }
-
-  @AutoValue
-  abstract static class InstanceState {
-    abstract WorkflowInstance workflowInstance();
-    abstract RunState runState();
-
-    static InstanceState create(WorkflowInstance workflowInstance, RunState runState) {
-      return new AutoValue_Scheduler_InstanceState(workflowInstance, runState);
-    }
   }
 
   @AutoValue
