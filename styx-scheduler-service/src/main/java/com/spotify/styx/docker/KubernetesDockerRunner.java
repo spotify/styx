@@ -378,12 +378,9 @@ class KubernetesDockerRunner implements DockerRunner {
       if (!workflowInstance.isPresent()) {
         continue;
       }
-      final Optional<RunState> runState = lookupPodRunState(pod, workflowInstance.get());
-      if (runState.isPresent()) {
-        emitPodEvents(Watcher.Action.MODIFIED, pod, runState.get());
-      } else {
-        cleanup(workflowInstance.get(), pod.getMetadata().getName());
-      }
+      lookupPodRunState(pod, workflowInstance.get(),
+                        () -> cleanup(workflowInstance.get(), pod.getMetadata().getName()))
+          .ifPresent(runState1 -> emitPodEvents(Watcher.Action.MODIFIED, pod, runState1));
     }
   }
 
@@ -402,11 +399,17 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private Optional<RunState> lookupPodRunState(Pod pod, WorkflowInstance workflowInstance) {
+    return lookupPodRunState(pod, workflowInstance, () -> {});
+  }
+
+  private Optional<RunState> lookupPodRunState(Pod pod, WorkflowInstance workflowInstance,
+                                               Runnable cleanupAction) {
     final String podName = pod.getMetadata().getName();
 
     final RunState runState = stateManager.get(workflowInstance);
     if (runState == null) {
       LOG.warn("Pod event for unknown or inactive workflow instance {}", workflowInstance);
+      cleanupAction.run();
       return Optional.empty();
     }
 
@@ -420,6 +423,7 @@ class KubernetesDockerRunner implements DockerRunner {
     if (!podName.equals(executionId)) {
       LOG.warn("Pod event not matching current exec id, current:{} != pod:{}",
           executionId, podName);
+      cleanupAction.run();
       return Optional.empty();
     }
 
