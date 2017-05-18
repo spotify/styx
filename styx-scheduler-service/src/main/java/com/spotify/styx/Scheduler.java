@@ -85,14 +85,17 @@ public class Scheduler {
   private final StateManager stateManager;
   private final WorkflowCache workflowCache;
   private final Storage storage;
+  private final WorkflowResourceDecorator resourceDecorator;
 
   public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager,
-                   WorkflowCache workflowCache, Storage storage) {
+      WorkflowCache workflowCache, Storage storage,
+      WorkflowResourceDecorator resourceDecorator) {
     this.time = Objects.requireNonNull(time);
     this.ttls = Objects.requireNonNull(ttls);
     this.stateManager = Objects.requireNonNull(stateManager);
     this.workflowCache = Objects.requireNonNull(workflowCache);
     this.storage = Objects.requireNonNull(storage);
+    this.resourceDecorator = Objects.requireNonNull(resourceDecorator);
   }
 
   void tick() {
@@ -148,14 +151,18 @@ public class Scheduler {
     Collections.shuffle(eligibleInstances);
 
     final Consumer<InstanceState> limitAndDequeue = (instance) -> {
-      final Set<String> resourceRefs =
-          workflowResourceReferences.getOrDefault(instance.workflowInstance().workflowId(),
-              emptySet());
+      final Set<String> workflowResourceRefs =
+          workflowResourceReferences.getOrDefault(instance.workflowInstance().workflowId(), emptySet());
 
-      if (resourceRefs.isEmpty()) {
+      final Set<String> instanceResourceRefs = workflowCache.workflow(instance.workflowInstance().workflowId())
+          .map(workflow -> resourceDecorator.decorateResources(
+              instance.runState(), workflow.configuration(), workflowResourceRefs))
+          .orElse(workflowResourceRefs);
+
+      if (instanceResourceRefs.isEmpty()) {
         sendDequeue(instance);
       } else {
-        evaluateResourcesForDequeue(resources, currentResourceUsage, instance, resourceRefs);
+        evaluateResourcesForDequeue(resources, currentResourceUsage, instance, instanceResourceRefs);
       }
     };
 
@@ -218,8 +225,8 @@ public class Scheduler {
 
     globalConcurrency.ifPresent(concurrency -> builder.add(GLOBAL_RESOURCE_ID));
 
-    workflowCache.workflow(workflowId)
-        .ifPresent(workflow -> builder.addAll(workflow.configuration().resources()));
+    workflowCache.workflow(workflowId).ifPresent(workflow ->
+        builder.addAll(workflow.configuration().resources()));
 
     return builder.build();
   }

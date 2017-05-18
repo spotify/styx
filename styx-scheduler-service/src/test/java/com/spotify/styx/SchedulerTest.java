@@ -25,9 +25,15 @@ import static java.time.Duration.ofSeconds;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anySetOf;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
@@ -36,6 +42,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
@@ -50,11 +57,14 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.runners.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -79,6 +89,8 @@ public class SchedulerTest {
 
   private ExecutorService executor = Executors.newCachedThreadPool();
 
+  @Mock WorkflowResourceDecorator resourceDecorator;
+
   @After
   public void tearDown() throws Exception {
     executor.shutdownNow();
@@ -92,8 +104,12 @@ public class SchedulerTest {
     when(storage.resources()).thenReturn(resourceLimits);
     when(storage.globalConcurrency()).thenReturn(Optional.empty());
 
-    stateManager = new SyncStateManager();
-    scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage);
+    when(resourceDecorator.decorateResources(
+        any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
+        .thenAnswer(a -> a.getArgumentAt(2, Set.class));
+
+    stateManager = Mockito.spy(new SyncStateManager());
+    scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage, resourceDecorator);
   }
 
   private void setResourceLimit(String resourceId, long limit) {
@@ -406,6 +422,56 @@ public class SchedulerTest {
 
     assertThat(countInState(State.QUEUED), is(4 - expectedRuns1 - expectedRuns2));
     assertThat(countInState(State.PREPARE), is(expectedRuns1 + expectedRuns2));
+  }
+
+  @Test
+  public void shouldDecorateWorkflowInstanceResources() throws Exception {
+    setUp(20);
+
+    Workflow workflow = workflowUsingResources(WORKFLOW_ID1, "foo", "bar");
+    when(resourceDecorator.decorateResources(
+        any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
+        .thenReturn(ImmutableSet.of("baz", "quux", "GLOBAL_STYX_CLUSTER"));
+
+    when(storage.globalConcurrency()).thenReturn(Optional.of(17L));
+
+    setResourceLimit("baz", 4);
+    setResourceLimit("quux", 4);
+    initWorkflow(workflow);
+    init(RunState.create(INSTANCE, State.QUEUED, time));
+
+    scheduler.tick();
+
+    verify(resourceDecorator).decorateResources(any(RunState.class), eq(workflow.configuration()),
+        eq(ImmutableSet.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
+
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE));
+  }
+
+  @Test
+  public void shouldLimitOnDecoratedWorkflowInstanceResourcesIfNotAvailable() throws Exception {
+    setUp(20);
+
+    Workflow workflow = workflowUsingResources(WORKFLOW_ID1, "foo", "bar");
+    when(resourceDecorator.decorateResources(
+        any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
+        .thenReturn(ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"));
+
+    when(storage.globalConcurrency()).thenReturn(Optional.of(17L));
+
+    setResourceLimit("baz", 0);
+    initWorkflow(workflow);
+    init(RunState.create(INSTANCE, State.QUEUED, time));
+
+    scheduler.tick();
+
+    verify(resourceDecorator).decorateResources(any(RunState.class), eq(workflow.configuration()),
+        eq(ImmutableSet.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
+
+    verify(stateManager).receiveIgnoreClosed(Event.info(INSTANCE,
+        Message.info("Resource limit reached for: [Resource{id=baz, concurrency=0}]")));
+
+    verify(stateManager, never()).receiveIgnoreClosed(Event.dequeue(INSTANCE));
   }
 
   private WorkflowInstance instance(WorkflowId id, String instanceId) {
