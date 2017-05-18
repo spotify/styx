@@ -399,8 +399,7 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private Optional<RunState> lookupPodRunState(Pod pod, WorkflowInstance workflowInstance) {
-    return lookupPodRunState(pod, workflowInstance, () -> {
-    });
+    return lookupPodRunState(pod, workflowInstance, () -> { });
   }
 
   private Optional<RunState> lookupPodRunState(Pod pod, WorkflowInstance workflowInstance,
