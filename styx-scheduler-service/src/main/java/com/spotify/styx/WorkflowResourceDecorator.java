@@ -21,15 +21,14 @@
 package com.spotify.styx;
 
 import com.spotify.styx.model.WorkflowConfiguration;
-import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.RunState;
 import java.util.Set;
 
 public interface WorkflowResourceDecorator {
 
-  WorkflowResourceDecorator NOOP = (wfi, cfg, res) -> res;
+  WorkflowResourceDecorator NOOP = (rs, cfg, res) -> res;
 
   Set<String> decorateResources(
-      WorkflowInstance workflowInstance,
-      WorkflowConfiguration workflowConfiguration,
+      RunState runState, WorkflowConfiguration workflowConfiguration,
       Set<String> workflowResources);
 }

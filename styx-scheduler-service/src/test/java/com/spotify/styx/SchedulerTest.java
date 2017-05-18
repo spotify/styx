@@ -27,6 +27,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anySetOf;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -104,7 +105,7 @@ public class SchedulerTest {
     when(storage.globalConcurrency()).thenReturn(Optional.empty());
 
     when(resourceDecorator.decorateResources(
-        any(WorkflowInstance.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
+        any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
         .thenAnswer(a -> a.getArgumentAt(2, Set.class));
 
     stateManager = Mockito.spy(new SyncStateManager());
@@ -429,7 +430,7 @@ public class SchedulerTest {
 
     Workflow workflow = workflowUsingResources(WORKFLOW_ID1, "foo", "bar");
     when(resourceDecorator.decorateResources(
-        any(WorkflowInstance.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
+        any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
         .thenReturn(ImmutableSet.of("baz", "quux", "GLOBAL_STYX_CLUSTER"));
 
     when(storage.globalConcurrency()).thenReturn(Optional.of(17L));
@@ -441,8 +442,8 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    verify(resourceDecorator).decorateResources(INSTANCE, workflow.configuration(), ImmutableSet.of(
-        "foo", "bar", "GLOBAL_STYX_CLUSTER"));
+    verify(resourceDecorator).decorateResources(any(RunState.class), eq(workflow.configuration()),
+        eq(ImmutableSet.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
 
     verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE));
   }
@@ -453,7 +454,7 @@ public class SchedulerTest {
 
     Workflow workflow = workflowUsingResources(WORKFLOW_ID1, "foo", "bar");
     when(resourceDecorator.decorateResources(
-        any(WorkflowInstance.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
+        any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
         .thenReturn(ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"));
 
     when(storage.globalConcurrency()).thenReturn(Optional.of(17L));
@@ -464,8 +465,8 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    verify(resourceDecorator).decorateResources(INSTANCE, workflow.configuration(), ImmutableSet.of(
-        "foo", "bar", "GLOBAL_STYX_CLUSTER"));
+    verify(resourceDecorator).decorateResources(any(RunState.class), eq(workflow.configuration()),
+        eq(ImmutableSet.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
 
     verify(stateManager).receiveIgnoreClosed(Event.info(INSTANCE,
         Message.info("Resource limit reached for: [Resource{id=baz, concurrency=0}]")));

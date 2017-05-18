@@ -156,7 +156,7 @@ public class Scheduler {
 
       final Set<String> instanceResourceRefs = workflowCache.workflow(instance.workflowInstance().workflowId())
           .map(workflow -> resourceDecorator.decorateResources(
-              instance.workflowInstance(), workflow.configuration(), workflowResourceRefs))
+              instance.runState(), workflow.configuration(), workflowResourceRefs))
           .orElse(workflowResourceRefs);
 
       if (instanceResourceRefs.isEmpty()) {
