@@ -169,6 +169,7 @@ public class StyxScheduler implements AppInit {
     private ExecutorFactory executorFactory = Executors::newScheduledThreadPool;
     private PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
     private RetryUtil retryUtil = DEFAULT_RETRY_UTIL;
+    private WorkflowResourceDecorator resourceDecorator = WorkflowResourceDecorator.NOOP;
 
     public Builder setTime(Time time) {
       this.time = time;
@@ -210,16 +211,13 @@ public class StyxScheduler implements AppInit {
       return this;
     }
 
+    public Builder setResourceDecorator(WorkflowResourceDecorator resourceDecorator) {
+      this.resourceDecorator = resourceDecorator;
+      return this;
+    }
+
     public StyxScheduler build() {
-      return new StyxScheduler(
-          time,
-          storageFactory,
-          dockerRunnerFactory,
-          scheduleSources,
-          statsFactory,
-          executorFactory,
-          publisherFactory,
-          retryUtil);
+      return new StyxScheduler(this);
     }
   }
 
@@ -241,29 +239,23 @@ public class StyxScheduler implements AppInit {
   private final ExecutorFactory executorFactory;
   private final PublisherFactory publisherFactory;
   private final RetryUtil retryUtil;
+  private final WorkflowResourceDecorator resourceDecorator;
 
   private StateManager stateManager;
   private Scheduler scheduler;
   private TriggerManager triggerManager;
   private BackfillTriggerManager backfillTriggerManager;
 
-  private StyxScheduler(
-      Time time,
-      StorageFactory storageFactory,
-      DockerRunnerFactory dockerRunnerFactory,
-      ScheduleSources scheduleSources,
-      StatsFactory statsFactory,
-      ExecutorFactory executorFactory,
-      PublisherFactory publisherFactory,
-      RetryUtil retryUtil) {
-    this.time = requireNonNull(time);
-    this.storageFactory = requireNonNull(storageFactory);
-    this.dockerRunnerFactory = requireNonNull(dockerRunnerFactory);
-    this.scheduleSources = requireNonNull(scheduleSources);
-    this.statsFactory = requireNonNull(statsFactory);
-    this.executorFactory = requireNonNull(executorFactory);
-    this.publisherFactory = requireNonNull(publisherFactory);
-    this.retryUtil = requireNonNull(retryUtil);
+  private StyxScheduler(Builder builder) {
+    this.time = requireNonNull(builder.time);
+    this.storageFactory = requireNonNull(builder.storageFactory);
+    this.dockerRunnerFactory = requireNonNull(builder.dockerRunnerFactory);
+    this.scheduleSources = requireNonNull(builder.scheduleSources);
+    this.statsFactory = requireNonNull(builder.statsFactory);
+    this.executorFactory = requireNonNull(builder.executorFactory);
+    this.publisherFactory = requireNonNull(builder.publisherFactory);
+    this.retryUtil = requireNonNull(builder.retryUtil);
+    this.resourceDecorator = requireNonNull(builder.resourceDecorator);
   }
 
   @Override
@@ -344,7 +336,7 @@ public class StyxScheduler implements AppInit {
         workflowChanged(workflowCache, workflowInitializer, stats, stateManager);
 
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
-                                              storage);
+                                              storage, resourceDecorator);
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
