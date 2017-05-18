@@ -215,10 +215,13 @@ public class Scheduler {
   private Stream<ResourceWithInstance> pairWithResources(Optional<Long> globalConcurrency,
                                                          InstanceState instanceState) {
     final WorkflowId workflowId = instanceState.workflowInstance().workflowId();
-    return workflowResources(globalConcurrency, workflowId).stream()
+    final Set<String> workflowResources = workflowResources(globalConcurrency, workflowId);
+    return workflowCache.workflow(workflowId)
+        .map(workflow -> resourceDecorator.decorateResources(
+            instanceState.runState(), workflow.configuration(), workflowResources))
+        .orElse(workflowResources).stream()
         .map(resource -> ResourceWithInstance.create(resource, instanceState));
   }
-
 
   private Set<String> workflowResources(Optional<Long> globalConcurrency, WorkflowId workflowId) {
     final ImmutableSet.Builder<String> builder = ImmutableSet.builder();
