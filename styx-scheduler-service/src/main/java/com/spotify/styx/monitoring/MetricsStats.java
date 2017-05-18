@@ -27,9 +27,9 @@ import com.spotify.metrics.core.MetricId;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import javaslang.Tuple;
 import javaslang.Tuple2;
 
@@ -54,6 +54,9 @@ public final class MetricsStats implements Stats {
   private static final MetricId WORKFLOW_COUNT = BASE
       .tagged("what", "workflow-count")
       .tagged("unit", "workflow");
+
+  private static final MetricId RESOURCE_USAGE = BASE
+      .tagged("what", "resource-usage");
 
   private static final MetricId EXIT_CODE_RATE = BASE
       .tagged("what", "exit-code-rate");
@@ -107,12 +110,13 @@ public final class MetricsStats implements Stats {
   private final Meter terminationLogMissing;
   private final Meter terminationLogInvalid;
   private final Meter exitCodeMismatch;
-  private final ConcurrentMap<String, Histogram> storageOperationHistograms;
-  private final ConcurrentMap<String, Meter> storageOperationMeters;
-  private final ConcurrentMap<String, Histogram> dockerOperationHistograms;
-  private final ConcurrentMap<String, Meter> dockerOperationMeters;
-  private final ConcurrentMap<WorkflowId, Gauge> activeStatesPerWorkflowGauges;
-  private final ConcurrentMap<Tuple2<WorkflowId, Integer>, Meter> exitCodePerWorkflowMeters;
+  private final Map<String, Histogram> storageOperationHistograms;
+  private final Map<String, Meter> storageOperationMeters;
+  private final Map<String, Histogram> dockerOperationHistograms;
+  private final Map<String, Meter> dockerOperationMeters;
+  private final Map<WorkflowId, Gauge> activeStatesPerWorkflowGauges;
+  private final Map<Tuple2<WorkflowId, Integer>, Meter> exitCodePerWorkflowMeters;
+  private final Map<String, Histogram> resourceUsageHistograms;
 
   public MetricsStats(SemanticMetricRegistry registry) {
     this.registry = Objects.requireNonNull(registry);
@@ -129,6 +133,7 @@ public final class MetricsStats implements Stats {
     this.dockerOperationMeters = new ConcurrentHashMap<>();
     this.activeStatesPerWorkflowGauges = new ConcurrentHashMap<>();
     this.exitCodePerWorkflowMeters = new ConcurrentHashMap<>();
+    this.resourceUsageHistograms = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -209,6 +214,15 @@ public final class MetricsStats implements Stats {
     pullImageErrorMeter.mark();
   }
 
+  @Override
+  public void registerResourceCount(String resource, Gauge<Long> resourceCount) {
+    registry.register(RESOURCE_USAGE.tagged("resource-total", resource), resourceCount);
+  }
+
+  @Override
+  public void resourceUsage(String resource, long usage) {
+    resourceUsageHistogram(resource).update(usage);
+  }
 
   private Meter exitCodeMeter(WorkflowId workflowId, int exitCode) {
     return exitCodePerWorkflowMeters
@@ -237,5 +251,10 @@ public final class MetricsStats implements Stats {
   private Meter dockerOpMeter(String operation) {
     return dockerOperationMeters.computeIfAbsent(
         operation, (op) -> registry.meter(DOCKER_RATE.tagged("operation", op)));
+  }
+
+  private Histogram resourceUsageHistogram(String resource) {
+    return resourceUsageHistograms.computeIfAbsent(
+        resource, (op) -> registry.histogram(RESOURCE_USAGE.tagged("resource-used", resource)));
   }
 }

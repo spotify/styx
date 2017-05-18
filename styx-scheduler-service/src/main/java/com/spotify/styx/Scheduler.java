@@ -38,6 +38,7 @@ import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
@@ -86,16 +87,19 @@ public class Scheduler {
   private final WorkflowCache workflowCache;
   private final Storage storage;
   private final WorkflowResourceDecorator resourceDecorator;
+  private final Stats stats;
 
   public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager,
-      WorkflowCache workflowCache, Storage storage,
-      WorkflowResourceDecorator resourceDecorator) {
+                   WorkflowCache workflowCache, Storage storage,
+                   WorkflowResourceDecorator resourceDecorator,
+                   Stats stats) {
     this.time = Objects.requireNonNull(time);
     this.ttls = Objects.requireNonNull(ttls);
     this.stateManager = Objects.requireNonNull(stateManager);
     this.workflowCache = Objects.requireNonNull(workflowCache);
     this.storage = Objects.requireNonNull(storage);
     this.resourceDecorator = Objects.requireNonNull(resourceDecorator);
+    this.stats = Objects.requireNonNull(stats);
   }
 
   void tick() {
@@ -142,6 +146,8 @@ public class Scheduler {
                 ResourceWithInstance::resource,
                 ConcurrentHashMap::new,
                 counting()));
+
+    currentResourceUsage.forEach(stats::resourceUsage);
 
     final List<InstanceState> eligibleInstances =
         activeStates.parallelStream()

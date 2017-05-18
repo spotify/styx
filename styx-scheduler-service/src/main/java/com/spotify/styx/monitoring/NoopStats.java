@@ -82,4 +82,12 @@ final class NoopStats implements Stats {
   @Override
   public void exitCodeMismatch() {
   }
+
+  @Override
+  public void registerResourceCount(String resource, Gauge<Long> resourceCount) {
+  }
+
+  @Override
+  public void resourceUsage(String resource, long usage) {
+  }
 }

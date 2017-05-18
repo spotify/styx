@@ -55,6 +55,7 @@ import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.WorkflowValidator;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -336,7 +337,7 @@ public class StyxScheduler implements AppInit {
         workflowChanged(workflowCache, workflowInitializer, stats, stateManager);
 
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
-                                              storage, resourceDecorator);
+                                              storage, resourceDecorator, stats);
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
@@ -552,6 +553,33 @@ public class StyxScheduler implements AppInit {
               .filter(runState -> runState.state().equals(state))
               .filter(runState -> !runState.data().trigger().isPresent())
               .count());
+    });
+
+    try {
+      storage.resources()
+          .forEach(resource ->
+                       stats.registerResourceCount(
+                           resource.id(),
+                           () -> {
+                             try {
+                               return storage.resource(resource.id())
+                                   .map(Resource::concurrency).orElse(0L);
+                             } catch (IOException e) {
+                               LOG.error("Failed to get resource {}", resource.id());
+                               return 0L;
+                             }
+                           }));
+    } catch (IOException e) {
+      LOG.error("Failed to get resources");
+    }
+
+    stats.registerResourceCount(Scheduler.GLOBAL_RESOURCE_ID, () -> {
+      try {
+        return storage.globalConcurrency().orElse(0L);
+      } catch (IOException e) {
+        LOG.error("Failed to get global resource");
+        return 0L;
+      }
     });
 
     stats.registerQueuedEvents(queuedEventsCount);
