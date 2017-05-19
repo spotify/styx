@@ -516,7 +516,7 @@ public class StyxScheduler implements AppInit {
 
     stats.registerQueuedEvents(stateManager::getQueuedEventsCount);
 
-    stats.registerWorkflowCount("all", () -> workflowCache.all().stream().count());
+    stats.registerWorkflowCount("all", () -> (long) workflowCache.all().size());
 
     stats.registerWorkflowCount("configured", () -> workflowCache.all().stream()
         .filter(WorkflowValidator::hasDockerConfiguration)
