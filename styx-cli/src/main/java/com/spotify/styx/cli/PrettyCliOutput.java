@@ -174,13 +174,18 @@ class PrettyCliOutput implements CliOutput {
         wf.configuration().dockerImage().orElse(""));
     System.out.println("Component: " + wf.componentId());
     System.out.println(" Workflow: " + wf.id().id());
-    System.out.println("  Enabled: " + state.enabled().map(Object::toString).orElse(""));
     System.out.println(" Schedule: " + wf.configuration().schedule());
-    System.out.println("   Commit: " + state.commitSha().orElse(""));
+    System.out.println("   Offset: " + wf.configuration().offset().orElse(""));
     System.out.println("    Image: " + image);
     System.out.println("     Args: " + wf.configuration().dockerArgs().orElse(Collections.emptyList()));
+    System.out.println("  TermLog: " + wf.configuration().dockerTerminationLogging());
     System.out.println("   Secret: " + wf.configuration().secret().map(s -> s.name() + ':' + s.mountPath()).orElse(""));
     System.out.println(" Svc Acct: " + wf.configuration().serviceAccount().orElse(""));
+    System.out.println("Resources: " + wf.configuration().resources());
+    System.out.println("   Commit: " + state.commitSha().orElse(""));
+    System.out.println("  Enabled: " + state.enabled().map(Object::toString).orElse(""));
+    System.out.println("     Trig: " + state.nextNaturalTrigger().map(Object::toString).orElse(""));
+    System.out.println("Ofst Trig :" + state.nextNaturalOffsetTrigger().map(Object::toString).orElse(""));
   }
 
   private Ansi getAnsiForState(RunStateDataPayload.RunStateData RunStateData) {
