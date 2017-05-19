@@ -27,9 +27,9 @@ import com.spotify.metrics.core.MetricId;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import javaslang.Tuple;
 import javaslang.Tuple2;
 
@@ -110,13 +110,13 @@ public final class MetricsStats implements Stats {
   private final Meter terminationLogMissing;
   private final Meter terminationLogInvalid;
   private final Meter exitCodeMismatch;
-  private final Map<String, Histogram> storageOperationHistograms;
-  private final Map<String, Meter> storageOperationMeters;
-  private final Map<String, Histogram> dockerOperationHistograms;
-  private final Map<String, Meter> dockerOperationMeters;
-  private final Map<WorkflowId, Gauge> activeStatesPerWorkflowGauges;
-  private final Map<Tuple2<WorkflowId, Integer>, Meter> exitCodePerWorkflowMeters;
-  private final Map<String, Histogram> resourceUsageHistograms;
+  private final ConcurrentMap<String, Histogram> storageOperationHistograms;
+  private final ConcurrentMap<String, Meter> storageOperationMeters;
+  private final ConcurrentMap<String, Histogram> dockerOperationHistograms;
+  private final ConcurrentMap<String, Meter> dockerOperationMeters;
+  private final ConcurrentMap<WorkflowId, Gauge> activeStatesPerWorkflowGauges;
+  private final ConcurrentMap<Tuple2<WorkflowId, Integer>, Meter> exitCodePerWorkflowMeters;
+  private final ConcurrentMap<String, Histogram> resourceUsageHistograms;
 
   public MetricsStats(SemanticMetricRegistry registry) {
     this.registry = Objects.requireNonNull(registry);
