@@ -213,8 +213,12 @@ with one running container. Because Styx treats each Trigger individually, it ca
 each one of them complete successfully.
 
 Styx does not have any assumptions about what is executed in the container, it only cares about
-the exit code. Any execution returning a non-zero exit code will cause a re-try to be scheduled,
-with an exponential back-off between each try.
+the exit code. Any execution returning a non-zero exit code will either cause a re-try to be scheduled;
+or cause an immediate failure of the workflow instance.
+
+* `20` exit code will cause a re-try to be scheduled after 10 minutes
+* `50` exit code will cause an immediate failure of the workflow instance (no re-try will be scheduled)
+* Other non-zero exit code will cause a re-try to be scheduled with  an exponential back-off between each try
 
 ### Injected environment variables
 

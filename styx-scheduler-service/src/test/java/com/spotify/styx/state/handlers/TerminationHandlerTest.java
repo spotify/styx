@@ -143,6 +143,17 @@ public class TerminationHandlerTest {
     assertThat(nextState.data().retryDelayMillis(), hasValue(Duration.ofMinutes(10).toMillis()));
   }
 
+  @Test
+  public void shouldFailOnFailFastExitCodeReceived() throws Exception {
+    StateData data = data(1, 1.0, Optional.of(50));
+    RunState maxedTerm = RunState.create(WORKFLOW_INSTANCE, FAILED, data, transitions::add);
+    stateManager.initialize(maxedTerm);
+    outputHandler.transitionInto(maxedTerm);
+
+    RunState nextState = transitions.get(0);
+    assertThat(nextState.state(), is(ERROR));
+  }
+
   private StateData data(int tries, double cost, Optional<Integer> lastExit) {
     return StateData.newBuilder()
         .tries(tries)
