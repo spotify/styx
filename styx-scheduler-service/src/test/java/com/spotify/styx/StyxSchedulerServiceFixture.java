@@ -297,12 +297,6 @@ public class StyxSchedulerServiceFixture {
     await().atMost(30, SECONDS).until(() -> dockerRuns.size() == n);
   }
 
-  void awaitNumberOfDockerRunsWontChange(int n) {
-    await().pollDelay(1, SECONDS).until(() -> {
-      return dockerRuns.size() == n;
-    });
-  }
-
   void awaitWorkflowInstanceState(WorkflowInstance instance, RunState.State state) {
     await().atMost(30, SECONDS).until(() -> {
       final RunState runState = getState(instance);
