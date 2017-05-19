@@ -555,20 +555,20 @@ public class StyxScheduler implements AppInit {
               .count());
     });
 
+    final Function<String, Gauge<Long>> createResourceCountGauge = (resource) -> () -> {
+      try {
+        return storage.resource(resource).map(Resource::concurrency).orElse(0L);
+      } catch (IOException e) {
+        LOG.error("Failed to get resource {}", resource);
+        return 0L;
+      }
+    };
+
     try {
       storage.resources()
           .forEach(resource ->
                        stats.registerResourceCount(
-                           resource.id(),
-                           () -> {
-                             try {
-                               return storage.resource(resource.id())
-                                   .map(Resource::concurrency).orElse(0L);
-                             } catch (IOException e) {
-                               LOG.error("Failed to get resource {}", resource.id());
-                               return 0L;
-                             }
-                           }));
+                           resource.id(), createResourceCountGauge.apply(resource.id())));
     } catch (IOException e) {
       LOG.error("Failed to get resources");
     }
