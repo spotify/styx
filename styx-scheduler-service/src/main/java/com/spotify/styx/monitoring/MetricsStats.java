@@ -223,6 +223,11 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
+  public void unregisterResourceConfigured(String resource) {
+    registry.remove(RESOURCE_CONFIGURED.tagged("resource", resource));
+  }
+
+  @Override
   public void resourceUsed(String resource, long used) {
     resourceUsedHistogram(resource).update(used);
   }

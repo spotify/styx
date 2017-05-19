@@ -59,6 +59,8 @@ public interface Stats {
 
   void registerResourceConfigured(String resource, Gauge<Long> resourceCount);
 
+  void unregisterResourceConfigured(String resource);
+
   void resourceUsed(String resource, long used);
 
   Stats NOOP = new NoopStats();

@@ -88,6 +88,10 @@ final class NoopStats implements Stats {
   }
 
   @Override
+  public void unregisterResourceConfigured(String resource) {
+  }
+
+  @Override
   public void resourceUsed(String resource, long used) {
   }
 }
