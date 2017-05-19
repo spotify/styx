@@ -22,6 +22,7 @@ package com.spotify.styx;
 
 import static com.spotify.styx.state.TimeoutConfig.createWithDefaultTtl;
 import static java.time.Duration.ofSeconds;
+import static org.hamcrest.Matchers.either;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
@@ -30,6 +31,7 @@ import static org.mockito.Matchers.anySetOf;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -63,6 +65,7 @@ import java.util.concurrent.Executors;
 import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Matchers;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.runners.MockitoJUnitRunner;
@@ -473,6 +476,49 @@ public class SchedulerTest {
 
     verify(stateManager, never()).receiveIgnoreClosed(Event.dequeue(INSTANCE));
   }
+
+  @Test
+  public void shouldCountDecoratedResourcesOnNonQueuedStates() throws Exception {
+    setUp(20);
+
+    Workflow workflow = workflowUsingResources(WORKFLOW_ID1, "foo", "bar");
+    when(resourceDecorator.decorateResources(
+        any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
+        .thenReturn(ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"));
+
+    when(storage.globalConcurrency()).thenReturn(Optional.of(17L));
+
+    setResourceLimit("baz", 4);
+    initWorkflow(workflow);
+
+    WorkflowInstance i0 = instance(WORKFLOW_ID1, "i0");
+    WorkflowInstance i1 = instance(WORKFLOW_ID1, "i1");
+    WorkflowInstance i2 = instance(WORKFLOW_ID1, "i2");
+    WorkflowInstance i3 = instance(WORKFLOW_ID1, "i3");
+    WorkflowInstance i4 = instance(WORKFLOW_ID1, "i4");
+
+    init(RunState.create(i0, State.QUEUED, time));
+    init(RunState.create(i1, State.SUBMITTING, time));
+    init(RunState.create(i2, State.PREPARE, time));
+    init(RunState.create(i3, State.TERMINATED, time));
+    init(RunState.create(i4, State.QUEUED, time));
+
+    scheduler.tick();
+
+    // 3 invocations to count current resource usage + 2 invocations to calculate future usage for queued states
+    verify(resourceDecorator, times(3 + 2)).decorateResources(any(RunState.class), eq(workflow.configuration()),
+        eq(ImmutableSet.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
+
+    verify(stateManager).receiveIgnoreClosed(Matchers.argThat(
+        either(is(Event.dequeue(i0)))
+            .or(is(Event.dequeue(i4)))));
+
+    assertThat(stateManager.get(i0).state() == State.PREPARE ||
+        stateManager.get(i4).state() == State.PREPARE, is(true));
+
+    assertThat(countInState(State.QUEUED), is(1));
+  }
+
 
   private WorkflowInstance instance(WorkflowId id, String instanceId) {
     return WorkflowInstance.create(id, instanceId);
