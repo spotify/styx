@@ -55,8 +55,11 @@ public final class MetricsStats implements Stats {
       .tagged("what", "workflow-count")
       .tagged("unit", "workflow");
 
-  private static final MetricId RESOURCE_USAGE = BASE
-      .tagged("what", "resource-usage");
+  private static final MetricId RESOURCE_USED = BASE
+      .tagged("what", "resource-used");
+
+  private static final MetricId RESOURCE_CONFIGURED = BASE
+      .tagged("what", "resource-configured");
 
   private static final MetricId EXIT_CODE_RATE = BASE
       .tagged("what", "exit-code-rate");
@@ -116,7 +119,7 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Meter> dockerOperationMeters;
   private final ConcurrentMap<WorkflowId, Gauge> activeStatesPerWorkflowGauges;
   private final ConcurrentMap<Tuple2<WorkflowId, Integer>, Meter> exitCodePerWorkflowMeters;
-  private final ConcurrentMap<String, Histogram> resourceUsageHistograms;
+  private final ConcurrentMap<String, Histogram> resourceUsedHistograms;
 
   public MetricsStats(SemanticMetricRegistry registry) {
     this.registry = Objects.requireNonNull(registry);
@@ -133,7 +136,7 @@ public final class MetricsStats implements Stats {
     this.dockerOperationMeters = new ConcurrentHashMap<>();
     this.activeStatesPerWorkflowGauges = new ConcurrentHashMap<>();
     this.exitCodePerWorkflowMeters = new ConcurrentHashMap<>();
-    this.resourceUsageHistograms = new ConcurrentHashMap<>();
+    this.resourceUsedHistograms = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -215,13 +218,13 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
-  public void registerResourceCount(String resource, Gauge<Long> resourceCount) {
-    registry.register(RESOURCE_USAGE.tagged("resource-total", resource), resourceCount);
+  public void registerResourceConfigured(String resource, Gauge<Long> resourceConfigured) {
+    registry.register(RESOURCE_CONFIGURED.tagged("resource", resource), resourceConfigured);
   }
 
   @Override
-  public void resourceUsage(String resource, long usage) {
-    resourceUsageHistogram(resource).update(usage);
+  public void resourceUsed(String resource, long used) {
+    resourceUsedHistogram(resource).update(used);
   }
 
   private Meter exitCodeMeter(WorkflowId workflowId, int exitCode) {
@@ -253,8 +256,8 @@ public final class MetricsStats implements Stats {
         operation, (op) -> registry.meter(DOCKER_RATE.tagged("operation", op)));
   }
 
-  private Histogram resourceUsageHistogram(String resource) {
-    return resourceUsageHistograms.computeIfAbsent(
-        resource, (op) -> registry.histogram(RESOURCE_USAGE.tagged("resource-used", resource)));
+  private Histogram resourceUsedHistogram(String resource) {
+    return resourceUsedHistograms.computeIfAbsent(
+        resource, (op) -> registry.histogram(RESOURCE_USED.tagged("resource", resource)));
   }
 }

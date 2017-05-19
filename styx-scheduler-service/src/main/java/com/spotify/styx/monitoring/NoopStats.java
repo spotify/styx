@@ -84,10 +84,10 @@ final class NoopStats implements Stats {
   }
 
   @Override
-  public void registerResourceCount(String resource, Gauge<Long> resourceCount) {
+  public void registerResourceConfigured(String resource, Gauge<Long> resourceCount) {
   }
 
   @Override
-  public void resourceUsage(String resource, long usage) {
+  public void resourceUsed(String resource, long used) {
   }
 }

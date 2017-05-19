@@ -556,7 +556,7 @@ public class StyxScheduler implements AppInit {
               .count());
     });
 
-    final Function<String, Gauge<Long>> createResourceCountGauge = (resource) -> {
+    final Function<String, Gauge<Long>> createResourceConfiguredGauge = (resource) -> {
       final Supplier<Optional<Resource>> resourceSupplier =
           new CachedSupplier<>(() -> storage.resource(resource), Instant::now);
       return () -> resourceSupplier.get().map(Resource::concurrency).orElse(0L);
@@ -564,14 +564,14 @@ public class StyxScheduler implements AppInit {
 
     try {
       storage.resources().forEach(resource -> stats
-          .registerResourceCount(resource.id(), createResourceCountGauge.apply(resource.id())));
+          .registerResourceConfigured(resource.id(), createResourceConfiguredGauge.apply(resource.id())));
     } catch (IOException e) {
-      LOG.warn("Failed to get resources, skip registering resource count");
+      LOG.warn("Failed to get resources", e);
     }
 
     final Supplier<Optional<Long>> globalConcurrency =
         new CachedSupplier<>(storage::globalConcurrency, Instant::now);
-    stats.registerResourceCount(Scheduler.GLOBAL_RESOURCE_ID, () ->
+    stats.registerResourceConfigured(Scheduler.GLOBAL_RESOURCE_ID, () ->
         globalConcurrency.get().orElse(0L));
 
     stats.registerSubmissionRateLimit(submissionRateLimiter::getRate);

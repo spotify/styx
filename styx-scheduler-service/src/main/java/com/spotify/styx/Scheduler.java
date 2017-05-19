@@ -147,7 +147,7 @@ public class Scheduler {
                 ConcurrentHashMap::new,
                 counting()));
 
-    currentResourceUsage.forEach(stats::resourceUsage);
+    currentResourceUsage.forEach(stats::resourceUsed);
 
     final List<InstanceState> eligibleInstances =
         activeStates.parallelStream()

@@ -57,9 +57,9 @@ public interface Stats {
 
   void exitCodeMismatch();
 
-  void registerResourceCount(String resource, Gauge<Long> resourceCount);
+  void registerResourceConfigured(String resource, Gauge<Long> resourceCount);
 
-  void resourceUsage(String resource, long usage);
+  void resourceUsed(String resource, long used);
 
   Stats NOOP = new NoopStats();
 }
