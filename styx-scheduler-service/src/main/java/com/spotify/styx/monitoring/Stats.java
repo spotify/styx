@@ -57,9 +57,7 @@ public interface Stats {
 
   void exitCodeMismatch();
 
-  void registerResourceConfigured(String resource, Gauge<Long> resourceCount);
-
-  void unregisterResourceConfigured(String resource);
+  void resourceConfigured(String resource, long configured);
 
   void resourceUsed(String resource, long used);
 

@@ -33,6 +33,7 @@ import com.google.auto.value.AutoValue;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
@@ -147,7 +148,7 @@ public class Scheduler {
                 ConcurrentHashMap::new,
                 counting()));
 
-    currentResourceUsage.forEach(stats::resourceUsed);
+    updateMetrics(resources, currentResourceUsage);
 
     final List<InstanceState> eligibleInstances =
         activeStates.parallelStream()
@@ -174,6 +175,14 @@ public class Scheduler {
 
     timedOutInstances.forEach(this::sendTimeout);
     eligibleInstances.forEach(limitAndDequeue);
+  }
+
+  private void updateMetrics(Map<String, Resource> resources,
+                             Map<String, Long> currentResourceUsage) {
+    resources.values().forEach(r -> stats.resourceConfigured(r.id(), r.concurrency()));
+    currentResourceUsage.forEach(stats::resourceUsed);
+    Sets.difference(resources.keySet(), currentResourceUsage.keySet())
+        .forEach(r -> stats.resourceUsed(r, 0));
   }
 
   private void evaluateResourcesForDequeue(

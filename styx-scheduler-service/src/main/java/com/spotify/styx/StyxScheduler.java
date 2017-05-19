@@ -20,7 +20,6 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.Scheduler.GLOBAL_RESOURCE_ID;
 import static com.spotify.styx.monitoring.MeteredProxy.instrument;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
@@ -56,7 +55,6 @@ import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.WorkflowValidator;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -97,7 +95,6 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -556,40 +553,6 @@ public class StyxScheduler implements AppInit {
               .filter(runState -> !runState.data().trigger().isPresent())
               .count());
     });
-
-    final Function<String, Gauge<Long>> createResourceConfiguredGauge = (resource) -> {
-      final Supplier<Optional<Resource>> resourceSupplier =
-          new CachedSupplier<>(() -> storage.resource(resource), Instant::now);
-      return () -> {
-        final Optional<Resource> resourceOpt = resourceSupplier.get();
-        if (resourceOpt.isPresent()) {
-          return resourceOpt.get().concurrency();
-        } else {
-          stats.unregisterResourceConfigured(resource);
-          throw new RuntimeException("Resource " + resource + " does not exist");
-        }
-      };
-    };
-
-    try {
-      storage.resources().forEach(resource -> stats
-          .registerResourceConfigured(resource.id(), createResourceConfiguredGauge.apply(resource.id())));
-    } catch (IOException e) {
-      LOG.warn("Failed to get resources", e);
-    }
-
-    final Supplier<Optional<Long>> globalConcurrencySupplier =
-        new CachedSupplier<>(storage::globalConcurrency, Instant::now);
-    stats.registerResourceConfigured(
-        GLOBAL_RESOURCE_ID, () -> {
-          final Optional<Long> globalConcurrencyOpt = globalConcurrencySupplier.get();
-          if (globalConcurrencyOpt.isPresent()) {
-            return globalConcurrencyOpt.get();
-          } else {
-            stats.unregisterResourceConfigured(GLOBAL_RESOURCE_ID);
-            throw new RuntimeException("Resource " + GLOBAL_RESOURCE_ID + " does not exist");
-          }
-        });
 
     stats.registerSubmissionRateLimit(submissionRateLimiter::getRate);
   }

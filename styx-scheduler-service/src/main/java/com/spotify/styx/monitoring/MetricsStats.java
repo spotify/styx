@@ -55,11 +55,11 @@ public final class MetricsStats implements Stats {
       .tagged("what", "workflow-count")
       .tagged("unit", "workflow");
 
-  private static final MetricId RESOURCE_USED = BASE
-      .tagged("what", "resource-used");
-
   private static final MetricId RESOURCE_CONFIGURED = BASE
       .tagged("what", "resource-configured");
+
+  private static final MetricId RESOURCE_USED = BASE
+      .tagged("what", "resource-used");
 
   private static final MetricId EXIT_CODE_RATE = BASE
       .tagged("what", "exit-code-rate");
@@ -119,6 +119,7 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Meter> dockerOperationMeters;
   private final ConcurrentMap<WorkflowId, Gauge> activeStatesPerWorkflowGauges;
   private final ConcurrentMap<Tuple2<WorkflowId, Integer>, Meter> exitCodePerWorkflowMeters;
+  private final ConcurrentMap<String, Histogram> resourceConfiguredHistograms;
   private final ConcurrentMap<String, Histogram> resourceUsedHistograms;
 
   public MetricsStats(SemanticMetricRegistry registry) {
@@ -136,6 +137,7 @@ public final class MetricsStats implements Stats {
     this.dockerOperationMeters = new ConcurrentHashMap<>();
     this.activeStatesPerWorkflowGauges = new ConcurrentHashMap<>();
     this.exitCodePerWorkflowMeters = new ConcurrentHashMap<>();
+    this.resourceConfiguredHistograms = new ConcurrentHashMap<>();
     this.resourceUsedHistograms = new ConcurrentHashMap<>();
   }
 
@@ -218,13 +220,8 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
-  public void registerResourceConfigured(String resource, Gauge<Long> resourceConfigured) {
-    registry.register(RESOURCE_CONFIGURED.tagged("resource", resource), resourceConfigured);
-  }
-
-  @Override
-  public void unregisterResourceConfigured(String resource) {
-    registry.remove(RESOURCE_CONFIGURED.tagged("resource", resource));
+  public void resourceConfigured(String resource, long configured) {
+    resourceConfiguredHistogram(resource).update(configured);
   }
 
   @Override
@@ -259,6 +256,11 @@ public final class MetricsStats implements Stats {
   private Meter dockerOpMeter(String operation) {
     return dockerOperationMeters.computeIfAbsent(
         operation, (op) -> registry.meter(DOCKER_RATE.tagged("operation", op)));
+  }
+
+  private Histogram resourceConfiguredHistogram(String resource) {
+    return resourceConfiguredHistograms.computeIfAbsent(
+        resource, (op) -> registry.histogram(RESOURCE_CONFIGURED.tagged("resource", resource)));
   }
 
   private Histogram resourceUsedHistogram(String resource) {

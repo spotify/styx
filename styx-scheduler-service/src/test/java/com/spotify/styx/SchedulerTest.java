@@ -362,11 +362,17 @@ public class SchedulerTest {
     setUp(20);
     setResourceLimit("r1", 3);
     setResourceLimit("r2", 2);
+    setResourceLimit("r3", 2);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1", "r2"));
 
     for (int i = 0; i < 4; i++) {
       init(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.QUEUED, time));
     }
+
+    scheduler.tick();
+
+    assertThat(countInState(State.QUEUED), is(2));
+    assertThat(countInState(State.PREPARE), is(2));
 
     scheduler.tick();
 
