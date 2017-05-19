@@ -22,6 +22,7 @@ package com.spotify.styx;
 
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
 import static java.util.Collections.singletonList;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 
@@ -286,31 +287,31 @@ public class StyxSchedulerServiceFixture {
   }
 
   void awaitBackfillCompleted(String id) {
-    await().until(() -> {
+    await().atMost(30, SECONDS).until(() -> {
       final Optional<Backfill> backfill = storage.backfill(id);
       return backfill.isPresent() && backfill.get().allTriggered();
     });
   }
 
   void awaitNumberOfDockerRuns(int n) {
-    await().until(() -> dockerRuns.size() == n);
+    await().atMost(30, SECONDS).until(() -> dockerRuns.size() == n);
   }
 
   void awaitNumberOfDockerRunsWontChange(int n) {
-    await().pollDelay(1, TimeUnit.SECONDS).until(() -> {
+    await().pollDelay(1, SECONDS).until(() -> {
       return dockerRuns.size() == n;
     });
   }
 
   void awaitWorkflowInstanceState(WorkflowInstance instance, RunState.State state) {
-    await().until(() -> {
+    await().atMost(30, SECONDS).until(() -> {
       final RunState runState = getState(instance);
       return runState != null && runState.state() == state;
     });
   }
 
   void awaitWorkflowInstanceCompletion(WorkflowInstance workflowInstance) {
-    await().until(() -> getState(workflowInstance) == null);
+    await().atMost(30, SECONDS).until(() -> getState(workflowInstance) == null);
   }
 
   private void printTime() {
