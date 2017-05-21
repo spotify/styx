@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasKey;
@@ -76,7 +77,7 @@ public class LocalFileScheduleSourceTest {
   public void tearDown() throws Exception {
     closer.close();
     executor.shutdown();
-    executor.awaitTermination(1, TimeUnit.SECONDS);
+    executor.awaitTermination(1, SECONDS);
   }
 
   @Test
@@ -117,7 +118,7 @@ public class LocalFileScheduleSourceTest {
 
     source.start();
 
-    await().until(workflows(), hasEntry("foo", simpleDef(testPath)));
+    await().atMost(30, SECONDS).until(workflows(), hasEntry("foo", simpleDef(testPath)));
   }
 
   @Test
@@ -132,8 +133,8 @@ public class LocalFileScheduleSourceTest {
 
     Files.write(testPath, readResource("example-defs.yaml"));
 
-    await().until(workflows(), hasEntry("foo", example1(testPath)));
-    await().until(workflows(), hasEntry("bar", example2(testPath)));
+    await().atMost(30, SECONDS).until(workflows(), hasEntry("foo", example1(testPath)));
+    await().atMost(30, SECONDS).until(workflows(), hasEntry("bar", example2(testPath)));
   }
 
   @Test
@@ -148,10 +149,10 @@ public class LocalFileScheduleSourceTest {
     source.start();
 
     Files.write(testPath, readResource("simple-def.yaml"));
-    await().until(workflows(), hasEntry("foo", simpleDef(testPath)));
+    await().atMost(30, SECONDS).until(workflows(), hasEntry("foo", simpleDef(testPath)));
 
     Files.write(testPath, readResource("different-def.yaml"));
-    await().until(workflows(), hasEntry("foo", differentDef(testPath)));
+    await().atMost(30, SECONDS).until(workflows(), hasEntry("foo", differentDef(testPath)));
   }
 
   @Test
@@ -166,10 +167,10 @@ public class LocalFileScheduleSourceTest {
     source.start();
 
     Files.write(testPath, readResource("simple-def.yaml"));
-    await().until(workflows(), hasKey("foo"));
+    await().atMost(30, SECONDS).until(workflows(), hasKey("foo"));
 
     Files.delete(testPath);
-    await().until(workflowsSize(), is(0));
+    await().atMost(30, SECONDS).until(workflowsSize(), is(0));
   }
 
   private ScheduleSource createSource(Config config) {
