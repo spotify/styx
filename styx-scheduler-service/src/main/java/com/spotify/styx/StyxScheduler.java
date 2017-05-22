@@ -336,7 +336,7 @@ public class StyxScheduler implements AppInit {
         workflowChanged(workflowCache, workflowInitializer, stats, stateManager);
 
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
-                                              storage, resourceDecorator);
+                                              storage, resourceDecorator, stats);
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
@@ -512,28 +512,29 @@ public class StyxScheduler implements AppInit {
       RateLimiter submissionRateLimiter,
       Stats stats) {
 
-    final Gauge<Long> queuedEventsCount = stateManager::getQueuedEventsCount;
-    final Gauge<Long> allWorkflowsCount = () -> workflowCache.all().stream().count();
-    final Gauge<Long> configuredWorkflowsCount = () -> workflowCache.all().stream()
+    stats.registerQueuedEvents(stateManager::getQueuedEventsCount);
+
+    stats.registerWorkflowCount("all", () -> (long) workflowCache.all().size());
+
+    stats.registerWorkflowCount("configured", () -> workflowCache.all().stream()
         .filter(WorkflowValidator::hasDockerConfiguration)
-        .count();
-    final Gauge<Long> configuredEnabledWorkflowsCount = () -> {
-      try {
-        final Set<WorkflowId> enabledWorkflowsSet = storage.enabled();
-        return workflowCache.all().stream()
-            .filter(WorkflowValidator::hasDockerConfiguration)
-            .filter((workflow) -> enabledWorkflowsSet.contains(WorkflowId.ofWorkflow(workflow)))
-            .count();
-      } catch (IOException e) {
-        LOG.error("Failed to read enabled status from storage", e);
-        return 0L;
-      }
+        .count());
+
+    final Supplier<Gauge<Long>> configuredEnabledWorkflowsCountGaugeSupplier = () -> {
+      final Supplier<Set<WorkflowId>> enabledWorkflowSupplier =
+          new CachedSupplier<>(storage::enabled, Instant::now);
+      return () -> workflowCache.all().stream()
+          .filter(WorkflowValidator::hasDockerConfiguration)
+          .filter((workflow) -> enabledWorkflowSupplier.get().contains(WorkflowId.ofWorkflow(workflow)))
+          .count();
     };
-    final Gauge<Long> dockerTerminationLoggingEnabledWorkflowsCount =
-        () -> workflowCache.all().stream()
+    stats.registerWorkflowCount("enabled", configuredEnabledWorkflowsCountGaugeSupplier.get());
+
+    stats.registerWorkflowCount("docker_termination_logging_enabled", () ->
+        workflowCache.all().stream()
             .filter(WorkflowValidator::hasDockerConfiguration)
             .filter((workflow) -> workflow.configuration().dockerTerminationLogging())
-            .count();
+            .count());
 
     Arrays.stream(RunState.State.values()).forEach(state -> {
       TriggerUtil.triggerTypesList().forEach(triggerType ->
@@ -547,19 +548,12 @@ public class StyxScheduler implements AppInit {
                   .count()));
       stats.registerActiveStates(
           state,
-          "none",
-          () -> stateManager.activeStates().values().stream()
+          "none", () -> stateManager.activeStates().values().stream()
               .filter(runState -> runState.state().equals(state))
               .filter(runState -> !runState.data().trigger().isPresent())
               .count());
     });
 
-    stats.registerQueuedEvents(queuedEventsCount);
-    stats.registerWorkflowCount("all", allWorkflowsCount);
-    stats.registerWorkflowCount("configured", configuredWorkflowsCount);
-    stats.registerWorkflowCount("enabled", configuredEnabledWorkflowsCount);
-    stats.registerWorkflowCount("docker_termination_logging_enabled",
-                                dockerTerminationLoggingEnabledWorkflowsCount);
     stats.registerSubmissionRateLimit(submissionRateLimiter::getRate);
   }
 

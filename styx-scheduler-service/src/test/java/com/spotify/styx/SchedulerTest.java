@@ -44,6 +44,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
@@ -112,7 +113,8 @@ public class SchedulerTest {
         .thenAnswer(a -> a.getArgumentAt(2, Set.class));
 
     stateManager = Mockito.spy(new SyncStateManager());
-    scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage, resourceDecorator);
+    scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage, resourceDecorator,
+                              Stats.NOOP);
   }
 
   private void setResourceLimit(String resourceId, long limit) {
@@ -363,11 +365,17 @@ public class SchedulerTest {
     setUp(20);
     setResourceLimit("r1", 3);
     setResourceLimit("r2", 2);
+    setResourceLimit("r3", 2);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1", "r2"));
 
     for (int i = 0; i < 4; i++) {
       init(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.QUEUED, time));
     }
+
+    scheduler.tick();
+
+    assertThat(countInState(State.QUEUED), is(2));
+    assertThat(countInState(State.PREPARE), is(2));
 
     scheduler.tick();
 

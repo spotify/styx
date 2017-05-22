@@ -33,11 +33,13 @@ import com.google.auto.value.AutoValue;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
@@ -86,16 +88,19 @@ public class Scheduler {
   private final WorkflowCache workflowCache;
   private final Storage storage;
   private final WorkflowResourceDecorator resourceDecorator;
+  private final Stats stats;
 
   public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager,
-      WorkflowCache workflowCache, Storage storage,
-      WorkflowResourceDecorator resourceDecorator) {
+                   WorkflowCache workflowCache, Storage storage,
+                   WorkflowResourceDecorator resourceDecorator,
+                   Stats stats) {
     this.time = Objects.requireNonNull(time);
     this.ttls = Objects.requireNonNull(ttls);
     this.stateManager = Objects.requireNonNull(stateManager);
     this.workflowCache = Objects.requireNonNull(workflowCache);
     this.storage = Objects.requireNonNull(storage);
     this.resourceDecorator = Objects.requireNonNull(resourceDecorator);
+    this.stats = Objects.requireNonNull(stats);
   }
 
   void tick() {
@@ -143,6 +148,8 @@ public class Scheduler {
                 ConcurrentHashMap::new,
                 counting()));
 
+    updateMetrics(resources, currentResourceUsage);
+
     final List<InstanceState> eligibleInstances =
         activeStates.parallelStream()
             .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
@@ -168,6 +175,14 @@ public class Scheduler {
 
     timedOutInstances.forEach(this::sendTimeout);
     eligibleInstances.forEach(limitAndDequeue);
+  }
+
+  private void updateMetrics(Map<String, Resource> resources,
+                             Map<String, Long> currentResourceUsage) {
+    resources.values().forEach(r -> stats.resourceConfigured(r.id(), r.concurrency()));
+    currentResourceUsage.forEach(stats::resourceUsed);
+    Sets.difference(resources.keySet(), currentResourceUsage.keySet())
+        .forEach(r -> stats.resourceUsed(r, 0));
   }
 
   private void evaluateResourcesForDequeue(

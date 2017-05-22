@@ -55,6 +55,12 @@ public final class MetricsStats implements Stats {
       .tagged("what", "workflow-count")
       .tagged("unit", "workflow");
 
+  private static final MetricId RESOURCE_CONFIGURED = BASE
+      .tagged("what", "resource-configured");
+
+  private static final MetricId RESOURCE_USED = BASE
+      .tagged("what", "resource-used");
+
   private static final MetricId EXIT_CODE_RATE = BASE
       .tagged("what", "exit-code-rate");
 
@@ -113,6 +119,8 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Meter> dockerOperationMeters;
   private final ConcurrentMap<WorkflowId, Gauge> activeStatesPerWorkflowGauges;
   private final ConcurrentMap<Tuple2<WorkflowId, Integer>, Meter> exitCodePerWorkflowMeters;
+  private final ConcurrentMap<String, Histogram> resourceConfiguredHistograms;
+  private final ConcurrentMap<String, Histogram> resourceUsedHistograms;
 
   public MetricsStats(SemanticMetricRegistry registry) {
     this.registry = Objects.requireNonNull(registry);
@@ -129,6 +137,8 @@ public final class MetricsStats implements Stats {
     this.dockerOperationMeters = new ConcurrentHashMap<>();
     this.activeStatesPerWorkflowGauges = new ConcurrentHashMap<>();
     this.exitCodePerWorkflowMeters = new ConcurrentHashMap<>();
+    this.resourceConfiguredHistograms = new ConcurrentHashMap<>();
+    this.resourceUsedHistograms = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -209,6 +219,15 @@ public final class MetricsStats implements Stats {
     pullImageErrorMeter.mark();
   }
 
+  @Override
+  public void resourceConfigured(String resource, long configured) {
+    resourceConfiguredHistogram(resource).update(configured);
+  }
+
+  @Override
+  public void resourceUsed(String resource, long used) {
+    resourceUsedHistogram(resource).update(used);
+  }
 
   private Meter exitCodeMeter(WorkflowId workflowId, int exitCode) {
     return exitCodePerWorkflowMeters
@@ -237,5 +256,15 @@ public final class MetricsStats implements Stats {
   private Meter dockerOpMeter(String operation) {
     return dockerOperationMeters.computeIfAbsent(
         operation, (op) -> registry.meter(DOCKER_RATE.tagged("operation", op)));
+  }
+
+  private Histogram resourceConfiguredHistogram(String resource) {
+    return resourceConfiguredHistograms.computeIfAbsent(
+        resource, (op) -> registry.histogram(RESOURCE_CONFIGURED.tagged("resource", resource)));
+  }
+
+  private Histogram resourceUsedHistogram(String resource) {
+    return resourceUsedHistograms.computeIfAbsent(
+        resource, (op) -> registry.histogram(RESOURCE_USED.tagged("resource", resource)));
   }
 }
