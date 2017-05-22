@@ -48,7 +48,7 @@ complement each other.
 
 ### More docs
 
-* [Styx design](doc/design-overview.md)
+* [Styx design]
 * [External services]
 * [API Specification](doc/api.apib) - [HTML version](https://spotify.github.io/styx/api.html)
 
@@ -214,11 +214,8 @@ each one of them complete successfully.
 
 Styx does not have any assumptions about what is executed in the container, it only cares about
 the exit code. Any execution returning a non-zero exit code will either cause a re-try to be scheduled;
-or cause an immediate failure of the workflow instance.
-
-* `20` exit code will cause a re-try to be scheduled after 10 minutes
-* `50` exit code will cause an immediate failure of the workflow instance (no re-try will be scheduled)
-* Other non-zero exit code will cause a re-try to be scheduled with  an exponential back-off between each try
+or cause an immediate failure of the workflow instance. For detailed description of exit codes,
+please refer to **Workflow state graph** section in [Styx design].
 
 ### Injected environment variables
 
@@ -254,6 +251,7 @@ jacoco report can be viewed under the Artifacts tab in the Circle-CI build view.
 This project adheres to the [Open Code of Conduct][code-of-conduct]. By participating, you are
 expected to honor this code.
 
+[Styx design]: doc/design-overview.md
 [External services]: doc/external-services.md
 [Kubernetes]: http://kubernetes.io/
 [Apollo]: https://spotify.github.io/apollo/
