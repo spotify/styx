@@ -29,37 +29,37 @@ import com.spotify.styx.state.RunState;
  */
 public interface Stats {
 
-  void storageOperation(String operation, long durationMillis);
+  void registerQueuedEventsMetric(Gauge<Long> queuedEventsCount);
 
-  void dockerOperation(String operation, long durationMillis);
+  void registerActiveStatesMetric(RunState.State state, String triggerName, Gauge<Long> activeStatesCount);
 
-  void submitToRunningTime(long durationSeconds);
+  void registerActiveStatesMetric(WorkflowId workflowId, Gauge<Long> activeStatesCount);
 
-  void registerQueuedEvents(Gauge<Long> queuedEventsCount);
+  void registerWorkflowCountMetric(String status, Gauge<Long> workflowCount);
 
-  void registerActiveStates(RunState.State state, String triggerName, Gauge<Long> activeStatesCount);
+  void registerSubmissionRateLimitMetric(Gauge<Double> submissionRateLimit);
 
-  void registerActiveStates(WorkflowId workflowId, Gauge<Long> activeStatesCount);
+  void recordStorageOperation(String operation, long durationMillis);
 
-  void registerWorkflowCount(String status, Gauge<Long> workflowCount);
+  void recordDockerOperation(String operation, long durationMillis);
 
-  void exitCode(WorkflowId workflowId, int exitCode);
+  void recordSubmitToRunningTime(long durationSeconds);
 
-  void pullImageError();
+  void recordExitCode(WorkflowId workflowId, int exitCode);
 
-  void naturalTrigger();
+  void recordPullImageError();
 
-  void registerSubmissionRateLimit(Gauge<Double> submissionRateLimit);
+  void recordNaturalTrigger();
 
-  void terminationLogMissing();
+  void recordTerminationLogMissing();
 
-  void terminationLogInvalid();
+  void recordTerminationLogInvalid();
 
-  void exitCodeMismatch();
+  void recordExitCodeMismatch();
 
-  void resourceConfigured(String resource, long configured);
+  void recordResourceConfigured(String resource, long configured);
 
-  void resourceUsed(String resource, long used);
+  void recordResourceUsed(String resource, long used);
 
   Stats NOOP = new NoopStats();
 }

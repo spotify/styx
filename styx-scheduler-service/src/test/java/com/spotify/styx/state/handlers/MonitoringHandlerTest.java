@@ -73,7 +73,7 @@ public class MonitoringHandlerTest {
     i = Instant.parse("2015-12-31T23:59:12.000Z");
     stateManager.receive(Event.started(state.workflowInstance()));
 
-    verify(stats).submitToRunningTime(Matchers.eq(2L));
+    verify(stats).recordSubmitToRunningTime(Matchers.eq(2L));
   }
 
   @Test
@@ -88,7 +88,7 @@ public class MonitoringHandlerTest {
     stateManager.receive(Event.started(state.workflowInstance()));
     stateManager.receive(Event.terminate(state.workflowInstance(), Optional.of(20)));
 
-    verify(stats).exitCode(state.workflowInstance().workflowId(), 20);
+    verify(stats).recordExitCode(state.workflowInstance().workflowId(), 20);
   }
 
   @Test
@@ -103,7 +103,7 @@ public class MonitoringHandlerTest {
     stateManager.receive(Event.started(state.workflowInstance()));
     stateManager.receive(Event.terminate(state.workflowInstance(), Optional.empty()));
 
-    verify(stats, never()).exitCode(any(WorkflowId.class), anyInt());
+    verify(stats, never()).recordExitCode(any(WorkflowId.class), anyInt());
   }
 
   @Test
@@ -122,6 +122,6 @@ public class MonitoringHandlerTest {
     i = Instant.parse("2015-12-31T23:59:16.000Z");
     stateManager.receive(Event.started(state.workflowInstance()));
 
-    verify(stats).submitToRunningTime(Matchers.eq(1L));
+    verify(stats).recordSubmitToRunningTime(Matchers.eq(1L));
   }
 }

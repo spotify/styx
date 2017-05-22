@@ -27,67 +27,68 @@ import com.spotify.styx.state.RunState;
 final class NoopStats implements Stats {
 
   @Override
-  public void storageOperation(String operation, long durationMillis) {
+  public void registerQueuedEventsMetric(Gauge<Long> queuedEventsCount) {
   }
 
   @Override
-  public void dockerOperation(String operation, long durationMillis) {
+  public void registerActiveStatesMetric(RunState.State state, String triggerName,
+                                         Gauge<Long> activeStatesCount) {
   }
 
   @Override
-  public void submitToRunningTime(long durationSeconds) {
+  public void registerActiveStatesMetric(WorkflowId workflowId, Gauge<Long> activeStatesCount) {
   }
 
   @Override
-  public void registerQueuedEvents(Gauge<Long> queuedEventsCount) {
+  public void registerWorkflowCountMetric(String status, Gauge<Long> workflowCount) {
   }
 
   @Override
-  public void registerActiveStates(RunState.State state, String triggerName,
-                                   Gauge<Long> activeStatesCount) {
+  public void registerSubmissionRateLimitMetric(Gauge<Double> submissionRateLimit) {
   }
 
   @Override
-  public void registerActiveStates(WorkflowId workflowId, Gauge<Long> activeStatesCount) {
+  public void recordStorageOperation(String operation, long durationMillis) {
   }
 
   @Override
-  public void registerWorkflowCount(String status, Gauge<Long> workflowCount) {
+  public void recordDockerOperation(String operation, long durationMillis) {
   }
 
   @Override
-  public void exitCode(WorkflowId workflowId, int exitCode) {
+  public void recordSubmitToRunningTime(long durationSeconds) {
   }
 
   @Override
-  public void pullImageError() {
+  public void recordExitCode(WorkflowId workflowId, int exitCode) {
+
   }
 
   @Override
-  public void naturalTrigger() {
+  public void recordPullImageError() {
   }
 
   @Override
-  public void registerSubmissionRateLimit(Gauge<Double> submissionRateLimit) {
+  public void recordNaturalTrigger() {
   }
 
   @Override
-  public void terminationLogMissing() {
+  public void recordTerminationLogMissing() {
   }
 
   @Override
-  public void terminationLogInvalid() {
+  public void recordTerminationLogInvalid() {
   }
 
   @Override
-  public void exitCodeMismatch() {
+  public void recordExitCodeMismatch() {
   }
 
   @Override
-  public void resourceConfigured(String resource, long configured) {
+  public void recordResourceConfigured(String resource, long configured) {
   }
 
   @Override
-  public void resourceUsed(String resource, long used) {
+  public void recordResourceUsed(String resource, long used) {
   }
 }

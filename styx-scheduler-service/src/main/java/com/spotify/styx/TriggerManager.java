@@ -109,7 +109,7 @@ public class TriggerManager {
           return; // so we don't update the trigger time
         }
 
-        stats.naturalTrigger();
+        stats.recordNaturalTrigger();
       }
 
       final Instant nextTrigger = nextInstant(instantSpec.instant(), schedule);

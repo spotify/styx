@@ -142,36 +142,19 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
-  public void storageOperation(String operation, long durationMillis) {
-    storageOpHistogram(operation).update(durationMillis);
-    storageOpMeter(operation).mark();
-  }
-
-  @Override
-  public void dockerOperation(String operation, long durationMillis) {
-    dockerOpHistogram(operation).update(durationMillis);
-    dockerOpMeter(operation).mark();
-  }
-
-  @Override
-  public void submitToRunningTime(long durationSeconds) {
-    submitToRunning.update(durationSeconds);
-  }
-
-  @Override
-  public void registerQueuedEvents(Gauge<Long> queuedEventsCount) {
+  public void registerQueuedEventsMetric(Gauge<Long> queuedEventsCount) {
     registry.register(QUEUED_EVENTS, queuedEventsCount);
   }
 
   @Override
-  public void registerActiveStates(RunState.State state, String triggerName,
-                                   Gauge<Long> activeStatesCount) {
+  public void registerActiveStatesMetric(RunState.State state, String triggerName,
+                                         Gauge<Long> activeStatesCount) {
     registry.register(ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER.tagged(
         "state", state.name(), "trigger", triggerName), activeStatesCount);
   }
 
   @Override
-  public void registerActiveStates(WorkflowId workflowId, Gauge<Long> activeStatesCount) {
+  public void registerActiveStatesMetric(WorkflowId workflowId, Gauge<Long> activeStatesCount) {
     activeStatesPerWorkflowGauges.computeIfAbsent(
         workflowId, (ignoreKey) -> registry.register(
             ACTIVE_STATES_PER_WORKFLOW.tagged(
@@ -180,52 +163,69 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
-  public void registerWorkflowCount(String status, Gauge<Long> workflowCount) {
+  public void registerWorkflowCountMetric(String status, Gauge<Long> workflowCount) {
     registry.register(WORKFLOW_COUNT.tagged("status", status), workflowCount);
   }
 
   @Override
-  public void exitCode(WorkflowId workflowId, int exitCode) {
-    exitCodeMeter(workflowId, exitCode).mark();
-  }
-
-  @Override
-  public void registerSubmissionRateLimit(Gauge<Double> submissionRateLimit) {
+  public void registerSubmissionRateLimitMetric(Gauge<Double> submissionRateLimit) {
     registry.register(SUBMISSION_RATE_LIMIT, submissionRateLimit);
   }
 
   @Override
-  public void terminationLogMissing() {
-    terminationLogMissing.mark();
+  public void recordStorageOperation(String operation, long durationMillis) {
+    storageOpHistogram(operation).update(durationMillis);
+    storageOpMeter(operation).mark();
   }
 
   @Override
-  public void terminationLogInvalid() {
-    terminationLogInvalid.mark();
+  public void recordDockerOperation(String operation, long durationMillis) {
+    dockerOpHistogram(operation).update(durationMillis);
+    dockerOpMeter(operation).mark();
   }
 
   @Override
-  public void exitCodeMismatch() {
-    exitCodeMismatch.mark();
+  public void recordSubmitToRunningTime(long durationSeconds) {
+    submitToRunning.update(durationSeconds);
   }
 
   @Override
-  public void naturalTrigger() {
-    naturalTrigger.mark();
+  public void recordExitCode(WorkflowId workflowId, int exitCode) {
+    exitCodeMeter(workflowId, exitCode).mark();
   }
 
   @Override
-  public void pullImageError() {
+  public void recordPullImageError() {
     pullImageErrorMeter.mark();
   }
 
   @Override
-  public void resourceConfigured(String resource, long configured) {
+  public void recordNaturalTrigger() {
+    naturalTrigger.mark();
+  }
+
+  @Override
+  public void recordTerminationLogMissing() {
+    terminationLogMissing.mark();
+  }
+
+  @Override
+  public void recordTerminationLogInvalid() {
+    terminationLogInvalid.mark();
+  }
+
+  @Override
+  public void recordExitCodeMismatch() {
+    exitCodeMismatch.mark();
+  }
+
+  @Override
+  public void recordResourceConfigured(String resource, long configured) {
     resourceConfiguredHistogram(resource).update(configured);
   }
 
   @Override
-  public void resourceUsed(String resource, long used) {
+  public void recordResourceUsed(String resource, long used) {
     resourceUsedHistogram(resource).update(used);
   }
 

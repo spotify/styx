@@ -512,11 +512,11 @@ public class StyxScheduler implements AppInit {
       RateLimiter submissionRateLimiter,
       Stats stats) {
 
-    stats.registerQueuedEvents(stateManager::getQueuedEventsCount);
+    stats.registerQueuedEventsMetric(stateManager::getQueuedEventsCount);
 
-    stats.registerWorkflowCount("all", () -> (long) workflowCache.all().size());
+    stats.registerWorkflowCountMetric("all", () -> (long) workflowCache.all().size());
 
-    stats.registerWorkflowCount("configured", () -> workflowCache.all().stream()
+    stats.registerWorkflowCountMetric("configured", () -> workflowCache.all().stream()
         .filter(WorkflowValidator::hasDockerConfiguration)
         .count());
 
@@ -528,9 +528,9 @@ public class StyxScheduler implements AppInit {
           .filter((workflow) -> enabledWorkflowSupplier.get().contains(WorkflowId.ofWorkflow(workflow)))
           .count();
     };
-    stats.registerWorkflowCount("enabled", configuredEnabledWorkflowsCountGaugeSupplier.get());
+    stats.registerWorkflowCountMetric("enabled", configuredEnabledWorkflowsCountGaugeSupplier.get());
 
-    stats.registerWorkflowCount("docker_termination_logging_enabled", () ->
+    stats.registerWorkflowCountMetric("docker_termination_logging_enabled", () ->
         workflowCache.all().stream()
             .filter(WorkflowValidator::hasDockerConfiguration)
             .filter((workflow) -> workflow.configuration().dockerTerminationLogging())
@@ -538,7 +538,7 @@ public class StyxScheduler implements AppInit {
 
     Arrays.stream(RunState.State.values()).forEach(state -> {
       TriggerUtil.triggerTypesList().forEach(triggerType ->
-          stats.registerActiveStates(
+          stats.registerActiveStatesMetric(
               state,
               triggerType,
               () -> stateManager.activeStates().values().stream()
@@ -546,7 +546,7 @@ public class StyxScheduler implements AppInit {
                   .filter(runState -> runState.data().trigger().isPresent() && triggerType
                       .equals(TriggerUtil.triggerType(runState.data().trigger().get())))
                   .count()));
-      stats.registerActiveStates(
+      stats.registerActiveStatesMetric(
           state,
           "none", () -> stateManager.activeStates().values().stream()
               .filter(runState -> runState.state().equals(state))
@@ -554,7 +554,7 @@ public class StyxScheduler implements AppInit {
               .count());
     });
 
-    stats.registerSubmissionRateLimit(submissionRateLimiter::getRate);
+    stats.registerSubmissionRateLimitMetric(submissionRateLimiter::getRate);
   }
 
   private static Consumer<Workflow> workflowChanged(
@@ -564,7 +564,7 @@ public class StyxScheduler implements AppInit {
       StateManager stateManager) {
 
     return (workflow) -> {
-      stats.registerActiveStates(
+      stats.registerActiveStatesMetric(
           workflow.id(),
           () -> stateManager.getActiveStatesCount(workflow.id()));
 

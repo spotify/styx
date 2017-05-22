@@ -435,7 +435,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
     for (Event event : events) {
       if (event.accept(new PullImageErrorMatcher())) {
-        stats.pullImageError();
+        stats.recordPullImageError();
       }
 
       try {
