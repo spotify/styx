@@ -37,12 +37,15 @@ import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class ExecutionDescriptionHandler implements OutputHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(ExecutionDescriptionHandler.class);
+
+  private static final String STYX_RUN = "styx-run";
 
   private final Storage storage;
   private final StateManager stateManager;
@@ -61,10 +64,10 @@ public class ExecutionDescriptionHandler implements OutputHandler {
     switch (state.state()) {
       case PREPARE:
         try {
-          final Event createdEvent =
-              Event.submit(state.workflowInstance(), getExecDescription(workflowInstance));
+          final Event submitEvent = Event.submit(
+              state.workflowInstance(), getExecDescription(workflowInstance), createExecutionId());
           try {
-            stateManager.receive(createdEvent);
+            stateManager.receive(submitEvent);
           } catch (StateManager.IsClosed isClosed) {
             LOG.warn("Could not send 'created' event", isClosed);
           }
@@ -119,5 +122,9 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         workflow.configuration().secret(),
         workflow.configuration().serviceAccount(),
         workflowState.commitSha());
+  }
+
+  static String createExecutionId() {
+    return STYX_RUN + "-" + UUID.randomUUID().toString();
   }
 }

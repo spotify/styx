@@ -75,7 +75,7 @@ public class PersistentEventTest {
     assertRoundtrip(Event.stop(INSTANCE1));
     assertRoundtrip(Event.timeout(INSTANCE1));
     assertRoundtrip(Event.halt(INSTANCE1));
-    assertRoundtrip(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION));
+    assertRoundtrip(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION, POD_NAME));
     assertRoundtrip(Event.submitted(INSTANCE1, POD_NAME));
   }
 
@@ -95,10 +95,21 @@ public class PersistentEventTest {
                                                + "\"secret\":{\"name\":\"secret\",\"mount_path\":\"/dev/null\"},"
                                                + "\"commit_sha\":\"" + COMMIT_SHA
                                                + "\"}")),
-        is(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION)));
+        is(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION, null)));
+    assertThat(deserializeEvent(json("submit", "\"execution_description\": { "
+                                               + "\"docker_image\":\"" + DOCKER_IMAGE + "\","
+                                               + "\"docker_args\":[\"foo\",\"bar\"],"
+                                               + "\"secret\":{\"name\":\"secret\",\"mount_path\":\"/dev/null\"},"
+                                               + "\"commit_sha\":\"" + COMMIT_SHA
+                                               + "\"}, "
+                                               + "\"execution_id\": \"" + POD_NAME + "\"")),
+        is(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION, POD_NAME)));
     assertThat(
         deserializeEvent(json("info", "\"message\":{\"line\":\"InfoMessage\",\"level\":\"INFO\"}")),
         is(Event.info(INSTANCE1, Message.info("InfoMessage"))));
+    assertThat(
+        deserializeEvent(json("submitted")),
+        is(Event.submitted(INSTANCE1, null)));
     assertThat(
         deserializeEvent(json("submitted", "\"execution_id\":\"" + POD_NAME + "\"")),
         is(Event.submitted(INSTANCE1, POD_NAME)));

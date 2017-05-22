@@ -63,7 +63,9 @@ public class KubernetesDockerRunnerPodPollerTest {
   private static final WorkflowInstance WORKFLOW_INSTANCE_2 =
       WorkflowInstance.create(TestData.WORKFLOW_ID_2, "bar");
   private static final DockerRunner.RunSpec RUN_SPEC =
-      DockerRunner.RunSpec.simple("busybox");
+      DockerRunner.RunSpec.simple("eid1", "busybox");
+  private static final DockerRunner.RunSpec RUN_SPEC_2 =
+      DockerRunner.RunSpec.simple("eid2", "busybox");
   private final static KubernetesSecretSpec SECRET_SPEC = KubernetesSecretSpec.builder().build();
 
   @Mock
@@ -155,14 +157,12 @@ public class KubernetesDockerRunnerPodPollerTest {
   @Test
   public void shouldDeleteUnwantedStyxPods() throws Exception {
     final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
-    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
-    final String podName1 = createdPod1.getMetadata().getName();
-    final String podName2 = createdPod2.getMetadata().getName();
+    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC_2, SECRET_SPEC);
 
     podList.setItems(Arrays.asList(createdPod1, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
-    when(k8sClient.pods().withName(podName1)).thenReturn(namedPod1);
-    when(k8sClient.pods().withName(podName2)).thenReturn(namedPod2);
+    when(k8sClient.pods().withName(RUN_SPEC.executionId())).thenReturn(namedPod1);
+    when(k8sClient.pods().withName(RUN_SPEC_2.executionId())).thenReturn(namedPod2);
 
     kdr.pollPods();
 
@@ -175,14 +175,12 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(debug.get()).thenReturn(true);
 
     final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
-    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
-    final String podName1 = createdPod1.getMetadata().getName();
-    final String podName2 = createdPod2.getMetadata().getName();
+    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC_2, SECRET_SPEC);
 
     podList.setItems(Arrays.asList(createdPod1, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
-    when(k8sClient.pods().withName(podName1)).thenReturn(namedPod1);
-    when(k8sClient.pods().withName(podName2)).thenReturn(namedPod2);
+    when(k8sClient.pods().withName(RUN_SPEC.executionId())).thenReturn(namedPod1);
+    when(k8sClient.pods().withName(RUN_SPEC_2.executionId())).thenReturn(namedPod2);
 
     kdr.pollPods();
 
@@ -197,17 +195,15 @@ public class KubernetesDockerRunnerPodPollerTest {
   @Test
   public void shouldNotDeleteUnwantedNonStyxPods() throws Exception {
     final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
-    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
-    final String podName1 = createdPod1.getMetadata().getName();
-    final String podName2 = createdPod2.getMetadata().getName();
+    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC_2, SECRET_SPEC);
 
     createdPod1.getMetadata().getAnnotations().remove("styx-workflow-instance");
     createdPod2.getMetadata().getAnnotations().remove("styx-workflow-instance");
 
     podList.setItems(Arrays.asList(createdPod1, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
-    when(k8sClient.pods().withName(podName1)).thenReturn(namedPod1);
-    when(k8sClient.pods().withName(podName2)).thenReturn(namedPod2);
+    when(k8sClient.pods().withName(RUN_SPEC.executionId())).thenReturn(namedPod1);
+    when(k8sClient.pods().withName(RUN_SPEC_2.executionId())).thenReturn(namedPod2);
 
     kdr.pollPods();
 
@@ -223,15 +219,13 @@ public class KubernetesDockerRunnerPodPollerTest {
   public void shouldNotDeleteWantedStyxPods() throws Exception {
     final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
     final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
-    final String podName1 = createdPod1.getMetadata().getName();
-    final String podName2 = createdPod2.getMetadata().getName();
 
     podList.setItems(Arrays.asList(createdPod1, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
-    when(k8sClient.pods().withName(podName1)).thenReturn(namedPod1);
-    when(k8sClient.pods().withName(podName2)).thenReturn(namedPod2);
+    when(k8sClient.pods().withName(RUN_SPEC.executionId())).thenReturn(namedPod1);
+    when(k8sClient.pods().withName(RUN_SPEC_2.executionId())).thenReturn(namedPod2);
 
-    setupActiveInstances(RunState.State.RUNNING, podName1, podName2);
+    setupActiveInstances(RunState.State.RUNNING, RUN_SPEC.executionId(), RUN_SPEC_2.executionId());
 
     kdr.pollPods();
 

@@ -92,8 +92,9 @@ class PersistentEvent {
     }
 
     @Override
-    public PersistentEvent submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) {
-      return new Submit(workflowInstance.toKey(), executionDescription);
+    public PersistentEvent submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
+        String executionId) {
+      return new Submit(workflowInstance.toKey(), executionDescription, executionId);
     }
 
     @Override
@@ -341,18 +342,21 @@ class PersistentEvent {
   public static class Submit extends PersistentEvent {
 
     public final ExecutionDescription executionDescription;
+    public final String executionId;
 
     @JsonCreator
     public Submit(
         @JsonProperty("workflow_instance") String workflowInstance,
-        @JsonProperty("execution_description") ExecutionDescription executionDescription) {
+        @JsonProperty("execution_description") ExecutionDescription executionDescription,
+        @JsonProperty("execution_id") String executionId) {
       super("submit", workflowInstance);
       this.executionDescription = executionDescription;
+      this.executionId = executionId;
     }
 
     @Override
     public Event toEvent() {
-      return Event.submit(WorkflowInstance.parseKey(workflowInstance), executionDescription);
+      return Event.submit(WorkflowInstance.parseKey(workflowInstance), executionDescription, executionId);
     }
   }
 }

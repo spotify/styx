@@ -24,6 +24,7 @@ import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresent;
 import static com.google.common.collect.Sets.newTreeSet;
 import static com.spotify.styx.state.RunState.State.DONE;
 import static com.spotify.styx.state.RunState.State.RUNNING;
+import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
@@ -58,7 +59,7 @@ public class ReplayEventsTest {
     events.add(SequenceEvent.create(Event.halt(WORKFLOW_INSTANCE),                                       1L, 1L));
     events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.backfill("bf-1")), 2L, 2L));
     events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE),                                    3L, 3L));
-    events.add(SequenceEvent.create(Event.submit(WORKFLOW_INSTANCE, TestData.EXECUTION_DESCRIPTION),     4L, 4L));
+    events.add(SequenceEvent.create(Event.submit(WORKFLOW_INSTANCE, EXECUTION_DESCRIPTION, "exec-1"),    4L, 4L));
     events.add(SequenceEvent.create(Event.submitted(WORKFLOW_INSTANCE, "exec-1"),                        5L, 5L));
     events.add(SequenceEvent.create(Event.started(WORKFLOW_INSTANCE),                                    6L, 6L));
 
@@ -79,7 +80,7 @@ public class ReplayEventsTest {
     SortedSet<SequenceEvent> events = newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
     events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.backfill("bf-1")), 1L, 1L));
     events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE),                                    2L, 2L));
-    events.add(SequenceEvent.create(Event.submit(WORKFLOW_INSTANCE, TestData.EXECUTION_DESCRIPTION),     3L, 3L));
+    events.add(SequenceEvent.create(Event.submit(WORKFLOW_INSTANCE, EXECUTION_DESCRIPTION, "exec-1"),    3L, 3L));
     events.add(SequenceEvent.create(Event.submitted(WORKFLOW_INSTANCE, "exec-1"),                        4L, 4L));
     events.add(SequenceEvent.create(Event.started(WORKFLOW_INSTANCE),                                    5L, 5L));
     events.add(SequenceEvent.create(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)),                  6L, 6L));

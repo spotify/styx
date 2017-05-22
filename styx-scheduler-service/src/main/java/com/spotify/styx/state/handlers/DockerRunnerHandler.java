@@ -73,7 +73,6 @@ public class DockerRunnerHandler implements OutputHandler {
           rateLimiter.acquire();
           try {
             final String executionId = dockerRunnerStart(state);
-            // this is racy
             final Event submitted = Event.submitted(state.workflowInstance(), executionId);
             try {
               stateManager.receive(submitted);
@@ -116,11 +115,16 @@ public class DockerRunnerHandler implements OutputHandler {
         () -> new ResourceNotFoundException("Missing execution description for "
                                             + state.workflowInstance().toKey()));
 
+    final String executionId = state.data().executionId()
+        // Backwards compatibility fallback
+        .orElseGet(ExecutionDescriptionHandler::createExecutionId);
+
     final String dockerImage = executionDescription.dockerImage();
     final List<String> dockerArgs = executionDescription.dockerArgs();
     final String parameter = workflowInstance.parameter();
     final List<String> command = argsReplace(dockerArgs, parameter);
     final DockerRunner.RunSpec runSpec = DockerRunner.RunSpec.create(
+        executionId,
         dockerImage,
         ImmutableList.copyOf(command),
         executionDescription.dockerTerminationLogging(),
@@ -131,7 +135,9 @@ public class DockerRunnerHandler implements OutputHandler {
     LOG.info("running:{} image:{} args:{} termination_logging:{}", workflowInstance.toKey(),
         runSpec.imageName(), runSpec.args(), runSpec.terminationLogging());
 
-    return dockerRunner.start(workflowInstance, runSpec);
+    dockerRunner.start(workflowInstance, runSpec);
+
+    return executionId;
   }
 
   private static List<String> argsReplace(List<String> template, String parameter) {

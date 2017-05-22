@@ -79,7 +79,7 @@ public class StyxSchedulerServiceFixture {
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxSchedulerServiceFixture.class);
 
-  static final String TEST_EXECUTION_ID = "execution_1";
+//  static final String TEST_EXECUTION_ID = "execution_1";
 
   private static LocalDatastoreHelper localDatastore;
 
@@ -329,9 +329,8 @@ public class StyxSchedulerServiceFixture {
       }
 
       @Override
-      public String start(WorkflowInstance workflowInstance, RunSpec runSpec) {
+      public void start(WorkflowInstance workflowInstance, RunSpec runSpec) {
         dockerRuns.add(Tuple.of(workflowInstance, runSpec));
-        return TEST_EXECUTION_ID;
       }
 
       @Override

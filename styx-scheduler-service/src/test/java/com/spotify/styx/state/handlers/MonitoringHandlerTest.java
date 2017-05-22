@@ -20,6 +20,7 @@
 
 package com.spotify.styx.state.handlers;
 
+import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Mockito.never;
@@ -83,7 +84,7 @@ public class MonitoringHandlerTest {
 
     stateManager.receive(Event.triggerExecution(state.workflowInstance(), Trigger.natural()));
     stateManager.receive(Event.dequeue(state.workflowInstance()));
-    stateManager.receive(Event.submit(state.workflowInstance(), TestData.EXECUTION_DESCRIPTION));
+    stateManager.receive(Event.submit(state.workflowInstance(), EXECUTION_DESCRIPTION, "exec-1"));
     stateManager.receive(Event.submitted(state.workflowInstance(), "exec-1"));
     stateManager.receive(Event.started(state.workflowInstance()));
     stateManager.receive(Event.terminate(state.workflowInstance(), Optional.of(20)));
@@ -98,7 +99,7 @@ public class MonitoringHandlerTest {
 
     stateManager.receive(Event.triggerExecution(state.workflowInstance(), Trigger.natural()));
     stateManager.receive(Event.dequeue(state.workflowInstance()));
-    stateManager.receive(Event.submit(state.workflowInstance(), TestData.EXECUTION_DESCRIPTION));
+    stateManager.receive(Event.submit(state.workflowInstance(), EXECUTION_DESCRIPTION, "exec-1"));
     stateManager.receive(Event.submitted(state.workflowInstance(), "exec-1"));
     stateManager.receive(Event.started(state.workflowInstance()));
     stateManager.receive(Event.terminate(state.workflowInstance(), Optional.empty()));

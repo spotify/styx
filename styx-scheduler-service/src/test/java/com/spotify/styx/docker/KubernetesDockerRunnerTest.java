@@ -94,14 +94,14 @@ public class KubernetesDockerRunnerTest {
   private static final String SERVICE_ACCOUNT = "sa@example.com";
   private static final String SERVICE_ACCOUNT_SECRET = "sa-secret";
   private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(TestData.WORKFLOW_ID, "foo");
-  private static final RunSpec RUN_SPEC = RunSpec.simple("busybox");
-  private static final RunSpec RUN_SPEC_WITH_SECRET = RunSpec.create("busybox",
+  private static final RunSpec RUN_SPEC = RunSpec.simple("eid0", "busybox");
+  private static final RunSpec RUN_SPEC_WITH_SECRET = RunSpec.create("eid1", "busybox",
                                                                      ImmutableList.copyOf(new String[0]),
                                                                      false,
                                                                      Optional.of(WorkflowConfiguration.Secret.create("secret1", "/etc/secret")),
                                                                      empty(),
                                                                      empty());
-  private static final RunSpec RUN_SPEC_WITH_SA = RunSpec.create("busybox",
+  private static final RunSpec RUN_SPEC_WITH_SA = RunSpec.create("eid3", "busybox",
                                                                  ImmutableList.copyOf(new String[0]),
                                                                  false,
                                                                  empty(),
@@ -119,7 +119,7 @@ public class KubernetesDockerRunnerTest {
   private static final KubernetesSecretSpec EMPTY_SECRET_SPEC = KubernetesSecretSpec.builder()
       .build();
 
-  private static final RunSpec RUN_SPEC_WITH_SECRET_AND_SA = RunSpec.create("busybox",
+  private static final RunSpec RUN_SPEC_WITH_SECRET_AND_SA = RunSpec.create("eid", "busybox",
                                                                             ImmutableList.copyOf(new String[0]),
                                                                             false,
                                                                             Optional.of(WorkflowConfiguration.Secret.create("secret1", KubernetesDockerRunner.STYX_WORKFLOW_SA_SECRET_MOUNT_PATH)),
@@ -188,13 +188,19 @@ public class KubernetesDockerRunnerTest {
 
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
     stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
-
-    when(pods.create(podCaptor.capture())).thenReturn(createdPod);
   }
 
   @After
   public void tearDown() throws Exception {
     kdr.close();
+  }
+
+  @Test
+  public void shouldUseExecutionIdForPodName() throws IOException, StateManager.IsClosed {
+    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    verify(pods).create(podCaptor.capture());
+    Pod submittedPod = podCaptor.getValue();
+    assertThat(submittedPod.getMetadata().getName(), is(RUN_SPEC.executionId()));
   }
 
   @Test
@@ -225,9 +231,6 @@ public class KubernetesDockerRunnerTest {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(null);
     when(k8sClient.secrets()).thenReturn(secrets);
-    Pod createdPod = KubernetesDockerRunner.createPod(
-        WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET, SECRET_SPEC_WITH_CUSTOM_SECRET);
-    when(pods.create(any(Pod.class))).thenReturn(createdPod);
 
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET);
   }
@@ -237,9 +240,6 @@ public class KubernetesDockerRunnerTest {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(null);
     when(k8sClient.secrets()).thenReturn(secrets);
-    Pod createdPod = KubernetesDockerRunner.createPod(
-        WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET_AND_SA, SECRET_SPEC_WITH_CUSTOM_SECRET);
-    when(pods.create(any(Pod.class))).thenReturn(createdPod);
 
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET_AND_SA);
   }
@@ -276,9 +276,6 @@ public class KubernetesDockerRunnerTest {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(new SecretBuilder().build());
     when(k8sClient.secrets()).thenReturn(secrets);
-    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET,
-        SECRET_SPEC_WITH_CUSTOM_SECRET);
-    when(pods.create(any(Pod.class))).thenReturn(createdPod);
 
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET);
 
@@ -296,9 +293,6 @@ public class KubernetesDockerRunnerTest {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(null);
     when(k8sClient.secrets()).thenReturn(secrets);
-
-    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, SECRET_SPEC_WITH_SA);
-    when(pods.create(any(Pod.class))).thenReturn(createdPod);
 
     when(serviceAccountSecretManager.ensureServiceAccountKeySecret(
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT)).thenReturn(SERVICE_ACCOUNT_SECRET);
@@ -341,7 +335,9 @@ public class KubernetesDockerRunnerTest {
 
     exception.expect(InvalidExecutionException.class);
     exception.expectMessage("Referenced secret '" + secret + "' has the managed service account key secret name prefix");
-    kdr.start(WORKFLOW_INSTANCE, RunSpec.create("busybox",
+    kdr.start(WORKFLOW_INSTANCE, RunSpec.create(
+        "eid",
+        "busybox",
         ImmutableList.of(),
         false,
         Optional.of(WorkflowConfiguration.Secret.create(secret, "/foo/bar")),

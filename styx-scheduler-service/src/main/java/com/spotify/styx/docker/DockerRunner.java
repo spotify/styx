@@ -26,6 +26,7 @@ import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.StateManager;
@@ -58,9 +59,8 @@ public interface DockerRunner extends Closeable {
    * Starts a workflow instance asynchronously.
    * @param workflowInstance The workflow instance that the run belongs to
    * @param runSpec          Specification of what to run
-   * @return The execution id for the started workflow instance
    */
-  String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException;
+  void start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException;
 
   /**
    * Perform cleanup for resources such as secrets etc. Resources that are not in use by any currently live workflows
@@ -78,6 +78,8 @@ public interface DockerRunner extends Closeable {
   @AutoValue
   abstract class RunSpec {
 
+    public abstract String executionId();
+
     public abstract String imageName();
 
     public abstract ImmutableList<String> args();
@@ -91,18 +93,19 @@ public interface DockerRunner extends Closeable {
     public abstract Optional<Trigger> trigger();
 
     public static RunSpec create(
+        String executionId,
         String imageName,
         ImmutableList<String> args,
         boolean terminationLogging,
-        Optional<WorkflowConfiguration.Secret> secret,
+        Optional<Secret> secret,
         Optional<String> serviceAccount,
         Optional<Trigger> trigger) {
-      return new AutoValue_DockerRunner_RunSpec(imageName, args, terminationLogging, secret,
+      return new AutoValue_DockerRunner_RunSpec(executionId, imageName, args, terminationLogging, secret,
                                                 serviceAccount, trigger);
     }
 
-    public static RunSpec simple(String imageName, String... args) {
-      return new AutoValue_DockerRunner_RunSpec(imageName, ImmutableList.copyOf(args),
+    public static RunSpec simple(String executionId, String imageName, String... args) {
+      return new AutoValue_DockerRunner_RunSpec(executionId, imageName, ImmutableList.copyOf(args),
                                                 false, empty(), empty(), empty());
     }
   }

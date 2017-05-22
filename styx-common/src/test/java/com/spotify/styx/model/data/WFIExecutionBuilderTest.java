@@ -87,14 +87,14 @@ public class WFIExecutionBuilderTest {
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1")), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(desc("img1"), "exec-id-00"), c++, ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
         SequenceEvent.create(E.started(), c++, ts("07:57")),
         SequenceEvent.create(E.terminate(RunState.MISSING_DEPS_EXIT_CODE), c++, ts("07:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
         SequenceEvent.create(E.retry(), c++, ts("08:56")),
-        SequenceEvent.create(E.submit(desc("img2")), c++, ts("08:55")),
+        SequenceEvent.create(E.submit(desc("img2"), "exec-id-01"), c++, ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57")),
         SequenceEvent.create(E.terminate(0), c++, ts("08:58")),
@@ -102,14 +102,14 @@ public class WFIExecutionBuilderTest {
 
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER1), c++, ts("09:55")),
         SequenceEvent.create(E.dequeue(), c++, ts("09:55")),
-        SequenceEvent.create(E.submit(desc("img3")), c++, ts("09:55")),
+        SequenceEvent.create(E.submit(desc("img3"), "exec-id-10"), c++, ts("09:55")),
         SequenceEvent.create(E.submitted("exec-id-10"), c++, ts("09:56")),
         SequenceEvent.create(E.started(), c++, ts("09:57")),
         SequenceEvent.create(E.terminate(1), c++, ts("09:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("09:59")),
 
         SequenceEvent.create(E.retry(), c++, ts("10:56")),
-        SequenceEvent.create(E.submit(desc("img4")), c++, ts("10:55")),
+        SequenceEvent.create(E.submit(desc("img4"), "exec-id-11"), c++, ts("10:55")),
         SequenceEvent.create(E.submitted("exec-id-11"), c++, ts("10:56")),
         SequenceEvent.create(E.started(), c++, ts("10:57"))
     );
@@ -182,14 +182,14 @@ public class WFIExecutionBuilderTest {
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1")), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(desc("img1"), "exec-id-00"), c++, ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
         SequenceEvent.create(E.started(), c++, ts("07:57")),
         SequenceEvent.create(E.timeout(), c++, ts("07:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
         SequenceEvent.create(E.retry(), c++, ts("08:56")),
-        SequenceEvent.create(E.submit(desc("img2")), c++, ts("08:55")),
+        SequenceEvent.create(E.submit(desc("img2"), "exec-id-01"), c++, ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57"))
     );
@@ -237,14 +237,14 @@ public class WFIExecutionBuilderTest {
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1")), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(desc("img1"), "exec-id-00"), c++, ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
         SequenceEvent.create(E.started(), c++, ts("07:57")),
         SequenceEvent.create(E.runError("Something failed"), c++, ts("07:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
         SequenceEvent.create(E.retry(), c++, ts("08:56")),
-        SequenceEvent.create(E.submit(desc("img2")), c++, ts("08:55")),
+        SequenceEvent.create(E.submit(desc("img2"), "exec-id-01"), c++, ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57"))
     );
@@ -292,13 +292,13 @@ public class WFIExecutionBuilderTest {
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1")), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(desc("img1"), "exec-id-00"), c++, ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
         SequenceEvent.create(E.halt(), c++, ts("07:57")),
 
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER1), c++, ts("08:56")),
         SequenceEvent.create(E.dequeue(), c++, ts("08:56")),
-        SequenceEvent.create(E.submit(desc("img2")), c++, ts("08:55")),
+        SequenceEvent.create(E.submit(desc("img2"), "exec-id-10"), c++, ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-10"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57"))
     );
