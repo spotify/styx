@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
+import com.spotify.styx.docker.InvalidExecutionException;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.state.OutputHandler;
@@ -95,7 +96,12 @@ public class DockerRunnerHandler implements OutputHandler {
             dockerRunner.start(state.workflowInstance(), runSpec);
           } catch (Throwable e) {
             try {
-              LOG.error("Failed the docker starting procedure for " + state.workflowInstance().toKey(), e);
+              final String msg = "Failed the docker starting procedure for " + state.workflowInstance().toKey();
+              if (isUserError(e)) {
+                LOG.info("{}: {}", msg, e.getMessage());
+              } else {
+                LOG.error(msg, e);
+              }
               stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()));
             } catch (StateManager.IsClosed isClosed) {
               LOG.warn("Failed to send 'runError' event", isClosed);
@@ -116,6 +122,10 @@ public class DockerRunnerHandler implements OutputHandler {
       default:
         // do nothing
     }
+  }
+
+  private boolean isUserError(Throwable e) {
+    return e instanceof InvalidExecutionException;
   }
 
   private RunSpec createRunSpec(RunState state) throws ResourceNotFoundException {
