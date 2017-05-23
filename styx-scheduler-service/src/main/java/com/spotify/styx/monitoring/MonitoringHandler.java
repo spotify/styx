@@ -55,7 +55,7 @@ public class MonitoringHandler implements OutputHandler {
 
       case TERMINATED:
         if (state.data().lastExit().isPresent()) {
-          stats.exitCode(state.workflowInstance().workflowId(), state.data().lastExit().get());
+          stats.recordExitCode(state.workflowInstance().workflowId(), state.data().lastExit().get());
         }
         break;
 
@@ -63,7 +63,7 @@ public class MonitoringHandler implements OutputHandler {
         final Instant a = time.get();
         final Instant b = map.remove(state.workflowInstance().toKey());
         final long durationSeconds = b.until(a, ChronoUnit.SECONDS);
-        stats.submitToRunningTime(durationSeconds);
+        stats.recordSubmitToRunningTime(durationSeconds);
 
       default:
         // do nothing

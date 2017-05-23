@@ -78,7 +78,7 @@ public final class KubernetesPodEventTranslator {
       if (terminated.getMessage() == null) {
         LOG.warn("Missing termination log message for workflow instance {} container {}",
                  workflowInstance, status.getContainerID());
-        stats.terminationLogMissing();
+        stats.recordTerminationLogMissing();
       } else {
         try {
           // TODO: handle multiple termination log messages
@@ -90,7 +90,7 @@ public final class KubernetesPodEventTranslator {
                 + "Termination log exit code: {}",
                 workflowInstance, status.getContainerID(), terminated.getExitCode(),
                 message.exitCode);
-            stats.exitCodeMismatch();
+            stats.recordExitCodeMismatch();
           }
 
           if (terminated.getExitCode() != null && message.exitCode == 0) {
@@ -104,7 +104,7 @@ public final class KubernetesPodEventTranslator {
             return Optional.of(message.exitCode);
           }
         } catch (IOException e) {
-          stats.terminationLogInvalid();
+          stats.recordTerminationLogInvalid();
           LOG.warn("Unexpected termination log message for workflow instance {} container {}",
               workflowInstance, status.getContainerID(), e);
         }

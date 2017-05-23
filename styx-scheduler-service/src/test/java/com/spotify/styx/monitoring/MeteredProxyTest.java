@@ -64,7 +64,7 @@ public class MeteredProxyTest {
     proxy.resource("foobar");
 
     verify(mock).resource("foobar");
-    verify(stats).storageOperation("resource", 123);
+    verify(stats).recordStorageOperation("resource", 123);
   }
 
   @Test
@@ -75,7 +75,7 @@ public class MeteredProxyTest {
     proxy.cleanup(workflowInstance, "barbaz");
 
     verify(mock).cleanup(workflowInstance, "barbaz");
-    verify(stats).dockerOperation("cleanup", 123);
+    verify(stats).recordDockerOperation("cleanup", 123);
   }
 
   @Test

@@ -71,9 +71,9 @@ public class MeteredProxy implements InvocationHandler {
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
 
     if (delegate instanceof Storage) {
-      stats.storageOperation(operation, durationMillis);
+      stats.recordStorageOperation(operation, durationMillis);
     } else if (delegate instanceof DockerRunner) {
-      stats.dockerOperation(operation, durationMillis);
+      stats.recordDockerOperation(operation, durationMillis);
     }
 
     return ret;

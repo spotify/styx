@@ -372,7 +372,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(waiting("Pending", "ErrImagePull"));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
-    verify(stats, times(1)).pullImageError();
+    verify(stats, times(1)).recordPullImageError();
     assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.FAILED));
   }
 

@@ -148,7 +148,7 @@ public class Scheduler {
                 ConcurrentHashMap::new,
                 counting()));
 
-    updateMetrics(resources, currentResourceUsage);
+    updateStats(resources, currentResourceUsage);
 
     final List<InstanceState> eligibleInstances =
         activeStates.parallelStream()
@@ -177,12 +177,12 @@ public class Scheduler {
     eligibleInstances.forEach(limitAndDequeue);
   }
 
-  private void updateMetrics(Map<String, Resource> resources,
-                             Map<String, Long> currentResourceUsage) {
-    resources.values().forEach(r -> stats.resourceConfigured(r.id(), r.concurrency()));
-    currentResourceUsage.forEach(stats::resourceUsed);
+  private void updateStats(Map<String, Resource> resources,
+                           Map<String, Long> currentResourceUsage) {
+    resources.values().forEach(r -> stats.recordResourceConfigured(r.id(), r.concurrency()));
+    currentResourceUsage.forEach(stats::recordResourceUsed);
     Sets.difference(resources.keySet(), currentResourceUsage.keySet())
-        .forEach(r -> stats.resourceUsed(r, 0));
+        .forEach(r -> stats.recordResourceUsed(r, 0));
   }
 
   private void evaluateResourcesForDequeue(
