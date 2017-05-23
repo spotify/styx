@@ -423,12 +423,13 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     awaitNumberOfDockerRuns(1);
 
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
+    String executionId = dockerRuns.get(0)._3;
 
     injectEvent(Event.started(workflowInstance));
     injectEvent(Event.terminate(workflowInstance, Optional.of(20)));
     awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
-    assertThat(dockerCleans, contains(TEST_EXECUTION_ID));
+    assertThat(dockerCleans, contains(executionId));
   }
 
   @Test
@@ -444,11 +445,12 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     awaitNumberOfDockerRuns(1);
 
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
+    String executionId = dockerRuns.get(0)._3;
 
     injectEvent(Event.runError(workflowInstance, "Something failed"));
     awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
-    assertThat(dockerCleans, contains(TEST_EXECUTION_ID));
+    assertThat(dockerCleans, contains(executionId));
   }
 
   @Test

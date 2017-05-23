@@ -114,6 +114,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
       Optional.of(SERVICE_ACCOUNT),
       empty());
 
+  private static final String TEST_EXEC_ID = "test-exec-id";
+
   private ExecutorService executor;
 
   @Mock NamespacedKubernetesClient k8sClient;
@@ -267,7 +269,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     final KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
         .serviceAccountSecret(secret.getMetadata().getName())
         .build();
-    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
+    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec, TEST_EXEC_ID);
 
     final PodStatus podStatus = podStatus(phase);
     pod.setStatus(podStatus);
@@ -291,7 +293,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     final KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
         .serviceAccountSecret(secret.getMetadata().getName())
         .build();
-    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
+    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec, TEST_EXEC_ID);
     pod.setStatus(podStatus("Running"));
     when(podList.getItems()).thenReturn(ImmutableList.of(pod));
     sut.cleanup();

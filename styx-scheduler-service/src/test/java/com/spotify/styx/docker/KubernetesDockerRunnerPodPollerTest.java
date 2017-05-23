@@ -99,7 +99,7 @@ public class KubernetesDockerRunnerPodPollerTest {
 
   @Test
   public void shouldSendRunErrorWhenPodForRunningWFIDoesntExist() throws Exception {
-    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
+    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC, POD_NAME);
     podList.setItems(Arrays.asList(createdPod));
     when(k8sClient.pods().list()).thenReturn(podList);
     setupActiveInstances(RunState.State.RUNNING, POD_NAME, POD_NAME_2);
@@ -112,8 +112,8 @@ public class KubernetesDockerRunnerPodPollerTest {
 
   @Test
   public void shouldNotSendRunErrorWhenPodForRunningWFIExists() throws Exception {
-    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
-    Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC, POD_NAME);
+    Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC, POD_NAME_2);
     podList.setItems(Arrays.asList(createdPod, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
     setupActiveInstances(RunState.State.RUNNING, POD_NAME, POD_NAME_2);
@@ -154,8 +154,8 @@ public class KubernetesDockerRunnerPodPollerTest {
 
   @Test
   public void shouldDeleteUnwantedStyxPods() throws Exception {
-    final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
-    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC, POD_NAME);
+    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC, POD_NAME_2);
     final String podName1 = createdPod1.getMetadata().getName();
     final String podName2 = createdPod2.getMetadata().getName();
 
@@ -174,8 +174,8 @@ public class KubernetesDockerRunnerPodPollerTest {
   public void shouldNotDeleteUnwantedStyxPodsIfDebugEnabled() throws Exception {
     when(debug.get()).thenReturn(true);
 
-    final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
-    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC, POD_NAME);
+    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC, POD_NAME_2);
     final String podName1 = createdPod1.getMetadata().getName();
     final String podName2 = createdPod2.getMetadata().getName();
 
@@ -196,8 +196,8 @@ public class KubernetesDockerRunnerPodPollerTest {
 
   @Test
   public void shouldNotDeleteUnwantedNonStyxPods() throws Exception {
-    final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
-    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC, POD_NAME);
+    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC, POD_NAME_2);
     final String podName1 = createdPod1.getMetadata().getName();
     final String podName2 = createdPod2.getMetadata().getName();
 
@@ -221,8 +221,8 @@ public class KubernetesDockerRunnerPodPollerTest {
 
   @Test
   public void shouldNotDeleteWantedStyxPods() throws Exception {
-    final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
-    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC, POD_NAME);
+    final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC, POD_NAME_2);
     final String podName1 = createdPod1.getMetadata().getName();
     final String podName2 = createdPod2.getMetadata().getName();
 

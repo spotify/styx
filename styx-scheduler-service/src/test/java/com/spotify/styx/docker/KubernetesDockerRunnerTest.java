@@ -148,7 +148,7 @@ public class KubernetesDockerRunnerTest {
 
   @Rule public ExpectedException exception = ExpectedException.none();
 
-  Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, EMPTY_SECRET_SPEC);
+  Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, EMPTY_SECRET_SPEC, POD_NAME);
   StateManager stateManager = Mockito.spy(new SyncStateManager());
   Stats stats = Mockito.mock(Stats.class);
 
@@ -188,8 +188,6 @@ public class KubernetesDockerRunnerTest {
 
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
     stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
-
-    when(pods.create(podCaptor.capture())).thenReturn(createdPod);
   }
 
   @After
@@ -225,11 +223,7 @@ public class KubernetesDockerRunnerTest {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(null);
     when(k8sClient.secrets()).thenReturn(secrets);
-    Pod createdPod = KubernetesDockerRunner.createPod(
-        WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET, SECRET_SPEC_WITH_CUSTOM_SECRET);
-    when(pods.create(any(Pod.class))).thenReturn(createdPod);
-
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET);
+    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET, POD_NAME);
   }
 
   @Test(expected = InvalidExecutionException.class)
@@ -237,17 +231,13 @@ public class KubernetesDockerRunnerTest {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(null);
     when(k8sClient.secrets()).thenReturn(secrets);
-    Pod createdPod = KubernetesDockerRunner.createPod(
-        WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET_AND_SA, SECRET_SPEC_WITH_CUSTOM_SECRET);
-    when(pods.create(any(Pod.class))).thenReturn(createdPod);
-
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET_AND_SA);
+    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET_AND_SA, POD_NAME);
   }
 
   @Test
   public void shouldMountSecret() throws IOException, StateManager.IsClosed {
     final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET,
-        SECRET_SPEC_WITH_CUSTOM_SECRET);
+        SECRET_SPEC_WITH_CUSTOM_SECRET, POD_NAME);
     assertThat(pod.getSpec().getVolumes().size(), is(1));
     assertThat(pod.getSpec().getVolumes().get(0).getName(),
                is(RUN_SPEC_WITH_SECRET.secret().get().name()));
@@ -259,7 +249,8 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldMountServiceAccount() throws IOException, StateManager.IsClosed {
-    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, SECRET_SPEC_WITH_SA);
+    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, SECRET_SPEC_WITH_SA,
+        POD_NAME);
     assertThat(pod.getSpec().getVolumes().size(), is(1));
     assertThat(pod.getSpec().getVolumes().get(0).getName(),
                is(KubernetesDockerRunner.STYX_WORKFLOW_SA_SECRET_NAME));
@@ -276,11 +267,8 @@ public class KubernetesDockerRunnerTest {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(new SecretBuilder().build());
     when(k8sClient.secrets()).thenReturn(secrets);
-    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET,
-        SECRET_SPEC_WITH_CUSTOM_SECRET);
-    when(pods.create(any(Pod.class))).thenReturn(createdPod);
 
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET);
+    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET, POD_NAME);
 
     verify(pods).create(podCaptor.capture());
   }
@@ -297,16 +285,13 @@ public class KubernetesDockerRunnerTest {
     when(namedResource.get()).thenReturn(null);
     when(k8sClient.secrets()).thenReturn(secrets);
 
-    Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, SECRET_SPEC_WITH_SA);
-    when(pods.create(any(Pod.class))).thenReturn(createdPod);
-
     when(serviceAccountSecretManager.ensureServiceAccountKeySecret(
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT)).thenReturn(SERVICE_ACCOUNT_SECRET);
 
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
     stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
 
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
+    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, POD_NAME);
 
     verify(serviceAccountSecretManager).ensureServiceAccountKeySecret(
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT);
@@ -332,7 +317,7 @@ public class KubernetesDockerRunnerTest {
 
     exception.expect(is(error));
 
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
+    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, POD_NAME);
   }
 
   @Test
@@ -346,7 +331,7 @@ public class KubernetesDockerRunnerTest {
         false,
         Optional.of(WorkflowConfiguration.Secret.create(secret, "/foo/bar")),
         Optional.empty(),
-        empty()));
+        empty()), POD_NAME);
 
     verify(pods, never()).create(any(Pod.class));
   }
@@ -395,7 +380,7 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldIgnoreDeletedEvents() throws Exception {
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC, POD_NAME);
     stateManager.receive(Event.started(WORKFLOW_INSTANCE));
 
     podWatcher.eventReceived(Watcher.Action.DELETED, createdPod);
@@ -435,7 +420,7 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldDiscardChangesForOldExecutions() throws Exception {
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC, POD_NAME);
     stateManager.receive(Event.started(WORKFLOW_INSTANCE));
 
     // simulate event from different pod, but still with the same workflow instance annotation
