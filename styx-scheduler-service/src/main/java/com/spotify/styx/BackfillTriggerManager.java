@@ -97,7 +97,7 @@ public class BackfillTriggerManager {
 
     for (int i = 0; i < remainingCapacity && partition.isBefore(backfill.end()); i++) {
       try {
-        CompletableFuture<Void> processed = triggerListener
+        final CompletableFuture<Void> processed = triggerListener
             .event(workflow, Trigger.backfill(backfill.id()), partition)
             .toCompletableFuture();
         // Wait for the trigger execution to complete before proceeding to the next partition
