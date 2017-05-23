@@ -124,13 +124,12 @@ public final class ReplayEvents {
         activeWorkflowInstances.getOrDefault(workflowInstance, sequenceEvents.last().counter());
 
     for (SequenceEvent sequenceEvent : sequenceEvents) {
-      // At the time of writing, we don't expect to get events while Styx is not running.
-      // That is because the only event producers are going to be in the same process.
-      // Thus, we don't expect any event in the sequence to be later than the last consumed
-      // event. We will treat this as an error for now and skip the rest of the events.
+      // The active state event counters are read before the events themselves and styx is 
+      // concurrently storing events, thus we might encounter an event with a counter value that is
+      // later than the earlier read active state event counter. Events _after_ the active state
+      // event counter might be dropped in some circumstances, hence we stop processing here to
+      // avoid returning phantom data.
       if (sequenceEvent.counter() > lastConsumedEvent) {
-        LOG.error("Got unexpected newer event than the last consumed event {} > {} for {}",
-            sequenceEvent.counter(), lastConsumedEvent, workflowInstance.toKey());
         break;
       }
 
