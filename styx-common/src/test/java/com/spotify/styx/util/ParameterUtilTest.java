@@ -203,7 +203,8 @@ public class ParameterUtilTest {
 
     UNPARSABLE = Arrays.asList(
         example("2017-03-26+01:00", DAYS),
-        example("2017-03-26+01:00", WEEKS)
+        example("2017-03-26+01:00", WEEKS),
+        example("2017-04-31", DAYS)
     );
   }
 
