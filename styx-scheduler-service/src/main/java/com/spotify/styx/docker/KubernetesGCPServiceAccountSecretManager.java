@@ -121,7 +121,7 @@ class KubernetesGCPServiceAccountSecretManager {
     // Check that the service account exists
     final boolean serviceAccountExists = keyManager.serviceAccountExists(serviceAccount);
     if (!serviceAccountExists) {
-      logger.error("[AUDIT] Workflow {} refers to non-existent service account {}", workflowId, serviceAccount);
+      logger.warn("[AUDIT] Workflow {} refers to non-existent service account {}", workflowId, serviceAccount);
       throw new InvalidExecutionException("Referenced service account " + serviceAccount + " was not found");
     }
 
@@ -158,7 +158,7 @@ class KubernetesGCPServiceAccountSecretManager {
       jsonKey = keyManager.createJsonKey(serviceAccount);
       p12Key = keyManager.createP12Key(serviceAccount);
     } catch (IOException e) {
-      logger.error("[AUDIT] Failed to create keys for {}", serviceAccount, e);
+      logger.warn("[AUDIT] Failed to create keys for {}", serviceAccount, e);
       throw e;
     }
 

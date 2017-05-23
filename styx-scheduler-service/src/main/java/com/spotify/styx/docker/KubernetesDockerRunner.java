@@ -176,7 +176,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
       // if it ever happens, that feels more like a hack than pure luck so let's be paranoid
       if (STYX_WORKFLOW_SA_SECRET_MOUNT_PATH.equals(specSecret.mountPath())) {
-        LOG.error("[AUDIT] Workflow {} tries to mount secret {} to the reserved path",
+        LOG.warn("[AUDIT] Workflow {} tries to mount secret {} to the reserved path",
                   workflowInstance.workflowId(), specSecret.name());
         throw new InvalidExecutionException(
             "Referenced secret '" + specSecret.name() + "' has the mount path "
@@ -185,7 +185,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
       final Secret secret = client.secrets().withName(specSecret.name()).get();
       if (secret == null) {
-        LOG.error("[AUDIT] Workflow {} refers to a non-existent secret {}",
+        LOG.warn("[AUDIT] Workflow {} refers to a non-existent secret {}",
                   workflowInstance.workflowId(), specSecret.name());
         throw new InvalidExecutionException(
             "Referenced secret '" + specSecret.name() + "' was not found");
