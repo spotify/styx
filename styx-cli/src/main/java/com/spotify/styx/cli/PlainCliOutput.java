@@ -56,10 +56,10 @@ class PlainCliOutput implements CliOutput {
 
         final String lastMessage;
         if (messages.isEmpty()) {
-          lastMessage = "No info";
+          lastMessage = "\"No info\"";
         } else {
           final Message message = messages.get(messages.size() - 1);
-          lastMessage = message.line();
+          lastMessage = String.format("\"%s\"", message.line());
         }
 
         System.out.println(String.format(
