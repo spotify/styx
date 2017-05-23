@@ -101,18 +101,18 @@ public class ExecutionDescriptionHandler implements OutputHandler {
     final Optional<List<String>> dockerArgsOpt = workflow.configuration().dockerArgs();
     if (!dockerArgsOpt.isPresent()) {
       throw new ResourceNotFoundException(format("%s has no docker args, halting %s",
-                                   workflowId, workflowInstance));
+                                                 workflowId, workflowInstance));
     }
 
     final WorkflowState workflowState = storage.workflowState(workflow.id());
 
     final Optional<String> dockerImageOpt = workflowState.dockerImage().isPresent()
-        ? workflowState.dockerImage()
-        : workflow.configuration().dockerImage(); // backwards compatibility
+                                            ? workflowState.dockerImage()
+                                            : workflow.configuration().dockerImage(); // backwards compatibility
 
     if (!dockerImageOpt.isPresent()) {
       throw new ResourceNotFoundException(format("%s has no docker image, halting %s",
-                                   workflowId, workflowInstance));
+                                                 workflowId, workflowInstance));
     }
 
     return ExecutionDescription.create(
@@ -123,6 +123,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         workflow.configuration().serviceAccount(),
         workflowState.commitSha());
   }
+
 
   static String createExecutionId() {
     return STYX_RUN + "-" + UUID.randomUUID().toString();
