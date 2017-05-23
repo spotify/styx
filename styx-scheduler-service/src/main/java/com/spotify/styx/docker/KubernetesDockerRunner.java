@@ -85,6 +85,7 @@ import java.util.concurrent.TimeUnit;
  */
 class KubernetesDockerRunner implements DockerRunner {
 
+  static final String STYX_RUN = "styx-run";
   static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
   static final String DOCKER_TERMINATION_LOGGING_ANNOTATION = "styx-docker-termination-logging";
   static final String COMPONENT_ID = "STYX_COMPONENT_ID";

@@ -53,7 +53,7 @@ public final class KubernetesPodEventTranslator {
   }
 
   private static final Predicate<ContainerStatus> IS_STYX_CONTAINER =
-      (cs) -> DockerRunner.STYX_RUN.equals(cs.getName());
+      (cs) -> KubernetesDockerRunner.STYX_RUN.equals(cs.getName());
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private static class TerminationLogMessage {
