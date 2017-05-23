@@ -47,6 +47,8 @@ import org.slf4j.LoggerFactory;
  */
 public interface DockerRunner extends Closeable {
 
+  String STYX_RUN = "styx-run";
+
   Logger LOG = LoggerFactory.getLogger(DockerRunner.class);
 
   /**

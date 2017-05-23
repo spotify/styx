@@ -322,8 +322,8 @@ public class KubernetesPodEventTranslatorTest {
   static PodStatus podStatus(String phase, boolean ready, ContainerState containerState) {
     PodStatus podStatus = podStatusNoContainer(phase);
     podStatus.getContainerStatuses()
-        .add(new ContainerStatus(KubernetesDockerRunner.STYX_RUN, "", "", containerState,
-                                 KubernetesDockerRunner.STYX_RUN, ready, 0, containerState));
+        .add(new ContainerStatus(DockerRunner.STYX_RUN, "", "", containerState,
+                                 DockerRunner.STYX_RUN, ready, 0, containerState));
     return podStatus;
   }
 
