@@ -26,6 +26,11 @@ import java.util.Optional;
 
 public class GcpUtil {
 
+  public static boolean isPermissionDenied(Throwable t) {
+    return t instanceof GoogleJsonResponseException
+        && isPermissionDenied((GoogleJsonResponseException) t);
+  }
+
   public static boolean isPermissionDenied(GoogleJsonResponseException e) {
     return e.getStatusCode() == 403 && Optional.ofNullable(e.getDetails())
         .map(GcpUtil::isPermissionDenied)
