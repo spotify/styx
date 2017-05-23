@@ -124,10 +124,11 @@ public final class ReplayEvents {
         activeWorkflowInstances.getOrDefault(workflowInstance, sequenceEvents.last().counter());
 
     for (SequenceEvent sequenceEvent : sequenceEvents) {
-      // The active state event counters are read before the events themselves and styx is concurrently storing
-      // events, thus we might encounter an event with a counter value that is later than the earlier read active state
-      // event counter. Events _after_ the active state event counter might be dropped in some circumstances, hence we
-      // stop processing here to avoid returning phantom data.
+      // The active state event counters are read before the events themselves and styx is 
+      // concurrently storing events, thus we might encounter an event with a counter value that is
+      // later than the earlier read active state event counter. Events _after_ the active state
+      // event counter might be dropped in some circumstances, hence we stop processing here to
+      // avoid returning phantom data.
       if (sequenceEvent.counter() > lastConsumedEvent) {
         break;
       }
