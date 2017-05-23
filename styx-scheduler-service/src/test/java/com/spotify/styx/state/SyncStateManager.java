@@ -21,7 +21,6 @@
 package com.spotify.styx.state;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;

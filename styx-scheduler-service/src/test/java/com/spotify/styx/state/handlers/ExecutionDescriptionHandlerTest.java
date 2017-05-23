@@ -22,16 +22,21 @@ package com.spotify.styx.state.handlers;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Schedule.HOURS;
+import static com.spotify.styx.state.RunState.State.PREPARE;
 import static com.spotify.styx.state.RunState.State.SUBMITTING;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -47,11 +52,9 @@ import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
 import java.io.IOException;
-import java.util.Optional;
 import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 public class ExecutionDescriptionHandlerTest {
 
@@ -66,7 +69,7 @@ public class ExecutionDescriptionHandlerTest {
   @Before
   public void setUp() throws Exception {
     storage = new InMemStorage();
-    stateManager = new SyncStateManager();
+    stateManager = spy(new SyncStateManager());
     toTest = new ExecutionDescriptionHandler(storage, stateManager);
   }
 
@@ -109,8 +112,8 @@ public class ExecutionDescriptionHandlerTest {
         .build();
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
 
-    Storage storageSpy = Mockito.spy(storage);
-    Mockito.when(storageSpy.workflowState(workflowInstance.workflowId()))
+    Storage storageSpy = spy(storage);
+    when(storageSpy.workflowState(workflowInstance.workflowId()))
         .thenThrow(new IOException("TEST"));
     storageSpy.storeWorkflow(workflow);
     storageSpy.patchState(workflow.id(), workflowState);
@@ -191,6 +194,35 @@ public class ExecutionDescriptionHandlerTest {
     assertThat(currentState.state(), is(SUBMITTING));
     assertTrue(data.executionDescription().isPresent());
     assertThat(data.executionDescription().get().dockerImage(), is("legacy-docker-image"));
+  }
+
+  @Test
+  public void shouldNotTransitIfStateManagerIsClosed() throws Exception {
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule("--date", "{}", "--bar"));
+    WorkflowState workflowState = WorkflowState.builder()
+        .enabled(true)
+        .dockerImage(DOCKER_IMAGE)
+        .commitSha(COMMIT_SHA)
+        .build();
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    RunState runState = RunState.fresh(workflowInstance, toTest);
+
+    doCallRealMethod()
+        .doCallRealMethod()
+        .doThrow(StateManager.IsClosed.class)
+        .when(stateManager).receive(any(Event.class));
+
+    storage.storeWorkflow(workflow);
+    storage.patchState(workflow.id(), workflowState);
+    stateManager.initialize(runState);
+    stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
+    stateManager.receive(Event.dequeue(workflowInstance));
+
+    RunState currentState = stateManager.get(workflowInstance);
+    StateData data = currentState.data();
+
+    assertThat(currentState.state(), is(PREPARE));
+    assertFalse(data.executionDescription().isPresent());
   }
 
   private WorkflowConfiguration schedule(String... args) {
