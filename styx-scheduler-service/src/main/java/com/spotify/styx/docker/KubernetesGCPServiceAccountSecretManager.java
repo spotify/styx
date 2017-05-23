@@ -108,8 +108,11 @@ class KubernetesGCPServiceAccountSecretManager {
       return serviceAccountSecretCache.get(serviceAccount, () ->
           getOrCreateSecret(workflowId, serviceAccount, epoch, secretName));
     } catch (Exception e) {
-      if (e.getCause() instanceof InvalidExecutionException) {
-        throw (InvalidExecutionException) e.getCause();
+      final Throwable cause = e.getCause();
+      if (cause instanceof InvalidExecutionException) {
+        throw (InvalidExecutionException) cause;
+      } else if (GcpUtil.isPermissionDenied(cause)) {
+        throw new InvalidExecutionException("Permission denied to service account: " + serviceAccount);
       } else {
         throw new RuntimeException(e);
       }
