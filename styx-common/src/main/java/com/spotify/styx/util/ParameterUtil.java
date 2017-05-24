@@ -37,6 +37,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.time.format.SignStyle;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
@@ -80,6 +81,7 @@ public final class ParameterUtil {
       .optionalEnd()
       .optionalEnd()
       .toFormatter()
+      .withResolverStyle(ResolverStyle.STRICT)
       .withZone(UTC);
 
   private static final DateTimeFormatter ISO_LOCAL_YEAR = new DateTimeFormatterBuilder()
