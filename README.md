@@ -4,11 +4,11 @@
 [![Coverage Status](https://codecov.io/gh/spotify/styx/branch/master/graph/badge.svg)](https://codecov.io/gh/spotify/styx)
 [![License](https://img.shields.io/github/license/spotify/styx.svg)](LICENSE)
 
-A data processing job scheduler for Kubernetes
+A batch job scheduler for Kubernetes
 
 ## Description
 
-Styx is a service that is used to trigger periodic invocations of docker containers. The
+Styx is a service that is used to trigger periodic invocations of Docker containers. The
 information needed to schedule such invocations, is read from a set of files on disk or an
 external service providing such information. The service takes responsibility for triggering
 and possibly also re-triggering invocations until a successful exit status has been emitted
@@ -17,12 +17,12 @@ or some other limit has been reached. Styx is built using the [Apollo] framework
 
 Styx can optionally provide some dynamic arguments to container executions that indicates
 which time period a particular invocation belongs to. For example an hourly job for the first
-hour of 2016-01-01 might have the dynamic argument `--datetime 2016-01-01T00` appended to the
+hour of 2016-01-01 might have the dynamic argument `2016-01-01T00` appended to the
 container invocation.
 
 The envisioned main use case for Styx is to execute data processing job, possibly long running
-processes that transform data periodically. It's initial use case is to run jobs written using
-[Luigi], but it does not have any hard ties to Luigi. Styx can just as well execute a container
+processes that transform data periodically. Its initial use case is to run workflows of jobs orchestrated using
+[Luigi], but it does not have any intrinsic ties to Luigi. Styx can just as well execute a container
 with some simple bash scripts.
 
 Styx was built to function smoothly on Google Cloud Platform, thus it makes use of Google products
@@ -32,14 +32,15 @@ easily be added.
 
 ## Key concepts
 
-The key type of information that Styx concerns itself with are Workflows. A Workflow is either
+The key concept that Styx concerns itself with are Workflows. A Workflow is either
 enabled or disabled and has a Schedule. A Schedule specifies how often a Workflow should be
-triggered, which docker image to run and which arguments to pass to it on each execution. Each time
+triggered, which Docker image to run and which arguments to pass to it on each execution. Each time
 a Workflow is triggered, a Workflow Instance is created. The Workflow instance is tracked as
-'active' until at least on execution of the docker image returns with a 0 exit code. Styx will keep
+'active' until at least one execution of the Docker image returns with a 0 exit code. Styx keeps
 track of Workflow Instance executions and provides information about them via the API.
 
 ## Development status
+
 Styx is actively being developed and deployed internally at Spotify where it is being used to run
 around 2200 production workflows. Because of how we build and integrate infrastructure components
 at Spotify, this repository does not contain a GUI at the time of writing, while we do have one
@@ -62,23 +63,21 @@ A fully functional Service can be found in [styx-standalone-service](./styx-stan
 This packaging contains both the API and Scheduler service in one artifact. This is how you build
 and run it.
 
-Some configuration keys in
+The following configuration keys in
 [`styx-standalone.conf`](./styx-standalone-service/src/main/resources/styx-standalone.conf) have
 to be specified for the service to work:
 
-Configure which Google services clusters/instances to use:
-
 ```yaml
-# gke cluster
+# Google Container Engine (GKE) cluster
 styx.gke.default.project-id = ""
 styx.gke.default.cluster-zone = ""
 styx.gke.default.cluster-id = ""
 
-# bigtable instance
+# Google Cloud Bigtable instance
 styx.bigtable.project-id = ""
 styx.bigtable.instance-id = ""
 
-# datastore config
+# Google Cloud Datastore config
 styx.datastore.project-id = ""
 styx.datastore.namespace = ""
 ```
@@ -104,7 +103,7 @@ Run the service:
 
 ### Workflow schedule configuration
 
-To define a schedule, simply write a  yaml file to `/etc/styx` (given the above configuration)
+To define a schedule, simply write a yaml file to `/etc/styx` (given the above configuration)
 
 `/etc/styx/my-schedules.yaml`
 ```yaml
@@ -128,14 +127,14 @@ A unique identifier for the workflow (lower-case-hyphenated). This identifier is
  the workflow through the API.
 
 #### `schedule[].docker_image` **[string]**:
-The docker image that should be executed.
+The Docker image that should be executed.
 
 #### `schedule[].docker_args` **[string]**
-The arguments passed to the docker image.
+The arguments passed to the Docker image.
 
-This list should only contain strings. These will be passed as the arguments to the docker
-container. Any occurrences of the `"{}"` placeholder argument will be replaced with the current
-partition date or datehour. Note that it must be quoted in the yaml file in order no to be
+This list should only contain strings. These will be passed as the arguments to the Docker
+container. Any occurrences of the `{}` placeholder argument will be replaced with the current
+partition date or datehour. Note that it must be quoted in the yaml file in order not to be
 interpreted as an object.
 
 Example arguments for the supported schedule values:
@@ -200,9 +199,9 @@ It is allowed and perfectly fine to have both `secret` and `service_account` con
 However users need to make sure `secret.mount_path` doesn't point to `/etc/styx-wf-sa-keys/`; otherwise
 Styx will refuse to trigger the workflow.
 
-In order for Styx to be able to create/delete keys for the `service_account`,
-[Service Account] that used by Styx to communicate with [External services] should be granted with
-`Service Account Key Admin` role for the `service_account`. This step can be done by following
+In order for Styx to be able to create/delete keys for the `service_account` of a workflow,
+the [Service Account] that Styx itself runs as should be granted `Service Account Key Admin`
+role for the `service_account` of the workflow. This can be done by following
 [Granting Roles to Service Accounts].
 
 ### Triggering and executions
@@ -213,14 +212,14 @@ to execute. If another Trigger happens during this time, both triggers will be a
 with one running container. Because Styx treats each Trigger individually, it can ensure that
 each one of them complete successfully.
 
-Styx does not have any assumptions about what is executed in the container, it only cares about
-the exit code. Any execution returning a non-zero exit code will either cause a re-try to be scheduled;
-or cause an immediate failure of the workflow instance. For detailed description of exit codes,
+Styx does not assume anything about what is executed in the container, it only cares about
+the exit code. Any execution returning a non-zero exit code will either cause a re-try to be scheduled,
+or be interpreted as a permanent failure of the workflow instance. For detailed description of exit codes,
 please refer to **Workflow state graph** section in [Styx design].
 
 ### Injected environment variables
 
-For each execution, Styx will inject a set of environment variables into the container.
+For each execution, Styx will inject a set of environment variables into the Docker container.
 
 | Variable Name | Description |
 |---|---|
@@ -245,7 +244,7 @@ An aggregate code coverage report for the entire project is created by the `repo
 ```
 
 CircleCI builds submit code coverage reports to [codecov.io]. In addition, the aggregate
-jacoco report can be viewed under the Artifacts tab in the Circle-CI build view.
+JaCoCo report can be viewed under the Artifacts tab in the CircleCI build view.
 
 ---
 
