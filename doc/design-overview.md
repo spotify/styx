@@ -50,11 +50,11 @@ source code repository, etc.
 
 #### State SUBMITTING
 
-This state submits a new pod to GKE and waits until GKE has accepted it.
+This state sends a request for starting a new pod to GKE.
 
 #### State SUBMITTED
 
-GKE have received the request for starting a new pod. Styx is now waiting
+The request for starting a new pod has been sent to GKE. Styx is now waiting
 for GKE to report back that the pod has started.
 
 #### State RUNNING
