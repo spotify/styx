@@ -195,6 +195,9 @@ public class DockerRunnerHandlerTest {
     stateManager.initialize(runState);
     dockerRunnerHandler.transitionInto(runState);
 
+    // Verify that the state manager receives two events:
+    // 1. submitted
+    // 2. runError
     verify(stateManager, timeout(60_000).times(2)).receive(any(Event.class));
 
     assertThat(stateManager.get(workflowInstance).state(), is(RunState.State.FAILED));
