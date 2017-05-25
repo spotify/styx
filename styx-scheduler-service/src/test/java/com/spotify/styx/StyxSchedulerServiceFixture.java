@@ -36,7 +36,6 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.spotify.apollo.test.ServiceHelper;
 import com.spotify.styx.docker.DockerRunner;
-import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
@@ -64,7 +63,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import javaslang.Tuple;
 import javaslang.Tuple2;
-import javaslang.Tuple3;
 import org.apache.hadoop.hbase.client.Connection;
 import org.jmock.lib.concurrent.DeterministicScheduler;
 import org.junit.After;
@@ -81,8 +79,6 @@ public class StyxSchedulerServiceFixture {
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxSchedulerServiceFixture.class);
 
-//  static final String TEST_EXECUTION_ID = "execution_1";
-
   private static LocalDatastoreHelper localDatastore;
 
   private Datastore datastore = localDatastore.getOptions().getService();
@@ -97,7 +93,7 @@ public class StyxSchedulerServiceFixture {
   private List<Workflow> workflows = Lists.newArrayList();
 
   // captured fields from fakes
-  List<Tuple2<WorkflowInstance, RunSpec>> dockerRuns = Lists.newArrayList();
+  List<Tuple2<WorkflowInstance, DockerRunner.RunSpec>> dockerRuns = Lists.newArrayList();
   List<String> dockerCleans = Lists.newArrayList();
   AtomicInteger dockerRestores = new AtomicInteger();
 
