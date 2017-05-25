@@ -129,9 +129,7 @@ class WFIExecutionBuilder {
     @Override
     public Void submitted(WorkflowInstance workflowInstance, String executionId) {
       currWorkflowInstance = workflowInstance;
-      if (currExecutionId == null) {
-        currExecutionId = executionId;
-      }
+      currExecutionId = executionId;
 
       executionStatusList.add(ExecStatus.create(eventTs, "SUBMITTED"));
       return null;
