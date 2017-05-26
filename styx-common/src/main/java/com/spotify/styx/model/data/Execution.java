@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Value representing an execution attempt
@@ -32,7 +33,7 @@ import java.util.List;
 public abstract class Execution {
 
   @JsonProperty
-  public abstract String executionId();
+  public abstract Optional<String> executionId();
 
   @JsonProperty
   public abstract String dockerImage();
@@ -42,7 +43,7 @@ public abstract class Execution {
 
   @JsonCreator
   public static Execution create(
-      @JsonProperty("execution_id") String executionId,
+      @JsonProperty("execution_id") Optional<String> executionId,
       @JsonProperty("docker_image") String dockerImage,
       @JsonProperty("statuses") List<ExecStatus> statuses) {
     return new AutoValue_Execution(executionId, dockerImage, statuses);
