@@ -61,10 +61,10 @@ public class RoutingDockerRunnerTest {
   @Test
   public void testUsesCreatesRunnerOnStart() throws Exception {
     when(dockerId.get()).thenReturn("default");
-    final String execId = dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC, MOCK_EXEC_ID);
 
     assertThat(createdRunners, hasKey("default"));
-    assertThat(execId, is(MOCK_EXEC_ID));
+    verify(createdRunners.get("default")).start(WORKFLOW_INSTANCE, RUN_SPEC, MOCK_EXEC_ID);
   }
 
   @Test
@@ -97,8 +97,8 @@ public class RoutingDockerRunnerTest {
   @Test
   public void testCreatesOnlyOneRunnerPerDockerId() throws Exception {
     when(dockerId.get()).thenReturn("default");
-    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
-    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC, MOCK_EXEC_ID);
+    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC, MOCK_EXEC_ID);
     dockerRunner.cleanup(WORKFLOW_INSTANCE, MOCK_EXEC_ID);
     dockerRunner.cleanup(WORKFLOW_INSTANCE, MOCK_EXEC_ID);
 
@@ -112,8 +112,8 @@ public class RoutingDockerRunnerTest {
     Mockito.reset(dockerId);
     when(dockerId.get()).thenReturn("id-1", "id-2");
 
-    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
-    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC, MOCK_EXEC_ID);
+    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC, MOCK_EXEC_ID);
 
     assertThat(createdRunners, hasKey("id-1"));
     assertThat(createdRunners, hasKey("id-2"));
@@ -124,8 +124,8 @@ public class RoutingDockerRunnerTest {
     Mockito.reset(dockerId);
     when(dockerId.get()).thenReturn("id-1", "id-2");
 
-    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
-    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC, MOCK_EXEC_ID);
+    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC, MOCK_EXEC_ID);
     dockerRunner.close();
 
     assertThat(createCounter, is(2));
@@ -138,13 +138,6 @@ public class RoutingDockerRunnerTest {
   private DockerRunner create(String id) {
     DockerRunner mock = mock(DockerRunner.class);
     createCounter++;
-
-    try {
-      when(mock.start(Mockito.any(), Mockito.any())).thenReturn(MOCK_EXEC_ID);
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
-
     createdRunners.put(id, mock);
     return mock;
   }

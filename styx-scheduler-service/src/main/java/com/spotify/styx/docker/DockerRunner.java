@@ -46,6 +46,8 @@ import org.slf4j.LoggerFactory;
  */
 public interface DockerRunner extends Closeable {
 
+  String STYX_RUN = "styx-run";
+
   Logger LOG = LoggerFactory.getLogger(DockerRunner.class);
 
   /**
@@ -58,9 +60,9 @@ public interface DockerRunner extends Closeable {
    * Starts a workflow instance asynchronously.
    * @param workflowInstance The workflow instance that the run belongs to
    * @param runSpec          Specification of what to run
-   * @return The execution id for the started workflow instance
+   * @param executionId      The execution id of the run
    */
-  String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException;
+  void start(WorkflowInstance workflowInstance, RunSpec runSpec, String executionId) throws IOException;
 
   /**
    * Perform cleanup for resources such as secrets etc. Resources that are not in use by any currently live workflows

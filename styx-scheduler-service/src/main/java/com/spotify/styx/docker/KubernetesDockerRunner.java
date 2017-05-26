@@ -74,7 +74,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -86,7 +85,6 @@ import java.util.concurrent.TimeUnit;
  */
 class KubernetesDockerRunner implements DockerRunner {
 
-  static final String STYX_RUN = "styx-run";
   static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
   static final String DOCKER_TERMINATION_LOGGING_ANNOTATION = "styx-docker-termination-logging";
   static final String COMPONENT_ID = "STYX_COMPONENT_ID";
@@ -138,11 +136,10 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   @Override
-  public String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
+  public void start(WorkflowInstance workflowInstance, RunSpec runSpec, String executionId) throws IOException {
     final KubernetesSecretSpec secretSpec = ensureSecrets(workflowInstance, runSpec);
     try {
-      final Pod pod = client.pods().create(createPod(workflowInstance, runSpec, secretSpec));
-      return pod.getMetadata().getName();
+      client.pods().create(createPod(workflowInstance, runSpec, secretSpec, executionId));
     } catch (KubernetesClientException kce) {
       throw new IOException("Failed to create Kubernetes pod", kce);
     }
@@ -199,12 +196,11 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   @VisibleForTesting
-  static Pod createPod(WorkflowInstance workflowInstance, RunSpec runSpec, KubernetesSecretSpec secretSpec) {
+  static Pod createPod(WorkflowInstance workflowInstance, RunSpec runSpec, KubernetesSecretSpec secretSpec,
+      String podName) {
     final String imageWithTag = runSpec.imageName().contains(":")
         ? runSpec.imageName()
         : runSpec.imageName() + ":latest";
-
-    final String podName = STYX_RUN + "-" + UUID.randomUUID().toString();
 
     final PodBuilder podBuilder = new PodBuilder()
         .withNewMetadata()

@@ -55,7 +55,7 @@ public class KubernetesPodEventTranslatorTest {
   private static final String MESSAGE_FORMAT = "{\"rfu\":{\"dum\":\"my\"},\"component_id\":\"dummy\",\"workflow_id\":\"dummy\",\"parameter\":\"dummy\",\"execution_id\":\"dummy\",\"event\":\"dummy\",\"exit_code\":%d}\n";
   private static final KubernetesSecretSpec SECRET_SPEC = KubernetesSecretSpec.builder().build();
 
-  Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC, SECRET_SPEC);
+  Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC, SECRET_SPEC, "test-exec-id");
 
   @Test
   public void terminateOnSuccessfulTermination() throws Exception {
@@ -322,8 +322,8 @@ public class KubernetesPodEventTranslatorTest {
   static PodStatus podStatus(String phase, boolean ready, ContainerState containerState) {
     PodStatus podStatus = podStatusNoContainer(phase);
     podStatus.getContainerStatuses()
-        .add(new ContainerStatus(KubernetesDockerRunner.STYX_RUN, "", "", containerState,
-                                 KubernetesDockerRunner.STYX_RUN, ready, 0, containerState));
+        .add(new ContainerStatus(DockerRunner.STYX_RUN, "", "", containerState,
+                                 DockerRunner.STYX_RUN, ready, 0, containerState));
     return podStatus;
   }
 
@@ -335,6 +335,6 @@ public class KubernetesPodEventTranslatorTest {
     return KubernetesDockerRunner.createPod(
         WFI,
         DockerRunner.RunSpec.create("busybox", ImmutableList.of(), true,
-            Optional.empty(), Optional.empty(), Optional.empty()), SECRET_SPEC);
+            Optional.empty(), Optional.empty(), Optional.empty()), SECRET_SPEC, "test-exec-id");
   }
 }

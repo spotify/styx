@@ -28,7 +28,10 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Matchers.same;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -83,11 +86,10 @@ public class DockerRunnerHandlerTest {
 
   @Captor ArgumentCaptor<WorkflowInstance> instanceCaptor;
   @Captor ArgumentCaptor<RunSpec> runSpecCaptor;
+  @Captor ArgumentCaptor<String> executionIdCaptor;
 
   @Before
   public void setUp() throws Exception {
-    when(dockerRunner.start(any(WorkflowInstance.class), any(RunSpec.class)))
-        .thenReturn(TEST_EXECUTION_ID);
     when(rateLimiter.acquire()).thenReturn(0.0);
   }
 
@@ -108,7 +110,7 @@ public class DockerRunnerHandlerTest {
 
     // Let the submission proceed and verify it does so
     semaphore.release();
-    verify(dockerRunner, timeout(60_000).times(1)).start(eq(instance1), any(RunSpec.class));
+    verify(dockerRunner, timeout(60_000).times(1)).start(eq(instance1), any(RunSpec.class), anyString());
 
     verifyNoMoreInteractions(rateLimiter);
 
@@ -122,13 +124,13 @@ public class DockerRunnerHandlerTest {
     verifyNoMoreInteractions(dockerRunner);
 
     semaphore.release();
-    verify(dockerRunner, timeout(60_000).times(2)).start(any(WorkflowInstance.class), any(RunSpec.class));
+    verify(dockerRunner, timeout(60_000).times(2)).start(any(WorkflowInstance.class), any(RunSpec.class), anyString());
     verifyNoMoreInteractions(rateLimiter);
 
     semaphore.release();
     semaphore.release();
 
-    verify(dockerRunner, timeout(60_000).times(4)).start(instanceCaptor.capture(), any(RunSpec.class));
+    verify(dockerRunner, timeout(60_000).times(4)).start(instanceCaptor.capture(), any(RunSpec.class), anyString());
     verifyNoMoreInteractions(rateLimiter);
 
     assertThat(instanceCaptor.getAllValues(), containsInAnyOrder(instance1, instance2, instance3, instance4));
@@ -156,7 +158,7 @@ public class DockerRunnerHandlerTest {
     stateManager.initialize(runState);
     dockerRunnerHandler.transitionInto(runState);
 
-    verify(dockerRunner, timeout(60_000)).start(instanceCaptor.capture(), runSpecCaptor.capture());
+    verify(dockerRunner, timeout(60_000)).start(instanceCaptor.capture(), runSpecCaptor.capture(), anyString());
 
     assertThat(instanceCaptor.getValue(), is(workflowInstance));
     assertThat(runSpecCaptor.getValue().imageName(), is(TEST_DOCKER_IMAGE));
@@ -172,15 +174,15 @@ public class DockerRunnerHandlerTest {
     stateManager.initialize(runState);
     dockerRunnerHandler.transitionInto(runState);
 
-    verify(dockerRunner, timeout(60_000)).start(instanceCaptor.capture(), runSpecCaptor.capture());
+    verify(dockerRunner, timeout(60_000)).start(instanceCaptor.capture(), runSpecCaptor.capture(), anyString());
 
     assertThat(runSpecCaptor.getValue().args(), contains("--date", "2016-03-14T15" , "--bar"));
   }
 
   @Test
   public void shouldFailIfDockerRunnerRaisesException() throws Exception {
-    when(dockerRunner.start(any(WorkflowInstance.class), any(RunSpec.class)))
-        .thenThrow(new IOException("Testing exception."));
+    doThrow(new IOException("Testing exception.")).when(dockerRunner)
+        .start(any(WorkflowInstance.class), any(RunSpec.class), anyString());
 
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
@@ -190,7 +192,7 @@ public class DockerRunnerHandlerTest {
     stateManager.initialize(runState);
     dockerRunnerHandler.transitionInto(runState);
 
-    verify(stateManager, timeout(60_000)).receive(any(Event.class));
+    verify(stateManager, timeout(60_000).times(2)).receive(any(Event.class));
 
     assertThat(stateManager.get(workflowInstance).state(), is(RunState.State.FAILED));
   }
@@ -234,9 +236,12 @@ public class DockerRunnerHandlerTest {
     stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
     stateManager.receive(Event.dequeue(workflowInstance));
     stateManager.receive(Event.submit(workflowInstance, EXECUTION_DESCRIPTION));
-    verify(stateManager, timeout(60_000)).receive(Event.submitted(workflowInstance, TEST_EXECUTION_ID));
+    verify(dockerRunner, timeout(60_000)).start(same(workflowInstance), any(RunSpec.class),
+        executionIdCaptor.capture());
+    final String executionId = executionIdCaptor.getValue();
+    verify(stateManager, timeout(60_000)).receive(Event.submitted(workflowInstance, executionId));
     stateManager.receive(Event.runError(workflowInstance, ""));
-    verify(dockerRunner).cleanup(workflowInstance, TEST_EXECUTION_ID);
+    verify(dockerRunner).cleanup(workflowInstance, executionId);
   }
 
   private WorkflowConfiguration configuration(String... args) {
