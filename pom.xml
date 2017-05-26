@@ -313,11 +313,6 @@
         <version>2.9.2</version>
       </dependency>
       <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-core-asl</artifactId>
-        <version>1.9.13</version>
-      </dependency>
-      <dependency>
         <groupId>commons-logging</groupId>
         <artifactId>commons-logging</artifactId>
         <version>1.2</version>
@@ -368,16 +363,6 @@
         <version>1.22.0</version>
       </dependency>
       <dependency>
-        <groupId>com.google.auth</groupId>
-        <artifactId>google-auth-library-credentials</artifactId>
-        <version>0.6.1</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.auth</groupId>
-        <artifactId>google-auth-library-oauth2-http</artifactId>
-        <version>0.6.1</version>
-      </dependency>
-      <dependency>
         <groupId>com.google.http-client</groupId>
         <artifactId>google-http-client</artifactId>
         <version>1.22.0</version>
@@ -386,11 +371,6 @@
         <groupId>com.google.http-client</groupId>
         <artifactId>google-http-client-jackson2</artifactId>
         <version>1.22.0</version>
-      </dependency>
-      <dependency>
-        <groupId>org.json</groupId>
-        <artifactId>json</artifactId>
-        <version>20160810</version>
       </dependency>
       <dependency>
         <groupId>com.google.protobuf</groupId>
