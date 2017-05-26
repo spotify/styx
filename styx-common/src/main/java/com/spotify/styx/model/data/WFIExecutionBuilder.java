@@ -49,8 +49,11 @@ class WFIExecutionBuilder {
   private Instant eventTs;
 
   private void closeExecution() {
-    if (currExecutionId != null && currDockerImg != null) {
-      Execution execution = Execution.create(currExecutionId, currDockerImg, executionStatusList);
+    if (currDockerImg != null) {
+      Execution execution = Execution.create(
+          Optional.ofNullable(currExecutionId),
+          currDockerImg,
+          executionStatusList);
       executionList.add(execution);
     }
 

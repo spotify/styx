@@ -36,6 +36,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import org.junit.Test;
 
 public class WFIExecutionBuilderTest {
@@ -127,7 +128,7 @@ public class WFIExecutionBuilderTest {
                     true,
                     Arrays.asList(
                         Execution.create(
-                            "exec-id-00",
+                            Optional.of("exec-id-00"),
                             "img1",
                             Arrays.asList(
                                 ExecStatus.create(time("07:56"), "SUBMITTED"),
@@ -136,7 +137,7 @@ public class WFIExecutionBuilderTest {
                             )
                         ),
                         Execution.create(
-                            "exec-id-01",
+                            Optional.of("exec-id-01"),
                             "img2",
                             Arrays.asList(
                                 ExecStatus.create(time("08:56"), "SUBMITTED"),
@@ -152,7 +153,7 @@ public class WFIExecutionBuilderTest {
                     false,
                     Arrays.asList(
                         Execution.create(
-                            "exec-id-10",
+                            Optional.of("exec-id-10"),
                             "img3",
                             Arrays.asList(
                                 ExecStatus.create(time("09:56"), "SUBMITTED"),
@@ -161,7 +162,7 @@ public class WFIExecutionBuilderTest {
                             )
                         ),
                         Execution.create(
-                            "exec-id-11",
+                            Optional.of("exec-id-11"),
                             "img4",
                             Arrays.asList(
                                 ExecStatus.create(time("10:56"), "SUBMITTED"),
@@ -207,7 +208,7 @@ public class WFIExecutionBuilderTest {
                     false,
                     Arrays.asList(
                         Execution.create(
-                            "exec-id-00",
+                            Optional.of("exec-id-00"),
                             "img1",
                             Arrays.asList(
                                 ExecStatus.create(time("07:56"), "SUBMITTED"),
@@ -216,7 +217,7 @@ public class WFIExecutionBuilderTest {
                             )
                         ),
                         Execution.create(
-                            "exec-id-01",
+                            Optional.of("exec-id-01"),
                             "img2",
                             Arrays.asList(
                                 ExecStatus.create(time("08:56"), "SUBMITTED"),
@@ -238,15 +239,14 @@ public class WFIExecutionBuilderTest {
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(), c++, ts("07:55")),
         SequenceEvent.create(E.submit(desc("img1")), c++, ts("07:55")),
-        SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
-        SequenceEvent.create(E.started(), c++, ts("07:57")),
-        SequenceEvent.create(E.runError("Something failed"), c++, ts("07:58")),
+        SequenceEvent.create(E.runError("First failure"), c++, ts("07:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
         SequenceEvent.create(E.retry(), c++, ts("08:56")),
         SequenceEvent.create(E.submit(desc("img2")), c++, ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
-        SequenceEvent.create(E.started(), c++, ts("08:57"))
+        SequenceEvent.create(E.started(), c++, ts("08:57")),
+        SequenceEvent.create(E.runError("Second failure"), c++, ts("08:59"))
     );
     assertValidTransitionSequence(events);
 
@@ -262,20 +262,19 @@ public class WFIExecutionBuilderTest {
                     false,
                     Arrays.asList(
                         Execution.create(
-                            "exec-id-00",
+                            Optional.empty(),
                             "img1",
                             Arrays.asList(
-                                ExecStatus.create(time("07:56"), "SUBMITTED"),
-                                ExecStatus.create(time("07:57"), "STARTED"),
-                                ExecStatus.create(time("07:58"), "Something failed")
+                                ExecStatus.create(time("07:58"), "First failure")
                             )
                         ),
                         Execution.create(
-                            "exec-id-01",
+                            Optional.of("exec-id-01"),
                             "img2",
                             Arrays.asList(
                                 ExecStatus.create(time("08:56"), "SUBMITTED"),
-                                ExecStatus.create(time("08:57"), "STARTED")
+                                ExecStatus.create(time("08:57"), "STARTED"),
+                                ExecStatus.create(time("08:59"), "Second failure")
                             )
                         )
                     )
@@ -316,7 +315,7 @@ public class WFIExecutionBuilderTest {
                     true,
                     Collections.singletonList(
                         Execution.create(
-                            "exec-id-00",
+                            Optional.of("exec-id-00"),
                             "img1",
                             Arrays.asList(
                                 ExecStatus.create(time("07:56"), "SUBMITTED"),
@@ -331,7 +330,7 @@ public class WFIExecutionBuilderTest {
                     false,
                     Collections.singletonList(
                         Execution.create(
-                            "exec-id-10",
+                            Optional.of("exec-id-10"),
                             "img2",
                             Arrays.asList(
                                 ExecStatus.create(time("08:56"), "SUBMITTED"),
