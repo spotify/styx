@@ -247,7 +247,7 @@
       <dependency>
         <groupId>com.google.api</groupId>
         <artifactId>api-common</artifactId>
-        <version>1.0.0</version>
+        <version>1.1.0</version>
       </dependency>
 
       <!-- test libs -->
