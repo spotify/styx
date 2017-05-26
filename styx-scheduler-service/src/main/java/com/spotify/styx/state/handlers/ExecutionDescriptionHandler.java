@@ -70,7 +70,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
           try {
             stateManager.receive(submitEvent);
           } catch (StateManager.IsClosed isClosed) {
-            LOG.warn("Could not send 'created' event", isClosed);
+            LOG.warn("Could not send 'submit' event", isClosed);
           }
         } catch (ResourceNotFoundException e) {
           LOG.info("Workflow {} does not exist, halting {}", workflowInstance.workflowId(),
