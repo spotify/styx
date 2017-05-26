@@ -27,6 +27,7 @@ import static org.junit.Assert.assertThat;
 import com.spotify.styx.model.WorkflowInstance;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Optional;
 import org.junit.Test;
 
 public class WorkflowInstanceExecutionDataTest {
@@ -46,12 +47,30 @@ public class WorkflowInstanceExecutionDataTest {
 
     Execution execution = OBJECT_MAPPER.readValue(json, Execution.class);
     Execution expected = Execution.create(
-        "exec-id",
-        "busybox:1.0",
+        Optional.of("exec-id"),
+        Optional.of("busybox:1.0"),
         Arrays.asList(
             ExecStatus.create(Instant.parse("2016-08-03T09:56:03.607Z"), "STARTED"),
             ExecStatus.create(Instant.parse("2016-08-03T09:57:03.607Z"), "RUNNING"),
             ExecStatus.create(Instant.parse("2016-08-03T09:58:03.607Z"), "SUCCESS")
+        )
+    );
+    assertThat(execution, is(expected));
+  }
+
+  @Test
+  public void shouldDeserializeExecutionNoOptionalFields() throws Exception {
+    String json = "{"
+                  + "\"statuses\":["
+                  + statusJson("16:56", "Error encountered")
+                  + "]}";
+
+    Execution execution = OBJECT_MAPPER.readValue(json, Execution.class);
+    Execution expected = Execution.create(
+        Optional.empty(),
+        Optional.empty(),
+        Arrays.asList(
+            ExecStatus.create(Instant.parse("2016-08-03T16:56:03.607Z"), "Error encountered")
         )
     );
     assertThat(execution, is(expected));
@@ -78,8 +97,8 @@ public class WorkflowInstanceExecutionDataTest {
         true,
         Arrays.asList(
             Execution.create(
-                "exec-id-0",
-                "busybox:1.0",
+                Optional.of("exec-id-0"),
+                Optional.of("busybox:1.0"),
                 Arrays.asList(
                     ExecStatus.create(Instant.parse("2016-08-03T09:56:03.607Z"), "STARTED"),
                     ExecStatus.create(Instant.parse("2016-08-03T09:57:03.607Z"), "RUNNING"),
@@ -87,8 +106,8 @@ public class WorkflowInstanceExecutionDataTest {
                 )
             ),
             Execution.create(
-                "exec-id-1",
-                "busybox:1.1",
+                Optional.of("exec-id-1"),
+                Optional.of("busybox:1.1"),
                 Arrays.asList(
                     ExecStatus.create(Instant.parse("2016-08-03T10:56:03.607Z"), "STARTED"),
                     ExecStatus.create(Instant.parse("2016-08-03T10:57:03.607Z"), "RUNNING"),
@@ -150,8 +169,8 @@ public class WorkflowInstanceExecutionDataTest {
                 true,
                 Arrays.asList(
                     Execution.create(
-                        "exec-id-00",
-                        "busybox:1.0",
+                        Optional.of("exec-id-00"),
+                        Optional.of("busybox:1.0"),
                         Arrays.asList(
                             ExecStatus.create(Instant.parse("2016-08-03T07:56:03.607Z"), "STARTED"),
                             ExecStatus.create(Instant.parse("2016-08-03T07:57:03.607Z"), "RUNNING"),
@@ -159,8 +178,8 @@ public class WorkflowInstanceExecutionDataTest {
                         )
                     ),
                     Execution.create(
-                        "exec-id-01",
-                        "busybox:1.1",
+                        Optional.of("exec-id-01"),
+                        Optional.of("busybox:1.1"),
                         Arrays.asList(
                             ExecStatus.create(Instant.parse("2016-08-03T08:56:03.607Z"), "STARTED"),
                             ExecStatus.create(Instant.parse("2016-08-03T08:57:03.607Z"), "RUNNING"),
@@ -175,8 +194,8 @@ public class WorkflowInstanceExecutionDataTest {
                 false,
                 Arrays.asList(
                     Execution.create(
-                        "exec-id-10",
-                        "busybox:1.2",
+                        Optional.of("exec-id-10"),
+                        Optional.of("busybox:1.2"),
                         Arrays.asList(
                             ExecStatus.create(Instant.parse("2016-08-03T09:56:03.607Z"), "STARTED"),
                             ExecStatus.create(Instant.parse("2016-08-03T09:57:03.607Z"), "RUNNING"),
@@ -184,8 +203,8 @@ public class WorkflowInstanceExecutionDataTest {
                         )
                     ),
                     Execution.create(
-                        "exec-id-11",
-                        "busybox:1.3",
+                        Optional.of("exec-id-11"),
+                        Optional.of("busybox:1.3"),
                         Arrays.asList(
                             ExecStatus.create(Instant.parse("2016-08-03T10:56:03.607Z"), "STARTED"),
                             ExecStatus.create(Instant.parse("2016-08-03T10:57:03.607Z"), "RUNNING"),
