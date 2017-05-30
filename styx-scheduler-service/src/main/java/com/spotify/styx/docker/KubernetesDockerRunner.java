@@ -491,7 +491,7 @@ class KubernetesDockerRunner implements DockerRunner {
       LOG.warn("Re-establishing watching from {}", lastResourceVersion);
 
       try {
-        watch = client.pods()
+        KubernetesDockerRunner.this.watch = client.pods()
             .withResourceVersion(Integer.toString(lastResourceVersion))
             .watch(this);
       } catch (Throwable e) {
