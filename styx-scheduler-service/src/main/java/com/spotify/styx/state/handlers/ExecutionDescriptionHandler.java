@@ -72,7 +72,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
             LOG.warn("Could not send 'created' event", isClosed);
           }
         } catch (ResourceNotFoundException e) {
-          LOG.warn("Failed to prepare execution description for "
+          LOG.info("Failed to prepare execution description for "
                    + state.workflowInstance().toKey(), e);
           stateManager.receiveIgnoreClosed(Event.halt(workflowInstance));
         } catch (IOException e) {
