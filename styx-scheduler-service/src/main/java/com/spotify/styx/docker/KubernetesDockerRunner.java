@@ -74,7 +74,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -138,11 +137,10 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   @Override
-  public String start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
+  public void start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
     final KubernetesSecretSpec secretSpec = ensureSecrets(workflowInstance, runSpec);
     try {
-      final Pod pod = client.pods().create(createPod(workflowInstance, runSpec, secretSpec));
-      return pod.getMetadata().getName();
+      client.pods().create(createPod(workflowInstance, runSpec, secretSpec));
     } catch (KubernetesClientException kce) {
       throw new IOException("Failed to create Kubernetes pod", kce);
     }
@@ -204,11 +202,9 @@ class KubernetesDockerRunner implements DockerRunner {
         ? runSpec.imageName()
         : runSpec.imageName() + ":latest";
 
-    final String podName = STYX_RUN + "-" + UUID.randomUUID().toString();
-
     final PodBuilder podBuilder = new PodBuilder()
         .withNewMetadata()
-        .withName(podName)
+        .withName(runSpec.executionId())
         .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
         .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION,
                           String.valueOf(runSpec.terminationLogging()))
@@ -221,7 +217,7 @@ class KubernetesDockerRunner implements DockerRunner {
         .withName(STYX_RUN)
         .withImage(imageWithTag)
         .withArgs(runSpec.args())
-        .withEnv(buildEnv(workflowInstance, runSpec, podName));
+        .withEnv(buildEnv(workflowInstance, runSpec));
 
     secretSpec.serviceAccountSecret().ifPresent(serviceAccountSecret -> {
       final SecretVolumeSource saVolumeSource = new SecretVolumeSourceBuilder()
@@ -272,14 +268,14 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private static List<EnvVar> buildEnv(WorkflowInstance workflowInstance,
-                                       RunSpec runSpec, String podName) {
+                                       RunSpec runSpec) {
     return Arrays.asList(
         envVar(COMPONENT_ID,    workflowInstance.workflowId().componentId()),
         // TODO: for backward compatibility, delete later
         envVar(ENDPOINT_ID,     workflowInstance.workflowId().id()),
         envVar(WORKFLOW_ID,     workflowInstance.workflowId().id()),
         envVar(PARAMETER,       workflowInstance.parameter()),
-        envVar(EXECUTION_ID,    podName),
+        envVar(EXECUTION_ID,    runSpec.executionId()),
         envVar(TERMINATION_LOG, "/dev/termination-log"),
         envVar(TRIGGER_ID,      runSpec.trigger().map(TriggerUtil::triggerId).orElse(null)),
         envVar(TRIGGER_TYPE,    runSpec.trigger().map(TriggerUtil::triggerType).orElse(null))
@@ -378,9 +374,12 @@ class KubernetesDockerRunner implements DockerRunner {
       if (!workflowInstance.isPresent()) {
         continue;
       }
-      lookupPodRunState(pod, workflowInstance.get(), () -> cleanup(workflowInstance.get(),
-                                                                   pod.getMetadata().getName()))
-          .ifPresent(runState -> emitPodEvents(Watcher.Action.MODIFIED, pod, runState));
+      final Optional<RunState> runState = lookupPodRunState(pod, workflowInstance.get());
+      if (runState.isPresent()) {
+        emitPodEvents(Watcher.Action.MODIFIED, pod, runState.get());
+      } else {
+        cleanup(workflowInstance.get(), pod.getMetadata().getName());
+      }
     }
   }
 
@@ -399,17 +398,11 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private Optional<RunState> lookupPodRunState(Pod pod, WorkflowInstance workflowInstance) {
-    return lookupPodRunState(pod, workflowInstance, () -> { });
-  }
-
-  private Optional<RunState> lookupPodRunState(Pod pod, WorkflowInstance workflowInstance,
-                                               Runnable cleanupAction) {
     final String podName = pod.getMetadata().getName();
 
     final RunState runState = stateManager.get(workflowInstance);
     if (runState == null) {
       LOG.warn("Pod event for unknown or inactive workflow instance {}", workflowInstance);
-      cleanupAction.run();
       return Optional.empty();
     }
 
@@ -423,7 +416,6 @@ class KubernetesDockerRunner implements DockerRunner {
     if (!podName.equals(executionId)) {
       LOG.warn("Pod event not matching current exec id, current:{} != pod:{}",
           executionId, podName);
-      cleanupAction.run();
       return Optional.empty();
     }
 
@@ -558,7 +550,8 @@ class KubernetesDockerRunner implements DockerRunner {
     }
 
     @Override
-    public Boolean submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) {
+    public Boolean submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
+        String executionId) {
       return false;
     }
 

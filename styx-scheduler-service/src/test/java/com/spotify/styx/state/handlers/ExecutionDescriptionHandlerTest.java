@@ -26,6 +26,7 @@ import static com.spotify.styx.state.RunState.State.SUBMITTING;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.startsWith;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertTrue;
 
@@ -90,6 +91,8 @@ public class ExecutionDescriptionHandlerTest {
     StateData data = currentState.data();
 
     assertThat(currentState.state(), is(SUBMITTING));
+    assertTrue(data.executionId().isPresent());
+    assertThat(data.executionId().get(), startsWith("styx-run-"));
     assertTrue(data.executionDescription().isPresent());
     assertThat(data.executionDescription().get().dockerImage(), is(DOCKER_IMAGE));
     assertThat(data.executionDescription().get().dockerArgs(), contains("--date", "{}", "--bar"));

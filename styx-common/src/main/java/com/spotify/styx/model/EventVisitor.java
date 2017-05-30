@@ -26,6 +26,7 @@ import com.github.sviperll.adt4j.Visitor;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
 import java.util.Optional;
+import javax.annotation.Nullable;
 
 /**
  * Generated {@link Event} ADT for all events that can be received by RunState
@@ -37,8 +38,9 @@ public interface EventVisitor<R> {
   R triggerExecution(@Getter WorkflowInstance workflowInstance, Trigger trigger);
   R info(@Getter WorkflowInstance workflowInstance, Message message);
   R dequeue(@Getter WorkflowInstance workflowInstance);
-  R submit(@Getter WorkflowInstance workflowInstance, ExecutionDescription executionDescription);
-  R submitted(@Getter WorkflowInstance workflowInstance, String executionId);
+  R submit(@Getter WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
+      @Nullable String executionId);
+  R submitted(@Getter WorkflowInstance workflowInstance, @Nullable String executionId);
   R started(@Getter WorkflowInstance workflowInstance);
   R terminate(@Getter WorkflowInstance workflowInstance, Optional<Integer> exitCode);
   R runError(@Getter WorkflowInstance workflowInstance, String message);

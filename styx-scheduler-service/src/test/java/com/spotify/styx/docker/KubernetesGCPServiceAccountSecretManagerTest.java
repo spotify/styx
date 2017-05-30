@@ -107,12 +107,14 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(WORKFLOW_ID, "foo");
 
-  private static final RunSpec RUN_SPEC_WITH_SA = RunSpec.create("busybox",
+  private static final RunSpec RUN_SPEC_WITH_SA = RunSpec.create("eid", "busybox",
       ImmutableList.copyOf(new String[0]),
       false,
       empty(),
       Optional.of(SERVICE_ACCOUNT),
       empty());
+
+  private static final String TEST_EXEC_ID = "test-exec-id";
 
   private ExecutorService executor;
 

@@ -43,9 +43,9 @@ public class RoutingDockerRunnerTest {
 
   static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(
       TestData.WORKFLOW_ID, "param");
-  static final DockerRunner.RunSpec RUN_SPEC =
-      DockerRunner.RunSpec.simple("busybox");
   static final String MOCK_EXEC_ID = "mock-run-id-0";
+  static final DockerRunner.RunSpec RUN_SPEC =
+      DockerRunner.RunSpec.simple(MOCK_EXEC_ID, "busybox");
 
   int createCounter = 0;
   Map<String, DockerRunner> createdRunners = Maps.newHashMap();
@@ -61,10 +61,10 @@ public class RoutingDockerRunnerTest {
   @Test
   public void testUsesCreatesRunnerOnStart() throws Exception {
     when(dockerId.get()).thenReturn("default");
-    final String execId = dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
 
     assertThat(createdRunners, hasKey("default"));
-    assertThat(execId, is(MOCK_EXEC_ID));
+    verify(createdRunners.get("default")).start(WORKFLOW_INSTANCE, RUN_SPEC);
   }
 
   @Test
@@ -138,13 +138,6 @@ public class RoutingDockerRunnerTest {
   private DockerRunner create(String id) {
     DockerRunner mock = mock(DockerRunner.class);
     createCounter++;
-
-    try {
-      when(mock.start(Mockito.any(), Mockito.any())).thenReturn(MOCK_EXEC_ID);
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
-
     createdRunners.put(id, mock);
     return mock;
   }

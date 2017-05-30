@@ -117,9 +117,11 @@ class WFIExecutionBuilder {
     }
 
     @Override
-    public Void submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) {
+    public Void submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
+        String executionId) {
       currWorkflowInstance = workflowInstance;
       currDockerImg = executionDescription.dockerImage();
+      currExecutionId = executionId;
 
       return null;
     }

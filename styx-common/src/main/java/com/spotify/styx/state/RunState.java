@@ -215,7 +215,8 @@ public abstract class RunState {
     }
 
     @Override
-    public RunState submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) {
+    public RunState submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
+        String executionId) {
       switch (state()) {
         case QUEUED: // for backwards compatibility
         case PREPARE:
@@ -223,6 +224,7 @@ public abstract class RunState {
               SUBMITTING,
               data().builder()
                   .executionDescription(executionDescription)
+                  .executionId(executionId)
                   .build());
 
         default:
@@ -237,8 +239,9 @@ public abstract class RunState {
           return state(
               SUBMITTED,
               data().builder()
-                  .executionId(executionId)
                   .tries(data().tries() + 1)
+                  // backwards compatibility
+                  .executionId(data().executionId().orElse(executionId))
                   .build());
 
         default:

@@ -94,14 +94,14 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       .schedule(Schedule.HOURS)
       .build();
 
-  private static RunSpec naturalRunSpec(String imageName, ImmutableList<String> args) {
-    return RunSpec.create(imageName, args, false, empty(), empty(),
+  private static RunSpec naturalRunSpec(String executionId, String imageName, ImmutableList<String> args) {
+    return RunSpec.create(executionId, imageName, args, false, empty(), empty(),
                           Optional.of(Trigger.natural()));
   }
 
-  private static RunSpec unknownRunSpec(String imageName, ImmutableList<String> args,
+  private static RunSpec unknownRunSpec(String executionId, String imageName, ImmutableList<String> args,
                                         String triggerId) {
-    return RunSpec.create(imageName, args, false, empty(), empty(),
+    return RunSpec.create(executionId, imageName, args, false, empty(), empty(),
                           Optional.of(Trigger.unknown(triggerId)));
   }
 
@@ -359,7 +359,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
-    assertThat(runSpec, is(naturalRunSpec("busybox", ImmutableList.of("--hour", "2016-03-14T15"))));
+    assertThat(runSpec, is(naturalRunSpec(runSpec.executionId(), "busybox", ImmutableList.of("--hour", "2016-03-14T15"))));
   }
 
   @Test
@@ -377,7 +377,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
-    assertThat(runSpec, is(naturalRunSpec("busybox", ImmutableList.of("--hour", "2016-03-14T15"))));
+    assertThat(runSpec, is(naturalRunSpec(runSpec.executionId(), "busybox", ImmutableList.of("--hour", "2016-03-14T15"))));
 
     injectEvent(Event.started(workflowInstance));
     injectEvent(Event.terminate(workflowInstance, Optional.of(20)));
@@ -407,7 +407,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance2 = dockerRuns.get(1)._1;
     RunSpec runSpec2 = dockerRuns.get(1)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
-    assertThat(runSpec2, is(naturalRunSpec("busybox:v777", ImmutableList.of("other", "args"))));
+    assertThat(runSpec2, is(naturalRunSpec(runSpec2.executionId(), "busybox:v777", ImmutableList.of("other", "args"))));
   }
 
   @Test
@@ -423,12 +423,13 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     awaitNumberOfDockerRuns(1);
 
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
+    RunSpec runSpec = dockerRuns.get(0)._2;
 
     injectEvent(Event.started(workflowInstance));
     injectEvent(Event.terminate(workflowInstance, Optional.of(20)));
     awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
-    assertThat(dockerCleans, contains(TEST_EXECUTION_ID));
+    assertThat(dockerCleans, contains(runSpec.executionId()));
   }
 
   @Test
@@ -444,11 +445,12 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     awaitNumberOfDockerRuns(1);
 
     WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
+    RunSpec runSpec = dockerRuns.get(0)._2;
 
     injectEvent(Event.runError(workflowInstance, "Something failed"));
     awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
 
-    assertThat(dockerCleans, contains(TEST_EXECUTION_ID));
+    assertThat(dockerCleans, contains(runSpec.executionId()));
   }
 
   @Test
@@ -503,7 +505,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(
-        unknownRunSpec("busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig1")));
+        unknownRunSpec(runSpec.executionId(), "busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig1")));
   }
 
   @Test
@@ -540,7 +542,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(
-        unknownRunSpec("busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig2")));
+        unknownRunSpec(runSpec.executionId(), "busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig2")));
   }
 
   @Test
@@ -552,28 +554,28 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER1),          0L);
-    givenStoredEvent(Event.dequeue(workflowInstance),                             1L);
-    givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION),  2L);
-    givenStoredEvent(Event.submitted(workflowInstance, "exec1"),                  3L);
-    givenStoredEvent(Event.started(workflowInstance),                             4L);
-    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),          5L);
-    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                   6L);
-    givenStoredEvent(Event.dequeue(workflowInstance),                             7L);
-    givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION),  8L);
-    givenStoredEvent(Event.submitted(workflowInstance, "exec2"),                  9L);
-    givenStoredEvent(Event.started(workflowInstance),                            10L);
-    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),         11L);
-    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                  12L);
-    givenStoredEvent(Event.halt(workflowInstance),                               13L);
-    givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER2),         14L);
-    givenStoredEvent(Event.dequeue(workflowInstance),                            15L);
-    givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION), 16L);
-    givenStoredEvent(Event.submitted(workflowInstance, "exec3"),                 17L);
-    givenStoredEvent(Event.started(workflowInstance),                            18L);
-    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),         19L);
-    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                  20L);
-    givenActiveStateAtSequenceCount(workflowInstance,                            20L);
+    givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER1),                   0L);
+    givenStoredEvent(Event.dequeue(workflowInstance),                                      1L);
+    givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION, "exec1"),  2L);
+    givenStoredEvent(Event.submitted(workflowInstance, "exec1"),                           3L);
+    givenStoredEvent(Event.started(workflowInstance),                                      4L);
+    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),                   5L);
+    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                            6L);
+    givenStoredEvent(Event.dequeue(workflowInstance),                                      7L);
+    givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION, "exec2"),  8L);
+    givenStoredEvent(Event.submitted(workflowInstance, "exec2"),                           9L);
+    givenStoredEvent(Event.started(workflowInstance),                                     10L);
+    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),                  11L);
+    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                           12L);
+    givenStoredEvent(Event.halt(workflowInstance),                                        13L);
+    givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER2),                  14L);
+    givenStoredEvent(Event.dequeue(workflowInstance),                                     15L);
+    givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION, "exec3"), 16L);
+    givenStoredEvent(Event.submitted(workflowInstance, "exec3"),                          17L);
+    givenStoredEvent(Event.started(workflowInstance),                                     18L);
+    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),                  19L);
+    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                           20L);
+    givenActiveStateAtSequenceCount(workflowInstance,                                     20L);
 
     styxStarts();
 
@@ -584,7 +586,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     RunSpec runSpec = dockerRuns.get(0)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(
-        unknownRunSpec("busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig2")));
+        unknownRunSpec(runSpec.executionId(), "busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig2")));
   }
 
   @Test

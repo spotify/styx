@@ -28,6 +28,7 @@ import static com.spotify.styx.state.RunState.State.PREPARE;
 import static com.spotify.styx.state.RunState.State.QUEUED;
 import static com.spotify.styx.state.RunState.State.RUNNING;
 import static com.spotify.styx.state.RunState.State.SUBMITTED;
+import static com.spotify.styx.state.RunState.State.SUBMITTING;
 import static com.spotify.styx.state.RunState.State.TERMINATED;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.contains;
@@ -94,7 +95,7 @@ public class RunStateTest {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue());
-    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1"));
     transitioner.receive(eventFactory.submitted("exec1"));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(1));
@@ -104,7 +105,7 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), hasValue(777L));
 
     transitioner.receive(eventFactory.dequeue());
-    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec2"));
     transitioner.receive(eventFactory.submitted("exec2"));
     transitioner.receive(eventFactory.started());
 
@@ -169,6 +170,31 @@ public class RunStateTest {
         equalTo(Optional.of(TEST_EXECUTION_ID_2)));
     assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, TERMINATED, QUEUED,
                                  PREPARE, SUBMITTED, RUNNING));
+  }
+
+  @Test
+  public void testSubmitSetsExecutionId() throws Exception {
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
+    transitioner.receive(eventFactory.dequeue());
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_1));
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(SUBMITTING));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().get(), equalTo(TEST_EXECUTION_ID_1));
+
+    transitioner.receive(eventFactory.submitted(TEST_EXECUTION_ID_1));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(SUBMITTED));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().get(), equalTo(TEST_EXECUTION_ID_1));
+
+    transitioner.receive(eventFactory.started());
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(RUNNING));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().get(), equalTo(TEST_EXECUTION_ID_1));
+
+    transitioner.receive(eventFactory.terminate(1));
+    transitioner.receive(eventFactory.retryAfter(999));
+    transitioner.receive(eventFactory.dequeue());
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_2));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().get(), equalTo(TEST_EXECUTION_ID_2));
   }
 
   @Test
@@ -439,7 +465,7 @@ public class RunStateTest {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue());
-    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_1));
     transitioner.receive(eventFactory.submitted(TEST_EXECUTION_ID_1));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(20));

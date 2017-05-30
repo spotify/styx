@@ -81,7 +81,7 @@ class LocalDockerRunner implements DockerRunner {
   }
 
   @Override
-  public String start(WorkflowInstance workflowInstance, RunSpec runSpec) {
+  public void start(WorkflowInstance workflowInstance, RunSpec runSpec) {
     final String imageTag = runSpec.imageName().contains(":")
         ? runSpec.imageName()
         : runSpec.imageName() + ":latest";
@@ -101,15 +101,14 @@ class LocalDockerRunner implements DockerRunner {
           .image(imageTag)
           .cmd(runSpec.args())
           .build();
-      creation = client.createContainer(containerConfig);
+      creation = client.createContainer(containerConfig, runSpec.executionId());
       client.startContainer(creation.id());
     } catch (DockerException | InterruptedException e) {
       throw new RuntimeException(e);
     }
 
     inFlight.put(creation.id(), workflowInstance);
-    LOG.info("Started container with id " + creation.id());
-    return creation.id();
+    LOG.info("Started container with id " + creation.id() + " and name " + runSpec.executionId());
   }
 
   @Override
