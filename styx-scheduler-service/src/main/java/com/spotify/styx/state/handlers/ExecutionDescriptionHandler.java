@@ -33,6 +33,7 @@ import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.MissingRequiredPropertyException;
 import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.util.List;
@@ -72,6 +73,10 @@ public class ExecutionDescriptionHandler implements OutputHandler {
             LOG.warn("Could not send 'created' event", isClosed);
           }
         } catch (ResourceNotFoundException e) {
+          LOG.info("Workflow {} does not exist, halting {}", workflowInstance.workflowId(),
+                   workflowInstance);
+          stateManager.receiveIgnoreClosed(Event.halt(workflowInstance));
+        } catch (MissingRequiredPropertyException e) {
           LOG.warn("Failed to prepare execution description for "
                    + state.workflowInstance().toKey(), e);
           stateManager.receiveIgnoreClosed(Event.halt(workflowInstance));
@@ -91,7 +96,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
   }
 
   private ExecutionDescription getExecDescription(WorkflowInstance workflowInstance)
-      throws IOException {
+      throws IOException, MissingRequiredPropertyException {
     final WorkflowId workflowId = workflowInstance.workflowId();
 
     final Optional<Workflow> workflowOpt = storage.workflow(workflowId);
@@ -100,19 +105,19 @@ public class ExecutionDescriptionHandler implements OutputHandler {
 
     final Optional<List<String>> dockerArgsOpt = workflow.configuration().dockerArgs();
     if (!dockerArgsOpt.isPresent()) {
-      throw new ResourceNotFoundException(format("%s has no docker args, halting %s",
-                                   workflowId, workflowInstance));
+      throw new MissingRequiredPropertyException(format("%s has no docker args, halting %s",
+                                                        workflowId, workflowInstance));
     }
 
     final WorkflowState workflowState = storage.workflowState(workflow.id());
 
     final Optional<String> dockerImageOpt = workflowState.dockerImage().isPresent()
-        ? workflowState.dockerImage()
-        : workflow.configuration().dockerImage(); // backwards compatibility
+                                            ? workflowState.dockerImage()
+                                            : workflow.configuration().dockerImage(); // backwards compatibility
 
     if (!dockerImageOpt.isPresent()) {
-      throw new ResourceNotFoundException(format("%s has no docker image, halting %s",
-                                   workflowId, workflowInstance));
+      throw new MissingRequiredPropertyException(format("%s has no docker image, halting %s",
+                                                        workflowId, workflowInstance));
     }
 
     return ExecutionDescription.create(
