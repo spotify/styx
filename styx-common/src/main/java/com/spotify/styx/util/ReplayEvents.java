@@ -59,7 +59,7 @@ public final class ReplayEvents {
       final long lastConsumedEvent = entry.getValue();
       final SettableTime time = new SettableTime();
       if (printLogs) {
-        LOG.info("Replaying {} up to #{}", workflowInstance.toKey(), lastConsumedEvent);
+        LOG.debug("Replaying {} up to #{}", workflowInstance.toKey(), lastConsumedEvent);
       }
 
       final SortedSet<SequenceEvent> sequenceEvents;
@@ -88,7 +88,7 @@ public final class ReplayEvents {
         }
 
         if (printLogs) {
-          LOG.info("  replaying #{} {}", sequenceEvent.counter(), sequenceEvent.event());
+          LOG.debug("  replaying #{} {}", sequenceEvent.counter(), sequenceEvent.event());
         }
         restoredState = restoredState.transition(sequenceEvent.event());
         replayLogger.transitionInto(restoredState);
