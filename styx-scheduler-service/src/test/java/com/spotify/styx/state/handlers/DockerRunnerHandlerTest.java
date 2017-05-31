@@ -42,6 +42,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
+import com.spotify.styx.docker.InvalidExecutionException;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Workflow;
@@ -50,6 +51,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.StateManager.IsClosed;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
@@ -184,7 +186,16 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldFailIfDockerRunnerRaisesException() throws Exception {
-    doThrow(new IOException("Testing exception.")).when(dockerRunner)
+    shouldFailIfDockerRunnerRaisesException(new IOException("Testing exception."));
+  }
+
+  @Test
+  public void shouldFailIfDockerRunnerRaisesUserErrorInvalidExecutionException() throws Exception {
+    shouldFailIfDockerRunnerRaisesException(new InvalidExecutionException("PEBKAC"));
+  }
+
+  void shouldFailIfDockerRunnerRaisesException(Throwable throwable) throws IOException, IsClosed {
+    doThrow(throwable).when(dockerRunner)
         .start(any(WorkflowInstance.class), any(RunSpec.class));
 
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, configuration());
