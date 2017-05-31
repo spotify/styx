@@ -20,15 +20,19 @@
 
 package com.spotify.styx.model.data;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
 
 @AutoValue
 public abstract class EventInfo {
 
+  @JsonProperty
   public abstract long timestamp();
 
+  @JsonProperty
   public abstract String name();
 
+  @JsonProperty
   public abstract String info();
 
   public static EventInfo create(long ts, String eventName, String eventInfo) {
