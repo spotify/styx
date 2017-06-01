@@ -37,7 +37,9 @@ import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.request.RequestContexts;
+import com.spotify.apollo.request.RequestMetadataImpl;
 import com.spotify.apollo.route.AsyncHandler;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -46,10 +48,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Supplier;
 import okio.ByteString;
-import org.hamcrest.MatcherAssert;
-import org.hamcrest.core.Is;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 /**
  * Tests Middlewares
@@ -87,15 +86,18 @@ public class MiddlewaresTest {
     );
 
     CompletionStage<Response<ByteString>> completionStage = outerHandler.invoke(
-        RequestContexts.create(Mockito.mock(Request.class), mock(Client.class), Collections.emptyMap()));
+        RequestContexts.create(mock(Request.class), mock(Client.class),
+                               Collections.emptyMap(), System.nanoTime(),
+                               RequestMetadataImpl.create(Instant.EPOCH, 
+                                                          Optional.empty(), Optional.empty())));
 
-    MatcherAssert.assertThat(completionStage.toCompletableFuture().get().payload().get().utf8(),
-                             Is.is(
-            "{\"foo\":\"blah\"," +
-            "\"inner_object\":{" +
-              "\"field_name_convention\":\"bloh\"," +
-              "\"enum_field\":\"enum_value\"}}"
-        ));
+    assertThat(completionStage.toCompletableFuture().get().payload().get().utf8(),
+               is(
+                   "{\"foo\":\"blah\"," +
+                   "\"inner_object\":{" +
+                   "\"field_name_convention\":\"bloh\"," +
+                   "\"enum_field\":\"enum_value\"}}"
+               ));
   }
 
   @Test
@@ -108,12 +110,12 @@ public class MiddlewaresTest {
         RequestContexts.create(mock(Request.class), mock(Client.class), Collections.emptyMap()));
 
     assertThat(completionStage.toCompletableFuture().get().payload().get().utf8(),
-        is(
-            "{\"foo\":\"blah\"," +
-            "\"inner_object\":{" +
-                "\"field_name_convention\":\"bloh\"," +
-                "\"enum_field\":\"enum_value\"}}"
-        ));
+               is(
+                   "{\"foo\":\"blah\"," +
+                   "\"inner_object\":{" +
+                   "\"field_name_convention\":\"bloh\"," +
+                   "\"enum_field\":\"enum_value\"}}"
+               ));
   }
 
   @Test
@@ -210,7 +212,7 @@ public class MiddlewaresTest {
     when(requestContext.request()).thenReturn(request);
     CompletionStage completionStage =
         CompletableFuture.completedFuture(Response.forStatus(Status.OK.withReasonPhrase("")));
-    assertThat(Middlewares.auditLogging()
+    assertThat(Middlewares.tokenValidator()
                    .apply(mockInnerHandler(requestContext, completionStage)).invoke(requestContext),
                equalTo(completionStage));
   }
@@ -224,7 +226,7 @@ public class MiddlewaresTest {
     when(requestContext.request()).thenReturn(request);
     CompletionStage completionStage =
         CompletableFuture.completedFuture(Response.forStatus(Status.OK.withReasonPhrase("")));
-    assertThat(Middlewares.auditLogging()
+    assertThat(Middlewares.tokenValidator()
                    .apply(mockInnerHandler(requestContext, completionStage)).invoke(requestContext),
                equalTo(completionStage));
   }

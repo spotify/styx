@@ -98,13 +98,15 @@ public final class Middlewares {
   }
 
   public static Middleware<AsyncHandler<? extends Response<?>>,
-      AsyncHandler<? extends Response<ByteString>>> auditLogging() {
+      AsyncHandler<? extends Response<ByteString>>> tokenValidator() {
     return innerHandler -> requestContext -> {
       final Request request = requestContext.request();
       if (!"GET".equals(request.method())) {
-        LOG.info("[AUDIT] {} {} with headers {} parameters {} and payload {}",
+        // TODO: validate token and log user account
+        LOG.info("[AUDIT] {} {} from {} with headers {} parameters {} and payload {}",
                  request.method(),
                  request.uri(),
+                 "anonymous",
                  request.headers(),
                  request.parameters(),
                  request.payload().map(ByteString::utf8).orElse("")

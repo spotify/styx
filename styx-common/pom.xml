@@ -91,6 +91,11 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>apollo-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <scope>test</scope>
