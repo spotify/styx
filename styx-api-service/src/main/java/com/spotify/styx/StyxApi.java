@@ -20,8 +20,8 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.api.Middlewares.auditLogging;
 import static com.spotify.styx.api.Middlewares.clientValidator;
+import static com.spotify.styx.api.Middlewares.tokenValidator;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
@@ -128,39 +128,39 @@ public class StyxApi implements AppInit {
         .registerRoutes(deprecatedWorkflowResource.routes()
                             .map(r -> r
                                 .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())))
+                                .withMiddleware(tokenValidator())))
         .registerRoutes(deprecatedBackfillResource.routes()
                             .map(r -> r
                                 .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())))
+                                .withMiddleware(tokenValidator())))
         .registerRoutes(deprecatedCliResource.routes()
                             .map(r -> r
                                 .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())))
+                                .withMiddleware(tokenValidator())))
         .registerRoutes(workflowResource.routes()
                             .map(r -> r
                                 .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())))
+                                .withMiddleware(tokenValidator())))
         .registerRoutes(backfillResource.routes()
                             .map(r -> r
                                 .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())))
+                                .withMiddleware(tokenValidator())))
         .registerRoutes(resourceResource.routes()
                             .map(r -> r
                                 .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())))
+                                .withMiddleware(tokenValidator())))
         .registerRoutes(styxConfigResource.routes()
                             .map(r -> r
                                 .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())))
+                                .withMiddleware(tokenValidator())))
         .registerRoutes(statusResource.routes()
                             .map(r -> r
                                 .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())))
+                                .withMiddleware(tokenValidator())))
         .registerRoutes(schedulerProxyResource.routes()
                             .map(r -> r
                                 .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())));
+                                .withMiddleware(tokenValidator())));
   }
 
   private static AggregateStorage storage(Environment environment) {
