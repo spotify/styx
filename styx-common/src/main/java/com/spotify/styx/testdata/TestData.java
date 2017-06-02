@@ -57,23 +57,23 @@ public final class TestData {
 
   public static final DataEndpoint HOURLY_DATA_ENDPOINT =
       DataEndpoint.create(
-          "styx.TestEndpoint", HOURS, empty(), empty(), empty(), emptyList());
+          "styx.TestEndpoint", HOURS, empty(), empty(), empty(), empty(), emptyList());
 
   public static final DataEndpoint DAILY_DATA_ENDPOINT =
       DataEndpoint.create(
-          "styx.TestEndpoint", DAYS, empty(), empty(), empty(), emptyList());
+          "styx.TestEndpoint", DAYS, empty(), empty(), empty(), empty(), emptyList());
 
   public static final DataEndpoint WEEKLY_DATA_ENDPOINT =
       DataEndpoint.create(
-          "styx.TestEndpoint", WEEKS, empty(), empty(), empty(), emptyList());
+          "styx.TestEndpoint", WEEKS, empty(), empty(), empty(), empty(), emptyList());
 
   public static final DataEndpoint MONTHLY_DATA_ENDPOINT =
       DataEndpoint.create(
-          "styx.TestEndpoint", MONTHS, empty(), empty(), empty(), emptyList());
+          "styx.TestEndpoint", MONTHS, empty(), empty(), empty(), empty(), emptyList());
 
   public static final DataEndpoint FULL_DATA_ENDPOINT =
       DataEndpoint.create(
-          "styx.TestEndpoint", DAYS, of("busybox"), of(asList("x", "y")),
+          "styx.TestEndpoint", DAYS, of("busybox"), empty(), of(asList("x", "y")),
           of(Secret.create("name", "/path")), emptyList());
 
   public static final ExecutionDescription EXECUTION_DESCRIPTION =

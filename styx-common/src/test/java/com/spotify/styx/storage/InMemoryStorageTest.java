@@ -34,6 +34,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
 import java.io.IOException;
 import java.net.URI;
+
 import org.junit.Test;
 
 /**
@@ -78,6 +79,6 @@ public class InMemoryStorageTest {
     return Workflow.create(
         workflowId.componentId(),
         URI.create("http://foo"),
-        DataEndpoint.create(workflowId.endpointId(), HOURS, empty(), empty(), empty(), emptyList()));
+        DataEndpoint.create(workflowId.endpointId(), HOURS, empty(), empty(), empty(), empty(), emptyList()));
   }
 }

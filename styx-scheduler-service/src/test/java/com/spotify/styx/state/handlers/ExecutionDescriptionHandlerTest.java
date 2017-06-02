@@ -173,6 +173,7 @@ public class ExecutionDescriptionHandlerTest {
         "styx.TestEndpoint",
         HOURS,
         Optional.of("legacy-docker-image"),
+        empty(),
         Optional.of(Lists.newArrayList("foo", "bar")),
         empty(),
         emptyList());
@@ -197,6 +198,7 @@ public class ExecutionDescriptionHandlerTest {
         "styx.TestEndpoint",
         HOURS,
         Optional.empty(),
+        empty(),
         Optional.of(Lists.newArrayList(args)),
         empty(),
         emptyList());

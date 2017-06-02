@@ -126,6 +126,9 @@ schedules:
 - `schedule[].docker_image` **string**: The docker image that should be executed
  - The docker image that contains the workflow
 
+- `schedule[].docker_image_override` **boolean**: Whether the `docker_image` in
+the workflow schedule configuration has precedence over the `docker_image` in Datastore.
+
 - `schedule[].docker_args` **[string]**: The arguments passed to the docker image
  - This list should only contain strings. These will be passed as the arguments to the docker
 container. Any occurrences of the `"{}"` placeholder argument will be replaced with the current

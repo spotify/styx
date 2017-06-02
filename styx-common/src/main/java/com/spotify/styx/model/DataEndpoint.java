@@ -45,6 +45,9 @@ public abstract class DataEndpoint {
   public abstract Optional<String> dockerImage();
 
   @JsonProperty
+  public abstract Optional<Boolean> dockerImageOverride();
+
+  @JsonProperty
   public abstract Optional<List<String>> dockerArgs();
 
   @JsonProperty
@@ -58,11 +61,12 @@ public abstract class DataEndpoint {
       @JsonProperty("id") String id,
       @JsonProperty("partitioning") Partitioning partitioning,
       @JsonProperty("docker_image") Optional<String> dockerImage,
+      @JsonProperty("docker_image_override") Optional<Boolean> dockerImageOverride,
       @JsonProperty("docker_args") Optional<List<String>> dockerArgs,
       @JsonProperty("secret") Optional<Secret> secret,
       @JsonProperty("resources") List<String> resources) {
 
-    return new AutoValue_DataEndpoint(id, partitioning, dockerImage, dockerArgs, secret,
+    return new AutoValue_DataEndpoint(id, partitioning, dockerImage, dockerImageOverride, dockerArgs, secret,
         resources == null ? Collections.emptyList() : resources);
   }
 

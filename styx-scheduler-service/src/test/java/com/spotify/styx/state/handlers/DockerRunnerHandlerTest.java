@@ -158,6 +158,7 @@ public class DockerRunnerHandlerTest {
         "styx.TestEndpoint",
         HOURS,
         Optional.of(TEST_DOCKER_IMAGE),
+        empty(),
         Optional.of(Lists.newArrayList(args)),
         empty(),
         emptyList());

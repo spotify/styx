@@ -81,14 +81,17 @@ public class DatastoreStorageTest {
 
   private static final DataEndpoint DATA_ENDPOINT_EMPTY_CONF =
       DataEndpoint.create(
-          WORKFLOW_ID_NO_DOCKER_IMG.endpointId(), DAYS, empty(), empty(), empty(), emptyList());
+          WORKFLOW_ID_NO_DOCKER_IMG.endpointId(), DAYS, empty(), empty(), empty(), empty(), emptyList());
   private static final Optional<String> DOCKER_IMAGE = of("busybox");
   private static final String DOCKER_IMAGE_COMPONENT = "busybox:component";
   private static final String DOCKER_IMAGE_WORKFLOW = "busybox:workflow";
   private static final String COMMIT_SHA = "dcee675978b4d89e291bb695d0ca7deaf05d2a32";
   private static final DataEndpoint DATA_ENDPOINT_WITH_DOCKER_IMAGE =
       DataEndpoint.create(
-          WORKFLOW_ID_WITH_DOCKER_IMG.endpointId(), DAYS, DOCKER_IMAGE, empty(), empty(), emptyList());
+          WORKFLOW_ID_WITH_DOCKER_IMG.endpointId(), DAYS, DOCKER_IMAGE, empty(), empty(), empty(), emptyList());
+  private static final DataEndpoint DATA_ENDPOINT_WITH_DOCKER_IMAGE_OVERRIDE_TRUE =
+      DataEndpoint.create(
+          WORKFLOW_ID_WITH_DOCKER_IMG.endpointId(), DAYS, DOCKER_IMAGE, Optional.of(true), empty(), empty(), emptyList());
   private static final Workflow
       WORKFLOW_NO_DOCKER_IMAGE =
       Workflow.create(WORKFLOW_ID_NO_DOCKER_IMG.componentId(), URI.create("http://foo"),
@@ -101,6 +104,10 @@ public class DatastoreStorageTest {
       WORKFLOW_WITH_DOCKER_IMAGE =
       Workflow.create(WORKFLOW_ID_WITH_DOCKER_IMG.componentId(), URI.create("http://foo"),
                       DATA_ENDPOINT_WITH_DOCKER_IMAGE);
+  private static final Workflow
+      WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE =
+      Workflow.create(WORKFLOW_ID_WITH_DOCKER_IMG.componentId(), URI.create("http://foo"),
+          DATA_ENDPOINT_WITH_DOCKER_IMAGE_OVERRIDE_TRUE);
 
   private static final Instant NEXT_EXECUTION = Instant.parse("2016-03-14T14:00:00Z");
 
@@ -223,7 +230,7 @@ public class DatastoreStorageTest {
   @Test
   public void shouldPersistDockerImagePerWorkflowId() throws Exception {
     storage.store(Workflow.create(WORKFLOW_ID1.componentId(), URI.create("http://foo"), DataEndpoint
-        .create(WORKFLOW_ID1.endpointId(), Partitioning.DAYS, Optional.empty(), Optional.empty(),
+        .create(WORKFLOW_ID1.endpointId(), Partitioning.DAYS, Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), emptyList())));
     storage.patchState(WORKFLOW_ID1, patchDockerImage(DOCKER_IMAGE_WORKFLOW));
     Optional<String> retrieved = storage.getDockerImage(WORKFLOW_ID1);
@@ -234,7 +241,7 @@ public class DatastoreStorageTest {
   @Test
   public void shouldPersistCommitShaPerWorkflowId() throws Exception {
     storage.store(Workflow.create(WORKFLOW_ID1.componentId(), URI.create("http://foo"), DataEndpoint
-        .create(WORKFLOW_ID1.endpointId(), Partitioning.DAYS, Optional.empty(), Optional.empty(),
+        .create(WORKFLOW_ID1.endpointId(), Partitioning.DAYS, Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), emptyList())));
     storage.patchState(WORKFLOW_ID1, WorkflowState.builder().commitSha(COMMIT_SHA).build());
     WorkflowState retrieved = storage.workflowState(WORKFLOW_ID1);
@@ -257,22 +264,49 @@ public class DatastoreStorageTest {
     assertThat(retrieved, is(WorkflowState.patchEnabled(false)));
   }
 
+
   @Test
-  public void shouldOverwriteDockerImageFromWorkflowWhenUsingComponent() throws Exception {
+  public void shouldNotOverwriteDockerImageFromWorkflowWhenUsingComponent() throws Exception {
+    WorkflowState state = patchDockerImage(DOCKER_IMAGE_COMPONENT);
+
     storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
+    storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id().componentId(), state);
+    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
+    assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_COMPONENT)));
+
+    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
+    retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
+    assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_COMPONENT)));
+  }
+
+  @Test
+  public void shouldNotOverwriteDockerImageFromWorkflowWhenUsingWorkflowId() throws Exception {
+    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
+    storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id(), patchDockerImage(DOCKER_IMAGE_WORKFLOW));
+    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
+    assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
+
+    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
+    retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
+    assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
+  }
+
+  @Test
+  public void shouldOverwriteDockerImageFromWorkflowWithOverrideWhenUsingComponent() throws Exception {
+    storage.store(WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE);
     WorkflowState state = patchDockerImage(DOCKER_IMAGE_COMPONENT);
     storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id().componentId(), state);
 
     Optional<String> retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
-    assertThat(retrieved, is(WORKFLOW_WITH_DOCKER_IMAGE.schedule().dockerImage()));
+    assertThat(retrieved, is(WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE.schedule().dockerImage()));
   }
 
   @Test
-  public void shouldOverwriteDockerImageFromWorkflowWhenUsingWorkflowId() throws Exception {
-    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
-    storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id(), patchDockerImage(DOCKER_IMAGE_WORKFLOW));
-    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
-    assertThat(retrieved, is(WORKFLOW_WITH_DOCKER_IMAGE.schedule().dockerImage()));
+  public void shouldOverwriteDockerImageFromWorkflowWithOverrideWhenUsingWorkflowId() throws Exception {
+    storage.store(WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE);
+    storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE.id(), patchDockerImage(DOCKER_IMAGE_WORKFLOW));
+    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE.id());
+    assertThat(retrieved, is(WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE.schedule().dockerImage()));
   }
 
   @Test
@@ -476,7 +510,7 @@ public class DatastoreStorageTest {
   @Test
   public void allFieldsAreSetWhenRetrievingWorkflowState() throws Exception {
     storage.store(Workflow.create(WORKFLOW_ID1.componentId(), URI.create("http://not/important"), DataEndpoint
-        .create(WORKFLOW_ID1.endpointId(), Partitioning.DAYS, Optional.empty(), Optional.empty(),
+        .create(WORKFLOW_ID1.endpointId(), Partitioning.DAYS, Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), emptyList())));
     WorkflowState state = WorkflowState.builder()
         .enabled(true)
@@ -509,6 +543,6 @@ public class DatastoreStorageTest {
     return Workflow.create(
         workflowId.componentId(),
         URI.create("http://foo"),
-        DataEndpoint.create(workflowId.endpointId(), HOURS, empty(), empty(), empty(), emptyList()));
+        DataEndpoint.create(workflowId.endpointId(), HOURS, empty(), empty(), empty(), empty(), emptyList()));
   }
 }

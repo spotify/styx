@@ -51,12 +51,14 @@ import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -359,20 +361,25 @@ class DatastoreStorage {
   }
 
   Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
-    Optional<String> dockerImage =
-        workflow(workflowId).flatMap(wf -> wf.schedule().dockerImage());
-    if (dockerImage.isPresent()) {
-      return dockerImage;
-    }
+    Optional<String> workflowDefinitionDockerImage = workflow(workflowId).flatMap(wf -> wf.schedule().dockerImage());
 
     final Key workflowKey = workflowKey(workflowId);
-    dockerImage = getOptStringProperty(datastore, workflowKey, PROPERTY_DOCKER_IMAGE);
-    if (dockerImage.isPresent()) {
-      return dockerImage;
-    }
+    Optional<String> workflowDockerImage = getOptStringProperty(datastore, workflowKey, PROPERTY_DOCKER_IMAGE);
 
     final Key componentKey = componentKeyFactory.newKey(workflowId.componentId());
-    return getOptStringProperty(datastore, componentKey, PROPERTY_DOCKER_IMAGE);
+    Optional<String> componentDockerImage = getOptStringProperty(datastore, componentKey, PROPERTY_DOCKER_IMAGE);
+
+    List<Optional<String>> dockerImages;
+    if (workflow(workflowId).flatMap(wf -> wf.schedule().dockerImageOverride()).orElse(false)) {
+      dockerImages = Arrays.asList(workflowDefinitionDockerImage, workflowDockerImage, componentDockerImage);
+    } else {
+      dockerImages = Arrays.asList(workflowDockerImage, componentDockerImage, workflowDefinitionDockerImage);
+    }
+    return dockerImages
+            .stream()
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .findFirst();
   }
 
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {

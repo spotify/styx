@@ -203,6 +203,7 @@ public class LocalFileScheduleSourceTest {
             "foo",
             Partitioning.HOURS,
             empty(),
+            empty(),
             Optional.of(emptyList()),
             empty(),
             emptyList()));
@@ -216,6 +217,7 @@ public class LocalFileScheduleSourceTest {
         DataEndpoint.create(
             "foo",
             Partitioning.DAYS,
+            empty(),
             empty(),
             Optional.of(singletonList("foo")),
             empty(),
@@ -231,6 +233,7 @@ public class LocalFileScheduleSourceTest {
             "foo",
             Partitioning.HOURS,
             empty(),
+            empty(),
             Optional.of(Arrays.asList("foo", "bar")),
             empty(),
             emptyList()));
@@ -244,6 +247,7 @@ public class LocalFileScheduleSourceTest {
         DataEndpoint.create(
             "bar",
             Partitioning.DAYS,
+            empty(),
             empty(),
             Optional.of(Arrays.asList("baz", "bax")),
             empty(),

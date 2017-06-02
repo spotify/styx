@@ -147,6 +147,7 @@ public class StateInitializingTriggerTest {
         "styx.TestEndpoint",
         partitioning,
         Optional.of("busybox"),
+        empty(),
         Optional.of(Lists.newArrayList(args)),
         empty(),
         emptyList());
