@@ -180,7 +180,7 @@
       <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
-        <version>1.7.20</version>
+        <version>1.7.25</version>
       </dependency>
 
       <!-- cli -->
@@ -193,6 +193,11 @@
         <groupId>net.sourceforge.argparse4j</groupId>
         <artifactId>argparse4j</artifactId>
         <version>0.7.0</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-simple</artifactId>
+        <version>1.7.25</version>
       </dependency>
 
       <!-- styx client libs -->
