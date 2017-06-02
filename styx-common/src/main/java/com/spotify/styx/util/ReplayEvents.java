@@ -76,8 +76,10 @@ public final class ReplayEvents {
         // Thus, we don't expect any event in the sequence to be later than the last consumed
         // event. We will treat this as an error for now and skip the rest of the events.
         if (sequenceEvent.counter() > lastConsumedEvent) {
-          LOG.error("Got unexpected newer event than the last consumed event {} > {} for {}",
-                    sequenceEvent.counter(), lastConsumedEvent, workflowInstance.toKey());
+          if (printLogs) {
+            LOG.error("Got unexpected newer event than the last consumed event {} > {} for {}",
+                sequenceEvent.counter(), lastConsumedEvent, workflowInstance.toKey());
+          }
           break;
         }
 
