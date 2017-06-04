@@ -66,7 +66,6 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
-import com.spotify.styx.testdata.TestData;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;

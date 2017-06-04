@@ -48,7 +48,6 @@ import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.Test;
 
 public class StateInitializingTriggerTest {

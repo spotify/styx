@@ -21,6 +21,7 @@
 package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V2;
+import static com.spotify.styx.api.Middlewares.authed;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
@@ -31,6 +32,7 @@ import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
+import com.spotify.styx.api.Middlewares.AuthContext;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -57,11 +59,11 @@ public final class WorkflowResource {
     this.storage = Objects.requireNonNull(storage);
   }
 
-  public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
+  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Arrays.asList(
         Route.with(
-            json(), "GET", BASE + "/<cid>/<wfid>",
-            rc -> workflow(arg("cid", rc), arg("wfid", rc))),
+            authed(), "GET", BASE + "/<cid>/<wfid>",
+            rc -> auth -> workflow(auth, arg("cid", rc), arg("wfid", rc))),
         Route.with(
             json(), "GET", BASE + "/<cid>/<wfid>/instances",
             rc -> instances(arg("cid", rc), arg("wfid", rc), rc.request())),
@@ -155,7 +157,7 @@ public final class WorkflowResource {
     return Response.forPayload(patchState);
   }
 
-  public Response<Workflow> workflow(String componentId, String id) {
+  public Response<Workflow> workflow(AuthContext authContext, String componentId, String id) {
     final WorkflowId workflowId = WorkflowId.create(componentId, id);
     try {
       return storage.workflow(workflowId).map(Response::forPayload)

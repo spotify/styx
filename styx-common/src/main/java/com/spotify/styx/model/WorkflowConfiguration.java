@@ -28,7 +28,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
-import org.codehaus.jackson.annotate.JsonIgnore;
 
 /**
  * A specification of a scheduled workflow

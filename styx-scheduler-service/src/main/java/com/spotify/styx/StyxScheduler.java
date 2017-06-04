@@ -20,8 +20,7 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.api.Middlewares.clientValidator;
-import static com.spotify.styx.api.Middlewares.tokenValidator;
+import static com.spotify.styx.api.Middlewares.auditLogger;
 import static com.spotify.styx.monitoring.MeteredProxy.instrument;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
@@ -97,7 +96,6 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -354,14 +352,11 @@ public class StyxScheduler implements AppInit {
 
     final SchedulerResource schedulerResource = new SchedulerResource(stateManager, trigger,
                                                                       storage, time);
-    final Supplier<Optional<List<String>>> clientBlacklistSupplier =
-        new CachedSupplier<>(storage::clientBlacklist, Instant::now);
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
         .registerRoutes(schedulerResource.routes().map(r -> r
-            .withMiddleware(clientValidator(clientBlacklistSupplier))
-            .withMiddleware(tokenValidator())));
+                .withMiddleware(auditLogger())));
 
     this.stateManager = stateManager;
     this.scheduler = scheduler;

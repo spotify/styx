@@ -60,20 +60,18 @@ public class MiddlewaresTest {
 
   private RequestContext mockRequestContext(boolean hasHeader) {
     RequestContext requestContext = mock(RequestContext.class);
-    Request request = mock(Request.class);
+    Request request = Request.forUri("/", "GET");
     if (hasHeader) {
-      when(request.header("User-Agent")).thenReturn(Optional.of("Styx CLI 0.1.1"));
-    } else {
-      when(request.header("User-Agent")).thenReturn(Optional.empty());
+      request = request.withHeader("User-Agent", "Styx CLI 0.1.1");
     }
     when(requestContext.request()).thenReturn(request);
     return requestContext;
   }
 
-  private AsyncHandler<? extends Response<?>> mockInnerHandler(RequestContext requestContext,
-                                                               CompletionStage completionStage) {
+  private <T> AsyncHandler<Response<T>> mockInnerHandler(RequestContext requestContext,
+                                                         CompletionStage completionStage) {
     // noinspection unchecked
-    AsyncHandler<? extends Response<?>> innerHandler = mock(AsyncHandler.class);
+    AsyncHandler<Response<T>> innerHandler = mock(AsyncHandler.class);
     // noinspection unchecked
     when(innerHandler.invoke(requestContext)).thenReturn(completionStage);
     return innerHandler;
@@ -207,12 +205,11 @@ public class MiddlewaresTest {
   @Test
   public void testAuditLoggingForGet() {
     RequestContext requestContext = mock(RequestContext.class);
-    Request request = mock(Request.class);
-    when(request.method()).thenReturn("GET");
+    Request request = Request.forUri("/", "GET");
     when(requestContext.request()).thenReturn(request);
     CompletionStage completionStage =
         CompletableFuture.completedFuture(Response.forStatus(Status.OK.withReasonPhrase("")));
-    assertThat(Middlewares.tokenValidator()
+    assertThat(Middlewares.auditLogger()
                    .apply(mockInnerHandler(requestContext, completionStage)).invoke(requestContext),
                equalTo(completionStage));
   }
@@ -220,13 +217,12 @@ public class MiddlewaresTest {
   @Test
   public void testAuditLoggingForPut() {
     RequestContext requestContext = mock(RequestContext.class);
-    Request request = mock(Request.class);
-    when(request.method()).thenReturn("PUT");
-    when(request.payload()).thenReturn(Optional.of(ByteString.encodeUtf8("hello")));
+    Request request = Request.forUri("/", "PUT")
+        .withPayload(ByteString.encodeUtf8("hello"));
     when(requestContext.request()).thenReturn(request);
     CompletionStage completionStage =
         CompletableFuture.completedFuture(Response.forStatus(Status.OK.withReasonPhrase("")));
-    assertThat(Middlewares.tokenValidator()
+    assertThat(Middlewares.auditLogger()
                    .apply(mockInnerHandler(requestContext, completionStage)).invoke(requestContext),
                equalTo(completionStage));
   }
