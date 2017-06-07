@@ -57,6 +57,7 @@ import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -416,21 +417,28 @@ class DatastoreStorage {
   }
 
   Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
-    final Optional<Entity> workflowEntity = getOpt(datastore, workflowKey(workflowId));
-    Optional<String> dockerImage = getOptStringProperty(workflowEntity, PROPERTY_DOCKER_IMAGE);
-    if (dockerImage.isPresent()) {
-      return dockerImage;
-    }
+    Optional<String> workflowDefinitionDockerImage =
+        workflow(workflowId).flatMap(wf -> wf.configuration().dockerImage());
 
-    dockerImage = getOptStringProperty(datastore,
-                                       componentKeyFactory.newKey(workflowId.componentId()),
-                                       PROPERTY_DOCKER_IMAGE);
-    if (dockerImage.isPresent()) {
-      return dockerImage;
-    }
+    final Key workflowKey = workflowKey(workflowId);
+    Optional<String> workflowDockerImage =
+        getOptStringProperty(datastore, workflowKey, PROPERTY_DOCKER_IMAGE);
 
-    return workflowEntity.map(w -> parseWorkflowJson(w, workflowId))
-        .flatMap(wf -> wf.configuration().dockerImage());
+    final Key componentKey = componentKeyFactory.newKey(workflowId.componentId());
+    Optional<String> componentDockerImage =
+        getOptStringProperty(datastore, componentKey, PROPERTY_DOCKER_IMAGE);
+
+    List<Optional<String>> dockerImages;
+    if (workflow(workflowId).flatMap(wf -> wf.configuration().dockerImageOverride()).orElse(false)) {
+      dockerImages = Arrays.asList(workflowDefinitionDockerImage, workflowDockerImage, componentDockerImage);
+    } else {
+      dockerImages = Arrays.asList(workflowDockerImage, componentDockerImage, workflowDefinitionDockerImage);
+    }
+    return dockerImages
+        .stream()
+        .filter(Optional::isPresent)
+        .map(Optional::get)
+        .findFirst();
   }
 
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {

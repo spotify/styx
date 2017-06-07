@@ -90,11 +90,19 @@ public class DatastoreStorageTest {
   private static final Optional<String> DOCKER_IMAGE = of("busybox");
   private static final String DOCKER_IMAGE_COMPONENT = "busybox:component";
   private static final String DOCKER_IMAGE_WORKFLOW = "busybox:workflow";
+  private static final String DOCKER_IMAGE_CONFIGURATION = "busybox:configuration";
   private static final String COMMIT_SHA = "dcee675978b4d89e291bb695d0ca7deaf05d2a32";
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_WITH_DOCKER_IMAGE =
       WorkflowConfiguration.builder()
           .id(WORKFLOW_ID_WITH_DOCKER_IMG.id())
           .schedule(DAYS)
+          .build();
+  private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_WITH_DOCKER_IMAGE_OVERRIDE_TRUE =
+      WorkflowConfiguration.builder()
+          .id(WORKFLOW_ID_WITH_DOCKER_IMG.id())
+          .schedule(DAYS)
+          .dockerImage(DOCKER_IMAGE_CONFIGURATION)
+          .dockerImageOverride(true)
           .build();
   private static final Workflow WORKFLOW_NO_DOCKER_IMAGE =
       Workflow.create(WORKFLOW_ID_NO_DOCKER_IMG.componentId(), URI.create("http://foo"),
@@ -107,6 +115,10 @@ public class DatastoreStorageTest {
       WORKFLOW_WITH_DOCKER_IMAGE =
       Workflow.create(WORKFLOW_ID_WITH_DOCKER_IMG.componentId(), URI.create("http://foo"),
                       WORKFLOW_CONFIGURATION_WITH_DOCKER_IMAGE);
+  private static final Workflow
+      WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE =
+      Workflow.create(WORKFLOW_ID_WITH_DOCKER_IMG.componentId(), URI.create("http://foo"),
+                      WORKFLOW_CONFIGURATION_WITH_DOCKER_IMAGE_OVERRIDE_TRUE);
 
   private static LocalDatastoreHelper helper;
   private DatastoreStorage storage;
@@ -318,6 +330,31 @@ public class DatastoreStorageTest {
     storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id().componentId(), state);
     retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
     assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
+  }
+
+  @Test
+  public void shouldUseDockerImageFromConfiguration() throws Exception {
+    storage.store(WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE);
+    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
+    assertThat(retrieved, is(WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE.configuration().dockerImage()));
+  }
+
+  @Test
+  public void shouldUseDockerImageFromConfigurationAndOverrideComponent() throws Exception {
+    storage.store(WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE);
+    WorkflowState state = patchDockerImage(DOCKER_IMAGE_COMPONENT);
+    storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE.id().componentId(), state);
+
+    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
+    assertThat(retrieved, is(WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE.configuration().dockerImage()));
+  }
+
+  @Test
+  public void shouldUseDockerImageFromConfigurationAndOverrideWorkflow() throws Exception {
+    storage.store(WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE);
+    storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE.id(), patchDockerImage(DOCKER_IMAGE_WORKFLOW));
+    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE.id());
+    assertThat(retrieved, is(WORKFLOW_WITH_DOCKER_IMAGE_OVERRIDE_TRUE.configuration().dockerImage()));
   }
 
   @Test(expected = ResourceNotFoundException.class)

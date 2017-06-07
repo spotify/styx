@@ -129,6 +129,10 @@ A unique identifier for the workflow (lower-case-hyphenated). This identifier is
 #### `schedule[].docker_image` **[string]**:
 The Docker image that should be executed.
 
+####  `schedule[].docker_image_override` **boolean**:
+Whether the `docker_image` in the workflow schedule configuration has precedence over the
+`docker_image` in Datastore.
+
 #### `schedule[].docker_args` **[string]**
 The arguments passed to the Docker image.
 
