@@ -8,42 +8,41 @@ A batch job scheduler for Kubernetes
 
 ## Description
 
-Styx is a service that is used to trigger periodic invocations of Docker containers. The
-information needed to schedule such invocations, is read from a set of files on disk or an
-external service providing such information. The service takes responsibility for triggering
-and possibly also re-triggering invocations until a successful exit status has been emitted
-or some other limit has been reached. Styx is built using the [Apollo] framework and uses
-[Kubernetes] for container orchestration.
+Styx is a service that is used to trigger periodic invocations of Docker containers. The information
+needed to schedule such invocations, is read from a set of files on disk or an external service
+providing such information. The service takes responsibility for triggering and possibly also
+re-triggering invocations until a successful exit status has been emitted or some other limit has
+been reached. Styx is built using the [Apollo] framework and uses [Kubernetes] for container
+orchestration.
 
-Styx can optionally provide some dynamic arguments to container executions that indicates
-which time period a particular invocation belongs to. For example an hourly job for the first
-hour of 2016-01-01 might have the dynamic argument `2016-01-01T00` appended to the
-container invocation.
+Styx can optionally provide some dynamic arguments to container executions that indicates which time
+period a particular invocation belongs to. For example an hourly job for the first hour of
+2016-01-01 might have the dynamic argument `2016-01-01T00` appended to the container invocation.
 
 The envisioned main use case for Styx is to execute data processing job, possibly long running
-processes that transform data periodically. Its initial use case is to run workflows of jobs orchestrated using
-[Luigi], but it does not have any intrinsic ties to Luigi. Styx can just as well execute a container
-with some simple bash scripts.
+processes that transform data periodically. Its initial use case is to run workflows of jobs
+orchestrated using [Luigi], but it does not have any intrinsic ties to Luigi. Styx can just as well
+execute a container with some simple bash scripts.
 
 Styx was built to function smoothly on Google Cloud Platform, thus it makes use of Google products
 such as Google Cloud Datastore, Google Cloud Bigtable and Google Container Engine. However, the
-integrations with these products are all done through clear interfaces and other backends can
-easily be added.
+integrations with these products are all done through clear interfaces and other backends can easily
+be added.
 
 ## Key concepts
 
-The key concept that Styx concerns itself with are Workflows. A Workflow is either
-enabled or disabled and has a Schedule. A Schedule specifies how often a Workflow should be
-triggered, which Docker image to run and which arguments to pass to it on each execution. Each time
-a Workflow is triggered, a Workflow Instance is created. The Workflow instance is tracked as
-'active' until at least one execution of the Docker image returns with a 0 exit code. Styx keeps
-track of Workflow Instance executions and provides information about them via the API.
+The key concept that Styx concerns itself with is Workflows. A Workflow is either enabled or
+disabled and has a Schedule. A Schedule specifies how often a Workflow should be triggered, which
+Docker image to run and which arguments to pass to it on each execution. Each time a Workflow is
+triggered, a Workflow Instance is created. The Workflow instance is tracked as 'active' until at
+least one execution of the Docker image returns with a 0 exit code. Styx keeps track of Workflow
+Instance executions and provides information about them via the API.
 
 ## Development status
 
 Styx is actively being developed and deployed internally at Spotify where it is being used to run
-around 2200 production workflows. Because of how we build and integrate infrastructure components
-at Spotify, this repository does not contain a GUI at the time of writing, while we do have one
+around 2200 production workflows. Because of how we build and integrate infrastructure components at
+Spotify, this repository does not contain a GUI at the time of writing, while we do have one
 internally. The goal is to break out more of these components into open source projects that
 complement each other.
 
@@ -206,15 +205,15 @@ role for the `service_account` of the workflow. This can be done by following
 
 ### Triggering and executions
 
-Each time a Workflow Schedule is triggered, Styx will treat that trigger as a first class
-entity. Each Trigger will have at least one Execution which can potentially take a long time
-to execute. If another Trigger happens during this time, both triggers will be active, each
-with one running container. Because Styx treats each Trigger individually, it can ensure that
-each one of them complete successfully.
+Each time a Workflow Schedule is triggered, Styx will treat that trigger as a first class entity.
+Each Trigger will have at least one Execution which can potentially take a long time to execute. If
+another Trigger happens during this time, both triggers will be active, each with one running
+container. Because Styx treats each Trigger individually, it can ensure that each one of them
+complete successfully.
 
-Styx does not assume anything about what is executed in the container, it only cares about
-the exit code. Any execution returning a non-zero exit code will either cause a re-try to be scheduled,
-or be interpreted as a permanent failure of the workflow instance. For detailed description of exit codes,
+Styx does not assume anything about what is executed in the container, it only cares about the exit
+code. Any execution returning a non-zero exit code will either cause a re-try to be scheduled, or be
+interpreted as a permanent failure of the workflow instance. For detailed description of exit codes,
 please refer to **Workflow state graph** section in [Styx design].
 
 ### Injected environment variables
