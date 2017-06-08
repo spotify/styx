@@ -113,7 +113,7 @@ public class WFIExecutionBuilderTest {
                             Optional.empty(),
                             Optional.empty(),
                             Arrays.asList(
-                                ExecStatus.create(time("07:56"), "Error message", Optional.empty())
+                                ExecStatus.create(time("07:56"), "FAILED", Optional.of("Error message"))
                             )
                         )
                     )
@@ -348,7 +348,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Arrays.asList(
-                                ExecStatus.create(time("07:58"), "First failure", Optional.empty())
+                                ExecStatus.create(time("07:58"), "FAILED", Optional.of("First failure"))
                             )
                         ),
                         Execution.create(
@@ -357,7 +357,7 @@ public class WFIExecutionBuilderTest {
                             Arrays.asList(
                                 ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("08:57"), "STARTED", Optional.empty()),
-                                ExecStatus.create(time("08:59"), "Second failure", Optional.empty())
+                                ExecStatus.create(time("08:59"), "FAILED", Optional.of("Second failure"))
                             )
                         )
                     )

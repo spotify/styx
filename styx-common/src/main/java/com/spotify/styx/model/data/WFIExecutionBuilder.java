@@ -177,7 +177,7 @@ class WFIExecutionBuilder {
     public Void runError(WorkflowInstance workflowInstance, String message) {
       currWorkflowInstance = workflowInstance;
 
-      executionStatusList.add(ExecStatus.create(eventTs, message, Optional.empty()));
+      executionStatusList.add(ExecStatus.create(eventTs, "FAILED", Optional.of(message)));
 
       closeExecution();
       return null;
