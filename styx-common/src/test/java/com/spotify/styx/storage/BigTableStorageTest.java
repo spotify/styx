@@ -89,9 +89,9 @@ public class BigTableStorageTest {
     assertThat(workflowInstanceExecutionData.triggers().get(0).executions().get(0).executionId(), is(Optional.of("execId")));
     assertThat(workflowInstanceExecutionData.triggers().get(0).executions().get(0).dockerImage(), is(Optional.of("img")));
     assertThat(workflowInstanceExecutionData.triggers().get(0).executions().get(0).statuses().get(0), is(
-        ExecStatus.create(Instant.ofEpochMilli(1L), "SUBMITTED")));
+        ExecStatus.create(Instant.ofEpochMilli(1L), "SUBMITTED", Optional.empty())));
     assertThat(workflowInstanceExecutionData.triggers().get(0).executions().get(0).statuses().get(1), is(
-        ExecStatus.create(Instant.ofEpochMilli(2L), "STARTED")));
+        ExecStatus.create(Instant.ofEpochMilli(2L), "STARTED", Optional.empty())));
   }
 
   @Test
@@ -114,16 +114,16 @@ public class BigTableStorageTest {
     assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).executionId(), is(Optional.of("execId1")));
     assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).dockerImage(), is(Optional.of("img1")));
     assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).statuses()
-                   .get(0), is(ExecStatus.create(Instant.ofEpochMilli(1L), "SUBMITTED")));
+                   .get(0), is(ExecStatus.create(Instant.ofEpochMilli(1L), "SUBMITTED", Optional.empty())));
     assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).statuses()
-                   .get(1), is(ExecStatus.create(Instant.ofEpochMilli(2L), "STARTED")));
+                   .get(1), is(ExecStatus.create(Instant.ofEpochMilli(2L), "STARTED", Optional.empty())));
     assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).triggerId(), is("triggerId2"));
     assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).executions().get(0).executionId(), is(Optional.of("execId2")));
     assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).executions().get(0).dockerImage(), is(Optional.of("img2")));
     assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).executions().get(0).statuses()
-                   .get(0), is(ExecStatus.create(Instant.ofEpochMilli(4L), "SUBMITTED")));
+                   .get(0), is(ExecStatus.create(Instant.ofEpochMilli(4L), "SUBMITTED", Optional.empty())));
     assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).executions().get(0).statuses()
-                   .get(1), is(ExecStatus.create(Instant.ofEpochMilli(5L), "STARTED")));
+                   .get(1), is(ExecStatus.create(Instant.ofEpochMilli(5L), "STARTED", Optional.empty())));
   }
 
   @Test

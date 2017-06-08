@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * Value representing an execution status change
@@ -37,11 +38,15 @@ public abstract class ExecStatus {
   @JsonProperty("status")
   public abstract String status();
 
+  @JsonProperty("message")
+  public abstract Optional<String> message();
+
   @JsonCreator
   public static ExecStatus create(
       @JsonProperty("timestamp") Instant timestamp,
-      @JsonProperty("status") String status
+      @JsonProperty("status") String status,
+      @JsonProperty("message") Optional<String> message
   ) {
-    return new AutoValue_ExecStatus(timestamp, status);
+    return new AutoValue_ExecStatus(timestamp, status, message);
   }
 }

@@ -79,7 +79,7 @@ public class WFIExecutionBuilderTest {
                             Optional.empty(),
                             Optional.empty(),
                             Arrays.asList(
-                                ExecStatus.create(time("07:56"), "HALTED")
+                                ExecStatus.create(time("07:56"), "HALTED", Optional.empty())
                             )
                         )
                     )
@@ -113,7 +113,7 @@ public class WFIExecutionBuilderTest {
                             Optional.empty(),
                             Optional.empty(),
                             Arrays.asList(
-                                ExecStatus.create(time("07:56"), "Error message")
+                                ExecStatus.create(time("07:56"), "Error message", Optional.empty())
                             )
                         )
                     )
@@ -173,18 +173,18 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Arrays.asList(
-                                ExecStatus.create(time("07:56"), "SUBMITTED"),
-                                ExecStatus.create(time("07:57"), "STARTED"),
-                                ExecStatus.create(time("07:58"), "MISSING_DEPS")
+                                ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
+                                ExecStatus.create(time("07:57"), "STARTED", Optional.empty()),
+                                ExecStatus.create(time("07:58"), "MISSING_DEPS", Optional.empty())
                             )
                         ),
                         Execution.create(
                             Optional.of("exec-id-01"),
                             Optional.of("img2"),
                             Arrays.asList(
-                                ExecStatus.create(time("08:56"), "SUBMITTED"),
-                                ExecStatus.create(time("08:57"), "STARTED"),
-                                ExecStatus.create(time("08:58"), "SUCCESS")
+                                ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
+                                ExecStatus.create(time("08:57"), "STARTED", Optional.empty()),
+                                ExecStatus.create(time("08:58"), "SUCCESS", Optional.empty())
                             )
                         )
                     )
@@ -198,17 +198,17 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-10"),
                             Optional.of("img3"),
                             Arrays.asList(
-                                ExecStatus.create(time("09:56"), "SUBMITTED"),
-                                ExecStatus.create(time("09:57"), "STARTED"),
-                                ExecStatus.create(time("09:58"), "FAILED")
+                                ExecStatus.create(time("09:56"), "SUBMITTED", Optional.empty()),
+                                ExecStatus.create(time("09:57"), "STARTED", Optional.empty()),
+                                ExecStatus.create(time("09:58"), "FAILED", Optional.empty())
                             )
                         ),
                         Execution.create(
                             Optional.of("exec-id-11"),
                             Optional.of("img4"),
                             Arrays.asList(
-                                ExecStatus.create(time("10:56"), "SUBMITTED"),
-                                ExecStatus.create(time("10:57"), "STARTED")
+                                ExecStatus.create(time("10:56"), "SUBMITTED", Optional.empty()),
+                                ExecStatus.create(time("10:57"), "STARTED", Optional.empty())
                             )
                         )
                     )
@@ -253,17 +253,17 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Arrays.asList(
-                                ExecStatus.create(time("07:56"), "SUBMITTED"),
-                                ExecStatus.create(time("07:57"), "STARTED"),
-                                ExecStatus.create(time("07:58"), "TIMEOUT")
+                                ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
+                                ExecStatus.create(time("07:57"), "STARTED", Optional.empty()),
+                                ExecStatus.create(time("07:58"), "TIMEOUT", Optional.empty())
                             )
                         ),
                         Execution.create(
                             Optional.of("exec-id-01"),
                             Optional.of("img2"),
                             Arrays.asList(
-                                ExecStatus.create(time("08:56"), "SUBMITTED"),
-                                ExecStatus.create(time("08:57"), "STARTED")
+                                ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
+                                ExecStatus.create(time("08:57"), "STARTED", Optional.empty())
                             )
                         )
                     )
@@ -307,16 +307,16 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Arrays.asList(
-                                ExecStatus.create(time("07:58"), "First failure")
+                                ExecStatus.create(time("07:58"), "First failure", Optional.empty())
                             )
                         ),
                         Execution.create(
                             Optional.of("exec-id-01"),
                             Optional.of("img2"),
                             Arrays.asList(
-                                ExecStatus.create(time("08:56"), "SUBMITTED"),
-                                ExecStatus.create(time("08:57"), "STARTED"),
-                                ExecStatus.create(time("08:59"), "Second failure")
+                                ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
+                                ExecStatus.create(time("08:57"), "STARTED", Optional.empty()),
+                                ExecStatus.create(time("08:59"), "Second failure", Optional.empty())
                             )
                         )
                     )
@@ -360,8 +360,8 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Arrays.asList(
-                                ExecStatus.create(time("07:56"), "SUBMITTED"),
-                                ExecStatus.create(time("07:57"), "HALTED")
+                                ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
+                                ExecStatus.create(time("07:57"), "HALTED", Optional.empty())
                             )
                         )
                     )
@@ -375,8 +375,8 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-10"),
                             Optional.of("img2"),
                             Arrays.asList(
-                                ExecStatus.create(time("08:56"), "SUBMITTED"),
-                                ExecStatus.create(time("08:57"), "STARTED")
+                                ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
+                                ExecStatus.create(time("08:57"), "STARTED", Optional.empty())
                             )
                         )
                     )

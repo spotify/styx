@@ -113,7 +113,7 @@ class WFIExecutionBuilder {
       currExecutionId = executionId;
       currDockerImg = dockerImage;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "SUBMITTED"));
+      executionStatusList.add(ExecStatus.create(eventTs, "SUBMITTED", Optional.empty()));
       return null;
     }
 
@@ -132,7 +132,7 @@ class WFIExecutionBuilder {
       currWorkflowInstance = workflowInstance;
       currExecutionId = executionId;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "SUBMITTED"));
+      executionStatusList.add(ExecStatus.create(eventTs, "SUBMITTED", Optional.empty()));
       return null;
     }
 
@@ -140,7 +140,7 @@ class WFIExecutionBuilder {
     public Void started(WorkflowInstance workflowInstance) {
       currWorkflowInstance = workflowInstance;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "STARTED"));
+      executionStatusList.add(ExecStatus.create(eventTs, "STARTED", Optional.empty()));
       return null;
     }
 
@@ -158,7 +158,7 @@ class WFIExecutionBuilder {
         }
       }).orElse("FAILED");
 
-      executionStatusList.add(ExecStatus.create(eventTs, status));
+      executionStatusList.add(ExecStatus.create(eventTs, status, Optional.empty()));
 
       closeExecution();
       return null;
@@ -168,7 +168,7 @@ class WFIExecutionBuilder {
     public Void runError(WorkflowInstance workflowInstance, String message) {
       currWorkflowInstance = workflowInstance;
 
-      executionStatusList.add(ExecStatus.create(eventTs, message));
+      executionStatusList.add(ExecStatus.create(eventTs, message, Optional.empty()));
 
       closeExecution();
       return null;
@@ -208,7 +208,7 @@ class WFIExecutionBuilder {
     public Void timeout(WorkflowInstance workflowInstance) {
       currWorkflowInstance = workflowInstance;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "TIMEOUT"));
+      executionStatusList.add(ExecStatus.create(eventTs, "TIMEOUT", Optional.empty()));
 
       closeExecution();
       return null;
@@ -219,7 +219,7 @@ class WFIExecutionBuilder {
       currWorkflowInstance = workflowInstance;
       completed = true;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "HALTED"));
+      executionStatusList.add(ExecStatus.create(eventTs, "HALTED", Optional.empty()));
 
       closeTrigger();
       return null;
