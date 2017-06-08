@@ -200,7 +200,7 @@ public class WFIExecutionBuilderTest {
                             Arrays.asList(
                                 ExecStatus.create(time("09:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("09:57"), "STARTED", Optional.empty()),
-                                ExecStatus.create(time("09:58"), "FAILED", Optional.empty())
+                                ExecStatus.create(time("09:58"), "FAILED", Optional.of("Exit code: 1"))
                             )
                         ),
                         Execution.create(
@@ -209,6 +209,47 @@ public class WFIExecutionBuilderTest {
                             Arrays.asList(
                                 ExecStatus.create(time("10:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("10:57"), "STARTED", Optional.empty())
+                            )
+                        )
+                    )
+                )
+            )
+        );
+
+    assertThat(workflowInstanceExecutionData, is(expected));
+  }
+
+  @Test
+  public void testFailureNoExitCode() throws Exception {
+    long c = 0L;
+    List<SequenceEvent> events = Arrays.asList(
+        SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
+        SequenceEvent.create(E.dequeue(), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(desc("img1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
+        SequenceEvent.create(E.started(), c++, ts("07:57")),
+        SequenceEvent.create(E.terminate(Optional.empty()), c++, ts("07:58"))
+    );
+    assertValidTransitionSequence(events);
+
+    WorkflowInstanceExecutionData workflowInstanceExecutionData =
+        new WFIExecutionBuilder().executionInfo(events);
+    WorkflowInstanceExecutionData expected =
+        WorkflowInstanceExecutionData.create(
+            WORKFLOW_INSTANCE,
+            Arrays.asList(
+                Trigger.create(
+                    "trig0",
+                    time("07:55"),
+                    false,
+                    Arrays.asList(
+                        Execution.create(
+                            Optional.of("exec-id-00"),
+                            Optional.of("img1"),
+                            Arrays.asList(
+                                ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
+                                ExecStatus.create(time("07:57"), "STARTED", Optional.empty()),
+                                ExecStatus.create(time("07:58"), "FAILED", Optional.of("Exit code unknown"))
                             )
                         )
                     )

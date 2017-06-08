@@ -148,7 +148,7 @@ class WFIExecutionBuilder {
     public Void terminate(WorkflowInstance workflowInstance, Optional<Integer> exitCode) {
       currWorkflowInstance = workflowInstance;
 
-      String status = exitCode.map(c -> {
+      final String status = exitCode.map(c -> {
         if (c == 0) {
           return "SUCCESS";
         } else if (c == RunState.MISSING_DEPS_EXIT_CODE) {
@@ -158,7 +158,16 @@ class WFIExecutionBuilder {
         }
       }).orElse("FAILED");
 
-      executionStatusList.add(ExecStatus.create(eventTs, status, Optional.empty()));
+      final Optional<String> message;
+      if (status.equals("FAILED")) {
+        message = exitCode
+            .map(c -> Optional.of("Exit code: " + c))
+            .orElseGet(() -> Optional.of("Exit code unknown"));
+      } else {
+        message = Optional.empty();
+      }
+
+      executionStatusList.add(ExecStatus.create(eventTs, status, message));
 
       closeExecution();
       return null;
