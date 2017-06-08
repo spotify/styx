@@ -34,7 +34,7 @@ public class WorkflowInstanceExecutionDataTest {
 
   @Test
   public void shouldDeserializeExecStatus() throws Exception {
-    String json = statusJson("09:56", "STARTED");
+    String json = statusJson("09:56", "STARTED", Optional.empty());
     ExecStatus executionStatus = OBJECT_MAPPER.readValue(json, ExecStatus.class);
 
     assertThat(executionStatus.timestamp(), is(Instant.parse("2016-08-03T09:56:03.607Z")));
@@ -43,7 +43,7 @@ public class WorkflowInstanceExecutionDataTest {
 
   @Test
   public void shouldDeserializeExecution() throws Exception {
-    String json = executionJson("exec-id", "busybox:1.0", "09", "SUCCESS");
+    String json = executionJson("exec-id", "busybox:1.0", "09", "SUCCESS", Optional.empty());
 
     Execution execution = OBJECT_MAPPER.readValue(json, Execution.class);
     Execution expected = Execution.create(
@@ -62,7 +62,7 @@ public class WorkflowInstanceExecutionDataTest {
   public void shouldDeserializeExecutionNoOptionalFields() throws Exception {
     String json = "{"
                   + "\"statuses\":["
-                  + statusJson("16:56", "Error encountered")
+                  + statusJson("16:56", "HALTED", Optional.empty())
                   + "]}";
 
     Execution execution = OBJECT_MAPPER.readValue(json, Execution.class);
@@ -70,7 +70,7 @@ public class WorkflowInstanceExecutionDataTest {
         Optional.empty(),
         Optional.empty(),
         Arrays.asList(
-            ExecStatus.create(Instant.parse("2016-08-03T16:56:03.607Z"), "Error encountered", Optional.empty())
+            ExecStatus.create(Instant.parse("2016-08-03T16:56:03.607Z"), "HALTED", Optional.empty())
         )
     );
     assertThat(execution, is(expected));
@@ -78,8 +78,8 @@ public class WorkflowInstanceExecutionDataTest {
 
   @Test
   public void shouldDeserializeTrigger() throws Exception {
-    String jsonExec0 = executionJson("exec-id-0", "busybox:1.0", "09", "FAILED");
-    String jsonExec1 = executionJson("exec-id-1", "busybox:1.1", "10", "SUCCESS");
+    String jsonExec0 = executionJson("exec-id-0", "busybox:1.0", "09", "FAILED", Optional.of("Exit code 1"));
+    String jsonExec1 = executionJson("exec-id-1", "busybox:1.1", "10", "SUCCESS", Optional.empty());
 
     String json =
         "{"
@@ -102,7 +102,7 @@ public class WorkflowInstanceExecutionDataTest {
                 Arrays.asList(
                     ExecStatus.create(Instant.parse("2016-08-03T09:56:03.607Z"), "STARTED", Optional.empty()),
                     ExecStatus.create(Instant.parse("2016-08-03T09:57:03.607Z"), "RUNNING", Optional.empty()),
-                    ExecStatus.create(Instant.parse("2016-08-03T09:58:03.607Z"), "FAILED", Optional.empty())
+                    ExecStatus.create(Instant.parse("2016-08-03T09:58:03.607Z"), "FAILED", Optional.of("Exit code 1"))
                 )
             ),
             Execution.create(
@@ -121,8 +121,8 @@ public class WorkflowInstanceExecutionDataTest {
 
   @Test
   public void shouldDeserializeExecutionData() throws Exception {
-    String jsonExec00 = executionJson("exec-id-00", "busybox:1.0", "07", "FAILED");
-    String jsonExec01 = executionJson("exec-id-01", "busybox:1.1", "08", "SUCCESS");
+    String jsonExec00 = executionJson("exec-id-00", "busybox:1.0", "07", "FAILED", Optional.of("Exit code 1"));
+    String jsonExec01 = executionJson("exec-id-01", "busybox:1.1", "08", "SUCCESS", Optional.empty());
 
     String jsonTrigger0 =
         "{"
@@ -133,8 +133,8 @@ public class WorkflowInstanceExecutionDataTest {
         + jsonExec00 + "," + jsonExec01
         + "]}";
 
-    String jsonExec10 = executionJson("exec-id-10", "busybox:1.2", "09", "FAILED");
-    String jsonExec11 = executionJson("exec-id-11", "busybox:1.3", "10", "SUCCESS");
+    String jsonExec10 = executionJson("exec-id-10", "busybox:1.2", "09", "FAILED", Optional.of("Exit code 1"));
+    String jsonExec11 = executionJson("exec-id-11", "busybox:1.3", "10", "SUCCESS", Optional.empty());
 
     String jsonTrigger1 =
         "{"
@@ -174,7 +174,7 @@ public class WorkflowInstanceExecutionDataTest {
                         Arrays.asList(
                             ExecStatus.create(Instant.parse("2016-08-03T07:56:03.607Z"), "STARTED", Optional.empty()),
                             ExecStatus.create(Instant.parse("2016-08-03T07:57:03.607Z"), "RUNNING", Optional.empty()),
-                            ExecStatus.create(Instant.parse("2016-08-03T07:58:03.607Z"), "FAILED", Optional.empty())
+                            ExecStatus.create(Instant.parse("2016-08-03T07:58:03.607Z"), "FAILED", Optional.of("Exit code 1"))
                         )
                     ),
                     Execution.create(
@@ -199,7 +199,7 @@ public class WorkflowInstanceExecutionDataTest {
                         Arrays.asList(
                             ExecStatus.create(Instant.parse("2016-08-03T09:56:03.607Z"), "STARTED", Optional.empty()),
                             ExecStatus.create(Instant.parse("2016-08-03T09:57:03.607Z"), "RUNNING", Optional.empty()),
-                            ExecStatus.create(Instant.parse("2016-08-03T09:58:03.607Z"), "FAILED", Optional.empty())
+                            ExecStatus.create(Instant.parse("2016-08-03T09:58:03.607Z"), "FAILED", Optional.of("Exit code 1"))
                         )
                     ),
                     Execution.create(
@@ -219,14 +219,15 @@ public class WorkflowInstanceExecutionDataTest {
     assertThat(executionData, is(expected));
   }
 
-  private String statusJson(String time, String status) {
-    return "{\"timestamp\":\"2016-08-03T" + time + ":03.607Z\", \"status\":\"" + status + "\"}";
+  private String statusJson(String time, String status, Optional<String> message) {
+    final String baseJson = "{\"timestamp\":\"2016-08-03T" + time + ":03.607Z\", \"status\":\"" + status + "\"";
+    return message.map(s -> baseJson + ", \"message\":\"" + s + "\"}").orElseGet(() -> baseJson + "}");
   }
 
-  private String executionJson(String id, String image, String hour, String endStatus) {
-    String jsonStatus1 = statusJson(hour + ":56", "STARTED");
-    String jsonStatus2 = statusJson(hour + ":57", "RUNNING");
-    String jsonStatus3 = statusJson(hour + ":58", endStatus);
+  private String executionJson(String id, String image, String hour, String endStatus, Optional<String> endMessage) {
+    String jsonStatus1 = statusJson(hour + ":56", "STARTED", Optional.empty());
+    String jsonStatus2 = statusJson(hour + ":57", "RUNNING", Optional.empty());
+    String jsonStatus3 = statusJson(hour + ":58", endStatus, endMessage);
 
     return
         "{"
