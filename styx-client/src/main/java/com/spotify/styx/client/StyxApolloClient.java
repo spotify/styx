@@ -27,9 +27,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
-import com.google.common.net.HostAndPort;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.Response;
@@ -58,7 +56,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
-import java.util.stream.Stream;
 import okio.ByteString;
 
 /**
