@@ -49,7 +49,7 @@ class WFIExecutionBuilder {
   private Instant eventTs;
 
   private void closeExecution() {
-    Execution execution = Execution.create(
+    final Execution execution = Execution.create(
         Optional.ofNullable(currExecutionId),
         Optional.ofNullable(currDockerImg),
         executionStatusList);
@@ -65,7 +65,7 @@ class WFIExecutionBuilder {
       closeExecution();
     }
 
-    Trigger trigger = Trigger.create(currTriggerId, triggerTs, completed, executionList);
+    final Trigger trigger = Trigger.create(currTriggerId, triggerTs, completed, executionList);
 
     triggerList.add(trigger);
     executionList = new ArrayList<>();
@@ -162,7 +162,7 @@ class WFIExecutionBuilder {
       if (status.equals("FAILED")) {
         message = exitCode
             .map(c -> Optional.of("Exit code: " + c))
-            .orElseGet(() -> Optional.of("Exit code unknown"));
+            .orElse(Optional.of("Exit code unknown"));
       } else {
         message = Optional.empty();
       }
@@ -177,7 +177,7 @@ class WFIExecutionBuilder {
     public Void runError(WorkflowInstance workflowInstance, String message) {
       currWorkflowInstance = workflowInstance;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "FAILED", Optional.of(message)));
+      executionStatusList.add(ExecStatus.create(eventTs, "FAILED", Optional.ofNullable(message)));
 
       closeExecution();
       return null;

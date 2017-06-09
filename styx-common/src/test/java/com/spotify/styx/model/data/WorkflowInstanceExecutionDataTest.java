@@ -221,7 +221,7 @@ public class WorkflowInstanceExecutionDataTest {
 
   private String statusJson(String time, String status, Optional<String> message) {
     final String baseJson = "{\"timestamp\":\"2016-08-03T" + time + ":03.607Z\", \"status\":\"" + status + "\"";
-    return message.map(s -> baseJson + ", \"message\":\"" + s + "\"}").orElseGet(() -> baseJson + "}");
+    return message.map(s -> baseJson + ", \"message\":\"" + s + "\"}").orElse(baseJson + "}");
   }
 
   private String executionJson(String id, String image, String hour, String endStatus, Optional<String> endMessage) {
