@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.Rule;
 import org.junit.Test;
@@ -85,12 +86,12 @@ public class BigTableStorageTest {
 
     WorkflowInstanceExecutionData workflowInstanceExecutionData = storage.executionData(WFI1);
     assertThat(workflowInstanceExecutionData.triggers().get(0).triggerId(), is("triggerId"));
-    assertThat(workflowInstanceExecutionData.triggers().get(0).executions().get(0).executionId(), is("execId"));
-    assertThat(workflowInstanceExecutionData.triggers().get(0).executions().get(0).dockerImage(), is("img"));
+    assertThat(workflowInstanceExecutionData.triggers().get(0).executions().get(0).executionId(), is(Optional.of("execId")));
+    assertThat(workflowInstanceExecutionData.triggers().get(0).executions().get(0).dockerImage(), is(Optional.of("img")));
     assertThat(workflowInstanceExecutionData.triggers().get(0).executions().get(0).statuses().get(0), is(
-        ExecStatus.create(Instant.ofEpochMilli(1L), "SUBMITTED")));
+        ExecStatus.create(Instant.ofEpochMilli(1L), "SUBMITTED", Optional.empty())));
     assertThat(workflowInstanceExecutionData.triggers().get(0).executions().get(0).statuses().get(1), is(
-        ExecStatus.create(Instant.ofEpochMilli(2L), "STARTED")));
+        ExecStatus.create(Instant.ofEpochMilli(2L), "STARTED", Optional.empty())));
   }
 
   @Test
@@ -110,19 +111,19 @@ public class BigTableStorageTest {
     assertThat(workflowInstanceExecutionData.size(), is(2));
 
     assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).triggerId(), is("triggerId1"));
-    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).executionId(), is("execId1"));
-    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).dockerImage(), is("img1"));
+    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).executionId(), is(Optional.of("execId1")));
+    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).dockerImage(), is(Optional.of("img1")));
     assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).statuses()
-                   .get(0), is(ExecStatus.create(Instant.ofEpochMilli(1L), "SUBMITTED")));
+                   .get(0), is(ExecStatus.create(Instant.ofEpochMilli(1L), "SUBMITTED", Optional.empty())));
     assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).statuses()
-                   .get(1), is(ExecStatus.create(Instant.ofEpochMilli(2L), "STARTED")));
+                   .get(1), is(ExecStatus.create(Instant.ofEpochMilli(2L), "STARTED", Optional.empty())));
     assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).triggerId(), is("triggerId2"));
-    assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).executions().get(0).executionId(), is("execId2"));
-    assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).executions().get(0).dockerImage(), is("img2"));
+    assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).executions().get(0).executionId(), is(Optional.of("execId2")));
+    assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).executions().get(0).dockerImage(), is(Optional.of("img2")));
     assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).executions().get(0).statuses()
-                   .get(0), is(ExecStatus.create(Instant.ofEpochMilli(4L), "SUBMITTED")));
+                   .get(0), is(ExecStatus.create(Instant.ofEpochMilli(4L), "SUBMITTED", Optional.empty())));
     assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).executions().get(0).statuses()
-                   .get(1), is(ExecStatus.create(Instant.ofEpochMilli(5L), "STARTED")));
+                   .get(1), is(ExecStatus.create(Instant.ofEpochMilli(5L), "STARTED", Optional.empty())));
   }
 
   @Test

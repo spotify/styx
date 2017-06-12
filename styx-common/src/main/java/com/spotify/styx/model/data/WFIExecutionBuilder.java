@@ -49,10 +49,11 @@ class WFIExecutionBuilder {
   private Instant eventTs;
 
   private void closeExecution() {
-    if (currExecutionId != null && currDockerImg != null) {
-      Execution execution = Execution.create(currExecutionId, currDockerImg, executionStatusList);
-      executionList.add(execution);
-    }
+    final Execution execution = Execution.create(
+        Optional.ofNullable(currExecutionId),
+        Optional.ofNullable(currDockerImg),
+        executionStatusList);
+    executionList.add(execution);
 
     executionStatusList = new ArrayList<>();
     currExecutionId = null;
@@ -64,7 +65,7 @@ class WFIExecutionBuilder {
       closeExecution();
     }
 
-    Trigger trigger = Trigger.create(currTriggerId, triggerTs, completed, executionList);
+    final Trigger trigger = Trigger.create(currTriggerId, triggerTs, completed, executionList);
 
     triggerList.add(trigger);
     executionList = new ArrayList<>();
@@ -112,7 +113,7 @@ class WFIExecutionBuilder {
       currExecutionId = executionId;
       currDockerImg = dockerImage;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "SUBMITTED"));
+      executionStatusList.add(ExecStatus.create(eventTs, "SUBMITTED", Optional.empty()));
       return null;
     }
 
@@ -131,7 +132,7 @@ class WFIExecutionBuilder {
       currWorkflowInstance = workflowInstance;
       currExecutionId = executionId;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "SUBMITTED"));
+      executionStatusList.add(ExecStatus.create(eventTs, "SUBMITTED", Optional.empty()));
       return null;
     }
 
@@ -139,7 +140,7 @@ class WFIExecutionBuilder {
     public Void started(WorkflowInstance workflowInstance) {
       currWorkflowInstance = workflowInstance;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "STARTED"));
+      executionStatusList.add(ExecStatus.create(eventTs, "STARTED", Optional.empty()));
       return null;
     }
 
@@ -147,7 +148,7 @@ class WFIExecutionBuilder {
     public Void terminate(WorkflowInstance workflowInstance, Optional<Integer> exitCode) {
       currWorkflowInstance = workflowInstance;
 
-      String status = exitCode.map(c -> {
+      final String status = exitCode.map(c -> {
         if (c == 0) {
           return "SUCCESS";
         } else if (c == RunState.MISSING_DEPS_EXIT_CODE) {
@@ -157,7 +158,16 @@ class WFIExecutionBuilder {
         }
       }).orElse("FAILED");
 
-      executionStatusList.add(ExecStatus.create(eventTs, status));
+      final Optional<String> message;
+      if (status.equals("FAILED")) {
+        message = exitCode
+            .map(c -> Optional.of("Exit code: " + c))
+            .orElse(Optional.of("Exit code unknown"));
+      } else {
+        message = Optional.empty();
+      }
+
+      executionStatusList.add(ExecStatus.create(eventTs, status, message));
 
       closeExecution();
       return null;
@@ -167,7 +177,7 @@ class WFIExecutionBuilder {
     public Void runError(WorkflowInstance workflowInstance, String message) {
       currWorkflowInstance = workflowInstance;
 
-      executionStatusList.add(ExecStatus.create(eventTs, message));
+      executionStatusList.add(ExecStatus.create(eventTs, "FAILED", Optional.ofNullable(message)));
 
       closeExecution();
       return null;
@@ -207,7 +217,7 @@ class WFIExecutionBuilder {
     public Void timeout(WorkflowInstance workflowInstance) {
       currWorkflowInstance = workflowInstance;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "TIMEOUT"));
+      executionStatusList.add(ExecStatus.create(eventTs, "TIMEOUT", Optional.empty()));
 
       closeExecution();
       return null;
@@ -218,7 +228,7 @@ class WFIExecutionBuilder {
       currWorkflowInstance = workflowInstance;
       completed = true;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "HALTED"));
+      executionStatusList.add(ExecStatus.create(eventTs, "HALTED", Optional.empty()));
 
       closeTrigger();
       return null;
