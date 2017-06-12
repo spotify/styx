@@ -26,5 +26,9 @@
       <groupId>com.spotify</groupId>
       <artifactId>completable-futures</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.google.apis</groupId>
+      <artifactId>google-api-services-iam</artifactId>
+    </dependency>
   </dependencies>
 </project>
