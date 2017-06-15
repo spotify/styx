@@ -57,7 +57,21 @@ import org.slf4j.LoggerFactory;
 public final class Middlewares {
 
   private static final Logger LOG = LoggerFactory.getLogger(Middlewares.class);
+
   public static final String BEARER_PREFIX = "Bearer ";
+  private static final GoogleIdTokenVerifier GOOGLE_ID_TOKEN_VERIFIER;
+
+  static {
+    final NetHttpTransport transport;
+    try {
+      transport = GoogleNetHttpTransport.newTrustedTransport();
+    } catch (GeneralSecurityException | IOException e) {
+      throw new RuntimeException(e);
+    }
+    GOOGLE_ID_TOKEN_VERIFIER = new GoogleIdTokenVerifier
+        .Builder(transport, Utils.getDefaultJsonFactory())
+        .build();
+  }
 
   private Middlewares() {
   }
@@ -106,55 +120,6 @@ public final class Middlewares {
     };
   }
 
-  private static final GoogleIdTokenVerifier GOOGLE_ID_TOKEN_VERIFIER;
-
-  static {
-    final NetHttpTransport transport;
-    try {
-      transport = GoogleNetHttpTransport.newTrustedTransport();
-    } catch (GeneralSecurityException | IOException e) {
-      throw new RuntimeException(e);
-    }
-    GOOGLE_ID_TOKEN_VERIFIER = new GoogleIdTokenVerifier
-        .Builder(transport, Utils.getDefaultJsonFactory())
-        .build();
-  }
-
-  public interface AuthContext {
-    Optional<GoogleIdToken> user();
-  }
-
-  public interface Authenticated<T> extends Function<AuthContext, T> {}
-  public interface Requested<T> extends Function<RequestContext, T> {}
-
-  public static <T> Middleware<Requested<Authenticated<T>>, AsyncHandler<Response<ByteString>>> authed() {
-    return ar -> jsonAsync().apply(requestContext -> {
-      final T payload = ar
-          .apply(requestContext)
-          .apply(auth(requestContext));
-      return completedFuture(Response.forPayload(payload));
-    });
-  }
-
-  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authValidator() {
-    return h -> rc -> {
-      if (!auth(rc).user().isPresent()) {
-        return completedFuture(Response.forStatus(Status.UNAUTHORIZED));
-      }
-
-      return h.invoke(rc);
-    };
-  }
-
-  public static AuthContext auth(RequestContext requestContext) {
-    return () -> requestContext.request()
-        .header(HttpHeaders.AUTHORIZATION)
-        .filter(s -> s.startsWith(BEARER_PREFIX))
-        .map(s -> s.substring(BEARER_PREFIX.length()))
-        .map(Middlewares::verifyIdToken)
-        .filter(Objects::nonNull);
-  }
-
   private static GoogleIdToken verifyIdToken(String s) {
     try {
       return GOOGLE_ID_TOKEN_VERIFIER.verify(s);
@@ -178,6 +143,43 @@ public final class Middlewares {
                      .replaceAll("\n", " "));
       }
       return innerHandler.invoke(requestContext);
+    };
+  }
+
+  public interface AuthContext {
+    Optional<GoogleIdToken> user();
+  }
+
+  private static AuthContext auth(RequestContext requestContext) {
+    return () -> requestContext.request()
+        .header(HttpHeaders.AUTHORIZATION)
+        .filter(s -> s.startsWith(BEARER_PREFIX))
+        .map(s -> s.substring(BEARER_PREFIX.length()))
+        .map(Middlewares::verifyIdToken)
+        .filter(Objects::nonNull);
+  }
+
+  // todo: make use of following middleware where we need to use the auth context in route handlers
+
+  interface Authenticated<T> extends Function<AuthContext, T> {}
+  interface Requested<T> extends Function<RequestContext, T> {}
+
+  private static <T> Middleware<Requested<Authenticated<T>>, AsyncHandler<Response<ByteString>>> authed() {
+    return ar -> jsonAsync().apply(requestContext -> {
+      final T payload = ar
+          .apply(requestContext)
+          .apply(auth(requestContext));
+      return completedFuture(Response.forPayload(payload));
+    });
+  }
+
+  private static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authValidator() {
+    return h -> rc -> {
+      if (!auth(rc).user().isPresent()) {
+        return completedFuture(Response.forStatus(Status.UNAUTHORIZED));
+      }
+
+      return h.invoke(rc);
     };
   }
 }

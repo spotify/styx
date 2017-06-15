@@ -22,7 +22,6 @@ package com.spotify.styx.api.deprecated;
 
 import static com.spotify.styx.api.Api.Version.V0;
 import static com.spotify.styx.api.Api.Version.V1;
-import static com.spotify.styx.api.Middlewares.authed;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.util.StreamUtil.cat;
 
@@ -33,7 +32,6 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.Api;
-import com.spotify.styx.api.Middlewares.AuthContext;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.deprecated.WorkflowInstanceExecutionData;
 import com.spotify.styx.model.deprecated.Workflow;
@@ -57,8 +55,8 @@ public final class WorkflowResource {
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
     final List<Route<AsyncHandler<Response<ByteString>>>> v0Routes = Arrays.asList(
         Route.with(
-            authed(), "GET", BASE + "/<cid>/<eid>",
-            rc -> auth -> workflow(auth, arg("cid", rc), arg("eid", rc))),
+            json(), "GET", BASE + "/<cid>/<eid>",
+            rc -> workflow(arg("cid", rc), arg("eid", rc))),
         Route.with(
             json(), "GET", BASE + "/<cid>/<eid>/instances",
             rc -> Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Use v1 api"))),
@@ -99,9 +97,9 @@ public final class WorkflowResource {
     return workflowResource.patchState(componentId, request);
   }
 
-  private Response<Workflow> workflow(AuthContext authContext, String componentId, String endpointId) {
+  private Response<Workflow> workflow(String componentId, String endpointId) {
     final Response<com.spotify.styx.model.Workflow> response =
-        workflowResource.workflow(authContext, componentId, endpointId);
+        workflowResource.workflow(componentId, endpointId);
     return response.withPayload(response.payload().map(Workflow::create).orElse(null));
   }
 
