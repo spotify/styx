@@ -30,6 +30,7 @@ import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HttpHeaders;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -41,10 +42,13 @@ import com.spotify.apollo.route.SyncHandler;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import okio.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +63,7 @@ public final class Middlewares {
   private static final Logger LOG = LoggerFactory.getLogger(Middlewares.class);
 
   public static final String BEARER_PREFIX = "Bearer ";
+  private static final Set<String> BLACKLISTED_HEADERS = ImmutableSet.of(HttpHeaders.AUTHORIZATION);
   private static final GoogleIdTokenVerifier GOOGLE_ID_TOKEN_VERIFIER;
 
   static {
@@ -137,7 +142,7 @@ public final class Middlewares {
                  request.method(),
                  request.uri(),
                  authContext.user().map(idToken -> idToken.getPayload().getEmail()).orElse("anonymous"),
-                 request.headers(),
+                 filterHeaders(request.headers()),
                  request.parameters(),
                  request.payload().map(ByteString::utf8).orElse("")
                      .replaceAll("\n", " "));
@@ -157,6 +162,12 @@ public final class Middlewares {
         .map(s -> s.substring(BEARER_PREFIX.length()))
         .map(Middlewares::verifyIdToken)
         .filter(Objects::nonNull);
+  }
+
+  private static Map<String, String> filterHeaders(Map<String, String> headers) {
+    return headers.entrySet().stream()
+        .filter(entry -> !BLACKLISTED_HEADERS.contains(entry.getKey()))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   // todo: make use of following middleware where we need to use the auth context in route handlers
