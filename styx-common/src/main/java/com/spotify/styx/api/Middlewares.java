@@ -39,11 +39,11 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.SyncHandler;
+import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -128,7 +128,9 @@ public final class Middlewares {
   private static GoogleIdToken verifyIdToken(String s) {
     try {
       return GOOGLE_ID_TOKEN_VERIFIER.verify(s);
-    } catch (GeneralSecurityException | IOException e) {
+    } catch (GeneralSecurityException | IllegalArgumentException e) {
+      return null; // will be treated as an invalid token
+    } catch (IOException e) {
       throw new RuntimeException(e);
     }
   }
@@ -137,6 +139,12 @@ public final class Middlewares {
     return innerHandler -> requestContext -> {
       final Request request = requestContext.request();
       final AuthContext authContext = auth(requestContext);
+
+      if (!authContext.isValid()) {
+        return completedFuture(Response.forStatus(
+            Status.BAD_REQUEST.withReasonPhrase("Invalid Authorization token")));
+      }
+
       if (!"GET".equals(request.method())) {
         LOG.info("[AUDIT] {} {} by {} with headers {} parameters {} and payload {}",
                  request.method(),
@@ -151,17 +159,27 @@ public final class Middlewares {
     };
   }
 
+  @AutoMatter
   public interface AuthContext {
+    boolean hasAuthHeader();
+    boolean isValid();
     Optional<GoogleIdToken> user();
   }
 
   private static AuthContext auth(RequestContext requestContext) {
-    return () -> requestContext.request()
+    final Request request = requestContext.request();
+    final boolean hasAuthHeader = request.header(HttpHeaders.AUTHORIZATION).isPresent();
+    final Optional<GoogleIdToken> googleIdToken = request
         .header(HttpHeaders.AUTHORIZATION)
         .filter(s -> s.startsWith(BEARER_PREFIX))
         .map(s -> s.substring(BEARER_PREFIX.length()))
-        .map(Middlewares::verifyIdToken)
-        .filter(Objects::nonNull);
+        .map(Middlewares::verifyIdToken);
+
+    return new AuthContextBuilder()
+        .hasAuthHeader(hasAuthHeader)
+        .isValid(!hasAuthHeader || googleIdToken.isPresent())
+        .user(googleIdToken)
+        .build();
   }
 
   private static Map<String, String> filterHeaders(Map<String, String> headers) {

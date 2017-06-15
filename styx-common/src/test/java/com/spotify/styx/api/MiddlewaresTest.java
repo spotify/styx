@@ -20,9 +20,13 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
+import static com.spotify.apollo.test.unit.StatusTypeMatchers.belongsToFamily;
+import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
+import static java.util.concurrent.CompletableFuture.completedFuture;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
-import static org.hamcrest.core.IsEqual.equalTo;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -31,6 +35,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
+import com.google.common.net.HttpHeaders;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -43,9 +48,10 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import okio.ByteString;
 import org.junit.Test;
@@ -66,6 +72,10 @@ public class MiddlewaresTest {
     }
     when(requestContext.request()).thenReturn(request);
     return requestContext;
+  }
+
+  private <T> AsyncHandler<Response<T>> mockInnerHandler(RequestContext requestContext) {
+    return mockInnerHandler(requestContext, completedFuture(Response.forStatus(Status.OK)));
   }
 
   private <T> AsyncHandler<Response<T>> mockInnerHandler(RequestContext requestContext,
@@ -101,7 +111,7 @@ public class MiddlewaresTest {
   @Test
   public void testJsonAsync() throws Exception {
     AsyncHandler<Response<ByteString>> outerHandler = Middlewares.jsonAsync().apply(
-        rc -> CompletableFuture.completedFuture(Response.forPayload(TEST_STRUCT))
+        rc -> completedFuture(Response.forPayload(TEST_STRUCT))
     );
 
     CompletionStage<Response<ByteString>> completionStage = outerHandler.invoke(
@@ -146,85 +156,101 @@ public class MiddlewaresTest {
   }
 
   @Test
-  public void testValidClientNoBlacklist() {
+  public void testValidClientNoBlacklist() throws Exception {
     Supplier<Optional<List<String>>> supplier = Optional::empty;
     RequestContext requestContext = mockRequestContext(true);
-    CompletionStage completionStage =
-        CompletableFuture.completedFuture(Response.forStatus(Status.OK.withReasonPhrase("")));
-    assertThat(Middlewares.clientValidator(supplier)
-                   .apply(mockInnerHandler(requestContext, completionStage)).invoke(requestContext),
-               equalTo(completionStage));
+    Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)
+        .apply(mockInnerHandler(requestContext))
+        .invoke(requestContext));
+    assertThat(response, hasStatus(withCode(Status.OK)));
   }
 
   @Test
-  public void testValidClientEmptyBlacklist() {
+  public void testValidClientEmptyBlacklist() throws Exception {
     Supplier<Optional<List<String>>> supplier = () -> Optional.of(ImmutableList.of());
     RequestContext requestContext = mockRequestContext(true);
-    CompletionStage completionStage =
-        CompletableFuture.completedFuture(Response.forStatus(Status.OK.withReasonPhrase("")));
-    assertThat(Middlewares.clientValidator(supplier)
-                   .apply(mockInnerHandler(requestContext, completionStage)).invoke(requestContext),
-               equalTo(completionStage));
+    Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)
+        .apply(mockInnerHandler(requestContext))
+        .invoke(requestContext));
+    assertThat(response, hasStatus(withCode(Status.OK)));
   }
 
   @Test
-  public void testValidClient() {
+  public void testValidClient() throws Exception {
     Supplier<Optional<List<String>>> supplier = () -> Optional.of(ImmutableList.of("Styx CLI 0.1.0"));
     RequestContext requestContext = mockRequestContext(true);
-    CompletionStage completionStage =
-        CompletableFuture.completedFuture(Response.forStatus(Status.OK.withReasonPhrase("")));
-    assertThat(Middlewares.clientValidator(supplier)
-                   .apply(mockInnerHandler(requestContext, completionStage)).invoke(requestContext),
-               equalTo(completionStage));
+    Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)
+        .apply(mockInnerHandler(requestContext))
+        .invoke(requestContext));
+    assertThat(response, hasStatus(withCode(Status.OK)));
   }
 
   @Test
-  public void testValidClientNoHeader() {
+  public void testValidClientNoHeader() throws Exception {
     Supplier<Optional<List<String>>> supplier = () -> Optional.of(ImmutableList.of("Styx CLI 0.1.0"));
     RequestContext requestContext = mockRequestContext(false);
-    CompletionStage completionStage =
-        CompletableFuture.completedFuture(Response.forStatus(Status.OK.withReasonPhrase("")));
-    assertThat(Middlewares.clientValidator(supplier)
-                   .apply(mockInnerHandler(requestContext, completionStage)).invoke(requestContext),
-               equalTo(completionStage));
+    Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)
+        .apply(mockInnerHandler(requestContext))
+        .invoke(requestContext));
+    assertThat(response, hasStatus(withCode(Status.OK)));
   }
 
   @Test
-  public void testInvalidClient() throws ExecutionException, InterruptedException {
+  public void testInvalidClient() throws Exception {
     Supplier<Optional<List<String>>> supplier = () -> Optional.of(ImmutableList.of("Styx CLI 0.1.1"));
     RequestContext requestContext = mockRequestContext(true);
-    CompletionStage completionStage = Middlewares.clientValidator(supplier)
-                   .apply(mockInnerHandler(requestContext, null)).invoke(requestContext);
 
-    // noinspection unchecked
-    assertThat(
-        ((Response<ByteString>) completionStage.toCompletableFuture().get()).status().family(),
-        is(Status.Family.CLIENT_ERROR));
+    Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)
+        .apply(mockInnerHandler(requestContext))
+        .invoke(requestContext));
+    assertThat(response, hasStatus(belongsToFamily(Status.Family.CLIENT_ERROR)));
   }
 
   @Test
-  public void testAuditLoggingForGet() {
+  public void testAuditLoggingForGet() throws Exception {
     RequestContext requestContext = mock(RequestContext.class);
     Request request = Request.forUri("/", "GET");
     when(requestContext.request()).thenReturn(request);
-    CompletionStage completionStage =
-        CompletableFuture.completedFuture(Response.forStatus(Status.OK.withReasonPhrase("")));
-    assertThat(Middlewares.auditLogger()
-                   .apply(mockInnerHandler(requestContext, completionStage)).invoke(requestContext),
-               equalTo(completionStage));
+
+    Response<Object> response = awaitResponse(Middlewares.auditLogger()
+        .apply(mockInnerHandler(requestContext))
+        .invoke(requestContext));
+    assertThat(response, hasStatus(withCode(Status.OK)));
   }
 
   @Test
-  public void testAuditLoggingForPut() {
+  public void testAuditLoggingForPut() throws Exception {
     RequestContext requestContext = mock(RequestContext.class);
     Request request = Request.forUri("/", "PUT")
         .withPayload(ByteString.encodeUtf8("hello"));
     when(requestContext.request()).thenReturn(request);
-    CompletionStage completionStage =
-        CompletableFuture.completedFuture(Response.forStatus(Status.OK.withReasonPhrase("")));
-    assertThat(Middlewares.auditLogger()
-                   .apply(mockInnerHandler(requestContext, completionStage)).invoke(requestContext),
-               equalTo(completionStage));
+
+    Response<Object> response = awaitResponse(Middlewares.auditLogger()
+        .apply(mockInnerHandler(requestContext))
+        .invoke(requestContext));
+    assertThat(response, hasStatus(withCode(Status.OK)));
+  }
+
+  @Test
+  public void testAuditLoggingForPutWithBrokenAuthorization()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = Request.forUri("/", "PUT")
+        .withHeader(HttpHeaders.AUTHORIZATION, "Bearer broken")
+        .withPayload(ByteString.encodeUtf8("hello"));
+    when(requestContext.request()).thenReturn(request);
+
+    Response<Object> response = Middlewares.auditLogger()
+        .apply(mockInnerHandler(requestContext))
+        .invoke(requestContext)
+        .toCompletableFuture().get(5, SECONDS);
+
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
+  }
+
+  public static <T> Response<T> awaitResponse(CompletionStage<Response<T>> completionStage)
+      throws Exception {
+    return completionStage.toCompletableFuture().get(5, TimeUnit.SECONDS);
   }
 
   @AutoValue
