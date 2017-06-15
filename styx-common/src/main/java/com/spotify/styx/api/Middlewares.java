@@ -155,7 +155,7 @@ public final class Middlewares {
         .filter(Objects::nonNull);
   }
 
-  private static GoogleIdToken verifyIdToken(final String s) {
+  private static GoogleIdToken verifyIdToken(String s) {
     try {
       return GOOGLE_ID_TOKEN_VERIFIER.verify(s);
     } catch (GeneralSecurityException | IOException e) {
@@ -168,7 +168,7 @@ public final class Middlewares {
       final Request request = requestContext.request();
       final AuthContext authContext = auth(requestContext);
       if (!"GET".equals(request.method())) {
-        LOG.info("[AUDIT] {} {} from {} with headers {} parameters {} and payload {}",
+        LOG.info("[AUDIT] {} {} by {} with headers {} parameters {} and payload {}",
                  request.method(),
                  request.uri(),
                  authContext.user().map(idToken -> idToken.getPayload().getEmail()).orElse("anonymous"),
