@@ -73,7 +73,9 @@ public class ResourceResourceTest extends VersionedApiTest {
   protected void init(Environment environment) {
     ResourceResource resourceResource = new ResourceResource(storage);
 
-    environment.routingEngine().registerRoutes(resourceResource.routes());
+    environment.routingEngine()
+        .registerRoutes(Api.withCommonMiddleware(
+            resourceResource.routes()));
   }
 
   @BeforeClass

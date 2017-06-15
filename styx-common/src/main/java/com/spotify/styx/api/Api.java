@@ -20,10 +20,17 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.styx.api.Middlewares.auditLogger;
+import static com.spotify.styx.api.Middlewares.clientValidator;
+import static com.spotify.styx.api.Middlewares.exceptionHandler;
+
 import com.spotify.apollo.Response;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import okio.ByteString;
 
@@ -44,6 +51,19 @@ public final class Api {
         .flatMap(v -> routes.stream().map(route -> route.withPrefix(v.prefix())));
   }
 
+  public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
+      Stream<Route<AsyncHandler<Response<ByteString>>>> routes) {
+    return withCommonMiddleware(routes, Optional::empty);
+  }
+
+  public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
+      Stream<Route<AsyncHandler<Response<ByteString>>>> routes,
+      Supplier<Optional<List<String>>> clientBlacklistSupplier) {
+    return routes.map(r -> r
+        .withMiddleware(auditLogger())
+        .withMiddleware(clientValidator(clientBlacklistSupplier))
+        .withMiddleware(exceptionHandler()));
+  }
   private Api() {
   }
 }

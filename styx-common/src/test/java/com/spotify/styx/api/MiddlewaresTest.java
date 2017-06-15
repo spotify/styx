@@ -48,6 +48,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -84,6 +85,15 @@ public class MiddlewaresTest {
     AsyncHandler<Response<T>> innerHandler = mock(AsyncHandler.class);
     // noinspection unchecked
     when(innerHandler.invoke(requestContext)).thenReturn(completionStage);
+    return innerHandler;
+  }
+
+  private <T> AsyncHandler<Response<T>> mockInnerHandler(RequestContext requestContext,
+                                                         Throwable throwable) {
+    // noinspection unchecked
+    AsyncHandler<Response<T>> innerHandler = mock(AsyncHandler.class);
+    // noinspection unchecked
+    when(innerHandler.invoke(requestContext)).thenThrow(throwable);
     return innerHandler;
   }
 
@@ -240,12 +250,45 @@ public class MiddlewaresTest {
         .withPayload(ByteString.encodeUtf8("hello"));
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = Middlewares.auditLogger()
+    Response<Object> response = Middlewares.auditLogger().and(Middlewares.exceptionHandler())
         .apply(mockInnerHandler(requestContext))
         .invoke(requestContext)
         .toCompletableFuture().get(5, SECONDS);
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
+  }
+
+  @Test
+  public void testExceptionHandler()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = Request.forUri("/", "GET");
+    when(requestContext.request()).thenReturn(request);
+
+    Response<Object> response = Middlewares.exceptionHandler()
+        .apply(mockInnerHandler(requestContext, new ResponseException(Response.forStatus(Status.IM_A_TEAPOT))))
+        .invoke(requestContext)
+        .toCompletableFuture().get(5, SECONDS);
+
+    assertThat(response, hasStatus(withCode(Status.IM_A_TEAPOT)));
+  }
+
+  @Test
+  public void testExceptionHandlerForAsyncException()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = Request.forUri("/", "GET");
+    when(requestContext.request()).thenReturn(request);
+
+    CompletableFuture<?> failedFuture = new CompletableFuture();
+    failedFuture.completeExceptionally(new ResponseException(Response.forStatus(Status.IM_A_TEAPOT)));
+
+    Response<Object> response = Middlewares.exceptionHandler()
+        .apply(mockInnerHandler(requestContext, failedFuture))
+        .invoke(requestContext)
+        .toCompletableFuture().get(5, SECONDS);
+
+    assertThat(response, hasStatus(withCode(Status.IM_A_TEAPOT)));
   }
 
   public static <T> Response<T> awaitResponse(CompletionStage<Response<T>> completionStage)

@@ -125,8 +125,8 @@ public class BackfillResourceTest extends VersionedApiTest {
   @Override
   protected void init(Environment environment) {
     environment.routingEngine()
-        .registerRoutes(
-            new BackfillResource(SCHEDULER_BASE, storage).routes());
+        .registerRoutes(Api.withCommonMiddleware(
+            new BackfillResource(SCHEDULER_BASE, storage).routes()));
   }
 
   @BeforeClass

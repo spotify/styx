@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletionException;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -125,10 +126,30 @@ public final class Middlewares {
     };
   }
 
+  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> exceptionHandler() {
+    return innerHandler -> requestContext -> {
+      try {
+        return innerHandler.invoke(requestContext).handle((r, t) -> {
+          if (t != null) {
+            if (t instanceof ResponseException) {
+              return ((ResponseException) t).getResponse();
+            } else {
+              throw new CompletionException(t);
+            }
+          } else {
+            return r;
+          }
+        });
+      } catch (ResponseException e) {
+        return completedFuture(e.getResponse());
+      }
+    };
+  }
+
   private static GoogleIdToken verifyIdToken(String s) {
     try {
       return GOOGLE_ID_TOKEN_VERIFIER.verify(s);
-    } catch (GeneralSecurityException | IllegalArgumentException e) {
+    } catch (GeneralSecurityException e) {
       return null; // will be treated as an invalid token
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -140,20 +161,15 @@ public final class Middlewares {
       final Request request = requestContext.request();
       final AuthContext authContext = auth(requestContext);
 
-      if (!authContext.isValid()) {
-        return completedFuture(Response.forStatus(
-            Status.BAD_REQUEST.withReasonPhrase("Invalid Authorization token")));
-      }
-
       if (!"GET".equals(request.method())) {
         LOG.info("[AUDIT] {} {} by {} with headers {} parameters {} and payload {}",
-                 request.method(),
-                 request.uri(),
-                 authContext.user().map(idToken -> idToken.getPayload().getEmail()).orElse("anonymous"),
-                 filterHeaders(request.headers()),
-                 request.parameters(),
-                 request.payload().map(ByteString::utf8).orElse("")
-                     .replaceAll("\n", " "));
+            request.method(),
+            request.uri(),
+            authContext.user().map(idToken -> idToken.getPayload().getEmail()).orElse("anonymous"),
+            filterHeaders(request.headers()),
+            request.parameters(),
+            request.payload().map(ByteString::utf8).orElse("")
+                .replaceAll("\n", " "));
       }
       return innerHandler.invoke(requestContext);
     };
@@ -161,25 +177,38 @@ public final class Middlewares {
 
   @AutoMatter
   public interface AuthContext {
-    boolean hasAuthHeader();
-    boolean isValid();
     Optional<GoogleIdToken> user();
   }
 
   private static AuthContext auth(RequestContext requestContext) {
     final Request request = requestContext.request();
     final boolean hasAuthHeader = request.header(HttpHeaders.AUTHORIZATION).isPresent();
-    final Optional<GoogleIdToken> googleIdToken = request
-        .header(HttpHeaders.AUTHORIZATION)
-        .filter(s -> s.startsWith(BEARER_PREFIX))
-        .map(s -> s.substring(BEARER_PREFIX.length()))
-        .map(Middlewares::verifyIdToken);
 
-    return new AuthContextBuilder()
-        .hasAuthHeader(hasAuthHeader)
-        .isValid(!hasAuthHeader || googleIdToken.isPresent())
-        .user(googleIdToken)
-        .build();
+    if (!hasAuthHeader) {
+      return Optional::empty;
+    }
+
+    final String authHeader = request.header(HttpHeaders.AUTHORIZATION).get();
+    if (!authHeader.startsWith(BEARER_PREFIX)) {
+      throw new ResponseException(Response.forStatus(Status.BAD_REQUEST
+          .withReasonPhrase("Authorization token must be of type Bearer")));
+    }
+
+    final GoogleIdToken googleIdToken;
+    try {
+      final String token = authHeader.substring(BEARER_PREFIX.length());
+      googleIdToken = verifyIdToken(token);
+    } catch (IllegalArgumentException e) {
+      throw new ResponseException(Response.forStatus(Status.BAD_REQUEST
+          .withReasonPhrase("Failed to parse Authorization token")), e);
+    }
+
+    if (googleIdToken == null) {
+      throw new ResponseException(Response.forStatus(Status.UNAUTHORIZED
+          .withReasonPhrase("Authorization token is invalid")));
+    }
+
+    return () -> Optional.of(googleIdToken);
   }
 
   private static Map<String, String> filterHeaders(Map<String, String> headers) {
@@ -204,9 +233,8 @@ public final class Middlewares {
 
   private static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authValidator() {
     return h -> rc -> {
-      if (!auth(rc).user().isPresent()) {
-        return completedFuture(Response.forStatus(Status.UNAUTHORIZED));
-      }
+      // ensure auth context is valid (throws otherwise)
+      auth(rc);
 
       return h.invoke(rc);
     };

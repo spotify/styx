@@ -42,7 +42,9 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
   protected void init(Environment environment) {
     final SchedulerProxyResource schedulerProxyResource = new SchedulerProxyResource(SCHEDULER_BASE);
 
-    environment.routingEngine().registerRoutes(schedulerProxyResource.routes());
+    environment.routingEngine()
+        .registerRoutes(Api.withCommonMiddleware(
+            schedulerProxyResource.routes()));
   }
 
   @Test

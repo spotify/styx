@@ -20,7 +20,6 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.api.Middlewares.auditLogger;
 import static com.spotify.styx.monitoring.MeteredProxy.instrument;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
@@ -52,6 +51,7 @@ import com.spotify.apollo.AppInit;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.route.Route;
 import com.spotify.metrics.core.SemanticMetricRegistry;
+import com.spotify.styx.api.Api;
 import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.WorkflowValidator;
@@ -355,8 +355,7 @@ public class StyxScheduler implements AppInit {
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
-        .registerRoutes(schedulerResource.routes().map(r -> r
-                .withMiddleware(auditLogger())));
+        .registerRoutes(Api.withCommonMiddleware(schedulerResource.routes()));
 
     this.stateManager = stateManager;
     this.scheduler = scheduler;
