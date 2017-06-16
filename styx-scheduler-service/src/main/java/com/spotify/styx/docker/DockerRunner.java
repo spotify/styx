@@ -92,6 +92,8 @@ public interface DockerRunner extends Closeable {
 
     public abstract Optional<Trigger> trigger();
 
+    public abstract Optional<String> commitSha();
+
     public static RunSpec create(
         String executionId,
         String imageName,
@@ -99,14 +101,15 @@ public interface DockerRunner extends Closeable {
         boolean terminationLogging,
         Optional<Secret> secret,
         Optional<String> serviceAccount,
-        Optional<Trigger> trigger) {
+        Optional<Trigger> trigger,
+        Optional<String> commitSha) {
       return new AutoValue_DockerRunner_RunSpec(executionId, imageName, args, terminationLogging, secret,
-                                                serviceAccount, trigger);
+                                                serviceAccount, trigger, commitSha);
     }
 
     public static RunSpec simple(String executionId, String imageName, String... args) {
       return new AutoValue_DockerRunner_RunSpec(executionId, imageName, ImmutableList.copyOf(args),
-                                                false, empty(), empty(), empty());
+                                                false, empty(), empty(), empty(), empty());
     }
   }
 

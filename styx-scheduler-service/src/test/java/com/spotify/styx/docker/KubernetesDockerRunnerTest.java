@@ -100,12 +100,14 @@ public class KubernetesDockerRunnerTest {
                                                                      false,
                                                                      Optional.of(WorkflowConfiguration.Secret.create("secret1", "/etc/secret")),
                                                                      empty(),
+                                                                     empty(),
                                                                      empty());
   private static final RunSpec RUN_SPEC_WITH_SA = RunSpec.create("eid3", "busybox",
                                                                  ImmutableList.copyOf(new String[0]),
                                                                  false,
                                                                  empty(),
                                                                  Optional.of(SERVICE_ACCOUNT),
+                                                                 empty(),
                                                                  empty());
 
   private static final KubernetesSecretSpec SECRET_SPEC_WITH_SA = KubernetesSecretSpec.builder()
@@ -124,6 +126,7 @@ public class KubernetesDockerRunnerTest {
                                                                             false,
                                                                             Optional.of(WorkflowConfiguration.Secret.create("secret1", KubernetesDockerRunner.STYX_WORKFLOW_SA_SECRET_MOUNT_PATH)),
                                                                             Optional.of(SERVICE_ACCOUNT),
+                                                                            empty(),
                                                                             empty());
 
   private static final int NO_POLL = Integer.MAX_VALUE;
@@ -342,6 +345,7 @@ public class KubernetesDockerRunnerTest {
         false,
         Optional.of(WorkflowConfiguration.Secret.create(secret, "/foo/bar")),
         Optional.empty(),
+        empty(),
         empty()));
 
     verify(pods, never()).create(any(Pod.class));

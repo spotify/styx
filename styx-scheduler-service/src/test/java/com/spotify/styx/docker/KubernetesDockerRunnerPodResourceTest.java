@@ -20,9 +20,19 @@
 
 package com.spotify.styx.docker;
 
+import static com.spotify.styx.docker.KubernetesDockerRunner.COMMIT_SHA;
+import static com.spotify.styx.docker.KubernetesDockerRunner.COMPONENT_ID;
+import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_IMAGE;
 import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_TERMINATION_LOGGING_ANNOTATION;
+import static com.spotify.styx.docker.KubernetesDockerRunner.EXECUTION_ID;
+import static com.spotify.styx.docker.KubernetesDockerRunner.PARAMETER;
+import static com.spotify.styx.docker.KubernetesDockerRunner.SERVICE_ACCOUNT;
 import static com.spotify.styx.docker.KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION;
 import static com.spotify.styx.docker.KubernetesDockerRunner.TERMINATION_LOG;
+import static com.spotify.styx.docker.KubernetesDockerRunner.TRIGGER_ID;
+import static com.spotify.styx.docker.KubernetesDockerRunner.TRIGGER_TYPE;
+import static com.spotify.styx.docker.KubernetesDockerRunner.WORKFLOW_ID;
+import static com.spotify.styx.docker.KubernetesDockerRunner.envVar;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasEntry;
@@ -47,9 +57,6 @@ import java.util.Optional;
 import org.junit.Test;
 
 public class KubernetesDockerRunnerPodResourceTest {
-
-  private static final String UUID_REGEX =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
   private static final WorkflowInstance WORKFLOW_INSTANCE =
       WorkflowInstance.create(TestData.WORKFLOW_ID, "2016-04-04");
@@ -132,7 +139,7 @@ public class KubernetesDockerRunnerPodResourceTest {
         WORKFLOW_INSTANCE,
             DockerRunner.RunSpec.create(
                 "eid", "busybox", ImmutableList.of(), true,
-                empty(), empty(), empty()), EMPTY_SECRET_SPEC);
+                empty(), empty(), empty(), empty()), EMPTY_SECRET_SPEC);
 
     Map<String, String> annotations = pod.getMetadata().getAnnotations();
     assertThat(annotations.get(DOCKER_TERMINATION_LOGGING_ANNOTATION), is("true"));
@@ -178,7 +185,7 @@ public class KubernetesDockerRunnerPodResourceTest {
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.create(
             "eid", "busybox", ImmutableList.of(), false, Optional.of(secret),
-            empty(), empty()), secretSpec);
+            empty(), empty(), empty()), secretSpec);
 
     List<Volume> volumes = pod.getSpec().getVolumes();
     List<Container> containers = pod.getSpec().getContainers();
@@ -201,38 +208,22 @@ public class KubernetesDockerRunnerPodResourceTest {
 
   @Test
   public void shouldConfigureEnvironmentVariables() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+    final Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec
             .create(TEST_EXECUTION_ID, "busybox", ImmutableList.of(), false, empty(),
-                    empty(), Optional.of(Trigger.unknown("trigger-id"))), EMPTY_SECRET_SPEC);
-    List<EnvVar> envVars = pod.getSpec().getContainers().get(0).getEnv();
+                    empty(), Optional.of(Trigger.unknown("trigger-id")), Optional.of("abc123")), EMPTY_SECRET_SPEC);
 
-    EnvVar workflow = new EnvVar();
-    workflow.setName(KubernetesDockerRunner.WORKFLOW_ID);
-    workflow.setValue(WORKFLOW_INSTANCE.workflowId().id());
-    EnvVar component = new EnvVar();
-    component.setName(KubernetesDockerRunner.COMPONENT_ID);
-    component.setValue(WORKFLOW_INSTANCE.workflowId().componentId());
-    EnvVar parameter = new EnvVar();
-    parameter.setName(KubernetesDockerRunner.PARAMETER);
-    parameter.setValue(WORKFLOW_INSTANCE.parameter());
-    EnvVar triggerId = new EnvVar();
-    triggerId.setName(KubernetesDockerRunner.TRIGGER_ID);
-    triggerId.setValue("trigger-id");
-    EnvVar triggerName = new EnvVar();
-    triggerName.setName(KubernetesDockerRunner.TRIGGER_TYPE);
-    triggerName.setValue("unknown");
+    final List<EnvVar> envVars = pod.getSpec().getContainers().get(0).getEnv();
 
-    assertThat(envVars.size(), is(8));
-    assertThat(envVars, hasItem(component));
-    assertThat(envVars, hasItem(workflow));
-    assertThat(envVars, hasItem(parameter));
-    assertThat(envVars, hasItem(triggerId));
-    assertThat(envVars, hasItem(triggerName));
-
-    EnvVar execution = envVars.get(4);
-    assertThat(execution.getName(),is(KubernetesDockerRunner.EXECUTION_ID));
-    assertThat(execution.getValue(), is(TEST_EXECUTION_ID));
+    assertThat(envVars, hasItem(envVar(COMPONENT_ID, WORKFLOW_INSTANCE.workflowId().componentId())));
+    assertThat(envVars, hasItem(envVar(WORKFLOW_ID, WORKFLOW_INSTANCE.workflowId().id())));
+    assertThat(envVars, hasItem(envVar(PARAMETER, WORKFLOW_INSTANCE.parameter())));
+    assertThat(envVars, hasItem(envVar(SERVICE_ACCOUNT, "")));
+    assertThat(envVars, hasItem(envVar(DOCKER_IMAGE, "busybox")));
+    assertThat(envVars, hasItem(envVar(TRIGGER_ID, "trigger-id")));
+    assertThat(envVars, hasItem(envVar(TRIGGER_TYPE, "unknown")));
+    assertThat(envVars, hasItem(envVar(COMMIT_SHA, "abc123")));
+    assertThat(envVars, hasItem(envVar(EXECUTION_ID, TEST_EXECUTION_ID)));
   }
 }
