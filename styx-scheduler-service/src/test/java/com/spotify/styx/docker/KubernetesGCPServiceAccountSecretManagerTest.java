@@ -112,6 +112,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
       false,
       empty(),
       Optional.of(SERVICE_ACCOUNT),
+      empty(),
       empty());
 
   private static final String TEST_EXEC_ID = "test-exec-id";

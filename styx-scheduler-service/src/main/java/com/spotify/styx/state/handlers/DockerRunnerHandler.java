@@ -152,7 +152,8 @@ public class DockerRunnerHandler implements OutputHandler {
         executionDescription.dockerTerminationLogging(),
         executionDescription.secret(),
         executionDescription.serviceAccount(),
-        state.data().trigger());
+        state.data().trigger(),
+        state.data().executionDescription().flatMap(ExecutionDescription::commitSha));
   }
 
   private static List<String> argsReplace(List<String> template, String parameter) {

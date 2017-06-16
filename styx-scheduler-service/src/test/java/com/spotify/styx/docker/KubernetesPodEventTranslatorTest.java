@@ -335,6 +335,6 @@ public class KubernetesPodEventTranslatorTest {
     return KubernetesDockerRunner.createPod(
         WFI,
         DockerRunner.RunSpec.create("eid", "busybox", ImmutableList.of(), true,
-            Optional.empty(), Optional.empty(), Optional.empty()), SECRET_SPEC);
+            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()), SECRET_SPEC);
   }
 }

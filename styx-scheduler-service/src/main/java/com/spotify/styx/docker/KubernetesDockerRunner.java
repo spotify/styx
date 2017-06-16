@@ -92,6 +92,10 @@ class KubernetesDockerRunner implements DockerRunner {
   // TODO: for backward compatibility, delete later
   private static final String ENDPOINT_ID = "STYX_ENDPOINT_ID";
   static final String WORKFLOW_ID = "STYX_WORKFLOW_ID";
+  static final String SERVICE_ACCOUNT = "STYX_SERVICE_ACCOUNT";
+  static final String DOCKER_ARGS = "STYX_DOCKER_ARGS";
+  static final String DOCKER_IMAGE = "STYX_DOCKER_IMAGE";
+  static final String COMMIT_SHA = "STYX_COMMIT_SHA";
   static final String PARAMETER = "STYX_PARAMETER";
   static final String EXECUTION_ID = "STYX_EXECUTION_ID";
   static final String TERMINATION_LOG = "STYX_TERMINATION_LOG";
@@ -263,7 +267,8 @@ class KubernetesDockerRunner implements DockerRunner {
     return podBuilder.build();
   }
 
-  private static EnvVar envVar(String name, String value) {
+  @VisibleForTesting
+  static EnvVar envVar(String name, String value) {
     return new EnvVarBuilder().withName(name).withValue(value).build();
   }
 
@@ -275,6 +280,10 @@ class KubernetesDockerRunner implements DockerRunner {
         envVar(ENDPOINT_ID,     workflowInstance.workflowId().id()),
         envVar(WORKFLOW_ID,     workflowInstance.workflowId().id()),
         envVar(PARAMETER,       workflowInstance.parameter()),
+        envVar(COMMIT_SHA,      runSpec.commitSha().orElse("")),
+        envVar(SERVICE_ACCOUNT, runSpec.serviceAccount().orElse("")),
+        envVar(DOCKER_ARGS,     String.join(" ", runSpec.args())),
+        envVar(DOCKER_IMAGE,    runSpec.imageName()),
         envVar(EXECUTION_ID,    runSpec.executionId()),
         envVar(TERMINATION_LOG, "/dev/termination-log"),
         envVar(TRIGGER_ID,      runSpec.trigger().map(TriggerUtil::triggerId).orElse(null)),

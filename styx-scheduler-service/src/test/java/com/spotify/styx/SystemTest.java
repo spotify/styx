@@ -96,13 +96,13 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
   private static RunSpec naturalRunSpec(String executionId, String imageName, ImmutableList<String> args) {
     return RunSpec.create(executionId, imageName, args, false, empty(), empty(),
-                          Optional.of(Trigger.natural()));
+                          Optional.of(Trigger.natural()), empty());
   }
 
   private static RunSpec unknownRunSpec(String executionId, String imageName, ImmutableList<String> args,
                                         String triggerId) {
     return RunSpec.create(executionId, imageName, args, false, empty(), empty(),
-                          Optional.of(Trigger.unknown(triggerId)));
+                          Optional.of(Trigger.unknown(triggerId)), empty());
   }
 
   @Test
