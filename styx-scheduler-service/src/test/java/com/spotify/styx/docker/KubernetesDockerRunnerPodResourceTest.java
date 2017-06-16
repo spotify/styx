@@ -20,7 +20,6 @@
 
 package com.spotify.styx.docker;
 
-import static com.jcabi.matchers.RegexMatchers.matchesPattern;
 import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_TERMINATION_LOGGING_ANNOTATION;
 import static com.spotify.styx.docker.KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION;
 import static com.spotify.styx.docker.KubernetesDockerRunner.TERMINATION_LOG;

@@ -20,8 +20,6 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.api.Middlewares.auditLogging;
-import static com.spotify.styx.api.Middlewares.clientValidator;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
@@ -30,7 +28,10 @@ import com.google.cloud.datastore.Datastore;
 import com.google.common.io.Closer;
 import com.spotify.apollo.AppInit;
 import com.spotify.apollo.Environment;
+import com.spotify.apollo.Response;
+import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
+import com.spotify.styx.api.Api;
 import com.spotify.styx.api.BackfillResource;
 import com.spotify.styx.api.ResourceResource;
 import com.spotify.styx.api.SchedulerProxyResource;
@@ -41,12 +42,15 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.StorageFactory;
+import com.spotify.styx.util.StreamUtil;
 import com.typesafe.config.Config;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
+import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -122,45 +126,22 @@ public class StyxApi implements AppInit {
     final Supplier<Optional<List<String>>> clientBlacklistSupplier =
         new CachedSupplier<>(storage::clientBlacklist, Instant::now);
 
+    // TODO remove deprecated resources
+    final Stream<Route<AsyncHandler<Response<ByteString>>>> routes = StreamUtil.cat(
+        deprecatedWorkflowResource.routes(),
+        deprecatedBackfillResource.routes(),
+        deprecatedCliResource.routes(),
+        workflowResource.routes(),
+        backfillResource.routes(),
+        resourceResource.routes(),
+        styxConfigResource.routes(),
+        statusResource.routes(),
+        schedulerProxyResource.routes()
+    );
+
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
-        // TODO remove deprecated resources
-        .registerRoutes(deprecatedWorkflowResource.routes()
-                            .map(r -> r
-                                .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())))
-        .registerRoutes(deprecatedBackfillResource.routes()
-                            .map(r -> r
-                                .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())))
-        .registerRoutes(deprecatedCliResource.routes()
-                            .map(r -> r
-                                .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())))
-        .registerRoutes(workflowResource.routes()
-                            .map(r -> r
-                                .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())))
-        .registerRoutes(backfillResource.routes()
-                            .map(r -> r
-                                .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())))
-        .registerRoutes(resourceResource.routes()
-                            .map(r -> r
-                                .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())))
-        .registerRoutes(styxConfigResource.routes()
-                            .map(r -> r
-                                .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())))
-        .registerRoutes(statusResource.routes()
-                            .map(r -> r
-                                .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())))
-        .registerRoutes(schedulerProxyResource.routes()
-                            .map(r -> r
-                                .withMiddleware(clientValidator(clientBlacklistSupplier))
-                                .withMiddleware(auditLogging())));
+        .registerRoutes(Api.withCommonMiddleware(routes, clientBlacklistSupplier));
   }
 
   private static AggregateStorage storage(Environment environment) {

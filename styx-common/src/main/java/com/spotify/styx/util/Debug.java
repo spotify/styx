@@ -20,7 +20,6 @@
 
 package com.spotify.styx.util;
 
-import java.time.Instant;
 import java.util.function.Supplier;
 
 public interface Debug extends Supplier<Boolean> {

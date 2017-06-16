@@ -53,7 +53,7 @@ public final class BackfillResource {
     this.backfillResource = Objects.requireNonNull(backfillResource);
   }
 
-  public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
+  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
     final EntityMiddleware em =
         EntityMiddleware.forCodec(JacksonEntityCodec.forMapper(Json.OBJECT_MAPPER));
 

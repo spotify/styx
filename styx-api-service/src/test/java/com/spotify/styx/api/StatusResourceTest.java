@@ -65,7 +65,8 @@ public class StatusResourceTest extends VersionedApiTest {
     final StatusResource statusResource = new StatusResource(storage);
 
     environment.routingEngine()
-        .registerRoutes(statusResource.routes());
+        .registerRoutes(Api.withCommonMiddleware(
+            statusResource.routes()));
   }
 
   @Test

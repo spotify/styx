@@ -47,7 +47,7 @@ public class SchedulerProxyResource {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
   }
 
-  public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
+  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
     final List<Route<AsyncHandler<Response<ByteString>>>> schedulerProxies = Arrays.asList(
         Route.async(
             "GET", BASE + "/<endpoint:path>",

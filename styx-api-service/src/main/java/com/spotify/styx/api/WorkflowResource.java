@@ -57,7 +57,7 @@ public final class WorkflowResource {
     this.storage = Objects.requireNonNull(storage);
   }
 
-  public Stream<? extends Route<? extends AsyncHandler<? extends Response<ByteString>>>> routes() {
+  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Arrays.asList(
         Route.with(
             json(), "GET", BASE + "/<cid>/<wfid>",
