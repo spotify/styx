@@ -67,7 +67,7 @@ class StyxApolloClient implements StyxClient {
   private static final String STYX_API_VERSION = "v2";
   private static final String STYX_CLIENT_VERSION =
       "Styx Client " + StyxApolloClient.class.getPackage().getImplementationVersion();
-  private static final int TTL_SECONDS = 90;
+  private static final Duration TTL = Duration.ofSeconds(90);
 
   private final URI apiHost;
   private final Client client;
@@ -89,7 +89,7 @@ class StyxApolloClient implements StyxClient {
         .addPathSegment("activeStates");
     componentId.ifPresent(id -> urlBuilder.addQueryParameter("component", id));
     return executeRequest(
-        Request.forUri(urlBuilder.build().toString()).withTtl(Duration.ofSeconds(TTL_SECONDS)),
+        Request.forUri(urlBuilder.build().toString()),
         RunStateDataPayload.class);
   }
 
@@ -104,7 +104,7 @@ class StyxApolloClient implements StyxClient {
         .addPathSegment(workflowId)
         .addPathSegment(parameter);
     return executeRequest(
-        Request.forUri(urlBuilder.build().toString()).withTtl(Duration.ofSeconds(TTL_SECONDS)))
+        Request.forUri(urlBuilder.build().toString()))
         .thenApply(response -> {
           final JsonNode jsonNode;
           try {
@@ -344,7 +344,7 @@ class StyxApolloClient implements StyxClient {
   }
 
   private CompletionStage<Response<ByteString>> executeRequest(final Request request) {
-    return client.send(request.withHeader("User-Agent", STYX_CLIENT_VERSION)).thenApply(response -> {
+    return client.send(request.withTtl(TTL).withHeader("User-Agent", STYX_CLIENT_VERSION)).thenApply(response -> {
       switch (response.status().family()) {
         case SUCCESSFUL:
           return response;
