@@ -113,7 +113,7 @@ class StyxApolloClient implements StyxClient {
             }
             jsonNode = OBJECT_MAPPER.readTree(response.payload().get().toByteArray());
           } catch (IOException e) {
-            throw new RuntimeException("Invalid json returned from API");
+            throw new RuntimeException("Invalid json returned from API", e);
           }
 
           if (!jsonNode.isObject()) {
