@@ -39,7 +39,7 @@ public class GoogleIdTokenAuth {
   private final HttpTransport httpTransport;
   private static final JsonFactory JSON_FACTORY = Utils.getDefaultJsonFactory();
 
-  public GoogleIdTokenAuth(HttpTransport httpTransport) {
+  GoogleIdTokenAuth(HttpTransport httpTransport) {
     this.httpTransport = httpTransport;
   }
 
@@ -47,7 +47,7 @@ public class GoogleIdTokenAuth {
     this(Utils.getDefaultTransport());
   }
 
-  public String getToken() throws IOException, GeneralSecurityException {
+  public String getToken(String targetAudience) throws IOException, GeneralSecurityException {
     GoogleCredential credential = GoogleCredential.getApplicationDefault();
     if (credential.getServiceAccountId() != null) {
       // is a service account
@@ -56,7 +56,7 @@ public class GoogleIdTokenAuth {
             "https://www.googleapis.com/auth/cloud-platform",
             "email"));
       }
-      return getServiceAccountToken(credential, "https://styx.spotify.net");
+      return getServiceAccountToken(credential, targetAudience);
     } else {
       // is a user
       return getUserToken(credential);

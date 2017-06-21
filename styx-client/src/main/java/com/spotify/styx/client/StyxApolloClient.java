@@ -346,17 +346,24 @@ class StyxApolloClient implements StyxClient {
   }
 
   private Request decorateRequest(final Request request) {
+    return withOptionalAuth(request.withHeader("User-Agent", STYX_CLIENT_VERSION).withTtl(TTL));
+  }
+
+  private Request withOptionalAuth(final Request request) {
     try {
-      return request
-          .withHeader("User-Agent", STYX_CLIENT_VERSION)
-          .withHeader("Authorization", "Bearer " + new GoogleIdTokenAuth().getToken());
-    } catch (IOException | GeneralSecurityException e) {
+      String authToken = new GoogleIdTokenAuth().getToken(this.apiHost.toString());
+      return request.withHeader("Authorization", "Bearer " + authToken);
+    } catch (IOException e) {
+      // Credential probably not configured. Proceed to invoke API without authentication.
+      return request;
+    } catch (GeneralSecurityException e) {
+      // Credential probably configured wrongly.
       throw new RuntimeException(e);
     }
   }
 
   private CompletionStage<Response<ByteString>> executeRequest(final Request request) {
-    return client.send(decorateRequest(request).withTtl(TTL)).thenApply(response -> {
+    return client.send(decorateRequest(request)).thenApply(response -> {
       switch (response.status().family()) {
         case SUCCESSFUL:
           return response;
