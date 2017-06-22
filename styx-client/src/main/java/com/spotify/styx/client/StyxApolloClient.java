@@ -36,6 +36,7 @@ import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.ResourcesPayload;
 import com.spotify.styx.api.RunStateDataPayload;
+import com.spotify.styx.client.auth.GoogleIdTokenAuth;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.Event;
@@ -50,6 +51,7 @@ import com.squareup.okhttp.HttpUrl;
 import com.squareup.okhttp.HttpUrl.Builder;
 import java.io.IOException;
 import java.net.URI;
+import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -343,8 +345,25 @@ class StyxApolloClient implements StyxClient {
     });
   }
 
+  private Request decorateRequest(final Request request) {
+    return withOptionalAuth(request.withHeader("User-Agent", STYX_CLIENT_VERSION).withTtl(TTL));
+  }
+
+  private Request withOptionalAuth(final Request request) {
+    try {
+      String authToken = new GoogleIdTokenAuth().getToken(this.apiHost.toString());
+      return request.withHeader("Authorization", "Bearer " + authToken);
+    } catch (IOException e) {
+      // Credential probably not configured. Proceed to invoke API without authentication.
+      return request;
+    } catch (GeneralSecurityException e) {
+      // Credential probably configured wrongly.
+      throw new RuntimeException(e);
+    }
+  }
+
   private CompletionStage<Response<ByteString>> executeRequest(final Request request) {
-    return client.send(request.withTtl(TTL).withHeader("User-Agent", STYX_CLIENT_VERSION)).thenApply(response -> {
+    return client.send(decorateRequest(request)).thenApply(response -> {
       switch (response.status().family()) {
         case SUCCESSFUL:
           return response;
