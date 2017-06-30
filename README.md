@@ -130,12 +130,11 @@ A unique identifier for the workflow (lower-case-hyphenated). This identifier is
 The Docker image that should be executed.
 
 #### `schedule[].docker_args` **[string]**
-The arguments passed to the Docker image.
+The list of arguments passed to the Docker container.
 
-This list should only contain strings. These will be passed as the arguments to the Docker
-container. Any occurrences of the `{}` placeholder argument will be replaced with the current
-partition date or datehour. Note that it must be quoted in the yaml file in order not to be
-interpreted as an object.
+This list should only contain strings. Any occurrences of the `{}` placeholder argument will be
+replaced with the current partition date or datehour. Note that it must be quoted in the yaml file
+in order not to be interpreted as an object.
 
 Example arguments for the supported schedule values:
 ```
@@ -145,7 +144,8 @@ Example arguments for the supported schedule values:
 ```
 
 #### `schedule[].schedule` **[string]**
-How often the workflow should be triggered.
+How often the workflow should be triggered and what the `{}` placeholder will be replaced with in
+`docker_args`.
 
 Supports [cron] syntax, along with a set of human readable aliases:
 ```
@@ -170,6 +170,15 @@ useful for irregular schedules.
 In fact, it is so common that we need to use a "last hour" parameter in jobs that we've set the
 default offset for all the well known (aliased) schedules to +1 period. E.g for an `@hourly`
 schedule, the default offset is `PT1H`, and for a `@daily` schedule the offset is `P1D`
+
+Example: a job needs to run daily at 2 AM but the partition argument needs to be midnight
+
+```yaml
+schedule: '@daily'
+offset: P1DT2H
+```
+
+At 2017-06-30T02 the execution for 2017-06-29 will be triggered.
 
 #### `schedule[].secret` **[secret]**
 Secret is used to mount keys stored in [Kubernetes Secrets] into the container.
@@ -223,11 +232,15 @@ For each execution, Styx will inject a set of environment variables into the Doc
 
 | Variable Name | Description |
 |---|---|
-| `STYX_COMPONENT_ID` | The component id of the workflow that is being executed. This will be the filename of the file which defines the workflow schedule. |
-| `STYX_WORKFLOW_ID` | The workflow id of the workflow that is being executed. This is the `id` field specified in the workflow schedule. |
+| `STYX_COMPONENT_ID` | The component id of the workflow. This will be the filename of the file which defines the workflow schedule. |
+| `STYX_WORKFLOW_ID` | The workflow id of the workflow. This is the `id` field specified in the workflow schedule. |
 | `STYX_PARAMETER` | The parameter argument. See section about `docker_args` above. |
-| `STYX_TRIGGER_ID` | The ID of the trigger which is being executed. |
-| `STYX_TRIGGER_TYPE` | The type of the trigger which is being executed. Possible values are: `natural`, `adhoc`, `backfill` and `unknown` |
+| `STYX_SERVICE_ACCOUNT` | The service account. |
+| `STYX_COMMIT_SHA` | The commit-sha of the workflow. |
+| `STYX_DOCKER_ARGS` | The arguments passed to the container. |
+| `STYX_DOCKER_IMAGE` | The docker image. |
+| `STYX_TRIGGER_ID` | The ID of the trigger. |
+| `STYX_TRIGGER_TYPE` | The type of the trigger. Possible values are: `natural`, `adhoc`, `backfill` and `unknown` |
 | `STYX_EXECUTION_ID` | A unique identifier for the execution. This is the execution id used to identify execution attempts of a trigger. |
 | `STYX_EXECUTION_COUNTER` | **to be implemented** - A counter indicating which execution this is. Goes from 0..N per trigger. |
 
