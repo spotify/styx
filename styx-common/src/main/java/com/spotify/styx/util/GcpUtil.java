@@ -38,8 +38,21 @@ public class GcpUtil {
   }
 
   public static boolean isPermissionDenied(GoogleJsonError error) {
-    return Optional.ofNullable(error.get("status"))
-        .map("PERMISSION_DENIED"::equals)
+    return "PERMISSION_DENIED".equals(error.get("status"));
+  }
+
+  public static boolean isResourceExhausted(Throwable t) {
+    return t instanceof GoogleJsonResponseException
+           && isResourceExhausted((GoogleJsonResponseException) t);
+  }
+
+  public static boolean isResourceExhausted(GoogleJsonResponseException e) {
+    return e.getStatusCode() == 429 && Optional.ofNullable(e.getDetails())
+        .map(GcpUtil::isResourceExhausted)
         .orElse(false);
+  }
+
+  public static boolean isResourceExhausted(GoogleJsonError error) {
+    return "RESOURCE_EXHAUSTED".equals(error.get("status"));
   }
 }

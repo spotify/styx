@@ -29,6 +29,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hashing;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.util.GcpUtil;
 import io.fabric8.kubernetes.api.model.Pod;
@@ -107,12 +108,14 @@ class KubernetesGCPServiceAccountSecretManager {
     try {
       return serviceAccountSecretCache.get(serviceAccount, () ->
           getOrCreateSecret(workflowId, serviceAccount, epoch, secretName));
-    } catch (ExecutionException e) {
+    } catch (ExecutionException | UncheckedExecutionException e) {
       final Throwable cause = e.getCause();
       if (cause instanceof InvalidExecutionException) {
         throw (InvalidExecutionException) cause;
       } else if (GcpUtil.isPermissionDenied(cause)) {
         throw new InvalidExecutionException("Permission denied to service account: " + serviceAccount);
+      } else if (GcpUtil.isResourceExhausted(cause)) {
+        throw new InvalidExecutionException("Maximum number of keys on service account reached: " + serviceAccount);
       } else {
         throw new RuntimeException(e);
       }

@@ -34,9 +34,12 @@ public class GcpUtilTest {
   private static final GoogleJsonError PERMISSION_DENIED_ERROR = new GoogleJsonError()
       .set("status", "PERMISSION_DENIED");
 
+  private static final GoogleJsonError RESOURCE_EXHAUSTED_ERROR = new GoogleJsonError()
+      .set("status", "RESOURCE_EXHAUSTED");
+
   @Test
   public void responseIsPermissionDenied() throws Exception {
-    final GoogleJsonResponseException permissionDenied = new GoogleJsonResponseException(
+    final Throwable permissionDenied = new GoogleJsonResponseException(
         new Builder(403, "Forbidden", new HttpHeaders()), PERMISSION_DENIED_ERROR);
     assertThat(GcpUtil.isPermissionDenied(permissionDenied), is(true));
   }
@@ -58,5 +61,31 @@ public class GcpUtilTest {
   public void errorIsNotPermissionDenied() throws Exception {
     assertThat(GcpUtil.isPermissionDenied(new GoogleJsonError()), is(false));
     assertThat(GcpUtil.isPermissionDenied(new GoogleJsonError().set("status", "foo failed")), is(false));
+  }
+
+  @Test
+  public void responseIsResourceExhausted() throws Exception {
+    final Throwable resourceExhausted = new GoogleJsonResponseException(
+        new Builder(429, "Too Many Requests", new HttpHeaders()), RESOURCE_EXHAUSTED_ERROR);
+    assertThat(GcpUtil.isResourceExhausted(resourceExhausted), is(true));
+  }
+
+  @Test
+  public void notFoundResponseIsNotPResourceExhausted() throws Exception {
+    assertThat(GcpUtil.isResourceExhausted(new GoogleJsonResponseException(
+        new Builder(404, "Not Found", new HttpHeaders()), new GoogleJsonError())), is(false));
+    assertThat(GcpUtil.isResourceExhausted(new GoogleJsonResponseException(
+        new Builder(404, "Not Found", new HttpHeaders()), null)), is(false));
+  }
+
+  @Test
+  public void errorIsResourceExhausted() throws Exception {
+    assertThat(GcpUtil.isResourceExhausted(RESOURCE_EXHAUSTED_ERROR), is(true));
+  }
+
+  @Test
+  public void errorIsNotResourceExhausted() throws Exception {
+    assertThat(GcpUtil.isResourceExhausted(new GoogleJsonError()), is(false));
+    assertThat(GcpUtil.isResourceExhausted(new GoogleJsonError().set("status", "foo failed")), is(false));
   }
 }
