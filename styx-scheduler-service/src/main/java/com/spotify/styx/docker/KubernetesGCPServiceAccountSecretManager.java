@@ -96,8 +96,7 @@ class KubernetesGCPServiceAccountSecretManager {
     this(client, keyManager, DEFAULT_SECRET_EPOCH_PROVIDER, DEFAULT_CLOCK);
   }
 
-  String ensureServiceAccountKeySecret(String workflowId,
-      String serviceAccount) throws IOException {
+  String ensureServiceAccountKeySecret(String workflowId, String serviceAccount) {
     final long epoch = epochProvider.epoch(clock.millis(), serviceAccount);
     final String secretName = buildSecretName(serviceAccount, epoch);
 
@@ -113,6 +112,8 @@ class KubernetesGCPServiceAccountSecretManager {
         throw (InvalidExecutionException) cause;
       } else if (GcpUtil.isPermissionDenied(cause)) {
         throw new InvalidExecutionException("Permission denied to service account: " + serviceAccount);
+      } else if (GcpUtil.isMaximumNumberOfKeysReached(cause)) {
+        throw new InvalidExecutionException("Maximum number of keys on service account reached: " + serviceAccount);
       } else {
         throw new RuntimeException(e);
       }
@@ -276,7 +277,8 @@ class KubernetesGCPServiceAccountSecretManager {
       keyManager.deleteKey(keyName);
     } catch (GoogleJsonResponseException e) {
       if (GcpUtil.isPermissionDenied(e)) {
-        logger.warn("[AUDIT] Permission denied when trying to delete unused service account key {}");
+        logger.warn("[AUDIT] Permission denied when trying to delete unused service account key {}",
+                    keyName);
       } else {
         throw e;
       }
