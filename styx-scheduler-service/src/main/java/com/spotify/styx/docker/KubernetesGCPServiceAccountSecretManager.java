@@ -187,8 +187,8 @@ class KubernetesGCPServiceAccountSecretManager {
 
     client.secrets().create(newSecret);
 
-    logger.info("[AUDIT] Secret {} created to store keys of {} referred by workflow {}",
-        secretName, serviceAccount, workflowId);
+    logger.info("[AUDIT] Secret {} created to store keys of {} referred by workflow {}, jsonKey: {}, p12Key: {}",
+        secretName, serviceAccount, workflowId, jsonKey.getName(), p12Key.getName());
   }
 
   private boolean keyExists(String jsonKeyName) {
@@ -276,7 +276,8 @@ class KubernetesGCPServiceAccountSecretManager {
       keyManager.deleteKey(keyName);
     } catch (GoogleJsonResponseException e) {
       if (GcpUtil.isPermissionDenied(e)) {
-        logger.warn("[AUDIT] Permission denied when trying to delete unused service account key {}");
+        logger.warn("[AUDIT] Permission denied when trying to delete unused service account key {}",
+                    keyName);
       } else {
         throw e;
       }
