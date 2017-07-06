@@ -123,6 +123,15 @@ public class TimeUtilTest {
   }
 
   @Test
+  public void shouldSupportZeroOffset() throws Exception {
+    String offset = "PT0S";
+    ZonedDateTime time = ZonedDateTime.parse("2017-01-22T08:07:11.22Z");
+    ZonedDateTime offsetTime = addOffset(time, offset);
+
+    assertThat(offsetTime, is(time));
+  }
+
+  @Test
   public void shouldAddOffset() throws Exception {
     String offset = "P1M3DT1H7M5S";
     ZonedDateTime time = ZonedDateTime.parse("2017-01-22T08:07:11.22Z");

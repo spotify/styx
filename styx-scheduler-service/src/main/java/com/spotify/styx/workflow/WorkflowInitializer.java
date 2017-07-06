@@ -51,10 +51,12 @@ public class WorkflowInitializer {
       throw new RuntimeException(e);
     }
 
-    // either the workflow is completely new, or the schedule has changed
+    // either the workflow is completely new, or the schedule/offset has changed
     final Schedule newSchedule = workflow.configuration().schedule();
+    final Optional<String> newOffset = workflow.configuration().offset();
     if (!previous.isPresent()
-        || !previous.get().configuration().schedule().equals(newSchedule)) {
+        || !previous.get().configuration().schedule().equals(newSchedule)
+        || !previous.get().configuration().offset().equals(newOffset)) {
       initializeNaturalTrigger(workflow);
     }
   }
