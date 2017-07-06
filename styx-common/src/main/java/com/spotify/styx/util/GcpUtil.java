@@ -42,4 +42,26 @@ public class GcpUtil {
         .map("PERMISSION_DENIED"::equals)
         .orElse(false);
   }
+
+  public static boolean isMaximumNumberOfKeysReached(Throwable t) {
+    return t instanceof GoogleJsonResponseException
+           && isMaximumNumberOfKeysReached((GoogleJsonResponseException) t);
+  }
+
+  public static boolean isMaximumNumberOfKeysReached(GoogleJsonResponseException e) {
+    return e.getStatusCode() == 429 && Optional.ofNullable(e.getDetails())
+        .map(GcpUtil::isMaximumNumberOfKeysReached)
+        .orElse(false);
+  }
+
+  public static boolean isMaximumNumberOfKeysReached(GoogleJsonError error) {
+    final Boolean status = Optional.ofNullable(error.get("status"))
+        .map("RESOURCE_EXHAUSTED"::equals)
+        .orElse(false);
+    final Boolean message = Optional.ofNullable(error.getMessage())
+        .map("Maximum number of keys on account reached."::equals)
+        .orElse(false);
+    return status && message;
+  }
+
 }

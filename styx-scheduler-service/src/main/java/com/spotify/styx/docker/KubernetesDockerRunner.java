@@ -155,8 +155,7 @@ class KubernetesDockerRunner implements DockerRunner {
     serviceAccountSecretManager.cleanup();
   }
 
-  private KubernetesSecretSpec ensureSecrets(WorkflowInstance workflowInstance, RunSpec runSpec)
-      throws IOException {
+  private KubernetesSecretSpec ensureSecrets(WorkflowInstance workflowInstance, RunSpec runSpec) {
     return KubernetesSecretSpec.builder()
         .customSecret(ensureCustomSecret(workflowInstance, runSpec))
         .serviceAccountSecret(runSpec.serviceAccount().isPresent()
