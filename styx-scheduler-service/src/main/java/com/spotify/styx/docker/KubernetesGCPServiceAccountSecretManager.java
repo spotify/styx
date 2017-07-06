@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -96,8 +97,7 @@ class KubernetesGCPServiceAccountSecretManager {
     this(client, keyManager, DEFAULT_SECRET_EPOCH_PROVIDER, DEFAULT_CLOCK);
   }
 
-  String ensureServiceAccountKeySecret(String workflowId,
-      String serviceAccount) throws IOException {
+  String ensureServiceAccountKeySecret(String workflowId, String serviceAccount) {
     final long epoch = epochProvider.epoch(clock.millis(), serviceAccount);
     final String secretName = buildSecretName(serviceAccount, epoch);
 
@@ -107,7 +107,7 @@ class KubernetesGCPServiceAccountSecretManager {
     try {
       return serviceAccountSecretCache.get(serviceAccount, () ->
           getOrCreateSecret(workflowId, serviceAccount, epoch, secretName));
-    } catch (Exception e) {
+    } catch (ExecutionException e) {
       final Throwable cause = e.getCause();
       if (cause instanceof InvalidExecutionException) {
         throw (InvalidExecutionException) cause;
