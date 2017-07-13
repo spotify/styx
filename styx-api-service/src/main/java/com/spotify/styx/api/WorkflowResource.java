@@ -21,6 +21,7 @@
 package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V2;
+import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
@@ -79,9 +80,8 @@ public final class WorkflowResource {
             rc -> patchState(arg("cid", rc), rc.request()))
     );
 
-    return Api.prefixRoutes(routes, V2);
+    return Api.prefixRoutes(routes, V2, V3);
   }
-
 
   public Response<WorkflowState> patchState(String componentId, String id, Request request) {
     final Optional<ByteString> payload = request.payload();

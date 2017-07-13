@@ -22,6 +22,7 @@ package com.spotify.styx.api;
 
 import static com.spotify.apollo.StatusType.Family.SUCCESSFUL;
 import static com.spotify.styx.api.Api.Version.V2;
+import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.util.ParameterUtil.rangeOfInstants;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
@@ -118,8 +119,8 @@ public final class BackfillResource {
     );
 
     return cat(
-        Api.prefixRoutes(entityRoutes, V2),
-        Api.prefixRoutes(routes, V2)
+        Api.prefixRoutes(entityRoutes, V2, V3),
+        Api.prefixRoutes(routes, V2, V3)
     );
   }
 

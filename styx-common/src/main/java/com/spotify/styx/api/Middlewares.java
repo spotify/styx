@@ -159,9 +159,9 @@ public final class Middlewares {
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> auditLogger() {
     return innerHandler -> requestContext -> {
       final Request request = requestContext.request();
-      final AuthContext authContext = auth(requestContext);
 
       if (!"GET".equals(request.method())) {
+        final AuthContext authContext = auth(requestContext);
         LOG.info("[AUDIT] {} {} by {} with headers {} parameters {} and payload {}",
             request.method(),
             request.uri(),
@@ -231,10 +231,14 @@ public final class Middlewares {
     });
   }
 
-  private static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authValidator() {
+  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authValidator() {
     return h -> rc -> {
-      // ensure auth context is valid (throws otherwise)
-      auth(rc);
+      if (!"GET".equals(rc.request().method())) {
+        if (!auth(rc).user().isPresent()) {
+          return completedFuture(
+              Response.forStatus(Status.UNAUTHORIZED.withReasonPhrase("Unauthorized access")));
+        }
+      }
 
       return h.invoke(rc);
     };

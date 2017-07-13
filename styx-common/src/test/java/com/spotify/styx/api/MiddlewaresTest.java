@@ -291,6 +291,31 @@ public class MiddlewaresTest {
     assertThat(response, hasStatus(withCode(Status.IM_A_TEAPOT)));
   }
 
+  @Test
+  public void testAuthValidatorForGet() throws Exception {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = Request.forUri("/", "GET");
+    when(requestContext.request()).thenReturn(request);
+
+    Response<Object> response = awaitResponse(Middlewares.authValidator()
+                                                  .apply(mockInnerHandler(requestContext))
+                                                  .invoke(requestContext));
+    assertThat(response, hasStatus(withCode(Status.OK)));
+  }
+
+  @Test
+  public void testAuthValidatorForPut() throws Exception {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = Request.forUri("/", "PUT")
+        .withPayload(ByteString.encodeUtf8("hello"));
+    when(requestContext.request()).thenReturn(request);
+
+    Response<Object> response = awaitResponse(Middlewares.authValidator()
+                                                  .apply(mockInnerHandler(requestContext))
+                                                  .invoke(requestContext));
+    assertThat(response, hasStatus(withCode(Status.UNAUTHORIZED)));
+  }
+
   public static <T> Response<T> awaitResponse(CompletionStage<Response<T>> completionStage)
       throws Exception {
     return completionStage.toCompletableFuture().get(5, TimeUnit.SECONDS);
