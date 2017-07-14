@@ -66,7 +66,7 @@ import okio.ByteString;
  * as {@link RuntimeException} instead.
  */
 class StyxApolloClient implements StyxClient {
-  private static final String STYX_API_VERSION = "v2";
+  private static final String STYX_API_VERSION = "v3";
   private static final String STYX_CLIENT_VERSION =
       "Styx Client " + StyxApolloClient.class.getPackage().getImplementationVersion();
   private static final Duration TTL = Duration.ofSeconds(90);
