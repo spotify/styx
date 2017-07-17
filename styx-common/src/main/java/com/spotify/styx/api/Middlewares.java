@@ -161,15 +161,16 @@ public final class Middlewares {
       final Request request = requestContext.request();
 
       if (!"GET".equals(request.method())) {
-        final AuthContext authContext = auth(requestContext);
         LOG.info("[AUDIT] {} {} by {} with headers {} parameters {} and payload {}",
-            request.method(),
-            request.uri(),
-            authContext.user().map(idToken -> idToken.getPayload().getEmail()).orElse("anonymous"),
-            filterHeaders(request.headers()),
-            request.parameters(),
-            request.payload().map(ByteString::utf8).orElse("")
-                .replaceAll("\n", " "));
+                 request.method(),
+                 request.uri(),
+                 auth(requestContext).user().map(idToken -> idToken.getPayload()
+                     .getEmail())
+                     .orElse("anonymous"),
+                 filterHeaders(request.headers()),
+                 request.parameters(),
+                 request.payload().map(ByteString::utf8).orElse("")
+                     .replaceAll("\n", " "));
       }
       return innerHandler.invoke(requestContext);
     };
