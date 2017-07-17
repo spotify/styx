@@ -83,7 +83,7 @@ public class StyxSchedulerServiceFixture {
 
   private Datastore datastore = localDatastore.getOptions().getService();
   private Connection bigtable = setupBigTableMockTable(0);
-  private AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
+  protected AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
   private DeterministicScheduler executor = new QuietDeterministicScheduler();
   private Consumer<Workflow> workflowChangeListener;
   private Consumer<Workflow> workflowRemoveListener;
