@@ -20,6 +20,8 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.api.Api.Version.V3;
+import static com.spotify.styx.api.Middlewares.authValidator;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
@@ -126,7 +128,7 @@ public class StyxApi implements AppInit {
     final Supplier<Optional<List<String>>> clientBlacklistSupplier =
         new CachedSupplier<>(storage::clientBlacklist, Instant::now);
 
-    // TODO remove deprecated resources
+    // TODO remove deprecated resources and remove V3 hack
     final Stream<Route<AsyncHandler<Response<ByteString>>>> routes = StreamUtil.cat(
         deprecatedWorkflowResource.routes(),
         deprecatedBackfillResource.routes(),
@@ -137,7 +139,7 @@ public class StyxApi implements AppInit {
         styxConfigResource.routes(),
         statusResource.routes(),
         schedulerProxyResource.routes()
-    );
+    ).map(r -> r.uri().startsWith(V3.prefix()) ? r.withMiddleware(authValidator()) : r);
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))

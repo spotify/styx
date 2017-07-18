@@ -20,6 +20,7 @@
 
 package com.spotify.styx.client;
 
+import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.serialization.Json.serialize;
 
@@ -66,7 +67,7 @@ import okio.ByteString;
  * as {@link RuntimeException} instead.
  */
 class StyxApolloClient implements StyxClient {
-  private static final String STYX_API_VERSION = "v2";
+  private static final String STYX_API_VERSION = V3.name().toLowerCase();
   private static final String STYX_CLIENT_VERSION =
       "Styx Client " + StyxApolloClient.class.getPackage().getImplementationVersion();
   private static final Duration TTL = Duration.ofSeconds(90);

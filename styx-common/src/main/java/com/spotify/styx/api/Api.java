@@ -37,7 +37,7 @@ import okio.ByteString;
 public final class Api {
 
   public enum Version {
-    V0, V1, V2;
+    V0, V1, V2, V3;
 
     public String prefix() {
       return "/api/v" + ordinal();

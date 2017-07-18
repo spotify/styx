@@ -159,17 +159,18 @@ public final class Middlewares {
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> auditLogger() {
     return innerHandler -> requestContext -> {
       final Request request = requestContext.request();
-      final AuthContext authContext = auth(requestContext);
 
       if (!"GET".equals(request.method())) {
         LOG.info("[AUDIT] {} {} by {} with headers {} parameters {} and payload {}",
-            request.method(),
-            request.uri(),
-            authContext.user().map(idToken -> idToken.getPayload().getEmail()).orElse("anonymous"),
-            filterHeaders(request.headers()),
-            request.parameters(),
-            request.payload().map(ByteString::utf8).orElse("")
-                .replaceAll("\n", " "));
+                 request.method(),
+                 request.uri(),
+                 auth(requestContext).user().map(idToken -> idToken.getPayload()
+                     .getEmail())
+                     .orElse("anonymous"),
+                 filterHeaders(request.headers()),
+                 request.parameters(),
+                 request.payload().map(ByteString::utf8).orElse("")
+                     .replaceAll("\n", " "));
       }
       return innerHandler.invoke(requestContext);
     };
@@ -231,10 +232,14 @@ public final class Middlewares {
     });
   }
 
-  private static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authValidator() {
+  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authValidator() {
     return h -> rc -> {
-      // ensure auth context is valid (throws otherwise)
-      auth(rc);
+      if (!"GET".equals(rc.request().method())) {
+        if (!auth(rc).user().isPresent()) {
+          return completedFuture(
+              Response.forStatus(Status.UNAUTHORIZED.withReasonPhrase("Unauthorized access")));
+        }
+      }
 
       return h.invoke(rc);
     };
