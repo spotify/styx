@@ -29,6 +29,8 @@ import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.api.JsonMatchers.assertNoJson;
 import static com.spotify.styx.model.SequenceEvent.create;
 import static com.spotify.styx.model.WorkflowState.patchDockerImage;
+import static com.spotify.styx.serialization.Json.deserialize;
+import static com.spotify.styx.serialization.Json.serialize;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
@@ -72,6 +74,8 @@ import org.junit.Test;
 
 public class WorkflowResourceTest extends VersionedApiTest {
 
+  private static final String SCHEDULER_BASE = "http://localhost:8080";
+
   private static LocalDatastoreHelper localDatastore;
 
   private Datastore datastore = localDatastore.getOptions().getService();
@@ -88,8 +92,22 @@ public class WorkflowResourceTest extends VersionedApiTest {
           .schedule(Schedule.DAYS)
           .build();
 
+  private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_WITH_IMAGE =
+      WorkflowConfiguration.builder()
+          .id("bar")
+          .schedule(Schedule.DAYS)
+          .dockerImage("bar-dummy:dummy")
+          .build();
+
   private static final Workflow WORKFLOW =
       Workflow.create("foo", URI.create("/hejhej"), WORKFLOW_CONFIGURATION);
+
+  private static final Workflow WORKFLOW2 =
+      Workflow.create("foo", URI.create(SCHEDULER_BASE + "/foo"), WORKFLOW_CONFIGURATION);
+
+  private static final Workflow WORKFLOW_WITH_IMAGE =
+      Workflow
+          .create("foo", URI.create(SCHEDULER_BASE + "/foo"), WORKFLOW_CONFIGURATION_WITH_IMAGE);
 
   private static final String VALID_SHA = "470a229b49a14e7682af2abfdac3b881a8aacdf9";
   private static final String INVALID_SHA = "XXXXXX9b49a14e7682af2abfdac3b881a8aacdf9";
@@ -123,7 +141,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
-    WorkflowResource workflowResource = new WorkflowResource(storage);
+    WorkflowResource workflowResource = new WorkflowResource(storage,
+        SCHEDULER_BASE);
 
     environment.routingEngine()
         .registerRoutes(Api.withCommonMiddleware(
@@ -161,6 +180,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     while (keys.hasNext()) {
       datastore.delete(keys.next());
     }
+    serviceHelper.stubClient().clear();
   }
 
   @Test
@@ -177,7 +197,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_FULL));
+            STATEPAYLOAD_FULL));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
@@ -200,7 +220,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_ENABLED));
+            STATEPAYLOAD_ENABLED));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
@@ -219,7 +239,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_OTHER_FIELD));
+            STATEPAYLOAD_OTHER_FIELD));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
@@ -234,7 +254,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_IMAGE));
+            STATEPAYLOAD_IMAGE));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
@@ -251,7 +271,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/state"),
-                                            STATEPAYLOAD_IMAGE));
+            STATEPAYLOAD_IMAGE));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
@@ -293,13 +313,13 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_VALID_SHA));
+            STATEPAYLOAD_VALID_SHA));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "commit_sha", equalTo(VALID_SHA));
 
     assertThat(storage.workflowState(WORKFLOW.id()).commitSha().get(),
-               is(VALID_SHA));
+        is(VALID_SHA));
   }
 
   @Test
@@ -308,26 +328,29 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_INVALID_SHA));
+            STATEPAYLOAD_INVALID_SHA));
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasStatus(withReasonPhrase(equalTo("Invalid SHA-1."))));
 
     assertThat(storage.workflowState(WORKFLOW.id()).commitSha().isPresent(),
-               is(false));
+        is(false));
   }
 
-  @Test @Ignore
+  @Test
+  @Ignore
   public void shouldReturnBadRequestOnEnableWhenWorkflowNotFound() throws Exception {
     // can't implement
     // this can't ever happen in the current bigtable storage implementation
   }
 
-  @Test @Ignore
+  @Test
+  @Ignore
   public void shouldReturnBadRequestOnImageWhenWorkflowNotFound() throws Exception {
   }
 
-  @Test @Ignore
+  @Test
+  @Ignore
   public void shouldReturnBadRequestOnImageWhenComponentNotFound() throws Exception {
   }
 
@@ -337,7 +360,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_BAD));
+            STATEPAYLOAD_BAD));
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasNoPayload());
@@ -350,7 +373,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/state"),
-                                            STATEPAYLOAD_BAD));
+            STATEPAYLOAD_BAD));
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasNoPayload());
@@ -362,12 +385,13 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V2);
 
     Response<ByteString> response =
-    awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state")));
+        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state")));
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasNoPayload());
     assertThat(response, hasStatus(withReasonPhrase(equalTo("Missing payload."))));
   }
+
 
   /**
    * This test should be removed when we actually support this
@@ -378,11 +402,12 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/state"),
-                                            STATEPAYLOAD_FULL));
+            STATEPAYLOAD_FULL));
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasNoPayload());
-    assertThat(response, hasStatus(withReasonPhrase(equalTo("Enabled flag not supported for components."))));
+    assertThat(response,
+        hasStatus(withReasonPhrase(equalTo("Enabled flag not supported for components."))));
   }
 
   @Test
@@ -441,8 +466,10 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "triggers.[0].executions.[0].statuses", hasSize(2));
     assertJson(response, "triggers.[0].executions.[0].statuses.[0].status", is("SUBMITTED"));
     assertJson(response, "triggers.[0].executions.[0].statuses.[1].status", is("STARTED"));
-    assertJson(response, "triggers.[0].executions.[0].statuses.[0].timestamp", is("2016-08-10T07:00:01Z"));
-    assertJson(response, "triggers.[0].executions.[0].statuses.[1].timestamp", is("2016-08-10T07:00:02Z"));
+    assertJson(response, "triggers.[0].executions.[0].statuses.[0].timestamp",
+        is("2016-08-10T07:00:01Z"));
+    assertJson(response, "triggers.[0].executions.[0].statuses.[1].timestamp",
+        is("2016-08-10T07:00:02Z"));
   }
 
   @Test
@@ -484,6 +511,123 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertJson(response, "[*]", hasSize(1));
     assertJson(response, "[0].workflow_instance.parameter", is("2016-08-12"));
+  }
+
+  @Test
+  public void shouldReturnBadRequestWhenNoPayloadIsSentWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path("/foo")));
+
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
+    assertThat(response, hasNoPayload());
+    assertThat(response, hasStatus(withReasonPhrase(equalTo("Missing payload."))));
+  }
+
+  @Test
+  public void shouldReturnBadRequestWhenMalformedStatePayloadIsSentWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path("/foo"),
+            STATEPAYLOAD_BAD));
+
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
+    assertThat(response, hasNoPayload());
+    assertThat(response, hasStatus(withReasonPhrase(equalTo("Invalid payload."))));
+  }
+
+  @Test
+  public void shouldReturnOkWhenSchedulerReturnsSuccessWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+    assertThat(WORKFLOW_CONFIGURATION_WITH_IMAGE.dockerImage().isPresent(), is(true));
+
+    serviceHelper.stubClient()
+        .respond(Response.forPayload(serialize(WORKFLOW_WITH_IMAGE)))
+        .to(SCHEDULER_BASE + "/api/v0/workflows");
+
+    Response<ByteString> response =
+        awaitResponse(
+            serviceHelper
+                .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION_WITH_IMAGE)));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertThat(deserialize(response.payload().get(), Workflow.class), equalTo(WORKFLOW_WITH_IMAGE));
+  }
+
+  @Test
+  public void shouldReturnErrorMessageWhenSchedulerFailsWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+    assertThat(WORKFLOW_CONFIGURATION_WITH_IMAGE.dockerImage().isPresent(), is(true));
+
+    serviceHelper.stubClient()
+        .respond(Response.forStatus(Status.SERVICE_UNAVAILABLE))
+        .to(SCHEDULER_BASE + "/api/v0/workflows");
+
+    Response<ByteString> response =
+        awaitResponse(
+            serviceHelper
+                .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION_WITH_IMAGE)));
+
+    assertThat(response, hasStatus(withCode(Status.SERVICE_UNAVAILABLE)));
+    assertThat(response, hasNoPayload());
+  }
+
+  @Test
+  public void shouldReturnInternalServerErrorWhenSchedulerRequestFails() throws Exception {
+    sinceVersion(Api.Version.V3);
+    assertThat(WORKFLOW_CONFIGURATION_WITH_IMAGE.dockerImage().isPresent(), is(true));
+
+    // stubClient intentionally not configured to answer on the internal SchedulerResource URI
+    // this will make the request from WorkflowResource to SchedulerResource fail,
+    // which should in turn produce an Internal Server Error response to the original caller
+    Response<ByteString> response =
+        awaitResponse(
+            serviceHelper
+                .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION_WITH_IMAGE)));
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
+  }
+
+  @Test
+  public void shouldReturnInternalServerErrorWhenSchedulerRequestFailsDeleteWorkflow()
+      throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    Response<ByteString> response =
+        awaitResponse(
+            serviceHelper.request("DELETE", path("/foo/bar")));
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
+  }
+
+  @Test
+  public void shouldForwardInternalResponseForDeleteWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+    serviceHelper.stubClient()
+        .respond(Response.forStatus(Status.OK))
+        .to(SCHEDULER_BASE + "/api/v0/workflows/foo/bar");
+
+    Response<ByteString> response =
+        awaitResponse(
+            serviceHelper.request("DELETE", path("/foo/bar")));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertThat(response, hasNoPayload());
+  }
+
+  @Test
+  public void shouldReturnBadRequestWhenMissingDockerImage() throws Exception {
+    sinceVersion(Api.Version.V3);
+    assertThat(WORKFLOW_CONFIGURATION.dockerImage().isPresent(), is(false));
+
+    Response<ByteString> response =
+        awaitResponse(
+            serviceHelper.request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
+
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
+    assertThat(response.status(), withReasonPhrase(equalTo("docker_image is required")));
   }
 
   private long ms(String time) {

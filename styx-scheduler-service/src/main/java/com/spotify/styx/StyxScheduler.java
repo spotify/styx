@@ -137,13 +137,25 @@ public class StyxScheduler implements AppInit {
   private static final Logger LOG = LoggerFactory.getLogger(StyxScheduler.class);
 
   // === Type aliases for dependency injectors ====================================================
-  public interface StateFactory extends Function<WorkflowInstance, RunState> { }
-  public interface ScheduleSources extends Supplier<Iterable<ScheduleSourceFactory>> { }
-  public interface StatsFactory extends Function<Environment, Stats> { }
-  public interface PublisherFactory extends Function<Environment, Publisher> { }
+  public interface StateFactory extends Function<WorkflowInstance, RunState> {
+
+  }
+
+  public interface ScheduleSources extends Supplier<Iterable<ScheduleSourceFactory>> {
+
+  }
+
+  public interface StatsFactory extends Function<Environment, Stats> {
+
+  }
+
+  public interface PublisherFactory extends Function<Environment, Publisher> {
+
+  }
 
   @FunctionalInterface
   interface DockerRunnerFactory {
+
     DockerRunner create(
         String id,
         Environment environment,
@@ -155,6 +167,7 @@ public class StyxScheduler implements AppInit {
 
   @FunctionalInterface
   interface ExecutorFactory {
+
     ScheduledExecutorService create(
         int threads,
         ThreadFactory threadFactory);
@@ -294,7 +307,8 @@ public class StyxScheduler implements AppInit {
 
     final Stats stats = statsFactory.apply(environment);
     final WorkflowCache workflowCache = new InMemWorkflowCache();
-    final Storage storage = instrument(Storage.class, storageFactory.apply(environment), stats, time);
+    final Storage storage = instrument(Storage.class, storageFactory.apply(environment), stats,
+        time);
 
     warmUpCache(workflowCache, storage);
 
@@ -309,11 +323,12 @@ public class StyxScheduler implements AppInit {
     final DockerRunner routingDockerRunner = DockerRunner.routing(
         id -> dockerRunnerFactory.create(id, environment, stateManager, executor, stats, debug),
         dockerId);
-    final DockerRunner dockerRunner = instrument(DockerRunner.class, routingDockerRunner, stats, time);
+    final DockerRunner dockerRunner = instrument(DockerRunner.class, routingDockerRunner, stats,
+        time);
 
     final RateLimiter submissionRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
 
-    final OutputHandler[] outputHandlers = new OutputHandler[] {
+    final OutputHandler[] outputHandlers = new OutputHandler[]{
         transitionLogger(""),
         new DockerRunnerHandler(
             dockerRunner, stateManager, submissionRateLimiter, dockerRunnerExecutor),
@@ -337,7 +352,7 @@ public class StyxScheduler implements AppInit {
         workflowChanged(workflowCache, workflowInitializer, stats, stateManager);
 
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
-                                              storage, resourceDecorator, stats);
+        storage, resourceDecorator, stats);
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
@@ -351,7 +366,8 @@ public class StyxScheduler implements AppInit {
     setupMetrics(stateManager, workflowCache, storage, submissionRateLimiter, stats);
 
     final SchedulerResource schedulerResource = new SchedulerResource(stateManager, trigger,
-                                                                      storage, time);
+        workflowChangeListener, workflowRemoveListener,
+        storage, time);
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
@@ -447,7 +463,8 @@ public class StyxScheduler implements AppInit {
         TimeUnit.SECONDS);
   }
 
-  private static void startTriggerManager(TriggerManager triggerManager, ScheduledExecutorService exec) {
+  private static void startTriggerManager(TriggerManager triggerManager,
+                                          ScheduledExecutorService exec) {
     exec.scheduleWithFixedDelay(
         guard(triggerManager::tick),
         TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
@@ -473,7 +490,7 @@ public class StyxScheduler implements AppInit {
   }
 
   private static void startRuntimeConfigUpdate(Storage storage, ScheduledExecutorService exec,
-      RateLimiter submissionRateLimiter) {
+                                               RateLimiter submissionRateLimiter) {
     exec.scheduleAtFixedRate(
         guard(() -> updateRuntimeConfig(storage, submissionRateLimiter)),
         0,
@@ -492,7 +509,7 @@ public class StyxScheduler implements AppInit {
       }
     } catch (IOException e) {
       LOG.warn("Failed to fetch the submission rate config from storage, "
-          + "skipping RateLimiter update");
+               + "skipping RateLimiter update");
     }
   }
 
@@ -526,10 +543,12 @@ public class StyxScheduler implements AppInit {
           new CachedSupplier<>(storage::enabled, Instant::now);
       return () -> workflowCache.all().stream()
           .filter(WorkflowValidator::hasDockerConfiguration)
-          .filter((workflow) -> enabledWorkflowSupplier.get().contains(WorkflowId.ofWorkflow(workflow)))
+          .filter(
+              (workflow) -> enabledWorkflowSupplier.get().contains(WorkflowId.ofWorkflow(workflow)))
           .count();
     };
-    stats.registerWorkflowCountMetric("enabled", configuredEnabledWorkflowsCountGaugeSupplier.get());
+    stats
+        .registerWorkflowCountMetric("enabled", configuredEnabledWorkflowsCountGaugeSupplier.get());
 
     stats.registerWorkflowCountMetric("docker_termination_logging_enabled", () ->
         workflowCache.all().stream()
@@ -622,7 +641,8 @@ public class StyxScheduler implements AppInit {
       LOG.info("Creating LocalDockerRunner");
       return closer.register(DockerRunner.local(scheduler, stateManager));
     } else {
-      final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(config, id));
+      final NamespacedKubernetesClient kubernetes = closer
+          .register(getKubernetesClient(config, id));
       final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
       return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats,
           serviceAccountKeyManager, debug));
@@ -663,8 +683,8 @@ public class StyxScheduler implements AppInit {
 
       final Cluster cluster = gke.projects().zones().clusters()
           .get(config.getString(projectKey),
-               config.getString(zoneKey),
-               config.getString(clusterIdKey)).execute();
+              config.getString(zoneKey),
+              config.getString(clusterIdKey)).execute();
 
       final io.fabric8.kubernetes.client.Config kubeConfig = new ConfigBuilder()
           .withMasterUrl("https://" + cluster.getEndpoint())

@@ -60,9 +60,11 @@ public class InMemStorage implements Storage {
   private final ConcurrentMap<WorkflowId, Workflow> workflowStore = Maps.newConcurrentMap();
   private final ConcurrentMap<String, Resource> resourceStore = Maps.newConcurrentMap();
   private final ConcurrentMap<String, Backfill> backfillStore = Maps.newConcurrentMap();
-  private final ConcurrentMap<WorkflowId, String> dockerImagesPerWorkflowId = Maps.newConcurrentMap();
+  private final ConcurrentMap<WorkflowId, String> dockerImagesPerWorkflowId = Maps
+      .newConcurrentMap();
   private final ConcurrentMap<String, String> dockerImagesPerComponent = Maps.newConcurrentMap();
-  private final ConcurrentMap<WorkflowId, WorkflowState> workflowStatePerWorkflowId = Maps.newConcurrentMap();
+  private final ConcurrentMap<WorkflowId, WorkflowState> workflowStatePerWorkflowId = Maps
+      .newConcurrentMap();
 
   public final List<SequenceEvent> writtenEvents = Lists.newCopyOnWriteArrayList();
   public final Map<WorkflowInstance, Long> activeStatesMap = Maps.newHashMap();
@@ -117,16 +119,18 @@ public class InMemStorage implements Storage {
 
   @Override
   public void delete(WorkflowId workflowId) throws IOException {
+    workflowStore.remove(workflowId);
+  }
+
+  @Override
+  public void updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec spec)
+      throws IOException {
     throw new UnsupportedOperationException("Unsupported Operation!");
   }
 
   @Override
-  public void updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec spec) throws IOException {
-    throw new UnsupportedOperationException("Unsupported Operation!");
-  }
-
-  @Override
-  public void updateNextNaturalTriggerOld(WorkflowId workflowId, Instant instant) throws IOException {
+  public void updateNextNaturalTriggerOld(WorkflowId workflowId, Instant instant)
+      throws IOException {
     throw new UnsupportedOperationException("Unsupported Operation!");
   }
 
@@ -141,7 +145,8 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public WorkflowInstanceExecutionData executionData(WorkflowInstance workflowInstance) throws IOException {
+  public WorkflowInstanceExecutionData executionData(WorkflowInstance workflowInstance)
+      throws IOException {
     throw new UnsupportedOperationException("Unsupported Operation!");
   }
 
@@ -178,7 +183,8 @@ public class InMemStorage implements Storage {
     patchState.dockerImage().ifPresent(image -> dockerImagesPerWorkflowId.put(workflowId, image));
     Optional<WorkflowState> originalState = Optional.of(
         workflowStatePerWorkflowId.getOrDefault(workflowId, patchState));
-    workflowStatePerWorkflowId.put(workflowId, WorkflowStateUtil.patchWorkflowState(originalState, patchState));
+    workflowStatePerWorkflowId
+        .put(workflowId, WorkflowStateUtil.patchWorkflowState(originalState, patchState));
   }
 
   @Override
@@ -240,7 +246,8 @@ public class InMemStorage implements Storage {
     Stream<Backfill> backfillStream = backfillStore.values().stream();
 
     if (!showAll) {
-      backfillStream = backfillStream.filter(backfill -> backfill.halted() && backfill.allTriggered());
+      backfillStream = backfillStream
+          .filter(backfill -> backfill.halted() && backfill.allTriggered());
     }
 
     return ImmutableList.copyOf(backfillStream.collect(Collectors.toList())
@@ -248,12 +255,14 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public List<Backfill> backfillsForComponent(boolean showAll, String component) throws IOException {
+  public List<Backfill> backfillsForComponent(boolean showAll, String component)
+      throws IOException {
     Stream<Backfill> backfillStream = backfillStore.values().stream()
         .filter(backfill -> backfill.workflowId().componentId().equals(component));
 
     if (!showAll) {
-      backfillStream = backfillStream.filter(backfill -> backfill.halted() && backfill.allTriggered());
+      backfillStream = backfillStream
+          .filter(backfill -> backfill.halted() && backfill.allTriggered());
     }
 
     return ImmutableList.copyOf(backfillStream.collect(Collectors.toList()));
@@ -265,19 +274,22 @@ public class InMemStorage implements Storage {
         .filter(backfill -> backfill.workflowId().id().equals(workflow));
 
     if (!showAll) {
-      backfillStream = backfillStream.filter(backfill -> backfill.halted() && backfill.allTriggered());
+      backfillStream = backfillStream
+          .filter(backfill -> backfill.halted() && backfill.allTriggered());
     }
 
     return ImmutableList.copyOf(backfillStream.collect(Collectors.toList()));
   }
 
   @Override
-  public List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId) throws IOException {
+  public List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId)
+      throws IOException {
     Stream<Backfill> backfillStream = backfillStore.values().stream()
         .filter(backfill -> backfill.workflowId().equals(workflowId));
 
     if (!showAll) {
-      backfillStream = backfillStream.filter(backfill -> backfill.halted() && backfill.allTriggered());
+      backfillStream = backfillStream
+          .filter(backfill -> backfill.halted() && backfill.allTriggered());
     }
 
     return ImmutableList.copyOf(backfillStream.collect(Collectors.toList()));
@@ -342,13 +354,15 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public Map<WorkflowInstance, Long> readActiveWorkflowInstances(String componentId) throws IOException {
+  public Map<WorkflowInstance, Long> readActiveWorkflowInstances(String componentId)
+      throws IOException {
     return activeStatesMap.entrySet().stream()
         .filter((entry) -> componentId.equals(entry.getKey().workflowId().componentId()))
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
-  public Optional<Long> getCounterFromActiveStates(WorkflowInstance workflowInstance) throws IOException {
+  public Optional<Long> getCounterFromActiveStates(WorkflowInstance workflowInstance)
+      throws IOException {
     return Optional.ofNullable(activeStatesMap.get(workflowInstance));
   }
 

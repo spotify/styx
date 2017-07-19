@@ -53,6 +53,67 @@ Resources related to the Workflows registered in Styx.
               }
         }
 
+
+### Delete Workflow [DELETE]
+
+Returns 200 OK if the Workflow was found an deleted, 404 Not Found otherwise.
+
++ Response 200
+
++ Response 404
+
+## Workflow Configuration [/v2/workflows/{component_id}]
+
+Accepts a Workflow Configuration update as a JSON object. Returns 200 OK if the Workflow was created or updated with the supplied configuration. Note that a non-null value is required for docker_image.
+
++ Parameters
+    + component_id: `styx-canary` (string) - Workflow Component
+
+### Create or update Workflow [POST]
+
++ Request (application/json)
+
+        {
+          "id": "StyxCanary",
+          "schedule": "days",
+          "offset": null,
+          "docker_image": "styx-canary-dummy:dummy",
+          "docker_args": [
+            "luigi",
+            "--module",
+            "canary_job",
+            "CanaryJob"
+          ],
+          "docker_termination_logging": false,
+          "secret": null,
+          "service_account": null,
+          "resources": []
+        }
+
++ Response 200 (application/json)
+
+        {
+          "component_id": "styx-canary",
+          "workflow_id": "StyxCanary",
+          "component_uri": "file:///etc/styx/schedule.yaml",
+          "configuration": {
+            "id": "StyxCanary",
+            "schedule": "days",
+            "offset": null,
+            "docker_image": "styx-canary-dummy:dummy",
+            "docker_args": [
+              "luigi",
+              "--module",
+              "canary_job",
+              "CanaryJob"
+            ],
+            "docker_termination_logging": false,
+            "secret": null,
+            "service_account": null,
+            "resources": []
+          }
+        }
+
 ## Workflow Instances [/v2/workflows/{component_id}/{workflow_id}/instances]
 
 + Parameters
@@ -157,6 +218,7 @@ Resources related to the Workflows registered in Styx.
             "next_natural_trigger": "2017-01-01T01:00:00Z",
             "next_natural_offset_trigger": "2017-01-01T02:00:00Z"
         }
+
 
 ### Set Workflow state [PATCH]
 

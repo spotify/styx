@@ -75,6 +75,8 @@ import org.junit.Test;
 @Deprecated
 public class WorkflowResourceTest extends VersionedApiTest {
 
+  private static final String SCHEDULER_BASE = "http://localhost:8080";
+
   private static LocalDatastoreHelper localDatastore;
 
   private Datastore datastore = localDatastore.getOptions().getService();
@@ -127,7 +129,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
   protected void init(Environment environment) {
     WorkflowResource
         workflowResource =
-        new WorkflowResource(new com.spotify.styx.api.WorkflowResource(storage));
+        new WorkflowResource(new com.spotify.styx.api.WorkflowResource(storage,
+            SCHEDULER_BASE));
 
     environment.routingEngine().registerRoutes(workflowResource.routes());
   }
@@ -179,7 +182,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_FULL));
+            STATEPAYLOAD_FULL));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
@@ -201,7 +204,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_ENABLED));
+            STATEPAYLOAD_ENABLED));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
@@ -220,7 +223,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_OTHER_FIELD));
+            STATEPAYLOAD_OTHER_FIELD));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
@@ -235,7 +238,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_IMAGE));
+            STATEPAYLOAD_IMAGE));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
@@ -252,7 +255,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/state"),
-                                            STATEPAYLOAD_IMAGE));
+            STATEPAYLOAD_IMAGE));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
@@ -294,13 +297,13 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_VALID_SHA));
+            STATEPAYLOAD_VALID_SHA));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "commit_sha", equalTo(VALID_SHA));
 
     assertThat(storage.workflowState(WORKFLOW.id()).commitSha().get(),
-               is(VALID_SHA));
+        is(VALID_SHA));
   }
 
   @Test
@@ -309,26 +312,29 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_INVALID_SHA));
+            STATEPAYLOAD_INVALID_SHA));
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasStatus(withReasonPhrase(equalTo("Invalid SHA-1."))));
 
     assertThat(storage.workflowState(WORKFLOW.id()).commitSha().isPresent(),
-               is(false));
+        is(false));
   }
 
-  @Test @Ignore
+  @Test
+  @Ignore
   public void shouldReturnBadRequestOnEnableWhenWorkflowNotFound() throws Exception {
     // can't implement
     // this can't ever happen in the current bigtable storage implementation
   }
 
-  @Test @Ignore
+  @Test
+  @Ignore
   public void shouldReturnBadRequestOnImageWhenWorkflowNotFound() throws Exception {
   }
 
-  @Test @Ignore
+  @Test
+  @Ignore
   public void shouldReturnBadRequestOnImageWhenComponentNotFound() throws Exception {
   }
 
@@ -338,7 +344,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_BAD));
+            STATEPAYLOAD_BAD));
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasNoPayload());
@@ -351,7 +357,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/state"),
-                                            STATEPAYLOAD_BAD));
+            STATEPAYLOAD_BAD));
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasNoPayload());
@@ -363,7 +369,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     tillVersion(Api.Version.V1);
 
     Response<ByteString> response =
-    awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state")));
+        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state")));
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasNoPayload());
@@ -379,11 +385,12 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/state"),
-                                            STATEPAYLOAD_FULL));
+            STATEPAYLOAD_FULL));
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasNoPayload());
-    assertThat(response, hasStatus(withReasonPhrase(equalTo("Enabled flag not supported for components."))));
+    assertThat(response,
+        hasStatus(withReasonPhrase(equalTo("Enabled flag not supported for components."))));
   }
 
   @Test
@@ -442,8 +449,10 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "triggers.[0].executions.[0].statuses", hasSize(2));
     assertJson(response, "triggers.[0].executions.[0].statuses.[0].status", is("SUBMITTED"));
     assertJson(response, "triggers.[0].executions.[0].statuses.[1].status", is("STARTED"));
-    assertJson(response, "triggers.[0].executions.[0].statuses.[0].timestamp", is("2016-08-10T07:00:01Z"));
-    assertJson(response, "triggers.[0].executions.[0].statuses.[1].timestamp", is("2016-08-10T07:00:02Z"));
+    assertJson(response, "triggers.[0].executions.[0].statuses.[0].timestamp",
+        is("2016-08-10T07:00:01Z"));
+    assertJson(response, "triggers.[0].executions.[0].statuses.[1].timestamp",
+        is("2016-08-10T07:00:02Z"));
   }
 
   @Test

@@ -49,11 +49,12 @@ public abstract class Workflow {
       @JsonProperty("component_uri") URI componentUri,
       @JsonProperty("schedule") WorkflowConfiguration schedule) {
     return new AutoValue_Workflow(componentId, schedule.id(), componentUri,
-                                  schedule);
+        schedule);
   }
 
   public static Workflow create(com.spotify.styx.model.Workflow workflow) {
-    return create(workflow.componentId(), workflow.componentUri(),
-                  WorkflowConfiguration.create(workflow.configuration()));
+    return create(workflow.componentId(),
+        workflow.componentUri().isPresent() ? workflow.componentUri().get() : URI.create(""),
+        WorkflowConfiguration.create(workflow.configuration()));
   }
 }
