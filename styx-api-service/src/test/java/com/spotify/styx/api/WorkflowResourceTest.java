@@ -575,34 +575,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldReturnInternalServerErrorWhenSchedulerRequestFails() throws Exception {
-    sinceVersion(Api.Version.V3);
-    assertThat(WORKFLOW_CONFIGURATION_WITH_IMAGE.dockerImage().isPresent(), is(true));
-
-    // stubClient intentionally not configured to answer on the internal SchedulerResource URI
-    // this will make the request from WorkflowResource to SchedulerResource fail,
-    // which should in turn produce an Internal Server Error response to the original caller
-    Response<ByteString> response =
-        awaitResponse(
-            serviceHelper
-                .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION_WITH_IMAGE)));
-
-    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
-  }
-
-  @Test
-  public void shouldReturnInternalServerErrorWhenSchedulerRequestFailsDeleteWorkflow()
-      throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    Response<ByteString> response =
-        awaitResponse(
-            serviceHelper.request("DELETE", path("/foo/bar")));
-
-    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
-  }
-
-  @Test
   public void shouldForwardInternalResponseForDeleteWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
     serviceHelper.stubClient()
