@@ -44,6 +44,8 @@ public interface WorkflowConfiguration {
 
   Optional<String> dockerImage();
 
+  Optional<Boolean> dockerImageOverride();
+
   Optional<List<String>> dockerArgs();
 
   /**
