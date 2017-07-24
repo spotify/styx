@@ -33,6 +33,7 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
+import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 import java.util.SortedMap;
@@ -134,7 +135,7 @@ class PlainCliOutput implements CliOutput {
     System.out.println(Joiner.on(' ').join(
         wf.componentId(),
         wf.id(),
-        wf.componentUri(),
+        wf.componentUri().orElse(URI.create("")),
         wf.configuration().schedule(),
         wf.configuration().offset().orElse(""),
         image,

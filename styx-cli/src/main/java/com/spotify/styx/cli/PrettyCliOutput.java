@@ -44,6 +44,7 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
+import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 import org.fusesource.jansi.Ansi;
@@ -174,6 +175,7 @@ class PrettyCliOutput implements CliOutput {
         wf.configuration().dockerImage().orElse(""));
     System.out.println("Component: " + wf.componentId());
     System.out.println(" Workflow: " + wf.id().id());
+    System.out.println(" Cmpt URI: " + wf.componentUri().orElse(URI.create("")));
     System.out.println(" Schedule: " + wf.configuration().schedule());
     System.out.println("   Offset: " + wf.configuration().offset().orElse(""));
     System.out.println("    Image: " + image);
