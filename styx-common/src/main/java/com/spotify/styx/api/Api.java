@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import okio.ByteString;
+import org.codehaus.jackson.annotate.JsonCreator;
 
 public final class Api {
 
@@ -41,6 +42,11 @@ public final class Api {
 
     public String prefix() {
       return "/api/v" + ordinal();
+    }
+
+    @JsonCreator
+    public Version parse(String version) {
+      return valueOf(version);
     }
   }
 

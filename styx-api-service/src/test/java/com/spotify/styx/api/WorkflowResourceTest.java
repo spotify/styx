@@ -102,9 +102,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private static final Workflow WORKFLOW =
       Workflow.create("foo", URI.create("/hejhej"), WORKFLOW_CONFIGURATION);
 
-  private static final Workflow WORKFLOW2 =
-      Workflow.create("foo", URI.create(SCHEDULER_BASE + "/foo"), WORKFLOW_CONFIGURATION);
-
   private static final Workflow WORKFLOW_WITH_IMAGE =
       Workflow
           .create("foo", URI.create(SCHEDULER_BASE + "/foo"), WORKFLOW_CONFIGURATION_WITH_IMAGE);
@@ -541,7 +538,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Test
   public void shouldReturnOkWhenSchedulerReturnsSuccessWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
-    assertThat(WORKFLOW_CONFIGURATION_WITH_IMAGE.dockerImage().isPresent(), is(true));
 
     serviceHelper.stubClient()
         .respond(Response.forPayload(serialize(WORKFLOW_WITH_IMAGE)))
@@ -559,7 +555,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Test
   public void shouldReturnErrorMessageWhenSchedulerFailsWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
-    assertThat(WORKFLOW_CONFIGURATION_WITH_IMAGE.dockerImage().isPresent(), is(true));
 
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.SERVICE_UNAVAILABLE))
@@ -577,6 +572,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Test
   public void shouldForwardInternalResponseForDeleteWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
+
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.OK))
         .to(SCHEDULER_BASE + "/api/v0/workflows/foo/bar");
@@ -592,7 +588,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Test
   public void shouldReturnBadRequestWhenMissingDockerImage() throws Exception {
     sinceVersion(Api.Version.V3);
-    assertThat(WORKFLOW_CONFIGURATION.dockerImage().isPresent(), is(false));
 
     Response<ByteString> response =
         awaitResponse(

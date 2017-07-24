@@ -135,7 +135,10 @@ public final class WorkflowResource {
           Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("docker_image is required")));
     }
 
-    final Workflow workflow = Workflow.create(componentId, Optional.empty(), workflowConfig);
+    final Workflow workflow = Workflow.create(componentId,
+                                              Optional.empty(),
+                                              Optional.of(V3),
+                                              workflowConfig);
 
     final ByteString requestPayload;
     try {
