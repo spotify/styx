@@ -121,7 +121,7 @@ public final class WorkflowResource {
       return CompletableFuture.completedFuture(
           Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload.")));
     }
-    WorkflowConfiguration workflowConfig;
+    final WorkflowConfiguration workflowConfig;
     try {
       workflowConfig = OBJECT_MAPPER
           .readValue(payload.get().toByteArray(), WorkflowConfiguration.class);
@@ -135,7 +135,7 @@ public final class WorkflowResource {
           Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("docker_image is required")));
     }
 
-    Workflow workflow = Workflow.create(componentId, Optional.empty(), workflowConfig);
+    final Workflow workflow = Workflow.create(componentId, Optional.empty(), workflowConfig);
 
     final ByteString requestPayload;
     try {
@@ -155,8 +155,8 @@ public final class WorkflowResource {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
     }
 
-    WorkflowId workflowId = WorkflowId.create(componentId, id);
-    WorkflowState patchState;
+    final WorkflowId workflowId = WorkflowId.create(componentId, id);
+    final WorkflowState patchState;
     try {
       patchState = OBJECT_MAPPER.readValue(payload.get().toByteArray(), WorkflowState.class);
     } catch (IOException e) {
@@ -189,7 +189,7 @@ public final class WorkflowResource {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
     }
 
-    WorkflowState patchState;
+    final WorkflowState patchState;
     try {
       patchState = OBJECT_MAPPER.readValue(payload.get().toByteArray(), WorkflowState.class);
     } catch (IOException e) {
@@ -279,7 +279,6 @@ public final class WorkflowResource {
     }
   }
 
-  // TODO: duplicate code
   private String schedulerApiUrl(CharSequence... parts) {
     return schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + "/" + String.join("/", parts);
   }

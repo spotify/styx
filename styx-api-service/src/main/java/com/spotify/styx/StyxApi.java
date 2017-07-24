@@ -66,7 +66,6 @@ public class StyxApi implements AppInit {
 
   public static final String SCHEDULER_SERVICE_BASE_URL = "styx.scheduler.base-url";
   public static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
-  public static final String COMPONENTS_API_BASE_URL = "styx.components.api.base-url";
 
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
 
@@ -112,7 +111,7 @@ public class StyxApi implements AppInit {
     final WorkflowResource workflowResource =
         new WorkflowResource(storage, schedulerServiceBaseUrl);
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
-        storage);
+                                                                   storage);
     final ResourceResource resourceResource = new ResourceResource(storage);
     final StyxConfigResource styxConfigResource = new StyxConfigResource(storage);
     final StatusResource statusResource = new StatusResource(storage);

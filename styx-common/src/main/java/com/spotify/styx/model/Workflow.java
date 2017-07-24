@@ -54,7 +54,7 @@ public abstract class Workflow {
       @JsonProperty("component_uri") Optional<URI> componentUri,
       @JsonProperty("configuration") WorkflowConfiguration configuration) {
     return new AutoValue_Workflow(componentId, configuration.id(), componentUri,
-        configuration);
+                                  configuration);
   }
 
   // wrapper for use of legacy factory function
@@ -63,6 +63,6 @@ public abstract class Workflow {
       URI componentUri,
       WorkflowConfiguration configuration) {
     return new AutoValue_Workflow(componentId, configuration.id(), Optional.of(componentUri),
-        configuration);
+                                  configuration);
   }
 }
