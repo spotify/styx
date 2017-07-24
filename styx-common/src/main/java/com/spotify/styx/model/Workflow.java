@@ -25,6 +25,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
 import java.net.URI;
+import java.util.Optional;
 
 @AutoValue
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -36,8 +37,9 @@ public abstract class Workflow {
   @JsonProperty
   public abstract String workflowId();
 
+  // component URI is a legacy concept and discouraged for new Workflows
   @JsonProperty
-  public abstract URI componentUri();
+  public abstract Optional<URI> componentUri();
 
   @JsonProperty
   public abstract WorkflowConfiguration configuration();
@@ -49,9 +51,18 @@ public abstract class Workflow {
   @JsonCreator
   public static Workflow create(
       @JsonProperty("component_id") String componentId,
-      @JsonProperty("component_uri") URI componentUri,
+      @JsonProperty("component_uri") Optional<URI> componentUri,
       @JsonProperty("configuration") WorkflowConfiguration configuration) {
     return new AutoValue_Workflow(componentId, configuration.id(), componentUri,
+                                  configuration);
+  }
+
+  // wrapper for use of legacy factory function
+  public static Workflow create(
+      String componentId,
+      URI componentUri,
+      WorkflowConfiguration configuration) {
+    return new AutoValue_Workflow(componentId, configuration.id(), Optional.of(componentUri),
                                   configuration);
   }
 }

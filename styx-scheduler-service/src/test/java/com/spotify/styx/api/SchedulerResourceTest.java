@@ -69,23 +69,38 @@ public class SchedulerResourceTest {
   private final InMemStorage storage = new InMemStorage();
   private final StateManager stateManager = new SyncStateManager();
 
-  private static final WorkflowInstance WFI = WorkflowInstance.create(TestData.WORKFLOW_ID, "12345");
+  private static final WorkflowInstance WFI = WorkflowInstance
+      .create(TestData.WORKFLOW_ID, "12345");
 
   private final Workflow HOURLY_WORKFLOW = Workflow.create("styx",
-                                                    TestData.WORKFLOW_URI,
-                                                    TestData.HOURLY_WORKFLOW_CONFIGURATION);
-  private final Workflow DAILY_WORKFLOW = Workflow.create("styx",
                                                            TestData.WORKFLOW_URI,
-                                                           TestData.DAILY_WORKFLOW_CONFIGURATION);
-  private final Workflow WEEKLY_WORKFLOW = Workflow.create("styx",
+                                                           TestData.HOURLY_WORKFLOW_CONFIGURATION);
+  private final Workflow DAILY_WORKFLOW = Workflow.create("styx",
                                                           TestData.WORKFLOW_URI,
-                                                          TestData.WEEKLY_WORKFLOW_CONFIGURATION);
+                                                          TestData.DAILY_WORKFLOW_CONFIGURATION);
+  private final Workflow WEEKLY_WORKFLOW = Workflow.create("styx",
+                                                           TestData.WORKFLOW_URI,
+                                                           TestData.WEEKLY_WORKFLOW_CONFIGURATION);
   private final Workflow MONTHLY_WORKFLOW = Workflow.create("styx",
                                                             TestData.WORKFLOW_URI,
                                                             TestData.MONTHLY_WORKFLOW_CONFIGURATION);
   private Optional<Workflow> triggeredWorkflow = Optional.empty();
   private Optional<Trigger> trigger = Optional.empty();
   private Optional<Instant> triggeredInstant = Optional.empty();
+
+  private void workflowChangeListener(Workflow workflow) {
+    try {
+      storage.storeWorkflow(workflow);
+    } catch (IOException e) {
+    }
+  }
+
+  private void workflowRemoveListener(Workflow workflow) {
+    try {
+      storage.delete(workflow.id());
+    } catch (IOException e) {
+    }
+  }
 
   @Rule
   public ServiceHelper serviceHelper = ServiceHelper.create(this::init, "styx");
@@ -99,7 +114,7 @@ public class SchedulerResourceTest {
           this.triggeredInstant = Optional.of(instant);
           return CompletableFuture.completedFuture(null);
         },
-        storage,
+        this::workflowChangeListener, this::workflowRemoveListener, storage,
         () -> Instant.parse("2015-12-31T23:59:10.000Z"));
 
     environment.routingEngine()
@@ -116,6 +131,7 @@ public class SchedulerResourceTest {
     return post.toCompletableFuture().get();
   }
 
+
   @Test
   public void testInjectEvent() throws Exception {
     RunState initialState = RunState.create(WFI, RunState.State.RUNNING);
@@ -130,6 +146,53 @@ public class SchedulerResourceTest {
 
     RunState finalState = stateManager.get(WFI);
     assertThat(finalState.state(), is(RunState.State.FAILED));
+  }
+
+  @Test
+  public void testCreateWorkflow() throws Exception {
+    ByteString workflowPayload = serialize(HOURLY_WORKFLOW);
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows", workflowPayload);
+
+    assertThat(post.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
+    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
+    storage.delete(HOURLY_WORKFLOW.id());
+  }
+
+  @Test
+  public void testUpdateWorkflow() throws Exception {
+    ByteString workflowPayload = serialize(HOURLY_WORKFLOW);
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows", workflowPayload);
+
+    assertThat(post.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
+    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
+
+    CompletionStage<Response<ByteString>> post2 =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows", workflowPayload);
+
+    assertThat(post2.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
+    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
+    storage.delete(HOURLY_WORKFLOW.id());
+  }
+
+  @Test
+  public void testDeleteWorkflowWhenPresent() throws Exception {
+    storage.storeWorkflow(HOURLY_WORKFLOW);
+    Response<ByteString> response = serviceHelper.request("DELETE", String
+        .join("/", SchedulerResource.BASE, "workflows", HOURLY_WORKFLOW.componentId(),
+              HOURLY_WORKFLOW.workflowId())).toCompletableFuture().get();
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isEmpty());
+  }
+
+  @Test
+  public void testDeleteWorkflowWhenNotPresent() throws Exception {
+    Response<ByteString> response = serviceHelper.request("DELETE", String
+        .join("/", SchedulerResource.BASE, "workflows", HOURLY_WORKFLOW.componentId(),
+              HOURLY_WORKFLOW.workflowId())).toCompletableFuture().get();
+    assertThat(response, hasStatus(withCode(Status.NOT_FOUND)));
+    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isEmpty());
   }
 
   @Test
@@ -222,7 +285,7 @@ public class SchedulerResourceTest {
             this.triggeredInstant = Optional.of(instant);
             return CompletableFuture.completedFuture(null);
           },
-          failingStorage,
+          this::workflowChangeListener, this::workflowRemoveListener, failingStorage,
           () -> Instant.parse("2015-12-31T23:59:10.000Z"));
 
       environment.routingEngine()
@@ -237,8 +300,9 @@ public class SchedulerResourceTest {
     Response<ByteString> response = post.toCompletableFuture().get();
 
     assertThat(response.status(),
-               is(Status.INTERNAL_SERVER_ERROR.withReasonPhrase("An error occurred while retrieving "
-                                                                + "workflow specifications")));
+               is(Status.INTERNAL_SERVER_ERROR
+                      .withReasonPhrase("An error occurred while retrieving "
+                                        + "workflow specifications")));
     assertThat(triggeredWorkflow, isEmpty());
     assertThat(triggeredInstant, isEmpty());
   }

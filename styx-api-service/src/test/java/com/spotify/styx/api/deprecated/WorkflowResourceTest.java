@@ -75,6 +75,8 @@ import org.junit.Test;
 @Deprecated
 public class WorkflowResourceTest extends VersionedApiTest {
 
+  private static final String SCHEDULER_BASE = "http://localhost:8080";
+
   private static LocalDatastoreHelper localDatastore;
 
   private Datastore datastore = localDatastore.getOptions().getService();
@@ -127,7 +129,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
   protected void init(Environment environment) {
     WorkflowResource
         workflowResource =
-        new WorkflowResource(new com.spotify.styx.api.WorkflowResource(storage));
+        new WorkflowResource(new com.spotify.styx.api.WorkflowResource(storage,
+                                                                       SCHEDULER_BASE));
 
     environment.routingEngine().registerRoutes(workflowResource.routes());
   }
@@ -276,8 +279,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertNoJson(response, "commit_sha");
 
     storage.patchState(WORKFLOW.id(),
-        WorkflowState.builder().enabled(true).dockerImage("tina:ranic")
-            .commitSha("470a229b49a14e7682af2abfdac3b881a8aacdf9").build());
+                       WorkflowState.builder().enabled(true).dockerImage("tina:ranic")
+                           .commitSha("470a229b49a14e7682af2abfdac3b881a8aacdf9").build());
 
     response =
         awaitResponse(serviceHelper.request("GET", path("/foo/bar/state")));
@@ -318,17 +321,20 @@ public class WorkflowResourceTest extends VersionedApiTest {
                is(false));
   }
 
-  @Test @Ignore
+  @Test
+  @Ignore
   public void shouldReturnBadRequestOnEnableWhenWorkflowNotFound() throws Exception {
     // can't implement
     // this can't ever happen in the current bigtable storage implementation
   }
 
-  @Test @Ignore
+  @Test
+  @Ignore
   public void shouldReturnBadRequestOnImageWhenWorkflowNotFound() throws Exception {
   }
 
-  @Test @Ignore
+  @Test
+  @Ignore
   public void shouldReturnBadRequestOnImageWhenComponentNotFound() throws Exception {
   }
 
@@ -363,7 +369,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     tillVersion(Api.Version.V1);
 
     Response<ByteString> response =
-    awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state")));
+        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state")));
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasNoPayload());
@@ -383,7 +389,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasNoPayload());
-    assertThat(response, hasStatus(withReasonPhrase(equalTo("Enabled flag not supported for components."))));
+    assertThat(response,
+               hasStatus(withReasonPhrase(equalTo("Enabled flag not supported for components."))));
   }
 
   @Test
@@ -442,8 +449,10 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "triggers.[0].executions.[0].statuses", hasSize(2));
     assertJson(response, "triggers.[0].executions.[0].statuses.[0].status", is("SUBMITTED"));
     assertJson(response, "triggers.[0].executions.[0].statuses.[1].status", is("STARTED"));
-    assertJson(response, "triggers.[0].executions.[0].statuses.[0].timestamp", is("2016-08-10T07:00:01Z"));
-    assertJson(response, "triggers.[0].executions.[0].statuses.[1].timestamp", is("2016-08-10T07:00:02Z"));
+    assertJson(response, "triggers.[0].executions.[0].statuses.[0].timestamp",
+               is("2016-08-10T07:00:01Z"));
+    assertJson(response, "triggers.[0].executions.[0].statuses.[1].timestamp",
+               is("2016-08-10T07:00:02Z"));
   }
 
   @Test

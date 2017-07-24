@@ -350,8 +350,9 @@ public class StyxScheduler implements AppInit {
     startCleaner(cleaner, executor);
     setupMetrics(stateManager, workflowCache, storage, submissionRateLimiter, stats);
 
-    final SchedulerResource schedulerResource = new SchedulerResource(stateManager, trigger,
-                                                                      storage, time);
+    final SchedulerResource schedulerResource =
+        new SchedulerResource(stateManager, trigger, workflowChangeListener, workflowRemoveListener,
+                              storage, time);
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))

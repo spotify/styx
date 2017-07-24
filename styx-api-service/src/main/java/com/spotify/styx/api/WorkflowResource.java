@@ -24,7 +24,10 @@ import static com.spotify.styx.api.Api.Version.V2;
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
+import static com.spotify.styx.serialization.Json.serialize;
+import static com.spotify.styx.util.StreamUtil.cat;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -33,6 +36,7 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
@@ -44,6 +48,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.stream.Stream;
 import okio.ByteString;
 
@@ -51,11 +57,15 @@ public final class WorkflowResource {
 
   static final String BASE = "/workflows";
   public static final int DEFAULT_PAGE_LIMIT = 24 * 7;
+  private static final String SCHEDULER_BASE_PATH = "/api/v0";
 
+  private final String schedulerServiceBaseUrl;
   private final Storage storage;
 
-  public WorkflowResource(Storage storage) {
+
+  public WorkflowResource(Storage storage, String schedulerServiceBaseUrl) {
     this.storage = Objects.requireNonNull(storage);
+    this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -78,9 +88,65 @@ public final class WorkflowResource {
         Route.with(
             json(), "PATCH", BASE + "/<cid>/state",
             rc -> patchState(arg("cid", rc), rc.request()))
+
     );
 
-    return Api.prefixRoutes(routes, V2, V3);
+    final List<Route<AsyncHandler<Response<ByteString>>>> forwardedRoutes = Arrays.asList(
+        Route.async(
+            "POST", BASE + "/<cid>",
+            rc -> createOrUpdateWorkflow(arg("cid", rc), rc)
+        ),
+        Route.async(
+            "DELETE", BASE + "/<cid>/<wfid>",
+            rc -> deleteWorkflow(arg("cid", rc), arg("wfid", rc), rc)
+        )
+    );
+
+    return cat(
+        Api.prefixRoutes(routes, V2, V3),
+        Api.prefixRoutes(forwardedRoutes, V3)
+    );
+  }
+
+  private CompletionStage<Response<ByteString>> deleteWorkflow(String cid, String wfid,
+                                                               RequestContext rc) {
+    return rc.requestScopedClient()
+        .send(rc.request().withUri(schedulerApiUrl("workflows", cid, wfid)));
+  }
+
+  private CompletionStage<Response<ByteString>> createOrUpdateWorkflow(String componentId,
+                                                                       RequestContext rc) {
+    final Optional<ByteString> payload = rc.request().payload();
+    if (!payload.isPresent()) {
+      return CompletableFuture.completedFuture(
+          Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload.")));
+    }
+    final WorkflowConfiguration workflowConfig;
+    try {
+      workflowConfig = OBJECT_MAPPER
+          .readValue(payload.get().toByteArray(), WorkflowConfiguration.class);
+    } catch (IOException e) {
+      return CompletableFuture.completedFuture(
+          Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid payload.")));
+    }
+
+    if (!workflowConfig.dockerImage().isPresent()) {
+      return CompletableFuture.completedFuture(
+          Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("docker_image is required")));
+    }
+
+    final Workflow workflow = Workflow.create(componentId, Optional.empty(), workflowConfig);
+
+    final ByteString requestPayload;
+    try {
+      requestPayload = serialize(workflow);
+    } catch (JsonProcessingException e) {
+      return CompletableFuture.completedFuture(Response.forStatus(
+          Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Failed to serialize proxy payload.")));
+    }
+
+    return rc.requestScopedClient()
+        .send(rc.request().withPayload(requestPayload).withUri(schedulerApiUrl("workflows")));
   }
 
   public Response<WorkflowState> patchState(String componentId, String id, Request request) {
@@ -89,8 +155,8 @@ public final class WorkflowResource {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
     }
 
-    WorkflowId workflowId = WorkflowId.create(componentId, id);
-    WorkflowState patchState;
+    final WorkflowId workflowId = WorkflowId.create(componentId, id);
+    final WorkflowState patchState;
     try {
       patchState = OBJECT_MAPPER.readValue(payload.get().toByteArray(), WorkflowState.class);
     } catch (IOException e) {
@@ -123,7 +189,7 @@ public final class WorkflowResource {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
     }
 
-    WorkflowState patchState;
+    final WorkflowState patchState;
     try {
       patchState = OBJECT_MAPPER.readValue(payload.get().toByteArray(), WorkflowState.class);
     } catch (IOException e) {
@@ -211,6 +277,10 @@ public final class WorkflowResource {
       return Response.forStatus(
           Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch execution info."));
     }
+  }
+
+  private String schedulerApiUrl(CharSequence... parts) {
+    return schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + "/" + String.join("/", parts);
   }
 
   private static boolean isValidSHA1(String s) {

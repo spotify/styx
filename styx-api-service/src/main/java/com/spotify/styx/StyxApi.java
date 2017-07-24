@@ -103,17 +103,20 @@ public class StyxApi implements AppInit {
   public void create(Environment environment) {
     final Config config = environment.config();
     final String schedulerServiceBaseUrl = config.hasPath(SCHEDULER_SERVICE_BASE_URL)
-        ? config.getString(SCHEDULER_SERVICE_BASE_URL)
-        : DEFAULT_SCHEDULER_SERVICE_BASE_URL;
+                                           ? config.getString(SCHEDULER_SERVICE_BASE_URL)
+                                           : DEFAULT_SCHEDULER_SERVICE_BASE_URL;
 
     final Storage storage = storageFactory.apply(environment);
 
-    final WorkflowResource workflowResource = new WorkflowResource(storage);
-    final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl, storage);
+    final WorkflowResource workflowResource =
+        new WorkflowResource(storage, schedulerServiceBaseUrl);
+    final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
+                                                                   storage);
     final ResourceResource resourceResource = new ResourceResource(storage);
     final StyxConfigResource styxConfigResource = new StyxConfigResource(storage);
     final StatusResource statusResource = new StatusResource(storage);
-    final SchedulerProxyResource schedulerProxyResource = new SchedulerProxyResource(schedulerServiceBaseUrl);
+    final SchedulerProxyResource schedulerProxyResource = new SchedulerProxyResource(
+        schedulerServiceBaseUrl);
 
     final com.spotify.styx.api.deprecated.WorkflowResource
         deprecatedWorkflowResource =
