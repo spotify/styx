@@ -81,7 +81,7 @@ import org.junit.Test;
 @Deprecated
 public class BackfillResourceTest extends VersionedApiTest {
 
-  private static final String SCHEDULER_BASE = "http://localhost:8080";
+  private static final String SCHEDULER_BASE = "http://localhost:12345";
 
   private static LocalDatastoreHelper localDatastore;
   private Connection bigtable = setupBigTableMockTable();

@@ -49,7 +49,7 @@ import org.junit.Test;
 @Deprecated
 public class CliResourceTest extends VersionedApiTest {
 
-  private static final String SCHEDULER_BASE = "http://localhost:8080";
+  private static final String SCHEDULER_BASE = "http://localhost:12345";
   private static final String COMPONENT_ID = "styx";
   private static final String ENDPOINT_ID = "test";
   private static final String PARAMETER = "1234";

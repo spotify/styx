@@ -32,7 +32,7 @@ import org.junit.Test;
 
 public class SchedulerProxyResourceTest extends VersionedApiTest {
 
-  private static final String SCHEDULER_BASE = "http://localhost:8080";
+  private static final String SCHEDULER_BASE = "http://localhost:12345";
 
   public SchedulerProxyResourceTest(Api.Version version) {
     super(SchedulerProxyResource.BASE, version);
