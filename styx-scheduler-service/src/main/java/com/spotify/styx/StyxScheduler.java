@@ -96,6 +96,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -570,9 +571,26 @@ public class StyxScheduler implements AppInit {
           workflow.id(),
           () -> stateManager.getActiveStatesCount(workflow.id()));
 
+      final Optional<Workflow> existingWorkflow = cache.workflow(workflow.id());
+      if (existingWorkflow.isPresent()) {
+        if (!isGreaterOrEqualApiVersion(workflow, existingWorkflow.get())) {
+          return;
+        }
+      }
+
       cache.store(workflow);
       workflowInitializer.inspectChange(workflow);
     };
+  }
+
+  // if we have ever registered/updated the workflow via API,
+  // we ignore any subsequent updates via schedule source or lower API version
+  private static boolean isGreaterOrEqualApiVersion(Workflow newWorkflow,
+                                                    Workflow existingWorkflow) {
+    return !existingWorkflow.fromApi().isPresent()
+           ||
+           newWorkflow.fromApi().isPresent()
+           && newWorkflow.fromApi().get().ordinal() >= existingWorkflow.fromApi().get().ordinal();
   }
 
   private static Consumer<Workflow> workflowRemoved(Storage storage) {

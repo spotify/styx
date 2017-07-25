@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
+import com.spotify.styx.api.Api;
 import java.net.URI;
 import java.util.Optional;
 
@@ -41,6 +42,11 @@ public abstract class Workflow {
   @JsonProperty
   public abstract Optional<URI> componentUri();
 
+  // this gives a hint that the workflow registration/modification came from
+  // a certain version of Styx API instead of any schedule source
+  @JsonProperty("__from_api")
+  public abstract Optional<Api.Version> fromApi();
+
   @JsonProperty
   public abstract WorkflowConfiguration configuration();
 
@@ -52,8 +58,12 @@ public abstract class Workflow {
   public static Workflow create(
       @JsonProperty("component_id") String componentId,
       @JsonProperty("component_uri") Optional<URI> componentUri,
+      @JsonProperty("__from_api") Optional<Api.Version> fromApi,
       @JsonProperty("configuration") WorkflowConfiguration configuration) {
-    return new AutoValue_Workflow(componentId, configuration.id(), componentUri,
+    return new AutoValue_Workflow(componentId,
+                                  configuration.id(),
+                                  componentUri,
+                                  fromApi,
                                   configuration);
   }
 
@@ -62,7 +72,10 @@ public abstract class Workflow {
       String componentId,
       URI componentUri,
       WorkflowConfiguration configuration) {
-    return new AutoValue_Workflow(componentId, configuration.id(), Optional.of(componentUri),
+    return new AutoValue_Workflow(componentId,
+                                  configuration.id(),
+                                  Optional.of(componentUri),
+                                  Optional.empty(),
                                   configuration);
   }
 }

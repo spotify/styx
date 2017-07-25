@@ -33,6 +33,7 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableList;
+import com.spotify.styx.api.Api;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
@@ -122,7 +123,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   public void shouldRunCustomWorkflowSchedule() throws Exception {
     Workflow customWorkflow = Workflow.create(
         "styx",
-        TestData.WORKFLOW_URI,
+        Optional.of(TestData.WORKFLOW_URI),
+        Optional.of(Api.Version.V3),
         WorkflowConfiguration.builder()
             .id("styx.TestEndpoint")
             .schedule(Schedule.parse("15,45 12,15 * * *"))
