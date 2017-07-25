@@ -74,7 +74,7 @@ import org.junit.Test;
 
 public class WorkflowResourceTest extends VersionedApiTest {
 
-  private static final String SCHEDULER_BASE = "http://localhost:8080";
+  private static final String SCHEDULER_BASE = "http://localhost:12345";
 
   private static LocalDatastoreHelper localDatastore;
 
