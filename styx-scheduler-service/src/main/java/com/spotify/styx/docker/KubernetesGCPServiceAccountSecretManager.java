@@ -64,15 +64,15 @@ class KubernetesGCPServiceAccountSecretManager {
   private static final String STYX_WORKFLOW_SA_JSON_KEY = "styx-wf-sa.json";
   private static final String STYX_WORKFLOW_SA_P12_KEY = "styx-wf-sa.p12";
 
-  static final Duration DEFAULT_SECRET_EPOCH_PERIOD = Duration.ofDays(7);
-  static final EpochProvider DEFAULT_SECRET_EPOCH_PROVIDER =
+  private static final Duration DEFAULT_SECRET_EPOCH_PERIOD = Duration.ofDays(7);
+  private static final EpochProvider DEFAULT_SECRET_EPOCH_PROVIDER =
       KubernetesGCPServiceAccountSecretManager::smearedEpoch;
 
   private static final Clock DEFAULT_CLOCK = Clock.systemUTC();
 
   // epoch period + timeout of "running" state
   // todo: use config value instead of hardcoded 24 hour timeout
-  static final Duration SECRET_GC_GRACE_PERIOD = DEFAULT_SECRET_EPOCH_PERIOD.plusHours(24);
+  private static final Duration SECRET_GC_GRACE_PERIOD = DEFAULT_SECRET_EPOCH_PERIOD.plusHours(24);
 
   private final KubernetesClient client;
   private final ServiceAccountKeyManager keyManager;

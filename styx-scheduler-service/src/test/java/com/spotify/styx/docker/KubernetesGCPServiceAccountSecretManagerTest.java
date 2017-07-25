@@ -20,8 +20,6 @@
 
 package com.spotify.styx.docker;
 
-import static com.spotify.styx.docker.KubernetesGCPServiceAccountSecretManager.DEFAULT_SECRET_EPOCH_PERIOD;
-import static com.spotify.styx.docker.KubernetesGCPServiceAccountSecretManager.SECRET_GC_GRACE_PERIOD;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_ID;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Optional.empty;
@@ -106,7 +104,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   private final static Clock CLOCK = Clock.fixed(Instant.now(), ZoneOffset.UTC);
 
   private static final Instant EXPIRED_CREATION_TIMESTAMP =
-      CLOCK.instant().minus(SECRET_GC_GRACE_PERIOD.plusSeconds(1));
+      CLOCK.instant().minus(Duration.ofDays(7).plusHours(24).plusSeconds(1));
 
   private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(WORKFLOW_ID, "foo");
 
@@ -482,8 +480,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test
-  public void shouldSmearRotation() throws Exception {
-    final long hours = DEFAULT_SECRET_EPOCH_PERIOD.toHours();
+  public void shouldSmearRotationWeekly() throws Exception {
+    final long hours = Duration.ofDays(7).toHours();
     final int[] rotationsPerHour = new int[(int) hours];
     final int n = 10000;
     for (int i = 0; i < n; i++) {
