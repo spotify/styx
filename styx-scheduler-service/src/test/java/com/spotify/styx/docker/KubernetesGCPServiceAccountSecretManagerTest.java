@@ -103,7 +103,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   private final static Clock CLOCK = Clock.fixed(Instant.now(), ZoneOffset.UTC);
 
-  private static final Instant EXPIRED_CREATION_TIMESTAMP = CLOCK.instant().minus(Duration.ofHours(48).plusSeconds(1));
+  private static final Instant EXPIRED_CREATION_TIMESTAMP =
+      CLOCK.instant().minus(Duration.ofDays(7).plusHours(24).plusSeconds(1));
 
   private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(WORKFLOW_ID, "foo");
 
@@ -479,14 +480,15 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test
-  public void shouldSmearRotation() throws Exception {
-    final int[] rotationsPerHour = new int[24];
-    final int n = 1000;
+  public void shouldSmearRotationWeekly() throws Exception {
+    final long hours = Duration.ofDays(7).toHours();
+    final int[] rotationsPerHour = new int[(int) hours];
+    final int n = 10000;
     for (int i = 0; i < n; i++) {
       long prevEpoch = 0;
-      for (int hour = 0; hour < 24; hour++) {
+      for (int hour = 0; hour < hours; hour++) {
         final long nowMillis = TimeUnit.HOURS.toMillis(hour);
-        final long epoch = KubernetesGCPServiceAccountSecretManager.smearedDailyEpoch(
+        final long epoch = KubernetesGCPServiceAccountSecretManager.smearedEpoch(
             nowMillis, "sa" + i + "@example.com");
         if (prevEpoch != epoch) {
           prevEpoch = epoch;
@@ -495,7 +497,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
       }
     }
     final IntSummaryStatistics stats = IntStream.of(rotationsPerHour).summaryStatistics();
-    final double expectedMeanRotationsPerHour = n / 24;
+    final double expectedMeanRotationsPerHour = n / hours;
     assertThat(stats.getAverage(), is(closeTo(expectedMeanRotationsPerHour, expectedMeanRotationsPerHour / 2)));
     assertThat((double) stats.getMax(), is(lessThan(expectedMeanRotationsPerHour * 2)));
   }
