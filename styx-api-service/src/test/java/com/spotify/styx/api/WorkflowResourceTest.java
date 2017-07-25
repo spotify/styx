@@ -267,7 +267,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldSucceedWithPatchStatePerComponent() throws Exception {
-    sinceVersion(Api.Version.V2);
+    isVersion(Api.Version.V2);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/state"),
@@ -369,7 +369,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldReturnBadRequestWhenMalformedStatePayloadIsSentComponent() throws Exception {
-    sinceVersion(Api.Version.V2);
+    isVersion(Api.Version.V2);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/state"),
@@ -398,7 +398,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
    */
   @Test
   public void shouldReturnBadRequestSettingEnabledOnComponent() throws Exception {
-    sinceVersion(Api.Version.V2);
+    isVersion(Api.Version.V2);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/state"),

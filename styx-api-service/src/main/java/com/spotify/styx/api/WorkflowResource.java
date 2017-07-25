@@ -45,6 +45,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -84,11 +85,7 @@ public final class WorkflowResource {
             rc -> state(arg("cid", rc), arg("wfid", rc))),
         Route.with(
             json(), "PATCH", BASE + "/<cid>/<wfid>/state",
-            rc -> patchState(arg("cid", rc), arg("wfid", rc), rc.request())),
-        Route.with(
-            json(), "PATCH", BASE + "/<cid>/state",
-            rc -> patchState(arg("cid", rc), rc.request()))
-
+            rc -> patchState(arg("cid", rc), arg("wfid", rc), rc.request()))
     );
 
     final List<Route<AsyncHandler<Response<ByteString>>>> forwardedRoutes = Arrays.asList(
@@ -102,9 +99,16 @@ public final class WorkflowResource {
         )
     );
 
+    final List<Route<AsyncHandler<Response<ByteString>>>> sunsetRoutes = Collections.singletonList(
+        Route.with(
+            json(), "PATCH", BASE + "/<cid>/state",
+            rc -> patchState(arg("cid", rc), rc.request()))
+    );
+
     return cat(
         Api.prefixRoutes(routes, V2, V3),
-        Api.prefixRoutes(forwardedRoutes, V3)
+        Api.prefixRoutes(forwardedRoutes, V3),
+        Api.prefixRoutes(sunsetRoutes, V2)
     );
   }
 
