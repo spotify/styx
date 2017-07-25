@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.util.GuardedRunnable.guard;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.Objects.requireNonNull;
 
@@ -71,30 +72,30 @@ public class TriggerManager {
       }
     } catch (IOException e) {
       LOG.warn("Couldn't fetch global enabled status, skipping this run.");
-      return ;
+      return;
     }
 
-    final Map<Workflow, TriggerInstantSpec> map;
-    final Set<WorkflowId> enabled;
+    final Map<Workflow, TriggerInstantSpec> canBeTriggeredWorkflows;
+    final Set<WorkflowId> enabledWorkflows;
     try {
-      map = storage.workflowsWithNextNaturalTrigger();
-      enabled = storage.enabled();
+      canBeTriggeredWorkflows = storage.workflowsWithNextNaturalTrigger();
+      enabledWorkflows = storage.enabled();
     } catch (IOException e) {
       LOG.warn("Couldn't fetch workflows to trigger, skipping this run.");
       return;
     }
 
     final Instant now = time.get();
-    map.entrySet().forEach(entry -> {
-      final Workflow workflow = entry.getKey();
-      final Schedule schedule = workflow.configuration().schedule();
-      final TriggerInstantSpec instantSpec = entry.getValue();
+    canBeTriggeredWorkflows.entrySet().stream()
+        .filter(entry -> now.isAfter(entry.getValue().offsetInstant()))
+        .forEach(entry -> tryTriggering(entry.getKey(), entry.getValue(), enabledWorkflows));
+  }
 
-      if (now.isBefore(instantSpec.offsetInstant())) {
-        return;
-      }
-
-      if (enabled.contains(workflow.id())) {
+  private void tryTriggering(Workflow workflow,
+                             TriggerInstantSpec instantSpec,
+                             Set<WorkflowId> enabledWorkflows) {
+    guard(() -> {
+      if (enabledWorkflows.contains(workflow.id())) {
         try {
           final CompletionStage<Void> processed = triggerListener.event(
               workflow,
@@ -112,6 +113,7 @@ public class TriggerManager {
         stats.recordNaturalTrigger();
       }
 
+      final Schedule schedule = workflow.configuration().schedule();
       final Instant nextTrigger = nextInstant(instantSpec.instant(), schedule);
       final Instant nextWithOffset = workflow.configuration().addOffset(nextTrigger);
       final TriggerInstantSpec nextSpec = TriggerInstantSpec.create(nextTrigger, nextWithOffset);
@@ -124,6 +126,6 @@ public class TriggerManager {
             workflow.id(), nextTrigger);
         throw Throwables.propagate(e);
       }
-    });
+    }).run();
   }
 }

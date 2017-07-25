@@ -205,7 +205,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
   @Test
   public void shouldConvertOldTriggerConfigurationToNew() throws Exception {
-    givenTheTimeIs("2016-03-14T10:59:00Z");
+    givenTheTimeIs("2016-03-14T10:59:01Z");
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
@@ -422,7 +422,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
   @Test
   public void runsDockerImageWithArgsTemplate() throws Exception {
-    givenTheTimeIs("2016-03-14T15:59:00Z");
+    givenTheTimeIs("2016-03-14T15:59:01Z");
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
@@ -440,7 +440,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
   @Test
   public void retriesUseLatestWorkflowSpecification() throws Exception {
-    givenTheTimeIs("2016-03-14T15:59:00Z");
+    givenTheTimeIs("2016-03-14T15:59:01Z");
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
@@ -488,7 +488,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
   @Test
   public void cleansUpDockerRunsWhenTerminating() throws Exception {
-    givenTheTimeIs("2016-03-14T15:59:00Z");
+    givenTheTimeIs("2016-03-14T15:59:01Z");
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
@@ -510,7 +510,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
   @Test
   public void cleansUpDockerRunsWhenFailing() throws Exception {
-    givenTheTimeIs("2016-03-14T15:59:00Z");
+    givenTheTimeIs("2016-03-14T15:59:01Z");
     givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
