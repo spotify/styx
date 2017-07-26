@@ -17,18 +17,33 @@ aglio -i doc/api.apib -o api.html --theme-template triple --theme-variables stre
 [dredd]: https://github.com/apiaryio/dredd
 [aglio]: https://github.com/danielgtaylor/aglio
 
+## Authentication
+
+Starting from V3, any request except `GET` requires Google Authentication.
+
+HTTP header `Authorization: Bearer <id_token>` with a valid Google ID token is required
+in those requests.
+
+To know more details, please check
+[Google documentation](https://developers.google.com/identity/sign-in/web/backend-auth).
 
 # Group Workflows
 
 Resources related to the Workflows registered in Styx.
 
-## Workflow [/v2/workflows/{component_id}/{workflow_id}]
+## Workflow [/{version}/workflows/{component_id}/{workflow_id}]
 
 + Parameters
     + component_id: `styx-canary` (string) - Workflow Component
     + workflow_id: `StyxCanary` (string) - Workflow ID
 
 ### Get Workflow [GET]
+
++ Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v2`
+            + `v3`
 
 + Response 200 (application/json)
 
@@ -53,20 +68,27 @@ Resources related to the Workflows registered in Styx.
               }
         }
 
-
 ### Delete Workflow [DELETE]
 
 Returns 200 OK if the Workflow was found an deleted, 404 Not Found otherwise.
 
-+ Response 200
++ Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v3`
 
++ Response 200
 + Response 404
 
-## Workflow Configuration [/v2/workflows/{component_id}]
+## Workflows [/{version}/workflows/{component_id}]
 
-Accepts a Workflow Configuration update as a JSON object. Returns 200 OK if the Workflow was created or updated with the supplied configuration. Note that a non-null value is required for docker_image.
+Accepts a Workflow definition as a JSON object. Returns 200 OK if the Workflow was registered
+or updated. Note that a non-null value is required for docker_image.
 
 + Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v3`
     + component_id: `styx-canary` (string) - Workflow Component
 
 ### Create or update Workflow [POST]
@@ -111,12 +133,17 @@ Accepts a Workflow Configuration update as a JSON object. Returns 200 OK if the 
             "secret": null,
             "service_account": null,
             "resources": []
-          }
+          },
+          "__from_api": "V3"
         }
 
-## Workflow Instances [/v2/workflows/{component_id}/{workflow_id}/instances]
+## Workflow Instances [/{version}/workflows/{component_id}/{workflow_id}/instances]
 
 + Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v2`
+            + `v3`
     + component_id: `styx-canary` (string) - Workflow Component
     + workflow_id: `StyxCanary` (string) - Workflow ID
 
@@ -157,9 +184,13 @@ Accepts a Workflow Configuration update as a JSON object. Returns 200 OK if the 
             }]
         }]
 
-## Workflow Instance [/v2/workflows/{component_id}/{workflow_id}/instances/{instance}]
+## Workflow Instance [/{version}/workflows/{component_id}/{workflow_id}/instances/{instance}]
 
 + Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v2`
+            + `v3`
     + component_id: `styx-canary` (string) - Workflow Component
     + workflow_id: `StyxCanary` (string) - Workflow ID
     + instance: `2016-07-13T08` (string) - Worfklow Instance parameter
@@ -201,9 +232,13 @@ Accepts a Workflow Configuration update as a JSON object. Returns 200 OK if the 
             }]
         }
 
-## Workflow state [/v2/workflows/{component_id}/{workflow_id}/state]
+## Workflow state [/{version}/workflows/{component_id}/{workflow_id}/state]
 
 + Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v2`
+            + `v3`
     + component_id: `styx-canary` (string) - Workflow Component
     + workflow_id: `StyxCanary` (string) - Workflow ID
 
@@ -271,7 +306,13 @@ Accepts a Workflow Configuration update as a JSON object. Returns 200 OK if the 
 Resources related to Styx Resources registered in the scheduler. Styx Resources
 can be used to limit the maximum concurrent executions for certain Workflows.
 
-## Resources [/v2/resources]
+## Resources [/{version}/resources]
+
++ Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v2`
+            + `v3`
 
 ### Get Resources [GET]
 
@@ -300,9 +341,13 @@ can be used to limit the maximum concurrent executions for certain Workflows.
             "id": "styx-canary-resource"
         }
 
-## Resource [/v2/resources/{resource}]
+## Resource [/{version}/resources/{resource}]
 
 + Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v2`
+            + `v3`
     + resource: `styx-canary-resource` (string) - Resource ID
 
 ### Get Resource [GET]
@@ -342,7 +387,13 @@ Resources related to the Backfills in Styx. This group allows to operate on
 Backfill entities registered in Styx and check detailed status of each single
 Workflow Instance belonging to a Backfill entity.
 
-## Backfills [/v2/backfills{?component,workflow,status,showAll}]
+## Backfills [/{version}/backfills{?component,workflow,status,showAll}]
+
++ Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v2`
+            + `v3`
 
 ### Get Backfills [GET]
 
@@ -447,9 +498,13 @@ Workflow Instance belonging to a Backfill entity.
             }
         }
 
-## Backfill [/v2/backfills/{backfill_id}]
+## Backfill [/{version}/backfills/{backfill_id}]
 
 + Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v2`
+            + `v3`
     + backfill_id: `backfill-1489054446085-52684` (string) - Backfill ID
 
 ### Modify Backfill [PUT]
@@ -496,7 +551,13 @@ Workflow Instance belonging to a Backfill entity.
 
 Resources related to inspect detailed status of Workflow Instances.
 
-## Active States [/v2/status/activeStates]
+## Active States [/{version}/status/activeStates]
+
++ Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v2`
+            + `v3`
 
 ### Get Active States [GET]
 
@@ -545,9 +606,13 @@ Resources related to inspect detailed status of Workflow Instances.
             }]
         }
 
-## Events [/v2/status/events/{component_id}/{workflow_id}/{instance}]
+## Events [/{version}/status/events/{component_id}/{workflow_id}/{instance}]
 
 + Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v2`
+            + `v3`
     + component_id: `styx-canary` (string) - Workflow Component
     + workflow_id: `StyxCanary` (string) - Workflow ID
     + instance: `2017-01-01T01` (string) - Worfklow Instance parameter
@@ -580,7 +645,13 @@ Resources related to inspect detailed status of Workflow Instances.
 
 Resources related to operations that act on the current state of the scheduler.
 
-## Events [/v2/scheduler/events]
+## Events [/{version}/scheduler/events]
+
++ Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v2`
+            + `v3`
 
 ### Inject Event [POST]
 
@@ -598,7 +669,13 @@ Resources related to operations that act on the current state of the scheduler.
             "workflow_instance": "styx-canary/StyxCanary/2017-01-01T01"
         }
 
-## Trigger [/v2/scheduler/trigger]
+## Trigger [/{version}/scheduler/trigger]
+
++ Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v2`
+            + `v3`
 
 ### Trigger Workflow Instance [POST]
 
@@ -626,7 +703,13 @@ Resources related to operations that act on the current state of the scheduler.
 
 Resources related to global configurations for Styx.
 
-## Global Enabled [/v2/config{?enabled}]
+## Global Enabled [/{version}/config{?enabled}]
+
++ Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v2`
+            + `v3`
 
 ### Get Global Enabled [GET]
 
