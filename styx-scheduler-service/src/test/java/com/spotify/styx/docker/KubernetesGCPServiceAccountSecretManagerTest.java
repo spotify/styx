@@ -40,7 +40,7 @@ import static org.mockito.Mockito.when;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpHeaders;
-import com.google.api.client.http.HttpResponseException.Builder;
+import com.google.api.client.http.HttpResponseException;
 import com.google.api.services.iam.v1.model.ServiceAccountKey;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -339,6 +339,23 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test
+  public void shouldHandleTooManyKeysCreated() throws IOException {
+    when(serviceAccountKeyManager.serviceAccountExists(anyString())).thenReturn(true);
+
+    final GoogleJsonResponseException resourceExhausted = new GoogleJsonResponseException(
+        new HttpResponseException.Builder(429, "RESOURCE_EXHAUSTED", new HttpHeaders()),
+        new GoogleJsonError().set("status", "RESOURCE_EXHAUSTED"));
+
+    doThrow(resourceExhausted).when(serviceAccountKeyManager).createJsonKey(any());
+    doThrow(resourceExhausted).when(serviceAccountKeyManager).createP12Key(any());
+
+    exception.expect(InvalidExecutionException.class);
+    exception.expectMessage("Maximum number of keys on service account reached: " + SERVICE_ACCOUNT);
+
+    sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(), SERVICE_ACCOUNT);
+  }
+
+  @Test
   public void shouldHandlePermissionDeniedErrorsWhenDeletingServiceAccountKeys() throws Exception {
     final Secret secret = fakeServiceAccountKeySecret(
         SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", EXPIRED_CREATION_TIMESTAMP.toString());
@@ -350,8 +367,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
     // Verify that the secret is delete even if we get permission denied errors on deleting the keys
     final GoogleJsonResponseException permissionDenied = new GoogleJsonResponseException(
-        new Builder(403, "Forbidden", new HttpHeaders()), new GoogleJsonError()
-        .set("status", "PERMISSION_DENIED"));
+        new HttpResponseException.Builder(403, "Forbidden", new HttpHeaders()),
+        new GoogleJsonError().set("status", "PERMISSION_DENIED"));
     doThrow(permissionDenied).when(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key"));
     doThrow(permissionDenied).when(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key"));
 

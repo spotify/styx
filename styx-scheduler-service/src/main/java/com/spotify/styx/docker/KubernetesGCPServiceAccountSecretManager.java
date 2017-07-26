@@ -29,6 +29,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hashing;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.util.GcpUtil;
 import io.fabric8.kubernetes.api.model.Pod;
@@ -47,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -99,8 +101,7 @@ class KubernetesGCPServiceAccountSecretManager {
     this(client, keyManager, DEFAULT_SECRET_EPOCH_PROVIDER, DEFAULT_CLOCK);
   }
 
-  String ensureServiceAccountKeySecret(String workflowId,
-      String serviceAccount) throws IOException {
+  String ensureServiceAccountKeySecret(String workflowId, String serviceAccount) {
     final long epoch = epochProvider.epoch(clock.millis(), serviceAccount);
     final String secretName = buildSecretName(serviceAccount, epoch);
 
@@ -110,12 +111,14 @@ class KubernetesGCPServiceAccountSecretManager {
     try {
       return serviceAccountSecretCache.get(serviceAccount, () ->
           getOrCreateSecret(workflowId, serviceAccount, epoch, secretName));
-    } catch (Exception e) {
+    } catch (ExecutionException | UncheckedExecutionException e) {
       final Throwable cause = e.getCause();
       if (cause instanceof InvalidExecutionException) {
         throw (InvalidExecutionException) cause;
       } else if (GcpUtil.isPermissionDenied(cause)) {
         throw new InvalidExecutionException("Permission denied to service account: " + serviceAccount);
+      } else if (GcpUtil.isResourceExhausted(cause)) {
+        throw new InvalidExecutionException("Maximum number of keys on service account reached: " + serviceAccount);
       } else {
         throw new RuntimeException(e);
       }
