@@ -23,6 +23,7 @@ package com.spotify.styx;
 import static com.spotify.styx.monitoring.MeteredProxy.instrument;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
+import static com.spotify.styx.util.GuardedRunnable.guard;
 import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static com.spotify.styx.util.ReplayEvents.transitionLogger;
 import static java.util.Objects.requireNonNull;
@@ -496,16 +497,6 @@ public class StyxScheduler implements AppInit {
       LOG.warn("Failed to fetch the submission rate config from storage, "
           + "skipping RateLimiter update");
     }
-  }
-
-  private static Runnable guard(Runnable delegate) {
-    return () -> {
-      try {
-        delegate.run();
-      } catch (Throwable t) {
-        LOG.warn("Guarded runnable threw", t);
-      }
-    };
   }
 
   private void setupMetrics(
