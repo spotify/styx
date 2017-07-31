@@ -234,6 +234,5 @@
     <!-- http://checkstyle.sourceforge.net/config_filters.html#SuppressionFilter -->
     <module name="SuppressionFilter">
         <property name="file" value="suppressions.xml"/>
-        <property name="optional" value="true"/>
     </module>
 </module>
