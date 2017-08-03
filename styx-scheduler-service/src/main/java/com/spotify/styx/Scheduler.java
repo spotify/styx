@@ -167,7 +167,7 @@ public class Scheduler {
           .orElse(workflowResourceRefs);
 
       if (instanceResourceRefs.isEmpty()) {
-        sendDequeue(instance, ImmutableSet.of());
+        sendDequeue(instance, instanceResourceRefs);
       } else {
         evaluateResourcesForDequeue(resources, currentResourceUsage, instance, instanceResourceRefs);
       }
