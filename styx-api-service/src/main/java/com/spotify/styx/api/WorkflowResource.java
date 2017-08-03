@@ -134,11 +134,6 @@ public final class WorkflowResource {
           Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid payload.")));
     }
 
-    if (!workflowConfig.dockerImage().isPresent()) {
-      return CompletableFuture.completedFuture(
-          Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("docker_image is required")));
-    }
-
     final Workflow workflow = Workflow.create(componentId,
                                               Optional.empty(),
                                               Optional.of(V3),

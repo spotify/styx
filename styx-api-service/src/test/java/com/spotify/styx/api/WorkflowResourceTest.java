@@ -585,18 +585,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertThat(response, hasNoPayload());
   }
 
-  @Test
-  public void shouldReturnBadRequestWhenMissingDockerImage() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    Response<ByteString> response =
-        awaitResponse(
-            serviceHelper.request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
-
-    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
-    assertThat(response.status(), withReasonPhrase(equalTo("docker_image is required")));
-  }
-
   private long ms(String time) {
     return Instant.parse("2016-08-10T" + time + "Z").toEpochMilli();
   }
