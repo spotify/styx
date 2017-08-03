@@ -24,6 +24,7 @@ import static java.util.Optional.empty;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
@@ -36,6 +37,7 @@ import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -93,6 +95,22 @@ public interface DockerRunner extends Closeable {
     public abstract Optional<Trigger> trigger();
 
     public abstract Optional<String> commitSha();
+    
+    public abstract Set<String> resources();
+
+    public static RunSpec create(
+        String executionId,
+        String imageName,
+        ImmutableList<String> args,
+        boolean terminationLogging,
+        Optional<Secret> secret,
+        Optional<String> serviceAccount,
+        Optional<Trigger> trigger,
+        Optional<String> commitSha,
+        Set<String> resources) {
+      return new AutoValue_DockerRunner_RunSpec(executionId, imageName, args, terminationLogging, secret,
+                                                serviceAccount, trigger, commitSha, resources);
+    }
 
     public static RunSpec create(
         String executionId,
@@ -103,13 +121,14 @@ public interface DockerRunner extends Closeable {
         Optional<String> serviceAccount,
         Optional<Trigger> trigger,
         Optional<String> commitSha) {
-      return new AutoValue_DockerRunner_RunSpec(executionId, imageName, args, terminationLogging, secret,
-                                                serviceAccount, trigger, commitSha);
+      return create(executionId, imageName, args, terminationLogging, secret,
+                    serviceAccount, trigger, commitSha, ImmutableSet.of());
     }
 
     public static RunSpec simple(String executionId, String imageName, String... args) {
-      return new AutoValue_DockerRunner_RunSpec(executionId, imageName, ImmutableList.copyOf(args),
-                                                false, empty(), empty(), empty(), empty());
+      return create(executionId, imageName, ImmutableList.copyOf(args),
+                    false, empty(), empty(), empty(), empty(),
+                    ImmutableSet.of());
     }
   }
 

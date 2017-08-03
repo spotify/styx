@@ -32,6 +32,7 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.RepeatRule;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
@@ -120,13 +121,13 @@ public class QueuedStateManagerTest {
     setUp();
 
     stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER1));
-    stateManager.receive(Event.dequeue(INSTANCE));
+    stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()));
     stateManager.receive(Event.halt(INSTANCE));
     assertTrue(stateManager.awaitIdle(1000));
 
     stateManager.initialize(RunState.fresh(INSTANCE));
     stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER2));
-    stateManager.receive(Event.dequeue(INSTANCE));
+    stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()));
     stateManager.receive(Event.created(INSTANCE, TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     stateManager.receive(Event.started(INSTANCE));
     stateManager.receive(Event.halt(INSTANCE));
@@ -334,7 +335,7 @@ public class QueuedStateManagerTest {
         stateManager.receive(Event.started(instance));
         stateManager.receive(Event.terminate(instance, Optional.of(20)));
         stateManager.receive(Event.retryAfter(instance, 300));
-        stateManager.receive(Event.dequeue(instance));
+        stateManager.receive(Event.dequeue(instance, ImmutableSet.of()));
       } catch (StateManager.IsClosed ignored) {
       }
     };
@@ -351,7 +352,7 @@ public class QueuedStateManagerTest {
         try {
           stateManager.initialize(RunState.fresh(instance));
           stateManager.receive(Event.triggerExecution(instance, TRIGGER1));
-          stateManager.receive(Event.dequeue(instance));
+          stateManager.receive(Event.dequeue(instance, ImmutableSet.of()));
         } catch (StateManager.IsClosed ignored) {
         }
 

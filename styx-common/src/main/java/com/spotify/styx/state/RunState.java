@@ -34,6 +34,7 @@ import static java.lang.System.currentTimeMillis;
 import static java.util.Optional.empty;
 
 import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
@@ -43,6 +44,7 @@ import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * State machine for run states.
@@ -88,6 +90,7 @@ public abstract class RunState {
   public abstract State state();
   public abstract long timestamp();
   public abstract StateData data();
+  public abstract Set<String> resources();
 
   abstract Time time();
   abstract OutputHandler outputHandler();
@@ -116,22 +119,27 @@ public abstract class RunState {
 
   public RunState withHandlers(OutputHandler[] outputHandlers) {
     return new AutoValue_RunState(
-        workflowInstance(), state(), timestamp(), data(), time(), fanOutput(outputHandlers));
+        workflowInstance(), state(), timestamp(), data(), resources(), time(), fanOutput(outputHandlers));
   }
 
   public RunState withTime(Time time) {
     return new AutoValue_RunState(
-        workflowInstance(), state(), timestamp(), data(), time, outputHandler());
+        workflowInstance(), state(), timestamp(), data(), resources(), time, outputHandler());
   }
 
   private RunState state(State state, StateData newStateData) {
     return new AutoValue_RunState(
-        workflowInstance(), state, time().get().toEpochMilli(), newStateData, time(), outputHandler());
+        workflowInstance(), state, time().get().toEpochMilli(), newStateData, resources(), time(), outputHandler());
   }
 
   private RunState state(State state) {
     return new AutoValue_RunState(
-        workflowInstance(), state, time().get().toEpochMilli(), data(), time(), outputHandler());
+        workflowInstance(), state, time().get().toEpochMilli(), data(), resources(), time(), outputHandler());
+  }
+
+  private RunState state(State state, Set<String> resources) {
+    return new AutoValue_RunState(
+        workflowInstance(), state, time().get().toEpochMilli(), data(), resources, time(), outputHandler());
   }
 
   private class TransitionVisitor implements EventVisitor<RunState> {
@@ -204,10 +212,10 @@ public abstract class RunState {
     }
 
     @Override
-    public RunState dequeue(WorkflowInstance workflowInstance) {
+    public RunState dequeue(WorkflowInstance workflowInstance, Set<String> resources) {
       switch (state()) {
         case QUEUED:
-          return state(PREPARE);
+          return state(PREPARE, resources);
 
         default:
           throw illegalTransition("dequeue");
@@ -428,7 +436,8 @@ public abstract class RunState {
       Time time,
       OutputHandler... outputHandler) {
     return new AutoValue_RunState(
-        workflowInstance, state, time.get().toEpochMilli(), stateData, time, fanOutput(outputHandler));
+        workflowInstance, state, time.get().toEpochMilli(), stateData, ImmutableSet.of(), time,
+        fanOutput(outputHandler));
   }
 
   public static RunState create(
@@ -437,6 +446,7 @@ public abstract class RunState {
       StateData stateData,
       OutputHandler... outputHandler) {
     return new AutoValue_RunState(
-        workflowInstance, state, currentTimeMillis(), stateData, Instant::now, fanOutput(outputHandler));
+        workflowInstance, state, currentTimeMillis(), stateData, ImmutableSet.of(), Instant::now,
+        fanOutput(outputHandler));
   }
 }

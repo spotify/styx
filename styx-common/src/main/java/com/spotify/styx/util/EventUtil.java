@@ -27,6 +27,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -72,7 +73,7 @@ public final class EventUtil {
     }
 
     @Override
-    public String dequeue(WorkflowInstance workflowInstance) {
+    public String dequeue(WorkflowInstance workflowInstance, Set<String> resources) {
       return "";
     }
 
@@ -155,7 +156,7 @@ public final class EventUtil {
     }
 
     @Override
-    public String dequeue(WorkflowInstance workflowInstance) {
+    public String dequeue(WorkflowInstance workflowInstance, Set<String> resources) {
       return "dequeue";
     }
 

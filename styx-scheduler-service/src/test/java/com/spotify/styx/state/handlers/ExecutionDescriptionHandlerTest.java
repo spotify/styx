@@ -37,6 +37,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -88,7 +89,7 @@ public class ExecutionDescriptionHandlerTest {
     storage.patchState(workflow.id(), workflowState);
     stateManager.initialize(runState);
     stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
-    stateManager.receive(Event.dequeue(workflowInstance));
+    stateManager.receive(Event.dequeue(workflowInstance, ImmutableSet.of()));
 
     RunState currentState = stateManager.get(workflowInstance);
     StateData data = currentState.data();
@@ -124,7 +125,7 @@ public class ExecutionDescriptionHandlerTest {
 
     stateManager.initialize(runState);
     stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
-    stateManager.receive(Event.dequeue(workflowInstance));
+    stateManager.receive(Event.dequeue(workflowInstance, ImmutableSet.of()));
 
     RunState failed = stateManager.get(workflowInstance);
     assertThat(failed.state(), Matchers.is(RunState.State.FAILED));
@@ -216,7 +217,7 @@ public class ExecutionDescriptionHandlerTest {
     storage.patchState(workflow.id(), workflowState);
     stateManager.initialize(runState);
     stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
-    stateManager.receive(Event.dequeue(workflowInstance));
+    stateManager.receive(Event.dequeue(workflowInstance, ImmutableSet.of()));
 
     RunState currentState = stateManager.get(workflowInstance);
     StateData data = currentState.data();
