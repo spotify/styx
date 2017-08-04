@@ -33,6 +33,7 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.api.Api;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Backfill;
@@ -633,13 +634,13 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
     givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER1),                   0L);
-    givenStoredEvent(Event.dequeue(workflowInstance),                                      1L);
+    givenStoredEvent(Event.dequeue(workflowInstance, ImmutableSet.of()),                   1L);
     givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION, "exec1"),  2L);
     givenStoredEvent(Event.submitted(workflowInstance, "exec1"),                           3L);
     givenStoredEvent(Event.started(workflowInstance),                                      4L);
     givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),                   5L);
     givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                            6L);
-    givenStoredEvent(Event.dequeue(workflowInstance),                                      7L);
+    givenStoredEvent(Event.dequeue(workflowInstance, ImmutableSet.of()),                              7L);
     givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION, "exec2"),  8L);
     givenStoredEvent(Event.submitted(workflowInstance, "exec2"),                           9L);
     givenStoredEvent(Event.started(workflowInstance),                                     10L);
@@ -647,7 +648,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                           12L);
     givenStoredEvent(Event.halt(workflowInstance),                                        13L);
     givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER2),                  14L);
-    givenStoredEvent(Event.dequeue(workflowInstance),                                     15L);
+    givenStoredEvent(Event.dequeue(workflowInstance, ImmutableSet.of()),                  15L);
     givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION, "exec3"), 16L);
     givenStoredEvent(Event.submitted(workflowInstance, "exec3"),                          17L);
     givenStoredEvent(Event.started(workflowInstance),                                     18L);

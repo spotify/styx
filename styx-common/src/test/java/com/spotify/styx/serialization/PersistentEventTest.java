@@ -25,6 +25,7 @@ import static com.spotify.styx.serialization.Json.serialize;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -65,7 +66,7 @@ public class PersistentEventTest {
     assertRoundtrip(Event.triggerExecution(INSTANCE1, UNKNOWN_TRIGGER));
     assertRoundtrip(Event.info(INSTANCE1, Message.info("InfoMessage")));
     assertRoundtrip(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE));
-    assertRoundtrip(Event.dequeue(INSTANCE1));
+    assertRoundtrip(Event.dequeue(INSTANCE1, ImmutableSet.of("foo", "bar")));
     assertRoundtrip(Event.started(INSTANCE1));
     assertRoundtrip(Event.terminate(INSTANCE1, Optional.of(20)));
     assertRoundtrip(Event.runError(INSTANCE1, "ErrorMessage"));
@@ -82,7 +83,7 @@ public class PersistentEventTest {
   @Test
   public void testDeserializeFromJson() throws Exception {
     assertThat(deserializeEvent(json("timeTrigger")), is(Event.timeTrigger(INSTANCE1)));
-    assertThat(deserializeEvent(json("dequeue")), is(Event.dequeue(INSTANCE1)));
+    assertThat(deserializeEvent(json("dequeue")), is(Event.dequeue(INSTANCE1, ImmutableSet.of())));
     assertThat(deserializeEvent(json("started")), is(Event.started(INSTANCE1)));
     assertThat(deserializeEvent(json("success")), is(Event.success(INSTANCE1)));
     assertThat(deserializeEvent(json("retry")), is(Event.retry(INSTANCE1)));
@@ -104,6 +105,9 @@ public class PersistentEventTest {
                                                + "\"}, "
                                                + "\"execution_id\": \"" + POD_NAME + "\"")),
         is(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION, POD_NAME)));
+    assertThat(
+        deserializeEvent(json("dequeue", "\"resources\":[\"foo\",\"bar\"]")),
+        is(Event.dequeue(INSTANCE1, ImmutableSet.of("foo", "bar"))));
     assertThat(
         deserializeEvent(json("info", "\"message\":{\"line\":\"InfoMessage\",\"level\":\"INFO\"}")),
         is(Event.info(INSTANCE1, Message.info("InfoMessage"))));

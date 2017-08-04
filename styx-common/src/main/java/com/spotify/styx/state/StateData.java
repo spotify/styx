@@ -25,6 +25,7 @@ import com.spotify.styx.model.ExecutionDescription;
 import io.norberg.automatter.AutoMatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * A value type for holding data related to the various states of the {@link RunState}.
@@ -46,6 +47,7 @@ public interface StateData {
   Optional<String> executionId();
   Optional<ExecutionDescription> executionDescription();
   List<Message> messages();
+  Set<String> resources();
 
   StateDataBuilder builder();
 

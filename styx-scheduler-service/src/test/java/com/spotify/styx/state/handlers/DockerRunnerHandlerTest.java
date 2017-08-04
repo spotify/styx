@@ -37,6 +37,7 @@ import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
@@ -249,7 +250,7 @@ public class DockerRunnerHandlerTest {
 
     stateManager.initialize(runState);
     stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
-    stateManager.receive(Event.dequeue(workflowInstance));
+    stateManager.receive(Event.dequeue(workflowInstance, ImmutableSet.of()));
     stateManager.receive(Event.submit(workflowInstance, EXECUTION_DESCRIPTION, TEST_EXECUTION_ID));
     verify(stateManager, timeout(60_000)).receive(Event.submitted(workflowInstance, TEST_EXECUTION_ID));
     stateManager.receive(Event.runError(workflowInstance, ""));

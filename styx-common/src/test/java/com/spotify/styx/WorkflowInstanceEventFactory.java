@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
@@ -52,7 +53,7 @@ public class WorkflowInstanceEventFactory {
   }
 
   public Event dequeue() {
-    return Event.dequeue(workflowInstance);
+    return Event.dequeue(workflowInstance, ImmutableSet.of());
   }
 
   public Event submit(ExecutionDescription executionDescription, String executionId) {

@@ -456,7 +456,8 @@ public class SchedulerTest {
     verify(resourceDecorator).decorateResources(any(RunState.class), eq(workflow.configuration()),
         eq(ImmutableSet.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
 
-    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE));
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE, 
+                                                           ImmutableSet.of("baz", "quux")));
   }
 
   @Test
@@ -482,7 +483,8 @@ public class SchedulerTest {
     verify(stateManager).receiveIgnoreClosed(Event.info(INSTANCE,
         Message.info("Resource limit reached for: [Resource{id=baz, concurrency=0}]")));
 
-    verify(stateManager, never()).receiveIgnoreClosed(Event.dequeue(INSTANCE));
+    verify(stateManager, never()).receiveIgnoreClosed(
+        Event.dequeue(INSTANCE, ImmutableSet.of("foo", "bar")));
   }
 
   @Test
@@ -518,8 +520,8 @@ public class SchedulerTest {
         eq(ImmutableSet.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
 
     verify(stateManager).receiveIgnoreClosed(Matchers.argThat(
-        either(is(Event.dequeue(i0)))
-            .or(is(Event.dequeue(i4)))));
+        either(is(Event.dequeue(i0, ImmutableSet.of("baz"))))
+            .or(is(Event.dequeue(i4, ImmutableSet.of("baz"))))));
 
     assertThat(stateManager.get(i0).state() == State.PREPARE ||
         stateManager.get(i4).state() == State.PREPARE, is(true));

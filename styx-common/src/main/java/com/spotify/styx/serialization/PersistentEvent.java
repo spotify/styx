@@ -28,6 +28,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeId;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
@@ -35,6 +36,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
 import java.util.Optional;
+import java.util.Set;
 
 @JsonTypeInfo(use = Id.NAME, visible = true)
 @JsonSubTypes({
@@ -42,7 +44,7 @@ import java.util.Optional;
     @JsonSubTypes.Type(value = PersistentEvent.TriggerExecution.class, name = "triggerExecution"),
     @JsonSubTypes.Type(value = PersistentEvent.Info.class, name = "info"),
     @JsonSubTypes.Type(value = PersistentEvent.Created.class, name = "created"),
-    @JsonSubTypes.Type(value = PersistentEvent.class, name = "dequeue"),
+    @JsonSubTypes.Type(value = PersistentEvent.Dequeue.class, name = "dequeue"),
     @JsonSubTypes.Type(value = PersistentEvent.Started.class, name = "started"),
     @JsonSubTypes.Type(value = PersistentEvent.Terminate.class, name = "terminate"),
     @JsonSubTypes.Type(value = PersistentEvent.RunError.class, name = "runError"),
@@ -87,8 +89,8 @@ class PersistentEvent {
     }
 
     @Override
-    public PersistentEvent dequeue(WorkflowInstance workflowInstance) {
-      return new PersistentEvent("dequeue", workflowInstance.toKey());
+    public PersistentEvent dequeue(WorkflowInstance workflowInstance, Set<String> resources) {
+      return new Dequeue(workflowInstance.toKey(), Optional.of(resources));
     }
 
     @Override
@@ -166,8 +168,6 @@ class PersistentEvent {
     switch (type) {
       case "timeTrigger":
         return Event.timeTrigger(workflowInstance);
-      case "dequeue":
-        return Event.dequeue(workflowInstance);
       case "success":
         return Event.success(workflowInstance);
       case "retry":
@@ -247,6 +247,24 @@ class PersistentEvent {
     @Override
     public Event toEvent() {
       return Event.created(WorkflowInstance.parseKey(workflowInstance), executionId, dockerImage);
+    }
+  }
+
+  public static class Dequeue extends PersistentEvent {
+
+    public final Set<String> resources;
+
+    @JsonCreator
+    public Dequeue(
+        @JsonProperty("workflow_instance") String workflowInstance,
+        @JsonProperty("resources") Optional<Set<String>> resources) {
+      super("dequeue", workflowInstance);
+      this.resources = resources.orElse(ImmutableSet.of());
+    }
+
+    @Override
+    public Event toEvent() {
+      return Event.dequeue(WorkflowInstance.parseKey(workflowInstance), resources);
     }
   }
 

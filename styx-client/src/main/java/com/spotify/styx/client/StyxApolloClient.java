@@ -29,6 +29,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.Response;
@@ -218,7 +219,8 @@ class StyxApolloClient implements StyxClient {
         WorkflowId.create(componentId, workflowId),
         parameter);
     try {
-      final ByteString payload = serialize(Event.dequeue(workflowInstance));
+      // FIXME: by injecting a dequeue event, we are not respecting resource limit
+      final ByteString payload = serialize(Event.dequeue(workflowInstance, ImmutableSet.of()));
       return executeRequest(
           Request.forUri(urlBuilder.build().toString(), "POST").withPayload(payload))
           .thenApply(response -> (Void) null);

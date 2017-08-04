@@ -33,6 +33,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.state.RunState;
@@ -64,7 +65,7 @@ public class ReplayEventsTest {
     events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.natural()),        0L, 0L));
     events.add(SequenceEvent.create(Event.halt(WORKFLOW_INSTANCE),                                       1L, 1L));
     events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.backfill("bf-1")), 2L, 2L));
-    events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE),                                    3L, 3L));
+    events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE, ImmutableSet.of()), 3L, 3L));
     events.add(SequenceEvent.create(Event.submit(WORKFLOW_INSTANCE, EXECUTION_DESCRIPTION, "exec-1"),    4L, 4L));
     events.add(SequenceEvent.create(Event.submitted(WORKFLOW_INSTANCE, "exec-1"),                        5L, 5L));
     events.add(SequenceEvent.create(Event.started(WORKFLOW_INSTANCE),                                    6L, 6L));
@@ -85,15 +86,15 @@ public class ReplayEventsTest {
   public void restoreRunStateForInactiveBackfill() throws Exception {
     SortedSet<SequenceEvent> events = newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
     events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.backfill("bf-1")), 1L, 1L));
-    events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE),                                    2L, 2L));
+    events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE, ImmutableSet.of()),                 2L, 2L));
     events.add(SequenceEvent.create(Event.submit(WORKFLOW_INSTANCE, EXECUTION_DESCRIPTION, "exec-1"),    3L, 3L));
     events.add(SequenceEvent.create(Event.submitted(WORKFLOW_INSTANCE, "exec-1"),                        4L, 4L));
     events.add(SequenceEvent.create(Event.started(WORKFLOW_INSTANCE),                                    5L, 5L));
     events.add(SequenceEvent.create(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)),                  6L, 6L));
     events.add(SequenceEvent.create(Event.success(WORKFLOW_INSTANCE),                                    7L, 7L));
     events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.adhoc("ad-hoc")),  8L, 8L));
-    events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE),                                    9L, 9L));
-    events.add(SequenceEvent.create(Event.halt(WORKFLOW_INSTANCE),                                     10L, 10L));
+    events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE, ImmutableSet.of()),                 9L, 9L));
+    events.add(SequenceEvent.create(Event.halt(WORKFLOW_INSTANCE),                                       10L, 10L));
 
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
 
@@ -109,7 +110,7 @@ public class ReplayEventsTest {
   public void returnsEmptyWithMissingBackfill() throws Exception {
     SortedSet<SequenceEvent> events = newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
     events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.backfill("bf-1")), 1L, 1L));
-    events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE),                                    2L, 2L));
+    events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE, ImmutableSet.of()),                 2L, 2L));
 
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
 
@@ -131,7 +132,7 @@ public class ReplayEventsTest {
   public void restoreRunStateForActiveInstance(long counter, State expectedState, boolean printLogs) throws Exception {
     SortedSet<SequenceEvent> events = newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
     events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.natural()),        0L, 0L));
-    events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE),                                    1L, 1L));
+    events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE, ImmutableSet.of()),                 1L, 1L));
     events.add(SequenceEvent.create(Event.submit(WORKFLOW_INSTANCE, EXECUTION_DESCRIPTION, "exec-1"),    2L, 2L));
     events.add(SequenceEvent.create(Event.submitted(WORKFLOW_INSTANCE, "exec-1"),                        3L, 3L));
     events.add(SequenceEvent.create(Event.started(WORKFLOW_INSTANCE),                                    4L, 4L));

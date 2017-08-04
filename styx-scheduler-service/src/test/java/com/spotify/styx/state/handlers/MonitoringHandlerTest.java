@@ -26,6 +26,7 @@ import static org.mockito.Matchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -83,7 +84,7 @@ public class MonitoringHandlerTest {
     stateManager.initialize(state);
 
     stateManager.receive(Event.triggerExecution(state.workflowInstance(), Trigger.natural()));
-    stateManager.receive(Event.dequeue(state.workflowInstance()));
+    stateManager.receive(Event.dequeue(state.workflowInstance(), ImmutableSet.of()));
     stateManager.receive(Event.submit(state.workflowInstance(), EXECUTION_DESCRIPTION, "exec-1"));
     stateManager.receive(Event.submitted(state.workflowInstance(), "exec-1"));
     stateManager.receive(Event.started(state.workflowInstance()));
@@ -98,7 +99,7 @@ public class MonitoringHandlerTest {
     stateManager.initialize(state);
 
     stateManager.receive(Event.triggerExecution(state.workflowInstance(), Trigger.natural()));
-    stateManager.receive(Event.dequeue(state.workflowInstance()));
+    stateManager.receive(Event.dequeue(state.workflowInstance(), ImmutableSet.of()));
     stateManager.receive(Event.submit(state.workflowInstance(), EXECUTION_DESCRIPTION, "exec-1"));
     stateManager.receive(Event.submitted(state.workflowInstance(), "exec-1"));
     stateManager.receive(Event.started(state.workflowInstance()));
@@ -117,7 +118,7 @@ public class MonitoringHandlerTest {
     stateManager.receive(Event.retryAfter(state.workflowInstance(), 0));
 
     i = Instant.parse("2015-12-31T23:59:15.000Z");
-    stateManager.receive(Event.dequeue(state.workflowInstance()));
+    stateManager.receive(Event.dequeue(state.workflowInstance(), ImmutableSet.of()));
     stateManager.receive(Event.created(state.workflowInstance(), "test_execution_id", "img"));
 
     i = Instant.parse("2015-12-31T23:59:16.000Z");

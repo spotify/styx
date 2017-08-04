@@ -167,7 +167,7 @@ public class Scheduler {
           .orElse(workflowResourceRefs);
 
       if (instanceResourceRefs.isEmpty()) {
-        sendDequeue(instance);
+        sendDequeue(instance, instanceResourceRefs);
       } else {
         evaluateResourcesForDequeue(resources, currentResourceUsage, instance, instanceResourceRefs);
       }
@@ -223,7 +223,9 @@ public class Scheduler {
     } else {
       resourceRefs.forEach(id -> currentResourceUsage.computeIfAbsent(id, id_ -> 0L));
       resourceRefs.forEach(id -> currentResourceUsage.compute(id, (id_, l) -> l + 1));
-      sendDequeue(instance);
+      sendDequeue(instance, resourceRefs.stream()
+          .filter(r -> !GLOBAL_RESOURCE_ID.equals(r))
+          .collect(toSet()));
     }
   }
 
@@ -262,7 +264,7 @@ public class Scheduler {
     return !deadline.isAfter(now);
   }
 
-  private void sendDequeue(InstanceState instanceState) {
+  private void sendDequeue(InstanceState instanceState, Set<String> resources) {
     final WorkflowInstance workflowInstance = instanceState.workflowInstance();
     final RunState state = instanceState.runState();
 
@@ -271,7 +273,7 @@ public class Scheduler {
     } else {
       LOG.info("{} executing retry #{}", workflowInstance.toKey(), state.data().tries());
     }
-    stateManager.receiveIgnoreClosed(Event.dequeue(workflowInstance));
+    stateManager.receiveIgnoreClosed(Event.dequeue(workflowInstance, resources));
   }
 
   private boolean hasTimedOut(RunState runState) {
