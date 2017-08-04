@@ -24,10 +24,8 @@ import static com.spotify.styx.api.Api.Version.V2;
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
-import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.util.StreamUtil.cat;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -36,7 +34,6 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
@@ -49,8 +46,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.stream.Stream;
 import okio.ByteString;
 
@@ -88,17 +83,6 @@ public final class WorkflowResource {
             rc -> patchState(arg("cid", rc), arg("wfid", rc), rc.request()))
     );
 
-    final List<Route<AsyncHandler<Response<ByteString>>>> forwardedRoutes = Arrays.asList(
-        Route.async(
-            "POST", BASE + "/<cid>",
-            rc -> createOrUpdateWorkflow(arg("cid", rc), rc)
-        ),
-        Route.async(
-            "DELETE", BASE + "/<cid>/<wfid>",
-            rc -> deleteWorkflow(arg("cid", rc), arg("wfid", rc), rc)
-        )
-    );
-
     final List<Route<AsyncHandler<Response<ByteString>>>> sunsetRoutes = Collections.singletonList(
         Route.with(
             json(), "PATCH", BASE + "/<cid>/state",
@@ -107,48 +91,8 @@ public final class WorkflowResource {
 
     return cat(
         Api.prefixRoutes(routes, V2, V3),
-        Api.prefixRoutes(forwardedRoutes, V3),
         Api.prefixRoutes(sunsetRoutes, V2)
     );
-  }
-
-  private CompletionStage<Response<ByteString>> deleteWorkflow(String cid, String wfid,
-                                                               RequestContext rc) {
-    return rc.requestScopedClient()
-        .send(rc.request().withUri(schedulerApiUrl("workflows", cid, wfid)));
-  }
-
-  private CompletionStage<Response<ByteString>> createOrUpdateWorkflow(String componentId,
-                                                                       RequestContext rc) {
-    final Optional<ByteString> payload = rc.request().payload();
-    if (!payload.isPresent()) {
-      return CompletableFuture.completedFuture(
-          Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload.")));
-    }
-    final WorkflowConfiguration workflowConfig;
-    try {
-      workflowConfig = OBJECT_MAPPER
-          .readValue(payload.get().toByteArray(), WorkflowConfiguration.class);
-    } catch (IOException e) {
-      return CompletableFuture.completedFuture(
-          Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid payload.")));
-    }
-
-    final Workflow workflow = Workflow.create(componentId,
-                                              Optional.empty(),
-                                              Optional.of(V3),
-                                              workflowConfig);
-
-    final ByteString requestPayload;
-    try {
-      requestPayload = serialize(workflow);
-    } catch (JsonProcessingException e) {
-      return CompletableFuture.completedFuture(Response.forStatus(
-          Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Failed to serialize proxy payload.")));
-    }
-
-    return rc.requestScopedClient()
-        .send(rc.request().withPayload(requestPayload).withUri(schedulerApiUrl("workflows")));
   }
 
   public Response<WorkflowState> patchState(String componentId, String id, Request request) {
