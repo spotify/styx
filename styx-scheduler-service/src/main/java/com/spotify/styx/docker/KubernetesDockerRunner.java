@@ -101,6 +101,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String TERMINATION_LOG = "STYX_TERMINATION_LOG";
   static final String TRIGGER_ID = "STYX_TRIGGER_ID";
   static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
+  static final String RESOURCES = "STYX_RESOURCES";
   private static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
   static final String STYX_WORKFLOW_SA_ENV_VARIABLE = "GOOGLE_APPLICATION_CREDENTIALS";
   static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
@@ -287,7 +288,8 @@ class KubernetesDockerRunner implements DockerRunner {
         envVar(EXECUTION_ID,    runSpec.executionId()),
         envVar(TERMINATION_LOG, "/dev/termination-log"),
         envVar(TRIGGER_ID,      runSpec.trigger().map(TriggerUtil::triggerId).orElse(null)),
-        envVar(TRIGGER_TYPE,    runSpec.trigger().map(TriggerUtil::triggerType).orElse(null))
+        envVar(TRIGGER_TYPE,    runSpec.trigger().map(TriggerUtil::triggerType).orElse(null)),
+        envVar(RESOURCES,       String.join(",", runSpec.resources()))
     );
   }
 
