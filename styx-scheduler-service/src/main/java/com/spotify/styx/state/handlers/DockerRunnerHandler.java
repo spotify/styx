@@ -23,7 +23,10 @@ package com.spotify.styx.state.handlers;
 import static java.util.Objects.requireNonNull;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.RateLimiter;
+import com.spotify.styx.WorkflowCache;
+import com.spotify.styx.WorkflowResourceDecorator;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.InvalidExecutionException;
@@ -37,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,16 +56,22 @@ public class DockerRunnerHandler implements OutputHandler {
   private final StateManager stateManager;
   private final RateLimiter rateLimiter;
   private final ExecutorService executor;
+  private final WorkflowCache workflowCache;
+  private final WorkflowResourceDecorator resourceDecorator;
 
   public DockerRunnerHandler(
       DockerRunner dockerRunner,
       StateManager stateManager,
       RateLimiter rateLimiter,
-      ExecutorService executor) {
-    this.dockerRunner = requireNonNull(dockerRunner);
-    this.stateManager = requireNonNull(stateManager);
+      ExecutorService executor,
+      WorkflowCache workflowCache,
+      WorkflowResourceDecorator resourceDecorator) {
+    this.dockerRunner = requireNonNull(dockerRunner, "dockerRunner");
+    this.stateManager = requireNonNull(stateManager, "stateManager");
     this.rateLimiter = requireNonNull(rateLimiter, "rateLimiter");
     this.executor = requireNonNull(executor, "executor");
+    this.workflowCache = requireNonNull(workflowCache, "workflowCache");
+    this.resourceDecorator = requireNonNull(resourceDecorator, "resourceDecorator");
   }
 
   @Override
@@ -153,7 +163,19 @@ public class DockerRunnerHandler implements OutputHandler {
         executionDescription.secret(),
         executionDescription.serviceAccount(),
         state.data().trigger(),
-        state.data().executionDescription().flatMap(ExecutionDescription::commitSha));
+        state.data().executionDescription().flatMap(ExecutionDescription::commitSha),
+        getEffectiveResources(state));
+  }
+
+  private Set<String> getEffectiveResources(RunState state) throws ResourceNotFoundException {
+    final Set<String> declaredResources = ImmutableSet.copyOf(
+        workflowCache.workflow(state.workflowInstance().workflowId())
+            .map(x -> x.configuration().resources()).orElse(ImmutableList.of()));
+
+    return workflowCache.workflow(state.workflowInstance().workflowId())
+        .map(workflow -> resourceDecorator.decorateResources(
+            state, workflow.configuration(), declaredResources))
+        .orElse(declaredResources);
   }
 
   private static List<String> argsReplace(List<String> template, String parameter) {
