@@ -136,16 +136,40 @@ public class BigtableStorage {
         }
       }
 
-      return workflowInstancesSet.parallelStream()
-          .map(workflowInstance -> {
-            try {
-              return executionData(workflowInstance);
-            } catch (IOException e) {
-              throw Throwables.propagate(e);
-            }
-          })
-          .sorted(WorkflowInstanceExecutionData.COMPARATOR)
-          .collect(Collectors.toList());
+      return executionData(workflowInstancesSet);
+    }
+  }
+
+  List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String start, String stop)
+      throws IOException {
+    try (final Table eventsTable = connection.getTable(EVENTS_TABLE_NAME)) {
+      final Scan scan = new Scan()
+          .setRowPrefixFilter(Bytes.toBytes(workflowId.toKey() + '#'))
+          .setFilter(new FirstKeyOnlyFilter());
+
+      final WorkflowInstance startRow = WorkflowInstance.create(workflowId, start);
+      scan.setStartRow(Bytes.toBytes(startRow.toKey() + '#'));
+
+      if (!Strings.isNullOrEmpty(stop)) {
+        final WorkflowInstance stopRow = WorkflowInstance.create(workflowId, stop);
+        scan.setStopRow(Bytes.toBytes(stopRow.toKey() + '#'));
+      }
+
+      final Set<WorkflowInstance> workflowInstancesSet = Sets.newHashSet();
+      try (ResultScanner scanner = eventsTable.getScanner(scan)) {
+        Result result = scanner.next();
+        while (result != null) {
+          final String key = new String(result.getRow());
+          final int lastHash = key.lastIndexOf('#');
+
+          final WorkflowInstance wfi = WorkflowInstance.parseKey(key.substring(0, lastHash));
+          workflowInstancesSet.add(wfi);
+
+          result = scanner.next();
+        }
+      }
+
+      return executionData(workflowInstancesSet);
     }
   }
 
@@ -167,6 +191,20 @@ public class BigtableStorage {
     }
 
     return WorkflowInstanceExecutionData.fromEvents(events);
+  }
+
+  private List<WorkflowInstanceExecutionData> executionData(
+      Set<WorkflowInstance> workflowInstancesSet) {
+    return workflowInstancesSet.parallelStream()
+        .map(workflowInstance -> {
+          try {
+            return executionData(workflowInstance);
+          } catch (IOException e) {
+            throw Throwables.propagate(e);
+          }
+        })
+        .sorted(WorkflowInstanceExecutionData.COMPARATOR)
+        .collect(Collectors.toList());
   }
 
   private SequenceEvent parseEventResult(Result r) throws IOException {

@@ -155,6 +155,63 @@ public class BigTableStorageTest {
   }
 
   @Test
+  public void shouldReturnRangeOfExecutionDataForWorkflow() throws Exception {
+    setUp(0);
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1), 0L, 0L));
+    storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId1", "img1"), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.started(WFI1), 2L, 2L));
+
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2), 0L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.created(WFI2, "execId2", "img2"), 1L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.started(WFI2), 2L, 5L));
+
+    List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =
+        storage.executionData(WORKFLOW_ID1, WFI1.parameter(), "");
+
+    assertThat(workflowInstanceExecutionData.size(), is(2));
+
+    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).triggerId(), is("triggerId1"));
+    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).executionId(), is(Optional.of("execId1")));
+    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).dockerImage(), is(Optional.of("img1")));
+    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).statuses()
+                   .get(0), is(ExecStatus.create(Instant.ofEpochMilli(1L), "SUBMITTED", Optional.empty())));
+    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).statuses()
+                   .get(1), is(ExecStatus.create(Instant.ofEpochMilli(2L), "STARTED", Optional.empty())));
+    assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).triggerId(), is("triggerId2"));
+    assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).executions().get(0).executionId(), is(Optional.of("execId2")));
+    assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).executions().get(0).dockerImage(), is(Optional.of("img2")));
+    assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).executions().get(0).statuses()
+                   .get(0), is(ExecStatus.create(Instant.ofEpochMilli(4L), "SUBMITTED", Optional.empty())));
+    assertThat(workflowInstanceExecutionData.get(1).triggers().get(0).executions().get(0).statuses()
+                   .get(1), is(ExecStatus.create(Instant.ofEpochMilli(5L), "STARTED", Optional.empty())));
+  }
+
+  @Test
+  public void shouldReturnExecutionDataForOneWorkflow() throws Exception {
+    setUp(0);
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1), 0L, 0L));
+    storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId1", "img1"), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.started(WFI1), 2L, 2L));
+
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2), 0L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.created(WFI2, "execId2", "img2"), 1L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.started(WFI2), 2L, 5L));
+
+    List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =
+        storage.executionData(WORKFLOW_ID1, WFI1.parameter(), WFI2.parameter());
+
+    assertThat(workflowInstanceExecutionData.size(), is(1));
+
+    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).triggerId(), is("triggerId1"));
+    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).executionId(), is(Optional.of("execId1")));
+    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).dockerImage(), is(Optional.of("img1")));
+    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).statuses()
+                   .get(0), is(ExecStatus.create(Instant.ofEpochMilli(1L), "SUBMITTED", Optional.empty())));
+    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).statuses()
+                   .get(1), is(ExecStatus.create(Instant.ofEpochMilli(2L), "STARTED", Optional.empty())));
+  }
+
+  @Test
   public void shouldProduceIOExceptionIfTooManyPutRetries() throws Exception {
     setUp(BigtableStorage.MAX_BIGTABLE_RETRIES);
 

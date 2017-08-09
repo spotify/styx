@@ -74,7 +74,6 @@ public interface Storage {
    * Get the global enabled flag for Styx.
    */
   boolean globalEnabled() throws IOException;
-
   /**
    * Get the debug flag for Styx.
    */
@@ -97,6 +96,7 @@ public interface Storage {
    * Get the id of the current docker runner id
    */
   String globalDockerRunnerId() throws IOException;
+
 
   /**
    * Stores a Workflow definition.
@@ -205,6 +205,20 @@ public interface Storage {
    */
   List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String offset, int limit)
       throws IOException;
+
+  /**
+   * Get execution information for all the {@link WorkflowInstance} of the specified {@link WorkflowId}.
+   *
+   * <p>Results can be paginated based on a start {@link WorkflowInstance#parameter()} and a stop
+   * {@link WorkflowInstance#parameter()}.
+   *
+   * @param workflowId  The workflowId to get execution information for
+   * @param start       The start parameter
+   * @param stop        The stop parameter
+   * @return A {@link WorkflowInstanceExecutionData} of all the instances
+   */
+  List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String start,
+                                                    String stop) throws IOException;
 
   /**
    * Use workflowState instead.

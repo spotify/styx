@@ -26,6 +26,7 @@ import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.util.StreamUtil.cat;
 
+import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -196,10 +197,16 @@ public final class WorkflowResource {
     final WorkflowId workflowId = WorkflowId.create(componentId, id);
     final String offset = request.parameter("offset").orElse("");
     final int limit = request.parameter("limit").map(Integer::parseInt).orElse(DEFAULT_PAGE_LIMIT);
+    final String start = request.parameter("start").orElse("");
+    final String stop = request.parameter("stop").orElse("");
 
     final List<WorkflowInstanceExecutionData> data;
     try {
-      data = storage.executionData(workflowId, offset, limit);
+      if (Strings.isNullOrEmpty(start)) {
+        data = storage.executionData(workflowId, offset, limit);
+      } else {
+        data = storage.executionData(workflowId, start, stop);
+      }
     } catch (IOException e) {
       return Response.forStatus(
           Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch execution info."));
