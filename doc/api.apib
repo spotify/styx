@@ -68,7 +68,15 @@ Resources related to the Workflows registered in Styx.
               }
         }
 
-## Workflow Instances [/{version}/workflows/{component_id}/{workflow_id}/instances]
+## Workflow Instances [/{version}/workflows/{component_id}/{workflow_id}/instances{?offset,limit,start,stop}]
+
+Query can be done in two different styles: `offset+limit` or `start+stop`.
+
+By using `offset` and `limit`, the oldest workflow instances is specified by `offset`, and
+the max number of workflows instances is specified by `limit`.
+
+By using `start` and `stop`, the oldest workflow instance is specified by `start`, and the latest is
+specified by `stop`; `start` is required while `stop` is optional.
 
 + Parameters
     + version: `v3` (enum[string]) - API version
@@ -77,6 +85,10 @@ Resources related to the Workflows registered in Styx.
             + `v3`
     + component_id: `styx-canary` (string) - Workflow Component
     + workflow_id: `StyxCanary` (string) - Workflow ID
+    + offset: `2017-01-01` (string) - the offset parameter
+    + limit: `10` (number) - max number of instances
+    + start: `2017-01-01` (string) - the start parameter
+    + stop: `2017-01-03` (string) - the stop parameter (exclusive)
 
 ### Get Workflow Instances [GET]
 

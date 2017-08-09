@@ -141,6 +141,13 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
+  public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String start,
+                                                           String stop) throws IOException {
+    return bigtableStorage.executionData(workflowId, start, stop);
+  }
+
+
+  @Override
   public void storeWorkflow(Workflow workflow) throws IOException {
     datastoreStorage.store(workflow);
   }

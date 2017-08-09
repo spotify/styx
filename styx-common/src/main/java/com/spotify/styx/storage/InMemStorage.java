@@ -157,6 +157,15 @@ public class InMemStorage implements Storage {
   }
 
   @Override
+  public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId,
+                                                           String startParameter,
+                                                           String stopParameter)
+      throws IOException {
+    throw new UnsupportedOperationException("Unsupported Operation!");
+  }
+
+
+  @Override
   public boolean enabled(WorkflowId workflowId) {
     return enabledWorkflows.contains(workflowId);
   }
