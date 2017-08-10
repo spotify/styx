@@ -30,7 +30,9 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.ImmutableList;
 import com.spotify.styx.api.Api;
@@ -83,6 +85,11 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   private static final Workflow HOURLY_WORKFLOW = Workflow.create(
       "styx",
       TestData.WORKFLOW_URI,
+      WORKFLOW_CONFIGURATION_HOURLY);
+  private static final Workflow HOURLY_WORKFLOW_V3_API = Workflow.create(
+      "styx",
+      Optional.of(TestData.WORKFLOW_URI),
+      Optional.of(Api.Version.V3),
       WORKFLOW_CONFIGURATION_HOURLY);
   private static final Workflow HOURLY_WORKFLOW_WITH_ZERO_OFFSET = Workflow.create(
       "styx",
@@ -486,6 +493,104 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     RunSpec runSpec2 = dockerRuns.get(1)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec2, is(naturalRunSpec(runSpec2.executionId(), "busybox:v777", ImmutableList.of("other", "args"))));
+  }
+
+  @Test
+  public void doNotUpdateWorkflowFromLowerAPI() throws Exception {
+    givenWorkflow(HOURLY_WORKFLOW_V3_API);
+
+    styxStarts();
+
+    WorkflowConfiguration changedWorkflowConfiguration = WorkflowConfiguration.builder()
+        .id(WORKFLOW_CONFIGURATION_HOURLY.id())
+        .schedule(Schedule.HOURS)
+        .dockerImage("busybox:v777")
+        .dockerArgs(asList("other", "args"))
+        .build();
+
+    Workflow changedWorkflow = Workflow.create(
+        HOURLY_WORKFLOW_V3_API.componentId(),
+        Optional.of(TestData.WORKFLOW_URI),
+        Optional.of(Api.Version.V2),
+        changedWorkflowConfiguration);
+
+    workflowChanges(changedWorkflow);
+
+    Optional<Workflow> workflow = storage.workflow(HOURLY_WORKFLOW_V3_API.id());
+    assertTrue(workflow.isPresent());
+    assertNotEquals(changedWorkflowConfiguration, workflow);
+  }
+
+  @Test
+  public void doNotUpdateWorkflowFromNoneAPI() throws Exception {
+    givenWorkflow(HOURLY_WORKFLOW_V3_API);
+
+    styxStarts();
+
+    WorkflowConfiguration changedWorkflowConfiguration = WorkflowConfiguration.builder()
+        .id(WORKFLOW_CONFIGURATION_HOURLY.id())
+        .schedule(Schedule.HOURS)
+        .dockerImage("busybox:v777")
+        .dockerArgs(asList("other", "args"))
+        .build();
+
+    Workflow changedWorkflow = Workflow.create(
+        HOURLY_WORKFLOW_V3_API.componentId(),
+        TestData.WORKFLOW_URI,
+        changedWorkflowConfiguration);
+
+    workflowChanges(changedWorkflow);
+
+    Optional<Workflow> workflow = storage.workflow(HOURLY_WORKFLOW_V3_API.id());
+    assertTrue(workflow.isPresent());
+    assertNotEquals(changedWorkflowConfiguration, workflow);
+  }
+
+  @Test
+  public void doNotDeleteWorkflowFromLowerAPI() throws Exception {
+    givenWorkflow(HOURLY_WORKFLOW_V3_API);
+
+    styxStarts();
+
+    WorkflowConfiguration changedWorkflowConfiguration = WorkflowConfiguration.builder()
+        .id(WORKFLOW_CONFIGURATION_HOURLY.id())
+        .schedule(Schedule.HOURS)
+        .dockerImage("busybox:v777")
+        .dockerArgs(asList("other", "args"))
+        .build();
+
+    Workflow changedWorkflow = Workflow.create(
+        HOURLY_WORKFLOW_V3_API.componentId(),
+        Optional.of(TestData.WORKFLOW_URI),
+        Optional.of(Api.Version.V2),
+        changedWorkflowConfiguration);
+
+    workflowDeleted(changedWorkflow);
+
+    assertTrue(storage.workflow(HOURLY_WORKFLOW_V3_API.id()).isPresent());
+  }
+
+  @Test
+  public void doNotDeleteWorkflowFromNoneAPI() throws Exception {
+    givenWorkflow(HOURLY_WORKFLOW_V3_API);
+
+    styxStarts();
+
+    WorkflowConfiguration changedWorkflowConfiguration = WorkflowConfiguration.builder()
+        .id(WORKFLOW_CONFIGURATION_HOURLY.id())
+        .schedule(Schedule.HOURS)
+        .dockerImage("busybox:v777")
+        .dockerArgs(asList("other", "args"))
+        .build();
+
+    Workflow changedWorkflow = Workflow.create(
+        HOURLY_WORKFLOW_V3_API.componentId(),
+        TestData.WORKFLOW_URI,
+        changedWorkflowConfiguration);
+
+    workflowDeleted(changedWorkflow);
+
+    assertTrue(storage.workflow(HOURLY_WORKFLOW_V3_API.id()).isPresent());
   }
 
   @Test

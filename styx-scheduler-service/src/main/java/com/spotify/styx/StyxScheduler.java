@@ -334,7 +334,7 @@ public class StyxScheduler implements AppInit {
         new BackfillTriggerManager(stateManager, workflowCache, storage, trigger);
 
     final WorkflowInitializer workflowInitializer = new WorkflowInitializer(storage, time);
-    final Consumer<Workflow> workflowRemoveListener = workflowRemoved(storage);
+    final Consumer<Workflow> workflowRemoveListener = workflowRemoved(workflowCache, storage);
     final Consumer<Workflow> workflowChangeListener =
         workflowChanged(workflowCache, workflowInitializer, stats, stateManager);
 
@@ -550,6 +550,21 @@ public class StyxScheduler implements AppInit {
     stats.registerSubmissionRateLimitMetric(submissionRateLimiter::getRate);
   }
 
+  // TODO: revise me
+  // If we have ever registered/updated the workflow via API endpoint,
+  // we ignore any subsequent updates via schedule source or lower API version.
+  //
+  // At this stage when rolling out workflow configuration API endpoint, we ignore in order
+  // to enable gradual rollout while still supporting the polling schedule source for users that
+  // haven't migrated.
+  private static boolean isGreaterOrEqualApiVersion(Workflow newWorkflow,
+                                                    Workflow existingWorkflow) {
+    return !existingWorkflow.fromApi().isPresent()
+           ||
+           newWorkflow.fromApi().isPresent()
+           && newWorkflow.fromApi().get().ordinal() >= existingWorkflow.fromApi().get().ordinal();
+  }
+
   private static Consumer<Workflow> workflowChanged(
       WorkflowCache cache,
       WorkflowInitializer workflowInitializer,
@@ -574,31 +589,22 @@ public class StyxScheduler implements AppInit {
     };
   }
 
-  // TODO: revise me
-  // If we have ever registered/updated the workflow via API endpoint,
-  // we ignore any subsequent updates via schedule source or lower API version.
-  //
-  // At this stage when rolling out workflow configuration API endpoint, we ignore in order
-  // to enable gradual rollout while still supporting the polling schedule source for users that
-  // haven't migrated.
-  private static boolean isGreaterOrEqualApiVersion(Workflow newWorkflow,
-                                                    Workflow existingWorkflow) {
-    return !existingWorkflow.fromApi().isPresent()
-           ||
-           newWorkflow.fromApi().isPresent()
-           && newWorkflow.fromApi().get().ordinal() >= existingWorkflow.fromApi().get().ordinal();
-  }
+  private static Consumer<Workflow> workflowRemoved(WorkflowCache cache, Storage storage) {
+    return workflow -> cache.workflow(workflow.id()).ifPresent(existingWorkflow -> {
+      if (!isGreaterOrEqualApiVersion(workflow, existingWorkflow)) {
+        return;
+      }
 
-  private static Consumer<Workflow> workflowRemoved(Storage storage) {
-    return workflow -> {
       try {
         storage.delete(workflow.id());
       } catch (IOException e) {
         LOG.warn("Couldn't remove workflow {}. ", workflow.id());
+        return;
       }
-    };
-  }
 
+      cache.remove(workflow);
+    });
+  }
   private static Stats stats(Environment environment) {
     return new MetricsStats(environment.resolve(SemanticMetricRegistry.class));
   }
