@@ -38,6 +38,13 @@ public interface WorkflowCache {
   void store(Workflow workflow);
 
   /**
+   * remove a {@link Workflow}.
+   *
+   * @param workflow The workflow to remove
+   */
+  void remove(Workflow workflow);
+
+  /**
    * Get a stored {@link Workflow}.
    *
    * @param workflowId  Id of the workflow to get

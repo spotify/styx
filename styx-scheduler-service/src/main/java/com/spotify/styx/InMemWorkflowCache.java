@@ -45,6 +45,11 @@ public class InMemWorkflowCache implements WorkflowCache {
   }
 
   @Override
+  public void remove(Workflow workflow) {
+    workflowStore.remove(workflow.id());
+  }
+
+  @Override
   public Optional<Workflow> workflow(WorkflowId workflowId) {
     return Optional.ofNullable(workflowStore.get(workflowId));
   }
