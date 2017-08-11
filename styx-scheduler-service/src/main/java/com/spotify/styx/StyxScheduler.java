@@ -80,6 +80,7 @@ import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.Debug;
+import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
@@ -315,7 +316,7 @@ public class StyxScheduler implements AppInit {
         new TerminationHandler(retryUtil, stateManager),
         new MonitoringHandler(time, stats),
         new PublisherHandler(publisher),
-        new ExecutionDescriptionHandler(storage, stateManager)
+        new ExecutionDescriptionHandler(storage, stateManager, new DockerImageValidator())
     };
     final StateFactory stateFactory =
         (workflowInstance) -> RunState.fresh(workflowInstance, time, outputHandlers);
