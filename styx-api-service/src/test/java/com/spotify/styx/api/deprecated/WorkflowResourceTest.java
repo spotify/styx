@@ -57,6 +57,7 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
+import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.net.URI;
@@ -127,7 +128,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
   protected void init(Environment environment) {
     WorkflowResource
         workflowResource =
-        new WorkflowResource(new com.spotify.styx.api.WorkflowResource(storage));
+        new WorkflowResource(new com.spotify.styx.api.WorkflowResource(
+            storage, new DockerImageValidator()));
 
     environment.routingEngine().registerRoutes(workflowResource.routes());
   }

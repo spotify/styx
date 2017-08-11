@@ -42,6 +42,7 @@ import com.spotify.styx.api.WorkflowResource;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
+import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.StreamUtil;
 import com.typesafe.config.Config;
@@ -107,7 +108,8 @@ public class StyxApi implements AppInit {
 
     final Storage storage = storageFactory.apply(environment);
 
-    final WorkflowResource workflowResource = new WorkflowResource(storage);
+    final WorkflowResource workflowResource = new WorkflowResource(storage,
+                                                                   new DockerImageValidator());
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
                                                                    storage);
     final ResourceResource resourceResource = new ResourceResource(storage);
