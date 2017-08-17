@@ -34,6 +34,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
@@ -89,11 +90,12 @@ public class Scheduler {
   private final Storage storage;
   private final WorkflowResourceDecorator resourceDecorator;
   private final Stats stats;
+  private final RateLimiter dequeueRateLimiter;
 
   public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager,
-                   WorkflowCache workflowCache, Storage storage,
-                   WorkflowResourceDecorator resourceDecorator,
-                   Stats stats) {
+      WorkflowCache workflowCache, Storage storage,
+      WorkflowResourceDecorator resourceDecorator,
+      Stats stats, RateLimiter dequeueRateLimiter) {
     this.time = Objects.requireNonNull(time);
     this.ttls = Objects.requireNonNull(ttls);
     this.stateManager = Objects.requireNonNull(stateManager);
@@ -101,6 +103,7 @@ public class Scheduler {
     this.storage = Objects.requireNonNull(storage);
     this.resourceDecorator = Objects.requireNonNull(resourceDecorator);
     this.stats = Objects.requireNonNull(stats);
+    this.dequeueRateLimiter = Objects.requireNonNull(dequeueRateLimiter, "dequeueRateLimiter");
   }
 
   void tick() {
@@ -263,6 +266,11 @@ public class Scheduler {
   }
 
   private void sendDequeue(InstanceState instanceState) {
+    if (!dequeueRateLimiter.tryAcquire()) {
+      LOG.debug("Dequeue rate limited");
+      return;
+    }
+
     final WorkflowInstance workflowInstance = instanceState.workflowInstance();
     final RunState state = instanceState.runState();
 

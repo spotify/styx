@@ -69,13 +69,10 @@ import org.mockito.runners.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class DockerRunnerHandlerTest {
 
-  private RateLimiter rateLimiter = Mockito.mock(RateLimiter.class);
-  private ExecutorService executor = Executors.newCachedThreadPool();
-
   private StateManager stateManager = Mockito.spy(new SyncStateManager());
   private DockerRunner dockerRunner = Mockito.mock(DockerRunner.class);
   private DockerRunnerHandler dockerRunnerHandler = new DockerRunnerHandler(
-      dockerRunner, stateManager, rateLimiter, executor);
+      dockerRunner, stateManager);
 
   private static final String TEST_EXECUTION_ID = "execution_1";
   private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
@@ -86,65 +83,6 @@ public class DockerRunnerHandlerTest {
 
   @Captor ArgumentCaptor<WorkflowInstance> instanceCaptor;
   @Captor ArgumentCaptor<RunSpec> runSpecCaptor;
-
-  @Before
-  public void setUp() throws Exception {
-    when(rateLimiter.acquire()).thenReturn(0.0);
-  }
-
-  @Test
-  public void shouldBeRateLimiting() throws Exception {
-
-    // Set up rate limiting to be under our control
-    Semaphore semaphore = new Semaphore(0);
-    when(rateLimiter.acquire()).then(a -> {
-      semaphore.acquire();
-      return 17.0;
-    });
-
-    // Submit an instance and verify that it blocks on the rate limiter
-    WorkflowInstance instance1 = startWorkflowInstance("2016-03-14");
-    verify(rateLimiter, timeout(60_000)).acquire();
-    verifyZeroInteractions(dockerRunner);
-
-    // Let the submission proceed and verify it does so
-    semaphore.release();
-    verify(dockerRunner, timeout(60_000).times(1)).start(eq(instance1), any(RunSpec.class));
-
-    verifyNoMoreInteractions(rateLimiter);
-
-    // Submit multiple instances and verify that each submission is rate limited
-    WorkflowInstance instance2 = startWorkflowInstance("2016-03-15");
-    WorkflowInstance instance3 = startWorkflowInstance("2016-03-16");
-    WorkflowInstance instance4 = startWorkflowInstance("2016-03-17");
-
-    verify(rateLimiter, timeout(60_000).times(4)).acquire();
-
-    verifyNoMoreInteractions(dockerRunner);
-
-    semaphore.release();
-    verify(dockerRunner, timeout(60_000).times(2)).start(any(WorkflowInstance.class), any(RunSpec.class));
-    verifyNoMoreInteractions(rateLimiter);
-
-    semaphore.release();
-    semaphore.release();
-
-    verify(dockerRunner, timeout(60_000).times(4)).start(instanceCaptor.capture(), any(RunSpec.class));
-    verifyNoMoreInteractions(rateLimiter);
-
-    assertThat(instanceCaptor.getAllValues(), containsInAnyOrder(instance1, instance2, instance3, instance4));
-  }
-
-  private WorkflowInstance startWorkflowInstance(String parameter) throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, configuration());
-    ExecutionDescription desc = ExecutionDescription.forImage(TEST_DOCKER_IMAGE);
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), parameter);
-    StateData stateData = StateData.newBuilder().executionDescription(desc).build();
-    RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING, stateData);
-    stateManager.initialize(runState);
-    dockerRunnerHandler.transitionInto(runState);
-    return workflowInstance;
-  }
 
   @Test
   public void shouldPassInArguments() throws Exception {

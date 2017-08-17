@@ -313,12 +313,12 @@ public class StyxScheduler implements AppInit {
         dockerId);
     final DockerRunner dockerRunner = instrument(DockerRunner.class, routingDockerRunner, stats, time);
 
-    final RateLimiter submissionRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
+    final RateLimiter dequeueRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
 
     final OutputHandler[] outputHandlers = new OutputHandler[] {
         transitionLogger(""),
         new DockerRunnerHandler(
-            dockerRunner, stateManager, submissionRateLimiter, dockerRunnerExecutor),
+            dockerRunner, stateManager),
         new TerminationHandler(retryUtil, stateManager),
         new MonitoringHandler(time, stats),
         new PublisherHandler(publisher),
@@ -339,7 +339,7 @@ public class StyxScheduler implements AppInit {
         workflowChanged(workflowCache, workflowInitializer, stats, stateManager);
 
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
-                                              storage, resourceDecorator, stats);
+                                              storage, resourceDecorator, stats, dequeueRateLimiter);
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
@@ -348,9 +348,9 @@ public class StyxScheduler implements AppInit {
     startBackfillTriggerManager(backfillTriggerManager, executor);
     startScheduleSources(environment, executor, workflowChangeListener, workflowRemoveListener);
     startScheduler(scheduler, executor);
-    startRuntimeConfigUpdate(storage, executor, submissionRateLimiter);
+    startRuntimeConfigUpdate(storage, executor, dequeueRateLimiter);
     startCleaner(cleaner, executor);
-    setupMetrics(stateManager, workflowCache, storage, submissionRateLimiter, stats);
+    setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats);
 
     final SchedulerResource schedulerResource =
         new SchedulerResource(stateManager, trigger, storage, time);
