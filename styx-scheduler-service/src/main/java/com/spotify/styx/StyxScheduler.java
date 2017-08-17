@@ -289,10 +289,8 @@ public class StyxScheduler implements AppInit {
 
     final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
     final ExecutorService eventWorker = Executors.newFixedThreadPool(16, eventTf);
-    final ExecutorService dockerRunnerExecutor = Executors.newSingleThreadExecutor(dockerRunnerTf);
     closer.register(executorCloser("scheduler", executor));
     closer.register(executorCloser("event-worker", eventWorker));
-    closer.register(executorCloser("docker-runner", dockerRunnerExecutor));
 
     final Stats stats = statsFactory.apply(environment);
     final WorkflowCache workflowCache = new InMemWorkflowCache();
