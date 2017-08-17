@@ -278,11 +278,6 @@ public class StyxScheduler implements AppInit {
         .setNameFormat("styx-event-worker-%d")
         .setUncaughtExceptionHandler(uncaughtExceptionHandler)
         .build();
-    final ThreadFactory dockerRunnerTf = new ThreadFactoryBuilder()
-        .setDaemon(true)
-        .setNameFormat("styx-docker-runner-%d")
-        .setUncaughtExceptionHandler(uncaughtExceptionHandler)
-        .build();
 
     final Publisher publisher = publisherFactory.apply(environment);
     closer.register(publisher);
