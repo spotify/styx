@@ -73,6 +73,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Matchers;
@@ -105,6 +106,11 @@ public class SchedulerTest {
   @Mock WorkflowResourceDecorator resourceDecorator;
 
   @Mock RateLimiter rateLimiter;
+
+  @Before
+  public void setUp() throws Exception {
+    when(rateLimiter.tryAcquire()).thenReturn(true);
+  }
 
   @After
   public void tearDown() throws Exception {
