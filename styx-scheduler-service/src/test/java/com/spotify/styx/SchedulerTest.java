@@ -28,7 +28,9 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anySetOf;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -107,6 +109,8 @@ public class SchedulerTest {
 
   @Mock RateLimiter rateLimiter;
 
+  @Mock Stats stats;
+
   @Before
   public void setUp() throws Exception {
     when(rateLimiter.tryAcquire()).thenReturn(true);
@@ -131,7 +135,7 @@ public class SchedulerTest {
 
     stateManager = Mockito.spy(new SyncStateManager());
     scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage, resourceDecorator,
-                              Stats.NOOP, rateLimiter);
+                              stats, rateLimiter);
   }
 
   private void setResourceLimit(String resourceId, long limit) {
@@ -164,12 +168,14 @@ public class SchedulerTest {
     when(rateLimiter.tryAcquire()).thenReturn(false);
 
     setUp(20);
-    initWorkflow(workflowUsingResources(WORKFLOW_ID1));
+    setResourceLimit("r1", 2);
+    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
     init(RunState.create(INSTANCE, State.QUEUED, time));
 
     scheduler.tick();
 
     verify(rateLimiter).tryAcquire();
+    verify(stats).recordResourceUsed("r1", 0L);
 
     assertThat(stateManager.get(INSTANCE).state(), is(State.QUEUED));
 
@@ -179,6 +185,8 @@ public class SchedulerTest {
 
     assertThat(stateManager.get(INSTANCE).state(), is(State.PREPARE));
 
+    verify(rateLimiter, times(2)).tryAcquire();
+    verify(stats).recordResourceUsed("r1", 1L);
   }
 
   @Test
