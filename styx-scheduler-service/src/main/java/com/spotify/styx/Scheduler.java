@@ -160,9 +160,9 @@ public class Scheduler {
     timedOutInstances.forEach(this::sendTimeout);
 
     for (InstanceState eligibleInstance : eligibleInstances) {
-      final boolean stop = limitAndDequeue(
+      final boolean proceed = limitAndDequeue(
           resources, workflowResourceReferences, currentResourceUsage, eligibleInstance);
-      if (stop) {
+      if (!proceed) {
         break;
       }
     }
@@ -222,14 +222,14 @@ public class Scheduler {
     } else {
       if (!dequeueRateLimiter.tryAcquire()) {
         LOG.debug("Dequeue rate limited");
-        return true;
+        return false;
       }
       instanceResourceRefs.forEach(id -> currentResourceUsage.computeIfAbsent(id, id_ -> 0L));
       instanceResourceRefs.forEach(id -> currentResourceUsage.compute(id, (id_, l) -> l + 1));
       sendDequeue(instance);
     }
 
-    return false;
+    return true;
   }
 
   private Stream<ResourceWithInstance> pairWithResources(Optional<Long> globalConcurrency,
