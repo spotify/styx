@@ -50,64 +50,53 @@ public class DockerRunnerHandler implements OutputHandler {
 
   private final DockerRunner dockerRunner;
   private final StateManager stateManager;
-  private final RateLimiter rateLimiter;
-  private final ExecutorService executor;
 
   public DockerRunnerHandler(
       DockerRunner dockerRunner,
-      StateManager stateManager,
-      RateLimiter rateLimiter,
-      ExecutorService executor) {
+      StateManager stateManager) {
     this.dockerRunner = requireNonNull(dockerRunner);
     this.stateManager = requireNonNull(stateManager);
-    this.rateLimiter = requireNonNull(rateLimiter, "rateLimiter");
-    this.executor = requireNonNull(executor, "executor");
   }
 
   @Override
   public void transitionInto(RunState state) {
     switch (state.state()) {
       case SUBMITTING:
-        // Perform rate limited submission on a separate thread pool to avoid blocking the caller.
-        executor.submit(() -> {
-          rateLimiter.acquire();
+        final RunSpec runSpec;
+        try {
+          runSpec = createRunSpec(state);
+        } catch (ResourceNotFoundException e) {
+          LOG.error("Unable to start docker procedure.", e);
+          stateManager.receiveIgnoreClosed(Event.halt(state.workflowInstance()));
+          return;
+        }
 
-          final RunSpec runSpec;
-          try {
-            runSpec = createRunSpec(state);
-          } catch (ResourceNotFoundException e) {
-            LOG.error("Unable to start docker procedure.", e);
-            stateManager.receiveIgnoreClosed(Event.halt(state.workflowInstance()));
-            return;
-          }
+        // Emit submitted event first to guarantee it is observed before events from the pod
+        final Event submitted = Event.submitted(state.workflowInstance(), runSpec.executionId());
+        try {
+          stateManager.receive(submitted);
+        } catch (StateManager.IsClosed isClosed) {
+          LOG.warn("Could not emit 'submitted' event", isClosed);
+          return;
+        }
 
-          // Emit submitted event first to guarantee it is observed before events from the pod
-          final Event submitted = Event.submitted(state.workflowInstance(), runSpec.executionId());
+        try {
+          LOG.info("running:{} image:{} args:{} termination_logging:{}", state.workflowInstance().toKey(),
+              runSpec.imageName(), runSpec.args(), runSpec.terminationLogging());
+          dockerRunner.start(state.workflowInstance(), runSpec);
+        } catch (Throwable e) {
           try {
-            stateManager.receive(submitted);
-          } catch (StateManager.IsClosed isClosed) {
-            LOG.warn("Could not emit 'submitted' event", isClosed);
-            return;
-          }
-
-          try {
-            LOG.info("running:{} image:{} args:{} termination_logging:{}", state.workflowInstance().toKey(),
-                runSpec.imageName(), runSpec.args(), runSpec.terminationLogging());
-            dockerRunner.start(state.workflowInstance(), runSpec);
-          } catch (Throwable e) {
-            try {
-              final String msg = "Failed the docker starting procedure for " + state.workflowInstance().toKey();
-              if (isUserError(e)) {
-                LOG.info("{}: {}", msg, e.getMessage());
-              } else {
-                LOG.error(msg, e);
-              }
-              stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()));
-            } catch (StateManager.IsClosed isClosed) {
-              LOG.warn("Failed to send 'runError' event", isClosed);
+            final String msg = "Failed the docker starting procedure for " + state.workflowInstance().toKey();
+            if (isUserError(e)) {
+              LOG.info("{}: {}", msg, e.getMessage());
+            } else {
+              LOG.error(msg, e);
             }
+            stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()));
+          } catch (StateManager.IsClosed isClosed) {
+            LOG.warn("Failed to send 'runError' event", isClosed);
           }
-        });
+        }
         break;
 
       case TERMINATED:

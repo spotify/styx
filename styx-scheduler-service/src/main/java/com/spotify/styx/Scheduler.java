@@ -34,6 +34,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
@@ -56,7 +57,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,11 +89,12 @@ public class Scheduler {
   private final Storage storage;
   private final WorkflowResourceDecorator resourceDecorator;
   private final Stats stats;
+  private final RateLimiter dequeueRateLimiter;
 
   public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager,
-                   WorkflowCache workflowCache, Storage storage,
-                   WorkflowResourceDecorator resourceDecorator,
-                   Stats stats) {
+      WorkflowCache workflowCache, Storage storage,
+      WorkflowResourceDecorator resourceDecorator,
+      Stats stats, RateLimiter dequeueRateLimiter) {
     this.time = Objects.requireNonNull(time);
     this.ttls = Objects.requireNonNull(ttls);
     this.stateManager = Objects.requireNonNull(stateManager);
@@ -101,6 +102,7 @@ public class Scheduler {
     this.storage = Objects.requireNonNull(storage);
     this.resourceDecorator = Objects.requireNonNull(resourceDecorator);
     this.stats = Objects.requireNonNull(stats);
+    this.dequeueRateLimiter = Objects.requireNonNull(dequeueRateLimiter, "dequeueRateLimiter");
   }
 
   void tick() {
@@ -148,8 +150,6 @@ public class Scheduler {
                 ConcurrentHashMap::new,
                 counting()));
 
-    updateStats(resources, currentResourceUsage);
-
     final List<InstanceState> eligibleInstances =
         activeStates.parallelStream()
             .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
@@ -157,24 +157,17 @@ public class Scheduler {
             .collect(toCollection(Lists::newArrayList));
     Collections.shuffle(eligibleInstances);
 
-    final Consumer<InstanceState> limitAndDequeue = (instance) -> {
-      final Set<String> workflowResourceRefs =
-          workflowResourceReferences.getOrDefault(instance.workflowInstance().workflowId(), emptySet());
-
-      final Set<String> instanceResourceRefs = workflowCache.workflow(instance.workflowInstance().workflowId())
-          .map(workflow -> resourceDecorator.decorateResources(
-              instance.runState(), workflow.configuration(), workflowResourceRefs))
-          .orElse(workflowResourceRefs);
-
-      if (instanceResourceRefs.isEmpty()) {
-        sendDequeue(instance);
-      } else {
-        evaluateResourcesForDequeue(resources, currentResourceUsage, instance, instanceResourceRefs);
-      }
-    };
-
     timedOutInstances.forEach(this::sendTimeout);
-    eligibleInstances.forEach(limitAndDequeue);
+
+    for (InstanceState eligibleInstance : eligibleInstances) {
+      final boolean proceed = limitAndDequeue(
+          resources, workflowResourceReferences, currentResourceUsage, eligibleInstance);
+      if (!proceed) {
+        break;
+      }
+    }
+
+    updateStats(resources, currentResourceUsage);
   }
 
   private void updateStats(Map<String, Resource> resources,
@@ -185,16 +178,22 @@ public class Scheduler {
         .forEach(r -> stats.recordResourceUsed(r, 0));
   }
 
-  private void evaluateResourcesForDequeue(
-      Map<String, Resource> resources,
-      Map<String, Long> currentResourceUsage,
-      InstanceState instance,
-      Set<String> resourceRefs) {
-    final Set<String> unknownResources = resourceRefs.stream()
+  private boolean limitAndDequeue(Map<String, Resource> resources,
+      Map<WorkflowId, Set<String>> workflowResourceReferences,
+      Map<String, Long> currentResourceUsage, InstanceState instance) {
+    final Set<String> workflowResourceRefs =
+        workflowResourceReferences.getOrDefault(instance.workflowInstance().workflowId(), emptySet());
+
+    final Set<String> instanceResourceRefs = workflowCache.workflow(instance.workflowInstance().workflowId())
+        .map(workflow -> resourceDecorator.decorateResources(
+            instance.runState(), workflow.configuration(), workflowResourceRefs))
+        .orElse(workflowResourceRefs);
+
+    final Set<String> unknownResources = instanceResourceRefs.stream()
         .filter(resourceRef -> !resources.containsKey(resourceRef))
         .collect(toSet());
 
-    final Set<String> depletedResources = resourceRefs.stream()
+    final Set<String> depletedResources = instanceResourceRefs.stream()
         .filter(resourceId -> {
           if (!resources.containsKey(resourceId)) {
             return false;
@@ -221,10 +220,16 @@ public class Scheduler {
         stateManager.receiveIgnoreClosed(Event.info(instance.workflowInstance(), message));
       }
     } else {
-      resourceRefs.forEach(id -> currentResourceUsage.computeIfAbsent(id, id_ -> 0L));
-      resourceRefs.forEach(id -> currentResourceUsage.compute(id, (id_, l) -> l + 1));
+      if (!dequeueRateLimiter.tryAcquire()) {
+        LOG.debug("Dequeue rate limited");
+        return false;
+      }
+      instanceResourceRefs.forEach(id -> currentResourceUsage.computeIfAbsent(id, id_ -> 0L));
+      instanceResourceRefs.forEach(id -> currentResourceUsage.compute(id, (id_, l) -> l + 1));
       sendDequeue(instance);
     }
+
+    return true;
   }
 
   private Stream<ResourceWithInstance> pairWithResources(Optional<Long> globalConcurrency,

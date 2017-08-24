@@ -22,22 +22,31 @@ package com.spotify.styx;
 
 import static com.spotify.styx.state.TimeoutConfig.createWithDefaultTtl;
 import static java.time.Duration.ofSeconds;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.either;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anySetOf;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.RateLimiter;
+import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
@@ -53,6 +62,7 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
 import java.net.URI;
@@ -63,7 +73,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Matchers;
@@ -95,6 +107,15 @@ public class SchedulerTest {
 
   @Mock WorkflowResourceDecorator resourceDecorator;
 
+  @Mock RateLimiter rateLimiter;
+
+  @Mock Stats stats;
+
+  @Before
+  public void setUp() throws Exception {
+    when(rateLimiter.tryAcquire()).thenReturn(true);
+  }
+
   @After
   public void tearDown() throws Exception {
     executor.shutdownNow();
@@ -114,7 +135,7 @@ public class SchedulerTest {
 
     stateManager = Mockito.spy(new SyncStateManager());
     scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage, resourceDecorator,
-                              Stats.NOOP);
+                              stats, rateLimiter);
   }
 
   private void setResourceLimit(String resourceId, long limit) {
@@ -139,6 +160,33 @@ public class SchedulerTest {
             .schedule(Schedule.HOURS)
             .resources(resources)
             .build());
+  }
+
+  @Test
+  public void shouldBeRateLimiting() throws Exception {
+
+    when(rateLimiter.tryAcquire()).thenReturn(false);
+
+    setUp(20);
+    setResourceLimit("r1", 2);
+    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
+    init(RunState.create(INSTANCE, State.QUEUED, time));
+
+    scheduler.tick();
+
+    verify(rateLimiter).tryAcquire();
+    verify(stats).recordResourceUsed("r1", 0L);
+
+    assertThat(stateManager.get(INSTANCE).state(), is(State.QUEUED));
+
+    when(rateLimiter.tryAcquire()).thenReturn(true);
+
+    scheduler.tick();
+
+    assertThat(stateManager.get(INSTANCE).state(), is(State.PREPARE));
+
+    verify(rateLimiter, times(2)).tryAcquire();
+    verify(stats).recordResourceUsed("r1", 1L);
   }
 
   @Test
