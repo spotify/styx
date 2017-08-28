@@ -113,7 +113,7 @@ public class ResourceResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldListResources() throws Exception {
-    sinceVersion(Api.Version.V1);
+    sinceVersion(Api.Version.V3);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("")));
@@ -125,7 +125,7 @@ public class ResourceResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldListMultipleResources() throws Exception {
-    sinceVersion(Api.Version.V1);
+    sinceVersion(Api.Version.V3);
 
     storage.storeResource(RESOURCE_2);
     Response<ByteString> response =
@@ -141,7 +141,7 @@ public class ResourceResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldGetResource() throws Exception {
-    sinceVersion(Api.Version.V1);
+    sinceVersion(Api.Version.V3);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/resource1")));
@@ -153,7 +153,7 @@ public class ResourceResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldPostResource() throws Exception {
-    sinceVersion(Api.Version.V1);
+    sinceVersion(Api.Version.V3);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("POST", path(""),
@@ -168,7 +168,7 @@ public class ResourceResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldUpdateResource() throws Exception {
-    sinceVersion(Api.Version.V1);
+    sinceVersion(Api.Version.V3);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PUT", path("/resource1"),
@@ -183,7 +183,7 @@ public class ResourceResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldDeleteResource() throws Exception {
-    sinceVersion(Api.Version.V1);
+    sinceVersion(Api.Version.V3);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("DELETE", path("/resource1")));
@@ -195,7 +195,7 @@ public class ResourceResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldHandleMultipleResourcesIndependently() throws Exception {
-    sinceVersion(Api.Version.V1);
+    sinceVersion(Api.Version.V3);
 
     // add resource2
     awaitResponse(serviceHelper.request("POST", path(""),

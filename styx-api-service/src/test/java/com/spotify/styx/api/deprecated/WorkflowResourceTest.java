@@ -75,8 +75,6 @@ import org.junit.Test;
 @Deprecated
 public class WorkflowResourceTest extends VersionedApiTest {
 
-  private static final String SCHEDULER_BASE = "http://localhost:12345";
-
   private static LocalDatastoreHelper localDatastore;
 
   private Datastore datastore = localDatastore.getOptions().getService();
@@ -129,8 +127,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   protected void init(Environment environment) {
     WorkflowResource
         workflowResource =
-        new WorkflowResource(new com.spotify.styx.api.WorkflowResource(storage,
-                                                                       SCHEDULER_BASE));
+        new WorkflowResource(new com.spotify.styx.api.WorkflowResource(storage));
 
     environment.routingEngine().registerRoutes(workflowResource.routes());
   }
