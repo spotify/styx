@@ -30,7 +30,7 @@
     <module>styx-common</module>
     <module>styx-test</module>
     <module>styx-standalone-service</module>
-    <module>report</module>
+    <module>styx-report</module>
   </modules>
 
   <licenses>
