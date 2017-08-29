@@ -20,6 +20,7 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.styx.api.Api.Version.V2;
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static java.util.stream.Collectors.toList;
@@ -78,7 +79,7 @@ public class StatusResource {
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
         .collect(toList());
 
-    return Api.prefixRoutes(routes, V3);
+    return Api.prefixRoutes(routes, V2, V3);
   }
 
   private static String arg(String name, RequestContext rc) {

@@ -71,7 +71,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
   @Test
   public void testEventsRoundtrip() throws Exception {
-    sinceVersion(Api.Version.V3);
+    sinceVersion(Api.Version.V2);
 
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI, TRIGGER), 0L, 0L));
     storage.writeEvent(SequenceEvent.create(Event.created(WFI, "exec0", "img0"), 1L, 1L));
@@ -91,7 +91,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
   @Test
   public void testGetAllActiveStates() throws Exception {
-    sinceVersion(Api.Version.V3);
+    sinceVersion(Api.Version.V2);
 
     storage.writeActiveState(WFI, 42L);
     storage.writeActiveState(OTHER_WFI, 84L);
@@ -111,7 +111,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
   @Test
   public void testFilterActiveStatesOnComponent() throws Exception {
-    sinceVersion(Api.Version.V3);
+    sinceVersion(Api.Version.V2);
 
     WorkflowInstance OTHER_WFI =
         WorkflowInstance.create(WorkflowId.create(COMPONENT_ID + "-other", ID), PARAMETER);

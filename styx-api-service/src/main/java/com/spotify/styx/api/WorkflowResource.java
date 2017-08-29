@@ -20,6 +20,7 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.styx.api.Api.Version.V2;
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
@@ -84,8 +85,15 @@ public final class WorkflowResource {
             rc -> patchState(arg("cid", rc), arg("wfid", rc), rc.request()))
     );
 
+    final List<Route<AsyncHandler<Response<ByteString>>>> sunsetRoutes = Collections.singletonList(
+        Route.with(
+            json(), "PATCH", BASE + "/<cid>/state",
+            rc -> patchState(arg("cid", rc), rc.request()))
+    );
+
     return cat(
-        Api.prefixRoutes(routes, V3)
+        Api.prefixRoutes(routes, V2, V3),
+        Api.prefixRoutes(sunsetRoutes, V2)
     );
   }
 

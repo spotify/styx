@@ -49,7 +49,7 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
 
   @Test
   public void testEventInjectionProxy() throws Exception {
-    sinceVersion(Api.Version.V3);
+    sinceVersion(Api.Version.V2);
 
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.ACCEPTED))
@@ -63,7 +63,7 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
 
   @Test
   public void testTriggerWorkflowInstanceProxy() throws Exception {
-    sinceVersion(Api.Version.V3);
+    sinceVersion(Api.Version.V2);
 
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.ACCEPTED))

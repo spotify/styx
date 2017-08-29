@@ -20,6 +20,9 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.styx.api.Api.Version.V0;
+import static com.spotify.styx.api.Api.Version.V1;
+import static com.spotify.styx.api.Api.Version.V2;
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.api.Middlewares.json;
 
@@ -60,7 +63,7 @@ public class StyxConfigResource {
             rc -> patchStyxConfig(rc.request()))
     );
 
-    return Api.prefixRoutes(routes, V3);
+    return Api.prefixRoutes(routes, V0, V1, V2, V3);
   }
 
   private Response<StyxConfig> styxConfig() {
