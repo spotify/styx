@@ -33,7 +33,9 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Key;
@@ -42,6 +44,7 @@ import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
@@ -55,11 +58,13 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
+import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Optional;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
@@ -69,6 +74,9 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
 
 public class WorkflowResourceTest extends VersionedApiTest {
 
@@ -80,6 +88,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   public WorkflowResourceTest(Api.Version version) {
     super(WorkflowResource.BASE, version, "workflow-test");
+    MockitoAnnotations.initMocks(this);
   }
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
@@ -121,9 +130,12 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private static final ByteString STATEPAYLOAD_OTHER_FIELD =
       ByteString.encodeUtf8("{\"enabled\":\"true\",\"other_field\":\"ignored\"}");
 
+  @Mock DockerImageValidator dockerImageValidator;
+
   @Override
   protected void init(Environment environment) {
-    WorkflowResource workflowResource = new WorkflowResource(storage);
+    when(dockerImageValidator.validateImageReference(Mockito.anyString())).thenReturn(Collections.emptyList());
+    WorkflowResource workflowResource = new WorkflowResource(storage, dockerImageValidator);
 
     environment.routingEngine()
         .registerRoutes(Api.withCommonMiddleware(
@@ -352,6 +364,21 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasNoPayload());
     assertThat(response, hasStatus(withReasonPhrase(equalTo("Missing payload."))));
+  }
+
+  @Test
+  public void shouldReturnBadRequestForInvalidDockerImageOnWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(ImmutableList.of("foo", "bar"));
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
+            STATEPAYLOAD_FULL));
+
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
+    assertThat(response, hasNoPayload());
+    assertThat(response, hasStatus(withReasonPhrase(equalTo("Invalid docker image: [foo, bar]"))));
   }
 
   @Test

@@ -24,6 +24,7 @@ import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.state.RunState.State.PREPARE;
 import static com.spotify.styx.state.RunState.State.SUBMITTING;
+import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.nullValue;
@@ -32,6 +33,7 @@ import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -51,11 +53,17 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.DockerImageValidator;
 import java.io.IOException;
+import java.util.Collections;
 import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.runners.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.class)
 public class ExecutionDescriptionHandlerTest {
 
   private static final String DOCKER_IMAGE = "my_docker_image";
@@ -66,11 +74,14 @@ public class ExecutionDescriptionHandlerTest {
   private StateManager stateManager;
   private ExecutionDescriptionHandler toTest;
 
+  @Mock DockerImageValidator dockerImageValidator;
+
   @Before
   public void setUp() throws Exception {
+    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Collections.emptyList());
     storage = new InMemStorage();
     stateManager = spy(new SyncStateManager());
-    toTest = new ExecutionDescriptionHandler(storage, stateManager);
+    toTest = new ExecutionDescriptionHandler(storage, stateManager, dockerImageValidator);
   }
 
   @Test
@@ -118,7 +129,7 @@ public class ExecutionDescriptionHandlerTest {
     storageSpy.storeWorkflow(workflow);
     storageSpy.patchState(workflow.id(), workflowState);
 
-    toTest = new ExecutionDescriptionHandler(storageSpy, stateManager);
+    toTest = new ExecutionDescriptionHandler(storageSpy, stateManager, dockerImageValidator);
 
     RunState runState = RunState.fresh(workflowInstance, toTest);
 
@@ -161,6 +172,22 @@ public class ExecutionDescriptionHandlerTest {
   public void shouldHaltIfMissingDockerImage() throws Exception {
     WorkflowConfiguration workflowConfiguration = schedule("foo", "bar");
     Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
+    RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
+
+    storage.storeWorkflow(workflow);
+    stateManager.initialize(runState);
+    toTest.transitionInto(runState);
+
+    RunState halted = stateManager.get(workflowInstance);
+    assertThat(halted, Matchers.is(nullValue()));
+  }
+
+  @Test
+  public void shouldHaltIfInvalidDockerImage() throws Exception {
+    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(ImmutableList.of("foo", "bar"));
+
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, FULL_WORKFLOW_CONFIGURATION);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 

@@ -39,9 +39,12 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -52,12 +55,14 @@ public final class WorkflowResource {
 
   static final String BASE = "/workflows";
   public static final int DEFAULT_PAGE_LIMIT = 24 * 7;
+  private final DockerImageValidator dockerImageValidator;
 
   private final Storage storage;
 
 
-  public WorkflowResource(Storage storage) {
+  public WorkflowResource(Storage storage, DockerImageValidator dockerImageValidator) {
     this.storage = Objects.requireNonNull(storage);
+    this.dockerImageValidator = Objects.requireNonNull(dockerImageValidator, "dockerImageValidator");
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -98,6 +103,13 @@ public final class WorkflowResource {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid payload."));
     }
 
+    if (patchState.dockerImage().isPresent()) {
+      final Collection<String> errors = dockerImageValidator.validateImageReference(patchState.dockerImage().get());
+      if (!errors.isEmpty()) {
+        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors));
+      }
+    }
+
     if (patchState.commitSha().isPresent()) {
       if (!isValidSHA1(patchState.commitSha().get())) {
         return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid SHA-1."));
@@ -134,6 +146,13 @@ public final class WorkflowResource {
     if (patchState.enabled().isPresent()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Enabled flag not supported "
                                                                     + "for components."));
+    }
+
+    if (patchState.dockerImage().isPresent()) {
+      final Collection<String> errors = dockerImageValidator.validateImageReference(patchState.dockerImage().get());
+      if (!errors.isEmpty()) {
+        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors));
+      }
     }
 
     if (patchState.commitSha().isPresent()) {
