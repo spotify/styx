@@ -20,7 +20,6 @@
 
 package com.spotify.styx.api;
 
-import static com.spotify.styx.api.Api.Version.V2;
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
@@ -43,7 +42,6 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -54,15 +52,12 @@ public final class WorkflowResource {
 
   static final String BASE = "/workflows";
   public static final int DEFAULT_PAGE_LIMIT = 24 * 7;
-  private static final String SCHEDULER_BASE_PATH = "/api/v0";
 
-  private final String schedulerServiceBaseUrl;
   private final Storage storage;
 
 
-  public WorkflowResource(Storage storage, String schedulerServiceBaseUrl) {
+  public WorkflowResource(Storage storage) {
     this.storage = Objects.requireNonNull(storage);
-    this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -84,15 +79,8 @@ public final class WorkflowResource {
             rc -> patchState(arg("cid", rc), arg("wfid", rc), rc.request()))
     );
 
-    final List<Route<AsyncHandler<Response<ByteString>>>> sunsetRoutes = Collections.singletonList(
-        Route.with(
-            json(), "PATCH", BASE + "/<cid>/state",
-            rc -> patchState(arg("cid", rc), rc.request()))
-    );
-
     return cat(
-        Api.prefixRoutes(routes, V2, V3),
-        Api.prefixRoutes(sunsetRoutes, V2)
+        Api.prefixRoutes(routes, V3)
     );
   }
 
@@ -230,10 +218,6 @@ public final class WorkflowResource {
       return Response.forStatus(
           Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch execution info."));
     }
-  }
-
-  private String schedulerApiUrl(CharSequence... parts) {
-    return schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + "/" + String.join("/", parts);
   }
 
   private static boolean isValidSHA1(String s) {
