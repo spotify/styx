@@ -544,13 +544,8 @@ public class StyxScheduler implements AppInit {
     stats.registerSubmissionRateLimitMetric(submissionRateLimiter::getRate);
   }
 
-  // TODO: revise me
-  // If we have ever registered/updated the workflow via API endpoint,
-  // we ignore any subsequent updates via schedule source or lower API version.
-  //
-  // At this stage when rolling out workflow configuration API endpoint, we ignore in order
-  // to enable gradual rollout while still supporting the polling schedule source for users that
-  // haven't migrated.
+  // If we have ever registered/updated the workflow via higher API version,
+  // we ignore any subsequent updates via lower API version.
   private static boolean isGreaterOrEqualApiVersion(Workflow newWorkflow,
                                                     Workflow existingWorkflow) {
     return !existingWorkflow.fromApi().isPresent()

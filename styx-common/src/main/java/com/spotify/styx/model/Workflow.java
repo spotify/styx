@@ -43,7 +43,7 @@ public abstract class Workflow {
   public abstract Optional<URI> componentUri();
 
   // this gives a hint that the workflow registration/modification came from
-  // a certain version of Styx API instead of any schedule source
+  // a certain version of Styx API
   @JsonProperty("__from_api")
   public abstract Optional<Api.Version> fromApi();
 
