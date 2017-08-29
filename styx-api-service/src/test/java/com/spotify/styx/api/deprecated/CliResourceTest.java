@@ -2,7 +2,7 @@
  * -\-\-
  * Spotify Styx API Service
  * --
- * Copyright (C) 2017 Spotify AB
+ * Copyright (C) 2016 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.api;
+package com.spotify.styx.api.deprecated;
 
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasPayload;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
@@ -31,6 +31,10 @@ import static org.junit.Assert.assertThat;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
+import com.spotify.styx.api.Api;
+import com.spotify.styx.api.EventsPayload;
+import com.spotify.styx.api.StatusResource;
+import com.spotify.styx.api.VersionedApiTest;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
@@ -42,36 +46,72 @@ import com.spotify.styx.storage.Storage;
 import okio.ByteString;
 import org.junit.Test;
 
-public class StatusResourceTest extends VersionedApiTest {
+@Deprecated
+public class CliResourceTest extends VersionedApiTest {
 
+  private static final String SCHEDULER_BASE = "http://localhost:12345";
   private static final String COMPONENT_ID = "styx";
-  private static final String ID = "test";
+  private static final String ENDPOINT_ID = "test";
   private static final String PARAMETER = "1234";
   private static final Trigger TRIGGER = Trigger.unknown("foobar");
   private static final String OTHER_COMPONENT_ID = "styx-other";
   private static final WorkflowInstance WFI =
-      WorkflowInstance.create(WorkflowId.create(COMPONENT_ID, ID), PARAMETER);
+      WorkflowInstance.create(WorkflowId.create(COMPONENT_ID, ENDPOINT_ID), PARAMETER);
   private static final WorkflowInstance OTHER_WFI =
-      WorkflowInstance.create(WorkflowId.create(OTHER_COMPONENT_ID, ID), PARAMETER);
+      WorkflowInstance.create(WorkflowId.create(OTHER_COMPONENT_ID, ENDPOINT_ID), PARAMETER);
 
   private Storage storage = new InMemStorage();
 
-  public StatusResourceTest(Api.Version version) {
-    super(StatusResource.BASE, version);
+  public CliResourceTest(Api.Version version) {
+    super(CliResource.BASE, version);
   }
 
   @Override
   protected void init(Environment environment) {
-    final StatusResource statusResource = new StatusResource(storage);
+    final CliResource
+        cliResource =
+        new CliResource(new StatusResource(storage), SCHEDULER_BASE);
 
-    environment.routingEngine()
-        .registerRoutes(Api.withCommonMiddleware(
-            statusResource.routes()));
+    environment.routingEngine().registerRoutes(cliResource.routes());
+  }
+
+  @Test
+  public void testEventInjectionProxy() throws Exception {
+    tillVersion(Api.Version.V1);
+
+    serviceHelper.stubClient()
+        .respond(Response.forStatus(Status.ACCEPTED))
+        .to(SCHEDULER_BASE + "/api/v0/events");
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path("/events")));
+
+    assertThat(response, hasStatus(withCode(Status.ACCEPTED)));
+  }
+
+  @Test
+  public void testTriggerWorkflowInstanceProxy() throws Exception {
+    tillVersion(Api.Version.V1);
+
+    serviceHelper.stubClient()
+        .respond(Response.forStatus(Status.ACCEPTED).withPayload(Json.serialize(WFI)))
+        .to(SCHEDULER_BASE + "/api/v0/trigger");
+
+    com.spotify.styx.model.deprecated.WorkflowInstance workflowInstance =
+        com.spotify.styx.model.deprecated.WorkflowInstance.create(WFI);
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path("/trigger"),
+                                            Json.serialize(workflowInstance)));
+
+    assertThat(response, hasStatus(withCode(Status.ACCEPTED)));
+    assertThat(Json.deserialize(response.payload().get(),
+                                com.spotify.styx.model.deprecated.WorkflowInstance.class),
+               is(workflowInstance));
   }
 
   @Test
   public void testEventsRoundtrip() throws Exception {
-    sinceVersion(Api.Version.V2);
+    tillVersion(Api.Version.V1);
 
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI, TRIGGER), 0L, 0L));
     storage.writeEvent(SequenceEvent.create(Event.created(WFI, "exec0", "img0"), 1L, 1L));
@@ -91,7 +131,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
   @Test
   public void testGetAllActiveStates() throws Exception {
-    sinceVersion(Api.Version.V2);
+    tillVersion(Api.Version.V1);
 
     storage.writeActiveState(WFI, 42L);
     storage.writeActiveState(OTHER_WFI, 84L);
@@ -103,18 +143,17 @@ public class StatusResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(withCode(Status.OK)));
 
     String json = response.payload().get().utf8();
-    RunStateDataPayload
-        parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
+    RunStateDataPayload parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
     assertThat(parsed.activeStates(), hasSize(2));
   }
 
   @Test
   public void testFilterActiveStatesOnComponent() throws Exception {
-    sinceVersion(Api.Version.V2);
+    tillVersion(Api.Version.V1);
 
     WorkflowInstance OTHER_WFI =
-        WorkflowInstance.create(WorkflowId.create(COMPONENT_ID + "-other", ID), PARAMETER);
+        WorkflowInstance.create(WorkflowId.create(COMPONENT_ID + "-other", ENDPOINT_ID), PARAMETER);
 
     storage.writeActiveState(WFI, 42L);
     storage.writeActiveState(OTHER_WFI, 84L);
@@ -126,8 +165,7 @@ public class StatusResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(withCode(Status.OK)));
 
     String json = response.payload().get().utf8();
-    RunStateDataPayload
-        parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
+    RunStateDataPayload parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
     assertThat(parsed.activeStates(), hasSize(1));
     assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().componentId(), is(COMPONENT_ID));

@@ -20,6 +20,8 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.styx.api.Api.Version.V1;
+import static com.spotify.styx.api.Api.Version.V2;
 import static com.spotify.styx.api.Api.Version.V3;
 import static java.util.stream.Collectors.toList;
 
@@ -79,7 +81,7 @@ public final class ResourceResource {
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
         .collect(toList());
 
-    return Api.prefixRoutes(routes, V3);
+    return Api.prefixRoutes(routes, V1, V2, V3);
   }
 
   private ResourcesPayload getResources() {

@@ -2,7 +2,7 @@
  * -\-\-
  * Spotify Styx API Service
  * --
- * Copyright (C) 2017 Spotify AB
+ * Copyright (C) 2016 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.api;
+package com.spotify.styx.api.deprecated;
 
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasHeader;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasNoPayload;
@@ -33,9 +33,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
-import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Key;
@@ -44,10 +42,11 @@ import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
+import com.spotify.styx.api.Api;
+import com.spotify.styx.api.VersionedApiTest;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
@@ -64,7 +63,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.Optional;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
@@ -74,10 +72,8 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
 
+@Deprecated
 public class WorkflowResourceTest extends VersionedApiTest {
 
   private static LocalDatastoreHelper localDatastore;
@@ -88,7 +84,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   public WorkflowResourceTest(Api.Version version) {
     super(WorkflowResource.BASE, version, "workflow-test");
-    MockitoAnnotations.initMocks(this);
   }
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
@@ -109,8 +104,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private static final ByteString STATEPAYLOAD_FULL =
       ByteString.encodeUtf8("{\"enabled\":\"true\", \"docker_image\":\"cherry:image\", "
                             + "\"commit_sha\":\"" + VALID_SHA
-                            + "\", \"next_natural_trigger\":\"2016-08-10T07:00:01Z\", "
-                            + "\"next_natural_offset_trigger\":\"2016-08-10T08:00:01Z\"}");
+                            + "\", \"next_natural_trigger\":\"2016-08-10T07:00:01Z\"}");
 
   private static final ByteString STATEPAYLOAD_ENABLED =
       ByteString.encodeUtf8("{\"enabled\":\"true\"}");
@@ -130,16 +124,14 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private static final ByteString STATEPAYLOAD_OTHER_FIELD =
       ByteString.encodeUtf8("{\"enabled\":\"true\",\"other_field\":\"ignored\"}");
 
-  @Mock DockerImageValidator dockerImageValidator;
-
   @Override
   protected void init(Environment environment) {
-    when(dockerImageValidator.validateImageReference(Mockito.anyString())).thenReturn(Collections.emptyList());
-    WorkflowResource workflowResource = new WorkflowResource(storage, dockerImageValidator);
+    WorkflowResource
+        workflowResource =
+        new WorkflowResource(new com.spotify.styx.api.WorkflowResource(
+            storage, new DockerImageValidator()));
 
-    environment.routingEngine()
-        .registerRoutes(Api.withCommonMiddleware(
-            workflowResource.routes()));
+    environment.routingEngine().registerRoutes(workflowResource.routes());
   }
 
   @BeforeClass
@@ -173,12 +165,11 @@ public class WorkflowResourceTest extends VersionedApiTest {
     while (keys.hasNext()) {
       datastore.delete(keys.next());
     }
-    serviceHelper.stubClient().clear();
   }
 
   @Test
   public void shouldSucceedWithFullPatchStatePerWorkflow() throws Exception {
-    sinceVersion(Api.Version.V2);
+    tillVersion(Api.Version.V1);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/foo/bar/state")));
@@ -198,7 +189,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "docker_image", equalTo("cherry:image"));
     assertJson(response, "commit_sha", equalTo(VALID_SHA));
     assertJson(response, "next_natural_trigger", equalTo("2016-08-10T07:00:01Z"));
-    assertJson(response, "next_natural_offset_trigger", equalTo("2016-08-10T08:00:01Z"));
 
     assertThat(storage.enabled(WORKFLOW.id()), is(true));
     assertThat(storage.workflowState(WORKFLOW.id()).dockerImage().get(), is("cherry:image"));
@@ -207,7 +197,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldSucceedWithEnabledPatchStatePerWorkflow() throws Exception {
-    sinceVersion(Api.Version.V2);
+    tillVersion(Api.Version.V1);
 
     storage.patchState(WORKFLOW.id(), patchDockerImage("preset:image"));
 
@@ -226,7 +216,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldSucceedWhenStatePayloadWithOtherFieldsIsSent() throws Exception {
-    sinceVersion(Api.Version.V2);
+    tillVersion(Api.Version.V1);
 
     storage.patchState(WORKFLOW.id(), patchDockerImage("preset:image"));
 
@@ -243,7 +233,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldSucceedWithImagePatchStatePerWorkflow() throws Exception {
-    sinceVersion(Api.Version.V2);
+    tillVersion(Api.Version.V1);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
@@ -260,7 +250,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldSucceedWithPatchStatePerComponent() throws Exception {
-    isVersion(Api.Version.V2);
+    tillVersion(Api.Version.V1);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/state"),
@@ -277,7 +267,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldReturnCurrentWorkflowState() throws Exception {
-    sinceVersion(Api.Version.V2);
+    tillVersion(Api.Version.V1);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/foo/bar/state")));
@@ -302,7 +292,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldAcceptPatchStateWithValidSHA1() throws Exception {
-    sinceVersion(Api.Version.V2);
+    tillVersion(Api.Version.V1);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
@@ -317,7 +307,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldFailPatchStateWithInvalidSHA1() throws Exception {
-    sinceVersion(Api.Version.V2);
+    tillVersion(Api.Version.V1);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
@@ -349,7 +339,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldReturnBadRequestWhenMalformedStatePayloadIsSent() throws Exception {
-    sinceVersion(Api.Version.V2);
+    tillVersion(Api.Version.V1);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
@@ -362,7 +352,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldReturnBadRequestWhenMalformedStatePayloadIsSentComponent() throws Exception {
-    isVersion(Api.Version.V2);
+    tillVersion(Api.Version.V1);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/state"),
@@ -375,7 +365,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldReturnBadRequestWhenNoPayloadIsSent() throws Exception {
-    sinceVersion(Api.Version.V2);
+    tillVersion(Api.Version.V1);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state")));
@@ -385,13 +375,12 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(withReasonPhrase(equalTo("Missing payload."))));
   }
 
-
   /**
    * This test should be removed when we actually support this
    */
   @Test
   public void shouldReturnBadRequestSettingEnabledOnComponent() throws Exception {
-    isVersion(Api.Version.V2);
+    tillVersion(Api.Version.V1);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/state"),
@@ -404,23 +393,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldReturnBadRequestForInvalidDockerImageOnWorkflow() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(ImmutableList.of("foo", "bar"));
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-            STATEPAYLOAD_FULL));
-
-    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
-    assertThat(response, hasNoPayload());
-    assertThat(response, hasStatus(withReasonPhrase(equalTo("Invalid docker image: [foo, bar]"))));
-  }
-
-  @Test
   public void shouldReturnWorkflowInstancesData() throws Exception {
-    sinceVersion(Api.Version.V2);
+    isVersion(Api.Version.V1);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
     storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER), 0L, ms("07:00:00")));
@@ -435,36 +409,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "[*]", hasSize(1));
     assertJson(response, "[0].workflow_instance.parameter", is("2016-08-10"));
     assertJson(response, "[0].workflow_instance.workflow_id.component_id", is("foo"));
-    assertJson(response, "[0].workflow_instance.workflow_id.id", is("bar"));
-    assertJson(response, "[0].triggers", hasSize(1));
-    assertJson(response, "[0].triggers.[0].trigger_id", is(TriggerUtil.NATURAL_TRIGGER_ID));
-    assertJson(response, "[0].triggers.[0].complete", is(false));
-    assertJson(response, "[0].triggers.[0].executions", hasSize(1));
-    assertJson(response, "[0].triggers.[0].executions.[0].execution_id", is("exec"));
-    assertJson(response, "[0].triggers.[0].executions.[0].docker_image", is("img"));
-    assertJson(response, "[0].triggers.[0].executions.[0].statuses", hasSize(2));
-    assertJson(response, "[0].triggers.[0].executions.[0].statuses.[0].status", is("SUBMITTED"));
-    assertJson(response, "[0].triggers.[0].executions.[0].statuses.[1].status", is("STARTED"));
-  }
-
-  @Test
-  public void shouldReturnWorkflowRangeOfInstancesData() throws Exception {
-    sinceVersion(Api.Version.V2);
-
-    WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
-    storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER), 0L, ms("07:00:00")));
-    storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
-    storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("GET", path("/foo/bar/instances?start=2016-08-10")));
-
-    assertThat(response, hasStatus(withCode(Status.OK)));
-
-    assertJson(response, "[*]", hasSize(1));
-    assertJson(response, "[0].workflow_instance.parameter", is("2016-08-10"));
-    assertJson(response, "[0].workflow_instance.workflow_id.component_id", is("foo"));
-    assertJson(response, "[0].workflow_instance.workflow_id.id", is("bar"));
+    assertJson(response, "[0].workflow_instance.workflow_id.endpoint_id", is("bar"));
     assertJson(response, "[0].triggers", hasSize(1));
     assertJson(response, "[0].triggers.[0].trigger_id", is(TriggerUtil.NATURAL_TRIGGER_ID));
     assertJson(response, "[0].triggers.[0].complete", is(false));
@@ -478,7 +423,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldReturnWorkflowInstanceData() throws Exception {
-    sinceVersion(Api.Version.V2);
+    isVersion(Api.Version.V1);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
     storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER), 0L, ms("07:00:00")));
@@ -492,7 +437,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertJson(response, "workflow_instance.parameter", is("2016-08-10"));
     assertJson(response, "workflow_instance.workflow_id.component_id", is("foo"));
-    assertJson(response, "workflow_instance.workflow_id.id", is("bar"));
+    assertJson(response, "workflow_instance.workflow_id.endpoint_id", is("bar"));
     assertJson(response, "triggers", hasSize(1));
     assertJson(response, "triggers.[0].trigger_id", is(TriggerUtil.NATURAL_TRIGGER_ID));
     assertJson(response, "triggers.[0].timestamp", is("2016-08-10T07:00:00Z"));
@@ -511,7 +456,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldReturnWorkflowInstanceDataBackfill() throws Exception {
-    sinceVersion(Api.Version.V2);
+    isVersion(Api.Version.V1);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
     storage.writeEvent(create(Event.triggerExecution(wfi, BACKFILL_TRIGGER), 0L, ms("07:00:00")));
@@ -523,7 +468,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertJson(response, "workflow_instance.parameter", is("2016-08-10"));
     assertJson(response, "workflow_instance.workflow_id.component_id", is("foo"));
-    assertJson(response, "workflow_instance.workflow_id.id", is("bar"));
+    assertJson(response, "workflow_instance.workflow_id.endpoint_id", is("bar"));
     assertJson(response, "triggers", hasSize(1));
     assertJson(response, "triggers.[0].trigger_id", is("backfill-1"));
     assertJson(response, "triggers.[0].timestamp", is("2016-08-10T07:00:00Z"));
@@ -532,7 +477,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldPaginateWorkflowInstancesData() throws Exception {
-    sinceVersion(Api.Version.V2);
+    isVersion(Api.Version.V1);
 
     WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-11");
     WorkflowInstance wfi2 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-12");

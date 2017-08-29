@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.api.Middlewares.authValidator;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
@@ -118,17 +119,31 @@ public class StyxApi implements AppInit {
     final SchedulerProxyResource schedulerProxyResource = new SchedulerProxyResource(
         schedulerServiceBaseUrl);
 
+    final com.spotify.styx.api.deprecated.WorkflowResource
+        deprecatedWorkflowResource =
+        new com.spotify.styx.api.deprecated.WorkflowResource(workflowResource);
+    final com.spotify.styx.api.deprecated.BackfillResource
+        deprecatedBackfillResource =
+        new com.spotify.styx.api.deprecated.BackfillResource(backfillResource);
+    final com.spotify.styx.api.deprecated.CliResource
+        deprecatedCliResource =
+        new com.spotify.styx.api.deprecated.CliResource(statusResource, schedulerServiceBaseUrl);
+
     final Supplier<Optional<List<String>>> clientBlacklistSupplier =
         new CachedSupplier<>(storage::clientBlacklist, Instant::now);
 
+    // TODO remove deprecated resources and remove V3 hack
     final Stream<Route<AsyncHandler<Response<ByteString>>>> routes = StreamUtil.cat(
+        deprecatedWorkflowResource.routes(),
+        deprecatedBackfillResource.routes(),
+        deprecatedCliResource.routes(),
         workflowResource.routes(),
         backfillResource.routes(),
         resourceResource.routes(),
         styxConfigResource.routes(),
         statusResource.routes(),
         schedulerProxyResource.routes()
-    ).map(r -> r.withMiddleware(authValidator()));
+    ).map(r -> r.uri().startsWith(V3.prefix()) ? r.withMiddleware(authValidator()) : r);
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
