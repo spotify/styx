@@ -31,7 +31,6 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.webtoken.JsonWebSignature;
 import com.google.api.client.json.webtoken.JsonWebSignature.Header;
 import com.google.api.client.json.webtoken.JsonWebToken.Payload;
-import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 
@@ -51,11 +50,6 @@ public class GoogleIdTokenAuth {
     GoogleCredential credential = GoogleCredential.getApplicationDefault();
     if (credential.getServiceAccountId() != null) {
       // is a service account
-      if (credential.createScopedRequired()) {
-        credential = credential.createScoped(ImmutableList.of(
-            "https://www.googleapis.com/auth/cloud-platform",
-            "email"));
-      }
       return getServiceAccountToken(credential, targetAudience);
     } else {
       // is a user
