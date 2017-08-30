@@ -327,6 +327,33 @@ class DatastoreStorage {
     return map;
   }
 
+  public List<Workflow> workflows(String componentId) throws IOException {
+    final Key componentKey = componentKeyFactory.newKey(componentId);
+
+    final List<Workflow> workflows = Lists.newArrayList();
+    final EntityQuery query = Query.newEntityQueryBuilder()
+        .setKind(KIND_WORKFLOW)
+        .setFilter(PropertyFilter.hasAncestor(componentKey))
+        .build();
+    final QueryResults<Entity> result = datastore.run(query);
+
+    while (result.hasNext()) {
+      final Entity entity = result.next();
+      final Workflow workflow;
+      if (entity.contains(PROPERTY_WORKFLOW_JSON)) {
+        try {
+          workflow = OBJECT_MAPPER.readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
+        } catch (IOException e) {
+          LOG.warn("Failed to read workflow {}.", entity.getKey());
+          continue;
+        }
+        workflows.add(workflow);
+      }
+    }
+
+    return workflows;
+  }
+
   Map<WorkflowInstance, Long> allActiveStates() throws IOException {
     final EntityQuery query =
         Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE).build();

@@ -32,6 +32,7 @@ import static com.spotify.styx.model.WorkflowState.patchDockerImage;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -548,6 +549,18 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertJson(response, "[*]", hasSize(1));
     assertJson(response, "[0].workflow_instance.parameter", is("2016-08-12"));
+  }
+
+  @Test
+  public void shouldReturnWorkflowsInComponent() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("/foo")));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertJson(response, "[*]", hasSize(1));
+    assertJson(response, "[0].component_id", is("foo"));
   }
 
   private long ms(String time) {

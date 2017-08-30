@@ -28,10 +28,14 @@ import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasEntry;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -596,6 +600,36 @@ public class DatastoreStorageTest {
     assertThat(storage.workflows(), hasEntry(WORKFLOW_ID1, workflow1));
     assertThat(storage.workflows(), hasEntry(WORKFLOW_ID2, workflow2));
     assertThat(storage.workflows(), hasEntry(WORKFLOW_ID3, workflow3));
+  }
+
+  @Test
+  public void shouldReturnAllWorkflowsInComponent() throws Exception {
+    String componentId = "component";
+
+    Workflow workflow1 = workflow(WORKFLOW_ID1);
+    Workflow workflow2 = workflow(WORKFLOW_ID2);
+    Workflow workflow3 = workflow(WORKFLOW_ID3);
+
+    assertThat(workflow1.componentId(), is(componentId));
+    assertThat(workflow2.componentId(), is(componentId));
+    assertThat(workflow3.componentId(), not(componentId));
+
+    storage.store(workflow1);
+    storage.store(workflow2);
+    storage.store(workflow3);
+
+    List<Workflow> l = storage.workflows(componentId);
+    assertThat(l, hasSize(2));
+
+    assertThat(l, hasItem(workflow1));
+    assertThat(l, hasItem(workflow2));
+  }
+
+  @Test
+  public void shouldReturnEmptyListIfComponentDoesNotExist() throws Exception {
+    String componentId = "component";
+    List<Workflow> l = storage.workflows(componentId);
+    assertThat(l, hasSize(0));
   }
 
   private Workflow workflow(WorkflowId workflowId) {
