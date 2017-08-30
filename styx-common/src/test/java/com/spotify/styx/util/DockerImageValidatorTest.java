@@ -60,6 +60,12 @@ public class DockerImageValidatorTest {
     assertThat(validator.validateImageReference(
         "foo@tarsum.v1+sha256:6c3c624b58dbbcd3c0dd82b4c53f04194d1247c6eebdaab7c610cf7d66709b3b"
     ), is(empty()));
+    assertThat(validator.validateImageReference(
+        "baz.io/foo/foo-bar:1.2.3-SNAPSHOT-20170830T143321-decafbad@sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+    ), is(empty()));
+    assertThat(validator.validateImageReference(
+        "gcr.io/foo/foo-bar:0.1.0-SNAPSHOT-20170830T143321-decafbad@sha256:4638a93bfd081a26acb585a46376a42df077a104c514fd96135240eb77200c2f"
+    ), is(empty()));
   }
 
   @Test
