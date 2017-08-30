@@ -60,6 +60,12 @@ public class DockerImageValidatorTest {
     assertThat(validator.validateImageReference(
         "foo@tarsum.v1+sha256:6c3c624b58dbbcd3c0dd82b4c53f04194d1247c6eebdaab7c610cf7d66709b3b"
     ), is(empty()));
+    assertThat(validator.validateImageReference(
+        "baz.io/foo/foo-bar:1.2.3-SNAPSHOT-20170830T143321-decafbad@sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+    ), is(empty()));
+    assertThat(validator.validateImageReference(
+        "baz.io:4711/foo/foo-bar:1.2.3-SNAPSHOT-20170830T143321-decafbad@sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+    ), is(empty()));
   }
 
   @Test
@@ -67,14 +73,26 @@ public class DockerImageValidatorTest {
     assertEquals(newHashSet("Tag cannot be empty"),
         validator.validateImageReference("repo:"));
 
+    assertEquals(newHashSet("Tag cannot be empty"),
+        validator.validateImageReference("repo:@sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"));
+
     assertEquals(newHashSet("Digest cannot be empty"),
         validator.validateImageReference("foo@"));
 
     assertEquals(newHashSet("Illegal digest: \":123\""),
         validator.validateImageReference("foo@:123"));
 
+    assertEquals(newHashSet("Illegal digest: \":123\""),
+        validator.validateImageReference("foo:bar@:123"));
+
     assertEquals(newHashSet("Illegal digest: \"sha256:\""),
         validator.validateImageReference("foo@sha256:"));
+
+    assertEquals(newHashSet("Illegal digest: \"sha256:\""),
+        validator.validateImageReference("foo:bar@sha256:"));
+
+    assertEquals(newHashSet("Illegal digest: \"sha256:\""),
+        validator.validateImageReference("foo:4711/baz:bar@sha256:"));
 
     assertFalse(validator.validateImageReference("repo:/").isEmpty());
 
@@ -90,11 +108,17 @@ public class DockerImageValidatorTest {
     assertEquals(newHashSet("Invalid domain name: \"reg.istry \""),
         validator.validateImageReference("reg.istry :4711/repo"));
 
+    assertEquals(newHashSet("Invalid domain name: \"1.2.3.4.\""),
+        validator.validateImageReference("1.2.3.4.:4711/namespace/repo@sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"));
+
     assertEquals(newHashSet("Invalid port in endpoint: \"reg.istry: 4711\""),
         validator.validateImageReference("reg.istry: 4711/repo"));
 
     assertEquals(newHashSet("Invalid port in endpoint: \"reg.istry:4711 \""),
         validator.validateImageReference("reg.istry:4711 /repo"));
+
+    assertEquals(newHashSet("Invalid port in endpoint: \"reg.istry:4711 \""),
+        validator.validateImageReference("reg.istry:4711 /repo@sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"));
 
     assertEquals(newHashSet("Invalid image name (reg.istry:4711/ repo), only ^([a-z0-9._-]+)$ is "
             + "allowed for each slash-separated name component "
@@ -116,6 +140,11 @@ public class DockerImageValidatorTest {
             + "(failed on \"repo \")"),
         validator.validateImageReference("reg.istry:4711/namespace/repo "));
 
+    assertEquals(newHashSet("Invalid image name (reg.istry:4711/namespace/ repo@sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae), only "
+            + "^([a-z0-9._-]+)$ is allowed for each slash-separated name component "
+            + "(failed on \" repo\")"),
+        validator.validateImageReference("reg.istry:4711/namespace/ repo@sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"));
+
     assertEquals(newHashSet("Invalid domain name: \"foo-.ba|z\""),
         validator.validateImageReference("foo-.ba|z/namespace/baz"));
 
@@ -125,8 +154,23 @@ public class DockerImageValidatorTest {
     assertEquals(newHashSet("Invalid domain name: \"reg..istry\""),
         validator.validateImageReference("reg..istry/namespace/baz"));
 
+    assertEquals(newHashSet("Invalid domain name: \"reg..istry\""),
+        validator.validateImageReference("reg..istry/namespace/baz:foo"));
+
+    assertEquals(newHashSet("Invalid domain name: \"reg..istry\""),
+        validator.validateImageReference("reg..istry/namespace/baz:foo@sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"));
+
+    assertEquals(newHashSet("Invalid domain name: \"reg..istry\""),
+        validator.validateImageReference("reg..istry/namespace/baz@sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"));
+
     assertEquals(newHashSet("Invalid port in endpoint: \"foo:345345345\""),
         validator.validateImageReference("foo:345345345/namespace/baz"));
+
+    assertEquals(newHashSet("Invalid port in endpoint: \"foo:345345345\""),
+        validator.validateImageReference("foo:345345345/namespace/baz:bar"));
+
+    assertEquals(newHashSet("Invalid port in endpoint: \"foo:345345345\""),
+        validator.validateImageReference("foo:345345345/namespace/baz:bar@sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"));
 
     assertEquals(newHashSet("Invalid port in endpoint: \"foo:-17\""),
         validator.validateImageReference("foo:-17/namespace/baz"));
