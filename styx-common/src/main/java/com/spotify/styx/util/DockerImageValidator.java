@@ -60,41 +60,27 @@ public class DockerImageValidator {
     final String tag;
     final String digest;
 
-    final String tagCandidate;
-
     final int lastAtSign = imageRef.lastIndexOf('@');
-    final int lastColon = imageRef.lastIndexOf(':');
+    final int tagColon;
+    final int tagEnd;
 
+    // Parse digest
     if (lastAtSign != -1) {
-      // We have a digest
-      final int tagColon = imageRef.lastIndexOf(':', lastAtSign);
-      if (tagColon != -1 && !(tagCandidate = imageRef.substring(tagColon + 1, lastAtSign)).contains("/")) {
-        // We also have a tag
-        repo = imageRef.substring(0, tagColon);
-        tag = tagCandidate;
-        digest = imageRef.substring(lastAtSign + 1);
-      } else {
-        // No tag
-        repo = imageRef.substring(0, lastAtSign);
-        tag = null;
-        digest = imageRef.substring(lastAtSign + 1);
-      }
-    } else if (lastColon != -1 && !(tagCandidate = imageRef.substring(lastColon + 1)).contains("/")) {
-      repo = imageRef.substring(0, lastColon);
-      tag = tagCandidate;
-      digest = null;
-    } else {
-      repo = imageRef;
-      tag = null;
-      digest = null;
-    }
-
-    if (digest != null) {
+      digest = imageRef.substring(lastAtSign + 1);
+      tagEnd = lastAtSign;
+      tagColon = imageRef.lastIndexOf(':', tagEnd);
       valid &= validateDigest(digest, errors);
+    } else {
+      tagColon = imageRef.lastIndexOf(':');
+      tagEnd = imageRef.length();
     }
 
-    if (tag != null) {
+    // Parse tag
+    if (tagColon != -1 && !(tag = imageRef.substring(tagColon + 1, tagEnd)).contains("/")) {
+      repo = imageRef.substring(0, tagColon);
       valid &= validateTag(tag, errors);
+    } else {
+      repo = imageRef.substring(0, tagEnd);
     }
 
     final String invalidRepoName = "Invalid repository name (ex: \"registry.domain.tld/myrepos\")";
