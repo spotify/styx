@@ -72,6 +72,9 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>/<wfid>",
             rc -> workflow(arg("cid", rc), arg("wfid", rc))),
         Route.with(
+            json(), "GET", BASE + "/<cid>",
+            rc -> workflows(arg("cid", rc))),
+        Route.with(
             json(), "GET", BASE + "/<cid>/<wfid>/instances",
             rc -> instances(arg("cid", rc), arg("wfid", rc), rc.request())),
         Route.with(
@@ -95,6 +98,15 @@ public final class WorkflowResource {
         Api.prefixRoutes(routes, V2, V3),
         Api.prefixRoutes(sunsetRoutes, V2)
     );
+  }
+
+  private Response<List<Workflow>> workflows(String componentId) {
+    try {
+      return Response.forPayload(storage.workflows(componentId));
+    } catch (IOException e) {
+      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(
+          "Failed to get workflows of component " + componentId));
+    }
   }
 
   public Response<WorkflowState> patchState(String componentId, String id, Request request) {

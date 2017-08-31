@@ -23,7 +23,10 @@ package com.spotify.styx.storage;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.model.Workflow;
@@ -32,12 +35,17 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
 import java.io.IOException;
 import java.net.URI;
+import java.util.List;
 import org.junit.Test;
 
 /**
  * Tests the InMemoryStorage that is used for testing.
  */
 public class InMemoryStorageTest {
+
+  private static final WorkflowId WORKFLOW_ID1 = WorkflowId.create("component", "endpoint1");
+  private static final WorkflowId WORKFLOW_ID2 = WorkflowId.create("component", "endpoint2");
+  private static final WorkflowId WORKFLOW_ID3 = WorkflowId.create("component2", "pointless");
 
   @Test
   public void testEnableWorkflow() throws IOException {
@@ -70,6 +78,39 @@ public class InMemoryStorageTest {
     assertThat(storage.globalEnabled(), is(false));
     assertThat(storage.setGlobalEnabled(true), is(false));
     assertThat(storage.globalEnabled(), is(true));
+  }
+
+  @Test
+  public void shouldReturnAllWorkflowsInComponent() throws Exception {
+    Storage storage = new InMemStorage();
+
+    String componentId = "component";
+
+    Workflow workflow1 = workflow(WORKFLOW_ID1);
+    Workflow workflow2 = workflow(WORKFLOW_ID2);
+    Workflow workflow3 = workflow(WORKFLOW_ID3);
+
+    assertThat(workflow1.componentId(), is(componentId));
+    assertThat(workflow2.componentId(), is(componentId));
+    assertThat(workflow3.componentId(), not(componentId));
+
+    storage.storeWorkflow(workflow1);
+    storage.storeWorkflow(workflow2);
+    storage.storeWorkflow(workflow3);
+
+    List<Workflow> l = storage.workflows(componentId);
+    assertThat(l, hasSize(2));
+
+    assertThat(l, hasItem(workflow1));
+    assertThat(l, hasItem(workflow2));
+  }
+
+  @Test
+  public void shouldReturnEmptyListIfComponentDoesNotExist() throws Exception {
+    Storage storage = new InMemStorage();
+    String componentId = "component";
+    List<Workflow> l = storage.workflows(componentId);
+    assertThat(l, hasSize(0));
   }
 
   private Workflow workflow(WorkflowId workflowId) {

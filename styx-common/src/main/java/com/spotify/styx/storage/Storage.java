@@ -114,6 +114,14 @@ public interface Storage {
   Optional<Workflow> workflow(WorkflowId workflowId) throws IOException;
 
   /**
+   * Get a list of {@link Workflow} definitions belonging to a component
+   *
+   * @param componentId The workflow to get
+   * @return A list of {@link Workflow} definitions
+   */
+  List<Workflow> workflows(String componentId) throws IOException;
+
+  /**
    * Removes a workflow definition.
    *
    * @param workflowId The workflow id to remove.

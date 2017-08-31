@@ -118,6 +118,13 @@ public class InMemStorage implements Storage {
   }
 
   @Override
+  public List<Workflow> workflows(String componentId) throws IOException {
+    return workflowStore.values().stream()
+        .filter(w -> w.componentId().equals(componentId))
+        .collect(Collectors.toList());
+  }
+
+  @Override
   public void delete(WorkflowId workflowId) throws IOException {
     workflowStore.remove(workflowId);
   }
