@@ -20,7 +20,6 @@
 
 package com.spotify.styx.api;
 
-import static com.spotify.styx.api.Api.Version.V2;
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
@@ -45,7 +44,6 @@ import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -88,15 +86,8 @@ public final class WorkflowResource {
             rc -> patchState(arg("cid", rc), arg("wfid", rc), rc.request()))
     );
 
-    final List<Route<AsyncHandler<Response<ByteString>>>> sunsetRoutes = Collections.singletonList(
-        Route.with(
-            json(), "PATCH", BASE + "/<cid>/state",
-            rc -> patchState(arg("cid", rc), rc.request()))
-    );
-
     return cat(
-        Api.prefixRoutes(routes, V2, V3),
-        Api.prefixRoutes(sunsetRoutes, V2)
+        Api.prefixRoutes(routes, V3)
     );
   }
 
@@ -148,51 +139,6 @@ public final class WorkflowResource {
     }
 
     return state(componentId, id);
-  }
-
-  public Response<WorkflowState> patchState(String componentId, Request request) {
-    final Optional<ByteString> payload = request.payload();
-    if (!payload.isPresent()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
-    }
-
-    final WorkflowState patchState;
-    try {
-      patchState = OBJECT_MAPPER.readValue(payload.get().toByteArray(), WorkflowState.class);
-    } catch (IOException e) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid payload."));
-    }
-
-    if (patchState.enabled().isPresent()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Enabled flag not supported "
-                                                                    + "for components."));
-    }
-
-    if (patchState.dockerImage().isPresent()) {
-      final Collection<String> errors = dockerImageValidator.validateImageReference(patchState.dockerImage().get());
-      if (!errors.isEmpty()) {
-        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors));
-      }
-    }
-
-    if (patchState.commitSha().isPresent()) {
-      if (!isValidSHA1(patchState.commitSha().get())) {
-        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid SHA-1."));
-      }
-    }
-
-    try {
-      storage.patchState(componentId, patchState);
-    } catch (ResourceNotFoundException e) {
-      return Response
-          .forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
-    } catch (IOException e) {
-      return Response
-          .forStatus(
-              Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Failed to update the state."));
-    }
-
-    return Response.forPayload(patchState);
   }
 
   public Response<Workflow> workflow(String componentId, String id) {

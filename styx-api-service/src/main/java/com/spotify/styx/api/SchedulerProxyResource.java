@@ -20,7 +20,6 @@
 
 package com.spotify.styx.api;
 
-import static com.spotify.styx.api.Api.Version.V2;
 import static com.spotify.styx.api.Api.Version.V3;
 
 import com.spotify.apollo.RequestContext;
@@ -67,7 +66,7 @@ public class SchedulerProxyResource {
             rc -> proxyToScheduler("/" + rc.pathArgs().get("endpoint"), rc))
     );
 
-    return Api.prefixRoutes(schedulerProxies, V2, V3);
+    return Api.prefixRoutes(schedulerProxies, V3);
   }
 
   private CompletionStage<Response<ByteString>> proxyToScheduler(String path, RequestContext rc) {

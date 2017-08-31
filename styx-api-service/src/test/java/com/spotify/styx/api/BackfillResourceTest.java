@@ -182,7 +182,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldListBackfillsNoStatus() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("")));
@@ -194,7 +194,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldListBackfillsWithStatus() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("?status=true")));
@@ -206,7 +206,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldFilterBackfillsOnComponentEvenWhenInactive() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     storage.storeBackfill(BACKFILL_3.builder().allTriggered(true).build());
 
@@ -221,7 +221,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldFilterBackfillsOnComponent() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     storage.storeBackfill(BACKFILL_3);
 
@@ -236,7 +236,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldFilterBackfillsOnWorkflow() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     storage.storeBackfill(BACKFILL_2);
     storage.storeBackfill(BACKFILL_3);
@@ -253,7 +253,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldFilterBackfillsOnComponentWorkflow() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     storage.storeBackfill(BACKFILL_2);
     storage.storeBackfill(BACKFILL_3);
@@ -271,7 +271,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldListActiveBackfillsByDefault() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     storage.storeBackfill(BACKFILL_2.builder().allTriggered(true).build());
     Response<ByteString> response =
@@ -283,7 +283,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldListAllBackfillsWithFlag() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     storage.storeBackfill(BACKFILL_2.builder().halted(true).build());
     Response<ByteString> response =
@@ -294,7 +294,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
    @Test
   public void shouldListMultipleBackfills() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     storage.storeBackfill(BACKFILL_2);
     Response<ByteString> response =
@@ -306,7 +306,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldGetBackfillStatus() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
     storage.storeBackfill(BACKFILL_1.builder().nextTrigger(Instant.parse("2017-01-01T02:00:00Z")).build());
@@ -331,7 +331,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldPostBackfill() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     final String json = "{\"start\":\"2017-01-01T00:00:00Z\"," +
                         "\"end\":\"2017-02-01T00:00:00Z\"," +
@@ -359,7 +359,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldFailOnMisalignedRange() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     final String json = "{\"start\":\"2017-01-01T00:00:01Z\"," +
                         "\"end\":\"2017-02-01T00:00:00Z\"," +
@@ -376,7 +376,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldFailOnAlreadyActiveWithinRange() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     final BackfillInput backfillInput = BackfillInput.create(
         BACKFILL_1.start(),
@@ -396,7 +396,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldUpdateBackfill() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     assertThat(storage.backfill(BACKFILL_1.id()).get().concurrency(), equalTo(1));
 
@@ -417,7 +417,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldHaltBackfill() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.ACCEPTED))
@@ -443,7 +443,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldNotHaltWaitingInstanceInBackfill() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.ACCEPTED))
@@ -471,7 +471,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldReturnServerErrorIfFailedToSend() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     serviceHelper.stubClient().respond(Responses.sequence(ImmutableList.of(ResponseWithDelay
                                                                                .forResponse(Response
@@ -513,7 +513,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Test
   public void shouldOnlyUpdateBackfillIfSameId() throws Exception {
-    sinceVersion(Api.Version.V2);
+    sinceVersion(Api.Version.V3);
 
     final Backfill updatedBackfill = BACKFILL_1.builder().concurrency(4).build();
     final String json = Json.OBJECT_MAPPER.writeValueAsString(updatedBackfill);
