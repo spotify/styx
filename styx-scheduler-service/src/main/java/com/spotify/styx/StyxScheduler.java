@@ -541,6 +541,10 @@ public class StyxScheduler implements AppInit {
               .count());
     });
 
+    workflowCache.all().forEach(workflow -> stats.registerActiveStatesMetric(
+        workflow.id(),
+        () -> stateManager.getActiveStatesCount(workflow.id())));
+
     stats.registerSubmissionRateLimitMetric(submissionRateLimiter::getRate);
   }
 
@@ -561,10 +565,6 @@ public class StyxScheduler implements AppInit {
       StateManager stateManager) {
 
     return (workflow) -> {
-      stats.registerActiveStatesMetric(
-          workflow.id(),
-          () -> stateManager.getActiveStatesCount(workflow.id()));
-
       final Optional<Workflow> existingWorkflow = cache.workflow(workflow.id());
       if (existingWorkflow.isPresent()) {
         if (!isGreaterOrEqualApiVersion(workflow, existingWorkflow.get())) {
@@ -572,6 +572,10 @@ public class StyxScheduler implements AppInit {
           return;
         }
       }
+
+      stats.registerActiveStatesMetric(
+          workflow.id(),
+          () -> stateManager.getActiveStatesCount(workflow.id()));
 
       cache.store(workflow);
       workflowInitializer.inspectChange(workflow);
@@ -594,6 +598,7 @@ public class StyxScheduler implements AppInit {
       cache.remove(workflow);
     });
   }
+
   private static Stats stats(Environment environment) {
     return new MetricsStats(environment.resolve(SemanticMetricRegistry.class));
   }
