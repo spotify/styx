@@ -22,11 +22,16 @@ package com.spotify.styx.api;
 
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
+import com.google.common.collect.Iterables;
+import com.google.common.net.HttpHeaders;
 import com.spotify.apollo.Environment;
+import com.spotify.apollo.Request;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
+import java.util.Optional;
 import okio.ByteString;
 import org.junit.Test;
 
@@ -43,8 +48,7 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
     final SchedulerProxyResource schedulerProxyResource = new SchedulerProxyResource(SCHEDULER_BASE);
 
     environment.routingEngine()
-        .registerRoutes(Api.withCommonMiddleware(
-            schedulerProxyResource.routes()));
+        .registerRoutes(schedulerProxyResource.routes());
   }
 
   @Test
@@ -73,5 +77,24 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
         awaitResponse(serviceHelper.request("POST", path("/trigger")));
 
     assertThat(response, hasStatus(withCode(Status.ACCEPTED)));
+  }
+
+  @Test
+  public void verifyStripsAuthorization() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    serviceHelper.stubClient()
+        .respond(Response.forStatus(Status.ACCEPTED))
+        .to(SCHEDULER_BASE + "/api/v0/trigger");
+
+    awaitResponse(serviceHelper.request(Request
+        .forUri(path("/trigger"), "POST")
+        .withHeader("foo", "bar")
+        .withHeader(HttpHeaders.AUTHORIZATION, "decafbad")));
+
+    final Request schedulerRequest = Iterables.getOnlyElement(serviceHelper.stubClient().sentRequests());
+    assertThat(schedulerRequest.header("foo"), is(Optional.of("bar")));
+    assertThat(schedulerRequest.headers().keySet().stream()
+        .anyMatch(header -> header.equalsIgnoreCase(HttpHeaders.AUTHORIZATION)), is(false));
   }
 }
