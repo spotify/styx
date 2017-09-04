@@ -11,7 +11,7 @@
 
   <artifactId>styx</artifactId>
   <packaging>pom</packaging>
-  <version>1.0.49</version>
+  <version>1.0.50-SNAPSHOT</version>
 
   <properties>
     <apollo.version>1.3.2</apollo.version>
@@ -78,7 +78,7 @@
     <url>https://github.com/spotify/styx</url>
     <connection>scm:git:git@github.com:spotify/styx.git</connection>
     <developerConnection>scm:git:git@github.com:spotify/styx.git</developerConnection>
-    <tag>v1.0.49</tag>
+    <tag>HEAD</tag>
   </scm>
 
   <dependencyManagement>
