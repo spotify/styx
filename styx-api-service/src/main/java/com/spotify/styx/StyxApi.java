@@ -116,7 +116,7 @@ public class StyxApi implements AppInit {
     final StyxConfigResource styxConfigResource = new StyxConfigResource(storage);
     final StatusResource statusResource = new StatusResource(storage);
     final SchedulerProxyResource schedulerProxyResource = new SchedulerProxyResource(
-        schedulerServiceBaseUrl);
+        schedulerServiceBaseUrl, environment.client());
 
     final Supplier<Optional<List<String>>> clientBlacklistSupplier =
         new CachedSupplier<>(storage::clientBlacklist, Instant::now);

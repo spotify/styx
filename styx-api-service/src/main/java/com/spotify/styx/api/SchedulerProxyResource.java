@@ -20,20 +20,17 @@
 
 package com.spotify.styx.api;
 
-import static com.google.common.net.HttpHeaders.AUTHORIZATION;
 import static com.spotify.styx.api.Api.Version.V3;
 
+import com.spotify.apollo.Client;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.concurrent.CompletionStage;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
 
@@ -46,9 +43,11 @@ public class SchedulerProxyResource {
   private static final String SCHEDULER_BASE_PATH = "/api/v0";
 
   private final String schedulerServiceBaseUrl;
+  private final Client client;
 
-  public SchedulerProxyResource(String schedulerServiceBaseUrl) {
+  public SchedulerProxyResource(String schedulerServiceBaseUrl, Client client) {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
+    this.client = Objects.requireNonNull(client, "client");
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -74,13 +73,7 @@ public class SchedulerProxyResource {
   }
 
   private CompletionStage<Response<ByteString>> proxyToScheduler(String path, RequestContext rc) {
-    final Map<String, String> headersWithoutAuthorization = rc.request().headers().entrySet().stream()
-        .filter(e -> !e.getKey().equalsIgnoreCase(AUTHORIZATION))
-        .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
-    return rc.requestScopedClient()
-        .send(rc.request()
-            .clearHeaders()
-            .withHeaders(headersWithoutAuthorization)
-            .withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + path));
+    return client.send(rc.request()
+        .withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + path));
   }
 }

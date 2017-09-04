@@ -45,7 +45,8 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
-    final SchedulerProxyResource schedulerProxyResource = new SchedulerProxyResource(SCHEDULER_BASE);
+    final SchedulerProxyResource schedulerProxyResource = new SchedulerProxyResource(SCHEDULER_BASE,
+        environment.client());
 
     environment.routingEngine()
         .registerRoutes(schedulerProxyResource.routes());
@@ -80,7 +81,7 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void verifyStripsAuthorization() throws Exception {
+  public void verifyPassesHeaders() throws Exception {
     sinceVersion(Api.Version.V3);
 
     serviceHelper.stubClient()
@@ -93,8 +94,8 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
         .withHeader(HttpHeaders.AUTHORIZATION, "decafbad")));
 
     final Request schedulerRequest = Iterables.getOnlyElement(serviceHelper.stubClient().sentRequests());
+
     assertThat(schedulerRequest.header("foo"), is(Optional.of("bar")));
-    assertThat(schedulerRequest.headers().keySet().stream()
-        .anyMatch(header -> header.equalsIgnoreCase(HttpHeaders.AUTHORIZATION)), is(false));
+    assertThat(schedulerRequest.header(HttpHeaders.AUTHORIZATION), is(Optional.of("decafbad")));
   }
 }
