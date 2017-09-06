@@ -52,12 +52,17 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Debug;
+import io.fabric8.kubernetes.api.model.ContainerState;
+import io.fabric8.kubernetes.api.model.ContainerStateRunning;
+import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
+import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.DoneablePod;
 import io.fabric8.kubernetes.api.model.DoneableSecret;
 import io.fabric8.kubernetes.api.model.ListMeta;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.PodList;
+import io.fabric8.kubernetes.api.model.PodStatus;
 import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.SecretBuilder;
 import io.fabric8.kubernetes.api.model.SecretList;
@@ -71,6 +76,10 @@ import io.fabric8.kubernetes.client.dsl.PodResource;
 import io.fabric8.kubernetes.client.dsl.Resource;
 import io.fabric8.kubernetes.client.dsl.Watchable;
 import java.io.IOException;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -130,17 +139,22 @@ public class KubernetesDockerRunnerTest {
                                                                             empty());
 
   private static final int NO_POLL = Integer.MAX_VALUE;
+  private static final int NON_DELETE_SECONDS = 120;
+  private static final Instant FIXED_INSTANT = Instant.parse("2017-09-01T01:00:00Z");
+  private static final Clock CLOCK = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
 
   @Mock NamespacedKubernetesClient k8sClient;
-
   @Mock KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
-
   @Mock MixedOperation<Pod, PodList, DoneablePod, PodResource<Pod, DoneablePod>> pods;
   @Mock MixedOperation<Secret, SecretList, DoneableSecret, Resource<Secret, DoneableSecret>> secrets;
   @Mock Resource<Secret, DoneableSecret> namedResource;
   @Mock PodResource<Pod, DoneablePod> namedPod;
-
   @Mock PodList podList;
+  @Mock PodStatus podStatus;
+  @Mock ContainerStatus containerStatus;
+  @Mock ContainerState containerState;
+  @Mock ContainerStateTerminated containerStateTerminated;
+  @Mock ContainerStateRunning containerStateRunning;
   @Mock ListMeta listMeta;
   @Mock Watchable<Watch, Watcher<Pod>> podWatchable;
   @Mock Watch watch;
@@ -178,7 +192,7 @@ public class KubernetesDockerRunnerTest {
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT))
         .thenReturn(SERVICE_ACCOUNT_SECRET);
 
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug, NO_POLL);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug, NO_POLL, NON_DELETE_SECONDS, CLOCK);
     kdr.init();
 
     podWatcher = watchCaptor.getValue();
@@ -207,10 +221,19 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldCleanupPod() throws Exception {
+  public void shouldCleanupRunningPodNotTrackedByStyx() throws Exception {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
     when(namedPod.get()).thenReturn(createdPod);
+
+    // inject mock status in real instance
+    createdPod.setStatus(podStatus);
+    
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
+    when(containerStatus.getName()).thenReturn(KubernetesDockerRunner.STYX_RUN);
+    when(containerStatus.getState()).thenReturn(containerState);
+    when(containerState.getRunning()).thenReturn(containerStateRunning);
+
     kdr.cleanup(WORKFLOW_INSTANCE, name);
     verify(namedPod).delete();
   }
@@ -228,6 +251,45 @@ public class KubernetesDockerRunnerTest {
     verify(k8sClient.pods(), never()).delete();
     verify(namedPod, never()).delete();
   }
+
+  @Test
+  public void shouldCleanupPodAfterNonDeletePeriod() {
+    final String name = createdPod.getMetadata().getName();
+    when(k8sClient.pods().withName(name)).thenReturn(namedPod);
+    when(namedPod.get()).thenReturn(createdPod);
+
+    // inject mock status in real instance
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
+    when(containerStatus.getName()).thenReturn(KubernetesDockerRunner.STYX_RUN);
+    when(containerStatus.getState()).thenReturn(containerState);
+    when(containerState.getTerminated()).thenReturn(containerStateTerminated);
+    when(containerStateTerminated.getFinishedAt())
+        .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(5)).toString());
+
+    kdr.cleanup(WORKFLOW_INSTANCE, name);
+    verify(namedPod).delete();
+  }
+
+  @Test
+  public void shouldNotCleanupPodBeforeNonDeletePeriod() {
+    final String name = createdPod.getMetadata().getName();
+    when(k8sClient.pods().withName(name)).thenReturn(namedPod);
+    when(namedPod.get()).thenReturn(createdPod);
+
+    // inject mock status in real instance
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
+    when(containerStatus.getName()).thenReturn(KubernetesDockerRunner.STYX_RUN);
+    when(containerStatus.getState()).thenReturn(containerState);
+    when(containerState.getTerminated()).thenReturn(containerStateTerminated);
+    when(containerStateTerminated.getFinishedAt())
+        .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(1)).toString());
+
+    kdr.cleanup(WORKFLOW_INSTANCE, name);
+    verify(namedPod, never()).delete();
+  }
+
 
   @Test(expected = InvalidExecutionException.class)
   public void shouldThrowIfSecretNotExist() throws IOException, StateManager.IsClosed {
@@ -454,7 +516,8 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(terminated("Succeeded", 20, null));
 
     // Start a new runner
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug, NO_POLL);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
+        debug, NO_POLL, 0, CLOCK);
     kdr.init();
 
     // Make the runner poll states for all pods
@@ -471,7 +534,8 @@ public class KubernetesDockerRunnerTest {
 
     // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
     kdr.close();
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug, 1);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
+        debug, 1, 0, CLOCK);
     kdr.init();
     kdr.restore();
 

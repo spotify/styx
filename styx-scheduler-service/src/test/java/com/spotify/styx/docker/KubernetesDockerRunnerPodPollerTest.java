@@ -27,6 +27,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
@@ -36,10 +37,14 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Debug;
+import io.fabric8.kubernetes.api.model.ContainerState;
+import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
+import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.DoneablePod;
 import io.fabric8.kubernetes.api.model.ListMeta;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodList;
+import io.fabric8.kubernetes.api.model.PodStatus;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.dsl.MixedOperation;
 import io.fabric8.kubernetes.client.dsl.PodResource;
@@ -75,7 +80,10 @@ public class KubernetesDockerRunnerPodPollerTest {
   PodList podList;
   @Mock PodResource<Pod, DoneablePod> namedPod1;
   @Mock PodResource<Pod, DoneablePod> namedPod2;
-
+  @Mock PodStatus podStatus;
+  @Mock ContainerStatus containerStatus;
+  @Mock ContainerState containerState;
+  @Mock ContainerStateTerminated containerStateTerminated;
   @Mock
   StateManager stateManager;
   @Mock
@@ -163,11 +171,24 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(k8sClient.pods().list()).thenReturn(podList);
     when(k8sClient.pods().withName(RUN_SPEC.executionId())).thenReturn(namedPod1);
     when(k8sClient.pods().withName(RUN_SPEC_2.executionId())).thenReturn(namedPod2);
+    when(namedPod1.get()).thenReturn(createdPod1);
+    when(namedPod2.get()).thenReturn(createdPod2);
+
+    setStatusAndState(createdPod1);
+    setStatusAndState(createdPod2);
 
     kdr.pollPods();
 
     verify(namedPod1).delete();
     verify(namedPod2).delete();
+  }
+
+  private void setStatusAndState(Pod createdPod) {
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
+    when(containerStatus.getName()).thenReturn(KubernetesDockerRunner.STYX_RUN);
+    when(containerStatus.getState()).thenReturn(containerState);
+    when(containerState.getTerminated()).thenReturn(containerStateTerminated);
   }
 
   @Test

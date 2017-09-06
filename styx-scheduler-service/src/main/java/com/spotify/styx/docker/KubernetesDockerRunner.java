@@ -48,6 +48,7 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.TriggerUtil;
 import io.fabric8.kubernetes.api.model.ContainerBuilder;
+import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.EnvVarBuilder;
 import io.fabric8.kubernetes.api.model.Pod;
@@ -68,6 +69,9 @@ import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -102,6 +106,8 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String TRIGGER_ID = "STYX_TRIGGER_ID";
   static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
   private static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
+  private static final int DEFAULT_POD_NON_DELETE_SECONDS = 120;
+  private static final Clock DEFAULT_CLOCK = Clock.systemUTC();
   static final String STYX_WORKFLOW_SA_ENV_VARIABLE = "GOOGLE_APPLICATION_CREDENTIALS";
   static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
   private static final String STYX_WORKFLOW_SA_JSON_KEY = "styx-wf-sa.json";
@@ -122,22 +128,30 @@ class KubernetesDockerRunner implements DockerRunner {
   private final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
   private final Debug debug;
   private final int pollPodsIntervalSeconds;
+  private final int podNonDeleteSeconds;
+  private final Clock clock;
 
   private Watch watch;
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
-      KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager, Debug debug, int pollPodsIntervalSeconds) {
+                         KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
+                         Debug debug, int pollPodsIntervalSeconds, int podNonDeleteSeconds,
+                         Clock clock) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client);
     this.stats = Objects.requireNonNull(stats);
     this.serviceAccountSecretManager = Objects.requireNonNull(serviceAccountSecretManager);
     this.debug = debug;
     this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
+    this.podNonDeleteSeconds = podNonDeleteSeconds;
+    this.clock = Objects.requireNonNull(clock);
   }
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
-      KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager, Debug debug) {
-    this(client, stateManager, stats, serviceAccountSecretManager, debug, DEFAULT_POLL_PODS_INTERVAL_SECONDS);
+                         KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
+                         Debug debug) {
+    this(client, stateManager, stats, serviceAccountSecretManager, debug,
+        DEFAULT_POLL_PODS_INTERVAL_SECONDS, DEFAULT_POD_NON_DELETE_SECONDS, DEFAULT_CLOCK);
   }
 
   @Override
@@ -294,11 +308,44 @@ class KubernetesDockerRunner implements DockerRunner {
   @Override
   public void cleanup(WorkflowInstance workflowInstance, String executionId) {
     if (!debug.get()) {
-      LOG.info("Cleaning up {} pod: {}", workflowInstance.toKey(), executionId);
-      client.pods().withName(executionId).delete();
+      Pod pod = client.pods().withName(executionId).get();
+
+      if (pod != null) {
+        if (isNonDeletePeriodExpired(pod)) {
+          LOG.info("Cleaning up {} pod: {}", workflowInstance.toKey(), executionId);
+          client.pods().withName(executionId).delete();
+        }
+      } else {
+        LOG.debug("Cannot cleanup pod {} because not found", executionId);
+      }
     } else {
       LOG.info("Keeping {} pod: {}", workflowInstance.toKey(), executionId);
     }
+  }
+
+  private boolean isNonDeletePeriodExpired(Pod pod) {
+    Optional<ContainerStatus> optionalTerminatedStatus =
+        pod.getStatus()
+            .getContainerStatuses()
+            .stream()
+            .filter(containerStatus -> containerStatus.getName().equals(STYX_RUN)
+                                       && Optional
+                                           .ofNullable(containerStatus.getState().getTerminated())
+                                           .isPresent()
+                                       && Optional.ofNullable(
+                containerStatus.getState().getTerminated().getFinishedAt()).isPresent())
+            .findFirst();
+
+    if (optionalTerminatedStatus.isPresent()) {
+      return Instant
+          .parse(optionalTerminatedStatus.get().getState().getTerminated().getFinishedAt())
+          .isBefore(clock.instant().minus(
+              Duration.ofSeconds(podNonDeleteSeconds)));
+    }
+
+    LOG.debug("Found running pod {} for unknown or inactive workflow instance", pod.getMetadata().getName());
+    // if there is no container in the pod that is of interest, then delete that pod
+    return true;
   }
 
   @Override
