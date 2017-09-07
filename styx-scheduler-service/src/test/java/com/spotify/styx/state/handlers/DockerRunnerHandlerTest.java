@@ -121,6 +121,20 @@ public class DockerRunnerHandlerTest {
   }
 
   @Test
+  public void shouldTransitionIntoSubmitted() throws Exception {
+    WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
+    RunState runState = RunState.create(workflowInstance, RunState.State.NEW, dockerRunnerHandler);
+
+    stateManager.initialize(runState);
+    stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
+    stateManager.receive(Event.dequeue(workflowInstance));
+    stateManager.receive(Event.submit(workflowInstance, EXECUTION_DESCRIPTION, TEST_EXECUTION_ID));
+    verify(stateManager, timeout(60_000)).receive(Event.submitted(workflowInstance, TEST_EXECUTION_ID));
+  }
+
+  @Test
   public void shouldFailIfDockerRunnerRaisesException() throws Exception {
     shouldFailIfDockerRunnerRaisesException(new IOException("Testing exception."));
   }
@@ -162,36 +176,6 @@ public class DockerRunnerHandlerTest {
     verify(stateManager, timeout(60_000)).receive(any(Event.class));
 
     assertThat(stateManager.get(workflowInstance), is(nullValue()));
-  }
-
-  @Test
-  public void shouldPerformCleanupOnFailed() throws Exception {
-    WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, RunState.State.FAILED,
-        StateData.newBuilder().executionId(TEST_EXECUTION_ID).build());
-
-    stateManager.initialize(runState);
-    dockerRunnerHandler.transitionInto(runState);
-
-    verify(dockerRunner, timeout(60_000)).cleanup(workflowInstance, TEST_EXECUTION_ID);
-  }
-
-  @Test
-  public void shouldPerformCleanupOnFailedThroughTransitions() throws Exception {
-    WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, RunState.State.NEW, dockerRunnerHandler);
-
-    stateManager.initialize(runState);
-    stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
-    stateManager.receive(Event.dequeue(workflowInstance));
-    stateManager.receive(Event.submit(workflowInstance, EXECUTION_DESCRIPTION, TEST_EXECUTION_ID));
-    verify(stateManager, timeout(60_000)).receive(Event.submitted(workflowInstance, TEST_EXECUTION_ID));
-    stateManager.receive(Event.runError(workflowInstance, ""));
-    verify(dockerRunner).cleanup(workflowInstance, TEST_EXECUTION_ID);
   }
 
   private WorkflowConfiguration configuration(String... args) {

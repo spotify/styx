@@ -594,49 +594,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @Test
-  public void cleansUpDockerRunsWhenTerminating() throws Exception {
-    givenTheTimeIs("2016-03-14T15:59:01Z");
-    givenTheGlobalEnableFlagIs(true);
-    givenWorkflow(HOURLY_WORKFLOW);
-    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T15:00:00Z");
-
-    styxStarts();
-    timePasses(1, MINUTES);
-    awaitNumberOfDockerRuns(1);
-
-    WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
-    RunSpec runSpec = dockerRuns.get(0)._2;
-
-    injectEvent(Event.started(workflowInstance));
-    injectEvent(Event.terminate(workflowInstance, Optional.of(20)));
-    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
-
-    assertThat(dockerCleans, contains(runSpec.executionId()));
-  }
-
-  @Test
-  public void cleansUpDockerRunsWhenFailing() throws Exception {
-    givenTheTimeIs("2016-03-14T15:59:01Z");
-    givenTheGlobalEnableFlagIs(true);
-    givenWorkflow(HOURLY_WORKFLOW);
-    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T15:00:00Z");
-
-    styxStarts();
-    timePasses(1, MINUTES);
-    awaitNumberOfDockerRuns(1);
-
-    WorkflowInstance workflowInstance = dockerRuns.get(0)._1;
-    RunSpec runSpec = dockerRuns.get(0)._2;
-
-    injectEvent(Event.runError(workflowInstance, "Something failed"));
-    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
-
-    assertThat(dockerCleans, contains(runSpec.executionId()));
-  }
-
-  @Test
   public void restoredStatesUseOriginalTimestamps() throws Exception {
     WorkflowInstance workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T10");
 
