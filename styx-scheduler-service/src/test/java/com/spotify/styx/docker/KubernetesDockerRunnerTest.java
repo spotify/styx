@@ -139,7 +139,7 @@ public class KubernetesDockerRunnerTest {
                                                                             empty());
 
   private static final int NO_POLL = Integer.MAX_VALUE;
-  private static final int NON_DELETE_SECONDS = 120;
+  private static final int POD_DELETION_DELAY_SECONDS = 120;
   private static final Instant FIXED_INSTANT = Instant.parse("2017-09-01T01:00:00Z");
   private static final Clock CLOCK = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
 
@@ -192,7 +192,8 @@ public class KubernetesDockerRunnerTest {
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT))
         .thenReturn(SERVICE_ACCOUNT_SECRET);
 
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug, NO_POLL, NON_DELETE_SECONDS, CLOCK);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug, NO_POLL,
+                                     POD_DELETION_DELAY_SECONDS, CLOCK);
     kdr.init();
 
     podWatcher = watchCaptor.getValue();
