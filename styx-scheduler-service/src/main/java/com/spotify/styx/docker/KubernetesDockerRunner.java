@@ -428,11 +428,8 @@ class KubernetesDockerRunner implements DockerRunner {
         continue;
       }
       final Optional<RunState> runState = lookupPodRunState(pod, workflowInstance.get());
-      if (runState.isPresent()) {
-        emitPodEvents(Watcher.Action.MODIFIED, pod, runState.get());
-      } else {
-        cleanup(workflowInstance.get(), pod.getMetadata().getName());
-      }
+      runState.ifPresent(runState1 -> emitPodEvents(Watcher.Action.MODIFIED, pod, runState1));
+      cleanup(workflowInstance.get(), pod.getMetadata().getName());
     }
   }
 
