@@ -512,6 +512,8 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldPollPodStatusAndEmitEventsOnRestore() throws Exception {
+    when(k8sClient.pods().withName(createdPod.getMetadata().getName())).thenReturn(namedPod);
+
     // Stop the runner and change the pod status to terminated while styx is "down"
     kdr.close();
     createdPod.setStatus(terminated("Succeeded", 20, null));
@@ -531,6 +533,8 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldRegularlyPollPodStatusAndEmitEvents() throws Exception {
+    when(k8sClient.pods().withName(createdPod.getMetadata().getName())).thenReturn(namedPod);
+    
     createdPod.setStatus(running(/* ready= */ true));
 
     // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
