@@ -99,15 +99,6 @@ public class DockerRunnerHandler implements OutputHandler {
         }
         break;
 
-      case TERMINATED:
-      case FAILED:
-      case ERROR:
-        if (state.data().executionId().isPresent()) {
-          final String executionId = state.data().executionId().get();
-          dockerRunner.cleanup(state.workflowInstance(), executionId);
-        }
-        break;
-
       default:
         // do nothing
     }
