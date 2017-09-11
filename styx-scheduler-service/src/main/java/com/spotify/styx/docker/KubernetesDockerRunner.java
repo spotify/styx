@@ -48,7 +48,6 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.TriggerUtil;
 import io.fabric8.kubernetes.api.model.ContainerBuilder;
-import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.EnvVarBuilder;
@@ -308,41 +307,37 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @Override
   public void cleanup(WorkflowInstance workflowInstance, String executionId) {
-    if (!debug.get()) {
-      final Optional<Pod> pod = Optional.ofNullable(client.pods().withName(executionId).get());
+    final Optional<Pod> pod = Optional.ofNullable(client.pods().withName(executionId).get());
 
-      pod.filter(this::isNonDeletePeriodExpired).ifPresent(p -> {
-        client.pods().withName(executionId).delete();
-        LOG.info("Cleaned up {} pod: {}", workflowInstance.toKey(), executionId);
-      });
+    pod.flatMap(KubernetesDockerRunner::getTerminatedStyxContainer)
+        .filter(this::isNonDeletePeriodExpired)
+        .ifPresent(containerStatus -> deletePod(workflowInstance, executionId));
+  }
+  
+  private static Optional<ContainerStatus> getTerminatedStyxContainer(Pod pod) {
+    return pod.getStatus()
+        .getContainerStatuses()
+        .stream()
+        .filter(containerStatus -> containerStatus.getName().equals(STYX_RUN))
+        .filter(containerStatus -> containerStatus.getState().getTerminated() != null)
+        .findFirst();
+  }
+  
+  private boolean isNonDeletePeriodExpired(ContainerStatus containerStatus) {
+    return Optional.ofNullable(containerStatus.getState().getTerminated().getFinishedAt())
+        .map(finishedAt -> Instant.parse(finishedAt)
+            .isBefore(clock.instant().minus(
+                Duration.ofSeconds(podDeletionDelaySeconds))))
+        .orElse(true);
+  }
+  
+  private void deletePod(WorkflowInstance workflowInstance, String executionId) {
+    if (!debug.get()) {
+      client.pods().withName(executionId).delete();
+      LOG.info("Cleaned up {} pod: {}", workflowInstance.toKey(), executionId);
     } else {
       LOG.info("Keeping {} pod: {}", workflowInstance.toKey(), executionId);
     }
-  }
-
-  private boolean isNonDeletePeriodExpired(Pod pod) {
-    final Optional<ContainerStatus> optionalTerminatedStatus =
-        pod.getStatus()
-            .getContainerStatuses()
-            .stream()
-            .filter(containerStatus -> containerStatus.getName().equals(STYX_RUN))
-            .filter(containerStatus -> Optional
-                .ofNullable(containerStatus.getState().getTerminated())
-                .map(ContainerStateTerminated::getFinishedAt)
-                .isPresent())
-            .findFirst();
-
-    return optionalTerminatedStatus.map(containerStatus -> Instant
-        .parse(containerStatus.getState().getTerminated().getFinishedAt())
-        .isBefore(clock.instant().minus(
-            Duration.ofSeconds(podDeletionDelaySeconds)))).orElseGet(() -> {
-
-              LOG.debug("Found running pod {} for unknown or inactive workflow instance",
-                  pod.getMetadata().getName());
-              // if there is no container in the pod that is of interest, then delete that pod
-              return true;
-            });
-
   }
 
   @Override
@@ -427,9 +422,13 @@ class KubernetesDockerRunner implements DockerRunner {
       if (!workflowInstance.isPresent()) {
         continue;
       }
-      lookupPodRunState(pod, workflowInstance.get())
-          .ifPresent(runState -> emitPodEvents(Watcher.Action.MODIFIED, pod, runState));
-      cleanup(workflowInstance.get(), pod.getMetadata().getName());
+      final Optional<RunState> runState = lookupPodRunState(pod, workflowInstance.get());
+      if (runState.isPresent()) {
+        emitPodEvents(Watcher.Action.MODIFIED, pod, runState.get());
+        cleanup(workflowInstance.get(), pod.getMetadata().getName());
+      } else {
+        deletePod(workflowInstance.get(), pod.getMetadata().getName());
+      }
     }
   }
 
