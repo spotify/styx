@@ -30,10 +30,12 @@ import static java.util.Optional.empty;
 import static java.util.Optional.of;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.lessThan;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -356,6 +358,14 @@ public class DatastoreStorageTest {
 
     assertTrue(enabled);
   }
+
+  @Test
+  public void shouldHavePodDeletionDelayDefault() throws Exception {
+    long delay = storage.podDeletionDelay();
+
+    assertThat(delay, is(equalTo(DatastoreStorage.DEFAULT_POD_DELETION_DELAY)));
+  }
+
 
   @Test
   public void shouldStoreWorkflowEnabledFlag() throws Exception {
