@@ -307,20 +307,40 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @Override
   public void cleanup(WorkflowInstance workflowInstance, String executionId) {
-    final Optional<Pod> pod = Optional.ofNullable(client.pods().withName(executionId).get());
-
-    pod.flatMap(KubernetesDockerRunner::getTerminatedStyxContainer)
+    Optional.ofNullable(client.pods().withName(executionId).get())
+        .flatMap(KubernetesDockerRunner::getTerminatedStyxContainer)
         .filter(this::isNonDeletePeriodExpired)
         .ifPresent(containerStatus -> deletePod(workflowInstance, executionId));
   }
+
+  private void cleanupWithoutRunState(WorkflowInstance workflowInstance, String executionId) {
+    Optional.ofNullable(client.pods().withName(executionId).get())
+        .flatMap(KubernetesDockerRunner::getStyxContainer)
+        .ifPresent(containerStatus -> {
+          if (containerStatus.getState().getTerminated() != null) {
+            if (isNonDeletePeriodExpired(containerStatus)) {
+              // if terminated and after graceful period, delete the pod
+              // otherwise wait until next polling happens
+              deletePod(workflowInstance, executionId);
+            }
+          } else {
+            // if not terminated, delete it directly
+            deletePod(workflowInstance, executionId);
+          }
+        });
+  }
   
-  private static Optional<ContainerStatus> getTerminatedStyxContainer(Pod pod) {
+  private static Optional<ContainerStatus> getStyxContainer(Pod pod) {
     return pod.getStatus()
         .getContainerStatuses()
         .stream()
         .filter(containerStatus -> containerStatus.getName().equals(STYX_RUN))
-        .filter(containerStatus -> containerStatus.getState().getTerminated() != null)
         .findFirst();
+  }
+
+  private static Optional<ContainerStatus> getTerminatedStyxContainer(Pod pod) {
+    return getStyxContainer(pod)
+        .filter(containerStatus -> containerStatus.getState().getTerminated() != null);
   }
   
   private boolean isNonDeletePeriodExpired(ContainerStatus containerStatus) {
@@ -427,7 +447,7 @@ class KubernetesDockerRunner implements DockerRunner {
         emitPodEvents(Watcher.Action.MODIFIED, pod, runState.get());
         cleanup(workflowInstance.get(), pod.getMetadata().getName());
       } else {
-        deletePod(workflowInstance.get(), pod.getMetadata().getName());
+        cleanupWithoutRunState(workflowInstance.get(), pod.getMetadata().getName());
       }
     }
   }
