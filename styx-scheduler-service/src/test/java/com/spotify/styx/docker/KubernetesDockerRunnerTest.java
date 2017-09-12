@@ -52,6 +52,7 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Debug;
+import com.spotify.styx.util.Delay;
 import io.fabric8.kubernetes.api.model.ContainerState;
 import io.fabric8.kubernetes.api.model.ContainerStateRunning;
 import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
@@ -139,7 +140,7 @@ public class KubernetesDockerRunnerTest {
                                                                             empty());
 
   private static final int NO_POLL = Integer.MAX_VALUE;
-  private static final int POD_DELETION_DELAY_SECONDS = 120;
+  private static final long POD_DELETION_DELAY_SECONDS = 120;
   private static final Instant FIXED_INSTANT = Instant.parse("2017-09-01T01:00:00Z");
   private static final Clock CLOCK = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
 
@@ -159,6 +160,7 @@ public class KubernetesDockerRunnerTest {
   @Mock Watchable<Watch, Watcher<Pod>> podWatchable;
   @Mock Watch watch;
   @Mock Debug debug;
+  @Mock Delay delay;
 
   @Captor ArgumentCaptor<Watcher<Pod>> watchCaptor;
   @Captor ArgumentCaptor<Pod> podCaptor;
@@ -175,6 +177,7 @@ public class KubernetesDockerRunnerTest {
   @Before
   public void setUp() throws Exception {
     when(debug.get()).thenReturn(false);
+    when(delay.get()).thenReturn(POD_DELETION_DELAY_SECONDS);
 
     when(k8sClient.inNamespace(any(String.class))).thenReturn(k8sClient);
     when(k8sClient.pods()).thenReturn(pods);
@@ -192,8 +195,8 @@ public class KubernetesDockerRunnerTest {
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT))
         .thenReturn(SERVICE_ACCOUNT_SECRET);
 
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug, NO_POLL,
-                                     POD_DELETION_DELAY_SECONDS, CLOCK);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug, delay,
+                                     NO_POLL, CLOCK);
     kdr.init();
 
     podWatcher = watchCaptor.getValue();
@@ -559,7 +562,7 @@ public class KubernetesDockerRunnerTest {
 
     // Start a new runner
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, NO_POLL, 0, CLOCK);
+        debug, delay, NO_POLL, CLOCK);
     kdr.init();
 
     // Make the runner poll states for all pods
@@ -579,7 +582,7 @@ public class KubernetesDockerRunnerTest {
     // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
     kdr.close();
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, 1, 0, CLOCK);
+        debug, delay, 1, CLOCK);
     kdr.init();
     kdr.restore();
 
@@ -607,7 +610,7 @@ public class KubernetesDockerRunnerTest {
     // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
     kdr.close();
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-                                     debug, 1, 0, CLOCK);
+                                     debug, delay, 1, CLOCK);
     kdr.init();
     kdr.restore();
 

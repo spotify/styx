@@ -55,6 +55,7 @@ public class InMemStorage implements Storage {
   private boolean globalEnabled = true;
   private Optional<Long> globalConcurrency = Optional.empty();
   private Optional<Double> submissionRate = Optional.empty();
+  private final long podDeletionDelay = 0;
   private final Set<WorkflowId> enabledWorkflows = Sets.newConcurrentHashSet();
   private final Set<String> components = Sets.newConcurrentHashSet();
   private final ConcurrentMap<WorkflowId, Workflow> workflowStore = Maps.newConcurrentMap();
@@ -92,6 +93,11 @@ public class InMemStorage implements Storage {
   @Override
   public Optional<Double> submissionRateLimit() throws IOException {
     return submissionRate;
+  }
+
+  @Override
+  public Long podDeletionDelay() throws IOException {
+    return podDeletionDelay;
   }
 
   @Override

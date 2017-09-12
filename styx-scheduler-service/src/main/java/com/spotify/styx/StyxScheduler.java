@@ -80,6 +80,7 @@ import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.Debug;
+import com.spotify.styx.util.Delay;
 import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.StorageFactory;
@@ -153,7 +154,8 @@ public class StyxScheduler implements AppInit {
         StateManager stateManager,
         ScheduledExecutorService scheduler,
         Stats stats,
-        Debug debug);
+        Debug debug,
+        Delay delay);
   }
 
   @FunctionalInterface
@@ -167,7 +169,9 @@ public class StyxScheduler implements AppInit {
 
     private Time time = Instant::now;
     private StorageFactory storageFactory = storage(StyxScheduler::storage);
-    private DockerRunnerFactory dockerRunnerFactory = StyxScheduler::createDockerRunner;
+    private DockerRunnerFactory dockerRunnerFactory =
+        (id, environment, stateManager1, scheduler1, stats, debug, delay) -> createDockerRunner(
+            id, environment, stateManager1, scheduler1, stats, debug, delay);
     private ScheduleSources scheduleSources = () -> ServiceLoader.load(ScheduleSourceFactory.class);
     private StatsFactory statsFactory = StyxScheduler::stats;
     private ExecutorFactory executorFactory = Executors::newScheduledThreadPool;
@@ -301,9 +305,10 @@ public class StyxScheduler implements AppInit {
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
 
     final Supplier<String> dockerId = new CachedSupplier<>(storage::globalDockerRunnerId, time);
+    final Delay delay = new CachedSupplier<>(storage::podDeletionDelay, time)::get;
     final Debug debug = new CachedSupplier<>(storage::debugEnabled, time)::get;
     final DockerRunner routingDockerRunner = DockerRunner.routing(
-        id -> dockerRunnerFactory.create(id, environment, stateManager, executor, stats, debug),
+        id -> dockerRunnerFactory.create(id, environment, stateManager, executor, stats, debug, delay),
         dockerId);
     final DockerRunner dockerRunner = instrument(DockerRunner.class, routingDockerRunner, stats, time);
 
@@ -629,7 +634,8 @@ public class StyxScheduler implements AppInit {
       StateManager stateManager,
       ScheduledExecutorService scheduler,
       Stats stats,
-      Debug debug) {
+      Debug debug,
+      Delay delay) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
 
@@ -640,7 +646,7 @@ public class StyxScheduler implements AppInit {
       final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(config, id));
       final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
       return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats,
-          serviceAccountKeyManager, debug));
+          serviceAccountKeyManager, debug, delay));
     }
   }
 
