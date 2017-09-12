@@ -169,7 +169,9 @@ public class StyxScheduler implements AppInit {
 
     private Time time = Instant::now;
     private StorageFactory storageFactory = storage(StyxScheduler::storage);
-    private DockerRunnerFactory dockerRunnerFactory = StyxScheduler::createDockerRunner;
+    private DockerRunnerFactory dockerRunnerFactory =
+        (id, environment, stateManager1, scheduler1, stats, debug, delay) -> createDockerRunner(
+            id, environment, stateManager1, scheduler1, stats, debug, delay);
     private ScheduleSources scheduleSources = () -> ServiceLoader.load(ScheduleSourceFactory.class);
     private StatsFactory statsFactory = StyxScheduler::stats;
     private ExecutorFactory executorFactory = Executors::newScheduledThreadPool;
