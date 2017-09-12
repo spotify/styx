@@ -141,6 +141,7 @@ public class KubernetesDockerRunnerTest {
 
   private static final int NO_POLL = Integer.MAX_VALUE;
   private static final int POD_DELETION_DELAY_SECONDS = 120;
+  private static final int SHORT_POLL_INTERVAL_SECONDS = 1;
   private static final Instant FIXED_INSTANT = Instant.parse("2017-09-01T01:00:00Z");
   private static final Clock CLOCK = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
 
@@ -609,7 +610,7 @@ public class KubernetesDockerRunnerTest {
     // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
     kdr.close();
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-                                     debug, 1, POD_DELETION_DELAY_SECONDS, CLOCK);
+                                     debug, SHORT_POLL_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, CLOCK);
     kdr.init();
     kdr.restore();
 
@@ -636,7 +637,7 @@ public class KubernetesDockerRunnerTest {
     // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
     kdr.close();
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-                                     debug, 1, POD_DELETION_DELAY_SECONDS, CLOCK);
+                                     debug, SHORT_POLL_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, CLOCK);
     kdr.init();
     kdr.restore();
 
