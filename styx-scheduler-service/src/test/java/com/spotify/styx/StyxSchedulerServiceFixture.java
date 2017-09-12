@@ -127,7 +127,7 @@ public class StyxSchedulerServiceFixture {
     StyxScheduler.ExecutorFactory executorFactory = (ts, tf) -> executor;
     StyxScheduler.PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
     StyxScheduler.DockerRunnerFactory dockerRunnerFactory =
-        (id, env, states, exec, stats, debug) -> fakeDockerRunner();
+        (id, env, states, exec, stats, debug, delay) -> fakeDockerRunner();
 
     styxScheduler = StyxScheduler.newBuilder()
         .setTime(time)
