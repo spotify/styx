@@ -32,6 +32,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyListOf;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
@@ -596,8 +597,9 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldPollPodStatusAndDeleteUntrackedPod() throws Exception {
+  public void shouldPollPodStatusAndDeleteUntrackedRunningPod() throws Exception {
     when(k8sClient.pods().withName(createdPod.getMetadata().getName())).thenReturn(namedPod);
+    when(namedPod.get()).thenReturn(createdPod);
 
     createdPod.setStatus(running(/* ready= */ true));
 
@@ -607,13 +609,65 @@ public class KubernetesDockerRunnerTest {
     // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
     kdr.close();
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-                                     debug, 1, 0, CLOCK);
+                                     debug, 1, POD_DELETION_DELAY_SECONDS, CLOCK);
     kdr.init();
     kdr.restore();
 
-    when(podList.getItems()).thenReturn(ImmutableList.of(createdPod));
-
     // Verify that the runner eventually polls and deletes the pod
+    verify(namedPod, timeout(30_000)).delete();
+  }
+
+  @Test
+  public void shouldPollPodStatusAndNotDeleteTerminatedPodBeforeNonDeletePeriod() throws Exception {
+    when(k8sClient.pods().withName(createdPod.getMetadata().getName())).thenReturn(namedPod);
+    when(namedPod.get()).thenReturn(createdPod);
+
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
+    when(containerStatus.getName()).thenReturn(KubernetesDockerRunner.STYX_RUN);
+    when(containerStatus.getState()).thenReturn(containerState);
+    when(containerState.getTerminated()).thenReturn(containerStateTerminated);
+    when(containerStateTerminated.getFinishedAt())
+        .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(1)).toString());
+
+    // Set up a new state manager without any state
+    StateManager stateManager = Mockito.spy(new SyncStateManager());
+
+    // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
+    kdr.close();
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
+                                     debug, 1, POD_DELETION_DELAY_SECONDS, CLOCK);
+    kdr.init();
+    kdr.restore();
+
+    // Verify that the runner eventually polls and does not delete the pod
+    verify(namedPod, after(2000).never()).delete();
+  }
+
+  @Test
+  public void shouldPollPodStatusAndDeleteTerminatedPodAfterNonDeletePeriod() throws Exception {
+    when(k8sClient.pods().withName(createdPod.getMetadata().getName())).thenReturn(namedPod);
+    when(namedPod.get()).thenReturn(createdPod);
+
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
+    when(containerStatus.getName()).thenReturn(KubernetesDockerRunner.STYX_RUN);
+    when(containerStatus.getState()).thenReturn(containerState);
+    when(containerState.getTerminated()).thenReturn(containerStateTerminated);
+    when(containerStateTerminated.getFinishedAt())
+        .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(5)).toString());
+
+    // Set up a new state manager without any state
+    StateManager stateManager = Mockito.spy(new SyncStateManager());
+
+    // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
+    kdr.close();
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
+                                     debug, 1, POD_DELETION_DELAY_SECONDS, CLOCK);
+    kdr.init();
+    kdr.restore();
+
+    // Verify that the runner eventually polls and does not delete the pod
     verify(namedPod, timeout(30_000)).delete();
   }
 }
