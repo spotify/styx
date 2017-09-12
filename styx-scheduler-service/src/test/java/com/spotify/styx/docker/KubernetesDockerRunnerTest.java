@@ -641,7 +641,7 @@ public class KubernetesDockerRunnerTest {
     kdr.init();
     kdr.restore();
 
-    // Verify that the runner eventually polls and does not delete the pod
+    // Wait long enough for the runner to poll and make sure we never delete the pod
     verify(namedPod, after(2000).never()).delete();
   }
 }
