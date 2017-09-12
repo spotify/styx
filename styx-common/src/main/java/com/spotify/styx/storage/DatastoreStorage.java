@@ -104,6 +104,7 @@ class DatastoreStorage {
   public static final String PROPERTY_HALTED = "halted";
   public static final String PROPERTY_DEBUG_ENABLED = "debug";
   public static final String PROPERTY_SUBMISSION_RATE_LIMIT = "submissionRateLimit";
+  public static final String PROPERTY_POD_DELETION_DELAY = "podDeletionDelay";
 
   public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
 
@@ -111,6 +112,7 @@ class DatastoreStorage {
   public static final String DEFAULT_CONFIG_DOCKER_RUNNER_ID = "default";
   public static final boolean DEFAULT_WORKFLOW_ENABLED = false;
   public static final boolean DEFAULT_DEBUG_ENABLED = false;
+  public static final long DEFAULT_POD_DELETION_DELAY = 120;
 
   public static final int MAX_RETRIES = 100;
 
@@ -790,6 +792,13 @@ class DatastoreStorage {
     return getOpt(datastore, globalConfigKey)
         .filter(e -> e.contains(PROPERTY_SUBMISSION_RATE_LIMIT))
         .map(e -> e.getDouble(PROPERTY_SUBMISSION_RATE_LIMIT));
+  }
+
+  Long podDeletionDelay() {
+    return getOpt(datastore, globalConfigKey)
+        .filter(e -> e.contains(PROPERTY_POD_DELETION_DELAY))
+        .map(e -> e.getLong(PROPERTY_POD_DELETION_DELAY))
+        .orElse(DEFAULT_POD_DELETION_DELAY);
   }
 
   Optional<List<String>> clientBlacklist() {

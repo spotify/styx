@@ -110,6 +110,11 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
+  public Long podDeletionDelay() throws IOException {
+    return datastoreStorage.podDeletionDelay();
+  }
+
+  @Override
   public boolean setGlobalEnabled(boolean enabled) throws IOException {
     return datastoreStorage.setGlobalEnabled(enabled);
   }

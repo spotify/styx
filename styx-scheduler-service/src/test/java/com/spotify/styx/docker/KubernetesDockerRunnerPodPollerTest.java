@@ -37,6 +37,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Debug;
+import com.spotify.styx.util.Delay;
 import io.fabric8.kubernetes.api.model.ContainerState;
 import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
@@ -91,17 +92,19 @@ public class KubernetesDockerRunnerPodPollerTest {
 
   @Mock KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
   @Mock Debug debug;
+  @Mock Delay delay;
 
   KubernetesDockerRunner kdr;
 
   @Before
   public void setUp() throws Exception {
     when(debug.get()).thenReturn(false);
+    when(delay.get()).thenReturn(0L);
 
     when(k8sClient.inNamespace(any(String.class))).thenReturn(k8sClient);
     when(k8sClient.pods()).thenReturn(pods);
 
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug, delay);
     podList = new PodList();
     podList.setMetadata(new ListMeta());
     podList.getMetadata().setResourceVersion("4711");

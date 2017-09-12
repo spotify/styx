@@ -85,6 +85,11 @@ public interface Storage {
   Optional<Double> submissionRateLimit() throws IOException;
 
   /**
+   * Get the pod deletion delay (in seconds) for Styx.
+   */
+  Long podDeletionDelay() throws IOException;
+
+  /**
    * Set the global enabled flag for Styx.
    *
    * @param enabled     The global enabled flag
