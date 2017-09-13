@@ -361,11 +361,6 @@ class KubernetesDockerRunner implements DockerRunner {
         .filter(containerStatus -> containerStatus.getName().equals(STYX_RUN))
         .findFirst();
   }
-
-  private static Optional<ContainerStatus> getTerminatedStyxContainer(List<ContainerStatus> containerStatuses) {
-    return getStyxContainer(containerStatuses)
-        .filter(containerStatus -> containerStatus.getState().getTerminated() != null);
-  }
   
   private boolean isNonDeletePeriodExpired(ContainerStatus containerStatus) {
     return Optional.ofNullable(containerStatus.getState().getTerminated().getFinishedAt())
