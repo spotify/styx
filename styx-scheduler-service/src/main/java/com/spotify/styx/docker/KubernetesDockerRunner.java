@@ -20,6 +20,7 @@
 
 package com.spotify.styx.docker;
 
+import static com.spotify.styx.docker.KubernetesPodEventTranslator.hasPullImageError;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.state.RunState.State.RUNNING;
@@ -308,26 +309,38 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @Override
   public void cleanup(WorkflowInstance workflowInstance, String executionId) {
-    cleanup(workflowInstance, executionId, containerStatuses -> 
-        getTerminatedStyxContainer(containerStatuses)
-            .filter(this::isNonDeletePeriodExpired)
-            .ifPresent(containerStatus -> deletePod(workflowInstance, executionId)));
+    cleanup(workflowInstance, executionId, containerStatuses ->
+        getStyxContainer(containerStatuses).ifPresent(containerStatus -> {
+          if (hasPullImageError(containerStatus)) {
+            deletePod(workflowInstance, executionId);
+          } else {
+            if (containerStatus.getState().getTerminated() != null) {
+              deletePodIfNonDeletePeriodExpired(workflowInstance, executionId, containerStatus);
+            }
+          }
+        }));
   }
 
   private void cleanupWithoutRunState(WorkflowInstance workflowInstance, String executionId) {
     cleanup(workflowInstance, executionId, containerStatuses -> 
         getStyxContainer(containerStatuses).ifPresent(containerStatus -> {
           if (containerStatus.getState().getTerminated() != null) {
-            if (isNonDeletePeriodExpired(containerStatus)) {
-              // if terminated and after graceful period, delete the pod
-              // otherwise wait until next polling happens
-              deletePod(workflowInstance, executionId);
-            }
+            deletePodIfNonDeletePeriodExpired(workflowInstance, executionId, containerStatus);
           } else {
             // if not terminated, delete it directly
             deletePod(workflowInstance, executionId);
           }
         }));
+  }
+
+  private void deletePodIfNonDeletePeriodExpired(WorkflowInstance workflowInstance,
+                                                 String executionId,
+                                                 ContainerStatus containerStatus) {
+    if (isNonDeletePeriodExpired(containerStatus)) {
+      // if terminated and after graceful period, delete the pod
+      // otherwise wait until next polling happens
+      deletePod(workflowInstance, executionId);
+    }
   }
 
   private void cleanup(WorkflowInstance workflowInstance, String executionId, 
