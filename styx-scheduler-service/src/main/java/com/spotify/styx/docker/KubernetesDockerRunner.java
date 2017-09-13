@@ -83,6 +83,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
@@ -307,16 +308,15 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @Override
   public void cleanup(WorkflowInstance workflowInstance, String executionId) {
-    Optional.ofNullable(client.pods().withName(executionId).get())
-        .flatMap(KubernetesDockerRunner::getTerminatedStyxContainer)
-        .filter(this::isNonDeletePeriodExpired)
-        .ifPresent(containerStatus -> deletePod(workflowInstance, executionId));
+    cleanup(workflowInstance, executionId, containerStatuses -> 
+        getTerminatedStyxContainer(containerStatuses)
+            .filter(this::isNonDeletePeriodExpired)
+            .ifPresent(containerStatus -> deletePod(workflowInstance, executionId)));
   }
 
   private void cleanupWithoutRunState(WorkflowInstance workflowInstance, String executionId) {
-    Optional.ofNullable(client.pods().withName(executionId).get())
-        .flatMap(KubernetesDockerRunner::getStyxContainer)
-        .ifPresent(containerStatus -> {
+    cleanup(workflowInstance, executionId, containerStatuses -> 
+        getStyxContainer(containerStatuses).ifPresent(containerStatus -> {
           if (containerStatus.getState().getTerminated() != null) {
             if (isNonDeletePeriodExpired(containerStatus)) {
               // if terminated and after graceful period, delete the pod
@@ -327,19 +327,30 @@ class KubernetesDockerRunner implements DockerRunner {
             // if not terminated, delete it directly
             deletePod(workflowInstance, executionId);
           }
-        });
+        }));
+  }
+
+  private void cleanup(WorkflowInstance workflowInstance, String executionId, 
+                       Consumer<List<ContainerStatus>> cleaner) {
+    Optional.ofNullable(client.pods().withName(executionId).get()).ifPresent(pod -> {
+      final List<ContainerStatus> containerStatuses = pod.getStatus().getContainerStatuses();
+      if (!containerStatuses.isEmpty()) {
+        cleaner.accept(containerStatuses);
+      } else {
+        // for some cases such as evicted pod, there is no container status, so we delete directly
+        deletePod(workflowInstance, executionId);
+      }
+    });
   }
   
-  private static Optional<ContainerStatus> getStyxContainer(Pod pod) {
-    return pod.getStatus()
-        .getContainerStatuses()
-        .stream()
+  private static Optional<ContainerStatus> getStyxContainer(List<ContainerStatus> containerStatuses) {
+    return containerStatuses.stream()
         .filter(containerStatus -> containerStatus.getName().equals(STYX_RUN))
         .findFirst();
   }
 
-  private static Optional<ContainerStatus> getTerminatedStyxContainer(Pod pod) {
-    return getStyxContainer(pod)
+  private static Optional<ContainerStatus> getTerminatedStyxContainer(List<ContainerStatus> containerStatuses) {
+    return getStyxContainer(containerStatuses)
         .filter(containerStatus -> containerStatus.getState().getTerminated() != null);
   }
   
