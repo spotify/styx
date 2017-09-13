@@ -133,7 +133,7 @@ public final class KubernetesPodEventTranslator {
     }
   }
 
-  public static List<Event> translate(
+  static List<Event> translate(
       WorkflowInstance workflowInstance,
       RunState state,
       Action action,
@@ -261,7 +261,7 @@ public final class KubernetesPodEventTranslator {
     }
   }
 
-  private static boolean hasPullImageError(ContainerStatus cs) {
+  static boolean hasPullImageError(ContainerStatus cs) {
     ContainerStateWaiting waiting = cs.getState().getWaiting();
     return waiting != null && (
         "PullImageError".equals(waiting.getReason())
