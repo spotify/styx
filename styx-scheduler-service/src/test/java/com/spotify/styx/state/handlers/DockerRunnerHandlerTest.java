@@ -111,6 +111,20 @@ public class DockerRunnerHandlerTest {
   }
 
   @Test
+  public void shouldTransitionIntoSubmitted() throws Exception {
+    WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
+    RunState runState = RunState.create(workflowInstance, RunState.State.NEW, dockerRunnerHandler);
+
+    stateManager.initialize(runState);
+    stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
+    stateManager.receive(Event.dequeue(workflowInstance));
+    stateManager.receive(Event.submit(workflowInstance, EXECUTION_DESCRIPTION, TEST_EXECUTION_ID));
+    verify(stateManager, timeout(60_000)).receive(Event.submitted(workflowInstance, TEST_EXECUTION_ID));
+  }
+
+  @Test
   public void shouldFailIfDockerRunnerRaisesException() throws Exception {
     shouldFailIfDockerRunnerRaisesException(new IOException("Testing exception."));
   }
