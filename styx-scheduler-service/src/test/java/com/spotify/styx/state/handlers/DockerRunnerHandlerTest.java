@@ -23,21 +23,15 @@ package com.spotify.styx.state.handlers;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.verifyZeroInteractions;
-import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.InvalidExecutionException;
@@ -55,10 +49,6 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Semaphore;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
@@ -121,20 +111,6 @@ public class DockerRunnerHandlerTest {
   }
 
   @Test
-  public void shouldTransitionIntoSubmitted() throws Exception {
-    WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, RunState.State.NEW, dockerRunnerHandler);
-
-    stateManager.initialize(runState);
-    stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
-    stateManager.receive(Event.dequeue(workflowInstance));
-    stateManager.receive(Event.submit(workflowInstance, EXECUTION_DESCRIPTION, TEST_EXECUTION_ID));
-    verify(stateManager, timeout(60_000)).receive(Event.submitted(workflowInstance, TEST_EXECUTION_ID));
-  }
-
-  @Test
   public void shouldFailIfDockerRunnerRaisesException() throws Exception {
     shouldFailIfDockerRunnerRaisesException(new IOException("Testing exception."));
   }
@@ -176,6 +152,36 @@ public class DockerRunnerHandlerTest {
     verify(stateManager, timeout(60_000)).receive(any(Event.class));
 
     assertThat(stateManager.get(workflowInstance), is(nullValue()));
+  }
+
+  @Test
+  public void shouldPerformCleanupOnFailed() throws Exception {
+    WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
+    RunState runState = RunState.create(workflowInstance, RunState.State.FAILED,
+        StateData.newBuilder().executionId(TEST_EXECUTION_ID).build());
+
+    stateManager.initialize(runState);
+    dockerRunnerHandler.transitionInto(runState);
+
+    verify(dockerRunner, timeout(60_000)).cleanup(workflowInstance, TEST_EXECUTION_ID);
+  }
+
+  @Test
+  public void shouldPerformCleanupOnFailedThroughTransitions() throws Exception {
+    WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
+    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
+    RunState runState = RunState.create(workflowInstance, RunState.State.NEW, dockerRunnerHandler);
+
+    stateManager.initialize(runState);
+    stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
+    stateManager.receive(Event.dequeue(workflowInstance));
+    stateManager.receive(Event.submit(workflowInstance, EXECUTION_DESCRIPTION, TEST_EXECUTION_ID));
+    verify(stateManager, timeout(60_000)).receive(Event.submitted(workflowInstance, TEST_EXECUTION_ID));
+    stateManager.receive(Event.runError(workflowInstance, ""));
+    verify(dockerRunner).cleanup(workflowInstance, TEST_EXECUTION_ID);
   }
 
   private WorkflowConfiguration configuration(String... args) {

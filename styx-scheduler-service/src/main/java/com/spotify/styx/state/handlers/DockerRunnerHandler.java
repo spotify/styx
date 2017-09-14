@@ -23,7 +23,6 @@ package com.spotify.styx.state.handlers;
 import static java.util.Objects.requireNonNull;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.InvalidExecutionException;
@@ -37,7 +36,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,6 +94,15 @@ public class DockerRunnerHandler implements OutputHandler {
           } catch (StateManager.IsClosed isClosed) {
             LOG.warn("Failed to send 'runError' event", isClosed);
           }
+        }
+        break;
+
+      case TERMINATED:
+      case FAILED:
+      case ERROR:
+        if (state.data().executionId().isPresent()) {
+          final String executionId = state.data().executionId().get();
+          dockerRunner.cleanup(state.workflowInstance(), executionId);
         }
         break;
 
