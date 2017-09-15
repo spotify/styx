@@ -309,6 +309,12 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @Override
   public void cleanup(WorkflowInstance workflowInstance, String executionId) {
+    // do not cleanup pod along with state machine transition and let polling thread
+    // take care of it
+  }
+
+  @VisibleForTesting
+  void cleanupWithRunState(WorkflowInstance workflowInstance, String executionId) {
     cleanup(workflowInstance, executionId, containerStatuses ->
         getStyxContainer(containerStatuses).ifPresent(containerStatus -> {
           if (hasPullImageError(containerStatus)) {
@@ -321,7 +327,8 @@ class KubernetesDockerRunner implements DockerRunner {
         }));
   }
 
-  private void cleanupWithoutRunState(WorkflowInstance workflowInstance, String executionId) {
+  @VisibleForTesting
+  void cleanupWithoutRunState(WorkflowInstance workflowInstance, String executionId) {
     cleanup(workflowInstance, executionId, containerStatuses -> 
         getStyxContainer(containerStatuses).ifPresent(containerStatus -> {
           if (containerStatus.getState().getTerminated() != null) {
@@ -464,7 +471,7 @@ class KubernetesDockerRunner implements DockerRunner {
       final Optional<RunState> runState = lookupPodRunState(pod, workflowInstance.get());
       if (runState.isPresent()) {
         emitPodEvents(Watcher.Action.MODIFIED, pod, runState.get());
-        cleanup(workflowInstance.get(), pod.getMetadata().getName());
+        cleanupWithRunState(workflowInstance.get(), pod.getMetadata().getName());
       } else {
         cleanupWithoutRunState(workflowInstance.get(), pod.getMetadata().getName());
       }
