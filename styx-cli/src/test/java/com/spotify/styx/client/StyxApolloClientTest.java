@@ -56,9 +56,9 @@ public class StyxApolloClientTest {
 
   @Test
   @Parameters({
-      "foo.bar, http://foo.bar",
-      "foo.bar:80, http://foo.bar",
-      "foo.bar:17, http://foo.bar:17",
+      "foo.bar, https://foo.bar",
+      "foo.bar:80, https://foo.bar",
+      "foo.bar:17, https://foo.bar:17",
       "http://foo.bar, http://foo.bar",
       "http://foo.bar:80, http://foo.bar",
       "http://foo.bar:17, http://foo.bar:17",
