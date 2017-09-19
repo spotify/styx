@@ -43,6 +43,7 @@ import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
+import com.spotify.styx.publisher.EventInterceptor;
 import com.spotify.styx.publisher.Publisher;
 import com.spotify.styx.schedule.ScheduleSourceFactory;
 import com.spotify.styx.state.RunState;
@@ -91,6 +92,7 @@ public class StyxSchedulerServiceFixture {
   // circumstantial fields, set by test cases
   private Instant now = Instant.parse("1970-01-01T00:00:00Z");
   private List<Workflow> workflows = Lists.newArrayList();
+  private List<SequenceEvent> transitionedEvents = Lists.newArrayList();
 
   // captured fields from fakes
   List<Tuple2<WorkflowInstance, DockerRunner.RunSpec>> dockerRuns = Lists.newArrayList();
@@ -128,6 +130,7 @@ public class StyxSchedulerServiceFixture {
     StyxScheduler.PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
     StyxScheduler.DockerRunnerFactory dockerRunnerFactory =
         (id, env, states, exec, stats, debug) -> fakeDockerRunner();
+    StyxScheduler.EventInterceptorFactory eventInterceptorFactory = (env) -> new InjectingInterceptor();
 
     styxScheduler = StyxScheduler.newBuilder()
         .setTime(time)
@@ -137,6 +140,7 @@ public class StyxSchedulerServiceFixture {
         .setStatsFactory(statsFactory)
         .setExecutorFactory(executorFactory)
         .setPublisherFactory(publisherFactory)
+        .setEventInterceptorFactory(eventInterceptorFactory)
         .build();
 
     serviceHelper = ServiceHelper.create(styxScheduler, StyxScheduler.SERVICE_NAME);
@@ -306,6 +310,10 @@ public class StyxSchedulerServiceFixture {
     await().atMost(30, SECONDS).until(() -> getState(workflowInstance) == null);
   }
 
+  void awaitUntilInterceptedEvent(SequenceEvent sequenceEvent) {
+    await().atMost(30, SECONDS).until(() -> transitionedEvents.contains(sequenceEvent));
+  }
+
   private void printTime() {
     LOG.info("The time is {}", now);
   }
@@ -357,5 +365,12 @@ public class StyxSchedulerServiceFixture {
       throw Throwables.propagate(e);
     }
     return bigtable;
+  }
+
+  private class InjectingInterceptor implements EventInterceptor {
+    @Override
+    public void eventTransitioned(SequenceEvent sequenceEvent) {
+      transitionedEvents.add(sequenceEvent);
+    }
   }
 }

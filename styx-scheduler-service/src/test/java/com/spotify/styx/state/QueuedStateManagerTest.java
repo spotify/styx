@@ -86,7 +86,7 @@ public class QueuedStateManagerTest {
     }
 
     storage = new InMemStorage();
-    stateManager = new QueuedStateManager(Instant::now, POOL, storage);
+    stateManager = new QueuedStateManager(Instant::now, POOL, storage, EventConsumer.NOOP);
 
     stateManager.initialize(initial);
     assertTrue(stateManager.awaitIdle(1000));
@@ -276,7 +276,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldRestoreStateAtCount() throws Exception {
-    stateManager = new QueuedStateManager(Instant::now, POOL, storage);
+    stateManager = new QueuedStateManager(Instant::now, POOL, storage, EventConsumer.NOOP);
 
     stateManager.restore(RunState.fresh(INSTANCE), 7L);
     stateManager.receive(Event.timeTrigger(INSTANCE));  // 8
@@ -289,7 +289,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldHandleThrowingOutputHandler() throws Exception {
-    stateManager = new QueuedStateManager(Instant::now, POOL, storage);
+    stateManager = new QueuedStateManager(Instant::now, POOL, storage, EventConsumer.NOOP);
 
     OutputHandler throwing = (state) -> {
       throw new RuntimeException();
@@ -303,7 +303,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void testGetActiveWorkflowInstance() throws Exception {
-    stateManager = new QueuedStateManager(Instant::now, POOL, storage);
+    stateManager = new QueuedStateManager(Instant::now, POOL, storage, EventConsumer.NOOP);
 
     assertThat(stateManager.isActiveWorkflowInstance(INSTANCE), is(false));
 

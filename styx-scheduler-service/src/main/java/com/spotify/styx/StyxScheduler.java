@@ -63,10 +63,13 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.MonitoringHandler;
 import com.spotify.styx.monitoring.Stats;
+import com.spotify.styx.publisher.EventInterceptor;
 import com.spotify.styx.publisher.Publisher;
 import com.spotify.styx.schedule.ScheduleSource;
 import com.spotify.styx.schedule.ScheduleSourceFactory;
+import com.spotify.styx.state.EventConsumer;
 import com.spotify.styx.state.OutputHandler;
+import com.spotify.styx.state.QueuedEventConsumer;
 import com.spotify.styx.state.QueuedStateManager;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
@@ -143,6 +146,7 @@ public class StyxScheduler implements AppInit {
   public interface ScheduleSources extends Supplier<Iterable<ScheduleSourceFactory>> { }
   public interface StatsFactory extends Function<Environment, Stats> { }
   public interface PublisherFactory extends Function<Environment, Publisher> { }
+  public interface EventInterceptorFactory extends Function<Environment, EventInterceptor> { }
 
   @FunctionalInterface
   interface DockerRunnerFactory {
@@ -173,6 +177,7 @@ public class StyxScheduler implements AppInit {
     private PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
     private RetryUtil retryUtil = DEFAULT_RETRY_UTIL;
     private WorkflowResourceDecorator resourceDecorator = WorkflowResourceDecorator.NOOP;
+    private EventInterceptorFactory eventInterceptorFactory  = (env) -> EventInterceptor.NOOP;
 
     public Builder setTime(Time time) {
       this.time = time;
@@ -219,6 +224,11 @@ public class StyxScheduler implements AppInit {
       return this;
     }
 
+    public Builder setEventInterceptorFactory(EventInterceptorFactory eventInterceptorFactory) {
+      this.eventInterceptorFactory = eventInterceptorFactory;
+      return this;
+    }
+
     public StyxScheduler build() {
       return new StyxScheduler(this);
     }
@@ -243,6 +253,7 @@ public class StyxScheduler implements AppInit {
   private final PublisherFactory publisherFactory;
   private final RetryUtil retryUtil;
   private final WorkflowResourceDecorator resourceDecorator;
+  private final EventInterceptorFactory eventInterceptorFactory;
 
   private StateManager stateManager;
   private Scheduler scheduler;
@@ -259,6 +270,7 @@ public class StyxScheduler implements AppInit {
     this.publisherFactory = requireNonNull(builder.publisherFactory);
     this.retryUtil = requireNonNull(builder.retryUtil);
     this.resourceDecorator = requireNonNull(builder.resourceDecorator);
+    this.eventInterceptorFactory = requireNonNull(builder.eventInterceptorFactory);
   }
 
   @Override
@@ -293,8 +305,12 @@ public class StyxScheduler implements AppInit {
 
     warmUpCache(workflowCache, storage);
 
+    final EventConsumer eventConsumer =
+        new QueuedEventConsumer(eventInterceptorFactory.apply(environment));
+    closer.register(eventConsumer);
+
     final QueuedStateManager stateManager = closer.register(
-        new QueuedStateManager(time, eventWorker, storage));
+        new QueuedStateManager(time, eventWorker, storage, eventConsumer));
 
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);

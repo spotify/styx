@@ -37,6 +37,7 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -161,6 +162,37 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     workflowInstance = dockerRuns.get(1)._1;
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(workflowInstance.parameter(), is("2016-03-14T15:15:00Z"));
+  }
+
+  @Test
+  public void shouldInterceptEvents() throws Exception {
+    Workflow customWorkflow = Workflow.create(
+        "styx",
+        WorkflowConfiguration.builder()
+            .id("styx.TestEndpoint")
+            .schedule(Schedule.parse("15,45 12,15 * * *"))
+            .dockerImage("busybox")
+            .dockerArgs(ImmutableList.of())
+            .build());
+
+    givenTheTimeIs("2016-03-14T15:30:00Z");
+    givenTheGlobalEnableFlagIs(true);
+    givenWorkflow(customWorkflow);
+    givenWorkflowEnabledStateIs(customWorkflow, true);
+    givenNextNaturalTrigger(customWorkflow, "2016-03-14T12:45:00Z");
+
+    WorkflowInstance wfi =
+        WorkflowInstance.create(customWorkflow.id(), "2016-03-14T12:45:00Z");
+    styxStarts();
+    tickTriggerManager();
+
+    final SequenceEvent expectedEvent =
+        SequenceEvent.create(
+            Event.triggerExecution(wfi, Trigger.natural()),
+            0,
+            Instant.parse("2016-03-14T15:30:00Z").toEpochMilli());
+
+    awaitUntilInterceptedEvent(expectedEvent);
   }
 
   @Test

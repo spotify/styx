@@ -22,7 +22,6 @@ package com.spotify.styx;
 
 import static com.spotify.styx.state.TimeoutConfig.createWithDefaultTtl;
 import static java.time.Duration.ofSeconds;
-import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.either;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
