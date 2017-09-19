@@ -35,7 +35,6 @@ import com.github.rholder.retry.RetryerBuilder;
 import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.WaitStrategies;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
@@ -48,6 +47,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.Debug;
+import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.TriggerUtil;
 import io.fabric8.kubernetes.api.model.ContainerBuilder;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
@@ -548,9 +548,9 @@ class KubernetesDockerRunner implements DockerRunner {
 
       try {
         stateManager.receive(event);
-      } catch (StateManager.IsClosed isClosed) {
-        LOG.warn("Could not receive kubernetes event", isClosed);
-        throw Throwables.propagate(isClosed);
+      } catch (IsClosedException isClosedException) {
+        LOG.warn("Could not receive kubernetes event", isClosedException);
+        throw new RuntimeException(isClosedException);
       }
     }
   }

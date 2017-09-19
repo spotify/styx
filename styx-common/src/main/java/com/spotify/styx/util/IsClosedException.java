@@ -1,8 +1,8 @@
-/*
+/*-
  * -\-\-
- * Spotify Styx Scheduler Service
+ * Spotify Styx Common
  * --
- * Copyright (C) 2017 Spotify AB
+ * Copyright (C) 2016 - 2017 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,11 @@
  * -/-/-
  */
 
-package com.spotify.styx.client;
+package com.spotify.styx.util;
 
-public class ClientErrorException extends RuntimeException {
+/**
+ * Exception that signals a closed state.
+ */
+public class IsClosedException extends Exception {
 
-  public ClientErrorException(String message, Throwable cause) {
-    super(message, cause);
-  }
 }

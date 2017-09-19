@@ -20,7 +20,6 @@
 
 package com.spotify.styx.model.data;
 
-import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
