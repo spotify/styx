@@ -80,7 +80,7 @@ class StyxApolloClient implements StyxClient {
     if (apiHost.contains("://")) {
       this.apiHost = URI.create(apiHost);
     } else {
-      this.apiHost = URI.create("http://" + apiHost);
+      this.apiHost = URI.create("https://" + apiHost);
     }
     this.client = Objects.requireNonNull(client, "client");
   }
