@@ -50,7 +50,9 @@ import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
@@ -446,13 +448,17 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
     storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER), 0L, ms("07:00:00")));
-    storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
-    storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
+    storage.writeEvent(create(Event.dequeue(wfi), 1L, ms("07:00:01")));
+    storage.writeEvent(create(Event.submit(wfi, ExecutionDescription.forImage("img"), "exec"), 2L, ms("07:00:02")));
+    storage.writeEvent(create(Event.submitted(wfi, "exec"), 3L, ms("07:00:03")));
+    storage.writeEvent(create(Event.started(wfi), 4L, ms("07:00:04")));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/foo/bar/instances/2016-08-10")));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
+
+    System.err.println(response.payload().get().utf8());
 
     assertJson(response, "workflow_instance.parameter", is("2016-08-10"));
     assertJson(response, "workflow_instance.workflow_id.component_id", is("foo"));
@@ -468,9 +474,9 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "triggers.[0].executions.[0].statuses.[0].status", is("SUBMITTED"));
     assertJson(response, "triggers.[0].executions.[0].statuses.[1].status", is("STARTED"));
     assertJson(response, "triggers.[0].executions.[0].statuses.[0].timestamp",
-               is("2016-08-10T07:00:01Z"));
+               is("2016-08-10T07:00:03Z"));
     assertJson(response, "triggers.[0].executions.[0].statuses.[1].timestamp",
-               is("2016-08-10T07:00:02Z"));
+               is("2016-08-10T07:00:04Z"));
   }
 
   @Test
