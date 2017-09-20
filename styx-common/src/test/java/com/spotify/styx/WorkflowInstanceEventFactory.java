@@ -35,6 +35,7 @@ public class WorkflowInstanceEventFactory {
     this.workflowInstance = workflowInstance;
   }
 
+  @Deprecated
   public Event timeTrigger() {
     return Event.timeTrigger(workflowInstance);
   }
@@ -47,6 +48,7 @@ public class WorkflowInstanceEventFactory {
     return Event.info(workflowInstance, message);
   }
 
+  @Deprecated
   public Event created(String executionId, String dockerImage) {
     return Event.created(workflowInstance, executionId, dockerImage);
   }
@@ -87,6 +89,7 @@ public class WorkflowInstanceEventFactory {
     return Event.retryAfter(workflowInstance, delayMillis);
   }
 
+  @Deprecated
   public Event retry() {
     return Event.retry(workflowInstance);
   }
