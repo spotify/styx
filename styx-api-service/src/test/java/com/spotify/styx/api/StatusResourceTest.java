@@ -28,10 +28,12 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
+import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -39,6 +41,7 @@ import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
+import java.util.List;
 import okio.ByteString;
 import org.junit.Test;
 
@@ -51,6 +54,7 @@ public class StatusResourceTest extends VersionedApiTest {
   private static final String OTHER_COMPONENT_ID = "styx-other";
   private static final WorkflowInstance WFI =
       WorkflowInstance.create(WorkflowId.create(COMPONENT_ID, ID), PARAMETER);
+  private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.forImage("foo/bar");
   private static final WorkflowInstance OTHER_WFI =
       WorkflowInstance.create(WorkflowId.create(OTHER_COMPONENT_ID, ID), PARAMETER);
 
@@ -73,9 +77,14 @@ public class StatusResourceTest extends VersionedApiTest {
   public void testEventsRoundtrip() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI, TRIGGER), 0L, 0L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI, "exec0", "img0"), 1L, 1L));
-    storage.writeEvent(SequenceEvent.create(Event.started(WFI), 2L, 2L));
+    final List<SequenceEvent> events = ImmutableList.of(
+        SequenceEvent.create(Event.triggerExecution(WFI, TRIGGER), 0L, 0L),
+        SequenceEvent.create(Event.dequeue(WFI), 1L, 1L),
+        SequenceEvent.create(Event.submit(WFI, EXECUTION_DESCRIPTION, "exec0"), 2L, 2L));
+
+    for (SequenceEvent event : events) {
+      storage.writeEvent(event);
+    }
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/events/styx/test/1234")));
@@ -86,7 +95,12 @@ public class StatusResourceTest extends VersionedApiTest {
     String json = response.payload().get().utf8();
     EventsPayload parsed = Json.OBJECT_MAPPER.readValue(json, EventsPayload.class);
 
-    assertThat(parsed.events(), hasSize(3));
+    assertThat(parsed.events(), hasSize(events.size()));
+
+    for (int i = 0; i < events.size(); i++) {
+      assertThat(parsed.events().get(i).timestamp(), is(events.get(i).timestamp()));
+      assertThat(parsed.events().get(i).event(), is(events.get(i).event()));
+    }
   }
 
   @Test
