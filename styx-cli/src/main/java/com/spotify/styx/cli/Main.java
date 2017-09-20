@@ -30,6 +30,7 @@ import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.ResourcesPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.client.ApiErrorException;
+import com.spotify.styx.client.ClientErrorException;
 import com.spotify.styx.client.StyxClient;
 import com.spotify.styx.client.StyxClientFactory;
 import com.spotify.styx.model.Backfill;
@@ -236,14 +237,16 @@ public final class Main {
       parser.parser.handleError(e);
       System.exit(EXIT_CODE_ARGUMENT_ERROR);
     } catch (ExecutionException e) {
-      Throwable cause = e.getCause();
+      final Throwable cause = e.getCause();
       if (cause instanceof ApiErrorException) {
         System.err.println("API error: " + cause.getMessage());
+      } else if (cause instanceof ClientErrorException) {
+        System.err.println(cause.getMessage());
       } else {
         cause.printStackTrace();
       }
       System.exit(EXIT_CODE_CLIENT_ERROR);
-    } catch (InterruptedException | IOException e) {
+    } catch (Exception e) {
       e.printStackTrace();
       System.exit(EXIT_CODE_UNKNOWN_ERROR);
     }
