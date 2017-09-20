@@ -390,8 +390,10 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
     storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER), 0L, ms("07:00:00")));
-    storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
-    storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
+    storage.writeEvent(create(Event.dequeue(wfi), 1L, ms("07:00:01")));
+    storage.writeEvent(create(Event.submit(wfi, ExecutionDescription.forImage("img"), "exec"), 2L, ms("07:00:02")));
+    storage.writeEvent(create(Event.submitted(wfi, "exec"), 3L, ms("07:00:03")));
+    storage.writeEvent(create(Event.started(wfi), 4L, ms("07:00:04")));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/foo/bar/instances")));
@@ -419,8 +421,10 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
     storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER), 0L, ms("07:00:00")));
-    storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
-    storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
+    storage.writeEvent(create(Event.dequeue(wfi), 1L, ms("07:00:01")));
+    storage.writeEvent(create(Event.submit(wfi, ExecutionDescription.forImage("img"), "exec"), 2L, ms("07:00:02")));
+    storage.writeEvent(create(Event.submitted(wfi, "exec"), 3L, ms("07:00:03")));
+    storage.writeEvent(create(Event.started(wfi), 4L, ms("07:00:04")));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/foo/bar/instances?start=2016-08-10")));
