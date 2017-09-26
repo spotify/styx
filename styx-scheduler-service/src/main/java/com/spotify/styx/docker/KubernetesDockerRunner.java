@@ -427,14 +427,17 @@ class KubernetesDockerRunner implements DockerRunner {
         .watch(new PodWatcher(Integer.parseInt(resourceVersion)));
   }
 
-  void examineRunningWFISandAssociatedPods(PodList podList) {
-    final Set<WorkflowInstance> runningWorkflowInstances = stateManager.activeStates()
+  private Set<WorkflowInstance> getRunningWorkflowInstances() {
+    return stateManager.activeStates()
         .values()
         .stream()
         .filter(runState -> runState.state().equals(RUNNING))
         .map(RunState::workflowInstance)
         .collect(toSet());
+  }
 
+  private void examineRunningWFISandAssociatedPods(Set<WorkflowInstance> runningWorkflowInstances,
+                                           PodList podList) {
     final Set<WorkflowInstance> workflowInstancesForPods = podList.getItems().stream()
         .filter(pod -> pod.getMetadata().getAnnotations()
             .containsKey(STYX_WORKFLOW_INSTANCE_ANNOTATION))
@@ -457,8 +460,9 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private synchronized void tryPollPods() {
+    final Set<WorkflowInstance> runningWorkflowInstances = getRunningWorkflowInstances();
     final PodList list = client.pods().list();
-    examineRunningWFISandAssociatedPods(list);
+    examineRunningWFISandAssociatedPods(runningWorkflowInstances, list);
 
     final int resourceVersion = Integer.parseInt(list.getMetadata().getResourceVersion());
 
