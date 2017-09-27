@@ -437,7 +437,7 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private void examineRunningWFISandAssociatedPods(Set<WorkflowInstance> runningWorkflowInstances,
-                                           PodList podList) {
+                                                   PodList podList) {
     final Set<WorkflowInstance> workflowInstancesForPods = podList.getItems().stream()
         .filter(pod -> pod.getMetadata().getAnnotations()
             .containsKey(STYX_WORKFLOW_INSTANCE_ANNOTATION))

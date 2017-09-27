@@ -21,7 +21,6 @@
 package com.spotify.styx.docker;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
-import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.podStatusNoContainer;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.running;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminated;
@@ -712,29 +711,5 @@ public class KubernetesDockerRunnerTest {
 
     // Verify that the runner eventually polls and deletes the pod
     verify(namedPod, timeout(30_000)).delete();
-  }
-
-  @Test
-  public void shouldPollPodAndTransitToFailedIfPodNotFound() throws Exception {
-    when(k8sClient.pods().withName(createdPod.getMetadata().getName())).thenReturn(namedPod);
-
-    createdPod.setStatus(running(/* ready= */ true));
-
-    // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
-    kdr.close();
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-                                     debug, 1, 0, CLOCK);
-    kdr.init();
-    kdr.restore();
-
-    // return empty pod list
-    when(podList.getItems()).thenReturn(ImmutableList.of());
-
-    // Verify that the runner eventually polls and finds out that the pod is gone
-    verify(stateManager, timeout(30_000))
-        .receive(Event.runError(WORKFLOW_INSTANCE, "No pod associated with this instance"));
-    await().timeout(30, SECONDS).until(() ->
-                                           assertThat(stateManager.get(WORKFLOW_INSTANCE).data()
-                                                          .lastExit(), isEmpty()));
   }
 }
