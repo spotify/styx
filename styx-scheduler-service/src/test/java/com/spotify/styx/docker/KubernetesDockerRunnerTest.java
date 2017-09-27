@@ -690,26 +690,4 @@ public class KubernetesDockerRunnerTest {
     await().timeout(30, SECONDS).until(() ->
         assertThat(stateManager.get(WORKFLOW_INSTANCE).data().lastExit(), hasValue(20)));
   }
-
-  // this test case is to cover no runState branch
-  @Test
-  public void shouldPollPodStatusAndDeleteUntrackedRunningPod() throws Exception {
-    when(k8sClient.pods().withName(createdPod.getMetadata().getName())).thenReturn(namedPod);
-    when(namedPod.get()).thenReturn(createdPod);
-
-    createdPod.setStatus(running(/* ready= */ true));
-
-    // Set up a new state manager without any state
-    StateManager stateManager = Mockito.spy(new SyncStateManager());
-
-    // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
-    kdr.close();
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-                                     debug, SHORT_POLL_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, CLOCK);
-    kdr.init();
-    kdr.restore();
-
-    // Verify that the runner eventually polls and deletes the pod
-    verify(namedPod, timeout(30_000)).delete();
-  }
 }
