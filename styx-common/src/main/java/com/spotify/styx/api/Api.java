@@ -33,20 +33,14 @@ import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import okio.ByteString;
-import org.codehaus.jackson.annotate.JsonCreator;
 
 public final class Api {
 
   public enum Version {
-    V0, V1, V2, V3;
+    V3;
 
     public String prefix() {
-      return "/api/v" + ordinal();
-    }
-
-    @JsonCreator
-    public Version parse(String version) {
-      return valueOf(version);
+      return "/api/" + name().toLowerCase();
     }
   }
 

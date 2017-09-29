@@ -214,7 +214,7 @@ class LocalFileScheduleSource implements ScheduleSource {
     final String componentId = componentId(path);
     final URI componentUri = path.toUri();
     return definitions.schedules().stream()
-        .map(schedule -> Workflow.create(componentId, componentUri, schedule))
+        .map(schedule -> Workflow.create(componentId, schedule))
         .collect(Collectors.toList());
   }
 

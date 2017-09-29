@@ -72,7 +72,7 @@ public class StateInitializingTriggerTest {
   @Test
   public void shouldInitializeWorkflowInstance() throws Exception {
     WorkflowConfiguration workflowConfiguration = schedule(HOURS);
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    Workflow workflow = Workflow.create("id", workflowConfiguration);
     setDockerImage(workflow.id(), workflow.configuration());
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
@@ -82,7 +82,7 @@ public class StateInitializingTriggerTest {
   @Test
   public void shouldInjectTriggerExecutionEventWithNaturalTrigger() throws Exception {
     WorkflowConfiguration workflowConfiguration = schedule(HOURS);
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    Workflow workflow = Workflow.create("id", workflowConfiguration);
     setDockerImage(workflow.id(), workflow.configuration());
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
@@ -97,7 +97,7 @@ public class StateInitializingTriggerTest {
   @Test
   public void shouldInjectTriggerExecutionEventWithBackfillTrigger() throws Exception {
     WorkflowConfiguration workflowConfiguration = schedule(HOURS);
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    Workflow workflow = Workflow.create("id", workflowConfiguration);
     setDockerImage(workflow.id(), workflow.configuration());
     trigger.event(workflow, BACKFILL_TRIGGER, TIME);
 
@@ -111,7 +111,7 @@ public class StateInitializingTriggerTest {
 
   @Test
   public void shouldDoNothingIfDockerInfoMissing() throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, TestData.DAILY_WORKFLOW_CONFIGURATION);
+    Workflow workflow = Workflow.create("id", TestData.DAILY_WORKFLOW_CONFIGURATION);
     setDockerImage(workflow.id(), workflow.configuration());
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
@@ -123,7 +123,7 @@ public class StateInitializingTriggerTest {
     for (Map.Entry<Schedule, String> scheduleCase : SCHEDULE_ARG_EXPECTS.entrySet()) {
       WorkflowConfiguration
           workflowConfiguration = schedule(scheduleCase.getKey(), "--date", "{}", "--bar");
-      Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+      Workflow workflow = Workflow.create("id", workflowConfiguration);
       setDockerImage(workflow.id(), workflow.configuration());
       trigger.event(workflow, NATURAL_TRIGGER, TIME);
 

@@ -30,12 +30,9 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.ImmutableList;
-import com.spotify.styx.api.Api;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
@@ -48,7 +45,6 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.state.handlers.TerminationHandler;
-import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -84,16 +80,9 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
   private static final Workflow HOURLY_WORKFLOW = Workflow.create(
       "styx",
-      TestData.WORKFLOW_URI,
-      WORKFLOW_CONFIGURATION_HOURLY);
-  private static final Workflow HOURLY_WORKFLOW_V3_API = Workflow.create(
-      "styx",
-      Optional.of(TestData.WORKFLOW_URI),
-      Optional.of(Api.Version.V3),
       WORKFLOW_CONFIGURATION_HOURLY);
   private static final Workflow HOURLY_WORKFLOW_WITH_ZERO_OFFSET = Workflow.create(
       "styx",
-      TestData.WORKFLOW_URI,
       WORKFLOW_CONFIGURATION_HOURLY_WITH_ZERO_OFFSET);
   private static final ExecutionDescription TEST_EXECUTION_DESCRIPTION =
       ExecutionDescription.create(
@@ -101,7 +90,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
           false, empty(), empty(), empty());
   private static final Workflow DAILY_WORKFLOW = Workflow.create(
       "styx",
-      TestData.WORKFLOW_URI,
       WORKFLOW_CONFIGURATION_DAILY);
   private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
   private static final Trigger TRIGGER2 = Trigger.unknown("trig2");
@@ -130,8 +118,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   public void shouldRunCustomWorkflowSchedule() throws Exception {
     Workflow customWorkflow = Workflow.create(
         "styx",
-        Optional.of(TestData.WORKFLOW_URI),
-        Optional.of(Api.Version.V3),
         WorkflowConfiguration.builder()
             .id("styx.TestEndpoint")
             .schedule(Schedule.parse("15,45 12,15 * * *"))
@@ -477,7 +463,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     Workflow changedWorkflow = Workflow.create(
         HOURLY_WORKFLOW.componentId(),
-        TestData.WORKFLOW_URI,
         changedWorkflowConfiguration);
 
     workflowChanges(changedWorkflow);
@@ -493,104 +478,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     RunSpec runSpec2 = dockerRuns.get(1)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec2, is(naturalRunSpec(runSpec2.executionId(), "busybox:v777", ImmutableList.of("other", "args"))));
-  }
-
-  @Test
-  public void doNotUpdateWorkflowFromLowerAPI() throws Exception {
-    givenWorkflow(HOURLY_WORKFLOW_V3_API);
-
-    styxStarts();
-
-    WorkflowConfiguration changedWorkflowConfiguration = WorkflowConfiguration.builder()
-        .id(WORKFLOW_CONFIGURATION_HOURLY.id())
-        .schedule(Schedule.HOURS)
-        .dockerImage("busybox:v777")
-        .dockerArgs(asList("other", "args"))
-        .build();
-
-    Workflow changedWorkflow = Workflow.create(
-        HOURLY_WORKFLOW_V3_API.componentId(),
-        Optional.of(TestData.WORKFLOW_URI),
-        Optional.of(Api.Version.V2),
-        changedWorkflowConfiguration);
-
-    workflowChanges(changedWorkflow);
-
-    Optional<Workflow> workflow = storage.workflow(HOURLY_WORKFLOW_V3_API.id());
-    assertTrue(workflow.isPresent());
-    assertNotEquals(changedWorkflowConfiguration, workflow);
-  }
-
-  @Test
-  public void doNotUpdateWorkflowFromNoneAPI() throws Exception {
-    givenWorkflow(HOURLY_WORKFLOW_V3_API);
-
-    styxStarts();
-
-    WorkflowConfiguration changedWorkflowConfiguration = WorkflowConfiguration.builder()
-        .id(WORKFLOW_CONFIGURATION_HOURLY.id())
-        .schedule(Schedule.HOURS)
-        .dockerImage("busybox:v777")
-        .dockerArgs(asList("other", "args"))
-        .build();
-
-    Workflow changedWorkflow = Workflow.create(
-        HOURLY_WORKFLOW_V3_API.componentId(),
-        TestData.WORKFLOW_URI,
-        changedWorkflowConfiguration);
-
-    workflowChanges(changedWorkflow);
-
-    Optional<Workflow> workflow = storage.workflow(HOURLY_WORKFLOW_V3_API.id());
-    assertTrue(workflow.isPresent());
-    assertNotEquals(changedWorkflowConfiguration, workflow);
-  }
-
-  @Test
-  public void doNotDeleteWorkflowFromLowerAPI() throws Exception {
-    givenWorkflow(HOURLY_WORKFLOW_V3_API);
-
-    styxStarts();
-
-    WorkflowConfiguration changedWorkflowConfiguration = WorkflowConfiguration.builder()
-        .id(WORKFLOW_CONFIGURATION_HOURLY.id())
-        .schedule(Schedule.HOURS)
-        .dockerImage("busybox:v777")
-        .dockerArgs(asList("other", "args"))
-        .build();
-
-    Workflow changedWorkflow = Workflow.create(
-        HOURLY_WORKFLOW_V3_API.componentId(),
-        Optional.of(TestData.WORKFLOW_URI),
-        Optional.of(Api.Version.V2),
-        changedWorkflowConfiguration);
-
-    workflowDeleted(changedWorkflow);
-
-    assertTrue(storage.workflow(HOURLY_WORKFLOW_V3_API.id()).isPresent());
-  }
-
-  @Test
-  public void doNotDeleteWorkflowFromNoneAPI() throws Exception {
-    givenWorkflow(HOURLY_WORKFLOW_V3_API);
-
-    styxStarts();
-
-    WorkflowConfiguration changedWorkflowConfiguration = WorkflowConfiguration.builder()
-        .id(WORKFLOW_CONFIGURATION_HOURLY.id())
-        .schedule(Schedule.HOURS)
-        .dockerImage("busybox:v777")
-        .dockerArgs(asList("other", "args"))
-        .build();
-
-    Workflow changedWorkflow = Workflow.create(
-        HOURLY_WORKFLOW_V3_API.componentId(),
-        TestData.WORKFLOW_URI,
-        changedWorkflowConfiguration);
-
-    workflowDeleted(changedWorkflow);
-
-    assertTrue(storage.workflow(HOURLY_WORKFLOW_V3_API.id()).isPresent());
   }
 
   @Test

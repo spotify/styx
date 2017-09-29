@@ -48,7 +48,6 @@ import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.ParameterUtil;
-import java.net.URI;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -314,7 +313,6 @@ public class BackfillTriggerManagerTest {
   private Workflow workflowUsingResources(WorkflowId id, String... resources) {
     return Workflow.create(
         id.componentId(),
-        URI.create("http://example.com"),
         WorkflowConfiguration.builder()
             .id(id.id())
             .schedule(Schedule.HOURS)

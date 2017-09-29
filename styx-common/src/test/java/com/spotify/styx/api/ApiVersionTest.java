@@ -19,15 +19,14 @@
  */
 package com.spotify.styx.api;
 
-import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
 public class ApiVersionTest {
 
   @Test
-  public void shouldParse() {
-    assertSame(Api.Version.V0, Api.Version.valueOf("V0"));
-    assertSame(Api.Version.V3, Api.Version.valueOf("V3"));
+  public void prefixShouldWork() throws Exception {
+    assertEquals("/api/v3", Api.Version.V3.prefix());
   }
 }
