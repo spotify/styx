@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.WorkflowExecutionGate.NO_BLOCKER;
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
@@ -35,7 +36,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.RateLimiter;
+import com.spotify.styx.WorkflowExecutionGate.ExecutionBlocker;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
@@ -56,7 +59,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,6 +89,8 @@ public class Scheduler {
   @VisibleForTesting
   static final String GLOBAL_RESOURCE_ID = "GLOBAL_STYX_CLUSTER";
 
+  private static final int SCHEDULING_BATCH_SIZE = 32;
+
   private final Time time;
   private final TimeoutConfig ttls;
   private final StateManager stateManager;
@@ -90,11 +99,12 @@ public class Scheduler {
   private final WorkflowResourceDecorator resourceDecorator;
   private final Stats stats;
   private final RateLimiter dequeueRateLimiter;
+  private final WorkflowExecutionGate gate;
 
   public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager,
       WorkflowCache workflowCache, Storage storage,
       WorkflowResourceDecorator resourceDecorator,
-      Stats stats, RateLimiter dequeueRateLimiter) {
+      Stats stats, RateLimiter dequeueRateLimiter, WorkflowExecutionGate gate) {
     this.time = Objects.requireNonNull(time);
     this.ttls = Objects.requireNonNull(ttls);
     this.stateManager = Objects.requireNonNull(stateManager);
@@ -103,6 +113,7 @@ public class Scheduler {
     this.resourceDecorator = Objects.requireNonNull(resourceDecorator);
     this.stats = Objects.requireNonNull(stats);
     this.dequeueRateLimiter = Objects.requireNonNull(dequeueRateLimiter, "dequeueRateLimiter");
+    this.gate = Objects.requireNonNull(gate, "gate");;
   }
 
   void tick() {
@@ -159,15 +170,36 @@ public class Scheduler {
 
     timedOutInstances.forEach(this::sendTimeout);
 
-    for (InstanceState eligibleInstance : eligibleInstances) {
-      final boolean proceed = limitAndDequeue(
-          resources, workflowResourceReferences, currentResourceUsage, eligibleInstance);
-      if (!proceed) {
-        break;
-      }
-    }
+    limitAndDequeue(resources, workflowResourceReferences, currentResourceUsage, eligibleInstances);
 
     updateStats(resources, currentResourceUsage);
+  }
+
+  private void limitAndDequeue(Map<String, Resource> resources,
+      Map<WorkflowId, Set<String>> workflowResourceReferences,
+      Map<String, Long> currentResourceUsage, List<InstanceState> eligibleInstances) {
+
+    // Process the eligible instances in batches in order to parallelize execution blocker lookup
+    for (List<InstanceState> batch : Lists.partition(eligibleInstances, SCHEDULING_BATCH_SIZE)) {
+
+      // Asynchronously look up execution blockers for a batch of instances
+      final Map<WorkflowInstance, CompletionStage<Optional<ExecutionBlocker>>> executionBlockers =
+          batch.stream()
+              .map(InstanceState::workflowInstance)
+              .collect(toMap(identity(), gate::executionBlocker));
+
+      // Evaluate each instance in the batch for dequeuing
+      for (InstanceState instance : batch) {
+        final boolean proceed = limitAndDequeue(
+            resources, workflowResourceReferences, currentResourceUsage, instance,
+            executionBlockers.getOrDefault(instance.workflowInstance(), NO_BLOCKER));
+
+        // Stop processing if rate limit was hit
+        if (!proceed) {
+          return;
+        }
+      }
+    }
   }
 
   /**
@@ -191,7 +223,29 @@ public class Scheduler {
 
   private boolean limitAndDequeue(Map<String, Resource> resources,
       Map<WorkflowId, Set<String>> workflowResourceReferences,
-      Map<String, Long> currentResourceUsage, InstanceState instance) {
+      Map<String, Long> currentResourceUsage, InstanceState instance,
+      CompletionStage<Optional<ExecutionBlocker>> executionBlockerFuture) {
+
+    // Check for execution blockers
+    final Optional<ExecutionBlocker> blocker;
+    try {
+      blocker = executionBlockerFuture.toCompletableFuture().get(30, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      LOG.debug("Interrupted");
+      return true;
+    } catch (ExecutionException | TimeoutException e) {
+      LOG.error("Failed to check for missing dependencies", e);
+      return true;
+    }
+
+    if (blocker.isPresent()) {
+      stateManager.receiveIgnoreClosed(Event.retryAfter(
+          instance.workflowInstance(),
+          blocker.get().delay().toMillis()));
+      LOG.debug("Dequeue rescheduled: {}: {}", instance.workflowInstance(), blocker.get());
+      return true;
+    }
+
     final Set<String> workflowResourceRefs =
         workflowResourceReferences.getOrDefault(instance.workflowInstance().workflowId(), emptySet());
 
