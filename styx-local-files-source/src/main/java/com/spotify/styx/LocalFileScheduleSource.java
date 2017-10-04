@@ -34,7 +34,6 @@ import com.spotify.styx.schedule.ScheduleSource;
 import com.sun.nio.file.SensitivityWatchEventModifier;
 import com.typesafe.config.Config;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
@@ -212,7 +211,6 @@ class LocalFileScheduleSource implements ScheduleSource {
     LOG.debug("Parsed schedule definitions: {}", definitions);
 
     final String componentId = componentId(path);
-    final URI componentUri = path.toUri();
     return definitions.schedules().stream()
         .map(schedule -> Workflow.create(componentId, schedule))
         .collect(Collectors.toList());

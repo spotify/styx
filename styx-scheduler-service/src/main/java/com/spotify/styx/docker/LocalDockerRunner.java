@@ -52,7 +52,6 @@ class LocalDockerRunner implements DockerRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(LocalDockerRunner.class);
 
-  private static final String LOCAL_DOCKER_EVENT = "local-docker-event";
   private static final int CHECK_INTERVAL = 5;
 
   private final DockerClient client;

@@ -53,7 +53,6 @@ import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Debug;
 import io.fabric8.kubernetes.api.model.ContainerState;
-import io.fabric8.kubernetes.api.model.ContainerStateRunning;
 import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.DoneablePod;
@@ -140,7 +139,6 @@ public class KubernetesDockerRunnerTest {
 
   private static final int NO_POLL = Integer.MAX_VALUE;
   private static final int POD_DELETION_DELAY_SECONDS = 120;
-  private static final int SHORT_POLL_INTERVAL_SECONDS = 1;
   private static final Instant FIXED_INSTANT = Instant.parse("2017-09-01T01:00:00Z");
   private static final Clock CLOCK = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
 
@@ -155,7 +153,6 @@ public class KubernetesDockerRunnerTest {
   @Mock ContainerStatus containerStatus;
   @Mock ContainerState containerState;
   @Mock ContainerStateTerminated containerStateTerminated;
-  @Mock ContainerStateRunning containerStateRunning;
   @Mock ListMeta listMeta;
   @Mock Watchable<Watch, Watcher<Pod>> podWatchable;
   @Mock Watch watch;
