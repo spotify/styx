@@ -194,7 +194,6 @@ public class LocalFileScheduleSourceTest {
   private Workflow simpleDef(Path testPath) {
     return Workflow.create(
         "test-file.yaml",
-        testPath.toUri(),
         WorkflowConfiguration.builder()
             .id("foo")
             .schedule(Schedule.HOURS)
@@ -206,7 +205,6 @@ public class LocalFileScheduleSourceTest {
   private Workflow differentDef(Path testPath) {
     return Workflow.create(
         "test-file.yaml",
-        testPath.toUri(),
         WorkflowConfiguration.builder()
             .id("foo")
             .schedule(Schedule.DAYS)
@@ -218,7 +216,6 @@ public class LocalFileScheduleSourceTest {
   private Workflow example1(Path testPath) {
     return Workflow.create(
         "test-file.yaml",
-        testPath.toUri(),
         WorkflowConfiguration.builder()
             .id("foo")
             .schedule(Schedule.HOURS)
@@ -230,7 +227,6 @@ public class LocalFileScheduleSourceTest {
   private Workflow example2(Path testPath) {
     return Workflow.create(
         "test-file.yaml",
-        testPath.toUri(),
         WorkflowConfiguration.builder()
             .id("bar")
             .schedule(Schedule.DAYS)

@@ -116,8 +116,6 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
       empty(),
       empty());
 
-  private static final String TEST_EXEC_ID = "test-exec-id";
-
   private ExecutorService executor;
 
   @Mock NamespacedKubernetesClient k8sClient;

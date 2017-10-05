@@ -28,14 +28,12 @@ import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
-import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -57,7 +55,6 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TriggerInstantSpec;
-import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -101,15 +98,15 @@ public class DatastoreStorageTest {
           .schedule(DAYS)
           .build();
   private static final Workflow WORKFLOW_NO_DOCKER_IMAGE =
-      Workflow.create(WORKFLOW_ID_NO_DOCKER_IMG.componentId(), URI.create("http://foo"),
+      Workflow.create(WORKFLOW_ID_NO_DOCKER_IMG.componentId(),
                       WORKFLOW_CONFIGURATION_EMPTY_CONF);
   private static final Workflow
       WORKFLOW_NO_STATE =
-      Workflow.create(WORKFLOW_ID_NO_STATE.componentId(), URI.create("http://foo"),
+      Workflow.create(WORKFLOW_ID_NO_STATE.componentId(),
                       WORKFLOW_CONFIGURATION_EMPTY_CONF);
   private static final Workflow
       WORKFLOW_WITH_DOCKER_IMAGE =
-      Workflow.create(WORKFLOW_ID_WITH_DOCKER_IMG.componentId(), URI.create("http://foo"),
+      Workflow.create(WORKFLOW_ID_WITH_DOCKER_IMG.componentId(),
                       WORKFLOW_CONFIGURATION_WITH_DOCKER_IMAGE);
 
   private static LocalDatastoreHelper helper;
@@ -151,8 +148,8 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldPersistWorkflows() throws Exception {
-    Workflow workflow = Workflow.create("test", URI.create("http://foo"),
-        FULL_WORKFLOW_CONFIGURATION);
+    Workflow workflow = Workflow.create("test",
+                                        FULL_WORKFLOW_CONFIGURATION);
     storage.store(workflow);
     Optional<Workflow> retrieved = storage.workflow(workflow.id());
 
@@ -186,8 +183,8 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldNotRemoveWorkflowWhenSettingDockerImage() throws Exception {
-    Workflow workflow = Workflow.create("test", URI.create("http://foo"),
-        FULL_WORKFLOW_CONFIGURATION);
+    Workflow workflow = Workflow.create("test",
+                                        FULL_WORKFLOW_CONFIGURATION);
     storage.store(workflow);
     Optional<Workflow> retrieved = storage.workflow(workflow.id());
     assertThat(retrieved, is(Optional.of(workflow)));
@@ -219,7 +216,7 @@ public class DatastoreStorageTest {
   public void shouldPersistDockerImagePerComponent() throws Exception {
     WorkflowState state = patchDockerImage(DOCKER_IMAGE_COMPONENT);
 
-    storage.store(Workflow.create(WORKFLOW_ID1.componentId(), URI.create("http://foo"),
+    storage.store(Workflow.create(WORKFLOW_ID1.componentId(),
                                   WORKFLOW_CONFIGURATION_EMPTY_CONF));
     storage.patchState(WORKFLOW_ID1.componentId(), state);
     Optional<String> retrieved = storage.getDockerImage(WORKFLOW_ID1);
@@ -231,7 +228,7 @@ public class DatastoreStorageTest {
   public void shouldPersistCommitShaPerComponent() throws Exception {
     WorkflowState state = WorkflowState.builder().commitSha(COMMIT_SHA).build();
 
-    storage.store(Workflow.create(WORKFLOW_ID1.componentId(), URI.create("http://foo"),
+    storage.store(Workflow.create(WORKFLOW_ID1.componentId(),
                                   WORKFLOW_CONFIGURATION_EMPTY_CONF));
     storage.patchState(WORKFLOW_ID1.componentId(), state);
     WorkflowState retrieved = storage.workflowState(WORKFLOW_ID1);
@@ -243,7 +240,6 @@ public class DatastoreStorageTest {
   public void shouldPersistDockerImagePerWorkflowId() throws Exception {
     storage.store(Workflow.create(
         WORKFLOW_ID1.componentId(),
-        URI.create("http://foo"),
         WorkflowConfiguration.builder()
             .id(WORKFLOW_ID1.id())
             .schedule(DAYS)
@@ -258,7 +254,6 @@ public class DatastoreStorageTest {
   public void shouldPersistCommitShaPerWorkflowId() throws Exception {
     storage.store(Workflow.create(
         WORKFLOW_ID1.componentId(),
-        URI.create("http://foo"),
         WorkflowConfiguration.builder()
             .id(WORKFLOW_ID1.id())
             .schedule(DAYS)
@@ -512,7 +507,6 @@ public class DatastoreStorageTest {
   public void allFieldsAreSetWhenRetrievingWorkflowState() throws Exception {
     storage.store(Workflow.create(
         WORKFLOW_ID1.componentId(),
-        URI.create("http://not/important"),
         WorkflowConfiguration.builder()
             .id(WORKFLOW_ID1.id())
             .schedule(DAYS)
@@ -635,7 +629,6 @@ public class DatastoreStorageTest {
   private Workflow workflow(WorkflowId workflowId) {
     return Workflow.create(
         workflowId.componentId(),
-        URI.create("http://foo"),
         WorkflowConfiguration.builder()
             .id(workflowId.id())
             .schedule(HOURS)

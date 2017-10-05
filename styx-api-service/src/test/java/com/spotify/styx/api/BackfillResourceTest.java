@@ -65,7 +65,6 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
 import java.io.IOException;
-import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import okio.ByteString;
@@ -149,19 +148,19 @@ public class BackfillResourceTest extends VersionedApiTest {
   @Before
   public void setUp() throws Exception {
     storage.storeWorkflow(Workflow.create(
-        BACKFILL_1.workflowId().componentId(), URI.create("http://example.com"),
+        BACKFILL_1.workflowId().componentId(),
         WorkflowConfiguration.builder()
             .id(BACKFILL_1.workflowId().id())
             .schedule(Schedule.HOURS)
             .build()));
     storage.storeWorkflow(Workflow.create(
-        BACKFILL_2.workflowId().componentId(), URI.create("http://example.com"),
+        BACKFILL_2.workflowId().componentId(),
         WorkflowConfiguration.builder()
             .id(BACKFILL_2.workflowId().id())
             .schedule(Schedule.HOURS)
             .build()));
     storage.storeWorkflow(Workflow.create(
-        BACKFILL_3.workflowId().componentId(), URI.create("http://example.com"),
+        BACKFILL_3.workflowId().componentId(),
         WorkflowConfiguration.builder()
             .id(BACKFILL_3.workflowId().id())
             .schedule(Schedule.HOURS)

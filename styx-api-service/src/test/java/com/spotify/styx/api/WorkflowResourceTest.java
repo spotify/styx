@@ -62,7 +62,6 @@ import com.spotify.styx.storage.BigtableStorage;
 import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
-import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
@@ -99,7 +98,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
           .build();
 
   private static final Workflow WORKFLOW =
-      Workflow.create("foo", URI.create("/hejhej"), WORKFLOW_CONFIGURATION);
+      Workflow.create("foo", WORKFLOW_CONFIGURATION);
 
   private static final String VALID_SHA = "470a229b49a14e7682af2abfdac3b881a8aacdf9";
   private static final String INVALID_SHA = "XXXXXX9b49a14e7682af2abfdac3b881a8aacdf9";

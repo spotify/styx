@@ -34,7 +34,6 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
 import java.io.IOException;
-import java.net.URI;
 import java.util.List;
 import org.junit.Test;
 
@@ -116,7 +115,6 @@ public class InMemoryStorageTest {
   private Workflow workflow(WorkflowId workflowId) {
     return Workflow.create(
         workflowId.componentId(),
-        URI.create("http://foo"),
         WorkflowConfiguration.builder()
             .id(workflowId.id())
             .schedule(HOURS)

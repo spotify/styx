@@ -32,7 +32,6 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-import java.net.URI;
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -40,9 +39,6 @@ public final class TestData {
 
   private TestData() {
   }
-
-  public static final URI WORKFLOW_URI =
-      URI.create("http://example.com/foo/bar");
 
   public static final WorkflowId WORKFLOW_ID =
       WorkflowId.create("styx", "styx.TestEndpoint");

@@ -41,7 +41,6 @@ import com.spotify.styx.util.FutureUtil;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
-import java.net.URI;
 import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -59,7 +58,7 @@ public class TriggerManagerTest {
   private static final Trigger NATURAL_TRIGGER = Trigger.natural();
 
   private static Workflow WORKFLOW_DAILY =
-      Workflow.create("comp", URI.create("http:/foo"), FULL_WORKFLOW_CONFIGURATION);
+      Workflow.create("comp", FULL_WORKFLOW_CONFIGURATION);
 
   @Mock
   Storage storage;

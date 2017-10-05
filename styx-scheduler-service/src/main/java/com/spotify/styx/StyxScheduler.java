@@ -98,7 +98,6 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -548,16 +547,6 @@ public class StyxScheduler implements AppInit {
     stats.registerSubmissionRateLimitMetric(submissionRateLimiter::getRate);
   }
 
-  // If we have ever registered/updated the workflow via higher API version,
-  // we ignore any subsequent updates via lower API version.
-  private static boolean isGreaterOrEqualApiVersion(Workflow newWorkflow,
-                                                    Workflow existingWorkflow) {
-    return !existingWorkflow.fromApi().isPresent()
-           ||
-           newWorkflow.fromApi().isPresent()
-           && newWorkflow.fromApi().get().ordinal() >= existingWorkflow.fromApi().get().ordinal();
-  }
-
   private static Consumer<Workflow> workflowChanged(
       WorkflowCache cache,
       WorkflowInitializer workflowInitializer,
@@ -565,14 +554,6 @@ public class StyxScheduler implements AppInit {
       StateManager stateManager) {
 
     return (workflow) -> {
-      final Optional<Workflow> existingWorkflow = cache.workflow(workflow.id());
-      if (existingWorkflow.isPresent()) {
-        if (!isGreaterOrEqualApiVersion(workflow, existingWorkflow.get())) {
-          // FIXME: instead of returning silently, a proper exception should be thrown out to indicate client error
-          return;
-        }
-      }
-
       stats.registerActiveStatesMetric(
           workflow.id(),
           () -> stateManager.getActiveStatesCount(workflow.id()));
@@ -584,10 +565,6 @@ public class StyxScheduler implements AppInit {
 
   private static Consumer<Workflow> workflowRemoved(WorkflowCache cache, Storage storage) {
     return workflow -> cache.workflow(workflow.id()).ifPresent(existingWorkflow -> {
-      if (!isGreaterOrEqualApiVersion(workflow, existingWorkflow)) {
-        return;
-      }
-
       try {
         storage.delete(workflow.id());
       } catch (IOException e) {

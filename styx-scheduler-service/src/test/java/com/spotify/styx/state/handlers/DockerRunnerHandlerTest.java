@@ -46,7 +46,6 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.StateManager.IsClosed;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.Trigger;
-import com.spotify.styx.testdata.TestData;
 import java.io.IOException;
 import java.util.Arrays;
 import org.junit.Test;
@@ -76,7 +75,7 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldPassInArguments() throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, configuration());
+    Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
     ExecutionDescription desc = ExecutionDescription.forImage(TEST_DOCKER_IMAGE);
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
@@ -97,7 +96,7 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldInterpolateScheduleArgument() throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, configuration());
+    Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
         StateData.newBuilder().executionDescription(EXECUTION_DESCRIPTION).build());
@@ -113,7 +112,7 @@ public class DockerRunnerHandlerTest {
   @Test
   public void shouldTransitionIntoSubmitted() throws Exception {
     WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.NEW, dockerRunnerHandler);
 
@@ -138,7 +137,7 @@ public class DockerRunnerHandlerTest {
     doThrow(throwable).when(dockerRunner)
         .start(any(WorkflowInstance.class), any(RunSpec.class));
 
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, configuration());
+    Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
         StateData.newBuilder().executionDescription(EXECUTION_DESCRIPTION).build());
@@ -156,7 +155,7 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldHaltIfMissingExecutionDescription() throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, configuration());
+    Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING);
 
@@ -171,7 +170,7 @@ public class DockerRunnerHandlerTest {
   @Test
   public void shouldPerformCleanupOnFailed() throws Exception {
     WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.FAILED,
         StateData.newBuilder().executionId(TEST_EXECUTION_ID).build());
@@ -185,7 +184,7 @@ public class DockerRunnerHandlerTest {
   @Test
   public void shouldPerformCleanupOnFailedThroughTransitions() throws Exception {
     WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.NEW, dockerRunnerHandler);
 

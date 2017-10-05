@@ -86,7 +86,7 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldTransitionIntoSubmitting() throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule("--date", "{}", "--bar"));
+    Workflow workflow = Workflow.create("id", schedule("--date", "{}", "--bar"));
     WorkflowState workflowState = WorkflowState.builder()
         .enabled(true)
         .dockerImage(DOCKER_IMAGE)
@@ -115,7 +115,7 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldTransitionIntoFailedIfStorageError() throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule("--date", "{}", "--bar"));
+    Workflow workflow = Workflow.create("id", schedule("--date", "{}", "--bar"));
     WorkflowState workflowState = WorkflowState.builder()
         .enabled(true)
         .dockerImage(DOCKER_IMAGE)
@@ -156,7 +156,7 @@ public class ExecutionDescriptionHandlerTest {
   @Test
   public void shouldHaltIfMissingDockerArgs() throws Exception {
     WorkflowConfiguration workflowConfiguration = TestData.DAILY_WORKFLOW_CONFIGURATION;
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
@@ -171,7 +171,7 @@ public class ExecutionDescriptionHandlerTest {
   @Test
   public void shouldHaltIfMissingDockerImage() throws Exception {
     WorkflowConfiguration workflowConfiguration = schedule("foo", "bar");
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
@@ -187,7 +187,7 @@ public class ExecutionDescriptionHandlerTest {
   public void shouldHaltIfInvalidDockerImage() throws Exception {
     when(dockerImageValidator.validateImageReference(anyString())).thenReturn(ImmutableList.of("foo", "bar"));
 
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, FULL_WORKFLOW_CONFIGURATION);
+    Workflow workflow = Workflow.create("id", FULL_WORKFLOW_CONFIGURATION);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
@@ -207,7 +207,7 @@ public class ExecutionDescriptionHandlerTest {
         .dockerImage("legacy-docker-image")
         .dockerArgs(ImmutableList.of("foo", "bar"))
         .build();
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, workflowConfiguration);
+    Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
@@ -225,7 +225,7 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldNotTransitIfStateManagerIsClosed() throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.WORKFLOW_URI, schedule("--date", "{}", "--bar"));
+    Workflow workflow = Workflow.create("id", schedule("--date", "{}", "--bar"));
     WorkflowState workflowState = WorkflowState.builder()
         .enabled(true)
         .dockerImage(DOCKER_IMAGE)
