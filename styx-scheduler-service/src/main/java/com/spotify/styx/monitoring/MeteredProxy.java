@@ -23,6 +23,8 @@ package com.spotify.styx.monitoring;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
+import io.fabric8.kubernetes.client.KubernetesClientException;
+import io.fabric8.kubernetes.client.KubernetesClientTimeoutException;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -30,6 +32,7 @@ import java.lang.reflect.Proxy;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
+import javaslang.control.Try;
 
 /**
  * A proxy for instrumenting an instance of {@link Storage} or {@link DockerRunner} using
@@ -62,20 +65,59 @@ public class MeteredProxy implements InvocationHandler {
     final String operation = method.getName();
 
     final Instant t0 = time.get();
-    final Object ret;
-    try {
-      ret = method.invoke(delegate, args);
-    } catch (InvocationTargetException e) {
-      throw e.getTargetException();
-    }
+    final Try<?> result = Try.of(() -> {
+      try {
+        return method.invoke(delegate, args);
+      } catch (InvocationTargetException e) {
+        throw e.getTargetException();
+      }
+    });
+
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
 
+    // TODO: Instrument at a lower level to catch errors with greater granularity. At this level we might not see
+    //       all errors as the implementation might swallow exceptions, perform retries, etc.
+    result.onFailure(error -> {
+      if (delegate instanceof DockerRunner) {
+        reportDockerOperationError(operation, durationMillis, error);
+      }
+    });
+
+    final String status = (result.isSuccess()) ? "success" : "failure";
     if (delegate instanceof Storage) {
-      stats.recordStorageOperation(operation, durationMillis);
+      stats.recordStorageOperation(operation, durationMillis, status);
     } else if (delegate instanceof DockerRunner) {
-      stats.recordDockerOperation(operation, durationMillis);
+      stats.recordDockerOperation(operation, durationMillis, status);
     }
 
-    return ret;
+    // Propagate failure
+    if (result.isFailure()) {
+      throw result.getCause();
+    }
+
+    // Return successful result
+    return result.get();
+  }
+
+  private void reportDockerOperationError(String operation, long durationMillis, Throwable e) {
+    final KubernetesClientException kubernetesClientException = findCause(e, KubernetesClientException.class);
+    if (kubernetesClientException != null) {
+      final String type = (kubernetesClientException instanceof KubernetesClientTimeoutException)
+          ? "kubernetes-client-timeout"
+          : "kubernetes-client";
+      stats.recordDockerOperationError(operation, type, kubernetesClientException.getCode(), durationMillis);
+    } else {
+      stats.recordDockerOperationError(operation, "unknown", 0, durationMillis);
+    }
+  }
+
+  private static <T> T findCause(Throwable throwable, Class<T> needle) {
+    while (throwable != null) {
+      if (needle.isInstance(throwable)) {
+        return needle.cast(throwable);
+      }
+      throwable = throwable.getCause();
+    }
+    return null;
   }
 }

@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import javaslang.Tuple;
 import javaslang.Tuple2;
+import javaslang.Tuple3;
 
 public final class MetricsStats implements Stats {
 
@@ -68,9 +69,10 @@ public final class MetricsStats implements Stats {
       .tagged("what", "storage-operation-duration")
       .tagged("unit", UNIT_MILLISECOND);
 
+  private static final String OPERATION = "operation";
   private static final MetricId STORAGE_RATE = BASE
       .tagged("what", "storage-operation-rate")
-      .tagged("unit", "operation");
+      .tagged("unit", OPERATION);
 
   private static final MetricId DOCKER_DURATION = BASE
       .tagged("what", "docker-operation-duration")
@@ -78,7 +80,11 @@ public final class MetricsStats implements Stats {
 
   private static final MetricId DOCKER_RATE = BASE
       .tagged("what", "docker-operation-rate")
-      .tagged("unit", "operation");
+      .tagged("unit", OPERATION);
+
+  private static final MetricId DOCKER_ERROR_RATE = BASE
+      .tagged("what", "docker-operation-error-rate")
+      .tagged("unit", OPERATION);
 
   private static final MetricId TRANSITIONING_DURATION = BASE
       .tagged("what", "time-transitioning-between-submitted-running")
@@ -105,6 +111,8 @@ public final class MetricsStats implements Stats {
       .tagged("what", "submission-rate-limit")
       .tagged("unit", "submission/s");
 
+  private static final String STATUS = "status";
+
   private final SemanticMetricRegistry registry;
 
   private final Histogram submitToRunning;
@@ -119,6 +127,7 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Meter> dockerOperationMeters;
   private final ConcurrentMap<WorkflowId, Gauge> activeStatesPerWorkflowGauges;
   private final ConcurrentMap<Tuple2<WorkflowId, Integer>, Meter> exitCodePerWorkflowMeters;
+  private final ConcurrentMap<Tuple3<String, String, Integer>, Meter> dockerOperationErrorMeters;
   private final ConcurrentMap<String, Histogram> resourceConfiguredHistograms;
   private final ConcurrentMap<String, Histogram> resourceUsedHistograms;
 
@@ -137,6 +146,7 @@ public final class MetricsStats implements Stats {
     this.dockerOperationMeters = new ConcurrentHashMap<>();
     this.activeStatesPerWorkflowGauges = new ConcurrentHashMap<>();
     this.exitCodePerWorkflowMeters = new ConcurrentHashMap<>();
+    this.dockerOperationErrorMeters = new ConcurrentHashMap<>();
     this.resourceConfiguredHistograms = new ConcurrentHashMap<>();
     this.resourceUsedHistograms = new ConcurrentHashMap<>();
   }
@@ -164,7 +174,7 @@ public final class MetricsStats implements Stats {
 
   @Override
   public void registerWorkflowCountMetric(String status, Gauge<Long> workflowCount) {
-    registry.register(WORKFLOW_COUNT.tagged("status", status), workflowCount);
+    registry.register(WORKFLOW_COUNT.tagged(STATUS, status), workflowCount);
   }
 
   @Override
@@ -173,15 +183,20 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
-  public void recordStorageOperation(String operation, long durationMillis) {
-    storageOpHistogram(operation).update(durationMillis);
-    storageOpMeter(operation).mark();
+  public void recordStorageOperation(String operation, long durationMillis, String status) {
+    storageOpHistogram(operation, status).update(durationMillis);
+    storageOpMeter(operation, status).mark();
   }
 
   @Override
-  public void recordDockerOperation(String operation, long durationMillis) {
-    dockerOpHistogram(operation).update(durationMillis);
-    dockerOpMeter(operation).mark();
+  public void recordDockerOperation(String operation, long durationMillis, String status) {
+    dockerOpHistogram(operation, status).update(durationMillis);
+    dockerOpMeter(operation, status).mark();
+  }
+
+  @Override
+  public void recordDockerOperationError(String operation, String type, int code, long durationMillis) {
+    dockerOpErrorMeter(operation, type, code).mark();
   }
 
   @Override
@@ -238,24 +253,33 @@ public final class MetricsStats implements Stats {
                 "exit-code", String.valueOf(tuple._2))));
   }
 
-  private Histogram storageOpHistogram(String operation) {
+  private Meter dockerOpErrorMeter(String operation, String type, int code) {
+    return dockerOperationErrorMeters
+        .computeIfAbsent(Tuple.of(operation, type, code), (tuple) ->
+            registry.meter(DOCKER_ERROR_RATE.tagged(
+                "operation", tuple._1,
+                "type", tuple._2,
+                "code", String.valueOf(tuple._3))));
+  }
+
+  private Histogram storageOpHistogram(String operation, String status) {
     return storageOperationHistograms.computeIfAbsent(
-        operation, (op) -> registry.histogram(STORAGE_DURATION.tagged("operation", op)));
+        operation, (op) -> registry.histogram(STORAGE_DURATION.tagged(OPERATION, op, STATUS, status)));
   }
 
-  private Meter storageOpMeter(String operation) {
+  private Meter storageOpMeter(String operation, String status) {
     return storageOperationMeters.computeIfAbsent(
-        operation, (op) -> registry.meter(STORAGE_RATE.tagged("operation", op)));
+        operation, (op) -> registry.meter(STORAGE_RATE.tagged(OPERATION, op, STATUS, status)));
   }
 
-  private Histogram dockerOpHistogram(String operation) {
+  private Histogram dockerOpHistogram(String operation, String status) {
     return dockerOperationHistograms.computeIfAbsent(
-        operation, (op) -> registry.histogram(DOCKER_DURATION.tagged("operation", op)));
+        operation, (op) -> registry.histogram(DOCKER_DURATION.tagged(OPERATION, op, STATUS, status)));
   }
 
-  private Meter dockerOpMeter(String operation) {
+  private Meter dockerOpMeter(String operation, String status) {
     return dockerOperationMeters.computeIfAbsent(
-        operation, (op) -> registry.meter(DOCKER_RATE.tagged("operation", op)));
+        operation, (op) -> registry.meter(DOCKER_RATE.tagged(OPERATION, op, STATUS, status)));
   }
 
   private Histogram resourceConfiguredHistogram(String resource) {

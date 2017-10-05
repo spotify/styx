@@ -39,9 +39,11 @@ public interface Stats {
 
   void registerSubmissionRateLimitMetric(Gauge<Double> submissionRateLimit);
 
-  void recordStorageOperation(String operation, long durationMillis);
+  void recordStorageOperation(String operation, long durationMillis, String status);
 
-  void recordDockerOperation(String operation, long durationMillis);
+  void recordDockerOperation(String operation, long durationMillis, String status);
+
+  void recordDockerOperationError(String operation, String type, int code, long durationMillis);
 
   void recordSubmitToRunningTime(long durationSeconds);
 
