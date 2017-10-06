@@ -130,6 +130,16 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
+  public void runErrorOnLostNode() throws Exception {
+    pod.setStatus(running(true));
+    pod.getStatus().setReason("NodeLost");
+
+    assertGeneratesEventsAndTransitions(
+        RunState.State.RUNNING, pod,
+        Event.runError(WFI, "Kubernetes node became unresponsive"));
+  }
+
+  @Test
   public void errorExitCodeOnTerminationLoggingButNoMessage() throws Exception {
     Pod pod = podWithTerminationLogging();
     pod.setStatus(terminated("Succeeded", 0, null));
