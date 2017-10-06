@@ -85,6 +85,10 @@ public class MetricsStatsTest {
       .tagged("what", "docker-operation-rate")
       .tagged("unit", "operation");
 
+  private static final MetricId DOCKER_ERROR_RATE = BASE
+      .tagged("what", "docker-operation-error-rate")
+      .tagged("unit", "operation");
+
   private static final MetricId TRANSITIONING_DURATION = BASE
       .tagged("what", "time-transitioning-between-submitted-running")
       .tagged("unit", UNIT_SECOND);
@@ -137,21 +141,33 @@ public class MetricsStatsTest {
 
   @Test
   public void shouldRecordStorageOperation() throws Exception {
-    String operation = "operation";
-    when(registry.histogram(STORAGE_DURATION.tagged("operation", operation))).thenReturn(histogram);
-    when(registry.meter(STORAGE_RATE.tagged("operation", operation))).thenReturn(meter);
-    stats.recordStorageOperation(operation, 1000L);
+    String operation = "write";
+    String status = "success";
+    when(registry.histogram(STORAGE_DURATION.tagged("operation", operation, "status", status))).thenReturn(histogram);
+    when(registry.meter(STORAGE_RATE.tagged("operation", operation, "status", status))).thenReturn(meter);
+    stats.recordStorageOperation(operation, 1000L, status);
     verify(histogram).update(1000L);
     verify(meter).mark();
   }
 
   @Test
   public void shouldRecordDockerOperation() throws Exception {
-    String operation = "operation";
-    when(registry.histogram(DOCKER_DURATION.tagged("operation", operation))).thenReturn(histogram);
-    when(registry.meter(DOCKER_RATE.tagged("operation", operation))).thenReturn(meter);
-    stats.recordDockerOperation("operation", 1000L);
+    String operation = "start";
+    String status = "success";
+    when(registry.histogram(DOCKER_DURATION.tagged("operation", operation, "status", status))).thenReturn(histogram);
+    when(registry.meter(DOCKER_RATE.tagged("operation", operation, "status", status))).thenReturn(meter);
+    stats.recordDockerOperation(operation, 1000L, status);
     verify(histogram).update(1000L);
+    verify(meter).mark();
+  }
+
+  @Test
+  public void shouldRecordDockerOperationError() throws Exception {
+    String operation = "start";
+    String type = "kubernetes-client";
+    int code = 429;
+    when(registry.meter(DOCKER_ERROR_RATE.tagged("operation", operation, "type", type, "code", String.valueOf(code)))).thenReturn(meter);
+    stats.recordDockerOperationError(operation, type, code, 1000L);
     verify(meter).mark();
   }
 

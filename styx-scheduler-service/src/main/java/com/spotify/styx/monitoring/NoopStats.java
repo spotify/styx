@@ -48,11 +48,15 @@ final class NoopStats implements Stats {
   }
 
   @Override
-  public void recordStorageOperation(String operation, long durationMillis) {
+  public void recordStorageOperation(String operation, long durationMillis, String status) {
   }
 
   @Override
-  public void recordDockerOperation(String operation, long durationMillis) {
+  public void recordDockerOperation(String operation, long durationMillis, String status) {
+  }
+
+  @Override
+  public void recordDockerOperationError(String operation, String type, int code, long durationMillis) {
   }
 
   @Override
@@ -61,7 +65,6 @@ final class NoopStats implements Stats {
 
   @Override
   public void recordExitCode(WorkflowId workflowId, int exitCode) {
-
   }
 
   @Override

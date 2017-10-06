@@ -20,6 +20,7 @@
 
 package com.spotify.styx.monitoring;
 
+import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doThrow;
@@ -27,9 +28,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.spotify.styx.docker.DockerRunner;
+import com.spotify.styx.docker.DockerRunner.RunSpec;
+import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
+import io.fabric8.kubernetes.api.model.Status;
+import io.fabric8.kubernetes.client.KubernetesClientException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -47,6 +52,8 @@ public class MeteredProxyTest {
   public ExpectedException expect = ExpectedException.none();
 
   @Mock WorkflowInstance workflowInstance;
+  @Mock RunSpec runSpec;
+  @Mock SequenceEvent event;
 
   Instant now = Instant.now();
   Instant later = now.plusMillis(123);
@@ -64,7 +71,7 @@ public class MeteredProxyTest {
     proxy.resource("foobar");
 
     verify(mock).resource("foobar");
-    verify(stats).recordStorageOperation("resource", 123);
+    verify(stats).recordStorageOperation("resource", 123, "success");
   }
 
   @Test
@@ -75,7 +82,7 @@ public class MeteredProxyTest {
     proxy.cleanup(workflowInstance, "barbaz");
 
     verify(mock).cleanup(workflowInstance, "barbaz");
-    verify(stats).recordDockerOperation("cleanup", 123);
+    verify(stats).recordDockerOperation("cleanup", 123, "success");
   }
 
   @Test
@@ -89,5 +96,21 @@ public class MeteredProxyTest {
     expect.expectMessage("with message");
 
     proxy.cleanup(workflowInstance, "foo");
+  }
+
+  @Test
+  public void reportKubernetesClientException() throws Exception {
+    DockerRunner mock = mock(DockerRunner.class);
+    DockerRunner proxy = MeteredProxy.instrument(DockerRunner.class, mock, stats, time);
+
+    doThrow(new KubernetesClientException("enhance your calm", 429, new Status())).when(mock).start(any(), any());
+
+    try {
+      proxy.start(workflowInstance, runSpec);
+      fail("Expected exception");
+    } catch (Exception ignored) {
+    }
+
+    verify(stats).recordDockerOperationError("start", "kubernetes-client", 429, 123);
   }
 }
