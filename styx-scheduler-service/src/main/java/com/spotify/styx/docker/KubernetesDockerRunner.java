@@ -410,7 +410,7 @@ class KubernetesDockerRunner implements DockerRunner {
         .build();
 
     try {
-      retryer.call(Executors.callable(this::tryPollPods));
+      retryer.call(Executors.callable(this::pollPods));
     } catch (ExecutionException | RetryException e) {
       throw new RuntimeException(e);
     }
