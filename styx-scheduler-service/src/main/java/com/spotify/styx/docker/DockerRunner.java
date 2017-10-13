@@ -22,6 +22,7 @@ package com.spotify.styx.docker;
 
 import static java.util.Optional.empty;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.spotify.styx.ServiceAccountKeyManager;
@@ -33,8 +34,10 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.Debug;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
+import io.norberg.automatter.AutoMatter;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
@@ -75,41 +78,39 @@ public interface DockerRunner extends Closeable {
    */
   void cleanup(WorkflowInstance workflowInstance, String executionId);
 
-  @AutoValue
-  abstract class RunSpec {
+  @AutoMatter
+  interface RunSpec {
 
-    public abstract String executionId();
+    String executionId();
 
-    public abstract String imageName();
+    String imageName();
 
-    public abstract ImmutableList<String> args();
+    List<String> args();
 
-    public abstract boolean terminationLogging();
+    boolean terminationLogging();
 
-    public abstract Optional<WorkflowConfiguration.Secret> secret();
+    Optional<WorkflowConfiguration.Secret> secret();
 
-    public abstract Optional<String> serviceAccount();
+    Optional<String> serviceAccount();
 
-    public abstract Optional<Trigger> trigger();
+    Optional<Trigger> trigger();
 
-    public abstract Optional<String> commitSha();
+    Optional<String> commitSha();
 
-    public static RunSpec create(
-        String executionId,
-        String imageName,
-        ImmutableList<String> args,
-        boolean terminationLogging,
-        Optional<Secret> secret,
-        Optional<String> serviceAccount,
-        Optional<Trigger> trigger,
-        Optional<String> commitSha) {
-      return new AutoValue_DockerRunner_RunSpec(executionId, imageName, args, terminationLogging, secret,
-                                                serviceAccount, trigger, commitSha);
+    Optional<String> memRequest();
+
+    Optional<String> memLimit();
+
+    static RunSpecBuilder builder() {
+      return new RunSpecBuilder();
     }
 
-    public static RunSpec simple(String executionId, String imageName, String... args) {
-      return new AutoValue_DockerRunner_RunSpec(executionId, imageName, ImmutableList.copyOf(args),
-                                                false, empty(), empty(), empty(), empty());
+    static RunSpec simple(String executionId, String imageName, String... args) {
+      return builder()
+          .executionId(executionId)
+          .imageName(imageName)
+          .args(args)
+          .build();
     }
   }
 
