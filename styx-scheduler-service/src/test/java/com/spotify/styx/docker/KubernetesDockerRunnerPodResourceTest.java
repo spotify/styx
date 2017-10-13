@@ -33,14 +33,12 @@ import static com.spotify.styx.docker.KubernetesDockerRunner.TRIGGER_ID;
 import static com.spotify.styx.docker.KubernetesDockerRunner.TRIGGER_TYPE;
 import static com.spotify.styx.docker.KubernetesDockerRunner.WORKFLOW_ID;
 import static com.spotify.styx.docker.KubernetesDockerRunner.envVar;
-import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
-import com.google.common.collect.ImmutableList;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
@@ -137,9 +135,12 @@ public class KubernetesDockerRunnerPodResourceTest {
   public void shouldEnableTerminationLoggingWhenTrue() throws Exception {
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
-            DockerRunner.RunSpec.create(
-                "eid", "busybox", ImmutableList.of(), true,
-                empty(), empty(), empty(), empty()), EMPTY_SECRET_SPEC);
+        DockerRunner.RunSpec.builder()
+            .executionId("eid")
+            .imageName("busybox")
+            .terminationLogging(true)
+            .build(),
+        EMPTY_SECRET_SPEC);
 
     Map<String, String> annotations = pod.getMetadata().getAnnotations();
     assertThat(annotations.get(DOCKER_TERMINATION_LOGGING_ANNOTATION), is("true"));
@@ -183,9 +184,12 @@ public class KubernetesDockerRunnerPodResourceTest {
         .build();
     Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec.create(
-            "eid", "busybox", ImmutableList.of(), false, Optional.of(secret),
-            empty(), empty(), empty()), secretSpec);
+        DockerRunner.RunSpec.builder()
+            .executionId("eid")
+            .imageName("busybox")
+            .secret(secret)
+            .build(),
+        secretSpec);
 
     List<Volume> volumes = pod.getSpec().getVolumes();
     List<Container> containers = pod.getSpec().getContainers();
@@ -210,9 +214,13 @@ public class KubernetesDockerRunnerPodResourceTest {
   public void shouldConfigureEnvironmentVariables() throws Exception {
     final Pod pod = KubernetesDockerRunner.createPod(
         WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec
-            .create(TEST_EXECUTION_ID, "busybox", ImmutableList.of(), false, empty(),
-                    empty(), Optional.of(Trigger.unknown("trigger-id")), Optional.of("abc123")), EMPTY_SECRET_SPEC);
+        DockerRunner.RunSpec.builder()
+            .executionId(TEST_EXECUTION_ID)
+            .imageName("busybox")
+            .trigger(Trigger.unknown("trigger-id"))
+            .commitSha("abc123")
+            .build(),
+        EMPTY_SECRET_SPEC);
 
     final List<EnvVar> envVars = pod.getSpec().getContainers().get(0).getEnv();
 

@@ -54,6 +54,10 @@ public class ExecutionDescriptionHandler implements OutputHandler {
   private final StateManager stateManager;
   private final DockerImageValidator dockerImageValidator;
 
+  // TODO: make runtime overridable (i.e. Storage.config())
+  private static final String DEFAULT_MEM_REQUEST = "512Mi";
+  private static final String DEFAULT_MEM_LIMIT =  "1024Mi";
+
   public ExecutionDescriptionHandler(
       Storage storage,
       StateManager stateManager,
@@ -132,13 +136,16 @@ public class ExecutionDescriptionHandler implements OutputHandler {
           workflowId, workflowInstance, errors));
     }
 
-    return ExecutionDescription.create(
-        dockerImageOpt.get(),
-        dockerArgsOpt.get(),
-        workflow.configuration().dockerTerminationLogging(),
-        workflow.configuration().secret(),
-        workflow.configuration().serviceAccount(),
-        workflowState.commitSha());
+    return ExecutionDescription.builder()
+        .dockerImage(dockerImageOpt.get())
+        .dockerArgs(dockerArgsOpt.get())
+        .dockerTerminationLogging(workflow.configuration().dockerTerminationLogging())
+        .secret(workflow.configuration().secret())
+        .serviceAccount(workflow.configuration().serviceAccount())
+        .commitSha(workflowState.commitSha())
+        .memLimit(workflow.configuration().memLimit().orElse(DEFAULT_MEM_LIMIT))
+        .memRequest(workflow.configuration().memRequest().orElse(DEFAULT_MEM_REQUEST))
+        .build();
   }
 
   static String createExecutionId() {

@@ -51,13 +51,12 @@ public class PersistentEventTest {
   private static final String POD_NAME = "test-event";
   private static final String DOCKER_IMAGE = "busybox:1.1";
   private static final String COMMIT_SHA = "00000ef508c1cb905e360590ce3e7e9193f6b370";
-  private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.create(
-      DOCKER_IMAGE,
-      Arrays.asList("foo", "bar"),
-      false,
-      Optional.of(WorkflowConfiguration.Secret.create("secret", "/dev/null")),
-      Optional.empty(),
-      Optional.of(COMMIT_SHA));
+  private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.builder()
+      .dockerImage(DOCKER_IMAGE)
+      .dockerArgs("foo", "bar")
+      .secret(WorkflowConfiguration.Secret.create("secret", "/dev/null"))
+      .commitSha(COMMIT_SHA)
+      .build();
 
   @Test
   public void testRoundtripAllEvents() throws Exception {

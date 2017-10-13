@@ -22,7 +22,6 @@ package com.spotify.styx;
 
 import static com.spotify.styx.model.WorkflowInstance.create;
 import static java.util.Arrays.asList;
-import static java.util.Optional.empty;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -48,7 +47,7 @@ import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import org.junit.Test;
 
@@ -85,9 +84,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       "styx",
       WORKFLOW_CONFIGURATION_HOURLY_WITH_ZERO_OFFSET);
   private static final ExecutionDescription TEST_EXECUTION_DESCRIPTION =
-      ExecutionDescription.create(
-          TEST_DOCKER_IMAGE, Arrays.asList("--date", "{}", "--bar"),
-          false, empty(), empty(), empty());
+      ExecutionDescription.builder()
+      .dockerImage(TEST_DOCKER_IMAGE)
+      .dockerArgs("--date", "{}", "--bar")
+      .build();
   private static final Workflow DAILY_WORKFLOW = Workflow.create(
       "styx",
       WORKFLOW_CONFIGURATION_DAILY);
@@ -103,15 +103,23 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       .schedule(Schedule.HOURS)
       .build();
 
-  private static RunSpec naturalRunSpec(String executionId, String imageName, ImmutableList<String> args) {
-    return RunSpec.create(executionId, imageName, args, false, empty(), empty(),
-                          Optional.of(Trigger.natural()), empty());
+  private static RunSpec naturalRunSpec(String executionId, String imageName, List<String> args) {
+    return RunSpec.builder()
+        .executionId(executionId)
+        .imageName(imageName)
+        .args(args)
+        .trigger(Trigger.natural())
+        .build();
   }
 
-  private static RunSpec unknownRunSpec(String executionId, String imageName, ImmutableList<String> args,
-                                        String triggerId) {
-    return RunSpec.create(executionId, imageName, args, false, empty(), empty(),
-                          Optional.of(Trigger.unknown(triggerId)), empty());
+  private static RunSpec unknownRunSpec(String executionId, String imageName, List<String> args, String triggerId) {
+    return RunSpec
+        .builder()
+        .executionId(executionId)
+        .imageName(imageName)
+        .args(args)
+        .trigger(Trigger.unknown(triggerId))
+        .build();
   }
 
   @Test

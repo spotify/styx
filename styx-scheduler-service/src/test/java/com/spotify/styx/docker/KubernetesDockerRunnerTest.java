@@ -25,7 +25,6 @@ import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.podStatus
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.running;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminated;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.waiting;
-import static java.util.Optional.empty;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.is;
@@ -62,6 +61,8 @@ import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.PodStatus;
+import io.fabric8.kubernetes.api.model.Quantity;
+import io.fabric8.kubernetes.api.model.ResourceRequirements;
 import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.SecretBuilder;
 import io.fabric8.kubernetes.api.model.SecretList;
@@ -103,20 +104,16 @@ public class KubernetesDockerRunnerTest {
   private static final String SERVICE_ACCOUNT_SECRET = "sa-secret";
   private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(TestData.WORKFLOW_ID, "foo");
   private static final RunSpec RUN_SPEC = RunSpec.simple("eid0", "busybox");
-  private static final RunSpec RUN_SPEC_WITH_SECRET = RunSpec.create("eid1", "busybox",
-                                                                     ImmutableList.copyOf(new String[0]),
-                                                                     false,
-                                                                     Optional.of(WorkflowConfiguration.Secret.create("secret1", "/etc/secret")),
-                                                                     empty(),
-                                                                     empty(),
-                                                                     empty());
-  private static final RunSpec RUN_SPEC_WITH_SA = RunSpec.create("eid3", "busybox",
-                                                                 ImmutableList.copyOf(new String[0]),
-                                                                 false,
-                                                                 empty(),
-                                                                 Optional.of(SERVICE_ACCOUNT),
-                                                                 empty(),
-                                                                 empty());
+  private static final RunSpec RUN_SPEC_WITH_SECRET = RunSpec.builder()
+      .executionId("eid1")
+      .imageName("busybox")
+      .secret(WorkflowConfiguration.Secret.create("secret1", "/etc/secret"))
+      .build();
+  private static final RunSpec RUN_SPEC_WITH_SA = RunSpec.builder()
+      .executionId("eid3")
+      .imageName("busybox")
+      .serviceAccount(SERVICE_ACCOUNT)
+      .build();
 
   private static final KubernetesSecretSpec SECRET_SPEC_WITH_SA = KubernetesSecretSpec.builder()
       .serviceAccountSecret(SERVICE_ACCOUNT_SECRET)
@@ -129,13 +126,12 @@ public class KubernetesDockerRunnerTest {
   private static final KubernetesSecretSpec EMPTY_SECRET_SPEC = KubernetesSecretSpec.builder()
       .build();
 
-  private static final RunSpec RUN_SPEC_WITH_SECRET_AND_SA = RunSpec.create("eid", "busybox",
-                                                                            ImmutableList.copyOf(new String[0]),
-                                                                            false,
-                                                                            Optional.of(WorkflowConfiguration.Secret.create("secret1", KubernetesDockerRunner.STYX_WORKFLOW_SA_SECRET_MOUNT_PATH)),
-                                                                            Optional.of(SERVICE_ACCOUNT),
-                                                                            empty(),
-                                                                            empty());
+  private static final RunSpec RUN_SPEC_WITH_SECRET_AND_SA = RunSpec.builder()
+      .executionId("eid")
+      .imageName("busybox")
+      .secret(WorkflowConfiguration.Secret.create("secret1", KubernetesDockerRunner.STYX_WORKFLOW_SA_SECRET_MOUNT_PATH))
+      .serviceAccount(SERVICE_ACCOUNT)
+      .build();
 
   private static final int NO_POLL = Integer.MAX_VALUE;
   private static final int POD_DELETION_DELAY_SECONDS = 120;
@@ -470,6 +466,24 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
+  public void shouldConfigureResourceRequirements() throws IOException, StateManager.IsClosed {
+    final String memRequest = "17Mi";
+    final String memLimit = "4711Mi";
+    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RunSpec.builder()
+        .executionId("eid1")
+        .imageName("busybox")
+        .memRequest(memRequest)
+        .memLimit(memLimit)
+        .build(),
+        EMPTY_SECRET_SPEC);
+
+    final ResourceRequirements resourceReqs = pod.getSpec().getContainers().get(0).getResources();
+    assertThat(resourceReqs.getRequests().get("memory"), is(new Quantity(memRequest)));
+    assertThat(resourceReqs.getLimits().get("memory"), is(new Quantity(memLimit)));
+  }
+
+
+  @Test
   public void shouldRunIfSecretExists() throws IOException, StateManager.IsClosed {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(new SecretBuilder().build());
@@ -533,15 +547,11 @@ public class KubernetesDockerRunnerTest {
 
     exception.expect(InvalidExecutionException.class);
     exception.expectMessage("Referenced secret '" + secret + "' has the managed service account key secret name prefix");
-    kdr.start(WORKFLOW_INSTANCE, RunSpec.create(
-        "eid",
-        "busybox",
-        ImmutableList.of(),
-        false,
-        Optional.of(WorkflowConfiguration.Secret.create(secret, "/foo/bar")),
-        Optional.empty(),
-        empty(),
-        empty()));
+    kdr.start(WORKFLOW_INSTANCE, RunSpec.builder()
+        .executionId("eid")
+        .imageName("busybox")
+        .secret(WorkflowConfiguration.Secret.create(secret, "/foo/bar"))
+        .build());
 
     verify(pods, never()).create(any(Pod.class));
   }

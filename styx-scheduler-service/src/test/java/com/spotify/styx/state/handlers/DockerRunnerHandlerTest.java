@@ -21,7 +21,6 @@
 package com.spotify.styx.state.handlers;
 
 import static com.spotify.styx.model.Schedule.HOURS;
-import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
@@ -47,7 +46,6 @@ import com.spotify.styx.state.StateManager.IsClosed;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.Trigger;
 import java.io.IOException;
-import java.util.Arrays;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
@@ -65,9 +63,10 @@ public class DockerRunnerHandlerTest {
 
   private static final String TEST_EXECUTION_ID = "execution_1";
   private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
-  private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.create(
-      TEST_DOCKER_IMAGE, Arrays.asList("--date", "{}", "--bar"),
-      false, empty(), empty(), empty());
+  private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.builder()
+      .dockerImage(TEST_DOCKER_IMAGE)
+      .dockerArgs("--date", "{}", "--bar")
+      .build();
   private static final Trigger TRIGGER = Trigger.unknown("trig");
 
   @Captor ArgumentCaptor<WorkflowInstance> instanceCaptor;
