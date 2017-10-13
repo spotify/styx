@@ -256,19 +256,6 @@ public interface Storage {
   void patchState(WorkflowId workflowId, WorkflowState state) throws IOException;
 
   /**
-   * Patches the component state used by all its {@link Workflow}s.
-   *
-   * <p>All the present fields in {@link WorkflowState} will be modified atomically.
-   *
-   * <p>That this method will ignore the {@link WorkflowState#enabled()} field since enable/disable
-   * is only supported on the workflow level. See {@link #patchState(WorkflowId, WorkflowState)}.
-   *
-   * @param componentId  The component to patch the state for
-   * @param state        The state object with optional fields to patch
-   */
-  void patchState(String componentId, WorkflowState state) throws IOException;
-
-  /**
    * Use workflowState instead.
    * Get a docker image name.
    *

@@ -213,30 +213,6 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldPersistDockerImagePerComponent() throws Exception {
-    WorkflowState state = patchDockerImage(DOCKER_IMAGE_COMPONENT);
-
-    storage.store(Workflow.create(WORKFLOW_ID1.componentId(),
-                                  WORKFLOW_CONFIGURATION_EMPTY_CONF));
-    storage.patchState(WORKFLOW_ID1.componentId(), state);
-    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_ID1);
-
-    assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_COMPONENT)));
-  }
-
-  @Test
-  public void shouldPersistCommitShaPerComponent() throws Exception {
-    WorkflowState state = WorkflowState.builder().commitSha(COMMIT_SHA).build();
-
-    storage.store(Workflow.create(WORKFLOW_ID1.componentId(),
-                                  WORKFLOW_CONFIGURATION_EMPTY_CONF));
-    storage.patchState(WORKFLOW_ID1.componentId(), state);
-    WorkflowState retrieved = storage.workflowState(WORKFLOW_ID1);
-
-    assertThat(retrieved.commitSha(), is(Optional.of(COMMIT_SHA)));
-  }
-
-  @Test
   public void shouldPersistDockerImagePerWorkflowId() throws Exception {
     storage.store(Workflow.create(
         WORKFLOW_ID1.componentId(),
@@ -280,20 +256,6 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldNotOverwriteDockerImageFromWorkflowWhenUsingComponent() throws Exception {
-    WorkflowState state = patchDockerImage(DOCKER_IMAGE_COMPONENT);
-
-    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
-    storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id().componentId(), state);
-    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
-    assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_COMPONENT)));
-
-    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
-    retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
-    assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_COMPONENT)));
-  }
-
-  @Test
   public void shouldNotOverwriteDockerImageFromWorkflowWhenUsingWorkflowId() throws Exception {
     storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
     storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id(), patchDockerImage(DOCKER_IMAGE_WORKFLOW));
@@ -303,26 +265,6 @@ public class DatastoreStorageTest {
     storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
     retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
     assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
-  }
-
-  @Test
-  public void shouldNotOverwriteDockerImageFromComponentWhenUsingWorkflowId() throws Exception {
-    WorkflowState state = patchDockerImage(DOCKER_IMAGE_COMPONENT);
-
-    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
-    storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id(), patchDockerImage(DOCKER_IMAGE_WORKFLOW));
-    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
-    assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
-
-    storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id().componentId(), state);
-    retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
-    assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
-  }
-
-  @Test(expected = ResourceNotFoundException.class)
-  public void shouldNotSetDockerImageWhenComponentDoesNotExist() throws Exception {
-    WorkflowState state = patchDockerImage(DOCKER_IMAGE_COMPONENT);
-    storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id().componentId(), state);
   }
 
   @Test(expected = ResourceNotFoundException.class)

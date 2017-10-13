@@ -426,22 +426,6 @@ class DatastoreStorage {
     }));
   }
 
-  void patchState(String componentId, WorkflowState state) throws IOException {
-    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
-      final Key componentKey = componentKeyFactory.newKey(componentId);
-      final Optional<Entity> componentOpt = getOpt(transaction, componentKey);
-      if (!componentOpt.isPresent()) {
-        throw new ResourceNotFoundException(String.format("%s doesn't exist.", componentId));
-      }
-
-      final Entity.Builder builder = Entity.newBuilder(componentOpt.get());
-      state.dockerImage().ifPresent(x -> builder.set(PROPERTY_DOCKER_IMAGE, x));
-      state.commitSha().ifPresent(x -> builder.set(PROPERTY_COMMIT_SHA, x));
-
-      return transaction.put(builder.build());
-    }));
-  }
-
   Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
     final Optional<Entity> workflowEntity = getOpt(datastore, workflowKey(workflowId));
     Optional<String> dockerImage = getOptStringProperty(workflowEntity, PROPERTY_DOCKER_IMAGE);

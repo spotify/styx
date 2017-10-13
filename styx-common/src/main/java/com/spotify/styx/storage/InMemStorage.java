@@ -204,18 +204,6 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public void patchState(String componentId, WorkflowState state) throws IOException {
-
-    if (!components.contains(componentId)) {
-      throw new ResourceNotFoundException("Component not found");
-    }
-
-    if (state.dockerImage().isPresent()) {
-      dockerImagesPerComponent.put(componentId, state.dockerImage().get());
-    }
-  }
-
-  @Override
   public Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
     if (dockerImagesPerWorkflowId.containsKey(workflowId)) {
       return Optional.of(dockerImagesPerWorkflowId.get(workflowId));
