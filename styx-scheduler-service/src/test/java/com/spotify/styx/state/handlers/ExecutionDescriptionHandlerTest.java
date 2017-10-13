@@ -111,6 +111,8 @@ public class ExecutionDescriptionHandlerTest {
     assertThat(data.executionDescription().get().dockerImage(), is(DOCKER_IMAGE));
     assertThat(data.executionDescription().get().dockerArgs(), contains("--date", "{}", "--bar"));
     assertThat(data.executionDescription().get().commitSha(), hasValue(COMMIT_SHA));
+    assertThat(data.executionDescription().get().memRequest(), hasValue("512Mi"));
+    assertThat(data.executionDescription().get().memLimit(), hasValue("1024Mi"));
   }
 
   @Test
@@ -251,6 +253,34 @@ public class ExecutionDescriptionHandlerTest {
     assertThat(currentState.state(), is(PREPARE));
     assertFalse(data.executionDescription().isPresent());
   }
+
+  @Test
+  public void shouldRespectResourceConfig() throws Exception {
+    final String memRequest = "123Mi";
+    final String memLimit = "456Mi";
+    final Workflow workflow = Workflow.create("id", WorkflowConfiguration.builder()
+        .id("styx.TestEndpoint")
+        .schedule(HOURS)
+        .dockerArgs(ImmutableList.copyOf(new String[]{"--date", "{}", "--bar"}))
+        .dockerImage(DOCKER_IMAGE)
+        .memRequest(memRequest)
+        .memLimit(memLimit)
+        .build());
+    final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+
+    final RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
+
+    storage.storeWorkflow(workflow);
+    stateManager.initialize(runState);
+    toTest.transitionInto(runState);
+
+    final RunState currentState = stateManager.get(workflowInstance);
+    final StateData data = currentState.data();
+
+    assertThat(data.executionDescription().get().memRequest(), hasValue(memRequest));
+    assertThat(data.executionDescription().get().memLimit(), hasValue(memLimit));
+  }
+
 
   private WorkflowConfiguration schedule(String... args) {
     return WorkflowConfiguration.builder()

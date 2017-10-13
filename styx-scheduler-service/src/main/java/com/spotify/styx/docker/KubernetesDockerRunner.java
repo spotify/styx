@@ -57,6 +57,8 @@ import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.PodSpecBuilder;
+import io.fabric8.kubernetes.api.model.Quantity;
+import io.fabric8.kubernetes.api.model.ResourceRequirementsBuilder;
 import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.SecretVolumeSource;
 import io.fabric8.kubernetes.api.model.SecretVolumeSourceBuilder;
@@ -234,11 +236,16 @@ class KubernetesDockerRunner implements DockerRunner {
     final PodSpecBuilder specBuilder = new PodSpecBuilder()
         .withRestartPolicy("Never");
 
+    final ResourceRequirementsBuilder resourceRequirements = new ResourceRequirementsBuilder();
+    runSpec.memRequest().ifPresent(s -> resourceRequirements.addToRequests("memory", new Quantity(s)));
+    runSpec.memLimit().ifPresent(s -> resourceRequirements.addToLimits("memory", new Quantity(s)));
+
     final ContainerBuilder containerBuilder = new ContainerBuilder()
         .withName(STYX_RUN)
         .withImage(imageWithTag)
         .withArgs(runSpec.args())
-        .withEnv(buildEnv(workflowInstance, runSpec));
+        .withEnv(buildEnv(workflowInstance, runSpec))
+        .withResources(resourceRequirements.build());
 
     secretSpec.serviceAccountSecret().ifPresent(serviceAccountSecret -> {
       final SecretVolumeSource saVolumeSource = new SecretVolumeSourceBuilder()

@@ -21,6 +21,7 @@
 package com.spotify.styx.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.spotify.styx.model.Schedule.WellKnown;
 import com.spotify.styx.util.TimeUtil;
 import io.norberg.automatter.AutoMatter;
@@ -60,6 +61,10 @@ public interface WorkflowConfiguration {
   Optional<String> serviceAccount();
 
   List<String> resources();
+
+  Optional<String> memRequest();
+
+  Optional<String> memLimit();
 
   default Instant addOffset(Instant next) {
     final String offset = offset().orElseGet(this::defaultOffset);

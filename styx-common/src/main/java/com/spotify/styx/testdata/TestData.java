@@ -24,7 +24,6 @@ import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.model.Schedule.MONTHS;
 import static com.spotify.styx.model.Schedule.WEEKS;
-import static java.util.Optional.empty;
 
 import com.google.common.collect.ImmutableList;
 import com.spotify.styx.model.ExecutionDescription;
@@ -32,8 +31,6 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-import java.util.Arrays;
-import java.util.Optional;
 
 public final class TestData {
 
@@ -84,11 +81,10 @@ public final class TestData {
           .build();
 
   public static final ExecutionDescription EXECUTION_DESCRIPTION =
-      ExecutionDescription.create(
-          "busybox:1.1",
-          Arrays.asList("foo", "bar"),
-          false,
-          Optional.of(WorkflowConfiguration.Secret.create("secret", "/dev/null")),
-          empty(),
-          Optional.of("00000ef508c1cb905e360590ce3e7e9193f6b370"));
+      ExecutionDescription.builder()
+          .dockerImage("busybox:1.1")
+          .dockerArgs("foo", "bar")
+          .secret(WorkflowConfiguration.Secret.create("secret", "/dev/null"))
+          .commitSha("00000ef508c1cb905e360590ce3e7e9193f6b370")
+          .build();
 }

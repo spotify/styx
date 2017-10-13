@@ -52,8 +52,9 @@ public class WFIExecutionBuilderTest {
 
 
   private ExecutionDescription desc(String dockerImage) {
-    return ExecutionDescription.create(
-        dockerImage, Collections.emptyList(), false, empty(), empty(), empty());
+    return ExecutionDescription.builder()
+        .dockerImage(dockerImage)
+        .build();
   }
 
   @Test

@@ -22,7 +22,6 @@ package com.spotify.styx.state.handlers;
 
 import static java.util.Objects.requireNonNull;
 
-import com.google.common.collect.ImmutableList;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.InvalidExecutionException;
@@ -132,15 +131,16 @@ public class DockerRunnerHandler implements OutputHandler {
     final List<String> dockerArgs = executionDescription.dockerArgs();
     final String parameter = state.workflowInstance().parameter();
     final List<String> command = argsReplace(dockerArgs, parameter);
-    return RunSpec.create(
-        executionId,
-        dockerImage,
-        ImmutableList.copyOf(command),
-        executionDescription.dockerTerminationLogging(),
-        executionDescription.secret(),
-        executionDescription.serviceAccount(),
-        state.data().trigger(),
-        state.data().executionDescription().flatMap(ExecutionDescription::commitSha));
+    return RunSpec.builder()
+        .executionId(executionId)
+        .imageName(dockerImage)
+        .args(command)
+        .terminationLogging(executionDescription.dockerTerminationLogging())
+        .secret(executionDescription.secret())
+        .serviceAccount(executionDescription.serviceAccount())
+        .trigger(state.data().trigger())
+        .commitSha(state.data().executionDescription().flatMap(ExecutionDescription::commitSha))
+        .build();
   }
 
   private static List<String> argsReplace(List<String> template, String parameter) {
