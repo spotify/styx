@@ -28,6 +28,7 @@ import static java.net.HttpURLConnection.HTTP_GONE;
 import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.github.rholder.retry.Attempt;
 import com.github.rholder.retry.RetryException;
 import com.github.rholder.retry.Retryer;
 import com.github.rholder.retry.RetryerBuilder;
@@ -401,16 +402,25 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @Override
   public void restore() {
+    // Failing here means restarting the styx scheduler and replaying all events again. This is quite time consuming
+    // and distressing when deploying, so try hard.
     final Retryer<Object> retryer = RetryerBuilder.newBuilder()
         .retryIfException()
-        .withWaitStrategy(WaitStrategies.exponentialWait())
-        .withStopStrategy(StopStrategies.stopAfterAttempt(3))
+        .withWaitStrategy(WaitStrategies.exponentialWait(10, TimeUnit.SECONDS))
+        .withStopStrategy(StopStrategies.stopAfterAttempt(10))
+        .withRetryListener(this::onRestorePollPodsAttempt)
         .build();
 
     try {
       retryer.call(Executors.callable(this::tryPollPods));
     } catch (ExecutionException | RetryException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  private <V> void onRestorePollPodsAttempt(Attempt<V> attempt) {
+    if (attempt.hasException()) {
+      LOG.warn("restore: failed polling pods, attempt = {}", attempt.getAttemptNumber(), attempt.getExceptionCause());
     }
   }
 
