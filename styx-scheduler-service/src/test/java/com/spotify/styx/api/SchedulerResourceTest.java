@@ -28,6 +28,7 @@ import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.serialization.Json.serialize;
+import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.startsWith;
@@ -85,7 +86,7 @@ public class SchedulerResourceTest {
   private final Workflow DAILY_WORKFLOW = Workflow.create("styx",
                                                           TestData.DAILY_WORKFLOW_CONFIGURATION);
   private final Workflow FULL_DAILY_WORKFLOW = Workflow.create("styx",
-                                                               TestData.FULL_WORKFLOW_CONFIGURATION);
+                                                               FULL_WORKFLOW_CONFIGURATION);
   private final Workflow WEEKLY_WORKFLOW = Workflow.create("styx",
                                                            TestData.WEEKLY_WORKFLOW_CONFIGURATION);
   private final Workflow MONTHLY_WORKFLOW = Workflow.create("styx",
@@ -165,7 +166,8 @@ public class SchedulerResourceTest {
   @Test
   public void testCreateWorkflow() throws Exception {
     final Response<ByteString> r = serviceHelper.request(
-        "POST", SchedulerResource.BASE + "/workflows", serialize(FULL_DAILY_WORKFLOW)).toCompletableFuture().get();
+        "POST", SchedulerResource.BASE + "/workflows/styx",
+        serialize(FULL_DAILY_WORKFLOW.configuration())).toCompletableFuture().get();
     assertThat(r, hasStatus(withCode(Status.OK)));
     assertThat(storage.workflow(FULL_DAILY_WORKFLOW.id()), isPresent());
     verify(dockerImageValidator).validateImageReference(FULL_DAILY_WORKFLOW.configuration().dockerImage().get());
@@ -176,22 +178,23 @@ public class SchedulerResourceTest {
   public void testCreateWorkflowInvalidImage() throws Exception {
     when(dockerImageValidator.validateImageReference(any())).thenReturn(ImmutableList.of("bad", "image"));
     final Response<ByteString> r = serviceHelper.request(
-        "POST", SchedulerResource.BASE + "/workflows", serialize(FULL_DAILY_WORKFLOW)).toCompletableFuture().get();
+        "POST", SchedulerResource.BASE + "/workflows/styx",
+        serialize(FULL_DAILY_WORKFLOW.configuration())).toCompletableFuture().get();
     assertThat(r, hasStatus(withCode(Status.BAD_REQUEST)));
     verify(dockerImageValidator).validateImageReference(FULL_DAILY_WORKFLOW.configuration().dockerImage().get());
   }
 
   @Test
   public void testUpdateWorkflow() throws Exception {
-    ByteString workflowPayload = serialize(HOURLY_WORKFLOW);
+    ByteString workflowPayload = serialize(HOURLY_WORKFLOW.configuration());
     CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows", workflowPayload);
+        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows/styx", workflowPayload);
 
     assertThat(post.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
     assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
 
     CompletionStage<Response<ByteString>> post2 =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows", workflowPayload);
+        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows/styx", workflowPayload);
 
     assertThat(post2.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
     assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
