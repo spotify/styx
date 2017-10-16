@@ -200,13 +200,6 @@
         <version>1.7.25</version>
       </dependency>
 
-      <!-- styx client libs -->
-      <dependency>
-        <groupId>com.squareup.okhttp3</groupId>
-        <artifactId>okhttp</artifactId>
-        <version>3.7.0</version>
-      </dependency>
-
       <!-- external clients libs -->
       <dependency>
         <groupId>com.spotify</groupId>
