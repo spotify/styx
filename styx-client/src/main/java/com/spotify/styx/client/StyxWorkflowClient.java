@@ -21,6 +21,7 @@
 package com.spotify.styx.client;
 
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowState;
 import java.util.concurrent.CompletionStage;
 
@@ -36,6 +37,21 @@ public interface StyxWorkflowClient {
    * @param workflowId  workflowId id
    */
   CompletionStage<Workflow> workflow(final String componentId, final String workflowId);
+
+  /**
+   * Create or update a workflow.
+   * @param componentId The component that the workflow belongs to.
+   * @param workflowConfig The workflow configuration.
+   * @return The created {@link Workflow}.
+   */
+  CompletionStage<Workflow> createOrUpdateWorkflow(String componentId, WorkflowConfiguration workflowConfig);
+
+  /**
+   * Delete a {@link Workflow}
+   * @param componentId The component that the workflow belongs to.
+   * @param workflowId The workflow to delete.
+   */
+  CompletionStage<Void> deleteWorkflow(String componentId, String workflowId);
 
   /**
    * Get a {@link WorkflowState}

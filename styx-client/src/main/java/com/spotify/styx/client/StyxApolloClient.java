@@ -43,6 +43,7 @@ import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
@@ -155,6 +156,30 @@ class StyxApolloClient implements StyxClient {
         .addPathSegment(componentId)
         .addPathSegment(workflowId);
     return executeRequest(Request.forUri(urlBuilder.build().toString()), Workflow.class);
+  }
+
+  @Override
+  public CompletionStage<Workflow> createOrUpdateWorkflow(String componentId, WorkflowConfiguration workflowConfig) {
+    final HttpUrl.Builder urlBuilder = getUrlBuilder()
+        .addPathSegment("workflows")
+        .addPathSegment(componentId);
+    final ByteString payload;
+    try {
+      payload = serialize(workflowConfig);
+    } catch (JsonProcessingException e) {
+      return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
+    }
+    final Request request = Request.forUri(urlBuilder.build().toString(), "POST").withPayload(payload);
+    return executeRequest(request, Workflow.class);
+  }
+
+  @Override
+  public CompletionStage<Void> deleteWorkflow(String componentId, String workflowId) {
+    final HttpUrl.Builder urlBuilder = getUrlBuilder()
+        .addPathSegment("workflows")
+        .addPathSegment(componentId)
+        .addPathSegment(workflowId);
+    return executeRequest(Request.forUri(urlBuilder.build().toString(), "DELETE"), Void.class);
   }
 
   @Override
