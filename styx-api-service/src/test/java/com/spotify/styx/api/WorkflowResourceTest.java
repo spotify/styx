@@ -29,6 +29,8 @@ import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.api.JsonMatchers.assertNoJson;
 import static com.spotify.styx.model.SequenceEvent.create;
 import static com.spotify.styx.model.WorkflowState.patchDockerImage;
+import static com.spotify.styx.serialization.Json.deserialize;
+import static com.spotify.styx.serialization.Json.serialize;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
@@ -62,6 +64,7 @@ import com.spotify.styx.storage.BigtableStorage;
 import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
+import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
@@ -80,6 +83,8 @@ import org.mockito.MockitoAnnotations;
 
 public class WorkflowResourceTest extends VersionedApiTest {
 
+  private static final String SCHEDULER_BASE = "http://localhost:12345";
+
   private static LocalDatastoreHelper localDatastore;
 
   private Datastore datastore = localDatastore.getOptions().getService();
@@ -97,8 +102,18 @@ public class WorkflowResourceTest extends VersionedApiTest {
           .schedule(Schedule.DAYS)
           .build();
 
+  private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_WITH_IMAGE =
+      WorkflowConfiguration.builder()
+          .id("bar")
+          .schedule(Schedule.DAYS)
+          .dockerImage("bar-dummy:dummy")
+          .build();
+
   private static final Workflow WORKFLOW =
       Workflow.create("foo", WORKFLOW_CONFIGURATION);
+
+  private static final Workflow WORKFLOW_WITH_IMAGE =
+      Workflow.create("foo", WORKFLOW_CONFIGURATION_WITH_IMAGE);
 
   private static final String VALID_SHA = "470a229b49a14e7682af2abfdac3b881a8aacdf9";
   private static final String INVALID_SHA = "XXXXXX9b49a14e7682af2abfdac3b881a8aacdf9";
@@ -135,7 +150,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Override
   protected void init(Environment environment) {
     when(dockerImageValidator.validateImageReference(Mockito.anyString())).thenReturn(Collections.emptyList());
-    WorkflowResource workflowResource = new WorkflowResource(storage, dockerImageValidator);
+    WorkflowResource workflowResource = new WorkflowResource(storage, SCHEDULER_BASE, dockerImageValidator);
 
     environment.routingEngine()
         .registerRoutes(Api.withCommonMiddleware(
@@ -511,6 +526,81 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertJson(response, "[*]", hasSize(1));
     assertJson(response, "[0].workflow_instance.parameter", is("2016-08-12"));
+  }
+
+  @Test
+  public void shouldReturnBadRequestWhenNoPayloadIsSentWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path("/foo")));
+
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
+    assertThat(response, hasNoPayload());
+    assertThat(response, hasStatus(withReasonPhrase(equalTo("Missing payload."))));
+  }
+
+  @Test
+  public void shouldReturnBadRequestWhenMalformedStatePayloadIsSentWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path("/foo"),
+                                            STATEPAYLOAD_BAD));
+
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
+    assertThat(response, hasNoPayload());
+    assertThat(response, hasStatus(withReasonPhrase(equalTo("Invalid payload."))));
+  }
+
+  @Test
+  public void shouldReturnOkWhenSchedulerReturnsSuccessWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    serviceHelper.stubClient()
+        .respond(Response.forPayload(serialize(WORKFLOW_WITH_IMAGE)))
+        .to(SCHEDULER_BASE + "/api/v0/workflows");
+
+    Response<ByteString> response =
+        awaitResponse(
+            serviceHelper
+                .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION_WITH_IMAGE)));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertThat(deserialize(response.payload().get(), Workflow.class), equalTo(WORKFLOW_WITH_IMAGE));
+  }
+
+  @Test
+  public void shouldReturnErrorMessageWhenSchedulerFailsWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    serviceHelper.stubClient()
+        .respond(Response.forStatus(Status.SERVICE_UNAVAILABLE))
+        .to(SCHEDULER_BASE + "/api/v0/workflows");
+
+    Response<ByteString> response =
+        awaitResponse(
+            serviceHelper
+                .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION_WITH_IMAGE)));
+
+    assertThat(response, hasStatus(withCode(Status.SERVICE_UNAVAILABLE)));
+    assertThat(response, hasNoPayload());
+  }
+
+  @Test
+  public void shouldForwardInternalResponseForDeleteWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    serviceHelper.stubClient()
+        .respond(Response.forStatus(Status.OK))
+        .to(SCHEDULER_BASE + "/api/v0/workflows/foo/bar");
+
+    Response<ByteString> response =
+        awaitResponse(
+            serviceHelper.request("DELETE", path("/foo/bar")));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertThat(response, hasNoPayload());
   }
 
   @Test
