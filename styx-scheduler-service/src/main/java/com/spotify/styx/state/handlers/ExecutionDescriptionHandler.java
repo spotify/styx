@@ -132,13 +132,14 @@ public class ExecutionDescriptionHandler implements OutputHandler {
           workflowId, workflowInstance, errors));
     }
 
-    return ExecutionDescription.create(
-        dockerImageOpt.get(),
-        dockerArgsOpt.get(),
-        workflow.configuration().dockerTerminationLogging(),
-        workflow.configuration().secret(),
-        workflow.configuration().serviceAccount(),
-        workflowState.commitSha());
+    return ExecutionDescription.builder()
+        .dockerImage(dockerImageOpt.get())
+        .dockerArgs(dockerArgsOpt.get())
+        .dockerTerminationLogging(workflow.configuration().dockerTerminationLogging())
+        .secret(workflow.configuration().secret())
+        .serviceAccount(workflow.configuration().serviceAccount())
+        .commitSha(workflowState.commitSha())
+        .build();
   }
 
   static String createExecutionId() {

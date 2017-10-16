@@ -30,7 +30,6 @@ import static com.spotify.styx.state.RunState.State.RUNNING;
 import static com.spotify.styx.state.RunState.State.SUBMITTED;
 import static com.spotify.styx.state.RunState.State.SUBMITTING;
 import static com.spotify.styx.state.RunState.State.TERMINATED;
-import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertThat;
@@ -40,7 +39,6 @@ import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.TriggerUtil;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -56,9 +54,10 @@ public class RunStateTest {
   private static final String TEST_EXECUTION_ID_2 = "execution_2";
 
   private static final String DOCKER_IMAGE = "busybox:1.1";
-  private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.create(
-      DOCKER_IMAGE, Arrays.asList("--date", "{}", "--bar"), false,
-      empty(), empty(), empty());
+  private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.builder()
+      .dockerImage(DOCKER_IMAGE)
+      .dockerArgs("--date", "{}", "--bar")
+      .build();
 
   private static final Trigger UNKNOWN_TRIGGER = Trigger.unknown("trig");
   private static final Trigger NATURAL_TRIGGER1 = Trigger.natural();

@@ -53,9 +53,10 @@ public class PublisherHandlerTest {
 
   @Test
   public void testPublishesRollingOutStateOnSubmitted() throws Exception {
-    ExecutionDescription executionDescription =
-        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), false, empty(),
-                                    empty(), Optional.of(COMMIT_SHA));
+    ExecutionDescription executionDescription = ExecutionDescription.builder()
+        .dockerImage(DOCKER_IMAGE)
+        .commitSha(COMMIT_SHA)
+        .build();
     RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.SUBMITTED,
@@ -70,9 +71,11 @@ public class PublisherHandlerTest {
 
   @Test
   public void testPublishesDoneStateOnRunning() throws Exception {
-    ExecutionDescription executionDescription =
-        ExecutionDescription.create("busybox:1.1", emptyList(),
-                                    false, empty(), empty(), Optional.of(COMMIT_SHA));
+    ExecutionDescription executionDescription = ExecutionDescription.builder()
+        .dockerImage(DOCKER_IMAGE)
+        .commitSha(COMMIT_SHA)
+        .build();
+
     RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.RUNNING,
@@ -89,9 +92,10 @@ public class PublisherHandlerTest {
   public void shouldRetryPublishesOnSubmitted() throws Exception {
     outputHandler = new PublisherHandler(new FailingPublisher(publisher, 2));
 
-    ExecutionDescription executionDescription =
-        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), false, empty(),
-                                    empty(), Optional.of(COMMIT_SHA));
+    ExecutionDescription executionDescription = ExecutionDescription.builder()
+        .dockerImage(DOCKER_IMAGE)
+        .commitSha(COMMIT_SHA)
+        .build();
     RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.SUBMITTED,
@@ -108,9 +112,10 @@ public class PublisherHandlerTest {
   public void shouldRetryPublishesOnRunning() throws Exception {
     outputHandler = new PublisherHandler(new FailingPublisher(publisher, 2));
 
-    ExecutionDescription executionDescription =
-        ExecutionDescription.create(DOCKER_IMAGE, emptyList(), false, empty(),
-                                    empty(), Optional.of(COMMIT_SHA));
+    ExecutionDescription executionDescription = ExecutionDescription.builder()
+        .dockerImage(DOCKER_IMAGE)
+        .commitSha(COMMIT_SHA)
+        .build();
     RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.RUNNING,

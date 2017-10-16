@@ -20,52 +20,41 @@
 
 package com.spotify.styx.model;
 
-import static java.util.Collections.emptyList;
-import static java.util.Optional.empty;
-
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.auto.value.AutoValue;
+import io.norberg.automatter.AutoMatter;
 import java.util.List;
 import java.util.Optional;
 
-@AutoValue
+@AutoMatter
 @JsonIgnoreProperties(ignoreUnknown = true)
-public abstract class ExecutionDescription {
+public interface ExecutionDescription {
 
-  @JsonProperty
-  public abstract String dockerImage();
+  @JsonProperty("docker_image")
+  String dockerImage();
 
-  @JsonProperty
-  public abstract List<String> dockerArgs();
+  @JsonProperty("docker_args")
+  List<String> dockerArgs();
 
-  @JsonProperty
-  public abstract boolean dockerTerminationLogging();
+  @JsonProperty("docker_termination_logging")
+  boolean dockerTerminationLogging();
 
-  @JsonProperty
-  public abstract Optional<WorkflowConfiguration.Secret> secret();
+  @JsonProperty("secret")
+  Optional<WorkflowConfiguration.Secret> secret();
 
-  @JsonProperty
-  public abstract Optional<String> serviceAccount();
+  @JsonProperty("service_account")
+  Optional<String> serviceAccount();
 
-  @JsonProperty
-  public abstract Optional<String> commitSha();
+  @JsonProperty("commit_sha")
+  Optional<String> commitSha();
 
-  @JsonCreator
-  public static ExecutionDescription create(
-      @JsonProperty("docker_image") String dockerImage,
-      @JsonProperty("docker_args") List<String> dockerArgs,
-      @JsonProperty("docker_termination_logging") boolean dockerTerminationLogging,
-      @JsonProperty("secret") Optional<WorkflowConfiguration.Secret> secret,
-      @JsonProperty("service_account") Optional<String> serviceAccount,
-      @JsonProperty("commit_sha") Optional<String> commitSha) {
-    return new AutoValue_ExecutionDescription(dockerImage, dockerArgs, dockerTerminationLogging,
-                                              secret, serviceAccount, commitSha);
+
+
+  static ExecutionDescriptionBuilder builder() {
+    return new ExecutionDescriptionBuilder();
   }
 
-  public static ExecutionDescription forImage(String dockerImage) {
-    return new AutoValue_ExecutionDescription(dockerImage, emptyList(), false, empty(), empty(),
-                                              empty());
+  static ExecutionDescription forImage(String dockerImage) {
+    return builder().dockerImage(dockerImage).build();
   }
 }

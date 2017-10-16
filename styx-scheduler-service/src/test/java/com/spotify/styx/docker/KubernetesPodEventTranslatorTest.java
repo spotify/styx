@@ -26,7 +26,6 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.junit.Assert.assertThat;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.Event;
@@ -334,7 +333,10 @@ public class KubernetesPodEventTranslatorTest {
   private Pod podWithTerminationLogging() {
     return KubernetesDockerRunner.createPod(
         WFI,
-        DockerRunner.RunSpec.create("eid", "busybox", ImmutableList.of(), true,
-            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()), SECRET_SPEC);
+        DockerRunner.RunSpec.builder()
+            .executionId("eid")
+            .imageName("busybox")
+            .terminationLogging(true).build(),
+        SECRET_SPEC);
   }
 }

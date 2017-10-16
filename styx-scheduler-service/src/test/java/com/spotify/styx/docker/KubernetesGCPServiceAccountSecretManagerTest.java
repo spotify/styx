@@ -22,7 +22,6 @@ package com.spotify.styx.docker;
 
 import static com.spotify.styx.testdata.TestData.WORKFLOW_ID;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.is;
@@ -70,7 +69,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.IntSummaryStatistics;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -108,13 +106,11 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(WORKFLOW_ID, "foo");
 
-  private static final RunSpec RUN_SPEC_WITH_SA = RunSpec.create("eid", "busybox",
-      ImmutableList.copyOf(new String[0]),
-      false,
-      empty(),
-      Optional.of(SERVICE_ACCOUNT),
-      empty(),
-      empty());
+  private static final RunSpec RUN_SPEC_WITH_SA = RunSpec.builder()
+      .executionId("eid")
+      .imageName("busybox")
+      .serviceAccount(SERVICE_ACCOUNT)
+      .build();
 
   private ExecutorService executor;
 
