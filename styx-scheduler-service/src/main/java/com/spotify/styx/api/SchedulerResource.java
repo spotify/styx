@@ -40,10 +40,12 @@ import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -61,6 +63,7 @@ public class SchedulerResource {
   private final Consumer<Workflow> workflowRemoveListener;
   private final Storage storage;
   private final Time time;
+  private final DockerImageValidator dockerImageValidator;
 
   private final RandomGenerator randomGenerator = RandomGenerator.DEFAULT;
 
@@ -70,13 +73,15 @@ public class SchedulerResource {
       Consumer<Workflow> workflowChangeListener,
       Consumer<Workflow> workflowRemoveListener,
       Storage storage,
-      Time time) {
+      Time time,
+      DockerImageValidator dockerImageValidator) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.triggerListener = Objects.requireNonNull(triggerListener);
     this.workflowChangeListener = workflowChangeListener;
     this.workflowRemoveListener = workflowRemoveListener;
     this.storage = Objects.requireNonNull(storage);
     this.time = Objects.requireNonNull(time);
+    this.dockerImageValidator = Objects.requireNonNull(dockerImageValidator, "dockerImageValidator");
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -122,6 +127,13 @@ public class SchedulerResource {
   }
 
   private Response<Workflow> createOrUpdateWorkflow(Workflow workflow) {
+    final Optional<String> dockerImage = workflow.configuration().dockerImage();
+    if (dockerImage.isPresent()) {
+      final Collection<String> errors = dockerImageValidator.validateImageReference(dockerImage.get());
+      if (!errors.isEmpty()) {
+        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors));
+      }
+    }
     workflowChangeListener.accept(workflow);
     return Response.forPayload(workflow);
   }

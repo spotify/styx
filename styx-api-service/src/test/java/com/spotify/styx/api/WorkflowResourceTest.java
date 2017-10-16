@@ -31,13 +31,15 @@ import static com.spotify.styx.model.SequenceEvent.create;
 import static com.spotify.styx.model.WorkflowState.patchDockerImage;
 import static com.spotify.styx.serialization.Json.deserialize;
 import static com.spotify.styx.serialization.Json.serialize;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.datastore.Datastore;
@@ -64,7 +66,6 @@ import com.spotify.styx.storage.BigtableStorage;
 import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
-import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
@@ -566,6 +567,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
             serviceHelper
                 .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION_WITH_IMAGE)));
 
+    verify(dockerImageValidator).validateImageReference(WORKFLOW_CONFIGURATION_WITH_IMAGE.dockerImage().get());
+
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(deserialize(response.payload().get(), Workflow.class), equalTo(WORKFLOW_WITH_IMAGE));
   }
@@ -582,6 +585,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
         awaitResponse(
             serviceHelper
                 .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION_WITH_IMAGE)));
+
+    verify(dockerImageValidator).validateImageReference(WORKFLOW_CONFIGURATION_WITH_IMAGE.dockerImage().get());
 
     assertThat(response, hasStatus(withCode(Status.SERVICE_UNAVAILABLE)));
     assertThat(response, hasNoPayload());
@@ -601,6 +606,22 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasNoPayload());
+  }
+
+  @Test
+  public void shouldFailInvalidWorkflowImageWithoutForwarding() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(dockerImageValidator.validateImageReference(any())).thenReturn(ImmutableList.of("bad", "image"));
+
+    Response<ByteString> response = awaitResponse(serviceHelper
+        .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION_WITH_IMAGE)));
+
+    verify(dockerImageValidator).validateImageReference(WORKFLOW_CONFIGURATION_WITH_IMAGE.dockerImage().get());
+
+    assertThat(serviceHelper.stubClient().sentRequests(), is(empty()));
+
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
   }
 
   @Test

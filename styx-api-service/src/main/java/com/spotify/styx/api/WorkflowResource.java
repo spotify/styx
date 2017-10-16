@@ -134,6 +134,15 @@ public final class WorkflowResource {
           Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid payload.")));
     }
 
+    final Optional<String> dockerImage = workflowConfig.dockerImage();
+    if (dockerImage.isPresent()) {
+      final Collection<String> errors = dockerImageValidator.validateImageReference(dockerImage.get());
+      if (!errors.isEmpty()) {
+        return CompletableFuture.completedFuture(
+            Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors)));
+      }
+    }
+
     final Workflow workflow = Workflow.create(componentId, workflowConfig);
 
     final ByteString requestPayload;
