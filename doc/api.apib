@@ -104,14 +104,14 @@ Resources related to the Workflows registered in Styx.
 
 ### Delete Workflow [DELETE]
 
-Returns 200 OK if the Workflow was found an deleted, 404 Not Found otherwise.
+Returns 204 No Content if the Workflow was found and deleted, 404 Not Found otherwise.
 
 + Parameters
     + version: `v3` (enum[string]) - API version
         + Members
             + `v3`
 
-+ Response 200
++ Response 204
 + Response 404
 
 ## Workflows [/{version}/workflows/{component_id}]
