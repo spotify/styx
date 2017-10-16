@@ -1,0 +1,9 @@
+id: foo
+schedule: DAYS
+docker_image: busybox
+docker_args: [echo, foo]
+---
+id: bar
+schedule: DAYS
+docker_image: busybox
+docker_args: [echo, bar]

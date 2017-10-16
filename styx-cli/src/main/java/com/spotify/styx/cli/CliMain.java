@@ -20,6 +20,13 @@
 
 package com.spotify.styx.cli;
 
+import static com.spotify.apollo.Status.NOT_FOUND;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
+import static net.sourceforge.argparse4j.impl.Arguments.fileType;
+
+import com.fasterxml.jackson.databind.MappingIterator;
+import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.core.Service;
@@ -38,9 +45,13 @@ import com.spotify.styx.client.StyxClientFactory;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.EventInfo;
+import com.spotify.styx.serialization.Json;
 import com.spotify.styx.util.ParameterUtil;
+import java.io.File;
+import java.io.IOException;
 import java.time.format.DateTimeParseException;
 import java.util.Collection;
 import java.util.Collections;
@@ -49,6 +60,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import javaslang.Tuple;
 import javaslang.Tuple2;
@@ -238,6 +250,12 @@ public final class CliMain {
             case SHOW:
               workflowShow();
               break;
+            case CREATE:
+              workflowCreate();
+              break;
+            case DELETE:
+              workflowDelete();
+              break;
             default:
               // parsing unknown command will fail so this would only catch non-exhaustive switches
               throw new ArgumentParserException(
@@ -266,6 +284,76 @@ public final class CliMain {
     } catch (Exception e) {
       e.printStackTrace();
       throw new CliExitException(EXIT_CODE_UNKNOWN_ERROR);
+    }
+  }
+
+  private void workflowDelete() throws ExecutionException, InterruptedException {
+    final String component = namespace.getString(parser.workflowDeleteComponentId.getDest());
+    final List<String> workflows = namespace.getList(parser.workflowDeleteWorkflowId.getDest());
+    final boolean force = namespace.getBoolean(parser.workflowDeleteForce.getDest());
+
+    // TODO: allow reading workflow ID's from file?
+
+    if (System.console() != null && !force) {
+      final String reply = System.console().readLine(
+          "Sure you want to delete the workflow" + (workflows.size() > 1 ? "s" : "") + " "
+              + workflows.stream().collect(joining(", "))
+              + "in component " + component + "? [yN]").trim();
+      if (!reply.equals("y")) {
+        throw new CliExitException(EXIT_CODE_UNKNOWN_ERROR);
+      }
+    }
+
+    final List<Tuple2<String, CompletionStage<Void>>> futures = workflows.stream()
+        .map(workflow -> Tuple.of(workflow, styxClient.deleteWorkflow(component, workflow)))
+        .collect(toList());
+
+    for (Tuple2<String, CompletionStage<Void>> future : futures) {
+      final String workflow = future._1;
+      try {
+        future._2.toCompletableFuture().get();
+        cliOutput.printMessage("Workflow " + workflow + " in component " + component + " deleted.");
+      } catch (ExecutionException e) {
+        final Throwable cause = e.getCause();
+        if (cause instanceof ApiErrorException) {
+          final ApiErrorException apiError = (ApiErrorException) cause;
+          if (apiError.getCode() == NOT_FOUND.code()) {
+            cliOutput.printMessage("Workflow " + workflow + " in component " + component + " not found.");
+          } else {
+            throw e;
+          }
+        } else {
+          throw e;
+        }
+      }
+    }
+  }
+
+  private void workflowCreate() throws IOException, ExecutionException, InterruptedException {
+    final String component = namespace.getString(parser.workflowCreateComponentId.getDest());
+    final File file = namespace.get(parser.workflowCreateFile.getDest());
+
+    final ObjectReader workflowReader = Json.YAML_MAPPER.reader()
+        .forType(WorkflowConfiguration.class);
+    final MappingIterator<WorkflowConfiguration> iterator;
+    if (file == null || file.getName().equals("-")) {
+      iterator = workflowReader.readValues(System.in);
+    } else {
+      iterator = workflowReader.readValues(file);
+    }
+
+    final List<WorkflowConfiguration> configurations = iterator.readAll();
+
+    // TODO: validate workflows locally before creating them
+
+    final List<CompletionStage<Workflow>> futures = configurations.stream()
+        .map(configuration -> styxClient.createOrUpdateWorkflow(component, configuration))
+        .collect(toList());
+
+    for (CompletionStage<Workflow> future : futures) {
+      final Workflow created = future.toCompletableFuture().get();
+      cliOutput.printMessage("Workflow " + created.workflowId() + " in component "
+          + created.componentId() + " created.");
     }
   }
 
@@ -506,6 +594,25 @@ public final class CliMain {
     final Argument workflowShowWorkflowId =
         workflowShow.addArgument("workflow").help("Workflow ID");
 
+    final Subparser workflowCreate = WorkflowCommand.CREATE.parser(workflowParser);
+    final Argument workflowCreateComponentId =
+        workflowCreate.addArgument("component").help("Component ID");
+    final Argument workflowCreateFile =
+        workflowCreate.addArgument("-f", "--file")
+            .type(fileType().acceptSystemIn().verifyCanRead())
+            .help("Workflow configuration file");
+
+    final Subparser workflowDelete = WorkflowCommand.DELETE.parser(workflowParser);
+    final Argument workflowDeleteComponentId =
+        workflowDelete.addArgument("component").help("Component ID");
+    final Argument workflowDeleteWorkflowId =
+        workflowDelete.addArgument("workflow").nargs("+").help("Workflow IDs");
+    final Argument workflowDeleteForce =
+        workflowDelete.addArgument("--force")
+            .help("Do not ask for confirmation")
+            .setDefault(false)
+            .action(Arguments.storeTrue());
+
     final Subparser list = Command.LIST.parser(subCommands);
     final Argument listComponent = list.addArgument("-c", "--component")
         .help("only show instances for COMPONENT");
@@ -639,7 +746,9 @@ public final class CliMain {
   }
 
   private enum WorkflowCommand {
-    SHOW("get", "Show info about a specific workflow");
+    SHOW("get", "Show info about a specific workflow"),
+    CREATE("", "Create or update a workflow"),
+    DELETE("", "Delete a workflow");
 
     private final String alias;
     private final String description;
