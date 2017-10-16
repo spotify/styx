@@ -143,19 +143,9 @@ public final class WorkflowResource {
       }
     }
 
-    final Workflow workflow = Workflow.create(componentId, workflowConfig);
-
-    final ByteString requestPayload;
-    try {
-      requestPayload = serialize(workflow);
-    } catch (JsonProcessingException e) {
-      return CompletableFuture.completedFuture(Response.forStatus(
-          Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Failed to serialize proxy payload.")));
-    }
-
     // TODO: handle workflow crud directly in api service instead of proxying to scheduler
     return rc.requestScopedClient()
-        .send(rc.request().withPayload(requestPayload).withUri(schedulerApiUrl("workflows")));
+        .send(rc.request().withPayload(payload.get()).withUri(schedulerApiUrl("workflows", componentId)));
   }
 
   private Response<List<Workflow>> workflows(String componentId) {

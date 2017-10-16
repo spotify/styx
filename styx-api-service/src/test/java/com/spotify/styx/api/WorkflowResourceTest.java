@@ -560,7 +560,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     serviceHelper.stubClient()
         .respond(Response.forPayload(serialize(WORKFLOW_WITH_IMAGE)))
-        .to(SCHEDULER_BASE + "/api/v0/workflows");
+        .to(SCHEDULER_BASE + "/api/v0/workflows/foo");
 
     Response<ByteString> response =
         awaitResponse(
@@ -579,7 +579,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.SERVICE_UNAVAILABLE))
-        .to(SCHEDULER_BASE + "/api/v0/workflows");
+        .to(SCHEDULER_BASE + "/api/v0/workflows/foo");
 
     Response<ByteString> response =
         awaitResponse(

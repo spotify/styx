@@ -34,6 +34,7 @@ import com.spotify.apollo.route.Route;
 import com.spotify.styx.TriggerListener;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
@@ -98,9 +99,9 @@ public class SchedulerResource {
             "POST", BASE + "/trigger",
             rc -> this::triggerWorkflowInstance),
         Route.with(
-            em.response(Workflow.class),
-            "POST", BASE + "/workflows",
-            rc -> this::createOrUpdateWorkflow),
+            em.response(WorkflowConfiguration.class, Workflow.class),
+            "POST", BASE + "/workflows/<cid>",
+            rc -> workflow -> createOrUpdateWorkflow(rc.pathArgs().get("cid"), workflow)),
         Route.with(
             em.serializerResponse(ByteString.class),
             "DELETE", BASE + "/workflows/<cid>/<wfid>",
@@ -126,14 +127,15 @@ public class SchedulerResource {
     return Response.forStatus(Status.NO_CONTENT);
   }
 
-  private Response<Workflow> createOrUpdateWorkflow(Workflow workflow) {
-    final Optional<String> dockerImage = workflow.configuration().dockerImage();
+  private Response<Workflow> createOrUpdateWorkflow(String componentId, WorkflowConfiguration configuration) {
+    final Optional<String> dockerImage = configuration.dockerImage();
     if (dockerImage.isPresent()) {
       final Collection<String> errors = dockerImageValidator.validateImageReference(dockerImage.get());
       if (!errors.isEmpty()) {
         return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors));
       }
     }
+    final Workflow workflow = Workflow.create(componentId, configuration);
     workflowChangeListener.accept(workflow);
     return Response.forPayload(workflow);
   }
