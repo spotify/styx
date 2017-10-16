@@ -178,7 +178,7 @@ public class SchedulerResourceTest {
     Response<ByteString> response = serviceHelper.request("DELETE", String
         .join("/", SchedulerResource.BASE, "workflows", HOURLY_WORKFLOW.componentId(),
               HOURLY_WORKFLOW.workflowId())).toCompletableFuture().get();
-    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertThat(response, hasStatus(withCode(Status.NO_CONTENT)));
     assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isEmpty());
   }
 
