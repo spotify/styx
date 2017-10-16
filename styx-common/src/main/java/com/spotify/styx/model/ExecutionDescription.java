@@ -48,8 +48,6 @@ public interface ExecutionDescription {
   @JsonProperty("commit_sha")
   Optional<String> commitSha();
 
-
-
   static ExecutionDescriptionBuilder builder() {
     return new ExecutionDescriptionBuilder();
   }
