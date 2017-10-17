@@ -28,6 +28,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
@@ -51,6 +52,7 @@ import com.spotify.styx.util.EventUtil;
 import com.squareup.okhttp.HttpUrl;
 import com.squareup.okhttp.HttpUrl.Builder;
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
@@ -364,13 +366,22 @@ class StyxApolloClient implements StyxClient {
   }
 
   private CompletionStage<Response<ByteString>> executeRequest(final Request request) {
-    return client.send(decorateRequest(request)).thenApply(response -> {
-      switch (response.status().family()) {
-        case SUCCESSFUL:
-          return response;
-        default:
-          final String message = response.status().code() + " " + response.status().reasonPhrase();
-          throw new ApiErrorException(message, response.status().code());
+    return client.send(decorateRequest(request)).handle((response, e) -> {
+      if (e != null) {
+        final Throwable rootCause = Throwables.getRootCause(e);
+        if (rootCause instanceof SocketTimeoutException) {
+          throw new ClientErrorException("Connection failed: " + rootCause.getMessage() + ": " + apiHost, e);
+        } else {
+          throw new ClientErrorException("Request failed: " + request, e);
+        }
+      } else {
+        switch (response.status().family()) {
+          case SUCCESSFUL:
+            return response;
+          default:
+            final String message = response.status().code() + " " + response.status().reasonPhrase();
+            throw new ApiErrorException(message, response.status().code());
+        }
       }
     });
   }
