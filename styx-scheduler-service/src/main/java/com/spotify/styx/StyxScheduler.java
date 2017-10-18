@@ -346,7 +346,8 @@ public class StyxScheduler implements AppInit {
     setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats);
 
     final SchedulerResource schedulerResource =
-        new SchedulerResource(stateManager, trigger, storage, time);
+        new SchedulerResource(stateManager, trigger, workflowChangeListener, workflowRemoveListener,
+                              storage, time, new DockerImageValidator());
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))

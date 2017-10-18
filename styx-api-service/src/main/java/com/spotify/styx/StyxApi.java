@@ -109,6 +109,7 @@ public class StyxApi implements AppInit {
     final Storage storage = storageFactory.apply(environment);
 
     final WorkflowResource workflowResource = new WorkflowResource(storage,
+                                                                   schedulerServiceBaseUrl,
                                                                    new DockerImageValidator());
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
                                                                    storage);

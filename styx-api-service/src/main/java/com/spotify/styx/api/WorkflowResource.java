@@ -23,8 +23,10 @@ package com.spotify.styx.api;
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
+import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.util.StreamUtil.cat;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
@@ -34,6 +36,7 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
@@ -47,6 +50,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.stream.Stream;
 import okio.ByteString;
 
@@ -54,14 +59,17 @@ public final class WorkflowResource {
 
   static final String BASE = "/workflows";
   public static final int DEFAULT_PAGE_LIMIT = 24 * 7;
+  private static final String SCHEDULER_BASE_PATH = "/api/v0";
   private final DockerImageValidator dockerImageValidator;
 
+  private final String schedulerServiceBaseUrl;
   private final Storage storage;
 
 
-  public WorkflowResource(Storage storage, DockerImageValidator dockerImageValidator) {
+  public WorkflowResource(Storage storage, String schedulerServiceBaseUrl, DockerImageValidator dockerImageValidator) {
     this.storage = Objects.requireNonNull(storage);
     this.dockerImageValidator = Objects.requireNonNull(dockerImageValidator, "dockerImageValidator");
+    this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -86,9 +94,58 @@ public final class WorkflowResource {
             rc -> patchState(arg("cid", rc), arg("wfid", rc), rc.request()))
     );
 
-    return cat(
-        Api.prefixRoutes(routes, V3)
+    final List<Route<AsyncHandler<Response<ByteString>>>> forwardedRoutes = Arrays.asList(
+        Route.async(
+            "POST", BASE + "/<cid>",
+            rc -> createOrUpdateWorkflow(arg("cid", rc), rc)
+        ),
+        Route.async(
+            "DELETE", BASE + "/<cid>/<wfid>",
+            rc -> deleteWorkflow(arg("cid", rc), arg("wfid", rc), rc)
+        )
     );
+
+    return cat(
+        Api.prefixRoutes(routes, V3),
+        Api.prefixRoutes(forwardedRoutes, V3)
+    );
+  }
+
+  private CompletionStage<Response<ByteString>> deleteWorkflow(String cid, String wfid,
+                                                               RequestContext rc) {
+    // TODO: handle workflow crud directly in api service instead of proxying to scheduler
+    return rc.requestScopedClient()
+        .send(rc.request().withUri(schedulerApiUrl("workflows", cid, wfid)));
+  }
+
+  private CompletionStage<Response<ByteString>> createOrUpdateWorkflow(String componentId,
+                                                                       RequestContext rc) {
+    final Optional<ByteString> payload = rc.request().payload();
+    if (!payload.isPresent()) {
+      return CompletableFuture.completedFuture(
+          Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload.")));
+    }
+    final WorkflowConfiguration workflowConfig;
+    try {
+      workflowConfig = OBJECT_MAPPER
+          .readValue(payload.get().toByteArray(), WorkflowConfiguration.class);
+    } catch (IOException e) {
+      return CompletableFuture.completedFuture(
+          Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid payload.")));
+    }
+
+    final Optional<String> dockerImage = workflowConfig.dockerImage();
+    if (dockerImage.isPresent()) {
+      final Collection<String> errors = dockerImageValidator.validateImageReference(dockerImage.get());
+      if (!errors.isEmpty()) {
+        return CompletableFuture.completedFuture(
+            Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors)));
+      }
+    }
+
+    // TODO: handle workflow crud directly in api service instead of proxying to scheduler
+    return rc.requestScopedClient()
+        .send(rc.request().withPayload(payload.get()).withUri(schedulerApiUrl("workflows", componentId)));
   }
 
   private Response<List<Workflow>> workflows(String componentId) {
@@ -203,6 +260,10 @@ public final class WorkflowResource {
       return Response.forStatus(
           Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch execution info."));
     }
+  }
+
+  private String schedulerApiUrl(CharSequence... parts) {
+    return schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + "/" + String.join("/", parts);
   }
 
   private static boolean isValidSHA1(String s) {
