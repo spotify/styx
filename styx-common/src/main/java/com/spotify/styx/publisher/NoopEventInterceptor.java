@@ -25,6 +25,6 @@ import com.spotify.styx.model.SequenceEvent;
 public class NoopEventInterceptor implements EventInterceptor {
 
   @Override
-  public void eventTransitioned(SequenceEvent sequenceEvent) {
+  public void interceptedEvent(SequenceEvent sequenceEvent) {
   }
 }

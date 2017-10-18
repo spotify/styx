@@ -20,7 +20,6 @@
 
 package com.spotify.styx.state;
 
-import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import java.io.Closeable;
 
@@ -30,12 +29,11 @@ import java.io.Closeable;
 public interface EventConsumer extends Closeable {
 
   /**
-   * This is meant to be called when an internal Styx {@link Event} has been processed by the
+   * This is meant to be called when an internal Styx event has been processed by the
    * {@link StateManager}.
    *
-   * @param sequenceEvent The {@link Event} that caused an internal state machine transition via
-   *                      the {@link StateManager}, in the {@link SequenceEvent} format that adds
-   *                      more information
+   * @param sequenceEvent The {@link SequenceEvent} that caused an internal state machine transition
+   *                      via the {@link StateManager}
    * @throws IsClosed if the event consumer is closed and can not handle events
    */
   void processedEvent(SequenceEvent sequenceEvent) throws IsClosed;

@@ -67,14 +67,14 @@ public class QueuedEventConsumerTest {
 
   private class InjectingInterceptor implements EventInterceptor {
     @Override
-    public void eventTransitioned(SequenceEvent sequenceEvent) {
+    public void interceptedEvent(SequenceEvent sequenceEvent) {
       trackedEvent = sequenceEvent;
     }
   }
 
   private class SlowInjectingInterceptor implements EventInterceptor {
     @Override
-    public void eventTransitioned(SequenceEvent sequenceEvent) {
+    public void interceptedEvent(SequenceEvent sequenceEvent) {
       try {
         //Todo better
         Thread.sleep(1000);

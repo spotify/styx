@@ -369,7 +369,7 @@ public class StyxSchedulerServiceFixture {
 
   private class InjectingInterceptor implements EventInterceptor {
     @Override
-    public void eventTransitioned(SequenceEvent sequenceEvent) {
+    public void interceptedEvent(SequenceEvent sequenceEvent) {
       transitionedEvents.add(sequenceEvent);
     }
   }

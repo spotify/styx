@@ -23,19 +23,18 @@ package com.spotify.styx.publisher;
 import com.spotify.styx.model.SequenceEvent;
 
 /**
- * Interface for acting on internal Styx events asynchronously, to be used without any interaction
- * with the internal state machines and/or the storage layer in use by the service.
+ * Interface for acting on internal Styx events. For example, this can be used to publish internal
+ * Styx events to third-party databases.
  */
 public interface EventInterceptor {
 
   /**
-   * Called when a state machine transition happens. The implementation of this will be called in
-   * a separate thread asynchronously. To be used for external applications, like emitting event
-   * information to external services.
+   * Called when a state machine transition happens due to a new internal Styx event.
    *
-   * @param sequenceEvent The event being processed by the internal state machine
+   * @param sequenceEvent The {@link SequenceEvent} that caused the internal state machine
+   *                      transition
    */
-  void eventTransitioned(SequenceEvent sequenceEvent);
+  void interceptedEvent(SequenceEvent sequenceEvent);
 
   EventInterceptor NOOP = new NoopEventInterceptor();
 }

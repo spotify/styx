@@ -76,7 +76,7 @@ public class QueuedEventConsumer implements EventConsumer {
     while (running || queue.size() > 0) {
       if (queue.size() > 0) {
         try {
-          eventInterceptor.eventTransitioned(queue.remove());
+          eventInterceptor.interceptedEvent(queue.remove());
         } catch (NoSuchElementException e) {
           throw new RuntimeException("The queue should not be empty");
         }
@@ -109,7 +109,7 @@ public class QueuedEventConsumer implements EventConsumer {
     }
     running = false;
 
-    LOG.info("Shutting down, waiting for queued events to process");
+    LOG.info("Shutting down, waiting for queued events to be consumed");
 
     try {
       if (!closedLatch.await(SHUTDOWN_GRACE_PERIOD_SECONDS, TimeUnit.SECONDS)) {
