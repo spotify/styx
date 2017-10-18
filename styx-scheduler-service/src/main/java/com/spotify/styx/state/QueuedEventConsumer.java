@@ -114,6 +114,7 @@ public class QueuedEventConsumer implements EventConsumer {
     try {
       if (!closedLatch.await(SHUTDOWN_GRACE_PERIOD_SECONDS, TimeUnit.SECONDS)) {
         dispatcherThread.interrupt();
+        LOG.warn("Graceful shutdown failed, {} events left in queue", queue.size());
         throw new IOException(
             "Graceful shutdown failed, event loop did not finish within grace period");
       }
