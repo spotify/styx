@@ -107,10 +107,16 @@ public class StyxApi implements AppInit {
                                            : DEFAULT_SCHEDULER_SERVICE_BASE_URL;
 
     final Storage storage = storageFactory.apply(environment);
+    
+    // N.B. if we need to forward a request to scheduler that behind an nginx, we CAN NOT
+    // use rc.requestScopedClient() and at the same time inherit all headers from original
+    // request, because request scoped client would add Authorization header again which
+    // results duplicated headers, and that would make nginx unhappy.
 
     final WorkflowResource workflowResource = new WorkflowResource(storage,
                                                                    schedulerServiceBaseUrl,
-                                                                   new DockerImageValidator());
+                                                                   new DockerImageValidator(),
+                                                                   environment.client());
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
                                                                    storage);
     final ResourceResource resourceResource = new ResourceResource(storage);

@@ -23,12 +23,11 @@ package com.spotify.styx.api;
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
-import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.util.StreamUtil.cat;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
+import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
@@ -64,12 +63,16 @@ public final class WorkflowResource {
 
   private final String schedulerServiceBaseUrl;
   private final Storage storage;
+  private final Client forwardingClient;
 
 
-  public WorkflowResource(Storage storage, String schedulerServiceBaseUrl, DockerImageValidator dockerImageValidator) {
+  public WorkflowResource(Storage storage, String schedulerServiceBaseUrl,
+                          DockerImageValidator dockerImageValidator,
+                          Client forwardingClient) {
     this.storage = Objects.requireNonNull(storage);
     this.dockerImageValidator = Objects.requireNonNull(dockerImageValidator, "dockerImageValidator");
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
+    this.forwardingClient = Objects.requireNonNull(forwardingClient);
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -114,8 +117,7 @@ public final class WorkflowResource {
   private CompletionStage<Response<ByteString>> deleteWorkflow(String cid, String wfid,
                                                                RequestContext rc) {
     // TODO: handle workflow crud directly in api service instead of proxying to scheduler
-    return rc.requestScopedClient()
-        .send(rc.request().withUri(schedulerApiUrl("workflows", cid, wfid)));
+    return forwardingClient.send(rc.request().withUri(schedulerApiUrl("workflows", cid, wfid)));
   }
 
   private CompletionStage<Response<ByteString>> createOrUpdateWorkflow(String componentId,
@@ -144,8 +146,9 @@ public final class WorkflowResource {
     }
 
     // TODO: handle workflow crud directly in api service instead of proxying to scheduler
-    return rc.requestScopedClient()
-        .send(rc.request().withPayload(payload.get()).withUri(schedulerApiUrl("workflows", componentId)));
+    return forwardingClient.send(rc.request()
+                                     .withPayload(payload.get())
+                                     .withUri(schedulerApiUrl("workflows", componentId)));
   }
 
   private Response<List<Workflow>> workflows(String componentId) {
