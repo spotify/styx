@@ -151,7 +151,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Override
   protected void init(Environment environment) {
     when(dockerImageValidator.validateImageReference(Mockito.anyString())).thenReturn(Collections.emptyList());
-    WorkflowResource workflowResource = new WorkflowResource(storage, SCHEDULER_BASE, dockerImageValidator);
+    WorkflowResource workflowResource = new WorkflowResource(storage, SCHEDULER_BASE, dockerImageValidator,
+                                                             environment.client());
 
     environment.routingEngine()
         .registerRoutes(Api.withCommonMiddleware(
