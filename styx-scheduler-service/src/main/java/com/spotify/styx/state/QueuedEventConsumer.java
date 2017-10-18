@@ -20,6 +20,7 @@
 
 package com.spotify.styx.state;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.publisher.EventInterceptor;
 import java.io.IOException;
@@ -73,18 +74,25 @@ public class QueuedEventConsumer implements EventConsumer {
   }
 
   private void dispatch() {
-    while (running || queue.size() > 0) {
-      if (queue.size() > 0) {
+    while (running || queueSize() > 0) {
+      if (queueSize() > 0) {
         try {
           eventInterceptor.interceptedEvent(queue.remove());
         } catch (NoSuchElementException e) {
           throw new RuntimeException("The queue should not be empty");
+        } catch (Exception e) {
+          LOG.warn("Received exception from event interceptor, {}", e);
         }
       } else {
         waitForSignal();
       }
     }
     closedLatch.countDown();
+  }
+
+  @VisibleForTesting
+  int queueSize() {
+    return queue.size();
   }
 
   private void signalDispatcher() {
@@ -114,7 +122,7 @@ public class QueuedEventConsumer implements EventConsumer {
     try {
       if (!closedLatch.await(SHUTDOWN_GRACE_PERIOD_SECONDS, TimeUnit.SECONDS)) {
         dispatcherThread.interrupt();
-        LOG.warn("Graceful shutdown failed, {} events left in queue", queue.size());
+        LOG.warn("Graceful shutdown failed, {} events left in queue", queueSize());
         throw new IOException(
             "Graceful shutdown failed, event loop did not finish within grace period");
       }
@@ -123,6 +131,6 @@ public class QueuedEventConsumer implements EventConsumer {
       throw new IOException(e);
     }
 
-    LOG.info("Shutdown was clean, {} events left in queue", queue.size());
+    LOG.info("Shutdown was clean, {} events left in queue", queueSize());
   }
 }

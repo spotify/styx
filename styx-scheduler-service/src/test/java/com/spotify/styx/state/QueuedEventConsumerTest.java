@@ -22,6 +22,7 @@ package com.spotify.styx.state;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
+import static org.awaitility.Awaitility.waitAtMost;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 
@@ -50,6 +51,16 @@ public class QueuedEventConsumerTest {
     eventConsumer.processedEvent(firstEvent);
     await().atMost(5, SECONDS).until(() -> trackedEvents.get(0) != null);
     assertThat(trackedEvents.get(0), is(firstEvent));
+  }
+
+  @Test
+  public void shouldSkipEventIfExceptionFromEventInterceptor() throws Exception {
+    QueuedEventConsumer eventConsumer =
+        new QueuedEventConsumer(new ExceptionalInterceptor());
+
+    eventConsumer.processedEvent(firstEvent);
+    waitAtMost(5, SECONDS).until(() -> eventConsumer.queueSize() == 0);
+    assertThat(trackedEvents.size(), is(0));
   }
 
   @Test
@@ -95,6 +106,19 @@ public class QueuedEventConsumerTest {
         e.printStackTrace();
       }
       trackedEvents.add(sequenceEvent);
+    }
+  }
+
+  private class ExceptionalInterceptor implements EventInterceptor {
+    @Override
+    public void interceptedEvent(SequenceEvent sequenceEvent) {
+      try {
+        //Todo better
+        Thread.sleep(1000);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+      throw new RuntimeException("Error");
     }
   }
 }
