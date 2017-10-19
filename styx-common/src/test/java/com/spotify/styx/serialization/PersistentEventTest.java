@@ -32,7 +32,6 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
-import java.util.Arrays;
 import java.util.Optional;
 import okio.ByteString;
 import org.junit.Assert;
