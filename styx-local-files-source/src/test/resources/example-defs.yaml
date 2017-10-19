@@ -1,8 +1,0 @@
-schedules:
-  - id: foo
-    schedule: hours
-    docker_args: [foo, bar]
-
-  - id: bar
-    schedule: days
-    docker_args: [baz, bax]

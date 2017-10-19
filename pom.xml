@@ -23,8 +23,6 @@
   <modules>
     <module>styx-api-service</module>
     <module>styx-scheduler-service</module>
-    <module>styx-schedule-source</module>
-    <module>styx-local-files-source</module>
     <module>styx-cli</module>
     <module>styx-client</module>
     <module>styx-common</module>

@@ -21,7 +21,6 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
-import static java.util.Collections.singletonList;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
@@ -44,7 +43,6 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
-import com.spotify.styx.schedule.ScheduleSourceFactory;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
@@ -123,7 +121,6 @@ public class StyxSchedulerServiceFixture {
   public void setUp() throws Exception {
     StorageFactory storageFactory = (env) -> storage;
     Time time = () -> now;
-    StyxScheduler.ScheduleSources scheduleSources = () -> singletonList(fakeScheduleSource());
     StyxScheduler.StatsFactory statsFactory = (env) -> Stats.NOOP;
     StyxScheduler.ExecutorFactory executorFactory = (ts, tf) -> executor;
     StyxScheduler.PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
@@ -137,7 +134,6 @@ public class StyxSchedulerServiceFixture {
         .setTime(time)
         .setStorageFactory(storageFactory)
         .setDockerRunnerFactory(dockerRunnerFactory)
-        .setScheduleSources(scheduleSources)
         .setStatsFactory(statsFactory)
         .setExecutorFactory(executorFactory)
         .setPublisherFactory(publisherFactory)
@@ -214,11 +210,11 @@ public class StyxSchedulerServiceFixture {
   }
 
   void workflowChanges(Workflow workflow) {
-    workflowChangeListener.accept(workflow);
+    styxScheduler.getWorkflowChangeListener().accept(workflow);
   }
 
   void workflowDeleted(Workflow workflow) {
-    workflowRemoveListener.accept(workflow);
+    styxScheduler.getWorkflowRemoveListener().accept(workflow);
   }
 
   /**
@@ -319,16 +315,7 @@ public class StyxSchedulerServiceFixture {
   private void printTime() {
     LOG.info("The time is {}", now);
   }
-
-  private ScheduleSourceFactory fakeScheduleSource() {
-    return (changeListener, removeListener, environment, exec) ->
-        /* start */ () -> {
-      workflowChangeListener = changeListener;
-      workflows.forEach(changeListener);
-      workflowRemoveListener = removeListener;
-    };
-  }
-
+  
   private DockerRunner fakeDockerRunner() {
     return new DockerRunner() {
       @Override
