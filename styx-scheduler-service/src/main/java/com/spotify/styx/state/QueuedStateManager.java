@@ -73,7 +73,7 @@ public class QueuedStateManager implements StateManager {
   private final Time time;
   private final Executor workerPool;
   private final Storage storage;
-  private final EventConsumer eventConsumer;
+  private final QueuedEventConsumer consumer;
 
   private final ConcurrentMap<WorkflowInstance, InstanceState> states = Maps.newConcurrentMap();
 
@@ -87,11 +87,11 @@ public class QueuedStateManager implements StateManager {
       Time time,
       Executor workerPool,
       Storage storage,
-      EventConsumer eventConsumer) {
+      QueuedEventConsumer consumer) {
     this.time = Objects.requireNonNull(time);
     this.workerPool = Objects.requireNonNull(workerPool);
     this.storage = Objects.requireNonNull(storage);
-    this.eventConsumer = Objects.requireNonNull(eventConsumer);
+    this.consumer = Objects.requireNonNull(consumer);
 
     this.dispatcherThread = new Thread(this::dispatch);
     dispatcherThread.setName(DISPATCHER_THREAD_NAME);
@@ -312,9 +312,9 @@ public class QueuedStateManager implements StateManager {
 
   private void consumeEvent(SequenceEvent sequenceEvent) throws IOException {
     try {
-      eventConsumer.processedEvent(sequenceEvent);
+      consumer.enqueue(sequenceEvent);
     } catch (QueuedEventConsumer.IsClosed isClosed) {
-      LOG.warn("Event consumer was closed while processing {}", sequenceEvent);
+      LOG.warn("QueuedEventConsumer was closed while processing {}", sequenceEvent);
     }
   }
 

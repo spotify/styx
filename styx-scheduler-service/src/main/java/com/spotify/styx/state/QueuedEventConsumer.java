@@ -22,7 +22,8 @@ package com.spotify.styx.state;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.SequenceEvent;
-import com.spotify.styx.publisher.EventInterceptor;
+import com.spotify.styx.publisher.EventConsumer;
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -32,32 +33,31 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Single threaded asynchronous event consumer queue. It requires a {@link EventInterceptor}
+ * Single threaded asynchronous event consumer queue. It requires a {@link EventConsumer}
  * implementation to act upon the queued events.
  */
-public class QueuedEventConsumer implements EventConsumer {
+public class QueuedEventConsumer implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(QueuedEventConsumer.class);
   private static final int SHUTDOWN_GRACE_PERIOD_SECONDS = 5;
 
-  private final EventInterceptor eventInterceptor;
+  private final EventConsumer eventConsumer;
   private final ThreadPoolExecutor executor;
 
-  public QueuedEventConsumer(EventInterceptor eventReceiver) {
-    this.eventInterceptor = Objects.requireNonNull(eventReceiver);
+  public QueuedEventConsumer(EventConsumer eventConsumer) {
+    this.eventConsumer = Objects.requireNonNull(eventConsumer);
     this.executor = new ThreadPoolExecutor( 1, 1, 0L,
         TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
   }
 
-  @Override
-  public void processedEvent(SequenceEvent sequenceEvent) throws IsClosed {
+  void enqueue(SequenceEvent sequenceEvent) throws IsClosed {
     if (executor.isTerminating() || executor.isShutdown()) {
       throw new IsClosed();
     }
     try {
-      executor.execute(() -> eventInterceptor.interceptedEvent(sequenceEvent));
+      executor.execute(() -> eventConsumer.event(sequenceEvent));
     } catch (Exception e) {
-      LOG.warn("Exception while consuming {}: {}", sequenceEvent.event(), e);
+      LOG.warn("Exception while consuming event {}: {}", sequenceEvent.event(), e);
     }
   }
 
@@ -86,5 +86,11 @@ public class QueuedEventConsumer implements EventConsumer {
       throw new IOException(e);
     }
     LOG.info("Shutdown was clean, {} events left in queue", queueSize());
+  }
+
+  /**
+   * Exception that signals that the {@link QueuedEventConsumer} is in a closed state.
+   */
+  class IsClosed extends Exception {
   }
 }
