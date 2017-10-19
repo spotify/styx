@@ -43,7 +43,7 @@ import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
-import com.spotify.styx.publisher.EventInterceptor;
+import com.spotify.styx.publisher.EventConsumer;
 import com.spotify.styx.publisher.Publisher;
 import com.spotify.styx.schedule.ScheduleSourceFactory;
 import com.spotify.styx.state.RunState;
@@ -130,7 +130,7 @@ public class StyxSchedulerServiceFixture {
     StyxScheduler.PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
     StyxScheduler.DockerRunnerFactory dockerRunnerFactory =
         (id, env, states, exec, stats, debug) -> fakeDockerRunner();
-    StyxScheduler.EventInterceptorFactory eventInterceptorFactory = (env) -> new InjectingInterceptor();
+    StyxScheduler.EventConsumerFactory eventConsumerFactory = (env) -> new InjectingEventConsumer();
 
     styxScheduler = StyxScheduler.newBuilder()
         .setTime(time)
@@ -140,7 +140,7 @@ public class StyxSchedulerServiceFixture {
         .setStatsFactory(statsFactory)
         .setExecutorFactory(executorFactory)
         .setPublisherFactory(publisherFactory)
-        .setEventInterceptorFactory(eventInterceptorFactory)
+        .setEventConsumerFactory(eventConsumerFactory)
         .build();
 
     serviceHelper = ServiceHelper.create(styxScheduler, StyxScheduler.SERVICE_NAME);
@@ -310,7 +310,7 @@ public class StyxSchedulerServiceFixture {
     await().atMost(30, SECONDS).until(() -> getState(workflowInstance) == null);
   }
 
-  void awaitUntilInterceptedEvent(SequenceEvent sequenceEvent) {
+  void awaitUntilEnqueuedEventForConsumption(SequenceEvent sequenceEvent) {
     await().atMost(30, SECONDS).until(() -> transitionedEvents.contains(sequenceEvent));
   }
 
@@ -367,9 +367,9 @@ public class StyxSchedulerServiceFixture {
     return bigtable;
   }
 
-  private class InjectingInterceptor implements EventInterceptor {
+  private class InjectingEventConsumer implements EventConsumer {
     @Override
-    public void interceptedEvent(SequenceEvent sequenceEvent) {
+    public void event(SequenceEvent sequenceEvent) {
       transitionedEvents.add(sequenceEvent);
     }
   }

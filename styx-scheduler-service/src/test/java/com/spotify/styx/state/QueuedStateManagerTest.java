@@ -37,10 +37,10 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.publisher.EventConsumer;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.testdata.TestData;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.Optional;
 import java.util.SortedSet;
 import java.util.Stack;
@@ -65,6 +65,8 @@ public class QueuedStateManagerTest {
   private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
   private static final Trigger TRIGGER2 = Trigger.unknown("trig2");
   private static final Trigger TRIGGER3 = Trigger.unknown("trig3");
+  private static final QueuedEventConsumer consumer =
+      new QueuedEventConsumer(EventConsumer.NOOP);
 
   private static final ExecutorService POOL = Executors.newFixedThreadPool(16);
 
@@ -86,7 +88,7 @@ public class QueuedStateManagerTest {
     }
 
     storage = new InMemStorage();
-    stateManager = new QueuedStateManager(Instant::now, POOL, storage, EventConsumer.NOOP);
+    stateManager = new QueuedStateManager(Instant::now, POOL, storage, consumer);
 
     stateManager.initialize(initial);
     assertTrue(stateManager.awaitIdle(1000));
@@ -276,7 +278,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldRestoreStateAtCount() throws Exception {
-    stateManager = new QueuedStateManager(Instant::now, POOL, storage, EventConsumer.NOOP);
+    stateManager = new QueuedStateManager(Instant::now, POOL, storage, consumer);
 
     stateManager.restore(RunState.fresh(INSTANCE), 7L);
     stateManager.receive(Event.timeTrigger(INSTANCE));  // 8
@@ -289,7 +291,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldHandleThrowingOutputHandler() throws Exception {
-    stateManager = new QueuedStateManager(Instant::now, POOL, storage, EventConsumer.NOOP);
+    stateManager = new QueuedStateManager(Instant::now, POOL, storage, consumer);
 
     OutputHandler throwing = (state) -> {
       throw new RuntimeException();
@@ -303,7 +305,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void testGetActiveWorkflowInstance() throws Exception {
-    stateManager = new QueuedStateManager(Instant::now, POOL, storage, EventConsumer.NOOP);
+    stateManager = new QueuedStateManager(Instant::now, POOL, storage, consumer);
 
     assertThat(stateManager.isActiveWorkflowInstance(INSTANCE), is(false));
 

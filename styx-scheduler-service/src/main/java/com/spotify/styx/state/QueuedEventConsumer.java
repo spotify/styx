@@ -22,115 +22,75 @@ package com.spotify.styx.state;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.SequenceEvent;
-import com.spotify.styx.publisher.EventInterceptor;
+import com.spotify.styx.publisher.EventConsumer;
+import java.io.Closeable;
 import java.io.IOException;
-import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Queue;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Single threaded asynchronous event consumer queue. It requires a {@link EventInterceptor}
+ * Single threaded asynchronous event consumer queue. It requires a {@link EventConsumer}
  * implementation to act upon the queued events.
  */
-public class QueuedEventConsumer implements EventConsumer {
+public class QueuedEventConsumer implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(QueuedEventConsumer.class);
-
-  private static final int EVENT_QUEUE_SIZE = 1000;
-  private static final long POLL_TIMEOUT_MILLIS = 100;
-  private final CountDownLatch closedLatch = new CountDownLatch(1);
-  private static final String DISPATCHER_THREAD_NAME = "styx-event-consumer-dispatcher";
   private static final int SHUTDOWN_GRACE_PERIOD_SECONDS = 5;
 
-  private final Thread dispatcherThread;
-  private final Object signal = new Object();
-  private final EventInterceptor eventInterceptor;
-  private final Queue<SequenceEvent> queue = new LinkedBlockingQueue<>(EVENT_QUEUE_SIZE);
+  private final EventConsumer eventConsumer;
+  private final ThreadPoolExecutor executor;
 
-  private volatile boolean running = true;
-
-  public QueuedEventConsumer(EventInterceptor eventReceiver) {
-    this.eventInterceptor = Objects.requireNonNull(eventReceiver);
-    this.dispatcherThread = new Thread(this::dispatch);
-    dispatcherThread.setName(DISPATCHER_THREAD_NAME);
-    dispatcherThread.start();
+  public QueuedEventConsumer(EventConsumer eventConsumer) {
+    this.eventConsumer = Objects.requireNonNull(eventConsumer);
+    this.executor = new ThreadPoolExecutor( 1, 1, 0L,
+        TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
   }
 
-  @Override
-  public void processedEvent(SequenceEvent sequenceEvent) throws IsClosed {
-    if (!running) {
+  void enqueue(SequenceEvent sequenceEvent) throws IsClosed {
+    if (executor.isTerminating() || executor.isShutdown()) {
       throw new IsClosed();
     }
-    if (!queue.offer(sequenceEvent)) {
-      LOG.warn("Events queue is full, skipping {}", sequenceEvent.event());
-    } else {
-      signalDispatcher();
+    try {
+      executor.execute(() -> eventConsumer.event(sequenceEvent));
+    } catch (Exception e) {
+      LOG.warn("Exception while consuming event {}: {}", sequenceEvent.event(), e);
     }
-  }
-
-  private void dispatch() {
-    while (running || queueSize() > 0) {
-      if (queueSize() > 0) {
-        try {
-          eventInterceptor.interceptedEvent(queue.remove());
-        } catch (NoSuchElementException e) {
-          throw new RuntimeException("The queue should not be empty");
-        } catch (Exception e) {
-          LOG.warn("Received exception from event interceptor, {}", e);
-        }
-      } else {
-        waitForSignal();
-      }
-    }
-    closedLatch.countDown();
   }
 
   @VisibleForTesting
   int queueSize() {
-    return queue.size();
-  }
-
-  private void signalDispatcher() {
-    synchronized (signal) {
-      signal.notifyAll();
-    }
-  }
-
-  private void waitForSignal() {
-    synchronized (signal) {
-      try {
-        signal.wait(POLL_TIMEOUT_MILLIS);
-      } catch (InterruptedException ignored) {
-      }
-    }
+    return executor.getQueue().size();
   }
 
   @Override
   public void close() throws IOException {
-    if (!running) {
+    if (executor.isTerminating() || executor.isShutdown()) {
       return;
     }
-    running = false;
 
+    executor.shutdown();
     LOG.info("Shutting down, waiting for queued events to be consumed");
-
     try {
-      if (!closedLatch.await(SHUTDOWN_GRACE_PERIOD_SECONDS, TimeUnit.SECONDS)) {
-        dispatcherThread.interrupt();
+      if (!executor.awaitTermination(SHUTDOWN_GRACE_PERIOD_SECONDS, TimeUnit.SECONDS)) {
+        executor.shutdownNow();
         LOG.warn("Graceful shutdown failed, {} events left in queue", queueSize());
         throw new IOException(
             "Graceful shutdown failed, event loop did not finish within grace period");
       }
     } catch (InterruptedException e) {
-      dispatcherThread.interrupt();
+      executor.shutdownNow();
       throw new IOException(e);
     }
-
     LOG.info("Shutdown was clean, {} events left in queue", queueSize());
+  }
+
+  /**
+   * Exception that signals that the {@link QueuedEventConsumer} is in a closed state.
+   */
+  class IsClosed extends Exception {
   }
 }

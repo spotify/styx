@@ -20,14 +20,8 @@
 
 package com.spotify.styx.docker;
 
-import static java.util.Optional.empty;
-
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.auto.value.AutoValue;
-import com.google.common.collect.ImmutableList;
 import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.model.WorkflowConfiguration;
-import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.StateManager;

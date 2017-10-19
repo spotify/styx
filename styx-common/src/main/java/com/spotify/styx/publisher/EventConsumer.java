@@ -1,6 +1,6 @@
 /*-
  * -\-\-
- * Spotify Styx Scheduler Service
+ * Spotify Styx Common
  * --
  * Copyright (C) 2016 - 2017 Spotify AB
  * --
@@ -18,31 +18,23 @@
  * -/-/-
  */
 
-package com.spotify.styx.state;
+package com.spotify.styx.publisher;
 
 import com.spotify.styx.model.SequenceEvent;
-import java.io.Closeable;
 
 /**
- * Basic interface to consume {@link SequenceEvent}
+ * Interface for acting on internal Styx events. For example, this can be used to publish internal
+ * Styx events to third-party databases. Events will be consumed on a dedicated thread pool.
  */
-public interface EventConsumer extends Closeable {
+public interface EventConsumer {
 
   /**
-   * This is meant to be called when an internal Styx event has been processed by the
-   * {@link StateManager}.
+   * Called when a state machine transition happens due to a new internal Styx event.
    *
-   * @param sequenceEvent The {@link SequenceEvent} that caused an internal state machine transition
-   *                      via the {@link StateManager}
-   * @throws IsClosed if the event consumer is closed and can not handle events
+   * @param sequenceEvent The {@link SequenceEvent} that caused the internal state machine
+   *                      transition
    */
-  void processedEvent(SequenceEvent sequenceEvent) throws IsClosed;
-
-  /**
-   * Exception that signals that the {@link EventConsumer} is in a closed state.
-   */
-  class IsClosed extends Exception {
-  }
+  void event(SequenceEvent sequenceEvent);
 
   EventConsumer NOOP = new NoopEventConsumer();
 }
