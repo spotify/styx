@@ -21,8 +21,6 @@
 package com.spotify.styx.state.handlers;
 
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
-import static java.util.Collections.emptyList;
-import static java.util.Optional.empty;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -33,7 +31,6 @@ import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import java.io.IOException;
-import java.util.Optional;
 import org.junit.Before;
 import org.junit.Test;
 

@@ -57,6 +57,7 @@ import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.WorkflowValidator;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -81,6 +82,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.DockerImageValidator;
+import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
@@ -143,6 +145,7 @@ public class StyxScheduler implements AppInit {
   public interface ScheduleSources extends Supplier<Iterable<ScheduleSourceFactory>> { }
   public interface StatsFactory extends Function<Environment, Stats> { }
   public interface PublisherFactory extends Function<Environment, Publisher> { }
+  public interface EventConsumerFactory extends Function<Environment, Consumer<SequenceEvent>> { }
 
   @FunctionalInterface
   interface DockerRunnerFactory {
@@ -173,6 +176,7 @@ public class StyxScheduler implements AppInit {
     private PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
     private RetryUtil retryUtil = DEFAULT_RETRY_UTIL;
     private WorkflowResourceDecorator resourceDecorator = WorkflowResourceDecorator.NOOP;
+    private EventConsumerFactory eventConsumerFactory = (env) -> (event) -> { };
 
     public Builder setTime(Time time) {
       this.time = time;
@@ -219,6 +223,11 @@ public class StyxScheduler implements AppInit {
       return this;
     }
 
+    public Builder setEventConsumerFactory(EventConsumerFactory eventConsumerFactory) {
+      this.eventConsumerFactory = eventConsumerFactory;
+      return this;
+    }
+
     public StyxScheduler build() {
       return new StyxScheduler(this);
     }
@@ -243,6 +252,7 @@ public class StyxScheduler implements AppInit {
   private final PublisherFactory publisherFactory;
   private final RetryUtil retryUtil;
   private final WorkflowResourceDecorator resourceDecorator;
+  private final EventConsumerFactory eventConsumerFactory;
 
   private StateManager stateManager;
   private Scheduler scheduler;
@@ -259,6 +269,7 @@ public class StyxScheduler implements AppInit {
     this.publisherFactory = requireNonNull(builder.publisherFactory);
     this.retryUtil = requireNonNull(builder.retryUtil);
     this.resourceDecorator = requireNonNull(builder.resourceDecorator);
+    this.eventConsumerFactory = requireNonNull(builder.eventConsumerFactory);
   }
 
   @Override
@@ -283,9 +294,11 @@ public class StyxScheduler implements AppInit {
     closer.register(publisher);
 
     final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
-    final ExecutorService eventWorker = Executors.newFixedThreadPool(16, eventTf);
     closer.register(executorCloser("scheduler", executor));
-    closer.register(executorCloser("event-worker", eventWorker));
+    final ExecutorService outputHandlerExecutor = Executors.newFixedThreadPool(16, eventTf);
+    closer.register(executorCloser("output-handler", outputHandlerExecutor));
+    final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
+    closer.register(executorCloser("event-consumer", eventConsumerExecutor));
 
     final Stats stats = statsFactory.apply(environment);
     final WorkflowCache workflowCache = new InMemWorkflowCache();
@@ -294,7 +307,8 @@ public class StyxScheduler implements AppInit {
     warmUpCache(workflowCache, storage);
 
     final QueuedStateManager stateManager = closer.register(
-        new QueuedStateManager(time, eventWorker, storage));
+        new QueuedStateManager(time, outputHandlerExecutor, storage,
+            eventConsumerFactory.apply(environment), eventConsumerExecutor));
 
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
@@ -360,7 +374,7 @@ public class StyxScheduler implements AppInit {
   }
 
   @VisibleForTesting
-  void receive(Event event) throws StateManager.IsClosed {
+  void receive(Event event) throws IsClosedException {
     stateManager.receive(event);
   }
 

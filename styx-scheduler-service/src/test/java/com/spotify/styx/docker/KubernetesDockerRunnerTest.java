@@ -51,6 +51,7 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Debug;
+import com.spotify.styx.util.IsClosedException;
 import io.fabric8.kubernetes.api.model.ContainerState;
 import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
@@ -208,7 +209,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldUseExecutionIdForPodName() throws IOException, StateManager.IsClosed {
+  public void shouldUseExecutionIdForPodName() throws IOException, IsClosedException {
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
     verify(pods).create(podCaptor.capture());
     Pod submittedPod = podCaptor.getValue();
@@ -421,7 +422,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test(expected = InvalidExecutionException.class)
-  public void shouldThrowIfSecretNotExist() throws IOException, StateManager.IsClosed {
+  public void shouldThrowIfSecretNotExist() throws IOException, IsClosedException {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(null);
     when(k8sClient.secrets()).thenReturn(secrets);
@@ -430,7 +431,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test(expected = InvalidExecutionException.class)
-  public void shouldThrowIfMountToReservedPath() throws IOException, StateManager.IsClosed {
+  public void shouldThrowIfMountToReservedPath() throws IOException, IsClosedException {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(null);
     when(k8sClient.secrets()).thenReturn(secrets);
@@ -439,7 +440,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldMountSecret() throws IOException, StateManager.IsClosed {
+  public void shouldMountSecret() throws IOException, IsClosedException {
     final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET,
         SECRET_SPEC_WITH_CUSTOM_SECRET);
     assertThat(pod.getSpec().getVolumes().size(), is(1));
@@ -452,7 +453,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldMountServiceAccount() throws IOException, StateManager.IsClosed {
+  public void shouldMountServiceAccount() throws IOException, IsClosedException {
     final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, SECRET_SPEC_WITH_SA);
     assertThat(pod.getSpec().getVolumes().size(), is(1));
     assertThat(pod.getSpec().getVolumes().get(0).getName(),
@@ -466,7 +467,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldConfigureResourceRequirements() throws IOException, StateManager.IsClosed {
+  public void shouldConfigureResourceRequirements() throws IOException, IsClosedException {
     final String memRequest = "17Mi";
     final String memLimit = "4711Mi";
     final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RunSpec.builder()
@@ -484,7 +485,7 @@ public class KubernetesDockerRunnerTest {
 
 
   @Test
-  public void shouldRunIfSecretExists() throws IOException, StateManager.IsClosed {
+  public void shouldRunIfSecretExists() throws IOException, IsClosedException {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(new SecretBuilder().build());
     when(k8sClient.secrets()).thenReturn(secrets);
@@ -501,7 +502,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldEnsureAndMountServiceAccountSecret() throws StateManager.IsClosed, IOException {
+  public void shouldEnsureAndMountServiceAccountSecret() throws IsClosedException, IOException {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(null);
     when(k8sClient.secrets()).thenReturn(secrets);
@@ -531,7 +532,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldNotRunIfServiceAccountSecretEnsureFails() throws StateManager.IsClosed, IOException {
+  public void shouldNotRunIfServiceAccountSecretEnsureFails() throws IsClosedException, IOException {
     final InvalidExecutionException error = new InvalidExecutionException("SA not found");
     when(serviceAccountSecretManager.ensureServiceAccountKeySecret(
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT)).thenThrow(error);
@@ -542,7 +543,8 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldNotRunIfSecretHasManagedServiceAccountKeySecretNamePrefix() throws StateManager.IsClosed, IOException {
+  public void shouldNotRunIfSecretHasManagedServiceAccountKeySecretNamePrefix() throws
+                                                                                IsClosedException, IOException {
     final String secret = "styx-wf-sa-keys-foo";
 
     exception.expect(InvalidExecutionException.class);

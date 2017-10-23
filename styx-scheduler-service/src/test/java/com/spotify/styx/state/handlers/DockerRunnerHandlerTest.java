@@ -42,9 +42,9 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
-import com.spotify.styx.state.StateManager.IsClosed;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.util.IsClosedException;
 import java.io.IOException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -132,7 +132,8 @@ public class DockerRunnerHandlerTest {
     shouldFailIfDockerRunnerRaisesException(new InvalidExecutionException("PEBKAC"));
   }
 
-  void shouldFailIfDockerRunnerRaisesException(Throwable throwable) throws IOException, IsClosed {
+  void shouldFailIfDockerRunnerRaisesException(Throwable throwable)
+      throws IOException, IsClosedException {
     doThrow(throwable).when(dockerRunner)
         .start(any(WorkflowInstance.class), any(RunSpec.class));
 

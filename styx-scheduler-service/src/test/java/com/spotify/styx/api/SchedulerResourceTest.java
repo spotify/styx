@@ -66,9 +66,6 @@ import okio.ByteString;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
 
 /**
  * API endpoints for interacting directly with the scheduler
