@@ -39,6 +39,7 @@ import com.spotify.styx.util.MissingRequiredPropertyException;
 import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -105,15 +106,12 @@ public class ExecutionDescriptionHandler implements OutputHandler {
       throws IOException, MissingRequiredPropertyException {
     final WorkflowId workflowId = workflowInstance.workflowId();
 
-    final Optional<Workflow> workflowOpt = storage.workflow(workflowId);
-    final Workflow workflow = workflowOpt.orElseThrow(
-        () -> new ResourceNotFoundException(format("Missing %s, halting %s", workflowId, workflowInstance)));
+    final Workflow workflow = storage.workflow(workflowId).orElseThrow(
+        () -> new ResourceNotFoundException(format("Missing %s, halting %s",
+                                                   workflowId, workflowInstance)));
 
-    final Optional<List<String>> dockerArgsOpt = workflow.configuration().dockerArgs();
-    if (!dockerArgsOpt.isPresent()) {
-      throw new MissingRequiredPropertyException(format("%s has no docker args, halting %s",
-                                                        workflowId, workflowInstance));
-    }
+    final List<String> dockerArgs = workflow.configuration().dockerArgs().orElse(
+        Collections.emptyList());
 
     final WorkflowState workflowState = storage.workflowState(workflow.id());
 
@@ -135,7 +133,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
 
     return ExecutionDescription.builder()
         .dockerImage(dockerImageOpt.get())
-        .dockerArgs(dockerArgsOpt.get())
+        .dockerArgs(dockerArgs)
         .dockerTerminationLogging(workflow.configuration().dockerTerminationLogging())
         .secret(workflow.configuration().secret())
         .serviceAccount(workflow.configuration().serviceAccount())
