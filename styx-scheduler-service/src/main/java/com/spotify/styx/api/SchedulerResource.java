@@ -37,6 +37,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
@@ -135,8 +136,21 @@ public class SchedulerResource {
         return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors));
       }
     }
+
     final Workflow workflow = Workflow.create(componentId, configuration);
     workflowChangeListener.accept(workflow);
+
+    final WorkflowState.Builder builder = WorkflowState.builder();
+    configuration.dockerImage().ifPresent(builder::dockerImage);
+    configuration.commitSha().ifPresent(builder::commitSha);
+    final WorkflowState workflowState = builder.build();
+
+    try {
+      storage.patchState(workflow.id(), workflowState);
+    } catch (IOException e) {
+      return Response.forStatus(INTERNAL_SERVER_ERROR.withReasonPhrase("could not store workflow state"));
+    }
+
     return Response.forPayload(workflow);
   }
 

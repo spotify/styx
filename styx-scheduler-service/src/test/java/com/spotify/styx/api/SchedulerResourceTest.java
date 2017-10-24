@@ -45,6 +45,8 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.test.ServiceHelper;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
@@ -66,9 +68,6 @@ import okio.ByteString;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
 
 /**
  * API endpoints for interacting directly with the scheduler
@@ -175,6 +174,21 @@ public class SchedulerResourceTest {
   }
 
   @Test
+  public void testCreateWorkflowWithoutDockerImage() throws Exception {
+    final WorkflowConfiguration workflowConfiguration =
+        WorkflowConfigurationBuilder.from(FULL_DAILY_WORKFLOW.configuration())
+            .dockerImage(Optional.empty()).build();
+    final Response<ByteString> r = serviceHelper.request(
+        "POST", SchedulerResource.BASE + "/workflows/styx",
+        serialize(workflowConfiguration)).toCompletableFuture().get();
+    assertThat(r, hasStatus(withCode(Status.OK)));
+    assertThat(storage.workflow(FULL_DAILY_WORKFLOW.id()), isPresent());
+    assertThat(storage.workflow(FULL_DAILY_WORKFLOW.id()).get().configuration().dockerImage(),
+               isEmpty());
+    storage.delete(FULL_DAILY_WORKFLOW.id());
+  }
+
+  @Test
   public void testCreateWorkflowInvalidImage() throws Exception {
     when(dockerImageValidator.validateImageReference(any())).thenReturn(ImmutableList.of("bad", "image"));
     final Response<ByteString> r = serviceHelper.request(
@@ -198,6 +212,30 @@ public class SchedulerResourceTest {
 
     assertThat(post2.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
     assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
+    storage.delete(HOURLY_WORKFLOW.id());
+  }
+
+  @Test
+  public void testUpdateWorkflowUpdatesWorkflowState() throws Exception {
+    ByteString workflowPayload = serialize(HOURLY_WORKFLOW.configuration());
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows/styx", workflowPayload);
+
+    assertThat(post.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
+    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
+
+    final WorkflowConfiguration workflowConfiguration =
+        WorkflowConfigurationBuilder.from(HOURLY_WORKFLOW.configuration())
+            .dockerImage("foobar")
+            .build();
+    ByteString workflowPayload2 = serialize(workflowConfiguration);
+    CompletionStage<Response<ByteString>> post2 =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows/styx", workflowPayload2);
+
+    assertThat(post2.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
+    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
+    assertThat(storage.workflowState(HOURLY_WORKFLOW.id()).dockerImage(),
+               is(Optional.of("foobar")));
     storage.delete(HOURLY_WORKFLOW.id());
   }
 

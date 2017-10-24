@@ -93,7 +93,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
 
   public WorkflowResourceTest(Api.Version version) {
-    super(WorkflowResource.BASE, version, "workflow-test");
+    super("/workflows", version, "workflow-test");
     MockitoAnnotations.initMocks(this);
   }
 
@@ -220,6 +220,20 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertThat(storage.enabled(WORKFLOW.id()), is(true));
     assertThat(storage.workflowState(WORKFLOW.id()).dockerImage().get(), is("cherry:image"));
     assertThat(storage.workflowState(WORKFLOW.id()).commitSha().get(), is(VALID_SHA));
+  }
+
+  @Test
+  public void shouldUpdateWorkflowConfigurationOnPatch() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
+                                        STATEPAYLOAD_FULL));
+
+    final WorkflowConfiguration workflowConfiguration =
+        storage.workflow(WORKFLOW.id()).get().configuration();
+
+    assertThat(workflowConfiguration.commitSha(), is(Optional.of(VALID_SHA)));
+    assertThat(workflowConfiguration.dockerImage(), is(Optional.of("cherry:image")));
   }
 
   @Test
