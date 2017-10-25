@@ -85,4 +85,9 @@ class JsonCliOutput implements CliOutput {
   public void printWorkflow(Workflow workflow, WorkflowState state) {
     printJson(ImmutableMap.of("workflow", workflow, "state", state));
   }
+
+  @Override
+  public void printError(String message) {
+    System.err.println(message);
+  }
 }

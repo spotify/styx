@@ -147,4 +147,9 @@ class PlainCliOutput implements CliOutput {
         state.nextNaturalTrigger().map(Object::toString).orElse(""),
         state.nextNaturalOffsetTrigger().map(Object::toString).orElse("")));
   }
+
+  @Override
+  public void printError(String message) {
+    System.err.println(message);
+  }
 }

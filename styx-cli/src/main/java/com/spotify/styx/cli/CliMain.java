@@ -20,6 +20,7 @@
 
 package com.spotify.styx.cli;
 
+import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.core.Service;
 import com.spotify.apollo.core.Services;
@@ -29,6 +30,7 @@ import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.ResourcesPayload;
 import com.spotify.styx.api.RunStateDataPayload;
+import com.spotify.styx.cli.CliMain.CliContext.Output;
 import com.spotify.styx.client.ApiErrorException;
 import com.spotify.styx.client.ClientErrorException;
 import com.spotify.styx.client.StyxClient;
@@ -39,8 +41,8 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.util.ParameterUtil;
-import java.io.IOException;
 import java.time.format.DateTimeParseException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +63,7 @@ import net.sourceforge.argparse4j.inf.Subparser;
 import net.sourceforge.argparse4j.inf.Subparsers;
 import net.sourceforge.argparse4j.internal.HelpScreenException;
 
-public final class Main {
+public final class CliMain {
 
   private static final String ENV_VAR_PREFIX = "STYX_CLI";
 
@@ -76,7 +78,7 @@ public final class Main {
   private static final int EXIT_CODE_ARGUMENT_ERROR = 2;
   private static final int EXIT_CODE_CLIENT_ERROR = 3;
   private static final String STYX_CLI_VERSION =
-      "Styx CLI " + Main.class.getPackage().getImplementationVersion();
+      "Styx CLI " + CliMain.class.getPackage().getImplementationVersion();
 
   private final StyxCliParser parser;
   private final Namespace namespace;
@@ -85,7 +87,7 @@ public final class Main {
   private final CliOutput cliOutput;
   private StyxClient styxClient;
 
-  private Main(
+  private CliMain(
       StyxCliParser parser,
       Namespace namespace,
       String apiHost,
@@ -98,24 +100,39 @@ public final class Main {
     this.cliOutput = Objects.requireNonNull(cliOutput);
   }
 
-  public static void main(String[] args) throws IOException, InterruptedException {
-    final StyxCliParser parser = new StyxCliParser();
+  public static void main(String... args) {
+    try {
+      run(CliContext.DEFAULT, args);
+    } catch (CliExitException e) {
+      System.exit(e.code());
+    }
+  }
+
+  static void run(CliContext cliContext, String... args) {
+    run(cliContext, ImmutableList.copyOf(args));
+  }
+
+  static void run(CliContext cliContext, Collection<String> args) {
+    final StyxCliParser parser = new StyxCliParser(cliContext);
     final Namespace namespace;
     final String apiHost;
 
+    if (args.isEmpty()) {
+      parser.parser.printHelp();
+      throw new CliExitException(EXIT_CODE_SUCCESS);
+    }
+
     try {
-      namespace = parser.parser.parseArgs(args);
+      namespace = parser.parser.parseArgs(args.toArray(new String[0]));
       apiHost = namespace.getString(parser.host.getDest());
       if (apiHost == null) {
         throw new ArgumentParserException("Styx API host not set", parser.parser);
       }
     } catch (HelpScreenException e) {
-      System.exit(EXIT_CODE_SUCCESS);
-      return; // needed to convince compiler that flow is interrupted
+      throw new CliExitException(EXIT_CODE_SUCCESS);
     } catch (ArgumentParserException e) {
       parser.parser.handleError(e);
-      System.exit(EXIT_CODE_ARGUMENT_ERROR);
-      return; // needed to convince compiler that flow is interrupted
+      throw new CliExitException(EXIT_CODE_ARGUMENT_ERROR);
     }
 
     final Service cliService = Services.usingName("styx-cli")
@@ -128,22 +145,22 @@ public final class Main {
     final boolean jsonOutput = namespace.getBoolean(parser.json.getDest());
     final CliOutput cliOutput;
     if (jsonOutput) {
-      cliOutput = new JsonCliOutput();
+      cliOutput = cliContext.output(Output.JSON);
     } else if (plainOutput) {
-      cliOutput = new PlainCliOutput();
+      cliOutput = cliContext.output(Output.PLAIN);
     } else {
-      cliOutput = new PrettyCliOutput();
+      cliOutput = cliContext.output(Output.PRETTY);
     }
 
-    new Main(parser, namespace, apiHost, cliService, cliOutput).run();
+    new CliMain(parser, namespace, apiHost, cliService, cliOutput).run(cliContext);
   }
 
-  private void run() {
+  private void run(CliContext cliContext) {
     final Command command = namespace.get(COMMAND_DEST);
 
     try (Service.Instance instance = cliService.start()) {
       final Client client = ApolloEnvironmentModule.environment(instance).environment().client();
-      styxClient = StyxClientFactory.create(client, apiHost);
+      styxClient = cliContext.createClient(client, apiHost);
 
       switch (command) {
         case LIST:
@@ -235,20 +252,20 @@ public final class Main {
       }
     } catch (ArgumentParserException e) {
       parser.parser.handleError(e);
-      System.exit(EXIT_CODE_ARGUMENT_ERROR);
+      throw new CliExitException(EXIT_CODE_ARGUMENT_ERROR);
     } catch (ExecutionException e) {
       final Throwable cause = e.getCause();
       if (cause instanceof ApiErrorException) {
-        System.err.println("API error: " + cause.getMessage());
+        cliOutput.printError("API error: " + cause.getMessage());
       } else if (cause instanceof ClientErrorException) {
-        System.err.println(cause.getMessage());
+        cliOutput.printError(cause.getMessage());
       } else {
         cause.printStackTrace();
       }
-      System.exit(EXIT_CODE_CLIENT_ERROR);
+      throw new CliExitException(EXIT_CODE_CLIENT_ERROR);
     } catch (Exception e) {
       e.printStackTrace();
-      System.exit(EXIT_CODE_UNKNOWN_ERROR);
+      throw new CliExitException(EXIT_CODE_UNKNOWN_ERROR);
     }
   }
 
@@ -500,7 +517,6 @@ public final class Main {
 
     final Argument host = parser.addArgument("-H", "--host")
         .help("Styx API host (can also be set with environment variable " + ENV_VAR_PREFIX + "_HOST)")
-        .setDefault(System.getenv(ENV_VAR_PREFIX + "_HOST"))
         .action(Arguments.store());
 
     final Argument json = parser.addArgument("--json")
@@ -514,6 +530,10 @@ public final class Main {
         .action(Arguments.storeTrue());
 
     final Argument version = parser.addArgument("--version").action(Arguments.version());
+
+    private StyxCliParser(CliContext cliContext) {
+      host.setDefault(cliContext.env().get(ENV_VAR_PREFIX + "_HOST"));
+    }
 
     private static Subparser addWorkflowInstanceArguments(Subparser subparser) {
       subparser.addArgument(COMPONENT_DEST)
@@ -675,5 +695,46 @@ public final class Main {
     public boolean consumeArgument() {
       return true;
     }
+  }
+
+  interface CliContext {
+
+    enum Output {
+      JSON,
+      PLAIN,
+      PRETTY
+    }
+
+    CliOutput output(Output output);
+
+    Map<String, String> env();
+
+    StyxClient createClient(Client client, String host);
+
+    CliContext DEFAULT = new CliContext() {
+      @Override
+      public StyxClient createClient(Client client, String host) {
+        return StyxClientFactory.create(client, host);
+      }
+
+      @Override
+      public CliOutput output(Output output) {
+        switch (output) {
+          case JSON:
+            return new JsonCliOutput();
+          case PLAIN:
+            return new PlainCliOutput();
+          case PRETTY:
+            return new PrettyCliOutput();
+          default:
+            throw new AssertionError();
+        }
+      }
+
+      @Override
+      public Map<String, String> env() {
+        return System.getenv();
+      }
+    };
   }
 }
