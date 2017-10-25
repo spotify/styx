@@ -36,7 +36,6 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
-import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
@@ -48,7 +47,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -177,32 +175,14 @@ public final class WorkflowResource {
     }
 
     if (patchState.dockerImage().isPresent()) {
-      final Collection<String> errors = dockerImageValidator.validateImageReference(patchState.dockerImage().get());
-      if (!errors.isEmpty()) {
-        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors));
-      }
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("docker_image not allowed"));
     }
 
     if (patchState.commitSha().isPresent()) {
-      if (!isValidSHA1(patchState.commitSha().get())) {
-        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid SHA-1."));
-      }
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("commit_sha not allowed"));
     }
 
-    final WorkflowConfiguration workflowConfiguration;
     try {
-      workflowConfiguration = storage.workflow(workflowId).get().configuration();
-    } catch (IOException | NoSuchElementException e) {
-      return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Workflow not found."));
-    }
-    final WorkflowConfigurationBuilder builder =
-        WorkflowConfigurationBuilder.from(workflowConfiguration);
-    patchState.commitSha().ifPresent(builder::commitSha);
-    patchState.dockerImage().ifPresent(builder::dockerImage);
-    final Workflow updatedWorkflow = Workflow.create(componentId, builder.build());
-
-    try {
-      storage.storeWorkflow(updatedWorkflow);
       storage.patchState(workflowId, patchState);
     } catch (ResourceNotFoundException e) {
       return Response.forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
@@ -278,10 +258,6 @@ public final class WorkflowResource {
 
   private String schedulerApiUrl(CharSequence... parts) {
     return schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + "/" + String.join("/", parts);
-  }
-
-  private static boolean isValidSHA1(String s) {
-    return s.matches("[a-fA-F0-9]{40}");
   }
 
   private static String arg(String name, RequestContext rc) {

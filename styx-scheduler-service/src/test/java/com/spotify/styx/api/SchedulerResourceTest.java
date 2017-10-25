@@ -29,6 +29,7 @@ import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
+import static com.spotify.styx.testdata.TestData.INVALID_SHA;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.startsWith;
@@ -237,6 +238,19 @@ public class SchedulerResourceTest {
     assertThat(storage.workflowState(HOURLY_WORKFLOW.id()).dockerImage(),
                is(Optional.of("foobar")));
     storage.delete(HOURLY_WORKFLOW.id());
+  }
+
+  @Test
+  public void testWorkflowWithInvalidShaFails() throws Exception {
+    final WorkflowConfiguration workflowConfiguration =
+        WorkflowConfigurationBuilder.from(HOURLY_WORKFLOW.configuration())
+            .commitSha(INVALID_SHA)
+            .build();
+    ByteString workflowPayload = serialize(workflowConfiguration);
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows/styx", workflowPayload);
+
+    assertThat(post.toCompletableFuture().get(), hasStatus(withCode(Status.BAD_REQUEST)));
   }
 
   @Test
