@@ -44,6 +44,8 @@ public interface WorkflowConfiguration {
 
   Optional<String> dockerImage();
 
+  Optional<String> commitSha();
+
   Optional<List<String>> dockerArgs();
 
   /**

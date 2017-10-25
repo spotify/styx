@@ -36,6 +36,7 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
@@ -47,6 +48,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -56,8 +58,8 @@ import okio.ByteString;
 
 public final class WorkflowResource {
 
-  static final String BASE = "/workflows";
-  public static final int DEFAULT_PAGE_LIMIT = 24 * 7;
+  private static final String BASE = "/workflows";
+  private static final int DEFAULT_PAGE_LIMIT = 24 * 7;
   private static final String SCHEDULER_BASE_PATH = "/api/v0";
   private final DockerImageValidator dockerImageValidator;
 
@@ -160,7 +162,7 @@ public final class WorkflowResource {
     }
   }
 
-  public Response<WorkflowState> patchState(String componentId, String id, Request request) {
+  private Response<WorkflowState> patchState(String componentId, String id, Request request) {
     final Optional<ByteString> payload = request.payload();
     if (!payload.isPresent()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
@@ -187,11 +189,23 @@ public final class WorkflowResource {
       }
     }
 
+    final WorkflowConfiguration workflowConfiguration;
     try {
+      workflowConfiguration = storage.workflow(workflowId).get().configuration();
+    } catch (IOException | NoSuchElementException e) {
+      return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Workflow not found."));
+    }
+    final WorkflowConfigurationBuilder builder =
+        WorkflowConfigurationBuilder.from(workflowConfiguration);
+    patchState.commitSha().ifPresent(builder::commitSha);
+    patchState.dockerImage().ifPresent(builder::dockerImage);
+    final Workflow updatedWorkflow = Workflow.create(componentId, builder.build());
+
+    try {
+      storage.storeWorkflow(updatedWorkflow);
       storage.patchState(workflowId, patchState);
     } catch (ResourceNotFoundException e) {
-      return Response
-          .forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
+      return Response.forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
       return Response
           .forStatus(
@@ -201,29 +215,26 @@ public final class WorkflowResource {
     return state(componentId, id);
   }
 
-  public Response<Workflow> workflow(String componentId, String id) {
-    final WorkflowId workflowId = WorkflowId.create(componentId, id);
+  private Response<Workflow> workflow(String componentId, String id) {
     try {
-      return storage.workflow(workflowId).map(Response::forPayload)
+      return storage.workflow(WorkflowId.create(componentId, id))
+          .map(Response::forPayload)
           .orElse(Response.forStatus(Status.NOT_FOUND));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
   }
 
-  public Response<WorkflowState> state(String componentId, String id) {
-    final WorkflowId workflowId = WorkflowId.create(componentId, id);
-    WorkflowState workflowState;
+  private Response<WorkflowState> state(String componentId, String id) {
     try {
-      workflowState = storage.workflowState(workflowId);
+      return Response.forPayload(storage.workflowState(WorkflowId.create(componentId, id)));
     } catch (IOException e) {
       return Response
           .forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch state."));
     }
-    return Response.forPayload(workflowState);
   }
 
-  public Response<List<WorkflowInstanceExecutionData>> instances(
+  private Response<List<WorkflowInstanceExecutionData>> instances(
       String componentId,
       String id,
       Request request) {
@@ -247,7 +258,7 @@ public final class WorkflowResource {
     return Response.forPayload(data);
   }
 
-  public Response<WorkflowInstanceExecutionData> instance(
+  private Response<WorkflowInstanceExecutionData> instance(
       String componentId,
       String id,
       String instanceId) {
