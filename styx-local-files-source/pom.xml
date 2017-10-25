@@ -4,7 +4,7 @@
   <parent>
     <groupId>com.spotify</groupId>
     <artifactId>styx</artifactId>
-    <version>1.0.62</version>
+    <version>1.0.63-SNAPSHOT</version>
   </parent>
 
   <name>Spotify Styx Local Files Schedule Source</name>
