@@ -105,6 +105,7 @@ public class StyxApolloClientTest {
     final CompletableFuture<Void> r = styx.deleteWorkflow("foo-comp", "bar-wf").toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
+    assertThat(r.isCompletedExceptionally(), is(false));
     final Request request = requestCaptor.getValue();
     assertThat(request.uri(), is(API_URL + "/workflows/foo-comp/bar-wf"));
     assertThat(request.method(), is("DELETE"));
