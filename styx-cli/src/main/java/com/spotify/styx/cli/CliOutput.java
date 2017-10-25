@@ -49,4 +49,6 @@ interface CliOutput {
   void printMessage(String message);
 
   void printWorkflow(Workflow workflow, WorkflowState state);
+
+  void printError(String message);
 }

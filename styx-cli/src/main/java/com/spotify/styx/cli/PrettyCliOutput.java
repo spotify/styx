@@ -188,6 +188,11 @@ class PrettyCliOutput implements CliOutput {
     System.out.println("Ofst Trig :" + state.nextNaturalOffsetTrigger().map(Object::toString).orElse(""));
   }
 
+  @Override
+  public void printError(String message) {
+    System.err.println(message);
+  }
+
   private Ansi getAnsiForState(RunStateDataPayload.RunStateData RunStateData) {
     final String state = RunStateData.state();
     switch (state) {
