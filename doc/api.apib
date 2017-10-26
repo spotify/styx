@@ -34,14 +34,12 @@ Resources related to the Workflows registered in Styx.
 ## Workflows [/{version}/workflows/{component_id}]
 
 + Parameters
-    + component_id: `styx-canary` (string) - Workflow Component
-
-### Get Workflows [GET]
-
-+ Parameters
     + version: `v3` (enum[string]) - API version
         + Members
             + `v3`
+    + component_id: `styx-canary` (string) - Workflow Component
+
+### Get Workflows [GET]
 
 + Response 200 (application/json)
 
@@ -65,6 +63,55 @@ Resources related to the Workflows registered in Styx.
                 "resources": []
               }
         }]
+
+### Create or update Workflow [POST]
+
+Accepts a Workflow definition as a JSON object. Returns 200 OK if the Workflow was registered
+or updated. Note that a non-null value is required for docker_image.
+
++ Request (application/json)
+
+        {
+          "id": "StyxCanary",
+          "schedule": "days",
+          "offset": null,
+          "docker_image": "styx-canary-dummy:dummy",
+          "docker_args": [
+            "luigi",
+            "--module",
+            "canary_job",
+            "CanaryJob"
+          ],
+          "docker_termination_logging": false,
+          "secret": null,
+          "service_account": null,
+          "resources": []
+        }
+
++ Response 200 (application/json)
+
+        {
+          "component_id": "styx-canary",
+          "workflow_id": "StyxCanary",
+          "component_uri": "file:///etc/styx/schedule.yaml",
+          "configuration": {
+            "id": "StyxCanary",
+            "schedule": "days",
+            "offset": null,
+            "docker_image": "styx-canary-dummy:dummy",
+            "docker_args": [
+              "luigi",
+              "--module",
+              "canary_job",
+              "CanaryJob"
+            ],
+            "docker_termination_logging": false,
+            "secret": null,
+            "service_account": null,
+            "resources": []
+          },
+          "__from_api": "V3"
+        }
 
 ## Workflow [/{version}/workflows/{component_id}/{workflow_id}]
 
@@ -113,63 +160,6 @@ Returns 204 No Content if the Workflow was found and deleted, 404 Not Found othe
 
 + Response 204
 + Response 404
-
-## Workflows [/{version}/workflows/{component_id}]
-
-Accepts a Workflow definition as a JSON object. Returns 200 OK if the Workflow was registered
-or updated. Note that a non-null value is required for docker_image.
-
-+ Parameters
-    + version: `v3` (enum[string]) - API version
-        + Members
-            + `v3`
-    + component_id: `styx-canary` (string) - Workflow Component
-
-### Create or update Workflow [POST]
-
-+ Request (application/json)
-
-        {
-          "id": "StyxCanary",
-          "schedule": "days",
-          "offset": null,
-          "docker_image": "styx-canary-dummy:dummy",
-          "docker_args": [
-            "luigi",
-            "--module",
-            "canary_job",
-            "CanaryJob"
-          ],
-          "docker_termination_logging": false,
-          "secret": null,
-          "service_account": null,
-          "resources": []
-        }
-
-+ Response 200 (application/json)
-
-        {
-          "component_id": "styx-canary",
-          "workflow_id": "StyxCanary",
-          "component_uri": "file:///etc/styx/schedule.yaml",
-          "configuration": {
-            "id": "StyxCanary",
-            "schedule": "days",
-            "offset": null,
-            "docker_image": "styx-canary-dummy:dummy",
-            "docker_args": [
-              "luigi",
-              "--module",
-              "canary_job",
-              "CanaryJob"
-            ],
-            "docker_termination_logging": false,
-            "secret": null,
-            "service_account": null,
-            "resources": []
-          },
-          "__from_api": "V3"
-        }
 
 ## Workflow Instances [/{version}/workflows/{component_id}/{workflow_id}/instances{?offset,limit,start,stop}]
 
