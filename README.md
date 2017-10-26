@@ -94,7 +94,7 @@ Run the service:
 
 ### Workflow configuration
 
-Refer to [API Specification](https://spotify.github.io/styx/api.html) for how to deploy a workflow.
+Refer to [API Specification](https://spotify.github.io/styx/api.html#workflows-workflows-post) for how to deploy a workflow.
 
 ```
 id: my-workflow
