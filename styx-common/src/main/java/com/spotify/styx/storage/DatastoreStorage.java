@@ -89,12 +89,10 @@ class DatastoreStorage {
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
   public static final String PROPERTY_NEXT_NATURAL_TRIGGER = "nextNaturalTrigger";
   public static final String PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER = "nextNaturalOffsetTrigger";
-  public static final String PROPERTY_DOCKER_IMAGE = "dockerImage";
   public static final String PROPERTY_COUNTER = "counter";
   public static final String PROPERTY_COMPONENT = "component";
   public static final String PROPERTY_WORKFLOW = "workflow";
   public static final String PROPERTY_PARAMETER = "parameter";
-  public static final String PROPERTY_COMMIT_SHA = "commitSha";
   public static final String PROPERTY_CONCURRENCY = "concurrency";
   public static final String PROPERTY_START = "start";
   public static final String PROPERTY_END = "end";
@@ -416,8 +414,6 @@ class DatastoreStorage {
 
       final Entity.Builder builder = Entity.newBuilder(workflowOpt.get());
       state.enabled().ifPresent(x -> builder.set(PROPERTY_WORKFLOW_ENABLED, x));
-      state.dockerImage().ifPresent(x -> builder.set(PROPERTY_DOCKER_IMAGE, x));
-      state.commitSha().ifPresent(x -> builder.set(PROPERTY_COMMIT_SHA, x));
       state.nextNaturalTrigger()
           .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToTimestamp(x)));
       state.nextNaturalOffsetTrigger()
@@ -428,18 +424,6 @@ class DatastoreStorage {
 
   Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
     final Optional<Entity> workflowEntity = getOpt(datastore, workflowKey(workflowId));
-    Optional<String> dockerImage = getOptStringProperty(workflowEntity, PROPERTY_DOCKER_IMAGE);
-    if (dockerImage.isPresent()) {
-      return dockerImage;
-    }
-
-    dockerImage = getOptStringProperty(datastore,
-                                       componentKeyFactory.newKey(workflowId.componentId()),
-                                       PROPERTY_DOCKER_IMAGE);
-    if (dockerImage.isPresent()) {
-      return dockerImage;
-    }
-
     return workflowEntity.map(w -> parseWorkflowJson(w, workflowId))
         .flatMap(wf -> wf.configuration().dockerImage());
   }
@@ -455,28 +439,6 @@ class DatastoreStorage {
         .ifPresent(builder::nextNaturalTrigger);
     getOptInstantProperty(workflowEntity, PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER)
         .ifPresent(builder::nextNaturalOffsetTrigger);
-
-    Optional<String> dockerImage = getOptStringProperty(workflowEntity, PROPERTY_DOCKER_IMAGE);
-    Optional<String> commitSha = getOptStringProperty(workflowEntity, PROPERTY_COMMIT_SHA);
-
-    if (!dockerImage.isPresent() || !commitSha.isPresent()) {
-      final Optional<Entity> componentEntity =
-          getOpt(datastore, componentKeyFactory.newKey(workflowId.componentId()));
-
-      if (!dockerImage.isPresent()) {
-        dockerImage = getOptStringProperty(componentEntity, PROPERTY_DOCKER_IMAGE);
-        if (!dockerImage.isPresent()) {
-          dockerImage = workflowEntity.map(w -> parseWorkflowJson(w, workflowId))
-              .flatMap(wf -> wf.configuration().dockerImage());
-        }
-      }
-
-      if (!commitSha.isPresent()) {
-        commitSha = getOptStringProperty(componentEntity, PROPERTY_COMMIT_SHA);
-      }
-    }
-    dockerImage.ifPresent(builder::dockerImage);
-    commitSha.ifPresent(builder::commitSha);
 
     return builder.build();
   }
@@ -610,7 +572,7 @@ class DatastoreStorage {
   }
 
   void setEnabled(WorkflowId workflowId1, boolean enabled) throws IOException {
-    patchState(workflowId1, WorkflowState.patchEnabled(enabled));
+    patchState(workflowId1, WorkflowState.builder().enabled(enabled).build());
   }
 
   private static Timestamp instantToTimestamp(Instant instant) {

@@ -186,14 +186,6 @@ public final class WorkflowResource {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid payload."));
     }
 
-    if (patchState.dockerImage().isPresent()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("docker_image not allowed"));
-    }
-
-    if (patchState.commitSha().isPresent()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("commit_sha not allowed"));
-    }
-
     try {
       storage.patchState(workflowId, patchState);
     } catch (ResourceNotFoundException e) {

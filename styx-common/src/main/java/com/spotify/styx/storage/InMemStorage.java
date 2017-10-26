@@ -60,9 +60,6 @@ public class InMemStorage implements Storage {
   private final ConcurrentMap<WorkflowId, Workflow> workflowStore = Maps.newConcurrentMap();
   private final ConcurrentMap<String, Resource> resourceStore = Maps.newConcurrentMap();
   private final ConcurrentMap<String, Backfill> backfillStore = Maps.newConcurrentMap();
-  private final ConcurrentMap<WorkflowId, String> dockerImagesPerWorkflowId = Maps
-      .newConcurrentMap();
-  private final ConcurrentMap<String, String> dockerImagesPerComponent = Maps.newConcurrentMap();
   private final ConcurrentMap<WorkflowId, WorkflowState> workflowStatePerWorkflowId = Maps
       .newConcurrentMap();
 
@@ -196,7 +193,6 @@ public class InMemStorage implements Storage {
       }
     });
 
-    patchState.dockerImage().ifPresent(image -> dockerImagesPerWorkflowId.put(workflowId, image));
     Optional<WorkflowState> originalState = Optional.of(
         workflowStatePerWorkflowId.getOrDefault(workflowId, patchState));
     workflowStatePerWorkflowId
@@ -205,14 +201,6 @@ public class InMemStorage implements Storage {
 
   @Override
   public Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
-    if (dockerImagesPerWorkflowId.containsKey(workflowId)) {
-      return Optional.of(dockerImagesPerWorkflowId.get(workflowId));
-    }
-
-    if (dockerImagesPerComponent.containsKey(workflowId.componentId())) {
-      return Optional.of(dockerImagesPerComponent.get(workflowId.componentId()));
-    }
-
     return Optional.ofNullable(workflowStore.get(workflowId))
         .flatMap(w -> w.configuration().dockerImage());
   }
@@ -222,7 +210,7 @@ public class InMemStorage implements Storage {
     return
         workflowStatePerWorkflowId.getOrDefault(
             workflowId,
-            WorkflowState.patchEnabled(false));
+            WorkflowState.builder().enabled(false).build());
   }
 
   @Override
