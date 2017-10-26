@@ -116,15 +116,13 @@ or updated. Note that a non-null value is required for docker_image.
 ## Workflow [/{version}/workflows/{component_id}/{workflow_id}]
 
 + Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v3`
     + component_id: `styx-canary` (string) - Workflow Component
     + workflow_id: `StyxCanary` (string) - Workflow ID
 
 ### Get Workflow [GET]
-
-+ Parameters
-    + version: `v3` (enum[string]) - API version
-        + Members
-            + `v3`
 
 + Response 200 (application/json)
 
@@ -152,11 +150,6 @@ or updated. Note that a non-null value is required for docker_image.
 ### Delete Workflow [DELETE]
 
 Returns 204 No Content if the Workflow was found and deleted, 404 Not Found otherwise.
-
-+ Parameters
-    + version: `v3` (enum[string]) - API version
-        + Members
-            + `v3`
 
 + Response 204
 + Response 404
