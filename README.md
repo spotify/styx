@@ -80,13 +80,6 @@ styx.datastore.project-id = ""
 styx.datastore.namespace = ""
 ```
 
-To monitor a different local directory for schedule definitions, edit this line:
-
-```yaml
-# directory to monitor for schedule definitions
-styx.source.local.dir = "/etc/styx"
-```
-
 Build the project:
 
 ```bash
@@ -99,35 +92,30 @@ Run the service:
 > java -jar styx-standalone-service/target/styx-standalone-service.jar
 ```
 
-### Workflow schedule configuration
+### Workflow configuration
 
-To define a schedule, simply write a yaml file to `/etc/styx` (given the above configuration)
+Refer to [API Specification](https://spotify.github.io/styx/api.html) for how to deploy a workflow.
 
-`/etc/styx/my-schedules.yaml`
-```yaml
-schedules:
-  - id: my-workflow
-    docker_image: my-workflow:0.1
-    docker_args: ['./run.sh', '{}']
-    schedule: hourly
-    offset: PT1H
-    secret:
-      name: my-secret
-      mount_path: /etc/my-keys
-    service_account: my-service-account@my-project.iam.gserviceaccount.com
+```
+id: my-workflow
+docker_image: my-workflow:0.1
+docker_args: ['./run.sh', '{}']
+schedule: hourly
+offset: PT1H
+secret:
+  name: my-secret
+  mount_path: /etc/my-keys
+service_account: my-service-account@my-project.iam.gserviceaccount.com
 ```
 
-#### `schedules` **[schedule]**
-The main key, containing a list of schedules.
-
-#### `schedule[].id` **[string]**
+#### `id` **[string]**
 A unique identifier for the workflow (lower-case-hyphenated). This identifier is used to refer to
  the workflow through the API.
 
-#### `schedule[].docker_image` **[string]**:
+#### `docker_image` **[string]**:
 The Docker image that should be executed.
 
-#### `schedule[].docker_args` **[string]**
+#### `docker_args` **[string]**
 The list of arguments passed to the Docker container.
 
 This list should only contain strings. Any occurrences of the `{}` placeholder argument will be
@@ -141,7 +129,7 @@ Example arguments for the supported schedule values:
 - weekly - 2016-04-04,    2016-04-11,    ... (Mondays)
 ```
 
-#### `schedule[].schedule` **[string]**
+#### `schedule` **[string]**
 How often the workflow should be triggered and what the `{}` placeholder will be replaced with in
 `docker_args`.
 
@@ -155,7 +143,7 @@ Supports [cron] syntax, along with a set of human readable aliases:
 @annually, annually = 0 0 1 1 *
 ```
 
-#### `schedule[].offset` **[string]**
+#### `offset` **[string]**
 An [ISO 8601 Duration] specification for offsetting the cron schedule.
 
 This is useful for when setting up a schedule that needs to be offset in time relative to the
@@ -178,7 +166,7 @@ offset: P1DT2H
 
 At 2017-06-30T02 the execution for 2017-06-29 will be triggered.
 
-#### `schedule[].secret` **[secret]**
+#### `secret` **[secret]**
 Secret is used to mount keys stored in [Kubernetes Secrets] into the container.
 
 * `.name` **[string]**
@@ -189,7 +177,7 @@ Secret is used to mount keys stored in [Kubernetes Secrets] into the container.
 
   Where the keys of the secret will be appearing in the container
 
-#### `schedule[].service_account` **[email address]**
+#### `service_account` **[email address]**
 The [Service Account] email address belonging to a project in [Google Cloud Platform].
 
 If the workflow intends to use keys of a [Service Account],
