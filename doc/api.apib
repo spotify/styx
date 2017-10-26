@@ -30,6 +30,37 @@ To know more details, please check
 # Group Workflows
 
 Resources related to the Workflows registered in Styx.
+## Workflows [/{version}/workflows]
+
+### Get Workflows [GET]
+
++ Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v3`
+
++ Response 200 (application/json)
+
+        [{
+            "component_id": "styx-canary",
+            "workflow_id": "StyxCanary",
+            "component_uri": "file:///etc/styx/schedule.yaml",
+            "configuration": {
+                "id": "StyxCanary",
+                "schedule": "hours",
+                "offset": null,
+                "docker_image": null,
+                "docker_args": [
+                  "luigi",
+                  "--module",
+                  "canary_job",
+                  "CanaryJob"
+                ],
+                "docker_termination_logging": false,
+                "secret": null,
+                "resources": []
+              }
+        }]
 
 ## Workflows [/{version}/workflows/{component_id}]
 
@@ -39,7 +70,7 @@ Resources related to the Workflows registered in Styx.
             + `v3`
     + component_id: `styx-canary` (string) - Workflow Component
 
-### Get Workflows [GET]
+### Get Workflows for component [GET]
 
 + Response 200 (application/json)
 
