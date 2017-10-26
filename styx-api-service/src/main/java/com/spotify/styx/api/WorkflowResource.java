@@ -81,6 +81,9 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>/<wfid>",
             rc -> workflow(arg("cid", rc), arg("wfid", rc))),
         Route.with(
+            json(), "GET", BASE,
+            rc -> workflows()),
+        Route.with(
             json(), "GET", BASE + "/<cid>",
             rc -> workflows(arg("cid", rc))),
         Route.with(
@@ -149,6 +152,15 @@ public final class WorkflowResource {
     return forwardingClient.send(rc.request()
                                      .withPayload(payload.get())
                                      .withUri(schedulerApiUrl("workflows", componentId)));
+  }
+
+  private Response<Collection<Workflow>> workflows() {
+    try {
+      return Response.forPayload(storage.workflows().values());
+    } catch (IOException e) {
+      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(
+          "Failed to get workflows"));
+    }
   }
 
   private Response<List<Workflow>> workflows(String componentId) {

@@ -535,8 +535,23 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldReturnWorkflows() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    storage.storeWorkflow(Workflow.create("other_component", WORKFLOW.configuration()));
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("")));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertJson(response, "[*]", hasSize(2));
+  }
+
+  @Test
   public void shouldReturnWorkflowsInComponent() throws Exception {
     sinceVersion(Api.Version.V3);
+
+    storage.storeWorkflow(Workflow.create("other_component", WORKFLOW.configuration()));
 
     Response<ByteString> response = awaitResponse(
         serviceHelper.request("GET", path("/foo")));
