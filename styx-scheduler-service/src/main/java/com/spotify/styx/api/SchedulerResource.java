@@ -130,12 +130,17 @@ public class SchedulerResource {
   }
 
   private Response<Workflow> createOrUpdateWorkflow(String componentId, WorkflowConfiguration configuration) {
-    final Optional<String> dockerImage = configuration.dockerImage();
-    if (dockerImage.isPresent()) {
-      final Collection<String> errors = dockerImageValidator.validateImageReference(dockerImage.get());
+    if (configuration.dockerImage().isPresent()) {
+      final Collection<String> errors = dockerImageValidator.validateImageReference(
+          configuration.dockerImage().get());
       if (!errors.isEmpty()) {
         return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors));
       }
+    }
+
+    if (configuration.commitSha().isPresent()
+        && !isValidSHA1(configuration.commitSha().get())) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid commit sha"));
     }
 
     final Workflow workflow = Workflow.create(componentId, configuration);
@@ -216,5 +221,9 @@ public class SchedulerResource {
 
     // todo: change payload to a struct returning the triggerId as well so the user can refer to it
     return Response.forPayload(workflowInstance);
+  }
+
+  private static boolean isValidSHA1(String s) {
+    return s.matches("[a-fA-F0-9]{40}");
   }
 }

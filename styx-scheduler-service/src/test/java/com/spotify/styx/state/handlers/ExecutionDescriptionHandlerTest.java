@@ -27,6 +27,7 @@ import static com.spotify.styx.state.RunState.State.SUBMITTING;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.hamcrest.core.Is.is;
@@ -52,7 +53,6 @@ import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.IsClosedException;
 import java.io.IOException;
@@ -83,6 +83,35 @@ public class ExecutionDescriptionHandlerTest {
     storage = new InMemStorage();
     stateManager = spy(new SyncStateManager());
     toTest = new ExecutionDescriptionHandler(storage, stateManager, dockerImageValidator);
+  }
+
+  @Test
+  public void shouldTransitionIntoSubmittingIfMissingDockerArgs() throws Exception {
+    Workflow workflow = Workflow.create("id", schedule());
+    WorkflowState workflowState = WorkflowState.builder()
+        .enabled(true)
+        .dockerImage(DOCKER_IMAGE)
+        .commitSha(COMMIT_SHA)
+        .build();
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    RunState runState = RunState.fresh(workflowInstance, toTest);
+
+    storage.storeWorkflow(workflow);
+    storage.patchState(workflow.id(), workflowState);
+    stateManager.initialize(runState);
+    stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
+    stateManager.receive(Event.dequeue(workflowInstance));
+
+    RunState currentState = stateManager.get(workflowInstance);
+    StateData data = currentState.data();
+
+    assertThat(currentState.state(), is(SUBMITTING));
+    assertTrue(data.executionId().isPresent());
+    assertThat(data.executionId().get(), startsWith("styx-run-"));
+    assertTrue(data.executionDescription().isPresent());
+    assertThat(data.executionDescription().get().dockerImage(), is(DOCKER_IMAGE));
+    assertThat(data.executionDescription().get().dockerArgs(), hasSize(0));
+    assertThat(data.executionDescription().get().commitSha(), hasValue(COMMIT_SHA));
   }
 
   @Test
@@ -147,21 +176,6 @@ public class ExecutionDescriptionHandlerTest {
     WorkflowInstance workflowInstance = WorkflowInstance.create(WorkflowId.create("c", "e"), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
-    stateManager.initialize(runState);
-    toTest.transitionInto(runState);
-
-    RunState halted = stateManager.get(workflowInstance);
-    assertThat(halted, Matchers.is(nullValue()));
-  }
-
-  @Test
-  public void shouldHaltIfMissingDockerArgs() throws Exception {
-    WorkflowConfiguration workflowConfiguration = TestData.DAILY_WORKFLOW_CONFIGURATION;
-    Workflow workflow = Workflow.create("id", workflowConfiguration);
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
-
-    storage.storeWorkflow(workflow);
     stateManager.initialize(runState);
     toTest.transitionInto(runState);
 

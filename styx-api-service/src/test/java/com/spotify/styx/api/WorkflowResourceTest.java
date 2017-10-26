@@ -37,7 +37,6 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -76,7 +75,6 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -116,26 +114,16 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private static final Workflow WORKFLOW_WITH_IMAGE =
       Workflow.create("foo", WORKFLOW_CONFIGURATION_WITH_IMAGE);
 
-  private static final String VALID_SHA = "470a229b49a14e7682af2abfdac3b881a8aacdf9";
-  private static final String INVALID_SHA = "XXXXXX9b49a14e7682af2abfdac3b881a8aacdf9";
-
   private static final Trigger NATURAL_TRIGGER = Trigger.natural();
   private static final Trigger BACKFILL_TRIGGER = Trigger.backfill("backfill-1");
 
   private static final ByteString STATEPAYLOAD_FULL =
-      ByteString.encodeUtf8("{\"enabled\":\"true\", \"docker_image\":\"cherry:image\", "
-                            + "\"commit_sha\":\"" + VALID_SHA
-                            + "\", \"next_natural_trigger\":\"2016-08-10T07:00:01Z\", "
+      ByteString.encodeUtf8("{\"enabled\":\"true\", "
+                            + "\"next_natural_trigger\":\"2016-08-10T07:00:01Z\", "
                             + "\"next_natural_offset_trigger\":\"2016-08-10T08:00:01Z\"}");
 
   private static final ByteString STATEPAYLOAD_ENABLED =
       ByteString.encodeUtf8("{\"enabled\":\"true\"}");
-
-  private static final ByteString STATEPAYLOAD_VALID_SHA =
-      ByteString.encodeUtf8("{\"commit_sha\":\"" + VALID_SHA + "\"}");
-
-  private static final ByteString STATEPAYLOAD_INVALID_SHA =
-      ByteString.encodeUtf8("{\"commit_sha\":\"" + INVALID_SHA + "\"}");
 
   private static final ByteString STATEPAYLOAD_IMAGE =
       ByteString.encodeUtf8("{\"docker_image\":\"berry:image\"}");
@@ -212,28 +200,14 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
     assertJson(response, "enabled", equalTo(true));
-    assertJson(response, "docker_image", equalTo("cherry:image"));
-    assertJson(response, "commit_sha", equalTo(VALID_SHA));
     assertJson(response, "next_natural_trigger", equalTo("2016-08-10T07:00:01Z"));
     assertJson(response, "next_natural_offset_trigger", equalTo("2016-08-10T08:00:01Z"));
 
     assertThat(storage.enabled(WORKFLOW.id()), is(true));
-    assertThat(storage.workflowState(WORKFLOW.id()).dockerImage().get(), is("cherry:image"));
-    assertThat(storage.workflowState(WORKFLOW.id()).commitSha().get(), is(VALID_SHA));
-  }
-
-  @Test
-  public void shouldUpdateWorkflowConfigurationOnPatch() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                        STATEPAYLOAD_FULL));
-
-    final WorkflowConfiguration workflowConfiguration =
-        storage.workflow(WORKFLOW.id()).get().configuration();
-
-    assertThat(workflowConfiguration.commitSha(), is(Optional.of(VALID_SHA)));
-    assertThat(workflowConfiguration.dockerImage(), is(Optional.of("cherry:image")));
+    assertThat(storage.workflowState(WORKFLOW.id()).nextNaturalTrigger().get().toString(),
+               equalTo("2016-08-10T07:00:01Z"));
+    assertThat(storage.workflowState(WORKFLOW.id()).nextNaturalOffsetTrigger().get().toString(),
+               equalTo("2016-08-10T08:00:01Z"));
   }
 
   @Test
@@ -273,23 +247,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldSucceedWithImagePatchStatePerWorkflow() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_IMAGE));
-
-    assertThat(response, hasStatus(withCode(Status.OK)));
-    assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
-    assertJson(response, "enabled", equalTo(false));
-    assertJson(response, "docker_image", equalTo("berry:image"));
-
-    assertThat(storage.enabled(WORKFLOW.id()), is(false));
-    assertThat(storage.getDockerImage(WORKFLOW.id()), is(Optional.of("berry:image")));
-  }
-
-  @Test
   public void shouldNotPatchStatePerComponent() throws Exception {
     sinceVersion(Api.Version.V3);
 
@@ -326,53 +283,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldAcceptPatchStateWithValidSHA1() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_VALID_SHA));
-
-    assertThat(response, hasStatus(withCode(Status.OK)));
-    assertJson(response, "commit_sha", equalTo(VALID_SHA));
-
-    assertThat(storage.workflowState(WORKFLOW.id()).commitSha().get(),
-               is(VALID_SHA));
-  }
-
-  @Test
-  public void shouldFailPatchStateWithInvalidSHA1() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_INVALID_SHA));
-
-    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
-    assertThat(response, hasStatus(withReasonPhrase(equalTo("Invalid SHA-1."))));
-
-    assertThat(storage.workflowState(WORKFLOW.id()).commitSha().isPresent(),
-               is(false));
-  }
-
-  @Test
-  @Ignore
-  public void shouldReturnBadRequestOnEnableWhenWorkflowNotFound() throws Exception {
-    // can't implement
-    // this can't ever happen in the current bigtable storage implementation
-  }
-
-  @Test
-  @Ignore
-  public void shouldReturnBadRequestOnImageWhenWorkflowNotFound() throws Exception {
-  }
-
-  @Test
-  @Ignore
-  public void shouldReturnBadRequestOnImageWhenComponentNotFound() throws Exception {
-  }
-
-  @Test
   public void shouldReturnBadRequestWhenMalformedStatePayloadIsSent() throws Exception {
     sinceVersion(Api.Version.V3);
 
@@ -395,21 +305,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasNoPayload());
     assertThat(response, hasStatus(withReasonPhrase(equalTo("Missing payload."))));
-  }
-
-  @Test
-  public void shouldReturnBadRequestForInvalidDockerImageOnWorkflow() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(ImmutableList.of("foo", "bar"));
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-            STATEPAYLOAD_FULL));
-
-    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
-    assertThat(response, hasNoPayload());
-    assertThat(response, hasStatus(withReasonPhrase(equalTo("Invalid docker image: [foo, bar]"))));
   }
 
   @Test

@@ -34,6 +34,9 @@ import com.spotify.styx.model.WorkflowInstance;
 
 public final class TestData {
 
+  public static final String VALID_SHA = "00000ef508c1cb905e360590ce3e7e9193f6b370";
+  public static final String INVALID_SHA = "XXXXXef508c1cb905e360590ce3e7e9193f6b370";
+
   private TestData() {
   }
 
@@ -49,24 +52,32 @@ public final class TestData {
   public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
           .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .dockerImage("busybox")
           .schedule(HOURS)
           .build();
 
   public static final WorkflowConfiguration DAILY_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
           .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .dockerImage("busybox")
           .schedule(DAYS)
           .build();
 
   public static final WorkflowConfiguration WEEKLY_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
           .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .dockerImage("busybox")
           .schedule(WEEKS)
           .build();
 
   public static final WorkflowConfiguration MONTHLY_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
           .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .dockerImage("busybox")
           .schedule(MONTHS)
           .build();
 
@@ -74,6 +85,7 @@ public final class TestData {
   public static final WorkflowConfiguration FULL_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
           .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
           .schedule(DAYS)
           .dockerImage("busybox")
           .dockerArgs(ImmutableList.of("x", "y"))
@@ -85,6 +97,6 @@ public final class TestData {
           .dockerImage("busybox:1.1")
           .dockerArgs("foo", "bar")
           .secret(WorkflowConfiguration.Secret.create("secret", "/dev/null"))
-          .commitSha("00000ef508c1cb905e360590ce3e7e9193f6b370")
+          .commitSha(VALID_SHA)
           .build();
 }
