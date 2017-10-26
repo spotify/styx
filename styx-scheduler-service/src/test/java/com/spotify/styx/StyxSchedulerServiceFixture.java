@@ -58,7 +58,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 import javaslang.Tuple;
 import javaslang.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
@@ -83,12 +82,10 @@ public class StyxSchedulerServiceFixture {
   private Connection bigtable = setupBigTableMockTable(0);
   protected AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
   private DeterministicScheduler executor = new QuietDeterministicScheduler();
-  private Consumer<Workflow> workflowChangeListener;
-  private Consumer<Workflow> workflowRemoveListener;
 
   // circumstantial fields, set by test cases
   private Instant now = Instant.parse("1970-01-01T00:00:00Z");
-  private List<Workflow> workflows = Lists.newArrayList();
+
   private List<Tuple2<SequenceEvent, RunState.State>> transitionedEvents = Lists.newArrayList();
 
   // captured fields from fakes
@@ -182,8 +179,6 @@ public class StyxSchedulerServiceFixture {
   }
 
   void givenWorkflow(Workflow workflow) throws IOException {
-    workflows.add(workflow);
-
     // storing before start causes the WorkflowInitializer not to do anything
     storage.storeWorkflow(workflow);
   }
