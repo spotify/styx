@@ -50,8 +50,6 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.util.EventUtil;
-import com.squareup.okhttp.HttpUrl;
-import com.squareup.okhttp.HttpUrl.Builder;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
@@ -62,6 +60,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
+import okhttp3.HttpUrl;
+import okhttp3.HttpUrl.Builder;
 import okio.ByteString;
 
 /**

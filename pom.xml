@@ -204,7 +204,7 @@
       <dependency>
         <groupId>com.squareup.okhttp3</groupId>
         <artifactId>okhttp</artifactId>
-        <version>3.7.0</version>
+        <version>3.9.0</version>
       </dependency>
 
       <!-- external clients libs -->
@@ -350,7 +350,7 @@
       <dependency>
         <groupId>com.squareup.okio</groupId>
         <artifactId>okio</artifactId>
-        <version>1.12.0</version>
+        <version>1.13.0</version>
       </dependency>
       <dependency>
         <groupId>com.squareup.okhttp</groupId>
