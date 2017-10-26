@@ -226,6 +226,12 @@ public final class KubernetesPodEventTranslator {
   private static Optional<Event> isInErrorState(WorkflowInstance workflowInstance, Pod pod) {
     final PodStatus status = pod.getStatus();
     final String phase = status.getPhase();
+    final String reason = status.getReason();
+
+    if ("NodeLost".equals(reason)) {
+      LOG.warn("Kubernetes node {} became unresponsive", pod.getSpec().getNodeName());
+      return Optional.of(Event.runError(workflowInstance, "Kubernetes node became unresponsive"));
+    }
 
     switch (phase) {
       case "Pending":
