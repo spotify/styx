@@ -37,7 +37,6 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -183,6 +182,35 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldSucceedWithFullPatchStatePerWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/foo/bar/state")));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertJson(response, "enabled", equalTo(false));
+    assertNoJson(response, "docker_image");
+    assertNoJson(response, "commit_sha");
+
+    response =
+        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
+                                            STATEPAYLOAD_FULL));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
+    assertJson(response, "enabled", equalTo(true));
+    assertJson(response, "next_natural_trigger", equalTo("2016-08-10T07:00:01Z"));
+    assertJson(response, "next_natural_offset_trigger", equalTo("2016-08-10T08:00:01Z"));
+
+    assertThat(storage.enabled(WORKFLOW.id()), is(true));
+    assertThat(storage.workflowState(WORKFLOW.id()).nextNaturalTrigger().get().toString(),
+               equalTo("2016-08-10T07:00:01Z"));
+    assertThat(storage.workflowState(WORKFLOW.id()).nextNaturalOffsetTrigger().get().toString(),
+               equalTo("2016-08-10T08:00:01Z"));
+  }
+
+  @Test
   public void shouldSucceedWithEnabledPatchStatePerWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
@@ -277,19 +305,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasNoPayload());
     assertThat(response, hasStatus(withReasonPhrase(equalTo("Missing payload."))));
-  }
-
-  @Test
-  public void shouldReturnOkForProperPatch() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(ImmutableList.of("foo", "bar"));
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-            STATEPAYLOAD_FULL));
-
-    assertThat(response, hasStatus(withCode(Status.OK)));
   }
 
   @Test
