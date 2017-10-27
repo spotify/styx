@@ -33,6 +33,7 @@ import com.google.cloud.datastore.KeyFactory;
 import com.google.cloud.datastore.PathElement;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
+import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
 import com.google.cloud.datastore.StructuredQuery.Filter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
@@ -213,7 +214,7 @@ class DatastoreStorage {
       final Key workflowKey = workflowKey(workflow.id());
       final Optional<Entity> workflowOpt = getOpt(transaction, workflowKey);
       final Entity workflowEntity = asBuilderOrNew(workflowOpt, workflowKey)
-          .set(PROPERTY_WORKFLOW_JSON, json)
+          .set(PROPERTY_WORKFLOW_JSON, StringValue.newBuilder(json).setExcludeFromIndexes(true).build())
           .build();
 
       return transaction.put(workflowEntity);
