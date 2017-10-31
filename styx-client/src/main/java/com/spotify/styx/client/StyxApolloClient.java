@@ -181,7 +181,8 @@ class StyxApolloClient implements StyxClient {
         .addPathSegment("workflows")
         .addPathSegment(componentId)
         .addPathSegment(workflowId);
-    return executeRequest(Request.forUri(urlBuilder.build().toString(), "DELETE"), Void.class);
+    return executeRequest(Request.forUri(urlBuilder.build().toString(), "DELETE"))
+        .thenApply(response -> null);
   }
 
   @Override
