@@ -89,7 +89,6 @@ public class DatastoreStorageTest {
           .build();
 
   private static final Optional<String> DOCKER_IMAGE = of("busybox");
-  private static final String DOCKER_IMAGE_COMPONENT = "busybox:component";
   private static final String DOCKER_IMAGE_WORKFLOW = "busybox:workflow";
   private static final String COMMIT_SHA = "dcee675978b4d89e291bb695d0ca7deaf05d2a32";
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_WITH_DOCKER_IMAGE =
@@ -219,8 +218,8 @@ public class DatastoreStorageTest {
         WorkflowConfiguration.builder()
             .id(WORKFLOW_ID1.id())
             .schedule(DAYS)
+            .dockerImage(DOCKER_IMAGE_WORKFLOW)
             .build()));
-    storage.patchState(WORKFLOW_ID1, patchDockerImage(DOCKER_IMAGE_WORKFLOW));
     Optional<String> retrieved = storage.getDockerImage(WORKFLOW_ID1);
 
     assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
@@ -233,8 +232,8 @@ public class DatastoreStorageTest {
         WorkflowConfiguration.builder()
             .id(WORKFLOW_ID1.id())
             .schedule(DAYS)
+            .commitSha(COMMIT_SHA)
             .build()));
-    storage.patchState(WORKFLOW_ID1, WorkflowState.builder().commitSha(COMMIT_SHA).build());
     WorkflowState retrieved = storage.workflowState(WORKFLOW_ID1);
 
     assertThat(retrieved.commitSha(), is(Optional.of(COMMIT_SHA)));
@@ -253,18 +252,6 @@ public class DatastoreStorageTest {
     storage.store(WORKFLOW_NO_STATE);
     WorkflowState retrieved = storage.workflowState(WORKFLOW_ID_NO_STATE);
     assertThat(retrieved, is(WorkflowState.patchEnabled(false)));
-  }
-
-  @Test
-  public void shouldNotOverwriteDockerImageFromWorkflowWhenUsingWorkflowId() throws Exception {
-    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
-    storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id(), patchDockerImage(DOCKER_IMAGE_WORKFLOW));
-    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
-    assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
-
-    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
-    retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
-    assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
   }
 
   @Test(expected = ResourceNotFoundException.class)
@@ -452,6 +439,8 @@ public class DatastoreStorageTest {
         WorkflowConfiguration.builder()
             .id(WORKFLOW_ID1.id())
             .schedule(DAYS)
+            .dockerImage(DOCKER_IMAGE.get())
+            .commitSha(COMMIT_SHA)
             .build()));
     Instant instant = Instant.parse("2016-03-14T14:00:00Z");
     Instant offset = instant.plus(1, ChronoUnit.DAYS);

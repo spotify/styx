@@ -37,9 +37,11 @@ public abstract class WorkflowState {
   @JsonProperty
   public abstract Optional<Boolean> enabled();
 
+  @Deprecated
   @JsonProperty
   public abstract Optional<String> dockerImage();
 
+  @Deprecated
   @JsonProperty
   public abstract Optional<String> commitSha();
 

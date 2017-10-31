@@ -28,7 +28,6 @@ import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
@@ -41,7 +40,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,34 +108,29 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         () -> new ResourceNotFoundException(format("Missing %s, halting %s",
                                                    workflowId, workflowInstance)));
 
-    final List<String> dockerArgs = workflow.configuration().dockerArgs().orElse(
-        Collections.emptyList());
+    final String dockerImage = workflow.configuration().dockerImage().orElseThrow(
+        () -> new MissingRequiredPropertyException(format("%s has no docker image, halting %s",
+                                                          workflowId,
+                                                          workflowInstance))
+    );
 
-    final WorkflowState workflowState = storage.workflowState(workflow.id());
-
-    final Optional<String> dockerImageOpt = workflowState.dockerImage().isPresent()
-                                            ? workflowState.dockerImage()
-                                            : workflow.configuration().dockerImage(); // backwards compatibility
-
-    if (!dockerImageOpt.isPresent()) {
-      throw new MissingRequiredPropertyException(format("%s has no docker image, halting %s",
-                                                        workflowId, workflowInstance));
-    }
-
-    final Collection<String> errors = dockerImageValidator.validateImageReference(dockerImageOpt.get());
+    final Collection<String> errors = dockerImageValidator.validateImageReference(dockerImage);
     if (!errors.isEmpty()) {
       throw new MissingRequiredPropertyException(format(
           "%s has an invalid docker image reference, halting %s. Errors: %s",
           workflowId, workflowInstance, errors));
     }
 
+    final List<String> dockerArgs = workflow.configuration().dockerArgs()
+        .orElse(Collections.emptyList());
+
     return ExecutionDescription.builder()
-        .dockerImage(dockerImageOpt.get())
+        .dockerImage(dockerImage)
         .dockerArgs(dockerArgs)
         .dockerTerminationLogging(workflow.configuration().dockerTerminationLogging())
         .secret(workflow.configuration().secret())
         .serviceAccount(workflow.configuration().serviceAccount())
-        .commitSha(workflowState.commitSha())
+        .commitSha(workflow.configuration().commitSha())
         .build();
   }
 

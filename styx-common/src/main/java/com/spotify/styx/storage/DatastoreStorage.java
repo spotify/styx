@@ -47,6 +47,7 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
@@ -202,14 +203,12 @@ class DatastoreStorage {
 
   void store(Workflow workflow) throws IOException {
     storeWithRetries(() -> datastore.runInTransaction(transaction -> {
-      final String json = OBJECT_MAPPER.writeValueAsString(workflow);
       final Key componentKey = componentKeyFactory.newKey(workflow.componentId());
-
-      final Entity retrievedComponent = transaction.get(componentKey);
-      if (retrievedComponent == null) {
+      if (transaction.get(componentKey) == null) {
         transaction.put(Entity.newBuilder(componentKey).build());
       }
 
+      final String json = OBJECT_MAPPER.writeValueAsString(workflow);
       final Key workflowKey = workflowKey(workflow.id());
       final Optional<Entity> workflowOpt = getOpt(transaction, workflowKey);
       final Entity workflowEntity = asBuilderOrNew(workflowOpt, workflowKey)
@@ -221,10 +220,9 @@ class DatastoreStorage {
   }
 
   Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
-    final Key workflowKey = workflowKey(workflowId);
-    return getOpt(datastore, workflowKey)
+    return getOpt(datastore, workflowKey(workflowId))
         .filter(e -> e.contains(PROPERTY_WORKFLOW_JSON))
-        .map(e -> parseWorkflowJson(e, workflowId));
+        .flatMap(e -> parseWorkflowJson(e, workflowId));
   }
 
   void delete(WorkflowId workflowId) throws IOException {
@@ -416,8 +414,6 @@ class DatastoreStorage {
 
       final Entity.Builder builder = Entity.newBuilder(workflowOpt.get());
       state.enabled().ifPresent(x -> builder.set(PROPERTY_WORKFLOW_ENABLED, x));
-      state.dockerImage().ifPresent(x -> builder.set(PROPERTY_DOCKER_IMAGE, x));
-      state.commitSha().ifPresent(x -> builder.set(PROPERTY_COMMIT_SHA, x));
       state.nextNaturalTrigger()
           .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToTimestamp(x)));
       state.nextNaturalOffsetTrigger()
@@ -428,19 +424,8 @@ class DatastoreStorage {
 
   Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
     final Optional<Entity> workflowEntity = getOpt(datastore, workflowKey(workflowId));
-    Optional<String> dockerImage = getOptStringProperty(workflowEntity, PROPERTY_DOCKER_IMAGE);
-    if (dockerImage.isPresent()) {
-      return dockerImage;
-    }
 
-    dockerImage = getOptStringProperty(datastore,
-                                       componentKeyFactory.newKey(workflowId.componentId()),
-                                       PROPERTY_DOCKER_IMAGE);
-    if (dockerImage.isPresent()) {
-      return dockerImage;
-    }
-
-    return workflowEntity.map(w -> parseWorkflowJson(w, workflowId))
+    return workflowEntity.flatMap(w -> parseWorkflowJson(w, workflowId))
         .flatMap(wf -> wf.configuration().dockerImage());
   }
 
@@ -456,27 +441,11 @@ class DatastoreStorage {
     getOptInstantProperty(workflowEntity, PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER)
         .ifPresent(builder::nextNaturalOffsetTrigger);
 
-    Optional<String> dockerImage = getOptStringProperty(workflowEntity, PROPERTY_DOCKER_IMAGE);
-    Optional<String> commitSha = getOptStringProperty(workflowEntity, PROPERTY_COMMIT_SHA);
-
-    if (!dockerImage.isPresent() || !commitSha.isPresent()) {
-      final Optional<Entity> componentEntity =
-          getOpt(datastore, componentKeyFactory.newKey(workflowId.componentId()));
-
-      if (!dockerImage.isPresent()) {
-        dockerImage = getOptStringProperty(componentEntity, PROPERTY_DOCKER_IMAGE);
-        if (!dockerImage.isPresent()) {
-          dockerImage = workflowEntity.map(w -> parseWorkflowJson(w, workflowId))
-              .flatMap(wf -> wf.configuration().dockerImage());
-        }
-      }
-
-      if (!commitSha.isPresent()) {
-        commitSha = getOptStringProperty(componentEntity, PROPERTY_COMMIT_SHA);
-      }
-    }
-    dockerImage.ifPresent(builder::dockerImage);
-    commitSha.ifPresent(builder::commitSha);
+    final Optional<WorkflowConfiguration> configuration = workflowEntity
+        .flatMap(w -> parseWorkflowJson(w, workflowId))
+        .map(Workflow::configuration);
+    configuration.flatMap(WorkflowConfiguration::dockerImage).ifPresent(builder::dockerImage);
+    configuration.flatMap(WorkflowConfiguration::commitSha).ifPresent(builder::commitSha);
 
     return builder.build();
   }
@@ -539,13 +508,13 @@ class DatastoreStorage {
     return WorkflowId.create(componentId, id);
   }
 
-  private Workflow parseWorkflowJson(Entity entity, WorkflowId workflowId) {
+  private Optional<Workflow> parseWorkflowJson(Entity entity, WorkflowId workflowId) {
     try {
-      return OBJECT_MAPPER
-          .readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
+      return Optional.ofNullable(OBJECT_MAPPER
+          .readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class));
     } catch (IOException e1) {
       LOG.info("Failed to read workflow for {}, {}", workflowId.componentId(), workflowId.id());
-      return null;
+      return Optional.empty();
     }
   }
 
