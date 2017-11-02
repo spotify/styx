@@ -256,16 +256,6 @@ public interface Storage {
   void patchState(WorkflowId workflowId, WorkflowState state) throws IOException;
 
   /**
-   * Use workflowState instead.
-   * Get a docker image name.
-   *
-   * @param workflowId The workflow to get the image for
-   * @return the full image name
-   */
-  @Deprecated
-  Optional<String> getDockerImage(WorkflowId workflowId) throws IOException;
-
-  /**
    * Get the persisted workflow state for a workflow.
    *
    * @param workflowId The workflow to get the repository for

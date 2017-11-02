@@ -207,12 +207,6 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
-    return Optional.ofNullable(workflowStore.get(workflowId))
-        .flatMap(w -> w.configuration().dockerImage());
-  }
-
-  @Override
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
     final WorkflowState stateFromWorkflow = workflowStateFromWorkflowConfiguration(workflowId);
     final WorkflowState workflowState = workflowStatePerWorkflowId.get(workflowId);
