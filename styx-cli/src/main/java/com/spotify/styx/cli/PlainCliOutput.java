@@ -129,20 +129,18 @@ class PlainCliOutput implements CliOutput {
 
   @Override
   public void printWorkflow(Workflow wf, WorkflowState state) {
-    final String image = state.dockerImage().orElseGet(() ->
-        wf.configuration().dockerImage().orElse(""));
     System.out.println(Joiner.on(' ').join(
         wf.componentId(),
         wf.id(),
         wf.configuration().schedule(),
         wf.configuration().offset().orElse(""),
-        image,
+        wf.configuration().dockerImage().orElse(""),
         wf.configuration().dockerArgs().orElse(Collections.emptyList()),
         wf.configuration().dockerTerminationLogging(),
         wf.configuration().secret().map(s -> s.name() + ':' + s.mountPath()).orElse(""),
         wf.configuration().serviceAccount().map(Object::toString).orElse(""),
         wf.configuration().resources(),
-        state.commitSha().orElse(""),
+        wf.configuration().commitSha().orElse(""),
         state.enabled().map(Object::toString).orElse(""),
         state.nextNaturalTrigger().map(Object::toString).orElse(""),
         state.nextNaturalOffsetTrigger().map(Object::toString).orElse("")));
