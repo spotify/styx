@@ -199,23 +199,14 @@ public class InMemStorage implements Storage {
 
     Optional<WorkflowState> originalState = Optional.of(
         workflowStatePerWorkflowId.getOrDefault(workflowId, patchState));
-    final WorkflowState patchWorkflowState = WorkflowStateUtil.patchWorkflowState(originalState, patchState);
-    final WorkflowState workflowStateFromConfigurationPatched = WorkflowStateUtil
-        .patchWorkflowState(Optional.of(patchWorkflowState),
-                            workflowStateFromWorkflowConfiguration(workflowId));
-    workflowStatePerWorkflowId.put(workflowId, workflowStateFromConfigurationPatched);
+    final WorkflowState patchWorkflowState =
+        WorkflowStateUtil.patchWorkflowState(originalState, patchState);
+    workflowStatePerWorkflowId.put(workflowId, patchWorkflowState);
   }
 
   @Override
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
-    final WorkflowState stateFromWorkflow = workflowStateFromWorkflowConfiguration(workflowId);
-    final WorkflowState workflowState = workflowStatePerWorkflowId.get(workflowId);
-    return WorkflowStateUtil.patchWorkflowState(Optional.ofNullable(workflowState), stateFromWorkflow);
-  }
-
-  private WorkflowState workflowStateFromWorkflowConfiguration(WorkflowId workflowId) {
-    WorkflowState.Builder builder = WorkflowState.builder();
-    return builder.build();
+    return workflowStatePerWorkflowId.get(workflowId);
   }
 
   @Override
