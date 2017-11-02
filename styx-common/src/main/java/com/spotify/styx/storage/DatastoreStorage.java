@@ -47,7 +47,6 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
@@ -437,10 +436,6 @@ class DatastoreStorage {
         .ifPresent(builder::nextNaturalTrigger);
     getOptInstantProperty(workflowEntity, PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER)
         .ifPresent(builder::nextNaturalOffsetTrigger);
-
-    final Optional<WorkflowConfiguration> configuration = workflowEntity
-        .map(w -> parseWorkflowJson(w, workflowId))
-        .map(Workflow::configuration);
 
     return builder.build();
   }
