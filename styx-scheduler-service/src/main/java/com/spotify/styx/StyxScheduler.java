@@ -107,6 +107,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -145,7 +146,7 @@ public class StyxScheduler implements AppInit {
   public interface ScheduleSources extends Supplier<Iterable<ScheduleSourceFactory>> { }
   public interface StatsFactory extends Function<Environment, Stats> { }
   public interface PublisherFactory extends Function<Environment, Publisher> { }
-  public interface EventConsumerFactory extends Function<Environment, Consumer<SequenceEvent>> { }
+  public interface EventConsumerFactory extends BiFunction<Environment, Stats, Consumer<SequenceEvent>> { }
 
   @FunctionalInterface
   interface DockerRunnerFactory {
@@ -176,7 +177,7 @@ public class StyxScheduler implements AppInit {
     private PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
     private RetryUtil retryUtil = DEFAULT_RETRY_UTIL;
     private WorkflowResourceDecorator resourceDecorator = WorkflowResourceDecorator.NOOP;
-    private EventConsumerFactory eventConsumerFactory = (env) -> (event) -> { };
+    private EventConsumerFactory eventConsumerFactory = (env, stats) -> (event) -> { };
 
     public Builder setTime(Time time) {
       this.time = time;
@@ -308,7 +309,7 @@ public class StyxScheduler implements AppInit {
 
     final QueuedStateManager stateManager = closer.register(
         new QueuedStateManager(time, outputHandlerExecutor, storage,
-            eventConsumerFactory.apply(environment), eventConsumerExecutor));
+            eventConsumerFactory.apply(environment, stats), eventConsumerExecutor));
 
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);

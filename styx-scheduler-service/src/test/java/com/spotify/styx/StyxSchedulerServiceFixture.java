@@ -130,7 +130,7 @@ public class StyxSchedulerServiceFixture {
     StyxScheduler.DockerRunnerFactory dockerRunnerFactory =
         (id, env, states, exec, stats, debug) -> fakeDockerRunner();
     StyxScheduler.EventConsumerFactory eventConsumerFactory =
-        (env) -> (event) -> transitionedEvents.add(event);
+        (env, stats) -> (event) -> transitionedEvents.add(event);
 
     styxScheduler = StyxScheduler.newBuilder()
         .setTime(time)
