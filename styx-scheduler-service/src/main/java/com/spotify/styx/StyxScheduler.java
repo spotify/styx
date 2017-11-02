@@ -337,7 +337,7 @@ public class StyxScheduler implements AppInit {
         (workflowInstance) -> RunState.fresh(workflowInstance, time, outputHandlers);
 
     final TriggerListener trigger =
-        new StateInitializingTrigger(stateFactory, stateManager, storage);
+        new StateInitializingTrigger(stateFactory, stateManager);
     final TriggerManager triggerManager = new TriggerManager(trigger, time, storage, stats);
     final BackfillTriggerManager backfillTriggerManager =
         new BackfillTriggerManager(stateManager, workflowCache, storage, trigger);

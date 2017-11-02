@@ -31,7 +31,6 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
-import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.IsClosedException;
 import java.time.Instant;
 import java.util.Objects;
@@ -49,12 +48,10 @@ final class StateInitializingTrigger implements TriggerListener {
 
   private final StateFactory stateFactory;
   private final StateManager stateManager;
-  private final Storage storage;
 
-  StateInitializingTrigger(StateFactory stateFactory, StateManager stateManager, Storage storage) {
+  StateInitializingTrigger(StateFactory stateFactory, StateManager stateManager) {
     this.stateFactory = Objects.requireNonNull(stateFactory);
     this.stateManager = Objects.requireNonNull(stateManager);
-    this.storage = Objects.requireNonNull(storage);
   }
 
   @Override

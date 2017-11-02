@@ -28,7 +28,6 @@ import static com.spotify.styx.model.Schedule.WEEKS;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertThat;
-import static org.mockito.Mockito.mock;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -41,7 +40,6 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.Trigger;
-import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.TriggerUtil;
 import java.time.Instant;
@@ -64,9 +62,8 @@ public class StateInitializingTriggerTest {
       );
 
   private SyncStateManager stateManager = new SyncStateManager();
-  private Storage storage = mock(Storage.class);
   private TriggerListener
-      trigger = new StateInitializingTrigger(RunState::fresh, stateManager, storage);
+      trigger = new StateInitializingTrigger(RunState::fresh, stateManager);
 
   @Test
   public void shouldInitializeWorkflowInstance() throws Exception {
