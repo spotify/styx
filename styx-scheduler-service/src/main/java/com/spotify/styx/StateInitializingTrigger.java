@@ -59,7 +59,7 @@ final class StateInitializingTrigger implements TriggerListener {
 
   @Override
   public CompletionStage<Void> event(Workflow workflow, Trigger trigger, Instant instant) {
-    if (!WorkflowValidator.hasDockerConfiguration(workflow, storage)) {
+    if (!WorkflowValidator.hasDockerConfiguration(workflow)) {
       LOG.warn("{} has no docker image or args info, skipping", workflow.id());
       return CompletableFuture.completedFuture(null);
     }

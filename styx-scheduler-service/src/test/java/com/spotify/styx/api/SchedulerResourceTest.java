@@ -217,30 +217,6 @@ public class SchedulerResourceTest {
   }
 
   @Test
-  public void testUpdateWorkflowUpdatesWorkflowState() throws Exception {
-    ByteString workflowPayload = serialize(HOURLY_WORKFLOW.configuration());
-    CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows/styx", workflowPayload);
-
-    assertThat(post.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
-    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
-
-    final WorkflowConfiguration workflowConfiguration =
-        WorkflowConfigurationBuilder.from(HOURLY_WORKFLOW.configuration())
-            .dockerImage("foobar")
-            .build();
-    ByteString workflowPayload2 = serialize(workflowConfiguration);
-    CompletionStage<Response<ByteString>> post2 =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows/styx", workflowPayload2);
-
-    assertThat(post2.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
-    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
-    assertThat(storage.workflowState(HOURLY_WORKFLOW.id()).dockerImage(),
-               is(Optional.of("foobar")));
-    storage.delete(HOURLY_WORKFLOW.id());
-  }
-
-  @Test
   public void testWorkflowWithInvalidShaFails() throws Exception {
     final WorkflowConfiguration workflowConfiguration =
         WorkflowConfigurationBuilder.from(HOURLY_WORKFLOW.configuration())

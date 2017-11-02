@@ -35,8 +35,6 @@ public final class WorkflowStateUtil {
         o -> {
           WorkflowState.Builder builder = o.toBuilder()
               .enabled(patch.enabled().orElse(o.enabled().orElse(false)));
-          patch.commitSha().ifPresent(builder::commitSha);
-          patch.dockerImage().ifPresent(builder::dockerImage);
           patch.nextNaturalTrigger().ifPresent(builder::nextNaturalTrigger);
           return builder.build();
         }

@@ -105,18 +105,12 @@ public class InMemStorage implements Storage {
   @Override
   public void storeWorkflow(Workflow workflow) throws IOException {
     workflowStore.put(workflow.id(), workflow);
-    final WorkflowState.Builder builder = WorkflowState.builder();
-    workflow.configuration().commitSha().ifPresent(builder::commitSha);
-    workflow.configuration().dockerImage().ifPresent(builder::dockerImage);
-    final WorkflowState patchState = builder.build();
 
     WorkflowState originalState = Optional.ofNullable(
         workflowStatePerWorkflowId.get(workflow.id())
     ).orElse(WorkflowState.patchEnabled(false));
 
-    final WorkflowState workflowState =
-        WorkflowStateUtil.patchWorkflowState(Optional.ofNullable(originalState), patchState);
-    workflowStatePerWorkflowId.put(workflow.id(), workflowState);
+    workflowStatePerWorkflowId.put(workflow.id(), originalState);
   }
 
   @Override
@@ -227,11 +221,6 @@ public class InMemStorage implements Storage {
 
   private WorkflowState workflowStateFromWorkflowConfiguration(WorkflowId workflowId) {
     WorkflowState.Builder builder = WorkflowState.builder();
-    final Workflow workflow = workflowStore.get(workflowId);
-    if (workflow != null) {
-      workflow.configuration().commitSha().ifPresent(builder::commitSha);
-      workflow.configuration().dockerImage().ifPresent(builder::dockerImage);
-    }
     return builder.build();
   }
 

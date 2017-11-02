@@ -240,11 +240,7 @@ public class ExecutionDescriptionHandlerTest {
   @Test
   public void shouldNotTransitIfStateManagerIsClosed() throws Exception {
     Workflow workflow = Workflow.create("id", schedule("--date", "{}", "--bar"));
-    WorkflowState workflowState = WorkflowState.builder()
-        .enabled(true)
-        .dockerImage(DOCKER_IMAGE)
-        .commitSha(COMMIT_SHA)
-        .build();
+    WorkflowState workflowState = WorkflowState.patchEnabled(true);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
     RunState runState = RunState.fresh(workflowInstance, toTest);
 

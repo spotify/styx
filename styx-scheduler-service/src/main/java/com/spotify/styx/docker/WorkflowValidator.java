@@ -20,12 +20,7 @@
 
 package com.spotify.styx.docker;
 
-import com.google.common.base.Throwables;
 import com.spotify.styx.model.Workflow;
-import com.spotify.styx.storage.Storage;
-import java.io.IOException;
-import java.util.List;
-import java.util.Optional;
 
 /**
  * A utility class for validating that a {@link Workflow} has the needed docker configuration for
@@ -37,19 +32,6 @@ public final class WorkflowValidator {
   }
 
   public static boolean hasDockerConfiguration(Workflow workflow) {
-    return workflow.configuration().dockerArgs().isPresent();
-  }
-
-  public static boolean hasDockerConfiguration(Workflow workflow, Storage storage) {
-    final Optional<List<String>> dockerArgs = workflow.configuration().dockerArgs();
-    if (!dockerArgs.isPresent()) {
-      return false;
-    }
-
-    try {
-      return storage.getDockerImage(workflow.id()).isPresent();
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
+    return workflow.configuration().dockerImage().isPresent();
   }
 }

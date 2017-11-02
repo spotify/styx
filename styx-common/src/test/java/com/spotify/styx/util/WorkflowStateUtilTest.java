@@ -29,10 +29,7 @@ import org.junit.Test;
 
 public class WorkflowStateUtilTest {
 
-  private static final String ORIGINAL_COMMIT_SHA = "3caec76e5703ad6181d211d2461e648d2166b1c0";
-  private static final String PATCHED_COMMIT_SHA = "0000c76e5703ad6181d211d2461e648d2166b1c0";
-
-  private WorkflowState FULLY_POPULATED_STATE = WorkflowState.all(true, "original_docker_image", ORIGINAL_COMMIT_SHA);
+  private WorkflowState FULLY_POPULATED_STATE = WorkflowState.patchEnabled(true);
 
   @Test
   public void patchAnEmptyStateReturnsPatch() {
@@ -54,19 +51,15 @@ public class WorkflowStateUtilTest {
     WorkflowState patchedState = WorkflowStateUtil.patchWorkflowState(
         Optional.of(FULLY_POPULATED_STATE),
         patch);
-    assertThat(patchedState, equalTo(WorkflowState.all(false, "original_docker_image", ORIGINAL_COMMIT_SHA)));
+    assertThat(patchedState, equalTo(WorkflowState.patchEnabled(false)));
   }
 
   @Test
   public void nonPopulatedNorPatchedEnabledShouldBeFalseAfterPatch() {
     WorkflowState patch = WorkflowState.empty();
     WorkflowState patchedState = WorkflowStateUtil.patchWorkflowState(
-        Optional.of(
-            WorkflowState.builder()
-                .dockerImage("original_docker_image")
-                .commitSha(ORIGINAL_COMMIT_SHA)
-                .build()),
+        Optional.of(WorkflowState.patchEnabled(false)),
         patch);
-    assertThat(patchedState, equalTo(WorkflowState.all(false, "original_docker_image", ORIGINAL_COMMIT_SHA)));
+    assertThat(patchedState, equalTo(WorkflowState.patchEnabled(false)));
   }
 }

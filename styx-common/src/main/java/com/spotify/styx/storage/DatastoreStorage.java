@@ -423,9 +423,7 @@ class DatastoreStorage {
   }
 
   Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
-    final Optional<Entity> workflowEntity = getOpt(datastore, workflowKey(workflowId));
-    return workflowEntity.map(w -> parseWorkflowJson(w, workflowId))
-        .flatMap(wf -> wf.configuration().dockerImage());
+    return workflow(workflowId).flatMap(wf -> wf.configuration().dockerImage());
   }
 
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
@@ -443,8 +441,6 @@ class DatastoreStorage {
     final Optional<WorkflowConfiguration> configuration = workflowEntity
         .map(w -> parseWorkflowJson(w, workflowId))
         .map(Workflow::configuration);
-    configuration.flatMap(WorkflowConfiguration::dockerImage).ifPresent(builder::dockerImage);
-    configuration.flatMap(WorkflowConfiguration::commitSha).ifPresent(builder::commitSha);
 
     return builder.build();
   }

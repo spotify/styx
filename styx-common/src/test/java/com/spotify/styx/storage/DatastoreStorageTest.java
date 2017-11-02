@@ -23,7 +23,6 @@ package com.spotify.styx.storage;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
-import static com.spotify.styx.model.WorkflowState.patchDockerImage;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static java.util.Optional.empty;
@@ -53,7 +52,6 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.time.Duration;
 import java.time.Instant;
@@ -181,22 +179,6 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldNotRemoveWorkflowWhenSettingDockerImage() throws Exception {
-    Workflow workflow = Workflow.create("test",
-                                        FULL_WORKFLOW_CONFIGURATION);
-    storage.store(workflow);
-    Optional<Workflow> retrieved = storage.workflow(workflow.id());
-    assertThat(retrieved, is(Optional.of(workflow)));
-
-    storage.patchState(workflow.id(), patchDockerImage(
-        FULL_WORKFLOW_CONFIGURATION.dockerImage().get()));
-    Optional<String> dockerImg = storage.getDockerImage(workflow.id());
-    retrieved = storage.workflow(workflow.id());
-    assertThat(dockerImg, is(FULL_WORKFLOW_CONFIGURATION.dockerImage()));
-    assertThat(retrieved, is(Optional.of(workflow)));
-  }
-
-  @Test
   public void shouldReturnEmptyOptionalWhenWorkflowIdDoesNotExist() throws Exception {
     Optional<Workflow> retrieved = storage.workflow(WorkflowId.create("foo", "bar"));
 
@@ -225,20 +207,6 @@ public class DatastoreStorageTest {
     assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
   }
 
-  @Test
-  public void shouldPersistCommitShaPerWorkflowId() throws Exception {
-    storage.store(Workflow.create(
-        WORKFLOW_ID1.componentId(),
-        WorkflowConfiguration.builder()
-            .id(WORKFLOW_ID1.id())
-            .schedule(DAYS)
-            .commitSha(COMMIT_SHA)
-            .build()));
-    WorkflowState retrieved = storage.workflowState(WORKFLOW_ID1);
-
-    assertThat(retrieved.commitSha(), is(Optional.of(COMMIT_SHA)));
-  }
-
 
   @Test
   public void shouldReturnEmptyOptionalWhenImageDoesNotExist() throws Exception {
@@ -252,11 +220,6 @@ public class DatastoreStorageTest {
     storage.store(WORKFLOW_NO_STATE);
     WorkflowState retrieved = storage.workflowState(WORKFLOW_ID_NO_STATE);
     assertThat(retrieved, is(WorkflowState.patchEnabled(false)));
-  }
-
-  @Test(expected = ResourceNotFoundException.class)
-  public void shouldNotSetDockerImageWhenWorkflowDoesNotExist() throws Exception {
-    storage.patchState(WORKFLOW_WITH_DOCKER_IMAGE.id(), patchDockerImage(DOCKER_IMAGE_WORKFLOW));
   }
 
   @Test
@@ -448,8 +411,6 @@ public class DatastoreStorageTest {
     storage.updateNextNaturalTrigger(WORKFLOW_ID1, spec);
     WorkflowState state = WorkflowState.builder()
         .enabled(true)
-        .dockerImage(DOCKER_IMAGE.get())
-        .commitSha(COMMIT_SHA)
         .nextNaturalTrigger(instant)
         .nextNaturalOffsetTrigger(offset)
         .build();

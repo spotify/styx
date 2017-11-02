@@ -28,7 +28,6 @@ import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
 import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.api.JsonMatchers.assertNoJson;
 import static com.spotify.styx.model.SequenceEvent.create;
-import static com.spotify.styx.model.WorkflowState.patchDockerImage;
 import static com.spotify.styx.serialization.Json.deserialize;
 import static com.spotify.styx.serialization.Json.serialize;
 import static org.hamcrest.Matchers.empty;
@@ -228,14 +227,11 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldSucceedWhenStatePayloadWithOtherFieldsIsSent() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.patchState(WORKFLOW.id(), patchDockerImage("preset:image"));
-
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
                                             STATEPAYLOAD_OTHER_FIELD));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
-    assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
     assertJson(response, "enabled", equalTo(true));
 
     assertThat(storage.enabled(WORKFLOW.id()), is(true));
