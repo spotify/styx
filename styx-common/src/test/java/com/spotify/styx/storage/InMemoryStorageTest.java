@@ -21,7 +21,6 @@
 package com.spotify.styx.storage;
 
 import static com.spotify.styx.model.Schedule.HOURS;
-import static com.spotify.styx.model.WorkflowState.patchEnabled;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
@@ -58,12 +57,12 @@ public class InMemoryStorageTest {
 
     WorkflowState workflowState = storage.workflowState(id1);
     assertThat(workflowState.enabled().get(), is(false));
-    storage.patchState(id1, patchEnabled(true));
+    storage.patchState(id1, WorkflowState.builder().enabled(true).build());
     workflowState = storage.workflowState(id1);
     assertThat(workflowState.enabled().get(), is(true));
-    storage.patchState(id2, patchEnabled(true));
+    storage.patchState(id2, WorkflowState.builder().enabled(true).build());
     assertThat(storage.enabled(), containsInAnyOrder(id1, id2));
-    storage.patchState(id1, patchEnabled(false));
+    storage.patchState(id1, WorkflowState.builder().enabled(false).build());
     workflowState = storage.workflowState(id1);
     assertThat(workflowState.enabled().get(), is(false));
   }

@@ -235,7 +235,7 @@ public class SchedulerResourceTest {
 
     assertThat(post2.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
     assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
-    assertThat(storage.workflowState(HOURLY_WORKFLOW.id()).dockerImage(),
+    assertThat(storage.workflow(HOURLY_WORKFLOW.id()).get().configuration().dockerImage(),
                is(Optional.of("foobar")));
     storage.delete(HOURLY_WORKFLOW.id());
   }

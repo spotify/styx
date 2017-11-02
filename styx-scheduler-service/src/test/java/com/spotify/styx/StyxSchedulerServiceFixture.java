@@ -20,7 +20,6 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.model.WorkflowState.patchEnabled;
 import static java.util.Collections.singletonList;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
@@ -42,6 +41,7 @@ import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
 import com.spotify.styx.schedule.ScheduleSourceFactory;
@@ -241,7 +241,7 @@ public class StyxSchedulerServiceFixture {
 
   void givenWorkflowEnabledStateIs(Workflow workflow, boolean enabled) {
     try {
-      storage.patchState(workflow.id(), patchEnabled(enabled));
+      storage.patchState(workflow.id(), WorkflowState.builder().enabled(enabled).build());
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }

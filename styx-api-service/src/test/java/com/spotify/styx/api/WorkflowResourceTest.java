@@ -28,7 +28,6 @@ import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
 import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.api.JsonMatchers.assertNoJson;
 import static com.spotify.styx.model.SequenceEvent.create;
-import static com.spotify.styx.model.WorkflowState.patchDockerImage;
 import static com.spotify.styx.serialization.Json.deserialize;
 import static com.spotify.styx.serialization.Json.serialize;
 import static org.hamcrest.Matchers.empty;
@@ -68,7 +67,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.Optional;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -130,9 +128,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   private static final ByteString STATEPAYLOAD_BAD =
       ByteString.encodeUtf8("{\"The BAD\"}");
-
-  private static final ByteString STATEPAYLOAD_OTHER_FIELD =
-      ByteString.encodeUtf8("{\"enabled\":\"true\",\"other_field\":\"ignored\"}");
 
   @Mock DockerImageValidator dockerImageValidator;
 
@@ -214,30 +209,9 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldSucceedWithEnabledPatchStatePerWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.patchState(WORKFLOW.id(), patchDockerImage("preset:image"));
-
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
                                             STATEPAYLOAD_ENABLED));
-
-    assertThat(response, hasStatus(withCode(Status.OK)));
-    assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
-    assertJson(response, "enabled", equalTo(true));
-    assertJson(response, "docker_image", equalTo("preset:image"));
-
-    assertThat(storage.enabled(WORKFLOW.id()), is(true));
-    assertThat(storage.getDockerImage(WORKFLOW.id()), is(Optional.of("preset:image")));
-  }
-
-  @Test
-  public void shouldSucceedWhenStatePayloadWithOtherFieldsIsSent() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    storage.patchState(WORKFLOW.id(), patchDockerImage("preset:image"));
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            STATEPAYLOAD_OTHER_FIELD));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
@@ -266,20 +240,15 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "enabled", equalTo(false));
-    assertNoJson(response, "docker_image");
-    assertNoJson(response, "commit_sha");
 
     storage.patchState(WORKFLOW.id(),
-                       WorkflowState.builder().enabled(true).dockerImage("tina:ranic")
-                           .commitSha("470a229b49a14e7682af2abfdac3b881a8aacdf9").build());
+                       WorkflowState.builder().enabled(true).build());
 
     response =
         awaitResponse(serviceHelper.request("GET", path("/foo/bar/state")));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "enabled", equalTo(true));
-    assertJson(response, "docker_image", equalTo("tina:ranic"));
-    assertJson(response, "commit_sha", equalTo("470a229b49a14e7682af2abfdac3b881a8aacdf9"));
   }
 
   @Test

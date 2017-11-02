@@ -43,6 +43,7 @@ import com.google.common.collect.ImmutableList;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
@@ -87,11 +88,14 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldTransitionIntoSubmittingIfMissingDockerArgs() throws Exception {
-    Workflow workflow = Workflow.create("id", schedule());
+    final WorkflowConfiguration workflowConfiguration =
+        WorkflowConfigurationBuilder.from(schedule())
+            .dockerImage(DOCKER_IMAGE)
+            .commitSha(COMMIT_SHA)
+            .build();
+    Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowState workflowState = WorkflowState.builder()
         .enabled(true)
-        .dockerImage(DOCKER_IMAGE)
-        .commitSha(COMMIT_SHA)
         .build();
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
     RunState runState = RunState.fresh(workflowInstance, toTest);
@@ -116,11 +120,14 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldTransitionIntoSubmitting() throws Exception {
-    Workflow workflow = Workflow.create("id", schedule("--date", "{}", "--bar"));
+    final WorkflowConfiguration workflowConfiguration =
+        WorkflowConfigurationBuilder.from(schedule("--date", "{}", "--bar"))
+            .dockerImage(DOCKER_IMAGE)
+            .commitSha(COMMIT_SHA)
+            .build();
+    Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowState workflowState = WorkflowState.builder()
         .enabled(true)
-        .dockerImage(DOCKER_IMAGE)
-        .commitSha(COMMIT_SHA)
         .build();
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
     RunState runState = RunState.fresh(workflowInstance, toTest);
@@ -145,16 +152,19 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldTransitionIntoFailedIfStorageError() throws Exception {
-    Workflow workflow = Workflow.create("id", schedule("--date", "{}", "--bar"));
+    final WorkflowConfiguration workflowConfiguration =
+        WorkflowConfigurationBuilder.from(schedule("--date", "{}", "--bar"))
+            .dockerImage(DOCKER_IMAGE)
+            .commitSha(COMMIT_SHA)
+            .build();
+    Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowState workflowState = WorkflowState.builder()
         .enabled(true)
-        .dockerImage(DOCKER_IMAGE)
-        .commitSha(COMMIT_SHA)
         .build();
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
 
     Storage storageSpy = spy(storage);
-    when(storageSpy.workflowState(workflowInstance.workflowId()))
+    when(storageSpy.workflow(workflowInstance.workflowId()))
         .thenThrow(new IOException("TEST"));
     storageSpy.storeWorkflow(workflow);
     storageSpy.patchState(workflow.id(), workflowState);
@@ -243,8 +253,6 @@ public class ExecutionDescriptionHandlerTest {
     Workflow workflow = Workflow.create("id", schedule("--date", "{}", "--bar"));
     WorkflowState workflowState = WorkflowState.builder()
         .enabled(true)
-        .dockerImage(DOCKER_IMAGE)
-        .commitSha(COMMIT_SHA)
         .build();
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
     RunState runState = RunState.fresh(workflowInstance, toTest);
