@@ -113,11 +113,9 @@ public class InMemStorage implements Storage {
     WorkflowState originalState = Optional.ofNullable(
         workflowStatePerWorkflowId.get(workflow.id())
     ).orElse(WorkflowState.patchEnabled(false));
-    System.out.println("originalState = " + originalState);
 
     final WorkflowState workflowState =
         WorkflowStateUtil.patchWorkflowState(Optional.ofNullable(originalState), patchState);
-    System.out.println("workflowState = " + workflowState);
     workflowStatePerWorkflowId.put(workflow.id(), workflowState);
   }
 
@@ -224,14 +222,16 @@ public class InMemStorage implements Storage {
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
     final WorkflowState stateFromWorkflow = workflowStateFromWorkflowConfiguration(workflowId);
     final WorkflowState workflowState = workflowStatePerWorkflowId.get(workflowId);
-    return WorkflowStateUtil.patchWorkflowState(Optional.of(workflowState), stateFromWorkflow);
+    return WorkflowStateUtil.patchWorkflowState(Optional.ofNullable(workflowState), stateFromWorkflow);
   }
 
   private WorkflowState workflowStateFromWorkflowConfiguration(WorkflowId workflowId) {
-    final Workflow workflow = workflowStore.get(workflowId);
     WorkflowState.Builder builder = WorkflowState.builder();
-    workflow.configuration().commitSha().ifPresent(builder::commitSha);
-    workflow.configuration().dockerImage().ifPresent(builder::dockerImage);
+    final Workflow workflow = workflowStore.get(workflowId);
+    if (workflow != null) {
+      workflow.configuration().commitSha().ifPresent(builder::commitSha);
+      workflow.configuration().dockerImage().ifPresent(builder::dockerImage);
+    }
     return builder.build();
   }
 

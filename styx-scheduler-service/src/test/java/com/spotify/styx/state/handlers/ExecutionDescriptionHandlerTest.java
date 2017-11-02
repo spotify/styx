@@ -57,6 +57,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.IsClosedException;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import org.hamcrest.Matchers;
 import org.junit.Before;
@@ -81,7 +82,7 @@ public class ExecutionDescriptionHandlerTest {
   @Before
   public void setUp() throws Exception {
     when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Collections.emptyList());
-    storage = new InMemStorage();
+    storage = spy(new InMemStorage());
     stateManager = spy(new SyncStateManager());
     toTest = new ExecutionDescriptionHandler(storage, stateManager, dockerImageValidator);
   }
@@ -121,9 +122,7 @@ public class ExecutionDescriptionHandlerTest {
             .dockerImage(DOCKER_IMAGE)
             .build();
     Workflow workflow = Workflow.create("id", workflowConfiguration);
-    WorkflowState workflowState = WorkflowState.builder()
-        .enabled(true)
-        .build();
+    WorkflowState workflowState = WorkflowState.patchEnabled(true);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
     RunState runState = RunState.fresh(workflowInstance, toTest);
 
@@ -148,21 +147,16 @@ public class ExecutionDescriptionHandlerTest {
   @Test
   public void shouldTransitionIntoFailedIfStorageError() throws Exception {
     Workflow workflow = Workflow.create("id", schedule("--date", "{}", "--bar"));
-    WorkflowState workflowState = WorkflowState.builder()
-        .enabled(true)
-        .build();
+    WorkflowState workflowState = WorkflowState.patchEnabled(true);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
 
-    Storage storageSpy = spy(storage);
-    when(storageSpy.workflowState(workflowInstance.workflowId()))
+    when(storage.workflow(workflow.id()))
         .thenThrow(new IOException("TEST"));
-    storageSpy.storeWorkflow(workflow);
-    storageSpy.patchState(workflow.id(), workflowState);
 
-    toTest = new ExecutionDescriptionHandler(storageSpy, stateManager, dockerImageValidator);
+    storage.storeWorkflow(workflow);
+    storage.patchState(workflow.id(), workflowState);
 
     RunState runState = RunState.fresh(workflowInstance, toTest);
-
     stateManager.initialize(runState);
     stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
     stateManager.receive(Event.dequeue(workflowInstance));
@@ -185,7 +179,12 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldHaltIfMissingDockerImage() throws Exception {
-    WorkflowConfiguration workflowConfiguration = schedule("foo", "bar");
+    WorkflowConfiguration workflowConfiguration = WorkflowConfiguration.builder()
+        .id("styx.TestEndpoint")
+        .schedule(HOURS)
+        .commitSha(COMMIT_SHA)
+        .dockerArgs(Arrays.asList("foo", "bar"))
+        .build();
     Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
@@ -271,7 +270,9 @@ public class ExecutionDescriptionHandlerTest {
     return WorkflowConfiguration.builder()
         .id("styx.TestEndpoint")
         .schedule(HOURS)
-        .dockerArgs(ImmutableList.copyOf(args))
+        .commitSha(COMMIT_SHA)
+        .dockerImage(DOCKER_IMAGE)
+        .dockerArgs(Arrays.asList(args))
         .build();
   }
 }
