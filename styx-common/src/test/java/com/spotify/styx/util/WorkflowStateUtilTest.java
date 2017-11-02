@@ -69,25 +69,4 @@ public class WorkflowStateUtilTest {
         patch);
     assertThat(patchedState, equalTo(WorkflowState.all(false, "original_docker_image", ORIGINAL_COMMIT_SHA)));
   }
-
-  @Test
-  public void patchDockerImageFieldReturnsPatchedOriginal() {
-    WorkflowState patch = WorkflowState.builder().dockerImage("patched_docker_image").build();
-    WorkflowState patchedState = WorkflowStateUtil.patchWorkflowState(
-        Optional.of(FULLY_POPULATED_STATE),
-        patch);
-    assertThat(patchedState, equalTo(WorkflowState.all(true, "patched_docker_image", ORIGINAL_COMMIT_SHA)));
-  }
-
-  @Test
-  public void patchCommitShaFieldReturnsPatchedOriginal() {
-    WorkflowState patch = WorkflowState.builder().commitSha(PATCHED_COMMIT_SHA).build();
-    WorkflowState patchedState = WorkflowStateUtil.patchWorkflowState(
-        Optional.of(FULLY_POPULATED_STATE),
-        patch);
-    assertThat(patchedState, equalTo(
-        WorkflowState.builder().enabled(true).dockerImage("original_docker_image")
-            .commitSha(PATCHED_COMMIT_SHA).build()));
-  }
-
 }

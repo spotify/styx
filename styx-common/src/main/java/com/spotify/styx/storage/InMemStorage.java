@@ -109,12 +109,16 @@ public class InMemStorage implements Storage {
     workflow.configuration().commitSha().ifPresent(builder::commitSha);
     workflow.configuration().dockerImage().ifPresent(builder::dockerImage);
     final WorkflowState patchState = builder.build();
-    Optional<WorkflowState> originalState = Optional.ofNullable(
-        workflowStatePerWorkflowId.get(workflow.id()));
-    workflowStatePerWorkflowId.put(workflow.id(),
-                                   WorkflowStateUtil.patchWorkflowState(originalState, patchState));
-    workflowStatePerWorkflowId.put(workflow.id(),
-                                   patchState);
+
+    WorkflowState originalState = Optional.ofNullable(
+        workflowStatePerWorkflowId.get(workflow.id())
+    ).orElse(WorkflowState.patchEnabled(false));
+    System.out.println("originalState = " + originalState);
+
+    final WorkflowState workflowState =
+        WorkflowStateUtil.patchWorkflowState(Optional.ofNullable(originalState), patchState);
+    System.out.println("workflowState = " + workflowState);
+    workflowStatePerWorkflowId.put(workflow.id(), workflowState);
   }
 
   @Override
@@ -203,8 +207,11 @@ public class InMemStorage implements Storage {
 
     Optional<WorkflowState> originalState = Optional.of(
         workflowStatePerWorkflowId.getOrDefault(workflowId, patchState));
-    workflowStatePerWorkflowId
-        .put(workflowId, WorkflowStateUtil.patchWorkflowState(originalState, patchState));
+    final WorkflowState patchWorkflowState = WorkflowStateUtil.patchWorkflowState(originalState, patchState);
+    final WorkflowState workflowStateFromConfigurationPatched = WorkflowStateUtil
+        .patchWorkflowState(Optional.of(patchWorkflowState),
+                            workflowStateFromWorkflowConfiguration(workflowId));
+    workflowStatePerWorkflowId.put(workflowId, workflowStateFromConfigurationPatched);
   }
 
   @Override
@@ -215,10 +222,17 @@ public class InMemStorage implements Storage {
 
   @Override
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
-    return
-        workflowStatePerWorkflowId.getOrDefault(
-            workflowId,
-            WorkflowState.patchEnabled(false));
+    final WorkflowState stateFromWorkflow = workflowStateFromWorkflowConfiguration(workflowId);
+    final WorkflowState workflowState = workflowStatePerWorkflowId.get(workflowId);
+    return WorkflowStateUtil.patchWorkflowState(Optional.of(workflowState), stateFromWorkflow);
+  }
+
+  private WorkflowState workflowStateFromWorkflowConfiguration(WorkflowId workflowId) {
+    final Workflow workflow = workflowStore.get(workflowId);
+    WorkflowState.Builder builder = WorkflowState.builder();
+    workflow.configuration().commitSha().ifPresent(builder::commitSha);
+    workflow.configuration().dockerImage().ifPresent(builder::dockerImage);
+    return builder.build();
   }
 
   @Override

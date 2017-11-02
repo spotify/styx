@@ -65,6 +65,19 @@ public interface Storage {
    */
   Optional<Long> getLatestStoredCounter(WorkflowInstance workflowInstance) throws IOException;
 
+
+
+
+
+
+
+
+
+
+
+
+
+
   /**
    * Get the global concurrency for Styx.
    */

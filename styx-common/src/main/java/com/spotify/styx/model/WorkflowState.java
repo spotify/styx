@@ -61,7 +61,9 @@ public abstract class WorkflowState {
   public abstract static class Builder {
 
     public abstract Builder enabled(boolean enabled);
+    @Deprecated
     public abstract Builder dockerImage(String dockerImage);
+    @Deprecated
     public abstract Builder commitSha(String commitSha);
     public abstract Builder nextNaturalTrigger(Instant nextNaturalTrigger);
     public abstract Builder nextNaturalOffsetTrigger(Instant nextNaturalOffsetTrigger);
