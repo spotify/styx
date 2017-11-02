@@ -222,7 +222,7 @@ class DatastoreStorage {
   Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
     return getOpt(datastore, workflowKey(workflowId))
         .filter(e -> e.contains(PROPERTY_WORKFLOW_JSON))
-        .flatMap(e -> parseWorkflowJson(e, workflowId));
+        .map(e -> parseWorkflowJson(e, workflowId));
   }
 
   void delete(WorkflowId workflowId) throws IOException {
@@ -424,8 +424,7 @@ class DatastoreStorage {
 
   Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
     final Optional<Entity> workflowEntity = getOpt(datastore, workflowKey(workflowId));
-
-    return workflowEntity.flatMap(w -> parseWorkflowJson(w, workflowId))
+    return workflowEntity.map(w -> parseWorkflowJson(w, workflowId))
         .flatMap(wf -> wf.configuration().dockerImage());
   }
 
@@ -442,7 +441,7 @@ class DatastoreStorage {
         .ifPresent(builder::nextNaturalOffsetTrigger);
 
     final Optional<WorkflowConfiguration> configuration = workflowEntity
-        .flatMap(w -> parseWorkflowJson(w, workflowId))
+        .map(w -> parseWorkflowJson(w, workflowId))
         .map(Workflow::configuration);
     configuration.flatMap(WorkflowConfiguration::dockerImage).ifPresent(builder::dockerImage);
     configuration.flatMap(WorkflowConfiguration::commitSha).ifPresent(builder::commitSha);
@@ -508,13 +507,13 @@ class DatastoreStorage {
     return WorkflowId.create(componentId, id);
   }
 
-  private Optional<Workflow> parseWorkflowJson(Entity entity, WorkflowId workflowId) {
+  private Workflow parseWorkflowJson(Entity entity, WorkflowId workflowId) {
     try {
-      return Optional.ofNullable(OBJECT_MAPPER
-          .readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class));
+      return OBJECT_MAPPER
+          .readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
     } catch (IOException e1) {
       LOG.info("Failed to read workflow for {}, {}", workflowId.componentId(), workflowId.id());
-      return Optional.empty();
+      return null;
     }
   }
 
