@@ -186,36 +186,6 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldPersistDockerImagePerWorkflow() throws Exception {
-    storage.store(WORKFLOW_WITH_DOCKER_IMAGE);
-    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_WITH_DOCKER_IMAGE.id());
-
-    assertThat(retrieved, is(WORKFLOW_WITH_DOCKER_IMAGE.configuration().dockerImage()));
-  }
-
-  @Test
-  public void shouldPersistDockerImagePerWorkflowId() throws Exception {
-    storage.store(Workflow.create(
-        WORKFLOW_ID1.componentId(),
-        WorkflowConfiguration.builder()
-            .id(WORKFLOW_ID1.id())
-            .schedule(DAYS)
-            .dockerImage(DOCKER_IMAGE_WORKFLOW)
-            .build()));
-    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_ID1);
-
-    assertThat(retrieved, is(Optional.of(DOCKER_IMAGE_WORKFLOW)));
-  }
-
-
-  @Test
-  public void shouldReturnEmptyOptionalWhenImageDoesNotExist() throws Exception {
-    storage.store(WORKFLOW_NO_DOCKER_IMAGE);
-    Optional<String> retrieved = storage.getDockerImage(WORKFLOW_ID_NO_DOCKER_IMG);
-    assertThat(retrieved, is(empty()));
-  }
-
-  @Test
   public void shouldReturnEmptyWorkflowStateExceptEnabledWhenWorkflowStateDoesNotExist() throws Exception {
     storage.store(WORKFLOW_NO_STATE);
     WorkflowState retrieved = storage.workflowState(WORKFLOW_ID_NO_STATE);

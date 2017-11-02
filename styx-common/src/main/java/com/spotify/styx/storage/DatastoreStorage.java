@@ -421,10 +421,6 @@ class DatastoreStorage {
     }));
   }
 
-  Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
-    return workflow(workflowId).flatMap(wf -> wf.configuration().dockerImage());
-  }
-
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
     final WorkflowState.Builder builder = WorkflowState.builder();
     final Optional<Entity> workflowEntity = getOpt(datastore, workflowKey(workflowId));
