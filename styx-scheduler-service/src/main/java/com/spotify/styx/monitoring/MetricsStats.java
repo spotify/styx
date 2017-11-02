@@ -25,8 +25,10 @@ import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
 import com.spotify.metrics.core.MetricId;
 import com.spotify.metrics.core.SemanticMetricRegistry;
+import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.util.EventUtil;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -111,6 +113,10 @@ public final class MetricsStats implements Stats {
       .tagged("what", "submission-rate-limit")
       .tagged("unit", "submission/s");
 
+  private static final MetricId EVENT_CONSUMER_ERROR_RATE = BASE
+      .tagged("what", "event-consumer-error-rate")
+      .tagged("unit", "error");
+
   private static final String STATUS = "status";
 
   private final SemanticMetricRegistry registry;
@@ -130,6 +136,7 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<Tuple3<String, String, Integer>, Meter> dockerOperationErrorMeters;
   private final ConcurrentMap<String, Histogram> resourceConfiguredHistograms;
   private final ConcurrentMap<String, Histogram> resourceUsedHistograms;
+  private final ConcurrentMap<String, Meter> eventConsumerErrorMeters;
 
   public MetricsStats(SemanticMetricRegistry registry) {
     this.registry = Objects.requireNonNull(registry);
@@ -149,6 +156,7 @@ public final class MetricsStats implements Stats {
     this.dockerOperationErrorMeters = new ConcurrentHashMap<>();
     this.resourceConfiguredHistograms = new ConcurrentHashMap<>();
     this.resourceUsedHistograms = new ConcurrentHashMap<>();
+    this.eventConsumerErrorMeters = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -244,6 +252,11 @@ public final class MetricsStats implements Stats {
     resourceUsedHistogram(resource).update(used);
   }
 
+  @Override
+  public void recordEventConsumerError(SequenceEvent event) {
+    eventConsumerErrorMeter(event).mark();
+  }
+
   private Meter exitCodeMeter(WorkflowId workflowId, int exitCode) {
     return exitCodePerWorkflowMeters
         .computeIfAbsent(Tuple.of(workflowId, exitCode), (tuple) ->
@@ -290,5 +303,11 @@ public final class MetricsStats implements Stats {
   private Histogram resourceUsedHistogram(String resource) {
     return resourceUsedHistograms.computeIfAbsent(
         resource, (op) -> registry.histogram(RESOURCE_USED.tagged("resource", resource)));
+  }
+
+  private Meter eventConsumerErrorMeter(SequenceEvent sequenceEvent) {
+    final String eventType = EventUtil.name(sequenceEvent.event());
+    return eventConsumerErrorMeters.computeIfAbsent(
+        eventType, (op) -> registry.meter(EVENT_CONSUMER_ERROR_RATE.tagged("event-type", eventType)));
   }
 }

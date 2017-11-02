@@ -21,6 +21,7 @@
 package com.spotify.styx.monitoring;
 
 import com.codahale.metrics.Gauge;
+import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
 
@@ -62,6 +63,8 @@ public interface Stats {
   void recordResourceConfigured(String resource, long configured);
 
   void recordResourceUsed(String resource, long used);
+
+  void recordEventConsumerError(SequenceEvent event);
 
   Stats NOOP = new NoopStats();
 }

@@ -29,8 +29,12 @@ import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
 import com.spotify.metrics.core.MetricId;
 import com.spotify.metrics.core.SemanticMetricRegistry;
+import com.spotify.styx.model.Event;
+import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.Trigger;
+import com.spotify.styx.testdata.TestData;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -113,6 +117,10 @@ public class MetricsStatsTest {
   private static final MetricId SUBMISSION_RATE_LIMIT = BASE
       .tagged("what", "submission-rate-limit")
       .tagged("unit", "submission/s");
+
+  private static final MetricId EVENT_CONSUMER_ERROR_RATE = BASE
+      .tagged("what", "event-consumer-error-rate")
+      .tagged("unit", "error");
 
   private Stats stats;
   
@@ -252,6 +260,15 @@ public class MetricsStatsTest {
   @Test
   public void shouldRecordPullImageError() throws Exception {
     stats.recordPullImageError();
+    verify(meter).mark();
+  }
+
+  @Test
+  public void shouldRecordEventConsumerError() throws Exception {
+    final SequenceEvent event = SequenceEvent
+        .create(Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural()), 0L, 0L);
+    when(registry.meter(EVENT_CONSUMER_ERROR_RATE.tagged("event-type", "triggerExecution"))).thenReturn(meter);
+    stats.recordEventConsumerError(event);
     verify(meter).mark();
   }
 
