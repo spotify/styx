@@ -70,37 +70,6 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public WorkflowInstanceExecutionData executionData(WorkflowInstance workflowInstance) throws IOException {
-    return bigtableStorage.executionData(workflowInstance);
-  }
-
-  @Override
-  public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String offset,
-                                                           int limit) throws IOException {
-    return bigtableStorage.executionData(workflowId, offset, limit);
-  }
-
-  @Override
-  public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String start,
-                                                           String stop) throws IOException {
-    return bigtableStorage.executionData(workflowId, start, stop);
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  @Override
   public Optional<Long> globalConcurrency() throws IOException {
     return datastoreStorage.globalConcurrency();
   }
@@ -158,6 +127,23 @@ public class AggregateStorage implements Storage {
   @Override
   public Set<WorkflowId> enabled() throws IOException {
     return datastoreStorage.enabled();
+  }
+
+  @Override
+  public WorkflowInstanceExecutionData executionData(WorkflowInstance workflowInstance) throws IOException {
+    return bigtableStorage.executionData(workflowInstance);
+  }
+
+  @Override
+  public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String offset,
+                                                           int limit) throws IOException {
+    return bigtableStorage.executionData(workflowId, offset, limit);
+  }
+
+  @Override
+  public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String start,
+                                                           String stop) throws IOException {
+    return bigtableStorage.executionData(workflowId, start, stop);
   }
 
 
