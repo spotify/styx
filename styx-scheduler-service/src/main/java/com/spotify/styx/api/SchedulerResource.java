@@ -128,12 +128,13 @@ public class SchedulerResource {
   }
 
   private Response<Workflow> createOrUpdateWorkflow(String componentId, WorkflowConfiguration configuration) {
-    if (configuration.dockerImage().isPresent()) {
-      final Collection<String> errors = dockerImageValidator.validateImageReference(
-          configuration.dockerImage().get());
-      if (!errors.isEmpty()) {
-        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors));
-      }
+    if (!configuration.dockerImage().isPresent()) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing docker image"));
+    }
+    final Collection<String> errors = dockerImageValidator.validateImageReference(
+      configuration.dockerImage().get());
+    if (!errors.isEmpty()) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors));
     }
 
     if (configuration.commitSha().isPresent()

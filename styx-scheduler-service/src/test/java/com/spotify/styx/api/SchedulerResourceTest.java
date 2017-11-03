@@ -182,11 +182,8 @@ public class SchedulerResourceTest {
     final Response<ByteString> r = serviceHelper.request(
         "POST", SchedulerResource.BASE + "/workflows/styx",
         serialize(workflowConfiguration)).toCompletableFuture().get();
-    assertThat(r, hasStatus(withCode(Status.OK)));
-    assertThat(storage.workflow(FULL_DAILY_WORKFLOW.id()), isPresent());
-    assertThat(storage.workflow(FULL_DAILY_WORKFLOW.id()).get().configuration().dockerImage(),
-               isEmpty());
-    storage.delete(FULL_DAILY_WORKFLOW.id());
+    assertThat(r, hasStatus(withCode(Status.BAD_REQUEST)));
+    assertThat(storage.workflow(FULL_DAILY_WORKFLOW.id()), isEmpty());
   }
 
   @Test
