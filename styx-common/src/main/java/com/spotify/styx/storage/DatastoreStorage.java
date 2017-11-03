@@ -89,12 +89,10 @@ class DatastoreStorage {
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
   public static final String PROPERTY_NEXT_NATURAL_TRIGGER = "nextNaturalTrigger";
   public static final String PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER = "nextNaturalOffsetTrigger";
-  public static final String PROPERTY_DOCKER_IMAGE = "dockerImage";
   public static final String PROPERTY_COUNTER = "counter";
   public static final String PROPERTY_COMPONENT = "component";
   public static final String PROPERTY_WORKFLOW = "workflow";
   public static final String PROPERTY_PARAMETER = "parameter";
-  public static final String PROPERTY_COMMIT_SHA = "commitSha";
   public static final String PROPERTY_CONCURRENCY = "concurrency";
   public static final String PROPERTY_START = "start";
   public static final String PROPERTY_END = "end";
@@ -516,36 +514,11 @@ class DatastoreStorage {
   }
 
   /**
-   * Optionally get a string value for an {@link Entity}'s property from a {@link DatastoreReader}.
-   *
-   * @return an optional containing the property value if it existed, empty otherwise.
-   */
-  private Optional<String> getOptStringProperty(DatastoreReader datastoreReader, Key key,
-                                                String property) {
-    return getOpt(datastoreReader, key)
-        .filter(e -> e.contains(property))
-        .map(e -> e.getString(property));
-  }
-
-  /**
-   * Optionally get a string value for an {@link Entity}'s property.
-   *
-   * @return an optional containing the property value if it existed, empty otherwise.
-   */
-  private Optional<String> getOptStringProperty(Optional<Entity> entity,
-                                                String property) {
-    return entity
-        .filter(e -> e.contains(property))
-        .map(e -> e.getString(property));
-  }
-
-  /**
    * Optionally get an {@link Instant} value for an {@link Entity}'s property.
    *
    * @return an optional containing the property value if it existed, empty otherwise.
    */
-  private Optional<Instant> getOptInstantProperty(Optional<Entity> entity,
-                                                String property) {
+  private Optional<Instant> getOptInstantProperty(Optional<Entity> entity, String property) {
     return entity
         .filter(w -> w.contains(property))
         .map(workflow -> timestampToInstant(workflow.getTimestamp(property)));
