@@ -59,6 +59,7 @@ import com.spotify.styx.util.IsClosedException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Optional;
 import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
@@ -90,9 +91,7 @@ public class ExecutionDescriptionHandlerTest {
   @Test
   public void shouldTransitionIntoSubmittingIfMissingDockerArgs() throws Exception {
     Workflow workflow = Workflow.create("id", schedule());
-    WorkflowState workflowState = WorkflowState.builder()
-        .enabled(true)
-        .build();
+    WorkflowState workflowState = WorkflowState.patchEnabled(true);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
     RunState runState = RunState.fresh(workflowInstance, toTest);
 
@@ -116,12 +115,7 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldTransitionIntoSubmitting() throws Exception {
-    final WorkflowConfiguration workflowConfiguration =
-        WorkflowConfigurationBuilder.from(schedule("--date", "{}", "--bar"))
-            .commitSha(COMMIT_SHA)
-            .dockerImage(DOCKER_IMAGE)
-            .build();
-    Workflow workflow = Workflow.create("id", workflowConfiguration);
+    Workflow workflow = Workflow.create("id", schedule("--date", "{}", "--bar"));
     WorkflowState workflowState = WorkflowState.patchEnabled(true);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
     RunState runState = RunState.fresh(workflowInstance, toTest);
@@ -179,12 +173,10 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldHaltIfMissingDockerImage() throws Exception {
-    WorkflowConfiguration workflowConfiguration = WorkflowConfiguration.builder()
-        .id("styx.TestEndpoint")
-        .schedule(HOURS)
-        .commitSha(COMMIT_SHA)
-        .dockerArgs(Arrays.asList("foo", "bar"))
-        .build();
+    WorkflowConfiguration workflowConfiguration =
+        WorkflowConfigurationBuilder.from(schedule("foo", "bar"))
+            .dockerImage(Optional.empty())
+            .build();
     Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
@@ -211,30 +203,6 @@ public class ExecutionDescriptionHandlerTest {
 
     RunState halted = stateManager.get(workflowInstance);
     assertThat(halted, Matchers.is(nullValue()));
-  }
-
-  @Test
-  public void shouldFallbackToDockerImageInScheduleDefinition() throws Exception {
-    WorkflowConfiguration workflowConfiguration = WorkflowConfiguration.builder()
-        .id("styx.TestEndpoint")
-        .schedule(HOURS)
-        .dockerImage("legacy-docker-image")
-        .dockerArgs(ImmutableList.of("foo", "bar"))
-        .build();
-    Workflow workflow = Workflow.create("id", workflowConfiguration);
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
-
-    storage.storeWorkflow(workflow);
-    stateManager.initialize(runState);
-    toTest.transitionInto(runState);
-
-    RunState currentState = stateManager.get(workflowInstance);
-    StateData data = currentState.data();
-
-    assertThat(currentState.state(), is(SUBMITTING));
-    assertTrue(data.executionDescription().isPresent());
-    assertThat(data.executionDescription().get().dockerImage(), is("legacy-docker-image"));
   }
 
   @Test
