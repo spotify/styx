@@ -64,6 +64,8 @@ public interface Stats {
 
   void recordResourceUsed(String resource, long used);
 
+  void recordEventConsumer(SequenceEvent event);
+
   void recordEventConsumerError(SequenceEvent event);
 
   Stats NOOP = new NoopStats();

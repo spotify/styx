@@ -118,6 +118,9 @@ public class MetricsStatsTest {
       .tagged("what", "submission-rate-limit")
       .tagged("unit", "submission/s");
 
+  private static final MetricId EVENT_CONSUMER_RATE = BASE
+      .tagged("what", "event-consumer-rate");
+
   private static final MetricId EVENT_CONSUMER_ERROR_RATE = BASE
       .tagged("what", "event-consumer-error-rate")
       .tagged("unit", "error");
@@ -264,15 +267,6 @@ public class MetricsStatsTest {
   }
 
   @Test
-  public void shouldRecordEventConsumerError() throws Exception {
-    final SequenceEvent event = SequenceEvent
-        .create(Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural()), 0L, 0L);
-    when(registry.meter(EVENT_CONSUMER_ERROR_RATE.tagged("event-type", "triggerExecution"))).thenReturn(meter);
-    stats.recordEventConsumerError(event);
-    verify(meter).mark();
-  }
-
-  @Test
   public void shouldRecordResourceConfigured() throws Exception {
     String resource = "resource";
     when(registry.histogram(RESOURCE_CONFIGURED.tagged("resource", resource))).thenReturn(histogram);
@@ -286,5 +280,23 @@ public class MetricsStatsTest {
     when(registry.histogram(RESOURCE_USED.tagged("resource", resource))).thenReturn(histogram);
     stats.recordResourceUsed(resource, 100L);
     verify(histogram).update(100L);
+  }
+
+  @Test
+  public void shouldRecordEventConsumerError() throws Exception {
+    final SequenceEvent event = SequenceEvent
+        .create(Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural()), 0L, 0L);
+    when(registry.meter(EVENT_CONSUMER_ERROR_RATE.tagged("event-type", "triggerExecution"))).thenReturn(meter);
+    stats.recordEventConsumerError(event);
+    verify(meter).mark();
+  }
+
+  @Test
+  public void shouldRecordEventConsumer() throws Exception {
+    final SequenceEvent event = SequenceEvent
+        .create(Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural()), 0L, 0L);
+    when(registry.meter(EVENT_CONSUMER_RATE.tagged("event-type", "triggerExecution"))).thenReturn(meter);
+    stats.recordEventConsumer(event);
+    verify(meter).mark();
   }
 }

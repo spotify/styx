@@ -113,6 +113,9 @@ public final class MetricsStats implements Stats {
       .tagged("what", "submission-rate-limit")
       .tagged("unit", "submission/s");
 
+  private static final MetricId EVENT_CONSUMER_RATE = BASE
+      .tagged("what", "event-consumer-rate");
+
   private static final MetricId EVENT_CONSUMER_ERROR_RATE = BASE
       .tagged("what", "event-consumer-error-rate")
       .tagged("unit", "error");
@@ -137,6 +140,7 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Histogram> resourceConfiguredHistograms;
   private final ConcurrentMap<String, Histogram> resourceUsedHistograms;
   private final ConcurrentMap<String, Meter> eventConsumerErrorMeters;
+  private final ConcurrentMap<String, Meter> eventConsumerMeters;
 
   public MetricsStats(SemanticMetricRegistry registry) {
     this.registry = Objects.requireNonNull(registry);
@@ -157,6 +161,7 @@ public final class MetricsStats implements Stats {
     this.resourceConfiguredHistograms = new ConcurrentHashMap<>();
     this.resourceUsedHistograms = new ConcurrentHashMap<>();
     this.eventConsumerErrorMeters = new ConcurrentHashMap<>();
+    this.eventConsumerMeters = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -253,6 +258,11 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
+  public void recordEventConsumer(SequenceEvent event) {
+    eventConsumerMeter(event).mark();
+  }
+
+  @Override
   public void recordEventConsumerError(SequenceEvent event) {
     eventConsumerErrorMeter(event).mark();
   }
@@ -303,6 +313,12 @@ public final class MetricsStats implements Stats {
   private Histogram resourceUsedHistogram(String resource) {
     return resourceUsedHistograms.computeIfAbsent(
         resource, (op) -> registry.histogram(RESOURCE_USED.tagged("resource", resource)));
+  }
+
+  private Meter eventConsumerMeter(SequenceEvent sequenceEvent) {
+    final String eventType = EventUtil.name(sequenceEvent.event());
+    return eventConsumerMeters.computeIfAbsent(
+        eventType, (op) -> registry.meter(EVENT_CONSUMER_RATE.tagged("event-type", eventType)));
   }
 
   private Meter eventConsumerErrorMeter(SequenceEvent sequenceEvent) {
