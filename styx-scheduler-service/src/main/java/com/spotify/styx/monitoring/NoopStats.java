@@ -97,6 +97,10 @@ final class NoopStats implements Stats {
   }
 
   @Override
+  public void recordEventConsumer(SequenceEvent event) {
+  }
+
+  @Override
   public void recordEventConsumerError(SequenceEvent event) {
   }
 }
