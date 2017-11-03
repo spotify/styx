@@ -103,7 +103,7 @@ public class StateInitializingTriggerTest {
   }
 
   @Test
-  public void shouldDoNothingIfDockerInfoMissing() throws Exception {
+  public void shouldDoNothingIfDockerImageMissing() throws Exception {
     final WorkflowConfiguration configuration =
         WorkflowConfigurationBuilder.from(TestData.DAILY_WORKFLOW_CONFIGURATION)
             .dockerImage(Optional.empty())
