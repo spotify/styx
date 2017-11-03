@@ -132,7 +132,7 @@ public class SchedulerResource {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing docker image"));
     }
     final Collection<String> errors = dockerImageValidator.validateImageReference(
-      configuration.dockerImage().get());
+        configuration.dockerImage().get());
     if (!errors.isEmpty()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors));
     }
