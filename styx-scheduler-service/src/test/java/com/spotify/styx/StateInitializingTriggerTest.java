@@ -75,6 +75,16 @@ public class StateInitializingTriggerTest {
   }
 
   @Test
+  public void shouldInitializeWorkflowInstanceWithoutDockerArgs() throws Exception {
+    WorkflowConfiguration workflowConfiguration =
+        WorkflowConfigurationBuilder.from(schedule(HOURS)).dockerArgs(Optional.empty()).build();
+    Workflow workflow = Workflow.create("id", workflowConfiguration);
+    trigger.event(workflow, NATURAL_TRIGGER, TIME);
+
+    assertThat(stateManager.activeStatesSize(), is(1));
+  }
+
+  @Test
   public void shouldInjectTriggerExecutionEventWithNaturalTrigger() throws Exception {
     WorkflowConfiguration workflowConfiguration = schedule(HOURS);
     Workflow workflow = Workflow.create("id", workflowConfiguration);
