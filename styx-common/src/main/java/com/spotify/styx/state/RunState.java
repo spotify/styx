@@ -207,7 +207,11 @@ public abstract class RunState {
     public RunState dequeue(WorkflowInstance workflowInstance) {
       switch (state()) {
         case QUEUED:
-          return state(PREPARE);
+          return state(
+              PREPARE,
+              data().builder()
+                  .retryDelayMillis(empty())
+                  .build());
 
         default:
           throw illegalTransition("dequeue");
@@ -357,6 +361,8 @@ public abstract class RunState {
               QUEUED,
               data().builder()
                   .retryDelayMillis(delayMillis)
+                  .executionId(empty())
+                  .executionDescription(empty())
                   .build());
 
         default:
