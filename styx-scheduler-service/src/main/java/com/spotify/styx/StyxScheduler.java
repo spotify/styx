@@ -107,6 +107,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -146,7 +147,7 @@ public class StyxScheduler implements AppInit {
   public interface ScheduleSources extends Supplier<Iterable<ScheduleSourceFactory>> { }
   public interface StatsFactory extends Function<Environment, Stats> { }
   public interface PublisherFactory extends Function<Environment, Publisher> { }
-  public interface EventConsumerFactory extends BiFunction<Environment, Stats, Consumer<SequenceEvent>> { }
+  public interface EventConsumerFactory extends BiFunction<Environment, Stats, BiConsumer<SequenceEvent, RunState>> { }
 
   @FunctionalInterface
   interface DockerRunnerFactory {
@@ -177,7 +178,7 @@ public class StyxScheduler implements AppInit {
     private PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
     private RetryUtil retryUtil = DEFAULT_RETRY_UTIL;
     private WorkflowResourceDecorator resourceDecorator = WorkflowResourceDecorator.NOOP;
-    private EventConsumerFactory eventConsumerFactory = (env, stats) -> (event) -> { };
+    private EventConsumerFactory eventConsumerFactory = (env, stats) -> (event, state) -> { };
 
     public Builder setTime(Time time) {
       this.time = time;

@@ -91,7 +91,7 @@ public class StyxSchedulerServiceFixture {
   // circumstantial fields, set by test cases
   private Instant now = Instant.parse("1970-01-01T00:00:00Z");
   private List<Workflow> workflows = Lists.newArrayList();
-  private List<SequenceEvent> transitionedEvents = Lists.newArrayList();
+  private List<Tuple2<SequenceEvent, RunState.State>> transitionedEvents = Lists.newArrayList();
 
   // captured fields from fakes
   List<Tuple2<WorkflowInstance, DockerRunner.RunSpec>> dockerRuns = Lists.newArrayList();
@@ -130,7 +130,8 @@ public class StyxSchedulerServiceFixture {
     StyxScheduler.DockerRunnerFactory dockerRunnerFactory =
         (id, env, states, exec, stats, debug) -> fakeDockerRunner();
     StyxScheduler.EventConsumerFactory eventConsumerFactory =
-        (env, stats) -> (event) -> transitionedEvents.add(event);
+        (env, stats) -> (event, state) ->  transitionedEvents.add(Tuple.of(event, state.state()));
+
 
     styxScheduler = StyxScheduler.newBuilder()
         .setTime(time)
@@ -310,8 +311,9 @@ public class StyxSchedulerServiceFixture {
     await().atMost(30, SECONDS).until(() -> getState(workflowInstance) == null);
   }
 
-  void awaitUntilConsumedEvent(SequenceEvent sequenceEvent) {
-    await().atMost(30, SECONDS).until(() -> transitionedEvents.contains(sequenceEvent));
+  void awaitUntilConsumedEvent(SequenceEvent sequenceEvent, RunState.State state) {
+    await().atMost(30, SECONDS).until(() ->
+        transitionedEvents.contains(Tuple.of(sequenceEvent, state)));
   }
 
   private void printTime() {
