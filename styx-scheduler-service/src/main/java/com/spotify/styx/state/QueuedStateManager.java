@@ -46,7 +46,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,7 +75,7 @@ public class QueuedStateManager implements StateManager {
   private final Time time;
   private final Executor outputHandlerExecutor;
   private final Storage storage;
-  private final Consumer<SequenceEvent> eventConsumer;
+  private final BiConsumer<SequenceEvent, RunState> eventConsumer;
   private final Executor eventConsumerExecutor;
 
   private final ConcurrentMap<WorkflowInstance, InstanceState> states = Maps.newConcurrentMap();
@@ -90,7 +90,7 @@ public class QueuedStateManager implements StateManager {
       Time time,
       Executor outputHandlerExecutor,
       Storage storage,
-      Consumer<SequenceEvent> eventConsumer,
+      BiConsumer<SequenceEvent, RunState> eventConsumer,
       Executor eventConsumerExecutor) {
     this.time = Objects.requireNonNull(time);
     this.outputHandlerExecutor = Objects.requireNonNull(outputHandlerExecutor);
@@ -299,7 +299,7 @@ public class QueuedStateManager implements StateManager {
     }
 
     try {
-      eventConsumerExecutor.execute(() -> eventConsumer.accept(sequenceEvent));
+      eventConsumerExecutor.execute(() -> eventConsumer.accept(sequenceEvent, state));
     } catch (Exception e) {
       LOG.warn("Error while consuming event {}", sequenceEvent, e);
     }

@@ -49,6 +49,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
 import org.junit.After;
@@ -66,7 +67,7 @@ public class QueuedStateManagerTest {
   private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
   private static final Trigger TRIGGER2 = Trigger.unknown("trig2");
   private static final Trigger TRIGGER3 = Trigger.unknown("trig3");
-  private static final Consumer<SequenceEvent> eventConsumer = (e) -> {};
+  private static final BiConsumer<SequenceEvent, RunState> eventConsumer = (e, s) -> {};
 
   private static final ExecutorService POOL1 = Executors.newFixedThreadPool(16);
   private static final Executor POOL2 = Executors.newSingleThreadExecutor();

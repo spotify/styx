@@ -165,7 +165,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @Test
-  public void shouldEnqueuEventsForConsumption() throws Exception {
+  public void shouldConsumeEvent() throws Exception {
     Workflow customWorkflow = Workflow.create(
         "styx",
         WorkflowConfiguration.builder()
@@ -192,7 +192,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
             0,
             Instant.parse("2016-03-14T15:30:00Z").toEpochMilli());
 
-    awaitUntilConsumedEvent(expectedEvent);
+    awaitUntilConsumedEvent(expectedEvent, RunState.State.QUEUED);
   }
 
   @Test
