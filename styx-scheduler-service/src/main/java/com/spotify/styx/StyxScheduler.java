@@ -55,7 +55,6 @@ import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.api.Api;
 import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
-import com.spotify.styx.docker.WorkflowValidator;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
@@ -337,7 +336,7 @@ public class StyxScheduler implements AppInit {
         (workflowInstance) -> RunState.fresh(workflowInstance, time, outputHandlers);
 
     final TriggerListener trigger =
-        new StateInitializingTrigger(stateFactory, stateManager, storage);
+        new StateInitializingTrigger(stateFactory, stateManager);
     final TriggerManager triggerManager = new TriggerManager(trigger, time, storage, stats);
     final BackfillTriggerManager backfillTriggerManager =
         new BackfillTriggerManager(stateManager, workflowCache, storage, trigger);
@@ -520,23 +519,23 @@ public class StyxScheduler implements AppInit {
     stats.registerWorkflowCountMetric("all", () -> (long) workflowCache.all().size());
 
     stats.registerWorkflowCountMetric("configured", () -> workflowCache.all().stream()
-        .filter(WorkflowValidator::hasDockerConfiguration)
+        .filter(workflow -> workflow.configuration().dockerImage().isPresent())
         .count());
 
     final Supplier<Gauge<Long>> configuredEnabledWorkflowsCountGaugeSupplier = () -> {
       final Supplier<Set<WorkflowId>> enabledWorkflowSupplier =
           new CachedSupplier<>(storage::enabled, Instant::now);
       return () -> workflowCache.all().stream()
-          .filter(WorkflowValidator::hasDockerConfiguration)
-          .filter((workflow) -> enabledWorkflowSupplier.get().contains(WorkflowId.ofWorkflow(workflow)))
+          .filter(workflow -> workflow.configuration().dockerImage().isPresent())
+          .filter(workflow -> enabledWorkflowSupplier.get().contains(WorkflowId.ofWorkflow(workflow)))
           .count();
     };
     stats.registerWorkflowCountMetric("enabled", configuredEnabledWorkflowsCountGaugeSupplier.get());
 
     stats.registerWorkflowCountMetric("docker_termination_logging_enabled", () ->
         workflowCache.all().stream()
-            .filter(WorkflowValidator::hasDockerConfiguration)
-            .filter((workflow) -> workflow.configuration().dockerTerminationLogging())
+            .filter(workflow -> workflow.configuration().dockerImage().isPresent())
+            .filter(workflow -> workflow.configuration().dockerTerminationLogging())
             .count());
 
     Arrays.stream(RunState.State.values()).forEach(state -> {

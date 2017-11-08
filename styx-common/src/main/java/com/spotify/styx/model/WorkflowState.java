@@ -38,12 +38,6 @@ public abstract class WorkflowState {
   public abstract Optional<Boolean> enabled();
 
   @JsonProperty
-  public abstract Optional<String> dockerImage();
-
-  @JsonProperty
-  public abstract Optional<String> commitSha();
-
-  @JsonProperty
   public abstract Optional<Instant> nextNaturalTrigger();
 
   @JsonProperty
@@ -59,8 +53,6 @@ public abstract class WorkflowState {
   public abstract static class Builder {
 
     public abstract Builder enabled(boolean enabled);
-    public abstract Builder dockerImage(String dockerImage);
-    public abstract Builder commitSha(String commitSha);
     public abstract Builder nextNaturalTrigger(Instant nextNaturalTrigger);
     public abstract Builder nextNaturalOffsetTrigger(Instant nextNaturalOffsetTrigger);
 
@@ -70,29 +62,17 @@ public abstract class WorkflowState {
   @JsonCreator
   public static WorkflowState create(
       @JsonProperty("enabled") Optional<Boolean> enabled,
-      @JsonProperty("docker_image") Optional<String> dockerImage,
-      @JsonProperty("commit_sha") Optional<String> commitSha,
       @JsonProperty("next_natural_trigger") Optional<Instant> nextNaturalTrigger,
       @JsonProperty("next_natural_offset_trigger") Optional<Instant> nextNaturalOffsetTrigger) {
     Builder builder = builder();
     enabled.ifPresent(builder::enabled);
-    dockerImage.ifPresent(builder::dockerImage);
-    commitSha.ifPresent(builder::commitSha);
     nextNaturalTrigger.ifPresent(builder::nextNaturalTrigger);
     nextNaturalOffsetTrigger.ifPresent(builder::nextNaturalOffsetTrigger);
     return builder.build();
   }
 
-  public static WorkflowState all(boolean enabled, String dockerImage, String commitSha) {
-    return builder().enabled(enabled).dockerImage(dockerImage).commitSha(commitSha).build();
-  }
-
   public static WorkflowState empty() {
     return builder().build();
-  }
-
-  public static WorkflowState patchDockerImage(String dockerImage) {
-    return builder().dockerImage(dockerImage).build();
   }
 
   public static WorkflowState patchEnabled(boolean enabled) {

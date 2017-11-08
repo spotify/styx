@@ -25,6 +25,7 @@ import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.util.StreamUtil.cat;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Client;
@@ -125,6 +126,7 @@ public final class WorkflowResource {
 
   private CompletionStage<Response<ByteString>> createOrUpdateWorkflow(String componentId,
                                                                        RequestContext rc) {
+    // TODO: handle validation in one place, see SchedulerResource.java
     final Optional<ByteString> payload = rc.request().payload();
     if (!payload.isPresent()) {
       return CompletableFuture.completedFuture(
@@ -181,17 +183,15 @@ public final class WorkflowResource {
     final WorkflowId workflowId = WorkflowId.create(componentId, id);
     final WorkflowState patchState;
     try {
+      final JsonNode json = OBJECT_MAPPER.readTree(payload.get().toByteArray());
+      if (json.has("commit_sha") || json.has("docker_image")) {
+        // TODO: remove this when nobody is doing PATCH with these fields (added 2017-11-08)
+        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(
+            "Invalid payload: commit_sha and docker_image not allowed."));
+      }
       patchState = OBJECT_MAPPER.readValue(payload.get().toByteArray(), WorkflowState.class);
     } catch (IOException e) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid payload."));
-    }
-
-    if (patchState.dockerImage().isPresent()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("docker_image not allowed"));
-    }
-
-    if (patchState.commitSha().isPresent()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("commit_sha not allowed"));
     }
 
     try {

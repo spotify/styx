@@ -38,9 +38,9 @@ import java.util.List;
 import org.junit.Test;
 
 /**
- * Tests the InMemoryStorage that is used for testing.
+ * Tests the InMemStorage that is used for testing.
  */
-public class InMemoryStorageTest {
+public class InMemStorageTest {
 
   private static final WorkflowId WORKFLOW_ID1 = WorkflowId.create("component", "endpoint1");
   private static final WorkflowId WORKFLOW_ID2 = WorkflowId.create("component", "endpoint2");

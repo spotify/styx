@@ -194,11 +194,6 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
-    return datastoreStorage.getDockerImage(workflowId);
-  }
-
-  @Override
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
     return datastoreStorage.workflowState(workflowId);
   }

@@ -56,13 +56,9 @@ public class InMemStorage implements Storage {
   private Optional<Long> globalConcurrency = Optional.empty();
   private Optional<Double> submissionRate = Optional.empty();
   private final Set<WorkflowId> enabledWorkflows = Sets.newConcurrentHashSet();
-  private final Set<String> components = Sets.newConcurrentHashSet();
   private final ConcurrentMap<WorkflowId, Workflow> workflowStore = Maps.newConcurrentMap();
   private final ConcurrentMap<String, Resource> resourceStore = Maps.newConcurrentMap();
   private final ConcurrentMap<String, Backfill> backfillStore = Maps.newConcurrentMap();
-  private final ConcurrentMap<WorkflowId, String> dockerImagesPerWorkflowId = Maps
-      .newConcurrentMap();
-  private final ConcurrentMap<String, String> dockerImagesPerComponent = Maps.newConcurrentMap();
   private final ConcurrentMap<WorkflowId, WorkflowState> workflowStatePerWorkflowId = Maps
       .newConcurrentMap();
 
@@ -109,7 +105,12 @@ public class InMemStorage implements Storage {
   @Override
   public void storeWorkflow(Workflow workflow) throws IOException {
     workflowStore.put(workflow.id(), workflow);
-    components.add(workflow.id().componentId());
+
+    WorkflowState originalState = Optional.ofNullable(
+        workflowStatePerWorkflowId.get(workflow.id())
+    ).orElse(WorkflowState.patchEnabled(false));
+
+    workflowStatePerWorkflowId.put(workflow.id(), originalState);
   }
 
   @Override
@@ -196,33 +197,16 @@ public class InMemStorage implements Storage {
       }
     });
 
-    patchState.dockerImage().ifPresent(image -> dockerImagesPerWorkflowId.put(workflowId, image));
     Optional<WorkflowState> originalState = Optional.of(
         workflowStatePerWorkflowId.getOrDefault(workflowId, patchState));
-    workflowStatePerWorkflowId
-        .put(workflowId, WorkflowStateUtil.patchWorkflowState(originalState, patchState));
-  }
-
-  @Override
-  public Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
-    if (dockerImagesPerWorkflowId.containsKey(workflowId)) {
-      return Optional.of(dockerImagesPerWorkflowId.get(workflowId));
-    }
-
-    if (dockerImagesPerComponent.containsKey(workflowId.componentId())) {
-      return Optional.of(dockerImagesPerComponent.get(workflowId.componentId()));
-    }
-
-    return Optional.ofNullable(workflowStore.get(workflowId))
-        .flatMap(w -> w.configuration().dockerImage());
+    final WorkflowState patchWorkflowState =
+        WorkflowStateUtil.patchWorkflowState(originalState, patchState);
+    workflowStatePerWorkflowId.put(workflowId, patchWorkflowState);
   }
 
   @Override
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
-    return
-        workflowStatePerWorkflowId.getOrDefault(
-            workflowId,
-            WorkflowState.patchEnabled(false));
+    return workflowStatePerWorkflowId.get(workflowId);
   }
 
   @Override

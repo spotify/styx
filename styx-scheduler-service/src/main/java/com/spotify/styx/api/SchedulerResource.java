@@ -37,7 +37,6 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
@@ -114,10 +113,9 @@ public class SchedulerResource {
   }
 
   private Response<ByteString> deleteWorkflow(String cid, String wfid) {
-    WorkflowId workflowId = WorkflowId.create(cid, wfid);
-    Optional<Workflow> workflowOpt = null;
+    final Optional<Workflow> workflowOpt;
     try {
-      workflowOpt = storage.workflow(workflowId);
+      workflowOpt = storage.workflow(WorkflowId.create(cid, wfid));
     } catch (IOException e) {
       return Response
           .forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Error in internal storage"));
@@ -130,12 +128,13 @@ public class SchedulerResource {
   }
 
   private Response<Workflow> createOrUpdateWorkflow(String componentId, WorkflowConfiguration configuration) {
-    if (configuration.dockerImage().isPresent()) {
-      final Collection<String> errors = dockerImageValidator.validateImageReference(
-          configuration.dockerImage().get());
-      if (!errors.isEmpty()) {
-        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors));
-      }
+    if (!configuration.dockerImage().isPresent()) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing docker image"));
+    }
+    final Collection<String> errors = dockerImageValidator.validateImageReference(
+        configuration.dockerImage().get());
+    if (!errors.isEmpty()) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors));
     }
 
     if (configuration.commitSha().isPresent()
@@ -145,17 +144,6 @@ public class SchedulerResource {
 
     final Workflow workflow = Workflow.create(componentId, configuration);
     workflowChangeListener.accept(workflow);
-
-    final WorkflowState.Builder builder = WorkflowState.builder();
-    configuration.dockerImage().ifPresent(builder::dockerImage);
-    configuration.commitSha().ifPresent(builder::commitSha);
-    final WorkflowState workflowState = builder.build();
-
-    try {
-      storage.patchState(workflow.id(), workflowState);
-    } catch (IOException e) {
-      return Response.forStatus(INTERNAL_SERVER_ERROR.withReasonPhrase("could not store workflow state"));
-    }
 
     return Response.forPayload(workflow);
   }

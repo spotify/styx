@@ -89,12 +89,10 @@ class DatastoreStorage {
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
   public static final String PROPERTY_NEXT_NATURAL_TRIGGER = "nextNaturalTrigger";
   public static final String PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER = "nextNaturalOffsetTrigger";
-  public static final String PROPERTY_DOCKER_IMAGE = "dockerImage";
   public static final String PROPERTY_COUNTER = "counter";
   public static final String PROPERTY_COMPONENT = "component";
   public static final String PROPERTY_WORKFLOW = "workflow";
   public static final String PROPERTY_PARAMETER = "parameter";
-  public static final String PROPERTY_COMMIT_SHA = "commitSha";
   public static final String PROPERTY_CONCURRENCY = "concurrency";
   public static final String PROPERTY_START = "start";
   public static final String PROPERTY_END = "end";
@@ -202,14 +200,12 @@ class DatastoreStorage {
 
   void store(Workflow workflow) throws IOException {
     storeWithRetries(() -> datastore.runInTransaction(transaction -> {
-      final String json = OBJECT_MAPPER.writeValueAsString(workflow);
       final Key componentKey = componentKeyFactory.newKey(workflow.componentId());
-
-      final Entity retrievedComponent = transaction.get(componentKey);
-      if (retrievedComponent == null) {
+      if (transaction.get(componentKey) == null) {
         transaction.put(Entity.newBuilder(componentKey).build());
       }
 
+      final String json = OBJECT_MAPPER.writeValueAsString(workflow);
       final Key workflowKey = workflowKey(workflow.id());
       final Optional<Entity> workflowOpt = getOpt(transaction, workflowKey);
       final Entity workflowEntity = asBuilderOrNew(workflowOpt, workflowKey)
@@ -221,8 +217,7 @@ class DatastoreStorage {
   }
 
   Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
-    final Key workflowKey = workflowKey(workflowId);
-    return getOpt(datastore, workflowKey)
+    return getOpt(datastore, workflowKey(workflowId))
         .filter(e -> e.contains(PROPERTY_WORKFLOW_JSON))
         .map(e -> parseWorkflowJson(e, workflowId));
   }
@@ -416,32 +411,12 @@ class DatastoreStorage {
 
       final Entity.Builder builder = Entity.newBuilder(workflowOpt.get());
       state.enabled().ifPresent(x -> builder.set(PROPERTY_WORKFLOW_ENABLED, x));
-      state.dockerImage().ifPresent(x -> builder.set(PROPERTY_DOCKER_IMAGE, x));
-      state.commitSha().ifPresent(x -> builder.set(PROPERTY_COMMIT_SHA, x));
       state.nextNaturalTrigger()
           .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToTimestamp(x)));
       state.nextNaturalOffsetTrigger()
           .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, instantToTimestamp(x)));
       return transaction.put(builder.build());
     }));
-  }
-
-  Optional<String> getDockerImage(WorkflowId workflowId) throws IOException {
-    final Optional<Entity> workflowEntity = getOpt(datastore, workflowKey(workflowId));
-    Optional<String> dockerImage = getOptStringProperty(workflowEntity, PROPERTY_DOCKER_IMAGE);
-    if (dockerImage.isPresent()) {
-      return dockerImage;
-    }
-
-    dockerImage = getOptStringProperty(datastore,
-                                       componentKeyFactory.newKey(workflowId.componentId()),
-                                       PROPERTY_DOCKER_IMAGE);
-    if (dockerImage.isPresent()) {
-      return dockerImage;
-    }
-
-    return workflowEntity.map(w -> parseWorkflowJson(w, workflowId))
-        .flatMap(wf -> wf.configuration().dockerImage());
   }
 
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
@@ -455,28 +430,6 @@ class DatastoreStorage {
         .ifPresent(builder::nextNaturalTrigger);
     getOptInstantProperty(workflowEntity, PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER)
         .ifPresent(builder::nextNaturalOffsetTrigger);
-
-    Optional<String> dockerImage = getOptStringProperty(workflowEntity, PROPERTY_DOCKER_IMAGE);
-    Optional<String> commitSha = getOptStringProperty(workflowEntity, PROPERTY_COMMIT_SHA);
-
-    if (!dockerImage.isPresent() || !commitSha.isPresent()) {
-      final Optional<Entity> componentEntity =
-          getOpt(datastore, componentKeyFactory.newKey(workflowId.componentId()));
-
-      if (!dockerImage.isPresent()) {
-        dockerImage = getOptStringProperty(componentEntity, PROPERTY_DOCKER_IMAGE);
-        if (!dockerImage.isPresent()) {
-          dockerImage = workflowEntity.map(w -> parseWorkflowJson(w, workflowId))
-              .flatMap(wf -> wf.configuration().dockerImage());
-        }
-      }
-
-      if (!commitSha.isPresent()) {
-        commitSha = getOptStringProperty(componentEntity, PROPERTY_COMMIT_SHA);
-      }
-    }
-    dockerImage.ifPresent(builder::dockerImage);
-    commitSha.ifPresent(builder::commitSha);
 
     return builder.build();
   }
@@ -561,36 +514,11 @@ class DatastoreStorage {
   }
 
   /**
-   * Optionally get a string value for an {@link Entity}'s property from a {@link DatastoreReader}.
-   *
-   * @return an optional containing the property value if it existed, empty otherwise.
-   */
-  private Optional<String> getOptStringProperty(DatastoreReader datastoreReader, Key key,
-                                                String property) {
-    return getOpt(datastoreReader, key)
-        .filter(e -> e.contains(property))
-        .map(e -> e.getString(property));
-  }
-
-  /**
-   * Optionally get a string value for an {@link Entity}'s property.
-   *
-   * @return an optional containing the property value if it existed, empty otherwise.
-   */
-  private Optional<String> getOptStringProperty(Optional<Entity> entity,
-                                                String property) {
-    return entity
-        .filter(e -> e.contains(property))
-        .map(e -> e.getString(property));
-  }
-
-  /**
    * Optionally get an {@link Instant} value for an {@link Entity}'s property.
    *
    * @return an optional containing the property value if it existed, empty otherwise.
    */
-  private Optional<Instant> getOptInstantProperty(Optional<Entity> entity,
-                                                String property) {
+  private Optional<Instant> getOptInstantProperty(Optional<Entity> entity, String property) {
     return entity
         .filter(w -> w.contains(property))
         .map(workflow -> timestampToInstant(workflow.getTimestamp(property)));

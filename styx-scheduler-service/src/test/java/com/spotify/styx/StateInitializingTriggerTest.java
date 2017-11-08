@@ -28,8 +28,6 @@ import static com.spotify.styx.model.Schedule.WEEKS;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -37,17 +35,16 @@ import com.google.common.collect.Sets;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
-import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.Trigger;
-import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.TriggerUtil;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.Test;
 
 public class StateInitializingTriggerTest {
@@ -65,15 +62,23 @@ public class StateInitializingTriggerTest {
       );
 
   private SyncStateManager stateManager = new SyncStateManager();
-  private Storage storage = mock(Storage.class);
   private TriggerListener
-      trigger = new StateInitializingTrigger(RunState::fresh, stateManager, storage);
+      trigger = new StateInitializingTrigger(RunState::fresh, stateManager);
 
   @Test
   public void shouldInitializeWorkflowInstance() throws Exception {
     WorkflowConfiguration workflowConfiguration = schedule(HOURS);
     Workflow workflow = Workflow.create("id", workflowConfiguration);
-    setDockerImage(workflow.id(), workflow.configuration());
+    trigger.event(workflow, NATURAL_TRIGGER, TIME);
+
+    assertThat(stateManager.activeStatesSize(), is(1));
+  }
+
+  @Test
+  public void shouldInitializeWorkflowInstanceWithoutDockerArgs() throws Exception {
+    WorkflowConfiguration workflowConfiguration =
+        WorkflowConfigurationBuilder.from(schedule(HOURS)).dockerArgs(Optional.empty()).build();
+    Workflow workflow = Workflow.create("id", workflowConfiguration);
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
     assertThat(stateManager.activeStatesSize(), is(1));
@@ -83,7 +88,6 @@ public class StateInitializingTriggerTest {
   public void shouldInjectTriggerExecutionEventWithNaturalTrigger() throws Exception {
     WorkflowConfiguration workflowConfiguration = schedule(HOURS);
     Workflow workflow = Workflow.create("id", workflowConfiguration);
-    setDockerImage(workflow.id(), workflow.configuration());
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
     WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(), "2016-01-18T09");
@@ -98,7 +102,6 @@ public class StateInitializingTriggerTest {
   public void shouldInjectTriggerExecutionEventWithBackfillTrigger() throws Exception {
     WorkflowConfiguration workflowConfiguration = schedule(HOURS);
     Workflow workflow = Workflow.create("id", workflowConfiguration);
-    setDockerImage(workflow.id(), workflow.configuration());
     trigger.event(workflow, BACKFILL_TRIGGER, TIME);
 
     WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(), "2016-01-18T09");
@@ -110,9 +113,12 @@ public class StateInitializingTriggerTest {
   }
 
   @Test
-  public void shouldDoNothingIfDockerInfoMissing() throws Exception {
-    Workflow workflow = Workflow.create("id", TestData.DAILY_WORKFLOW_CONFIGURATION);
-    setDockerImage(workflow.id(), workflow.configuration());
+  public void shouldDoNothingIfDockerImageMissing() throws Exception {
+    final WorkflowConfiguration configuration =
+        WorkflowConfigurationBuilder.from(TestData.DAILY_WORKFLOW_CONFIGURATION)
+            .dockerImage(Optional.empty())
+            .build();
+    Workflow workflow = Workflow.create("id", configuration);
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
     assertThat(stateManager.activeStatesSize(), is(0));
@@ -124,7 +130,6 @@ public class StateInitializingTriggerTest {
       WorkflowConfiguration
           workflowConfiguration = schedule(scheduleCase.getKey(), "--date", "{}", "--bar");
       Workflow workflow = Workflow.create("id", workflowConfiguration);
-      setDockerImage(workflow.id(), workflow.configuration());
       trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
       RunState runState =
@@ -147,10 +152,5 @@ public class StateInitializingTriggerTest {
         .dockerImage("busybox")
         .dockerArgs(ImmutableList.copyOf(args))
         .build();
-  }
-
-  // todo: do not use deprecated getDockerImage method
-  private void setDockerImage(WorkflowId workflowId, WorkflowConfiguration workflowConfiguration) throws IOException {
-    when(storage.getDockerImage(workflowId)).thenReturn(workflowConfiguration.dockerImage());
   }
 }
