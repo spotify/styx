@@ -24,7 +24,6 @@ import static com.spotify.styx.util.FutureUtil.exceptionallyCompletedFuture;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 
 import com.spotify.styx.StyxScheduler.StateFactory;
-import com.spotify.styx.docker.WorkflowValidator;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
@@ -56,8 +55,8 @@ final class StateInitializingTrigger implements TriggerListener {
 
   @Override
   public CompletionStage<Void> event(Workflow workflow, Trigger trigger, Instant instant) {
-    if (!WorkflowValidator.hasDockerConfiguration(workflow)) {
-      LOG.warn("{} has no docker image or args info, skipping", workflow.id());
+    if (!workflow.configuration().dockerImage().isPresent()) {
+      LOG.warn("{} has no docker image, skipping", workflow.id());
       return CompletableFuture.completedFuture(null);
     }
 
