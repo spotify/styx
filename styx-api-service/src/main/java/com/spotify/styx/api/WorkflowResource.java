@@ -125,6 +125,7 @@ public final class WorkflowResource {
 
   private CompletionStage<Response<ByteString>> createOrUpdateWorkflow(String componentId,
                                                                        RequestContext rc) {
+    // TODO: handle validation in one place, see SchedulerResource.java
     final Optional<ByteString> payload = rc.request().payload();
     if (!payload.isPresent()) {
       return CompletableFuture.completedFuture(
