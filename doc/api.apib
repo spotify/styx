@@ -526,13 +526,82 @@ Workflow Instance belonging to a Backfill entity.
             }
         }
 
-## Backfill [/{version}/backfills/{backfill_id}]
+## Backfill [/{version}/backfills/{backfill_id}{?status}]
 
 + Parameters
     + version: `v3` (enum[string]) - API version
         + Members
             + `v3`
     + backfill_id: `backfill-1489054446085-52684` (string) - Backfill ID
+
+### Get Backfill [GET]
+
++ Parameters
+    + status: `true` (optional, boolean) - If to return the status list per backfill
+      + Default: true
+
++ Response 200 (application/json)
+
+        {
+            "backfill": {
+                "all_triggered": true,
+                "concurrency": 10,
+                "end": "2017-01-01T01:00:00Z",
+                "halted": false,
+                "id": "backfill-1489054446085-53384",
+                "next_trigger": "2017-01-01T01:00:00Z",
+                "schedule": "hours",
+                "start": "2017-01-01T00:00:00Z",
+                "workflow_id": {
+                    "component_id": "styx-canary",
+                    "id": "StyxCanary"
+                }
+            },
+            "statuses": {
+                "active_states": [{
+                    "state": "DONE",
+                    "workflow_instance": {
+                        "parameter": "2017-01-01T00",
+                        "workflow_id": {
+                            "component_id": "styx-canary",
+                            "id": "StyxCanary"
+                        }
+                    },
+                    "state_data": {
+                        "consecutive_failures": 0,
+                        "execution_description": {
+                            "commit_sha": "f043333085fa87738ac24f04d64fb58ecc845111",
+                            "docker_args": [
+                                "luigi",
+                                "--module",
+                                "canary_job",
+                                "CanaryJob"
+                            ],
+                            "docker_image": "styx-canary-dummy:dummy",
+                            "docker_termination_logging": false,
+                            "secret": null
+                        },
+                        "execution_id": "styx-run-6b1962c6-23ba-4245-a13b-ec3baa4b2133",
+                        "last_exit": 0,
+                        "messages": [
+                            {
+                                "level": "INFO",
+                                "line": "Exit code: 0"
+                            }
+                        ],
+                        "retry_cost": 0.0,
+                        "retry_delay_millis": null,
+                        "tries": 1,
+                        "trigger": {
+                            "@type": "backfill",
+                            "trigger_id": "backfill-1489054446085-53384"
+                        },
+                        "trigger_id": "backfill-1489054446085-53384"
+                    }
+                }]
+            }
+        }
+
 
 ### Modify Backfill [PUT]
 

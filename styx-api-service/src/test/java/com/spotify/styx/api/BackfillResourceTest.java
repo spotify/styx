@@ -304,7 +304,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldGetBackfillStatus() throws Exception {
+  public void shouldGetBackfillStatusWithStatusByDefault() throws Exception {
     sinceVersion(Api.Version.V3);
 
     WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
@@ -326,6 +326,30 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertJson(response, "statuses.active_states[2].state", equalTo("WAITING"));
     assertJson(response, "statuses.active_states[23].state", equalTo("WAITING"));
     assertJson(response, "statuses.active_states", hasSize(24));
+  }
+
+  @Test
+  public void shouldGetBackfillWithoutStatus() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    storage.storeBackfill(BACKFILL_1.builder().nextTrigger(Instant.parse("2017-01-01T02:00:00Z")).build());
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/" + BACKFILL_1.id() + "?status=false")));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfill.id", equalTo(BACKFILL_1.id()));
+    assertNoJson(response, "statuses");
+  }
+
+  @Test
+  public void shouldReturnNotFoundForMissingBackfill() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/missing-id?status=false")));
+
+    assertThat(response.status(), is(Status.NOT_FOUND));
   }
 
   @Test

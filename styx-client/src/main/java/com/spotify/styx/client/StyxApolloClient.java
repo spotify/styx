@@ -312,7 +312,7 @@ class StyxApolloClient implements StyxClient {
 
   @Override
   public CompletionStage<Backfill> backfillEditConcurrency(String backfillId, int concurrency) {
-    return backfill(backfillId).thenCompose(backfillPayload -> {
+    return backfill(backfillId, false).thenCompose(backfillPayload -> {
       final Backfill editedBackfill = backfillPayload.backfill().builder()
           .concurrency(concurrency)
           .build();
@@ -339,10 +339,11 @@ class StyxApolloClient implements StyxClient {
   }
 
   @Override
-  public CompletionStage<BackfillPayload> backfill(String backfillId) {
+  public CompletionStage<BackfillPayload> backfill(String backfillId, boolean includeStatus) {
     final HttpUrl.Builder urlBuilder = getUrlBuilder()
         .addPathSegment("backfills")
         .addPathSegment(backfillId);
+    urlBuilder.addQueryParameter("status", Boolean.toString(includeStatus));
     return executeRequest(Request.forUri(urlBuilder.build().toString()), BackfillPayload.class);
   }
 
@@ -350,12 +351,12 @@ class StyxApolloClient implements StyxClient {
   public CompletionStage<BackfillsPayload> backfillList(Optional<String> componentId,
                                                         Optional<String> workflowId,
                                                         boolean showAll,
-                                                        boolean status) {
+                                                        boolean includeStatus) {
     final HttpUrl.Builder urlBuilder = getUrlBuilder().addPathSegment("backfills");
     componentId.ifPresent(c -> urlBuilder.addQueryParameter("component", c));
     workflowId.ifPresent(w -> urlBuilder.addQueryParameter("workflow", w));
     urlBuilder.addQueryParameter("showAll", Boolean.toString(showAll));
-    urlBuilder.addQueryParameter("status", Boolean.toString(status));
+    urlBuilder.addQueryParameter("status", Boolean.toString(includeStatus));
     return executeRequest(Request.forUri(urlBuilder.build().toString()), BackfillsPayload.class);
   }
 
