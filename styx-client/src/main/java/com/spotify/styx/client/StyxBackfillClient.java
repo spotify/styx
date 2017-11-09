@@ -67,24 +67,24 @@ public interface StyxBackfillClient {
   /**
    * Get an existing {@link Backfill}
    *
-   * @param backfillId backfill id
-   * @param status     if to include status info for the {@link Backfill}
+   * @param backfillId    backfill id
+   * @param includeStatus if to include status info for the {@link Backfill}
    * @return The required {@link Backfill}
    */
-  CompletionStage<BackfillPayload> backfill(final String backfillId, boolean status);
+  CompletionStage<BackfillPayload> backfill(final String backfillId, boolean includeStatus);
 
   /**
    * List of existing {@link Backfill}s
    *
-   * @param componentId componentId id to filter on
-   * @param workflowId  componentId id to filter on
-   * @param showAll     if to include also inactive {@link Backfill}s
-   * @param status      if to include status info for the {@link Backfill}s
+   * @param componentId   componentId id to filter on
+   * @param workflowId    componentId id to filter on
+   * @param showAll       if to include also inactive {@link Backfill}s
+   * @param includeStatus if to include status info for the {@link Backfill}s
    * @return The required list of {@link Backfill}s, according to the applied filters/options
    */
   CompletionStage<BackfillsPayload> backfillList(final Optional<String> componentId,
                                                  final Optional<String> workflowId,
                                                  final boolean showAll,
-                                                 final boolean status);
+                                                 final boolean includeStatus);
 
 }
