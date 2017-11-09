@@ -518,19 +518,19 @@ class KubernetesDockerRunner implements DockerRunner {
 
     final RunState runState = stateManager.get(workflowInstance);
     if (runState == null) {
-      LOG.warn("Pod event for unknown or inactive workflow instance {}", workflowInstance);
+      LOG.debug("Pod event for unknown or inactive workflow instance {}", workflowInstance);
       return Optional.empty();
     }
 
     final Optional<String> executionIdOpt = runState.data().executionId();
     if (!executionIdOpt.isPresent()) {
-      LOG.warn("Pod event for state with no current executionId: {}", podName);
+      LOG.debug("Pod event for state with no current executionId: {}", podName);
       return Optional.empty();
     }
 
     final String executionId = executionIdOpt.get();
     if (!podName.equals(executionId)) {
-      LOG.warn("Pod event not matching current exec id, current:{} != pod:{}",
+      LOG.debug("Pod event not matching current exec id, current:{} != pod:{}",
           executionId, podName);
       return Optional.empty();
     }
