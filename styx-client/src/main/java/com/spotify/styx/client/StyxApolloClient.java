@@ -312,7 +312,7 @@ class StyxApolloClient implements StyxClient {
 
   @Override
   public CompletionStage<Backfill> backfillEditConcurrency(String backfillId, int concurrency) {
-    return backfill(backfillId).thenCompose(backfillPayload -> {
+    return backfill(backfillId, false).thenCompose(backfillPayload -> {
       final Backfill editedBackfill = backfillPayload.backfill().builder()
           .concurrency(concurrency)
           .build();
@@ -339,10 +339,11 @@ class StyxApolloClient implements StyxClient {
   }
 
   @Override
-  public CompletionStage<BackfillPayload> backfill(String backfillId) {
+  public CompletionStage<BackfillPayload> backfill(String backfillId, boolean status) {
     final HttpUrl.Builder urlBuilder = getUrlBuilder()
         .addPathSegment("backfills")
         .addPathSegment(backfillId);
+    urlBuilder.addQueryParameter("status", Boolean.toString(status));
     return executeRequest(Request.forUri(urlBuilder.build().toString()), BackfillPayload.class);
   }
 

@@ -68,9 +68,10 @@ public interface StyxBackfillClient {
    * Get an existing {@link Backfill}
    *
    * @param backfillId backfill id
+   * @param status     if to include status info for the {@link Backfill}
    * @return The required {@link Backfill}
    */
-  CompletionStage<BackfillPayload> backfill(final String backfillId);
+  CompletionStage<BackfillPayload> backfill(final String backfillId, boolean status);
 
   /**
    * List of existing {@link Backfill}s

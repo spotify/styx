@@ -29,7 +29,6 @@ import static com.spotify.styx.util.StreamUtil.cat;
 import static java.util.stream.Collectors.toList;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.base.Throwables;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -102,7 +101,7 @@ public final class BackfillResource {
         Route.with(
             em.serializerResponse(BackfillPayload.class),
             "GET", BASE + "/<bid>",
-            rc -> getBackfill(rc.pathArgs().get("bid"))),
+            rc -> getBackfill(rc, rc.pathArgs().get("bid"))),
         Route.with(
             em.response(Backfill.class),
             "PUT", BASE + "/<bid>",
@@ -144,7 +143,7 @@ public final class BackfillResource {
         backfills = storage.backfills(showAll).stream();
       }
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
 
     final List<BackfillPayload> backfillPayloads = backfills.parallel()
@@ -158,18 +157,23 @@ public final class BackfillResource {
     return BackfillsPayload.create(backfillPayloads);
   }
 
-  public Response<BackfillPayload> getBackfill(String id) {
+  public Response<BackfillPayload> getBackfill(RequestContext rc, String id) {
+    final boolean includeStatuses = rc.request().parameter("status").orElse("true").equals("true");
     try {
       final Optional<Backfill> backfillOpt = storage.backfill(id);
-      if (backfillOpt.isPresent()) {
-        final List<RunStateData> statuses = retrieveBackfillStatuses(backfillOpt.get());
-        return Response.forPayload(BackfillPayload.create(
-            backfillOpt.get(), Optional.of(RunStateDataPayload.create(statuses))));
-      } else {
+      if (!backfillOpt.isPresent()) {
         return Response.forStatus(Status.NOT_FOUND);
       }
+      final Backfill backfill = backfillOpt.get();
+      if (includeStatuses) {
+        final List<RunStateData> statuses = retrieveBackfillStatuses(backfill);
+        return Response.forPayload(BackfillPayload.create(
+            backfill, Optional.of(RunStateDataPayload.create(statuses))));
+      } else {
+        return Response.forPayload(BackfillPayload.create(backfill, Optional.empty()));
+      }
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
   }
 
@@ -252,7 +256,7 @@ public final class BackfillResource {
       }
       schedule = workflowOpt.get().configuration().schedule();
     } catch (Exception e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
 
     if (!TimeUtil.isAligned(input.start(), schedule)) {
@@ -296,7 +300,7 @@ public final class BackfillResource {
     try {
       storage.storeBackfill(backfill);
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
 
     return Response.forPayload(backfill);
@@ -327,7 +331,7 @@ public final class BackfillResource {
     try {
       activeWorkflowInstances = storage.readActiveWorkflowInstances();
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
 
     final List<Instant> processedInstants = rangeOfInstants(

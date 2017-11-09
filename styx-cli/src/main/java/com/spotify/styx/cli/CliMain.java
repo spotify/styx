@@ -392,7 +392,7 @@ public final class CliMain {
   private void backfillShow() throws ExecutionException, InterruptedException {
     final String id = namespace.getString(parser.backfillShowId.getDest());
 
-    final BackfillPayload backfillPayload = styxClient.backfill(id).toCompletableFuture().get();
+    final BackfillPayload backfillPayload = styxClient.backfill(id, true).toCompletableFuture().get();
     cliOutput.printBackfillPayload(backfillPayload);
   }
 
