@@ -22,9 +22,11 @@ package com.spotify.styx.client;
 
 import static com.google.common.collect.Iterables.getLast;
 import static java.util.Arrays.asList;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -36,11 +38,15 @@ import com.spotify.apollo.Request;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.styx.api.Api;
+import com.spotify.styx.client.auth.GoogleIdTokenAuth;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.serialization.Json;
+import java.io.IOException;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import okhttp3.HttpUrl;
@@ -57,6 +63,7 @@ import org.mockito.MockitoAnnotations;
 public class StyxApolloClientTest {
 
   @Mock Client client;
+  @Mock GoogleIdTokenAuth auth;
 
   @Captor ArgumentCaptor<Request> requestCaptor;
 
@@ -71,6 +78,7 @@ public class StyxApolloClientTest {
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
+    when(auth.getToken(any())).thenReturn(Optional.of("foobar"));
   }
 
   @Test
@@ -130,5 +138,55 @@ public class StyxApolloClientTest {
     assertThat(request.uri(), is(API_URL + "/workflows/foo-comp"));
     assertThat(Json.deserialize(request.payload().get(), WorkflowConfiguration.class), is(config));
     assertThat(request.method(), is("POST"));
+  }
+
+  @Test
+  public void testTokenFailure() throws Exception {
+    final IOException rootCause = new IOException("netsplit!");
+    when(auth.getToken(any())).thenThrow(rootCause);
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+    final CompletableFuture<Void> f = styx.triggerWorkflowInstance("foo", "bar", "baz")
+        .toCompletableFuture();
+    try {
+      f.get();
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(e.getCause(), instanceOf(ClientErrorException.class));
+      assertThat(e.getCause().getMessage(), is("Authentication failure: " + rootCause.getMessage()));
+      assertThat(e.getCause().getCause(), is(rootCause));
+    }
+  }
+
+  @Test
+  public void testUnathorizedMissingCredentialsApiError() throws Exception {
+    when(auth.getToken(any())).thenReturn(Optional.empty());
+    when(client.send(any()))
+        .thenReturn(CompletableFuture.completedFuture(Response.forStatus(Status.UNAUTHORIZED)));
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+
+    try {
+      styx.triggerWorkflowInstance("foo", "bar", "baz").toCompletableFuture().get();
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(e.getCause(), instanceOf(ApiErrorException.class));
+      ApiErrorException apiErrorException = (ApiErrorException) e.getCause();
+      assertThat(apiErrorException.isAuthenticated(), is(false));
+    }
+  }
+
+  @Test
+  public void testUnauthorizedWithCredentialsApiError() throws Exception {
+    when(client.send(any()))
+        .thenReturn(CompletableFuture.completedFuture(Response.forStatus(Status.UNAUTHORIZED)));
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+
+    try {
+      styx.triggerWorkflowInstance("foo", "bar", "baz").toCompletableFuture().get();
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(e.getCause(), instanceOf(ApiErrorException.class));
+      ApiErrorException apiErrorException = (ApiErrorException) e.getCause();
+      assertThat(apiErrorException.isAuthenticated(), is(true));
+    }
   }
 }

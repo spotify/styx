@@ -30,6 +30,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.Response;
@@ -77,15 +78,23 @@ class StyxApolloClient implements StyxClient {
 
   private final URI apiHost;
   private final Client client;
+  private final GoogleIdTokenAuth auth;
 
   StyxApolloClient(final Client client,
                    final String apiHost) {
+    this(client, apiHost, GoogleIdTokenAuth.ofDefaultCredential());
+  }
+
+  StyxApolloClient(final Client client,
+                   final String apiHost,
+                   final GoogleIdTokenAuth auth) {
     if (apiHost.contains("://")) {
       this.apiHost = URI.create(apiHost);
     } else {
       this.apiHost = URI.create("https://" + apiHost);
     }
     this.client = Objects.requireNonNull(client, "client");
+    this.auth = Objects.requireNonNull(auth, "auth");
   }
 
   @Override
@@ -375,25 +384,26 @@ class StyxApolloClient implements StyxClient {
     });
   }
 
-  private Request decorateRequest(final Request request) {
-    return withOptionalAuth(request.withHeader("User-Agent", STYX_CLIENT_VERSION).withTtl(TTL));
-  }
-
-  private Request withOptionalAuth(final Request request) {
-    try {
-      String authToken = new GoogleIdTokenAuth().getToken(this.apiHost.toString());
-      return request.withHeader("Authorization", "Bearer " + authToken);
-    } catch (IOException e) {
-      // Credential probably not configured. Proceed to invoke API without authentication.
-      return request;
-    } catch (GeneralSecurityException e) {
-      // Credential probably configured wrongly.
-      throw new RuntimeException(e);
-    }
+  private Request decorateRequest(
+      final Request request, final Optional<String> authToken) {
+    return request
+        .withHeader("User-Agent", STYX_CLIENT_VERSION)
+        .withTtl(TTL)
+        .withHeaders(authToken
+            .map(t -> ImmutableMap.of("Authorization", "Bearer " + authToken))
+            .orElse(ImmutableMap.of()));
   }
 
   private CompletionStage<Response<ByteString>> executeRequest(final Request request) {
-    return client.send(decorateRequest(request)).handle((response, e) -> {
+    final Optional<String> authToken;
+    try {
+      authToken = auth.getToken(this.apiHost.toString());
+    } catch (IOException | GeneralSecurityException e) {
+      // Credential probably invalid, configured wrongly or the token request failed.
+      return CompletableFutures.exceptionallyCompletedFuture(
+          new ClientErrorException("Authentication failure: " + e.getMessage(), e));
+    }
+    return client.send(decorateRequest(request, authToken)).handle((response, e) -> {
       if (e != null) {
         final Throwable rootCause = Throwables.getRootCause(e);
         if (rootCause instanceof SocketTimeoutException) {
@@ -407,7 +417,7 @@ class StyxApolloClient implements StyxClient {
             return response;
           default:
             final String message = response.status().code() + " " + response.status().reasonPhrase();
-            throw new ApiErrorException(message, response.status().code());
+            throw new ApiErrorException(message, response.status().code(), authToken.isPresent());
         }
       }
     });

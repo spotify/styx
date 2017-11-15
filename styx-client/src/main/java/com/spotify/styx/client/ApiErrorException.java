@@ -27,13 +27,19 @@ package com.spotify.styx.client;
 public class ApiErrorException extends RuntimeException {
 
   private final int code;
+  private final boolean authenticated;
 
-  ApiErrorException(String message, int code) {
+  public ApiErrorException(String message, int code, boolean authenticated) {
     super(message);
     this.code = code;
+    this.authenticated = authenticated;
   }
 
   public int getCode() {
     return code;
+  }
+
+  public boolean isAuthenticated() {
+    return authenticated;
   }
 }

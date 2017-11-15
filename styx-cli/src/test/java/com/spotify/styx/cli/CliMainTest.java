@@ -20,10 +20,13 @@
 
 package com.spotify.styx.cli;
 
+import static com.spotify.futures.CompletableFutures.exceptionallyCompletedFuture;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.contains;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -32,6 +35,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Resources;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.cli.CliMain.CliContext;
+import com.spotify.styx.client.ApiErrorException;
 import com.spotify.styx.client.StyxClient;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -118,6 +122,34 @@ public class CliMainTest {
 
     verify(cliOutput).printMessage("Workflow foo in component " + component + " deleted.");
     verify(cliOutput).printMessage("Workflow bar in component " + component + " deleted.");
+  }
+
+  @Test
+  public void testMissingCredentialsHelpMessage() throws Exception {
+    when(client.triggerWorkflowInstance(any(), any(), any()))
+        .thenReturn(exceptionallyCompletedFuture(new ApiErrorException("foo", 401, false)));
+
+    try {
+      CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02");
+      fail();
+    } catch (CliExitException ignored) {
+    }
+
+    verify(cliOutput).printError(contains("gcloud auth application-default login"));
+  }
+
+  @Test
+  public void testUnauthorizedMessage() throws Exception {
+    when(client.triggerWorkflowInstance(any(), any(), any()))
+        .thenReturn(exceptionallyCompletedFuture(new ApiErrorException("foo", 401, true)));
+
+    try {
+      CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02");
+      fail();
+    } catch (CliExitException ignored) {
+    }
+
+    verify(cliOutput).printError("API error: Unauthorized");
   }
 
   private Path fileFromResource(String name) throws IOException {
