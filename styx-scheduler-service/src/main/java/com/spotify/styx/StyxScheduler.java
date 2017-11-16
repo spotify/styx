@@ -45,7 +45,6 @@ import com.google.api.services.iam.v1.IamScopes;
 import com.google.cloud.datastore.Datastore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -89,7 +88,6 @@ import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.workflow.WorkflowInitializer;
 import com.typesafe.config.Config;
-import com.typesafe.config.ConfigFactory;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
@@ -633,10 +631,26 @@ public class StyxScheduler implements AppInit {
       LOG.info("Creating LocalDockerRunner");
       return closer.register(DockerRunner.local(scheduler, stateManager));
     } else {
-      final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(config, id));
+      final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(
+          config, id, createGkeClient(), DefaultKubernetesClient::new));
       final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
       return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats,
           serviceAccountKeyManager, debug));
+    }
+  }
+
+  private static Container createGkeClient() {
+    try {
+      final HttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+      final JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
+      final GoogleCredential credential =
+          GoogleCredential.getApplicationDefault(httpTransport, jsonFactory)
+              .createScoped(ContainerScopes.all());
+      return new Container.Builder(httpTransport, jsonFactory, credential)
+          .setApplicationName(SERVICE_NAME)
+          .build();
+    } catch (GeneralSecurityException | IOException e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -657,24 +671,12 @@ public class StyxScheduler implements AppInit {
     }
   }
 
-  private static NamespacedKubernetesClient getKubernetesClient(Config rootConfig, String id) {
+  static NamespacedKubernetesClient getKubernetesClient(Config rootConfig, String id,
+      Container gke, KubernetesClientFactory clientFactory) {
     try {
-      final HttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
-      final JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
-      final GoogleCredential credential =
-          GoogleCredential.getApplicationDefault(httpTransport, jsonFactory)
-              .createScoped(ContainerScopes.all());
-      final Container gke = new Container.Builder(httpTransport, jsonFactory, credential)
-          .setApplicationName(SERVICE_NAME)
-          .build();
-
-      final Config configDefaults = ConfigFactory.parseMap(ImmutableMap.of(
-          GKE_CLUSTER_NAMESPACE, "default"));
-
       final Config config = rootConfig
           .getConfig(GKE_CLUSTER_PATH)
-          .getConfig(id)
-          .withFallback(configDefaults);
+          .getConfig(id);
 
       final Cluster cluster = gke.projects().zones().clusters()
           .get(config.getString(GKE_CLUSTER_PROJECT_ID),
@@ -686,11 +688,11 @@ public class StyxScheduler implements AppInit {
           .withCaCertData(cluster.getMasterAuth().getClusterCaCertificate())
           .withClientCertData(cluster.getMasterAuth().getClientCertificate())
           .withClientKeyData(cluster.getMasterAuth().getClientKey())
+          .withNamespace(config.getString(GKE_CLUSTER_NAMESPACE))
           .build();
 
-      return new DefaultKubernetesClient(kubeConfig)
-          .inNamespace(config.getString(GKE_CLUSTER_NAMESPACE));
-    } catch (GeneralSecurityException | IOException e) {
+      return clientFactory.apply(kubeConfig);
+    } catch (IOException e) {
       throw Throwables.propagate(e);
     }
   }
@@ -713,4 +715,7 @@ public class StyxScheduler implements AppInit {
   private static boolean isDevMode(Config config) {
     return STYX_MODE_DEVELOPMENT.equals(config.getString(STYX_MODE));
   }
+
+  interface KubernetesClientFactory
+      extends Function<io.fabric8.kubernetes.client.Config, NamespacedKubernetesClient> { }
 }
