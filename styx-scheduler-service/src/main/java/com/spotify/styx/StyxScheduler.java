@@ -64,8 +64,6 @@ import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.MonitoringHandler;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
-import com.spotify.styx.schedule.ScheduleSource;
-import com.spotify.styx.schedule.ScheduleSourceFactory;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.QueuedStateManager;
 import com.spotify.styx.state.RunState;
@@ -99,7 +97,6 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -144,7 +141,6 @@ public class StyxScheduler implements AppInit {
 
   // === Type aliases for dependency injectors ====================================================
   public interface StateFactory extends Function<WorkflowInstance, RunState> { }
-  public interface ScheduleSources extends Supplier<Iterable<ScheduleSourceFactory>> { }
   public interface StatsFactory extends Function<Environment, Stats> { }
   public interface PublisherFactory extends Function<Environment, Publisher> { }
   public interface EventConsumerFactory extends BiFunction<Environment, Stats, BiConsumer<SequenceEvent, RunState>> { }
@@ -172,7 +168,6 @@ public class StyxScheduler implements AppInit {
     private Time time = Instant::now;
     private StorageFactory storageFactory = storage(StyxScheduler::storage);
     private DockerRunnerFactory dockerRunnerFactory = StyxScheduler::createDockerRunner;
-    private ScheduleSources scheduleSources = () -> ServiceLoader.load(ScheduleSourceFactory.class);
     private StatsFactory statsFactory = StyxScheduler::stats;
     private ExecutorFactory executorFactory = Executors::newScheduledThreadPool;
     private PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
@@ -192,11 +187,6 @@ public class StyxScheduler implements AppInit {
 
     public Builder setDockerRunnerFactory(DockerRunnerFactory dockerRunnerFactory) {
       this.dockerRunnerFactory = dockerRunnerFactory;
-      return this;
-    }
-
-    public Builder setScheduleSources(ScheduleSources scheduleSources) {
-      this.scheduleSources = scheduleSources;
       return this;
     }
 
@@ -248,7 +238,6 @@ public class StyxScheduler implements AppInit {
   private final Time time;
   private final StorageFactory storageFactory;
   private final DockerRunnerFactory dockerRunnerFactory;
-  private final ScheduleSources scheduleSources;
   private final StatsFactory statsFactory;
   private final ExecutorFactory executorFactory;
   private final PublisherFactory publisherFactory;
@@ -261,11 +250,13 @@ public class StyxScheduler implements AppInit {
   private TriggerManager triggerManager;
   private BackfillTriggerManager backfillTriggerManager;
 
+  private Consumer<Workflow> workflowRemoveListener;
+  private Consumer<Workflow> workflowChangeListener;
+
   private StyxScheduler(Builder builder) {
     this.time = requireNonNull(builder.time);
     this.storageFactory = requireNonNull(builder.storageFactory);
     this.dockerRunnerFactory = requireNonNull(builder.dockerRunnerFactory);
-    this.scheduleSources = requireNonNull(builder.scheduleSources);
     this.statsFactory = requireNonNull(builder.statsFactory);
     this.executorFactory = requireNonNull(builder.executorFactory);
     this.publisherFactory = requireNonNull(builder.publisherFactory);
@@ -355,7 +346,6 @@ public class StyxScheduler implements AppInit {
     restoreState(storage, outputHandlers, stateManager, dockerRunner);
     startTriggerManager(triggerManager, executor);
     startBackfillTriggerManager(backfillTriggerManager, executor);
-    startScheduleSources(environment, executor, workflowChangeListener, workflowRemoveListener);
     startScheduler(scheduler, executor);
     startRuntimeConfigUpdate(storage, executor, dequeueRateLimiter);
     startCleaner(cleaner, executor);
@@ -373,6 +363,8 @@ public class StyxScheduler implements AppInit {
     this.scheduler = scheduler;
     this.triggerManager = triggerManager;
     this.backfillTriggerManager = backfillTriggerManager;
+    this.workflowRemoveListener = workflowRemoveListener;
+    this.workflowChangeListener = workflowChangeListener;
   }
 
   @VisibleForTesting
@@ -398,6 +390,16 @@ public class StyxScheduler implements AppInit {
   @VisibleForTesting
   void tickBackfillTriggerManager() {
     backfillTriggerManager.tick();
+  }
+
+  @VisibleForTesting
+  Consumer<Workflow> getWorkflowRemoveListener() {
+    return workflowRemoveListener;
+  }
+
+  @VisibleForTesting
+  Consumer<Workflow> getWorkflowChangeListener() {
+    return workflowChangeListener;
   }
 
   private void warmUpCache(WorkflowCache cache, Storage storage) {
@@ -432,23 +434,6 @@ public class StyxScheduler implements AppInit {
     // Eagerly fetch container state before starting the scheduler in order to recover executions
     // that completed while styx was offline and avoiding re-running WFIs due to state timeouts.
     dockerRunner.restore();
-  }
-
-  private void startScheduleSources(
-      Environment environment,
-      ScheduledExecutorService scheduler,
-      Consumer<Workflow> workflowChangeListener,
-      Consumer<Workflow> workflowRemoveListener) {
-    for (ScheduleSourceFactory sourceFactory : scheduleSources.get()) {
-      try {
-        LOG.info("Loading auto-discovered ScheduleSource from {}", sourceFactory);
-        final ScheduleSource scheduleSource = sourceFactory.create(
-            workflowChangeListener, workflowRemoveListener, environment, scheduler);
-        scheduleSource.start();
-      } catch (Throwable t) {
-        LOG.warn("ScheduleSourceFactory {} threw", sourceFactory, t);
-      }
-    }
   }
 
   private static void startCleaner(Cleaner cleaner, ScheduledExecutorService exec) {

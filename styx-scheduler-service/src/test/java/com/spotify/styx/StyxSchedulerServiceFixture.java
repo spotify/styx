@@ -21,7 +21,6 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
-import static java.util.Collections.singletonList;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
@@ -44,7 +43,6 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
-import com.spotify.styx.schedule.ScheduleSourceFactory;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
@@ -60,7 +58,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 import javaslang.Tuple;
 import javaslang.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
@@ -85,12 +82,10 @@ public class StyxSchedulerServiceFixture {
   private Connection bigtable = setupBigTableMockTable(0);
   protected AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
   private DeterministicScheduler executor = new QuietDeterministicScheduler();
-  private Consumer<Workflow> workflowChangeListener;
-  private Consumer<Workflow> workflowRemoveListener;
 
   // circumstantial fields, set by test cases
   private Instant now = Instant.parse("1970-01-01T00:00:00Z");
-  private List<Workflow> workflows = Lists.newArrayList();
+
   private List<Tuple2<SequenceEvent, RunState.State>> transitionedEvents = Lists.newArrayList();
 
   // captured fields from fakes
@@ -123,7 +118,6 @@ public class StyxSchedulerServiceFixture {
   public void setUp() throws Exception {
     StorageFactory storageFactory = (env) -> storage;
     Time time = () -> now;
-    StyxScheduler.ScheduleSources scheduleSources = () -> singletonList(fakeScheduleSource());
     StyxScheduler.StatsFactory statsFactory = (env) -> Stats.NOOP;
     StyxScheduler.ExecutorFactory executorFactory = (ts, tf) -> executor;
     StyxScheduler.PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
@@ -137,7 +131,6 @@ public class StyxSchedulerServiceFixture {
         .setTime(time)
         .setStorageFactory(storageFactory)
         .setDockerRunnerFactory(dockerRunnerFactory)
-        .setScheduleSources(scheduleSources)
         .setStatsFactory(statsFactory)
         .setExecutorFactory(executorFactory)
         .setPublisherFactory(publisherFactory)
@@ -186,8 +179,6 @@ public class StyxSchedulerServiceFixture {
   }
 
   void givenWorkflow(Workflow workflow) throws IOException {
-    workflows.add(workflow);
-
     // storing before start causes the WorkflowInitializer not to do anything
     storage.storeWorkflow(workflow);
   }
@@ -214,11 +205,11 @@ public class StyxSchedulerServiceFixture {
   }
 
   void workflowChanges(Workflow workflow) {
-    workflowChangeListener.accept(workflow);
+    styxScheduler.getWorkflowChangeListener().accept(workflow);
   }
 
   void workflowDeleted(Workflow workflow) {
-    workflowRemoveListener.accept(workflow);
+    styxScheduler.getWorkflowRemoveListener().accept(workflow);
   }
 
   /**
@@ -319,16 +310,7 @@ public class StyxSchedulerServiceFixture {
   private void printTime() {
     LOG.info("The time is {}", now);
   }
-
-  private ScheduleSourceFactory fakeScheduleSource() {
-    return (changeListener, removeListener, environment, exec) ->
-        /* start */ () -> {
-      workflowChangeListener = changeListener;
-      workflows.forEach(changeListener);
-      workflowRemoveListener = removeListener;
-    };
-  }
-
+  
   private DockerRunner fakeDockerRunner() {
     return new DockerRunner() {
       @Override

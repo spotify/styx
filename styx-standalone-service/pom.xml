@@ -26,11 +26,6 @@
       <artifactId>styx-scheduler-service</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <dependency>
-      <groupId>com.spotify</groupId>
-      <artifactId>styx-local-files-source</artifactId>
-      <version>${project.version}</version>
-    </dependency>
 
     <dependency>
       <groupId>com.spotify</groupId>
