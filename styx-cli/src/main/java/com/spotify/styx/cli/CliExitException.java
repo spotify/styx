@@ -20,14 +20,35 @@
 
 package com.spotify.styx.cli;
 
-public class CliExitException extends RuntimeException {
-  private final int code;
+class CliExitException extends RuntimeException {
 
-  public CliExitException(int code) {
-    this.code = code;
+  enum ExitStatus {
+    Success(0),
+    UnknownError(1),
+    ArgumentError(2),
+    ClientError(3),
+    ApiError(4),
+    AuthError(5);
+
+    final int code;
+
+    ExitStatus(final int code) {
+      this.code = code;
+    }
   }
 
-  public int code() {
-    return code;
+
+  private final ExitStatus status;
+
+  private CliExitException(ExitStatus status) {
+    this.status = status;
+  }
+
+  ExitStatus status() {
+    return status;
+  }
+
+  static CliExitException of(ExitStatus code) {
+    return new CliExitException(code);
   }
 }

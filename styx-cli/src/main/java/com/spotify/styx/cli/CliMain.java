@@ -20,6 +20,7 @@
 
 package com.spotify.styx.cli;
 
+import static com.google.common.base.Throwables.getStackTraceAsString;
 import static com.spotify.apollo.Status.NOT_FOUND;
 import static com.spotify.apollo.Status.UNAUTHORIZED;
 import static java.util.stream.Collectors.joining;
@@ -38,6 +39,7 @@ import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.ResourcesPayload;
 import com.spotify.styx.api.RunStateDataPayload;
+import com.spotify.styx.cli.CliExitException.ExitStatus;
 import com.spotify.styx.cli.CliMain.CliContext.Output;
 import com.spotify.styx.client.ApiErrorException;
 import com.spotify.styx.client.ClientErrorException;
@@ -86,10 +88,6 @@ public final class CliMain {
   private static final String WORKFLOW_DEST = "workflow";
   private static final String PARAMETER_DEST = "parameter";
 
-  private static final int EXIT_CODE_SUCCESS = 0;
-  private static final int EXIT_CODE_UNKNOWN_ERROR = 1;
-  private static final int EXIT_CODE_ARGUMENT_ERROR = 2;
-  private static final int EXIT_CODE_CLIENT_ERROR = 3;
   private static final String STYX_CLI_VERSION =
       "Styx CLI " + CliMain.class.getPackage().getImplementationVersion();
 
@@ -117,7 +115,7 @@ public final class CliMain {
     try {
       run(CliContext.DEFAULT, args);
     } catch (CliExitException e) {
-      System.exit(e.code());
+      System.exit(e.status().code);
     }
   }
 
@@ -132,7 +130,7 @@ public final class CliMain {
 
     if (args.isEmpty()) {
       parser.parser.printHelp();
-      throw new CliExitException(EXIT_CODE_SUCCESS);
+      throw CliExitException.of(ExitStatus.Success);
     }
 
     try {
@@ -142,10 +140,10 @@ public final class CliMain {
         throw new ArgumentParserException("Styx API host not set", parser.parser);
       }
     } catch (HelpScreenException e) {
-      throw new CliExitException(EXIT_CODE_SUCCESS);
+      throw CliExitException.of(ExitStatus.Success);
     } catch (ArgumentParserException e) {
       parser.parser.handleError(e);
-      throw new CliExitException(EXIT_CODE_ARGUMENT_ERROR);
+      throw CliExitException.of(ExitStatus.ArgumentError);
     }
 
     final Service cliService = Services.usingName("styx-cli")
@@ -271,7 +269,7 @@ public final class CliMain {
       }
     } catch (ArgumentParserException e) {
       parser.parser.handleError(e);
-      throw new CliExitException(EXIT_CODE_ARGUMENT_ERROR);
+      throw CliExitException.of(ExitStatus.ArgumentError);
     } catch (ExecutionException e) {
       final Throwable cause = e.getCause();
       if (cause instanceof ApiErrorException) {
@@ -289,18 +287,21 @@ public final class CliMain {
           } else {
             cliOutput.printError("API error: Unauthorized");
           }
+          throw CliExitException.of(ExitStatus.AuthError);
         } else {
           cliOutput.printError("API error: " + cause.getMessage());
+          throw CliExitException.of(ExitStatus.ApiError);
         }
       } else if (cause instanceof ClientErrorException) {
-        cliOutput.printError(cause.getMessage());
+        cliOutput.printError("Client error: " + cause.getMessage());
+        throw CliExitException.of(ExitStatus.ClientError);
       } else {
-        cause.printStackTrace();
+        cliOutput.printError(getStackTraceAsString(cause));
+        throw CliExitException.of(ExitStatus.ClientError);
       }
-      throw new CliExitException(EXIT_CODE_CLIENT_ERROR);
     } catch (Exception e) {
-      e.printStackTrace();
-      throw new CliExitException(EXIT_CODE_UNKNOWN_ERROR);
+      cliOutput.printError(getStackTraceAsString(e));
+      throw CliExitException.of(ExitStatus.UnknownError);
     }
   }
 
@@ -317,7 +318,7 @@ public final class CliMain {
               + workflows.stream().collect(joining(", "))
               + "in component " + component + "? [yN]").trim();
       if (!reply.equals("y")) {
-        throw new CliExitException(EXIT_CODE_UNKNOWN_ERROR);
+        throw CliExitException.of(ExitStatus.UnknownError);
       }
     }
 

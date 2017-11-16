@@ -29,13 +29,18 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.contains;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Resources;
+import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.api.RunStateDataPayload;
+import com.spotify.styx.cli.CliExitException.ExitStatus;
 import com.spotify.styx.cli.CliMain.CliContext;
 import com.spotify.styx.client.ApiErrorException;
+import com.spotify.styx.client.ClientErrorException;
 import com.spotify.styx.client.StyxClient;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -125,6 +130,72 @@ public class CliMainTest {
   }
 
   @Test
+  public void testClientError() throws Exception {
+    final ClientErrorException exception = new ClientErrorException(
+        "foo failure", new IOException());
+    when(client.triggerWorkflowInstance(any(), any(), any()))
+        .thenReturn(exceptionallyCompletedFuture(exception));
+
+    try {
+      CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02");
+      fail();
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.ClientError));
+    }
+
+    verify(cliOutput).printError("Client error: " + exception.getMessage());
+  }
+
+  @Test
+  public void testApiError() throws Exception {
+    final ApiErrorException exception = new ApiErrorException("bar failure", 500, true);
+    when(client.triggerWorkflowInstance(any(), any(), any()))
+        .thenReturn(exceptionallyCompletedFuture(exception));
+
+    try {
+      CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02");
+      fail();
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.ApiError));
+    }
+
+    verify(cliOutput).printError("API error: " + exception.getMessage());
+  }
+
+  @Test
+  public void testClientUnknownError() throws Exception {
+    final NullPointerException exception = new NullPointerException();
+    when(client.triggerWorkflowInstance(any(), any(), any()))
+        .thenReturn(CompletableFutures.exceptionallyCompletedFuture(exception));
+
+    try {
+      CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02");
+      fail();
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.ClientError));
+    }
+
+    verify(cliOutput).printError(Throwables.getStackTraceAsString(exception));
+  }
+
+
+  @Test
+  public void testUnknownError() throws Exception {
+    final NullPointerException exception = new NullPointerException();
+    when(client.triggerWorkflowInstance(any(), any(), any()))
+        .thenThrow(exception);
+
+    try {
+      CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02");
+      fail();
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.UnknownError));
+    }
+
+    verify(cliOutput).printError(Throwables.getStackTraceAsString(exception));
+  }
+
+  @Test
   public void testMissingCredentialsHelpMessage() throws Exception {
     when(client.triggerWorkflowInstance(any(), any(), any()))
         .thenReturn(exceptionallyCompletedFuture(new ApiErrorException("foo", 401, false)));
@@ -132,7 +203,8 @@ public class CliMainTest {
     try {
       CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02");
       fail();
-    } catch (CliExitException ignored) {
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.AuthError));
     }
 
     verify(cliOutput).printError(contains("gcloud auth application-default login"));
@@ -146,10 +218,42 @@ public class CliMainTest {
     try {
       CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02");
       fail();
-    } catch (CliExitException ignored) {
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.AuthError));
     }
 
     verify(cliOutput).printError("API error: Unauthorized");
+  }
+
+  @Test
+  public void testHelp() throws Exception {
+    try {
+      CliMain.run(cliContext, "--help");
+      fail();
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.Success));
+    }
+
+    try {
+      CliMain.run(cliContext);
+      fail();
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.Success));
+    }
+
+    verifyZeroInteractions(client);
+  }
+
+  @Test
+  public void testArgumentError() throws Exception {
+    try {
+      CliMain.run(cliContext, "foozbarz");
+      fail();
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.ArgumentError));
+    }
+
+    verifyZeroInteractions(client);
   }
 
   private Path fileFromResource(String name) throws IOException {
