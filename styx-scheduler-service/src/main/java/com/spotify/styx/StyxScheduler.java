@@ -45,6 +45,7 @@ import com.google.api.services.iam.v1.IamScopes;
 import com.google.cloud.datastore.Datastore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -88,6 +89,7 @@ import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.workflow.WorkflowInitializer;
 import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
@@ -119,10 +121,11 @@ public class StyxScheduler implements AppInit {
 
   public static final String SERVICE_NAME = "styx-scheduler";
 
-  public static final String GKE_CLUSTER_PREFIX = "styx.gke.";
-  public static final String GKE_CLUSTER_PROJECT_ID = ".project-id";
-  public static final String GKE_CLUSTER_ZONE = ".cluster-zone";
-  public static final String GKE_CLUSTER_ID = ".cluster-id";
+  public static final String GKE_CLUSTER_PATH = "styx.gke";
+  public static final String GKE_CLUSTER_PROJECT_ID = "project-id";
+  public static final String GKE_CLUSTER_ZONE = "cluster-zone";
+  public static final String GKE_CLUSTER_ID = "cluster-id";
+  public static final String GKE_CLUSTER_NAMESPACE = "namespace";
 
   public static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
   public static final String STYX_MODE = "styx.mode";
@@ -654,7 +657,7 @@ public class StyxScheduler implements AppInit {
     }
   }
 
-  private static NamespacedKubernetesClient getKubernetesClient(Config config, String id) {
+  private static NamespacedKubernetesClient getKubernetesClient(Config rootConfig, String id) {
     try {
       final HttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
       final JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
@@ -665,14 +668,18 @@ public class StyxScheduler implements AppInit {
           .setApplicationName(SERVICE_NAME)
           .build();
 
-      final String projectKey = GKE_CLUSTER_PREFIX + id + GKE_CLUSTER_PROJECT_ID;
-      final String zoneKey = GKE_CLUSTER_PREFIX + id + GKE_CLUSTER_ZONE;
-      final String clusterIdKey = GKE_CLUSTER_PREFIX + id + GKE_CLUSTER_ID;
+      final Config configDefaults = ConfigFactory.parseMap(ImmutableMap.of(
+          GKE_CLUSTER_NAMESPACE, "default"));
+
+      final Config config = rootConfig
+          .getConfig(GKE_CLUSTER_PATH)
+          .getConfig(id)
+          .withFallback(configDefaults);
 
       final Cluster cluster = gke.projects().zones().clusters()
-          .get(config.getString(projectKey),
-               config.getString(zoneKey),
-               config.getString(clusterIdKey)).execute();
+          .get(config.getString(GKE_CLUSTER_PROJECT_ID),
+               config.getString(GKE_CLUSTER_ZONE),
+               config.getString(GKE_CLUSTER_ID)).execute();
 
       final io.fabric8.kubernetes.client.Config kubeConfig = new ConfigBuilder()
           .withMasterUrl("https://" + cluster.getEndpoint())
@@ -682,7 +689,7 @@ public class StyxScheduler implements AppInit {
           .build();
 
       return new DefaultKubernetesClient(kubeConfig)
-          .inNamespace("default");
+          .inNamespace(config.getString(GKE_CLUSTER_NAMESPACE));
     } catch (GeneralSecurityException | IOException e) {
       throw Throwables.propagate(e);
     }
