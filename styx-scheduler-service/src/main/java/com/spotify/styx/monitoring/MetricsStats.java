@@ -37,99 +37,99 @@ import javaslang.Tuple2;
 import javaslang.Tuple3;
 
 public final class MetricsStats implements Stats {
-
   private static final String UNIT_SECOND = "s";
   private static final String UNIT_MILLISECOND = "ms";
   private static final MetricId BASE = MetricId.build("styx");
 
-  private static final MetricId QUEUED_EVENTS = BASE
+  static final MetricId QUEUED_EVENTS = BASE
       .tagged("what", "queued-events-count")
       .tagged("unit", "events");
 
-  private static final MetricId ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER = BASE
+  static final MetricId ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER = BASE
       .tagged("what", "active-states-per-runstate-per-trigger-count")
       .tagged("unit", "state");
 
-  private static final MetricId ACTIVE_STATES_PER_WORKFLOW = BASE
+  static final MetricId ACTIVE_STATES_PER_WORKFLOW = BASE
       .tagged("what", "active-states-per-workflow-count")
       .tagged("unit", "state");
 
-  private static final MetricId WORKFLOW_COUNT = BASE
+  static final MetricId WORKFLOW_COUNT = BASE
       .tagged("what", "workflow-count")
       .tagged("unit", "workflow");
 
-  private static final MetricId RESOURCE_CONFIGURED = BASE
+  static final MetricId RESOURCE_CONFIGURED = BASE
       .tagged("what", "resource-configured");
 
-  private static final MetricId RESOURCE_USED = BASE
+  static final MetricId RESOURCE_USED = BASE
       .tagged("what", "resource-used");
 
-  private static final MetricId EXIT_CODE_RATE = BASE
+  static final MetricId EXIT_CODE_RATE = BASE
       .tagged("what", "exit-code-rate");
 
-  private static final MetricId STORAGE_DURATION = BASE
+  static final MetricId STORAGE_DURATION = BASE
       .tagged("what", "storage-operation-duration")
       .tagged("unit", UNIT_MILLISECOND);
 
-  private static final String OPERATION = "operation";
-  private static final MetricId STORAGE_RATE = BASE
+  static final String OPERATION = "operation";
+
+  static final MetricId STORAGE_RATE = BASE
       .tagged("what", "storage-operation-rate")
       .tagged("unit", OPERATION);
 
-  private static final MetricId DOCKER_DURATION = BASE
+  static final MetricId DOCKER_DURATION = BASE
       .tagged("what", "docker-operation-duration")
       .tagged("unit", UNIT_MILLISECOND);
 
-  private static final MetricId DOCKER_RATE = BASE
+  static final MetricId DOCKER_RATE = BASE
       .tagged("what", "docker-operation-rate")
       .tagged("unit", OPERATION);
 
-  private static final MetricId DOCKER_ERROR_RATE = BASE
+  static final MetricId DOCKER_ERROR_RATE = BASE
       .tagged("what", "docker-operation-error-rate")
       .tagged("unit", OPERATION);
 
-  private static final MetricId TRANSITIONING_DURATION = BASE
+  static final MetricId TRANSITIONING_DURATION = BASE
       .tagged("what", "time-transitioning-between-submitted-running")
       .tagged("unit", UNIT_SECOND);
 
-  private static final MetricId PULL_IMAGE_ERROR_RATE = BASE
+  static final MetricId PULL_IMAGE_ERROR_RATE = BASE
       .tagged("what", "pull-image-error-rate")
       .tagged("unit", "error");
 
-  private static final MetricId NATURAL_TRIGGER_RATE = BASE
+  static final MetricId NATURAL_TRIGGER_RATE = BASE
       .tagged("what", "natural-trigger-rate")
       .tagged("unit", "trigger");
 
-  private static final MetricId TERMINATION_LOG_MISSING = BASE
+  static final MetricId TERMINATION_LOG_MISSING = BASE
       .tagged("what", "termination-log-missing");
 
-  private static final MetricId TERMINATION_LOG_INVALID = BASE
+  static final MetricId TERMINATION_LOG_INVALID = BASE
       .tagged("what", "termination-log-invalid");
 
-  private static final MetricId EXIT_CODE_MISMATCH = BASE
+  static final MetricId EXIT_CODE_MISMATCH = BASE
       .tagged("what", "exit-code-mismatch");
 
-  private static final MetricId SUBMISSION_RATE_LIMIT = BASE
+  static final MetricId SUBMISSION_RATE_LIMIT = BASE
       .tagged("what", "submission-rate-limit")
       .tagged("unit", "submission/s");
 
-  private static final MetricId EVENT_CONSUMER_RATE = BASE
+  static final MetricId EVENT_CONSUMER_RATE = BASE
       .tagged("what", "event-consumer-rate");
 
-  private static final MetricId EVENT_CONSUMER_ERROR_RATE = BASE
+  static final MetricId EVENT_CONSUMER_ERROR_RATE = BASE
       .tagged("what", "event-consumer-error-rate")
       .tagged("unit", "error");
 
-  private static final MetricId NEW_WORKFLOW_RATE = BASE
+  static final MetricId NEW_WORKFLOW_RATE = BASE
       .tagged("what", "new-workflow");
 
-  private static final MetricId UPDATED_WORKFLOW_RATE = BASE
+  static final MetricId UPDATED_WORKFLOW_RATE = BASE
       .tagged("what", "updated-workflow");
 
-  private static final MetricId REMOVED_WORKFLOW_RATE = BASE
+  static final MetricId REMOVED_WORKFLOW_RATE = BASE
       .tagged("what", "removed-workflow");
 
-  private static final MetricId WORKFLOW_CONSUMER_ERROR_RATE = BASE
+  static final MetricId WORKFLOW_CONSUMER_ERROR_RATE = BASE
       .tagged("what", "workflow-consumer-error-rate")
       .tagged("unit", "error");
 

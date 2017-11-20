@@ -20,6 +20,27 @@
 
 package com.spotify.styx.monitoring;
 
+import static com.spotify.styx.monitoring.MetricsStats.ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER;
+import static com.spotify.styx.monitoring.MetricsStats.ACTIVE_STATES_PER_WORKFLOW;
+import static com.spotify.styx.monitoring.MetricsStats.DOCKER_DURATION;
+import static com.spotify.styx.monitoring.MetricsStats.DOCKER_ERROR_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.DOCKER_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.EVENT_CONSUMER_ERROR_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.EVENT_CONSUMER_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_MISMATCH;
+import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.NATURAL_TRIGGER_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.PULL_IMAGE_ERROR_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.QUEUED_EVENTS;
+import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_CONFIGURED;
+import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_USED;
+import static com.spotify.styx.monitoring.MetricsStats.STORAGE_DURATION;
+import static com.spotify.styx.monitoring.MetricsStats.STORAGE_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.SUBMISSION_RATE_LIMIT;
+import static com.spotify.styx.monitoring.MetricsStats.TERMINATION_LOG_INVALID;
+import static com.spotify.styx.monitoring.MetricsStats.TERMINATION_LOG_MISSING;
+import static com.spotify.styx.monitoring.MetricsStats.TRANSITIONING_DURATION;
+import static com.spotify.styx.monitoring.MetricsStats.WORKFLOW_COUNT;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -27,7 +48,6 @@ import static org.mockito.Mockito.when;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
-import com.spotify.metrics.core.MetricId;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
@@ -43,87 +63,6 @@ import org.mockito.runners.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class MetricsStatsTest {
-
-  private static final String UNIT_SECOND = "s";
-  private static final String UNIT_MILLISECOND = "ms";
-  private static final MetricId BASE = MetricId.build("styx");
-
-  private static final MetricId QUEUED_EVENTS = BASE
-      .tagged("what", "queued-events-count")
-      .tagged("unit", "events");
-
-  private static final MetricId ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER = BASE
-      .tagged("what", "active-states-per-runstate-per-trigger-count")
-      .tagged("unit", "state");
-
-  private static final MetricId ACTIVE_STATES_PER_WORKFLOW = BASE
-      .tagged("what", "active-states-per-workflow-count")
-      .tagged("unit", "state");
-
-  private static final MetricId WORKFLOW_COUNT = BASE
-      .tagged("what", "workflow-count")
-      .tagged("unit", "workflow");
-
-  private static final MetricId RESOURCE_CONFIGURED = BASE
-      .tagged("what", "resource-configured");
-
-  private static final MetricId RESOURCE_USED = BASE
-      .tagged("what", "resource-used");
-
-  private static final MetricId EXIT_CODE_RATE = BASE
-      .tagged("what", "exit-code-rate");
-
-  private static final MetricId STORAGE_DURATION = BASE
-      .tagged("what", "storage-operation-duration")
-      .tagged("unit", UNIT_MILLISECOND);
-
-  private static final MetricId STORAGE_RATE = BASE
-      .tagged("what", "storage-operation-rate")
-      .tagged("unit", "operation");
-
-  private static final MetricId DOCKER_DURATION = BASE
-      .tagged("what", "docker-operation-duration")
-      .tagged("unit", UNIT_MILLISECOND);
-
-  private static final MetricId DOCKER_RATE = BASE
-      .tagged("what", "docker-operation-rate")
-      .tagged("unit", "operation");
-
-  private static final MetricId DOCKER_ERROR_RATE = BASE
-      .tagged("what", "docker-operation-error-rate")
-      .tagged("unit", "operation");
-
-  private static final MetricId TRANSITIONING_DURATION = BASE
-      .tagged("what", "time-transitioning-between-submitted-running")
-      .tagged("unit", UNIT_SECOND);
-
-  private static final MetricId PULL_IMAGE_ERROR_RATE = BASE
-      .tagged("what", "pull-image-error-rate")
-      .tagged("unit", "error");
-
-  private static final MetricId NATURAL_TRIGGER_RATE = BASE
-      .tagged("what", "natural-trigger-rate")
-      .tagged("unit", "trigger");
-
-  private static final MetricId TERMINATION_LOG_MISSING = BASE
-      .tagged("what", "termination-log-missing");
-
-  private static final MetricId TERMINATION_LOG_INVALID = BASE
-      .tagged("what", "termination-log-invalid");
-
-  private static final MetricId EXIT_CODE_MISMATCH = BASE
-      .tagged("what", "exit-code-mismatch");
-
-  private static final MetricId SUBMISSION_RATE_LIMIT = BASE
-      .tagged("what", "submission-rate-limit")
-      .tagged("unit", "submission/s");
-
-  private static final MetricId EVENT_CONSUMER_RATE = BASE
-      .tagged("what", "event-consumer-rate");
-
-  private static final MetricId EVENT_CONSUMER_ERROR_RATE = BASE
-      .tagged("what", "event-consumer-error-rate")
-      .tagged("unit", "error");
 
   private Stats stats;
   
