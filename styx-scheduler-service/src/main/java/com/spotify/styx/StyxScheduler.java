@@ -97,6 +97,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -144,6 +145,8 @@ public class StyxScheduler implements AppInit {
   public interface StatsFactory extends Function<Environment, Stats> { }
   public interface PublisherFactory extends Function<Environment, Publisher> { }
   public interface EventConsumerFactory extends BiFunction<Environment, Stats, BiConsumer<SequenceEvent, RunState>> { }
+  public interface WorkflowConsumerFactory
+      extends BiFunction<Environment, Stats, BiConsumer<Optional<Workflow>, Optional<Workflow>>> { }
 
   @FunctionalInterface
   interface DockerRunnerFactory {
@@ -174,6 +177,7 @@ public class StyxScheduler implements AppInit {
     private RetryUtil retryUtil = DEFAULT_RETRY_UTIL;
     private WorkflowResourceDecorator resourceDecorator = WorkflowResourceDecorator.NOOP;
     private EventConsumerFactory eventConsumerFactory = (env, stats) -> (event, state) -> { };
+    private WorkflowConsumerFactory workflowConsumerFactory = (env, stats) -> (oldWorkflow, newWorkflow) -> { };
 
     public Builder setTime(Time time) {
       this.time = time;
@@ -220,6 +224,11 @@ public class StyxScheduler implements AppInit {
       return this;
     }
 
+    public Builder setWorkflowConsumerFactory(WorkflowConsumerFactory workflowConsumerFactory) {
+      this.workflowConsumerFactory = workflowConsumerFactory;
+      return this;
+    }
+
     public StyxScheduler build() {
       return new StyxScheduler(this);
     }
@@ -244,6 +253,7 @@ public class StyxScheduler implements AppInit {
   private final RetryUtil retryUtil;
   private final WorkflowResourceDecorator resourceDecorator;
   private final EventConsumerFactory eventConsumerFactory;
+  private final WorkflowConsumerFactory workflowConsumerFactory;
 
   private StateManager stateManager;
   private Scheduler scheduler;
@@ -263,6 +273,7 @@ public class StyxScheduler implements AppInit {
     this.retryUtil = requireNonNull(builder.retryUtil);
     this.resourceDecorator = requireNonNull(builder.resourceDecorator);
     this.eventConsumerFactory = requireNonNull(builder.eventConsumerFactory);
+    this.workflowConsumerFactory = requireNonNull(builder.workflowConsumerFactory);
   }
 
   @Override
@@ -334,9 +345,12 @@ public class StyxScheduler implements AppInit {
         new BackfillTriggerManager(stateManager, workflowCache, storage, trigger);
 
     final WorkflowInitializer workflowInitializer = new WorkflowInitializer(storage, time);
-    final Consumer<Workflow> workflowRemoveListener = workflowRemoved(workflowCache, storage);
+    final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer =
+        workflowConsumerFactory.apply(environment, stats);
+    final Consumer<Workflow> workflowRemoveListener =
+        workflowRemoved(workflowCache, storage, workflowConsumer);
     final Consumer<Workflow> workflowChangeListener =
-        workflowChanged(workflowCache, workflowInitializer, stats, stateManager);
+        workflowChanged(workflowCache, workflowInitializer, stats, stateManager, workflowConsumer);
 
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
                                               storage, resourceDecorator, stats, dequeueRateLimiter);
@@ -553,19 +567,25 @@ public class StyxScheduler implements AppInit {
       WorkflowCache cache,
       WorkflowInitializer workflowInitializer,
       Stats stats,
-      StateManager stateManager) {
-
+      StateManager stateManager,
+      BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
     return (workflow) -> {
       stats.registerActiveStatesMetric(
           workflow.id(),
           () -> stateManager.getActiveStatesCount(workflow.id()));
 
-      cache.store(workflow);
+      final Optional<Workflow> oldWorkflowOptional = cache.workflow(workflow.id());
+
       workflowInitializer.inspectChange(workflow);
+      cache.store(workflow);
+      workflowConsumer.accept(oldWorkflowOptional, Optional.of(workflow));
     };
   }
 
-  private static Consumer<Workflow> workflowRemoved(WorkflowCache cache, Storage storage) {
+  private static Consumer<Workflow> workflowRemoved(
+      WorkflowCache cache,
+      Storage storage,
+      BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
     return workflow -> cache.workflow(workflow.id()).ifPresent(existingWorkflow -> {
       try {
         storage.delete(workflow.id());
@@ -573,8 +593,8 @@ public class StyxScheduler implements AppInit {
         LOG.warn("Couldn't remove workflow {}. ", workflow.id());
         return;
       }
-
       cache.remove(workflow);
+      workflowConsumer.accept(Optional.of(workflow), Optional.empty());
     });
   }
 

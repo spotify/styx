@@ -196,6 +196,41 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @Test
+  public void shouldConsumeDeletedWorkflow() throws Exception {
+    givenWorkflow(HOURLY_WORKFLOW);
+    styxStarts();
+
+    workflowDeleted(HOURLY_WORKFLOW);
+    awaitUntilConsumedWorkflow(Optional.of(HOURLY_WORKFLOW), Optional.empty());
+  }
+
+  @Test
+  public void shouldConsumeChangedWorkflow() throws Exception {
+    givenWorkflow(HOURLY_WORKFLOW);
+    styxStarts();
+
+    workflowChanges(DAILY_WORKFLOW);
+    awaitUntilConsumedWorkflow(Optional.of(HOURLY_WORKFLOW), Optional.of(DAILY_WORKFLOW));
+  }
+
+  @Test
+  public void shouldConsumeSameWorkflow() throws Exception {
+    givenWorkflow(HOURLY_WORKFLOW);
+    styxStarts();
+
+    workflowChanges(HOURLY_WORKFLOW);
+    awaitUntilConsumedWorkflow(Optional.of(HOURLY_WORKFLOW), Optional.of(HOURLY_WORKFLOW));
+  }
+
+  @Test
+  public void shouldConsumeNewWorkflow() throws Exception {
+    styxStarts();
+
+    workflowChanges(HOURLY_WORKFLOW);
+    awaitUntilConsumedWorkflow(Optional.empty(), Optional.of(HOURLY_WORKFLOW));
+  }
+
+  @Test
   public void shouldCatchUpWithNaturalTriggers() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
     givenTheGlobalEnableFlagIs(true);
