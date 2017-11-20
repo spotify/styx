@@ -121,13 +121,13 @@ public final class MetricsStats implements Stats {
       .tagged("unit", "error");
 
   static final MetricId NEW_WORKFLOW_RATE = BASE
-      .tagged("what", "new-workflow");
+      .tagged("what", "new-workflow-rate");
 
   static final MetricId UPDATED_WORKFLOW_RATE = BASE
-      .tagged("what", "updated-workflow");
+      .tagged("what", "updated-workflow-rate");
 
   static final MetricId REMOVED_WORKFLOW_RATE = BASE
-      .tagged("what", "removed-workflow");
+      .tagged("what", "removed-workflow-rate");
 
   static final MetricId WORKFLOW_CONSUMER_ERROR_RATE = BASE
       .tagged("what", "workflow-consumer-error-rate")
