@@ -30,10 +30,8 @@ import static com.spotify.styx.monitoring.MetricsStats.EVENT_CONSUMER_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_MISMATCH;
 import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.NATURAL_TRIGGER_RATE;
-import static com.spotify.styx.monitoring.MetricsStats.NEW_WORKFLOW_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.PULL_IMAGE_ERROR_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.QUEUED_EVENTS;
-import static com.spotify.styx.monitoring.MetricsStats.REMOVED_WORKFLOW_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_CONFIGURED;
 import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_USED;
 import static com.spotify.styx.monitoring.MetricsStats.STORAGE_DURATION;
@@ -42,8 +40,8 @@ import static com.spotify.styx.monitoring.MetricsStats.SUBMISSION_RATE_LIMIT;
 import static com.spotify.styx.monitoring.MetricsStats.TERMINATION_LOG_INVALID;
 import static com.spotify.styx.monitoring.MetricsStats.TERMINATION_LOG_MISSING;
 import static com.spotify.styx.monitoring.MetricsStats.TRANSITIONING_DURATION;
-import static com.spotify.styx.monitoring.MetricsStats.UPDATED_WORKFLOW_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.WORKFLOW_CONSUMER_ERROR_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.WORKFLOW_CONSUMER_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.WORKFLOW_COUNT;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -69,7 +67,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 public class MetricsStatsTest {
 
   private Stats stats;
-  
+
   @Mock
   private SemanticMetricRegistry registry;
 
@@ -90,9 +88,6 @@ public class MetricsStatsTest {
     when(registry.meter(TERMINATION_LOG_MISSING)).thenReturn(meter);
     when(registry.meter(TERMINATION_LOG_INVALID)).thenReturn(meter);
     when(registry.meter(EXIT_CODE_MISMATCH)).thenReturn(meter);
-    when(registry.meter(NEW_WORKFLOW_RATE)).thenReturn(meter);
-    when(registry.meter(UPDATED_WORKFLOW_RATE)).thenReturn(meter);
-    when(registry.meter(REMOVED_WORKFLOW_RATE)).thenReturn(meter);
     when(registry.meter(WORKFLOW_CONSUMER_ERROR_RATE)).thenReturn(meter);
     stats = new MetricsStats(registry);
   }
@@ -230,15 +225,6 @@ public class MetricsStatsTest {
   }
 
   @Test
-  public void shouldRecordEventConsumerError() throws Exception {
-    final SequenceEvent event = SequenceEvent
-        .create(Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural()), 0L, 0L);
-    when(registry.meter(EVENT_CONSUMER_ERROR_RATE.tagged("event-type", "triggerExecution"))).thenReturn(meter);
-    stats.recordEventConsumerError(event);
-    verify(meter).mark();
-  }
-
-  @Test
   public void shouldRecordEventConsumer() throws Exception {
     final SequenceEvent event = SequenceEvent
         .create(Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural()), 0L, 0L);
@@ -248,20 +234,18 @@ public class MetricsStatsTest {
   }
 
   @Test
-  public void shouldRecordNewWorkflow() throws Exception {
-    stats.recordNewWorkflow();
+  public void shouldRecordEventConsumerError() throws Exception {
+    final SequenceEvent event = SequenceEvent
+        .create(Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural()), 0L, 0L);
+    when(registry.meter(EVENT_CONSUMER_ERROR_RATE.tagged("event-type", "triggerExecution"))).thenReturn(meter);
+    stats.recordEventConsumerError(event);
     verify(meter).mark();
   }
 
   @Test
-  public void shouldRecordUpdatedWorkflow() throws Exception {
-    stats.recordUpdatedWorkflow();
-    verify(meter).mark();
-  }
-
-  @Test
-  public void shouldRecordRemovedWorkflow() throws Exception {
-    stats.recordRemovedWorkflow();
+  public void shouldRecordWorkflowConsumer() throws Exception {
+    when(registry.meter(WORKFLOW_CONSUMER_RATE.tagged("action", "updated"))).thenReturn(meter);
+    stats.recordWorkflowConsumer("updated");
     verify(meter).mark();
   }
 

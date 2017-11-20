@@ -105,15 +105,7 @@ final class NoopStats implements Stats {
   }
 
   @Override
-  public void recordNewWorkflow() {
-  }
-
-  @Override
-  public void recordUpdatedWorkflow() {
-  }
-
-  @Override
-  public void recordRemovedWorkflow() {
+  public void recordWorkflowConsumer(String action) {
   }
 
   @Override

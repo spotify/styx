@@ -37,6 +37,7 @@ import javaslang.Tuple2;
 import javaslang.Tuple3;
 
 public final class MetricsStats implements Stats {
+
   private static final String UNIT_SECOND = "s";
   private static final String UNIT_MILLISECOND = "ms";
   private static final MetricId BASE = MetricId.build("styx");
@@ -120,14 +121,8 @@ public final class MetricsStats implements Stats {
       .tagged("what", "event-consumer-error-rate")
       .tagged("unit", "error");
 
-  static final MetricId NEW_WORKFLOW_RATE = BASE
-      .tagged("what", "new-workflow-rate");
-
-  static final MetricId UPDATED_WORKFLOW_RATE = BASE
-      .tagged("what", "updated-workflow-rate");
-
-  static final MetricId REMOVED_WORKFLOW_RATE = BASE
-      .tagged("what", "removed-workflow-rate");
+  static final MetricId WORKFLOW_CONSUMER_RATE = BASE
+      .tagged("what", "workflow-consumer-rate");
 
   static final MetricId WORKFLOW_CONSUMER_ERROR_RATE = BASE
       .tagged("what", "workflow-consumer-error-rate")
@@ -143,9 +138,6 @@ public final class MetricsStats implements Stats {
   private final Meter terminationLogMissing;
   private final Meter terminationLogInvalid;
   private final Meter exitCodeMismatch;
-  private final Meter newWorkflowMeter;
-  private final Meter updatedWorkflowMeter;
-  private final Meter removedWorkflowMeter;
   private final Meter workflowConsumerErrorMeter;
   private final ConcurrentMap<String, Histogram> storageOperationHistograms;
   private final ConcurrentMap<String, Meter> storageOperationMeters;
@@ -158,6 +150,7 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Histogram> resourceUsedHistograms;
   private final ConcurrentMap<String, Meter> eventConsumerErrorMeters;
   private final ConcurrentMap<String, Meter> eventConsumerMeters;
+  private final ConcurrentMap<String, Meter> workflowConsumerMeters;
 
   public MetricsStats(SemanticMetricRegistry registry) {
     this.registry = Objects.requireNonNull(registry);
@@ -168,9 +161,6 @@ public final class MetricsStats implements Stats {
     this.terminationLogMissing = registry.meter(TERMINATION_LOG_MISSING);
     this.terminationLogInvalid = registry.meter(TERMINATION_LOG_INVALID);
     this.exitCodeMismatch = registry.meter(EXIT_CODE_MISMATCH);
-    this.newWorkflowMeter = registry.meter(NEW_WORKFLOW_RATE);
-    this.updatedWorkflowMeter = registry.meter(UPDATED_WORKFLOW_RATE);
-    this.removedWorkflowMeter = registry.meter(REMOVED_WORKFLOW_RATE);
     this.workflowConsumerErrorMeter = registry.meter(WORKFLOW_CONSUMER_ERROR_RATE);
     this.storageOperationHistograms = new ConcurrentHashMap<>();
     this.storageOperationMeters = new ConcurrentHashMap<>();
@@ -183,6 +173,7 @@ public final class MetricsStats implements Stats {
     this.resourceUsedHistograms = new ConcurrentHashMap<>();
     this.eventConsumerErrorMeters = new ConcurrentHashMap<>();
     this.eventConsumerMeters = new ConcurrentHashMap<>();
+    this.workflowConsumerMeters = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -289,18 +280,8 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
-  public void recordNewWorkflow() {
-    newWorkflowMeter.mark();
-  }
-
-  @Override
-  public void recordUpdatedWorkflow() {
-    updatedWorkflowMeter.mark();
-  }
-
-  @Override
-  public void recordRemovedWorkflow() {
-    removedWorkflowMeter.mark();
+  public void recordWorkflowConsumer(String action) {
+    workflowConsumerMeter(action).mark();
   }
 
   @Override
@@ -366,5 +347,10 @@ public final class MetricsStats implements Stats {
     final String eventType = EventUtil.name(sequenceEvent.event());
     return eventConsumerErrorMeters.computeIfAbsent(
         eventType, (op) -> registry.meter(EVENT_CONSUMER_ERROR_RATE.tagged("event-type", eventType)));
+  }
+
+  private Meter workflowConsumerMeter(String action) {
+    return workflowConsumerMeters.computeIfAbsent(
+        action, (op) -> registry.meter(WORKFLOW_CONSUMER_RATE.tagged("action", action)));
   }
 }
