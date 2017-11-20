@@ -120,6 +120,19 @@ public final class MetricsStats implements Stats {
       .tagged("what", "event-consumer-error-rate")
       .tagged("unit", "error");
 
+  private static final MetricId NEW_WORKFLOW_RATE = BASE
+      .tagged("what", "new-workflow");
+
+  private static final MetricId UPDATED_WORKFLOW_RATE = BASE
+      .tagged("what", "updated-workflow");
+
+  private static final MetricId REMOVED_WORKFLOW_RATE = BASE
+      .tagged("what", "removed-workflow");
+
+  private static final MetricId WORKFLOW_CONSUMER_ERROR_RATE = BASE
+      .tagged("what", "workflow-consumer-error-rate")
+      .tagged("unit", "error");
+
   private static final String STATUS = "status";
 
   private final SemanticMetricRegistry registry;
@@ -130,6 +143,10 @@ public final class MetricsStats implements Stats {
   private final Meter terminationLogMissing;
   private final Meter terminationLogInvalid;
   private final Meter exitCodeMismatch;
+  private final Meter newWorkflowMeter;
+  private final Meter updatedWorkflowMeter;
+  private final Meter removedWorkflowMeter;
+  private final Meter workflowConsumerErrorMeter;
   private final ConcurrentMap<String, Histogram> storageOperationHistograms;
   private final ConcurrentMap<String, Meter> storageOperationMeters;
   private final ConcurrentMap<String, Histogram> dockerOperationHistograms;
@@ -151,6 +168,10 @@ public final class MetricsStats implements Stats {
     this.terminationLogMissing = registry.meter(TERMINATION_LOG_MISSING);
     this.terminationLogInvalid = registry.meter(TERMINATION_LOG_INVALID);
     this.exitCodeMismatch = registry.meter(EXIT_CODE_MISMATCH);
+    this.newWorkflowMeter = registry.meter(NEW_WORKFLOW_RATE);
+    this.updatedWorkflowMeter = registry.meter(UPDATED_WORKFLOW_RATE);
+    this.removedWorkflowMeter = registry.meter(REMOVED_WORKFLOW_RATE);
+    this.workflowConsumerErrorMeter = registry.meter(WORKFLOW_CONSUMER_ERROR_RATE);
     this.storageOperationHistograms = new ConcurrentHashMap<>();
     this.storageOperationMeters = new ConcurrentHashMap<>();
     this.dockerOperationHistograms = new ConcurrentHashMap<>();
@@ -265,6 +286,26 @@ public final class MetricsStats implements Stats {
   @Override
   public void recordEventConsumerError(SequenceEvent event) {
     eventConsumerErrorMeter(event).mark();
+  }
+
+  @Override
+  public void recordNewWorkflow() {
+    newWorkflowMeter.mark();
+  }
+
+  @Override
+  public void recordUpdatedWorkflow() {
+    updatedWorkflowMeter.mark();
+  }
+
+  @Override
+  public void recordRemovedWorkflow() {
+    removedWorkflowMeter.mark();
+  }
+
+  @Override
+  public void recordWorkflowConsumerError() {
+    workflowConsumerErrorMeter.mark();
   }
 
   private Meter exitCodeMeter(WorkflowId workflowId, int exitCode) {

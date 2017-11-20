@@ -68,5 +68,13 @@ public interface Stats {
 
   void recordEventConsumerError(SequenceEvent event);
 
+  void recordNewWorkflow();
+
+  void recordUpdatedWorkflow();
+
+  void recordRemovedWorkflow();
+
+  void recordWorkflowConsumerError();
+
   Stats NOOP = new NoopStats();
 }
