@@ -33,21 +33,31 @@ import com.google.api.client.json.webtoken.JsonWebSignature.Header;
 import com.google.api.client.json.webtoken.JsonWebToken.Payload;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.util.Objects;
+import java.util.Optional;
 
 public class GoogleIdTokenAuth {
-  private final HttpTransport httpTransport;
   private static final JsonFactory JSON_FACTORY = Utils.getDefaultJsonFactory();
 
-  GoogleIdTokenAuth(HttpTransport httpTransport) {
-    this.httpTransport = httpTransport;
+  private final HttpTransport httpTransport;
+  private final Optional<GoogleCredential> credential;
+
+  GoogleIdTokenAuth(
+      HttpTransport httpTransport,
+      Optional<GoogleCredential> credential) {
+    this.httpTransport = Objects.requireNonNull(httpTransport, "httpTransport");
+    this.credential = Objects.requireNonNull(credential, "credential");
   }
 
-  public GoogleIdTokenAuth() {
-    this(Utils.getDefaultTransport());
+  public Optional<String> getToken(String targetAudience)
+      throws IOException, GeneralSecurityException {
+    return credential.isPresent()
+        ? Optional.of(getToken(targetAudience, credential.get()))
+        : Optional.empty();
   }
 
-  public String getToken(String targetAudience) throws IOException, GeneralSecurityException {
-    GoogleCredential credential = GoogleCredential.getApplicationDefault();
+  private String getToken(String targetAudience, GoogleCredential credential)
+      throws IOException, GeneralSecurityException {
     if (credential.getServiceAccountId() != null) {
       // is a service account
       return getServiceAccountToken(credential, targetAudience);
@@ -99,5 +109,25 @@ public class GoogleIdTokenAuth {
         .setRequestInitializer(credential);
     final TokenResponse response = request.execute();
     return (String) response.get("id_token");
+  }
+
+  public static GoogleIdTokenAuth ofDefaultCredential() {
+    try {
+      return of(Optional.of(GoogleCredential.getApplicationDefault()));
+    } catch (IOException e) {
+      return of(Optional.empty());
+    }
+  }
+
+  public static GoogleIdTokenAuth of(Optional<GoogleCredential> credential) {
+    return of(Utils.getDefaultTransport(), credential);
+  }
+
+  public static GoogleIdTokenAuth of(GoogleCredential credential) {
+    return of(Utils.getDefaultTransport(), Optional.of(credential));
+  }
+
+  private static GoogleIdTokenAuth of(HttpTransport transport, Optional<GoogleCredential> credential) {
+    return new GoogleIdTokenAuth(transport, credential);
   }
 }

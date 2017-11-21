@@ -21,6 +21,7 @@
 package com.spotify.styx.cli;
 
 import static com.spotify.apollo.Status.NOT_FOUND;
+import static com.spotify.apollo.Status.UNAUTHORIZED;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static net.sourceforge.argparse4j.impl.Arguments.fileType;
@@ -274,7 +275,23 @@ public final class CliMain {
     } catch (ExecutionException e) {
       final Throwable cause = e.getCause();
       if (cause instanceof ApiErrorException) {
-        cliOutput.printError("API error: " + cause.getMessage());
+        final ApiErrorException apiError = (ApiErrorException) cause;
+        if (apiError.getCode() == UNAUTHORIZED.code()) {
+          if (!apiError.isAuthenticated()) {
+            cliOutput.printError(
+                "API error: Unauthorized: Please set up Application Default Credentials or set the "
+                    + "GOOGLE_APPLICATION_CREDENTIALS env var to point to a file defining the "
+                    + "credentials.\n"
+                    + "\n"
+                    + "Hint: Try setting up credentials using gcloud: \n"
+                    + "\n"
+                    + "\t$ gcloud auth application-default login");
+          } else {
+            cliOutput.printError("API error: Unauthorized");
+          }
+        } else {
+          cliOutput.printError("API error: " + cause.getMessage());
+        }
       } else if (cause instanceof ClientErrorException) {
         cliOutput.printError(cause.getMessage());
       } else {
