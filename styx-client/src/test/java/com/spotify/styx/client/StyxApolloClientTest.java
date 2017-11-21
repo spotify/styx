@@ -141,6 +141,19 @@ public class StyxApolloClientTest {
   }
 
   @Test
+  public void testTokenSuccess() throws Exception {
+    when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
+        Response.forStatus(Status.OK)));
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+    final CompletableFuture<Void> r =
+        styx.triggerWorkflowInstance("foo", "bar", "baz").toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    assertThat(request.header("Authorization").get(), is("Bearer foobar"));
+  }
+
+  @Test
   public void testTokenFailure() throws Exception {
     final IOException rootCause = new IOException("netsplit!");
     when(auth.getToken(any())).thenThrow(rootCause);
