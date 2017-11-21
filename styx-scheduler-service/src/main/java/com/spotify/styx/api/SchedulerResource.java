@@ -148,7 +148,7 @@ public class SchedulerResource {
     try {
       workflowChangeListener.accept(workflow);
     } catch (WorkflowInitializationException e) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(e.getLocalizedMessage()));
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(e.getMessage()));
     }
 
     return Response.forPayload(workflow);
