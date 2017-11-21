@@ -390,7 +390,7 @@ class StyxApolloClient implements StyxClient {
         .withHeader("User-Agent", STYX_CLIENT_VERSION)
         .withTtl(TTL)
         .withHeaders(authToken
-            .map(t -> ImmutableMap.of("Authorization", "Bearer " + authToken))
+            .map(t -> ImmutableMap.of("Authorization", "Bearer " + t))
             .orElse(ImmutableMap.of()));
   }
 
