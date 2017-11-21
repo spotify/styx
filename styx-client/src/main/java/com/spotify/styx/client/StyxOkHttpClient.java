@@ -21,6 +21,7 @@
 package com.spotify.styx.client;
 
 import static com.spotify.styx.api.Api.Version.V3;
+import static com.spotify.styx.client.FutureOkHttpClient.APPLICATION_JSON;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.serialization.Json.serialize;
 
@@ -51,18 +52,12 @@ import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.security.GeneralSecurityException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.TimeUnit;
-import okhttp3.Call;
-import okhttp3.Callback;
 import okhttp3.HttpUrl;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
@@ -78,23 +73,27 @@ public class StyxOkHttpClient implements StyxClient {
   private static final String STYX_API_VERSION = V3.name().toLowerCase();
   private static final String STYX_CLIENT_VERSION =
       "Styx Client " + StyxOkHttpClient.class.getPackage().getImplementationVersion();
-  private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
-  private static final Duration READ_TIMEOUT = Duration.ofSeconds(90);
-  private static final Duration WRITE_TIMEOUT = Duration.ofSeconds(90);
-  private static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
 
   private final URI apiHost;
+  private final GoogleIdTokenAuth auth;
+  private final FutureOkHttpClient client;
 
   public static StyxOkHttpClient create(String apiHost) {
-    return new StyxOkHttpClient(apiHost);
+    return new StyxOkHttpClient(FutureOkHttpClient.createDefault(), apiHost);
   }
 
-  private StyxOkHttpClient(String apiHost) {
+  StyxOkHttpClient(FutureOkHttpClient client, String apiHost) {
+    this(client, apiHost, GoogleIdTokenAuth.ofDefaultCredential());
+  }
+
+  StyxOkHttpClient(FutureOkHttpClient client, String apiHost, GoogleIdTokenAuth auth) {
     if (apiHost.contains("://")) {
       this.apiHost = URI.create(apiHost);
     } else {
       this.apiHost = URI.create("https://" + apiHost);
     }
+    this.client = Objects.requireNonNull(client, "client");
+    this.auth = Objects.requireNonNull(auth, "auth");
   }
 
   @Override
@@ -390,7 +389,7 @@ public class StyxOkHttpClient implements StyxClient {
 
   private <T> CompletionStage<T> executeRequest(final Request request,
                                                 final Class<T> tClass) {
-    return executeRequest(decorateRequest(request)).thenApply(response -> {
+    return executeRequest(request).thenApply(response -> {
       if (response.body() == null) {
         throw new RuntimeException("Expected payload not found");
       } else {
@@ -403,60 +402,39 @@ public class StyxOkHttpClient implements StyxClient {
     });
   }
 
-  private Request decorateRequest(final Request request) {
-    return withOptionalAuth(
-        request.newBuilder()
-            .header("User-Agent", STYX_CLIENT_VERSION)
-            .build());
-  }
-
-  private Request withOptionalAuth(final Request request) {
-    try {
-      final String authToken = new GoogleIdTokenAuth().getToken(this.apiHost.toString());
-      return request.newBuilder().header("Authorization", "Bearer " + authToken).build();
-    } catch (IOException e) {
-      // Credential probably not configured. Proceed to invoke API without authentication.
-      return request;
-    } catch (GeneralSecurityException e) {
-      // Credential probably configured wrongly.
-      throw new RuntimeException(e);
-    }
-  }
-
   private CompletionStage<Response> executeRequest(final Request request) {
-    final OkHttpClient client = new OkHttpClient.Builder()
-        .connectTimeout(CONNECT_TIMEOUT.getSeconds(), TimeUnit.SECONDS)
-        .readTimeout(READ_TIMEOUT.getSeconds(), TimeUnit.SECONDS)
-        .writeTimeout(WRITE_TIMEOUT.getSeconds(), TimeUnit.SECONDS)
-        .build();
+    final Optional<String> authToken;
+    try {
+      authToken = auth.getToken(this.apiHost.toString());
+    } catch (IOException | GeneralSecurityException e) {
+      // Credential probably invalid, configured wrongly or the token request failed.
+      return CompletableFutures.exceptionallyCompletedFuture(
+          new ClientErrorException("Authentication failure: " + e.getMessage(), e));
+    }
 
-    final CompletableFuture<Response> future = new CompletableFuture<>();
+    final Request.Builder requestBuilder = request.newBuilder()
+        .header("User-Agent", STYX_CLIENT_VERSION);
 
-    client.newCall(request).enqueue(new Callback() {
-      @Override
-      public void onFailure(Call call, IOException e) {
-        final String message;
+    authToken.ifPresent(token -> requestBuilder.header("Authorization", "Bearer " + token));
+
+    return client.send(requestBuilder.build()).handle((response, e) -> {
+      if (e != null) {
         final Throwable rootCause = Throwables.getRootCause(e);
         if (rootCause instanceof SocketTimeoutException) {
-          message = "Connection failed: " + rootCause.getMessage() + ": " + apiHost;
+          throw new ClientErrorException(
+              "Connection failed: " + rootCause.getMessage() + ": " + apiHost, e);
         } else {
-          message = "Request failed: " + request;
+          throw new ClientErrorException("Request failed: " + request, e);
         }
-        future.completeExceptionally(new ClientErrorException(message, e));
-      }
-
-      @Override
-      public void onResponse(Call call, Response response) throws IOException {
+      } else {
         if (response.isSuccessful()) {
-          future.complete(response);
+          return response;
         } else {
-          future.completeExceptionally(new ApiErrorException(
-              response.code() + " " + response.message(), response.code()));
+          final String message = response.code() + " " + response.message();
+          throw new ApiErrorException(message, response.code(), authToken.isPresent());
         }
       }
     });
-
-    return future.whenComplete((v, t) -> client.dispatcher().executorService().shutdown());
   }
 
   private HttpUrl.Builder getUrlBuilder() {

@@ -21,11 +21,10 @@
 package com.spotify.styx.cli;
 
 import static com.google.common.base.Throwables.getStackTraceAsString;
-import static com.spotify.apollo.Status.UNAUTHORIZED;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static java.net.HttpURLConnection.HTTP_UNAUTHORIZED;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
-import static net.sourceforge.argparse4j.impl.Arguments.fileType;
 
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -50,7 +49,6 @@ import com.spotify.styx.serialization.Json;
 import com.spotify.styx.util.ParameterUtil;
 import java.io.File;
 import java.io.IOException;
-import java.net.HttpURLConnection;
 import java.time.format.DateTimeParseException;
 import java.util.Collection;
 import java.util.Collections;
@@ -107,6 +105,7 @@ public final class CliMain {
   public static void main(String... args) {
     try {
       run(CliContext.DEFAULT, args);
+      System.exit(ExitStatus.Success.code);
     } catch (CliExitException e) {
       System.exit(e.status().code);
     }
@@ -260,7 +259,7 @@ public final class CliMain {
       final Throwable cause = e.getCause();
       if (cause instanceof ApiErrorException) {
         final ApiErrorException apiError = (ApiErrorException) cause;
-        if (apiError.getCode() == UNAUTHORIZED.code()) {
+        if (apiError.getCode() == HTTP_UNAUTHORIZED) {
           if (!apiError.isAuthenticated()) {
             cliOutput.printError(
                 "API error: Unauthorized: Please set up Application Default Credentials or set the "
@@ -603,7 +602,7 @@ public final class CliMain {
         workflowCreate.addArgument("component").help("Component ID");
     final Argument workflowCreateFile =
         workflowCreate.addArgument("-f", "--file")
-            .type(fileType().acceptSystemIn().verifyCanRead())
+            .type(Arguments.fileType().acceptSystemIn().verifyCanRead())
             .help("Workflow configuration file");
 
     final Subparser workflowDelete = WorkflowCommand.DELETE.parser(workflowParser);
