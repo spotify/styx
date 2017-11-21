@@ -42,82 +42,90 @@ public final class MetricsStats implements Stats {
   private static final String UNIT_MILLISECOND = "ms";
   private static final MetricId BASE = MetricId.build("styx");
 
-  private static final MetricId QUEUED_EVENTS = BASE
+  static final MetricId QUEUED_EVENTS = BASE
       .tagged("what", "queued-events-count")
       .tagged("unit", "events");
 
-  private static final MetricId ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER = BASE
+  static final MetricId ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER = BASE
       .tagged("what", "active-states-per-runstate-per-trigger-count")
       .tagged("unit", "state");
 
-  private static final MetricId ACTIVE_STATES_PER_WORKFLOW = BASE
+  static final MetricId ACTIVE_STATES_PER_WORKFLOW = BASE
       .tagged("what", "active-states-per-workflow-count")
       .tagged("unit", "state");
 
-  private static final MetricId WORKFLOW_COUNT = BASE
+  static final MetricId WORKFLOW_COUNT = BASE
       .tagged("what", "workflow-count")
       .tagged("unit", "workflow");
 
-  private static final MetricId RESOURCE_CONFIGURED = BASE
+  static final MetricId RESOURCE_CONFIGURED = BASE
       .tagged("what", "resource-configured");
 
-  private static final MetricId RESOURCE_USED = BASE
+  static final MetricId RESOURCE_USED = BASE
       .tagged("what", "resource-used");
 
-  private static final MetricId EXIT_CODE_RATE = BASE
+  static final MetricId EXIT_CODE_RATE = BASE
       .tagged("what", "exit-code-rate");
 
-  private static final MetricId STORAGE_DURATION = BASE
+  static final MetricId STORAGE_DURATION = BASE
       .tagged("what", "storage-operation-duration")
       .tagged("unit", UNIT_MILLISECOND);
 
-  private static final String OPERATION = "operation";
-  private static final MetricId STORAGE_RATE = BASE
+  static final String OPERATION = "operation";
+
+  static final MetricId STORAGE_RATE = BASE
       .tagged("what", "storage-operation-rate")
       .tagged("unit", OPERATION);
 
-  private static final MetricId DOCKER_DURATION = BASE
+  static final MetricId DOCKER_DURATION = BASE
       .tagged("what", "docker-operation-duration")
       .tagged("unit", UNIT_MILLISECOND);
 
-  private static final MetricId DOCKER_RATE = BASE
+  static final MetricId DOCKER_RATE = BASE
       .tagged("what", "docker-operation-rate")
       .tagged("unit", OPERATION);
 
-  private static final MetricId DOCKER_ERROR_RATE = BASE
+  static final MetricId DOCKER_ERROR_RATE = BASE
       .tagged("what", "docker-operation-error-rate")
       .tagged("unit", OPERATION);
 
-  private static final MetricId TRANSITIONING_DURATION = BASE
+  static final MetricId TRANSITIONING_DURATION = BASE
       .tagged("what", "time-transitioning-between-submitted-running")
       .tagged("unit", UNIT_SECOND);
 
-  private static final MetricId PULL_IMAGE_ERROR_RATE = BASE
+  static final MetricId PULL_IMAGE_ERROR_RATE = BASE
       .tagged("what", "pull-image-error-rate")
       .tagged("unit", "error");
 
-  private static final MetricId NATURAL_TRIGGER_RATE = BASE
+  static final MetricId NATURAL_TRIGGER_RATE = BASE
       .tagged("what", "natural-trigger-rate")
       .tagged("unit", "trigger");
 
-  private static final MetricId TERMINATION_LOG_MISSING = BASE
+  static final MetricId TERMINATION_LOG_MISSING = BASE
       .tagged("what", "termination-log-missing");
 
-  private static final MetricId TERMINATION_LOG_INVALID = BASE
+  static final MetricId TERMINATION_LOG_INVALID = BASE
       .tagged("what", "termination-log-invalid");
 
-  private static final MetricId EXIT_CODE_MISMATCH = BASE
+  static final MetricId EXIT_CODE_MISMATCH = BASE
       .tagged("what", "exit-code-mismatch");
 
-  private static final MetricId SUBMISSION_RATE_LIMIT = BASE
+  static final MetricId SUBMISSION_RATE_LIMIT = BASE
       .tagged("what", "submission-rate-limit")
       .tagged("unit", "submission/s");
 
-  private static final MetricId EVENT_CONSUMER_RATE = BASE
+  static final MetricId EVENT_CONSUMER_RATE = BASE
       .tagged("what", "event-consumer-rate");
 
-  private static final MetricId EVENT_CONSUMER_ERROR_RATE = BASE
+  static final MetricId EVENT_CONSUMER_ERROR_RATE = BASE
       .tagged("what", "event-consumer-error-rate")
+      .tagged("unit", "error");
+
+  static final MetricId WORKFLOW_CONSUMER_RATE = BASE
+      .tagged("what", "workflow-consumer-rate");
+
+  static final MetricId WORKFLOW_CONSUMER_ERROR_RATE = BASE
+      .tagged("what", "workflow-consumer-error-rate")
       .tagged("unit", "error");
 
   private static final String STATUS = "status";
@@ -130,6 +138,7 @@ public final class MetricsStats implements Stats {
   private final Meter terminationLogMissing;
   private final Meter terminationLogInvalid;
   private final Meter exitCodeMismatch;
+  private final Meter workflowConsumerErrorMeter;
   private final ConcurrentMap<String, Histogram> storageOperationHistograms;
   private final ConcurrentMap<String, Meter> storageOperationMeters;
   private final ConcurrentMap<String, Histogram> dockerOperationHistograms;
@@ -141,6 +150,7 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Histogram> resourceUsedHistograms;
   private final ConcurrentMap<String, Meter> eventConsumerErrorMeters;
   private final ConcurrentMap<String, Meter> eventConsumerMeters;
+  private final ConcurrentMap<String, Meter> workflowConsumerMeters;
 
   public MetricsStats(SemanticMetricRegistry registry) {
     this.registry = Objects.requireNonNull(registry);
@@ -151,6 +161,7 @@ public final class MetricsStats implements Stats {
     this.terminationLogMissing = registry.meter(TERMINATION_LOG_MISSING);
     this.terminationLogInvalid = registry.meter(TERMINATION_LOG_INVALID);
     this.exitCodeMismatch = registry.meter(EXIT_CODE_MISMATCH);
+    this.workflowConsumerErrorMeter = registry.meter(WORKFLOW_CONSUMER_ERROR_RATE);
     this.storageOperationHistograms = new ConcurrentHashMap<>();
     this.storageOperationMeters = new ConcurrentHashMap<>();
     this.dockerOperationHistograms = new ConcurrentHashMap<>();
@@ -162,6 +173,7 @@ public final class MetricsStats implements Stats {
     this.resourceUsedHistograms = new ConcurrentHashMap<>();
     this.eventConsumerErrorMeters = new ConcurrentHashMap<>();
     this.eventConsumerMeters = new ConcurrentHashMap<>();
+    this.workflowConsumerMeters = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -267,6 +279,16 @@ public final class MetricsStats implements Stats {
     eventConsumerErrorMeter(event).mark();
   }
 
+  @Override
+  public void recordWorkflowConsumer(String action) {
+    workflowConsumerMeter(action).mark();
+  }
+
+  @Override
+  public void recordWorkflowConsumerError() {
+    workflowConsumerErrorMeter.mark();
+  }
+
   private Meter exitCodeMeter(WorkflowId workflowId, int exitCode) {
     return exitCodePerWorkflowMeters
         .computeIfAbsent(Tuple.of(workflowId, exitCode), (tuple) ->
@@ -325,5 +347,10 @@ public final class MetricsStats implements Stats {
     final String eventType = EventUtil.name(sequenceEvent.event());
     return eventConsumerErrorMeters.computeIfAbsent(
         eventType, (op) -> registry.meter(EVENT_CONSUMER_ERROR_RATE.tagged("event-type", eventType)));
+  }
+
+  private Meter workflowConsumerMeter(String action) {
+    return workflowConsumerMeters.computeIfAbsent(
+        action, (op) -> registry.meter(WORKFLOW_CONSUMER_RATE.tagged("action", action)));
   }
 }

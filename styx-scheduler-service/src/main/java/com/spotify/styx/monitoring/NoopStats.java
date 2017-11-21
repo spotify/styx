@@ -103,4 +103,12 @@ final class NoopStats implements Stats {
   @Override
   public void recordEventConsumerError(SequenceEvent event) {
   }
+
+  @Override
+  public void recordWorkflowConsumer(String action) {
+  }
+
+  @Override
+  public void recordWorkflowConsumerError() {
+  }
 }
