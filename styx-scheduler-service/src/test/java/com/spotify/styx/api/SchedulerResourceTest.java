@@ -59,6 +59,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.TriggerUtil;
+import com.spotify.styx.workflow.WorkflowInitializationException;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
@@ -83,6 +84,8 @@ public class SchedulerResourceTest {
 
   private final Workflow HOURLY_WORKFLOW = Workflow.create("styx",
                                                            TestData.HOURLY_WORKFLOW_CONFIGURATION);
+  private final Workflow HOURLY_WORKFLOW_WITH_INVALID_OFFSET =
+      Workflow.create("styx", TestData.HOURLY_WORKFLOW_CONFIGURATION_WITH_INVALID_OFFSET);
   private final Workflow DAILY_WORKFLOW = Workflow.create("styx",
                                                           TestData.DAILY_WORKFLOW_CONFIGURATION);
   private final Workflow FULL_DAILY_WORKFLOW = Workflow.create("styx",
@@ -98,6 +101,10 @@ public class SchedulerResourceTest {
   private final DockerImageValidator dockerImageValidator = mock(DockerImageValidator.class);
 
   private void workflowChangeListener(Workflow workflow) {
+    if (workflow.equals(HOURLY_WORKFLOW_WITH_INVALID_OFFSET)) {
+      throw new WorkflowInitializationException(new RuntimeException());
+    }
+
     try {
       storage.storeWorkflow(workflow);
     } catch (IOException e) {
@@ -209,6 +216,26 @@ public class SchedulerResourceTest {
         serviceHelper.request("POST", SchedulerResource.BASE + "/workflows/styx", workflowPayload);
 
     assertThat(post2.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
+    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
+    storage.delete(HOURLY_WORKFLOW.id());
+  }
+
+  @Test
+  public void testUpdateWorkflowWithInvalidOffset() throws Exception {
+    ByteString workflowPayload = serialize(HOURLY_WORKFLOW.configuration());
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows/styx", workflowPayload);
+
+    assertThat(post.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
+    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
+
+    ByteString workflowWithInvalidOffset =
+        serialize(HOURLY_WORKFLOW_WITH_INVALID_OFFSET.configuration());
+    CompletionStage<Response<ByteString>> post2 =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows/styx",
+                              workflowWithInvalidOffset);
+
+    assertThat(post2.toCompletableFuture().get(), hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
     storage.delete(HOURLY_WORKFLOW.id());
   }

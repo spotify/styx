@@ -56,6 +56,23 @@ public final class TestData {
           .dockerImage("busybox")
           .schedule(HOURS)
           .build();
+  public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_INVALID_OFFSET =
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .dockerImage("busybox")
+          .schedule(HOURS)
+          .offset("P1D2H") // the correct one should be P1DT2H
+          .build();
+
+  public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_VALID_OFFSET =
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .dockerImage("busybox")
+          .schedule(HOURS)
+          .offset("P1DT2H")
+          .build();
 
   public static final WorkflowConfiguration DAILY_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
@@ -80,7 +97,6 @@ public final class TestData {
           .dockerImage("busybox")
           .schedule(MONTHS)
           .build();
-
 
   public static final WorkflowConfiguration FULL_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
