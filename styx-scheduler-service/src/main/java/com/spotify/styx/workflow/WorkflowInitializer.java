@@ -31,8 +31,11 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class WorkflowInitializer {
+  private static final Logger LOG = LoggerFactory.getLogger(WorkflowInitializer.class);
 
   private final Storage storage;
   private final Time time;
@@ -46,10 +49,12 @@ public class WorkflowInitializer {
     final Optional<Workflow> previous;
     try {
       previous = storage.workflow(workflow.id());
-      storage.storeWorkflow(workflow);
     } catch (IOException e) {
+      LOG.warn("failed to read workflow {} from storage", workflow.id(), e);
       throw new RuntimeException(e);
     }
+
+    Optional<TriggerInstantSpec> nextSpec = Optional.empty();
 
     // either the workflow is completely new, or the schedule/offset has changed
     final Schedule newSchedule = workflow.configuration().schedule();
@@ -57,21 +62,30 @@ public class WorkflowInitializer {
     if (!previous.isPresent()
         || !previous.get().configuration().schedule().equals(newSchedule)
         || !previous.get().configuration().offset().equals(newOffset)) {
-      initializeNaturalTrigger(workflow);
+      try {
+        nextSpec = Optional.of(initializeNaturalTrigger(workflow));
+      } catch (Exception e) {
+        LOG.info("could not compute next natural trigger for workflow {}", workflow, e);
+        throw new WorkflowInitializationException(e);
+      }
+    }
+
+    try {
+      storage.storeWorkflow(workflow);
+      if (nextSpec.isPresent()) {
+        storage.updateNextNaturalTrigger(workflow.id(), nextSpec.get());
+      }
+    } catch (IOException e) {
+      LOG.warn("failed to write workflow {} to storage", workflow.id(), e);
+      throw new RuntimeException(e);
     }
   }
 
-  private void initializeNaturalTrigger(Workflow workflow) {
+  private TriggerInstantSpec initializeNaturalTrigger(Workflow workflow) {
     final Instant now = time.get();
     final Schedule schedule = workflow.configuration().schedule();
     final Instant nextTrigger = lastInstant(now, schedule);
     final Instant nextWithOffset = workflow.configuration().addOffset(nextTrigger);
-    final TriggerInstantSpec nextSpec = TriggerInstantSpec.create(nextTrigger, nextWithOffset);
-
-    try {
-      storage.updateNextNaturalTrigger(workflow.id(), nextSpec);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    return TriggerInstantSpec.create(nextTrigger, nextWithOffset);
   }
 }

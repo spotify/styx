@@ -45,6 +45,7 @@ import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.Time;
+import com.spotify.styx.workflow.WorkflowInitializationException;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collection;
@@ -143,7 +144,12 @@ public class SchedulerResource {
     }
 
     final Workflow workflow = Workflow.create(componentId, configuration);
-    workflowChangeListener.accept(workflow);
+
+    try {
+      workflowChangeListener.accept(workflow);
+    } catch (WorkflowInitializationException e) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(e.getMessage()));
+    }
 
     return Response.forPayload(workflow);
   }
