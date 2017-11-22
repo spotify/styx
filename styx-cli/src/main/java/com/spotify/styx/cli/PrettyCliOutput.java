@@ -57,7 +57,7 @@ class PrettyCliOutput implements CliOutput {
     System.out.println(String.format("  %-20s %-12s %-47s %-7s %s",
                                      "WORKFLOW INSTANCE",
                                      "STATE",
-                                     "LAST EXECUTION ID",
+                                     "EXECUTION ID",
                                      "TRIES",
                                      "PREVIOUS EXECUTION MESSAGE"));
 
