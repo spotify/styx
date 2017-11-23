@@ -135,7 +135,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
             .build());
 
     givenTheTimeIs("2016-03-14T15:30:00Z");
-    givenTheGlobalEnableFlagIs(true);
     givenWorkflow(customWorkflow);
     givenWorkflowEnabledStateIs(customWorkflow, true);
     givenNextNaturalTrigger(customWorkflow, "2016-03-14T12:45:00Z");
@@ -176,7 +175,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
             .build());
 
     givenTheTimeIs("2016-03-14T15:30:00Z");
-    givenTheGlobalEnableFlagIs(true);
     givenWorkflow(customWorkflow);
     givenWorkflowEnabledStateIs(customWorkflow, true);
     givenNextNaturalTrigger(customWorkflow, "2016-03-14T12:45:00Z");
@@ -233,7 +231,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @Test
   public void shouldCatchUpWithNaturalTriggers() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
-    givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T12:00:00Z");
@@ -276,7 +273,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @Test
   public void shouldConvertOldTriggerConfigurationToNew() throws Exception {
     givenTheTimeIs("2016-03-14T10:59:01Z");
-    givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTriggerOld(HOURLY_WORKFLOW, "2016-03-14T11:00:00Z");
@@ -292,7 +288,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @Test
   public void testTriggerBackfillsWithinResourceLimit() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
-    givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, false);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
@@ -313,7 +308,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @Test
   public void testTriggerBackfillsWillComplete() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
-    givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, false);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
@@ -341,7 +335,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @Test
   public void removedEnabledWorkflowWontGetScheduled() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
-    givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T13:00:00Z");
@@ -366,7 +359,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @Test
   public void updatesNextNaturalTriggerWhenWFScheduleChangesFromFinerToCoarser() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
-    givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T14:00:00Z");
@@ -398,7 +390,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @Test
   public void updatesNextNaturalTriggerWhenWFOffsetChanges() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
-    givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T14:00:00Z");
@@ -461,7 +452,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @Test
   public void updatesNextNaturalTriggerWhenWFScheduleChangesFromCoarserToFiner() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
-    givenTheGlobalEnableFlagIs(true);
     givenWorkflow(DAILY_WORKFLOW);
     givenWorkflowEnabledStateIs(DAILY_WORKFLOW, true);
     givenNextNaturalTrigger(DAILY_WORKFLOW, "2016-03-13T00:00:00Z");
@@ -493,7 +483,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @Test
   public void runsDockerImageWithArgsTemplate() throws Exception {
     givenTheTimeIs("2016-03-14T15:59:01Z");
-    givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T15:00:00Z");
@@ -511,7 +500,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @Test
   public void retriesUseLatestWorkflowSpecification() throws Exception {
     givenTheTimeIs("2016-03-14T15:59:01Z");
-    givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T15:00:00Z");
@@ -558,7 +546,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @Test
   public void cleansUpDockerRunsWhenTerminating() throws Exception {
     givenTheTimeIs("2016-03-14T15:59:01Z");
-    givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T15:00:00Z");
@@ -580,7 +567,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @Test
   public void cleansUpDockerRunsWhenFailing() throws Exception {
     givenTheTimeIs("2016-03-14T15:59:01Z");
-    givenTheGlobalEnableFlagIs(true);
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T15:00:00Z");

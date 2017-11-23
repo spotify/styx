@@ -29,6 +29,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 
+import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -69,14 +70,15 @@ public class InMemStorageTest {
   }
 
   @Test
-  public void testEnableGlobal() throws IOException {
+  public void testConfig() throws IOException {
     Storage storage = new InMemStorage();
 
-    assertThat(storage.globalEnabled(), is(true));
-    assertThat(storage.setGlobalEnabled(false), is(true));
-    assertThat(storage.globalEnabled(), is(false));
-    assertThat(storage.setGlobalEnabled(true), is(false));
-    assertThat(storage.globalEnabled(), is(true));
+    final StyxConfig expectedConfig = StyxConfig.newBuilder()
+        .globalEnabled(true)
+        .globalDockerRunnerId("default")
+        .build();
+
+    assertThat(storage.config(), is(expectedConfig));
   }
 
   @Test

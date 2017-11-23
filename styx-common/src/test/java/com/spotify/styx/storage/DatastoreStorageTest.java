@@ -25,8 +25,8 @@ import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
-import static java.util.Optional.empty;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
@@ -46,6 +46,7 @@ import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -59,7 +60,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.hamcrest.Matchers;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -162,7 +162,7 @@ public class DatastoreStorageTest {
   public void shouldReturnEmptyOptionalWhenWorkflowIdDoesNotExist() throws Exception {
     Optional<Workflow> retrieved = storage.workflow(WorkflowId.create("foo", "bar"));
 
-    assertThat(retrieved, is(empty()));
+    assertThat(retrieved, is(Optional.empty()));
   }
 
   @Test
@@ -172,28 +172,6 @@ public class DatastoreStorageTest {
     storage.store(workflow);
     WorkflowState retrieved = storage.workflowState(workflow.id());
     assertThat(retrieved, is(WorkflowState.patchEnabled(false)));
-  }
-
-  @Test
-  public void shouldStoreGlobalEnabledFlag() throws Exception {
-    boolean old1 = storage.setGlobalEnabled(false);
-    assertTrue(old1);
-    assertFalse(storage.globalEnabled());
-
-    boolean old2 = storage.setGlobalEnabled(true);
-    assertFalse(old2);
-    assertTrue(storage.globalEnabled());
-
-    boolean old3 = storage.setGlobalEnabled(true);
-    assertTrue(old3);
-    assertTrue(storage.globalEnabled());
-  }
-
-  @Test
-  public void shouldBeGlobalEnabledByDefault() throws Exception {
-    boolean enabled = storage.globalEnabled();
-
-    assertTrue(enabled);
   }
 
   @Test
@@ -246,7 +224,7 @@ public class DatastoreStorageTest {
 
     storage.setEnabled(WORKFLOW_ID2, false);
     storage.setEnabled(WORKFLOW_ID3, false);
-    assertThat(storage.enabled(), is(Matchers.empty()));
+    assertThat(storage.enabled(), is(empty()));
   }
 
   @Test
@@ -367,23 +345,13 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void defaultGlobalDockerRunnerId() throws Exception {
-    assertThat(storage.globalDockerRunnerId(), is("default"));
-  }
-
-  @Test
   public void getsGlobalDockerRunnerId() throws Exception {
     Entity config = Entity.newBuilder(storage.globalConfigKey)
         .set(DatastoreStorage.PROPERTY_CONFIG_DOCKER_RUNNER_ID, "foobar")
         .build();
     helper.getOptions().getService().put(config);
 
-    assertThat(storage.globalDockerRunnerId(), is("foobar"));
-  }
-
-  @Test
-  public void shouldNotReturnClientBlacklist() {
-    assertFalse(storage.clientBlacklist().isPresent());
+    assertThat(storage.config().globalDockerRunnerId(), is("foobar"));
   }
 
   @Test
@@ -392,7 +360,7 @@ public class DatastoreStorageTest {
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
             ImmutableList.of()).build();
     helper.getOptions().getService().put(config);
-    assertTrue(storage.clientBlacklist().get().isEmpty());
+    assertThat(storage.config().clientBlacklist(), is(empty()));
   }
 
   @Test
@@ -402,7 +370,7 @@ public class DatastoreStorageTest {
             ImmutableList.of(StringValue.of("v1"), StringValue.of("v2"), StringValue.of("v3")))
         .build();
     helper.getOptions().getService().put(config);
-    List<String> blacklist = storage.clientBlacklist().get();
+    List<String> blacklist = storage.config().clientBlacklist();
     assertThat(blacklist.size(), is(3));
     assertThat(blacklist.get(0), is("v1"));
     assertThat(blacklist.get(1), is("v2"));
@@ -461,6 +429,16 @@ public class DatastoreStorageTest {
     String componentId = "component";
     List<Workflow> l = storage.workflows(componentId);
     assertThat(l, hasSize(0));
+  }
+
+  @Test
+  public void testDefaultConfig() throws Exception {
+    final StyxConfig expectedConfig = StyxConfig.newBuilder()
+        .globalEnabled(true)
+        .globalDockerRunnerId("default")
+        .build();
+
+    assertThat(storage.config(), is(expectedConfig));
   }
 
   private Workflow workflow(WorkflowId workflowId) {

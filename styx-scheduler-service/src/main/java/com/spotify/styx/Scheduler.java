@@ -110,7 +110,7 @@ public class Scheduler {
     final Optional<Long> globalConcurrency;
     try {
       resources = storage.resources().stream().collect(toMap(Resource::id, identity()));
-      globalConcurrency = storage.globalConcurrency();
+      globalConcurrency = storage.config().globalConcurrency();
     } catch (IOException e) {
       LOG.warn("Failed to get resource limits", e);
       return;

@@ -167,7 +167,7 @@ public class MiddlewaresTest {
 
   @Test
   public void testValidClientNoBlacklist() throws Exception {
-    Supplier<Optional<List<String>>> supplier = Optional::empty;
+    Supplier<List<String>> supplier = Collections::emptyList;
     RequestContext requestContext = mockRequestContext(true);
     Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)
         .apply(mockInnerHandler(requestContext))
@@ -177,7 +177,7 @@ public class MiddlewaresTest {
 
   @Test
   public void testValidClientEmptyBlacklist() throws Exception {
-    Supplier<Optional<List<String>>> supplier = () -> Optional.of(ImmutableList.of());
+    Supplier<List<String>> supplier = Collections::emptyList;
     RequestContext requestContext = mockRequestContext(true);
     Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)
         .apply(mockInnerHandler(requestContext))
@@ -187,7 +187,7 @@ public class MiddlewaresTest {
 
   @Test
   public void testValidClient() throws Exception {
-    Supplier<Optional<List<String>>> supplier = () -> Optional.of(ImmutableList.of("Styx CLI 0.1.0"));
+    Supplier<List<String>> supplier = () -> ImmutableList.of("Styx CLI 0.1.0");
     RequestContext requestContext = mockRequestContext(true);
     Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)
         .apply(mockInnerHandler(requestContext))
@@ -197,7 +197,7 @@ public class MiddlewaresTest {
 
   @Test
   public void testValidClientNoHeader() throws Exception {
-    Supplier<Optional<List<String>>> supplier = () -> Optional.of(ImmutableList.of("Styx CLI 0.1.0"));
+    Supplier<List<String>> supplier = () -> ImmutableList.of("Styx CLI 0.1.0");
     RequestContext requestContext = mockRequestContext(false);
     Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)
         .apply(mockInnerHandler(requestContext))
@@ -207,7 +207,7 @@ public class MiddlewaresTest {
 
   @Test
   public void testInvalidClient() throws Exception {
-    Supplier<Optional<List<String>>> supplier = () -> Optional.of(ImmutableList.of("Styx CLI 0.1.1"));
+    Supplier<List<String>> supplier = () -> ImmutableList.of("Styx CLI 0.1.1");
     RequestContext requestContext = mockRequestContext(true);
 
     Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)

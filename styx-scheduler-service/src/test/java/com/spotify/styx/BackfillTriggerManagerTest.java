@@ -39,6 +39,7 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -99,6 +100,8 @@ public class BackfillTriggerManagerTest {
   @Mock
   private Storage storage;
 
+  @Mock StyxConfig config;
+
   private WorkflowCache workflowCache;
 
   private BackfillTriggerManager backfillTriggerManager;
@@ -112,7 +115,8 @@ public class BackfillTriggerManagerTest {
     when(triggerListener.event(any(Workflow.class), any(Trigger.class), any(Instant.class)))
         .then(a -> CompletableFuture.completedFuture(null));
     when(storage.resources()).thenReturn(resourceLimits);
-    when(storage.globalConcurrency()).thenReturn(Optional.empty());
+    when(config.globalConcurrency()).thenReturn(Optional.empty());
+    when(storage.config()).thenReturn(config);
 
     stateManager = new SyncStateManager();
     workflowCache = new InMemWorkflowCache();

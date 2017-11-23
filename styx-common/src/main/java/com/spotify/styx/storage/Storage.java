@@ -24,6 +24,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -66,37 +67,9 @@ public interface Storage {
   Optional<Long> getLatestStoredCounter(WorkflowInstance workflowInstance) throws IOException;
 
   /**
-   * Get the global concurrency for Styx.
+   * Get the global {@link com.spotify.styx.model.StyxConfig}.
    */
-  Optional<Long> globalConcurrency() throws IOException;
-
-  /**
-   * Get the global enabled flag for Styx.
-   */
-  boolean globalEnabled() throws IOException;
-  /**
-   * Get the debug flag for Styx.
-   */
-  boolean debugEnabled() throws IOException;
-
-  /**
-   * Get the per-second submission rate limit for Styx.
-   */
-  Optional<Double> submissionRateLimit() throws IOException;
-
-  /**
-   * Set the global enabled flag for Styx.
-   *
-   * @param enabled     The global enabled flag
-   * @return the previously stored global enable flag value
-   */
-  boolean setGlobalEnabled(boolean enabled) throws IOException;
-
-  /**
-   * Get the id of the current docker runner id
-   */
-  String globalDockerRunnerId() throws IOException;
-
+  StyxConfig config() throws IOException;
 
   /**
    * Stores a Workflow definition.
@@ -282,11 +255,4 @@ public interface Storage {
   Optional<Backfill> backfill(String id) throws IOException;
 
   void storeBackfill(Backfill backfill) throws IOException;
-
-  /**
-   * Get client blacklist.
-   *
-   * @return the client blacklist or {@link Optional#empty()}
-   */
-  Optional<List<String>> clientBlacklist();
 }

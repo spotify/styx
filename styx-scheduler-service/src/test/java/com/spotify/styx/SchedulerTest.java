@@ -41,6 +41,7 @@ import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -96,10 +97,9 @@ public class SchedulerTest {
   private ExecutorService executor = Executors.newCachedThreadPool();
 
   @Mock WorkflowResourceDecorator resourceDecorator;
-
   @Mock RateLimiter rateLimiter;
-
   @Mock Stats stats;
+  @Mock StyxConfig config;
 
   @Before
   public void setUp() throws Exception {
@@ -117,7 +117,8 @@ public class SchedulerTest {
 
     storage = mock(Storage.class);
     when(storage.resources()).thenReturn(resourceLimits);
-    when(storage.globalConcurrency()).thenReturn(Optional.empty());
+    when(config.globalConcurrency()).thenReturn(Optional.empty());
+    when(storage.config()).thenReturn(config);
 
     when(resourceDecorator.decorateResources(
         any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
@@ -257,7 +258,7 @@ public class SchedulerTest {
   public void shouldIssueInfoIfGlobalResourceDepleted() throws Exception {
     setUp(20);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
-    when(storage.globalConcurrency()).thenReturn(Optional.of(0L));
+    when(config.globalConcurrency()).thenReturn(Optional.of(0L));
     init(RunState.create(INSTANCE, State.QUEUED, time));
 
     scheduler.tick();
@@ -481,7 +482,7 @@ public class SchedulerTest {
         any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
         .thenReturn(ImmutableSet.of("baz", "quux", "GLOBAL_STYX_CLUSTER"));
 
-    when(storage.globalConcurrency()).thenReturn(Optional.of(17L));
+    when(config.globalConcurrency()).thenReturn(Optional.of(17L));
 
     setResourceLimit("baz", 4);
     setResourceLimit("quux", 4);
@@ -505,7 +506,7 @@ public class SchedulerTest {
         any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
         .thenReturn(ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"));
 
-    when(storage.globalConcurrency()).thenReturn(Optional.of(17L));
+    when(config.globalConcurrency()).thenReturn(Optional.of(17L));
 
     setResourceLimit("baz", 0);
     initWorkflow(workflow);
@@ -531,7 +532,7 @@ public class SchedulerTest {
         any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
         .thenReturn(ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"));
 
-    when(storage.globalConcurrency()).thenReturn(Optional.of(17L));
+    when(config.globalConcurrency()).thenReturn(Optional.of(17L));
 
     setResourceLimit("baz", 4);
     initWorkflow(workflow);

@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.monitoring.Stats;
@@ -60,10 +61,9 @@ public class TriggerManagerTest {
   private static Workflow WORKFLOW_DAILY =
       Workflow.create("comp", FULL_WORKFLOW_CONFIGURATION);
 
-  @Mock
-  Storage storage;
-  @Mock
-  TriggerListener triggerListener;
+  @Mock Storage storage;
+  @Mock TriggerListener triggerListener;
+  @Mock StyxConfig config;
 
   private TriggerManager triggerManager;
   private final Time MANAGER_TIME = () -> parse("2016-10-10T13:11:11Z");
@@ -77,6 +77,7 @@ public class TriggerManagerTest {
 
   @Before
   public void setUp() throws IOException {
+    when(storage.config()).thenReturn(config);
     triggerManager = new TriggerManager(triggerListener, MANAGER_TIME, storage, Stats.NOOP);
     when(triggerListener.event(any(Workflow.class), any(Trigger.class), any(Instant.class)))
         .thenReturn(CompletableFuture.completedFuture(null));
@@ -144,7 +145,7 @@ public class TriggerManagerTest {
 
   @Test
   public void shouldNotTriggerExecutionOnDisabledGlobally() throws IOException {
-    when(storage.globalEnabled()).thenReturn(false);
+    when(config.globalEnabled()).thenReturn(false);
     triggerManager.tick();
     verify(triggerListener, never()).event(any(), any(), any());
     verify(storage, never()).updateNextNaturalTrigger(any(), any());
@@ -171,7 +172,7 @@ public class TriggerManagerTest {
   }
 
   private void setupWithNextNaturalTrigger(boolean enabled, Instant nextNaturalTrigger) throws IOException {
-    when(storage.globalEnabled()).thenReturn(true);
+    when(config.globalEnabled()).thenReturn(true);
     if (enabled) {
       when(storage.enabled()).thenReturn(ImmutableSet.of(WORKFLOW_DAILY.id()));
     } else {
