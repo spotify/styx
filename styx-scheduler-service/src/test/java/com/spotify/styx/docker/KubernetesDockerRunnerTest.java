@@ -151,7 +151,6 @@ public class KubernetesDockerRunnerTest {
   @Mock ContainerState containerState;
   @Mock ContainerStateTerminated containerStateTerminated;
   @Mock ListMeta listMeta;
-  @Mock Watchable<Watch, Watcher<Pod>> podWatchable;
   @Mock Watch watch;
   @Mock Debug debug;
 
@@ -174,14 +173,12 @@ public class KubernetesDockerRunnerTest {
     when(k8sClient.inNamespace(any(String.class))).thenReturn(k8sClient);
     when(k8sClient.pods()).thenReturn(pods);
 
-    // pods().list().getMetadata().getResourceVersion()
     when(pods.list()).thenReturn(podList);
     when(podList.getItems()).thenReturn(ImmutableList.of(createdPod));
     when(podList.getMetadata()).thenReturn(listMeta);
     when(listMeta.getResourceVersion()).thenReturn("1000");
 
-    when(pods.withResourceVersion("1000")).thenReturn(podWatchable);
-    when(podWatchable.watch(watchCaptor.capture())).thenReturn(watch);
+    when(pods.watch(watchCaptor.capture())).thenReturn(watch);
 
     when(serviceAccountSecretManager.ensureServiceAccountKeySecret(
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT))

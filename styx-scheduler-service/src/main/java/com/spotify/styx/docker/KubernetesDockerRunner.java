@@ -438,10 +438,8 @@ class KubernetesDockerRunner implements DockerRunner {
         pollPodsIntervalSeconds,
         TimeUnit.SECONDS);
 
-    final String resourceVersion = client.pods().list().getMetadata().getResourceVersion();
     watch = client.pods()
-        .withResourceVersion(resourceVersion)
-        .watch(new PodWatcher(Integer.parseInt(resourceVersion)));
+        .watch(new PodWatcher());
   }
 
   private Set<WorkflowInstance> getRunningWorkflowInstances() {
@@ -481,10 +479,9 @@ class KubernetesDockerRunner implements DockerRunner {
     final PodList list = client.pods().list();
     examineRunningWFISandAssociatedPods(runningWorkflowInstances, list);
 
-    final int resourceVersion = Integer.parseInt(list.getMetadata().getResourceVersion());
 
     for (Pod pod : list.getItems()) {
-      logEvent(Watcher.Action.MODIFIED, pod, resourceVersion, true);
+      logEvent(Watcher.Action.MODIFIED, pod, list.getMetadata().getResourceVersion(), true);
       final Optional<WorkflowInstance> workflowInstance = readPodWorkflowInstance(pod);
       if (!workflowInstance.isPresent()) {
         continue;
@@ -555,7 +552,7 @@ class KubernetesDockerRunner implements DockerRunner {
     }
   }
 
-  private void logEvent(Watcher.Action action, Pod pod, int resourceVersion,
+  private void logEvent(Watcher.Action action, Pod pod, String resourceVersion,
                         boolean polled) {
     final String podName = pod.getMetadata().getName();
     final String workflowInstance = pod.getMetadata().getAnnotations()
@@ -578,37 +575,24 @@ class KubernetesDockerRunner implements DockerRunner {
 
     private static final int RECONNECT_DELAY_SECONDS = 1;
 
-    private int lastResourceVersion;
-
-    PodWatcher(int resourceVersion) {
-      this.lastResourceVersion = resourceVersion;
-    }
-
     @Override
     public void eventReceived(Action action, Pod pod) {
       if (pod == null) {
         return;
       }
 
-      logEvent(action, pod, lastResourceVersion, false);
+      logEvent(action, pod, pod.getMetadata().getResourceVersion(), false);
 
-      try {
-        readPodWorkflowInstance(pod)
-            .flatMap(workflowInstance -> lookupPodRunState(pod, workflowInstance))
-            .ifPresent(runState -> emitPodEvents(action, pod, runState));
-      } finally {
-        // fixme: this breaks the kubernetes api convention of not interpreting the resource version
-        // https://github.com/kubernetes/kubernetes/blob/release-1.2/docs/devel/api-conventions.md#metadata
-        lastResourceVersion = Integer.parseInt(pod.getMetadata().getResourceVersion());
-      }
+      readPodWorkflowInstance(pod)
+          .flatMap(workflowInstance -> lookupPodRunState(pod, workflowInstance))
+          .ifPresent(runState -> emitPodEvents(action, pod, runState));
     }
 
     private void reconnect() {
-      LOG.warn("Re-establishing watching from {}", lastResourceVersion);
+      LOG.warn("Re-establishing pod watcher");
 
       try {
         watch = client.pods()
-            .withResourceVersion(Integer.toString(lastResourceVersion))
             .watch(this);
       } catch (Throwable e) {
         LOG.warn("Retry threw", e);
@@ -623,17 +607,7 @@ class KubernetesDockerRunner implements DockerRunner {
     @Override
     public void onClose(KubernetesClientException e) {
       LOG.warn("Watch closed", e);
-
-      // kube seems to gc old resource versions
-      // according to WatchConnectionManager L222, HTTP_GONE indicates
-      // resource version no long exists
-      if (e != null && e.getCode() == HTTP_GONE) {
-        // todo: this is racy : more events can be purged while we're playing catch up
-        lastResourceVersion++;
-        reconnect();
-      } else {
-        scheduleReconnect();
-      }
+      scheduleReconnect();
     }
   }
 
