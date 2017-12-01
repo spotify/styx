@@ -33,6 +33,7 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
@@ -457,7 +458,9 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasNoPayload());
-    assertThat(response, hasStatus(withReasonPhrase(equalTo("Invalid payload."))));
+    assertThat(response, hasStatus(withReasonPhrase(
+        startsWith("Invalid payload. Unexpected character ('}' (code 125)): "
+                   + "was expecting a colon to separate field name and value"))));
   }
 
   @Test

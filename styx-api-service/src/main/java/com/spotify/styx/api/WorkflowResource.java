@@ -138,7 +138,8 @@ public final class WorkflowResource {
           .readValue(payload.get().toByteArray(), WorkflowConfiguration.class);
     } catch (IOException e) {
       return CompletableFuture.completedFuture(
-          Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid payload.")));
+          Response.forStatus(Status.BAD_REQUEST
+                                 .withReasonPhrase("Invalid payload. " + e.getMessage())));
     }
 
     final Optional<String> dockerImage = workflowConfig.dockerImage();
