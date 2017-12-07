@@ -63,14 +63,18 @@ public class TimeUtil {
 
     return (executionTime.isMatch(utcDateTime))
         ? instant
-        : executionTime.lastExecution(utcDateTime).toInstant();
+        : executionTime.lastExecution(utcDateTime)
+               .orElseThrow(IllegalArgumentException::new)
+               .toInstant();
   }
 
   public static Instant previousInstant(Instant instant, Schedule schedule) {
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
     final ZonedDateTime utcDateTime = instant.atZone(UTC);
 
-    return executionTime.lastExecution(utcDateTime).toInstant();
+    return executionTime.lastExecution(utcDateTime)
+        .orElseThrow(IllegalArgumentException::new)
+        .toInstant();
   }
 
   /**
@@ -85,9 +89,10 @@ public class TimeUtil {
   public static Instant nextInstant(Instant instant, Schedule schedule) {
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
     final ZonedDateTime utcDateTime = instant.atZone(UTC);
-    final ZonedDateTime nextDateTime = executionTime.nextExecution(utcDateTime);
 
-    return nextDateTime.toInstant();
+    return executionTime.nextExecution(utcDateTime)
+        .orElseThrow(IllegalArgumentException::new)
+        .toInstant();
   }
 
   /**

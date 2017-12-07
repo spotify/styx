@@ -39,7 +39,7 @@ public class TimeUtilTest {
   private static final Instant TIME = Instant.parse("2016-01-19T09:11:22.333Z");
 
   @Test
-  public void shouldGetLastInstant() throws Exception {
+  public void shouldGetLastInstant() {
     final Instant lastTimeHours = Instant.parse("2016-01-19T09:00:00.00Z");
     final Instant lastTimeDays = Instant.parse("2016-01-19T00:00:00.00Z");
     final Instant lastTimeWeeks = Instant.parse("2016-01-18T00:00:00.00Z");
@@ -59,7 +59,18 @@ public class TimeUtilTest {
   }
 
   @Test
-  public void shouldReturnLastInstantUnchangedIfMatchingTime() throws Exception {
+  public void shouldWorkForComplexCron() {
+    final Instant lastInstant = lastInstant(Instant.parse("2016-01-19T09:00:00.00Z"),
+                                            Schedule.parse("5-59/20 * * * *"));
+    assertThat(lastInstant, is(Instant.parse("2016-01-19T08:45:00.00Z")));
+
+    final Instant nextInstance = nextInstant(Instant.parse("2016-01-19T09:00:00.00Z"),
+                                             Schedule.parse("5-59/20 * * * *"));
+    assertThat(nextInstance, is(Instant.parse("2016-01-19T09:05:00.00Z")));
+  }
+
+  @Test
+  public void shouldReturnLastInstantUnchangedIfMatchingTime() {
     final Instant lastTimeHours = Instant.parse("2016-01-19T09:00:00.00Z");
     final Instant lastTimeDays = Instant.parse("2016-01-19T00:00:00.00Z");
     final Instant lastTimeWeeks = Instant.parse("2016-01-18T00:00:00.00Z");
@@ -78,8 +89,20 @@ public class TimeUtilTest {
     assertThat(months, is(lastTimeMonths));
   }
 
+  @Test(expected = IllegalArgumentException.class)
+  public void shouldFailIfNoLastInstance() {
+    lastInstant(Instant.parse("2016-01-19T09:00:00.00Z"),
+                Schedule.parse("* * * * * 2017"));
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void shouldFailIfNoPreviousInstance() {
+    lastInstant(Instant.parse("2016-01-19T09:00:00.00Z"),
+                Schedule.parse("* * * * * 2017"));
+  }
+
   @Test
-  public void shouldGetNextInstant() throws Exception {
+  public void shouldGetNextInstant() {
     final Instant nextTimeHours = Instant.parse("2016-01-19T10:00:00.00Z");
     final Instant nextTimeDays = Instant.parse("2016-01-20T00:00:00.00Z");
     final Instant nextTimeWeeks = Instant.parse("2016-01-25T00:00:00.00Z");
@@ -98,8 +121,14 @@ public class TimeUtilTest {
     assertThat(months, is(nextTimeMonths));
   }
 
+  @Test(expected = IllegalArgumentException.class)
+  public void shouldFailIfNoNextInstance() {
+    lastInstant(Instant.parse("2018-01-19T09:00:00.00Z"),
+                Schedule.parse("* * * * * 2017"));
+  }
+
   @Test
-  public void shouldTestWellKnownAlignedInstants() throws Exception {
+  public void shouldTestWellKnownAlignedInstants() {
     assertTrue(isAligned(Instant.parse("2017-02-06T10:00:00.00Z"), Schedule.HOURS));
     assertTrue(isAligned(Instant.parse("2017-02-06T00:00:00.00Z"), Schedule.DAYS));
     assertTrue(isAligned(Instant.parse("2017-02-06T00:00:00.00Z"), Schedule.WEEKS));
@@ -114,7 +143,7 @@ public class TimeUtilTest {
   }
 
   @Test
-  public void shouldTestCustomAlignedInstants() throws Exception {
+  public void shouldTestCustomAlignedInstants() {
     Schedule custom = Schedule.parse("15,42 10 * * *");
     assertTrue(isAligned(Instant.parse("2017-02-06T10:15:00.00Z"), custom));
     assertTrue(isAligned(Instant.parse("2017-02-06T10:42:00.00Z"), custom));
@@ -123,7 +152,7 @@ public class TimeUtilTest {
   }
 
   @Test
-  public void shouldSupportZeroOffset() throws Exception {
+  public void shouldSupportZeroOffset() {
     String offset = "PT0S";
     ZonedDateTime time = ZonedDateTime.parse("2017-01-22T08:07:11.22Z");
     ZonedDateTime offsetTime = addOffset(time, offset);
@@ -132,7 +161,7 @@ public class TimeUtilTest {
   }
 
   @Test
-  public void shouldAddOffset() throws Exception {
+  public void shouldAddOffset() {
     String offset = "P1M3DT1H7M5S";
     ZonedDateTime time = ZonedDateTime.parse("2017-01-22T08:07:11.22Z");
     ZonedDateTime offsetTime = addOffset(time, offset);
@@ -141,7 +170,7 @@ public class TimeUtilTest {
   }
 
   @Test
-  public void shouldAddOffsetWithNoPeriod() throws Exception {
+  public void shouldAddOffsetWithNoPeriod() {
     String offset = "PT1H7M5S";
     ZonedDateTime time = ZonedDateTime.parse("2017-01-22T08:07:11.22Z");
     ZonedDateTime offsetTime = addOffset(time, offset);
@@ -150,7 +179,7 @@ public class TimeUtilTest {
   }
 
   @Test
-  public void shouldAddOffsetWithNoTime() throws Exception {
+  public void shouldAddOffsetWithNoTime() {
     String offset = "P1M3D";
     ZonedDateTime time = ZonedDateTime.parse("2017-01-22T08:07:11.22Z");
     ZonedDateTime offsetTime = addOffset(time, offset);
@@ -159,7 +188,7 @@ public class TimeUtilTest {
   }
 
   @Test
-  public void shouldAddOffsetWithWeek() throws Exception {
+  public void shouldAddOffsetWithWeek() {
     String offset = "P2W";
     ZonedDateTime time = ZonedDateTime.parse("2017-01-22T08:07:11.22Z");
     ZonedDateTime offsetTime = addOffset(time, offset);
@@ -168,7 +197,7 @@ public class TimeUtilTest {
   }
 
   @Test
-  public void cronScheduleShouldNotEqualEquivalentWellKnownSchedule() throws Exception {
+  public void cronScheduleShouldNotEqualEquivalentWellKnownSchedule() {
     assertFalse(Schedule.parse("0 * * * *").equals(Schedule.HOURS));
   }
 }
