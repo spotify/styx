@@ -65,7 +65,7 @@ public class TimeUtilTest {
     assertThat(lastInstant, is(Instant.parse("2016-01-19T08:45:00.00Z")));
 
     final Instant nextInstance = nextInstant(Instant.parse("2016-01-19T09:00:00.00Z"),
-                                             Schedule.parse("5-59/20 * * * *"));
+                                             Schedule.parse("05-59/20 * * * *"));
     assertThat(nextInstance, is(Instant.parse("2016-01-19T09:05:00.00Z")));
   }
 
@@ -87,18 +87,6 @@ public class TimeUtilTest {
 
     final Instant months = lastInstant(lastTimeMonths, Schedule.MONTHS);
     assertThat(months, is(lastTimeMonths));
-  }
-
-  @Test(expected = IllegalArgumentException.class)
-  public void shouldFailIfNoLastInstance() {
-    lastInstant(Instant.parse("2016-01-19T09:00:00.00Z"),
-                Schedule.parse("* * * * * 2017"));
-  }
-
-  @Test(expected = IllegalArgumentException.class)
-  public void shouldFailIfNoPreviousInstance() {
-    lastInstant(Instant.parse("2016-01-19T09:00:00.00Z"),
-                Schedule.parse("* * * * * 2017"));
   }
 
   @Test
