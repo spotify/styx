@@ -170,7 +170,7 @@ public final class ParameterUtil {
 
     // test alignment
     if (!TimeUtil.isAligned(instant, schedule)) {
-      return TimeUtil.lastInstant(instant, schedule);
+      return TimeUtil.previousInstant(instant, schedule);
     } else {
       return instant;
     }

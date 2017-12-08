@@ -47,7 +47,7 @@ public class ParameterUtilTest {
   private static final Instant TIME = parse("2016-01-19T09:11:22.333Z");
 
   @Test
-  public void testToParameter() throws Exception {
+  public void testToParameter() {
     assertThat(ParameterUtil.toParameter(Schedule.HOURS, TIME), is("2016-01-19T09"));
     assertThat(ParameterUtil.toParameter(Schedule.DAYS, TIME), is("2016-01-19"));
     assertThat(ParameterUtil.toParameter(Schedule.WEEKS, TIME), is("2016-01-19"));
@@ -59,21 +59,21 @@ public class ParameterUtilTest {
   }
 
   @Test
-  public void shouldParseDateHour() throws Exception {
+  public void shouldParseDateHour() {
     final Instant instant = ParameterUtil.parseDateHour("2016-01-19T08");
 
     assertThat(instant, is(parse("2016-01-19T08:00:00.000Z")));
   }
 
   @Test
-  public void shouldParseDate() throws Exception {
+  public void shouldParseDate() {
     final Instant instant = ParameterUtil.parseDate("2016-01-19");
 
     assertThat(instant, is(parse("2016-01-19T00:00:00.000Z")));
   }
 
   @Test
-  public void shouldRangeOfInstantsHours() throws Exception {
+  public void shouldRangeOfInstantsHours() {
     final Instant startInstant = parse("2016-12-31T23:00:00.00Z");
     final Instant endInstant = parse("2017-01-01T02:00:00.00Z");
 
@@ -86,7 +86,7 @@ public class ParameterUtilTest {
   }
 
   @Test
-  public void shouldRangeOfInstantsDays() throws Exception {
+  public void shouldRangeOfInstantsDays() {
     final Instant startInstant = parse("2016-12-31T00:00:00.00Z");
     final Instant endInstant = parse("2017-01-03T00:00:00.00Z");
 
@@ -99,7 +99,7 @@ public class ParameterUtilTest {
   }
 
   @Test
-  public void shouldRangeOfInstantsWeeks() throws Exception {
+  public void shouldRangeOfInstantsWeeks() {
     final Instant startInstant = parse("2016-12-26T00:00:00.00Z");
     final Instant endInstant = parse("2017-01-16T00:00:00.00Z");
 
@@ -112,7 +112,7 @@ public class ParameterUtilTest {
   }
 
   @Test
-  public void shouldRangeOfInstantsMonths() throws Exception {
+  public void shouldRangeOfInstantsMonths() {
     final Instant startInstant = parse("2017-01-01T00:00:00.00Z");
     final Instant endInstant = parse("2017-04-01T00:00:00.00Z");
 
@@ -125,7 +125,7 @@ public class ParameterUtilTest {
   }
 
   @Test
-  public void shouldReturnEmptyListStartEqualsEnd() throws Exception {
+  public void shouldReturnEmptyListStartEqualsEnd() {
     final Instant startInstant = parse("2016-12-31T23:00:00.00Z");
     final Instant endInstant = parse("2016-12-31T23:00:00.00Z");
 
@@ -134,7 +134,7 @@ public class ParameterUtilTest {
   }
 
   @Test(expected=IllegalArgumentException.class)
-  public void shouldRaiseRangeOfInstantsStartAfterEnd() throws Exception {
+  public void shouldRaiseRangeOfInstantsStartAfterEnd() {
     final Instant startInstant = parse("2016-12-31T23:00:00.00Z");
     final Instant endInstant = parse("2016-01-01T01:00:00.00Z");
 
@@ -209,7 +209,7 @@ public class ParameterUtilTest {
   }
 
   @Test
-  public void parseAllExamples() throws Exception {
+  public void parseAllExamples() {
     for (ParseExample example : PARSE_EXAMPLES) {
       Instant parsed = parseAlignedInstant(example.toParse(), example.schedule());
       assertThat(
@@ -219,7 +219,7 @@ public class ParameterUtilTest {
   }
 
   @Test
-  public void unparsableExamples() throws Exception {
+  public void unparsableExamples() {
     for (ParseExample example : UNPARSABLE) {
       try {
         parseAlignedInstant(example.toParse(), example.schedule());

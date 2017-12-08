@@ -33,6 +33,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.Period;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
 
 /**
@@ -61,16 +62,23 @@ public class TimeUtil {
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
     final ZonedDateTime utcDateTime = instant.atZone(UTC);
 
-    return (executionTime.isMatch(utcDateTime))
-        ? instant
-        : executionTime.lastExecution(utcDateTime).toInstant();
+    // executionTime.isMatch ignores seconds for unix cron
+    // so we fail the check immediately if there is a sub-minute value
+    return (instant.truncatedTo(ChronoUnit.MINUTES).equals(instant)
+            && executionTime.isMatch(utcDateTime))
+           ? instant
+           : executionTime.lastExecution(utcDateTime)
+               .orElseThrow(IllegalArgumentException::new) // with unix cron, this should not happen
+               .toInstant();
   }
 
   public static Instant previousInstant(Instant instant, Schedule schedule) {
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
     final ZonedDateTime utcDateTime = instant.atZone(UTC);
 
-    return executionTime.lastExecution(utcDateTime).toInstant();
+    return executionTime.lastExecution(utcDateTime)
+        .orElseThrow(IllegalArgumentException::new) // with unix cron, this should not happen
+        .toInstant();
   }
 
   /**
@@ -85,9 +93,10 @@ public class TimeUtil {
   public static Instant nextInstant(Instant instant, Schedule schedule) {
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
     final ZonedDateTime utcDateTime = instant.atZone(UTC);
-    final ZonedDateTime nextDateTime = executionTime.nextExecution(utcDateTime);
 
-    return nextDateTime.toInstant();
+    return executionTime.nextExecution(utcDateTime)
+        .orElseThrow(IllegalArgumentException::new) // with unix cron, this should not happen
+        .toInstant();
   }
 
   /**
@@ -98,6 +107,12 @@ public class TimeUtil {
    * @return true if the given instant aligns with the schedule
    */
   public static boolean isAligned(Instant instant, Schedule schedule) {
+    // executionTime.isMatch ignores seconds for unix cron
+    // so we fail the check immediately if there is a sub-minute value
+    if (!instant.truncatedTo(ChronoUnit.MINUTES).equals(instant)) {
+      return false;
+    }
+
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
     final ZonedDateTime utcDateTime = instant.atZone(UTC);
 
