@@ -255,7 +255,7 @@ class StyxApolloClient implements StyxClient {
         WorkflowId.create(componentId, workflowId),
         parameter);
     try {
-      final ByteString payload = serialize(Event.dequeue(workflowInstance));
+      final ByteString payload = serialize(Event.retryAfter(workflowInstance, 0L));
       return executeRequest(
           Request.forUri(urlBuilder.build().toString(), "POST").withPayload(payload))
           .thenApply(response -> (Void) null);

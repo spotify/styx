@@ -42,6 +42,7 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.DockerImageValidator;
+import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.Time;
@@ -161,7 +162,11 @@ public class SchedulerResource {
     }
 
     try {
-      stateManager.receive(event);
+      if ("dequeue".equals(EventUtil.name(event))) {
+        stateManager.receive(Event.retryAfter(event.workflowInstance(), 0L));
+      } else {
+        stateManager.receive(event);
+      }
     } catch (IsClosedException isClosedException) {
       return Response.forStatus(INTERNAL_SERVER_ERROR);
     }
