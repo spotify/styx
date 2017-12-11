@@ -357,6 +357,7 @@ public abstract class RunState {
       switch (state()) {
         case TERMINATED:
         case FAILED:
+        case QUEUED:
           return state(
               QUEUED,
               data().builder()
