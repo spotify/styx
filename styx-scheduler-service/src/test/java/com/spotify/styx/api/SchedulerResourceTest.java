@@ -25,12 +25,10 @@ import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresent;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
-import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.INVALID_SHA;
-import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.CoreMatchers.startsWith;
@@ -158,23 +156,6 @@ public class SchedulerResourceTest {
     return post.toCompletableFuture().get();
   }
 
-
-  @Test
-  public void testInjectEvent() throws Exception {
-    RunState initialState = RunState.create(WFI, RunState.State.RUNNING);
-    stateManager.initialize(initialState);
-
-    Event injectedEvent = Event.timeout(WFI);
-    ByteString eventPayload = serialize(injectedEvent);
-    CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/events", eventPayload);
-
-    post.toCompletableFuture().get(); // block until done
-
-    RunState finalState = stateManager.get(WFI);
-    assertThat(finalState.state(), is(RunState.State.FAILED));
-  }
-
   @Test
   public void testRetry() throws Exception {
     RunState initialState = RunState.create(
@@ -192,6 +173,26 @@ public class SchedulerResourceTest {
         .receive(Event.retryAfter(WFI, 0L));
     RunState finalState = stateManager.get(WFI);
     assertThat(finalState.data().retryDelayMillis(), is(Optional.of(0L)));
+    assertThat(finalState.state(), is(RunState.State.QUEUED));
+  }
+
+  @Test
+  public void testRetryWithDelayParameter() throws Exception {
+    RunState initialState = RunState.create(
+        WFI, RunState.State.QUEUED, StateData.newBuilder().retryDelayMillis(1000L).build());
+    stateManager.initialize(initialState);
+
+    ByteString wfiPayload = serialize(WFI);
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/retry?delay=500", wfiPayload);
+
+    post.toCompletableFuture().get(); // block until done
+
+    verify(stateManager, times(1)).receive(any());
+    verify(stateManager, times(1))
+        .receive(Event.retryAfter(WFI, 500L));
+    RunState finalState = stateManager.get(WFI);
+    assertThat(finalState.data().retryDelayMillis(), is(Optional.of(500L)));
     assertThat(finalState.state(), is(RunState.State.QUEUED));
   }
 
@@ -251,6 +252,39 @@ public class SchedulerResourceTest {
     RunState finalState = stateManager.get(WFI);
     assertThat(finalState.data().retryDelayMillis(), is(Optional.of(0L)));
     assertThat(finalState.state(), is(RunState.State.QUEUED));
+  }
+
+  @Test
+  public void testInjectHaltEvent() throws Exception {
+    RunState initialState = RunState.create(WFI, RunState.State.RUNNING);
+    stateManager.initialize(initialState);
+
+    Event injectedEvent = Event.halt(WFI);
+    ByteString eventPayload = serialize(injectedEvent);
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/events", eventPayload);
+
+    post.toCompletableFuture().get(); // block until done
+
+    verify(stateManager, times(1)).receive(any());
+    verify(stateManager, times(1))
+        .receive(Event.halt(WFI));
+    assertThat(stateManager.get(WFI), is(nullValue()));
+  }
+
+  @Test
+  public void shouldFailOnInjectRetryEvent() throws Exception {
+    RunState initialState = RunState.create(
+        WFI, RunState.State.QUEUED, StateData.newBuilder().retryDelayMillis(1000L).build());
+    stateManager.initialize(initialState);
+
+    Event injectedEvent = Event.retry(WFI);
+    ByteString eventPayload = serialize(injectedEvent);
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/events", eventPayload);
+
+    final Response<ByteString> response = post.toCompletableFuture().get();
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
   }
 
   @Test
@@ -368,13 +402,11 @@ public class SchedulerResourceTest {
 
   @Test
   public void testRejectUnknownWorkflowInstance() throws Exception {
-    Event injectedEvent = Event.timeout(WFI);
-    ByteString eventPayload = serialize(injectedEvent);
+    ByteString eventPayload = serialize(WFI);
     CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/events", eventPayload);
+        serviceHelper.request("POST", SchedulerResource.BASE + "/retry", eventPayload);
 
-    final Response<ByteString> response =
-        post.toCompletableFuture().get();// block until done
+    final Response<ByteString> response = post.toCompletableFuture().get();
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
   }

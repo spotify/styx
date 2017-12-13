@@ -187,10 +187,16 @@ public class SchedulerResource {
 
   private Response<Event> injectEvent(Event event) {
     if ("dequeue".equals(EventUtil.name(event))) {
+      // For backwards compatibility
       return Response.forStatus(eventInjectorHelper(
           Event.retryAfter(event.workflowInstance(), 0L))).withPayload(event);
+    } else if ("halt".equals(EventUtil.name(event))) {
+      // For backwards compatibility
+      return Response.forStatus(eventInjectorHelper(event));
     } else {
-      return Response.forStatus(eventInjectorHelper(event)).withPayload(event);
+      return Response.forStatus(BAD_REQUEST.withReasonPhrase(
+          "This API for injecting generic events is deprecated, refer to the specific API for the "
+          + "event you want to send to the scheduler"));
     }
   }
 

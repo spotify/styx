@@ -739,29 +739,6 @@ Resources related to inspect detailed status of Workflow Instances.
 
 Resources related to operations that act on the current state of the scheduler.
 
-## Events [/{version}/scheduler/events]
-
-+ Parameters
-    + version: `v3` (enum[string]) - API version
-        + Members
-            + `v3`
-
-### Inject Event [POST]
-
-+ Request (application/json)
-
-        {
-            "@type": "dequeue",
-            "workflow_instance": "styx-canary/StyxCanary/2017-01-01T01"
-        }
-
-+ Response 200 (application/json)
-
-        {
-            "@type": "dequeue",
-            "workflow_instance": "styx-canary/StyxCanary/2017-01-01T01"
-        }
-
 ## Retry [/{version}/scheduler/retry{?delay}]
 
 + Parameters
