@@ -230,12 +230,12 @@ class StyxApolloClient implements StyxClient {
                                                     String parameter) {
     final HttpUrl.Builder urlBuilder = getUrlBuilder()
         .addPathSegment("scheduler")
-        .addPathSegment("events");
+        .addPathSegment("halt");
     final WorkflowInstance workflowInstance = WorkflowInstance.create(
         WorkflowId.create(componentId, workflowId),
         parameter);
     try {
-      final ByteString payload = serialize(Event.halt(workflowInstance));
+      final ByteString payload = serialize(workflowInstance);
       return executeRequest(
           Request.forUri(urlBuilder.build().toString(), "POST").withPayload(payload))
           .thenApply(response -> (Void) null);
@@ -250,12 +250,12 @@ class StyxApolloClient implements StyxClient {
                                                      String parameter) {
     final HttpUrl.Builder urlBuilder = getUrlBuilder()
         .addPathSegment("scheduler")
-        .addPathSegment("events");
+        .addPathSegment("retry");
     final WorkflowInstance workflowInstance = WorkflowInstance.create(
         WorkflowId.create(componentId, workflowId),
         parameter);
     try {
-      final ByteString payload = serialize(Event.retryAfter(workflowInstance, 0L));
+      final ByteString payload = serialize(workflowInstance);
       return executeRequest(
           Request.forUri(urlBuilder.build().toString(), "POST").withPayload(payload))
           .thenApply(response -> (Void) null);

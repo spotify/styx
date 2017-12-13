@@ -32,10 +32,12 @@ import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.INVALID_SHA;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.CoreMatchers.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -174,6 +176,63 @@ public class SchedulerResourceTest {
   }
 
   @Test
+  public void testRetry() throws Exception {
+    RunState initialState = RunState.create(
+        WFI, RunState.State.QUEUED, StateData.newBuilder().retryDelayMillis(1000L).build());
+    stateManager.initialize(initialState);
+
+    ByteString wfiPayload = serialize(WFI);
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/retry", wfiPayload);
+
+    post.toCompletableFuture().get(); // block until done
+
+    verify(stateManager, times(1)).receive(any());
+    verify(stateManager, times(1))
+        .receive(Event.retryAfter(WFI, 0L));
+    RunState finalState = stateManager.get(WFI);
+    assertThat(finalState.data().retryDelayMillis(), is(Optional.of(0L)));
+    assertThat(finalState.state(), is(RunState.State.QUEUED));
+  }
+
+  @Test
+  public void testRetryWithWrongDelayParameter() throws Exception {
+    RunState initialState = RunState.create(
+        WFI, RunState.State.QUEUED, StateData.newBuilder().retryDelayMillis(1000L).build());
+    stateManager.initialize(initialState);
+
+    ByteString wfiPayload = serialize(WFI);
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/retry?delay=abc", wfiPayload);
+
+    final Response<ByteString> response = post.toCompletableFuture().get();
+
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST
+        .withReasonPhrase("Delay parameter could not be parsed"))));
+    verify(stateManager, never()).receive(any());
+    RunState finalState = stateManager.get(WFI);
+    assertThat(finalState.data().retryDelayMillis(), is(Optional.of(1000L)));
+    assertThat(finalState.state(), is(RunState.State.QUEUED));
+  }
+
+  @Test
+  public void testHalt() throws Exception {
+    RunState initialState = RunState.create(WFI, RunState.State.RUNNING);
+    stateManager.initialize(initialState);
+
+    ByteString wfiPayload = serialize(WFI);
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/halt", wfiPayload);
+
+    post.toCompletableFuture().get(); // block until done
+
+    verify(stateManager, times(1)).receive(any());
+    verify(stateManager, times(1))
+        .receive(Event.halt(WFI));
+    assertThat(stateManager.get(WFI), is(nullValue()));
+  }
+
+  @Test
   public void testInjectDequeueEvent() throws Exception {
     RunState initialState = RunState.create(
         WFI, RunState.State.QUEUED, StateData.newBuilder().retryDelayMillis(1000L).build());
@@ -192,6 +251,17 @@ public class SchedulerResourceTest {
     RunState finalState = stateManager.get(WFI);
     assertThat(finalState.data().retryDelayMillis(), is(Optional.of(0L)));
     assertThat(finalState.state(), is(RunState.State.QUEUED));
+  }
+
+  @Test
+  public void shouldFailOnInjectEventForUnknownWorkflowInstance() throws Exception {
+    Event injectedEvent = Event.dequeue(WFI);
+    ByteString eventPayload = serialize(injectedEvent);
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/events", eventPayload);
+
+    final Response<ByteString> response = post.toCompletableFuture().get();
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
   }
 
   @Test
@@ -307,7 +377,6 @@ public class SchedulerResourceTest {
         post.toCompletableFuture().get();// block until done
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
-    assertThat(response, hasStatus(withReasonPhrase(containsString("not found"))));
   }
 
   @Test

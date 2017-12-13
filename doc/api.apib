@@ -762,6 +762,52 @@ Resources related to operations that act on the current state of the scheduler.
             "workflow_instance": "styx-canary/StyxCanary/2017-01-01T01"
         }
 
+## Retry [/{version}/scheduler/retry{?delay}]
+
++ Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v3`
+
+### Send Retry [POST]
+
++ Parameters
+    + delay: `0` (optional, long) - The new delay value to set for the workflow instance
+      + Default: 0
+
++ Request (application/json)
+
+        {
+            "workflow_instance": "styx-canary/StyxCanary/2017-01-01T01"
+        }
+
++ Response 200 (application/json)
+
+        {
+            "workflow_instance": "styx-canary/StyxCanary/2017-01-01T01"
+        }
+
+## Halt [/{version}/scheduler/halt]
+
++ Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v3`
+
+### Send Halt [POST]
+
++ Request (application/json)
+
+        {
+            "workflow_instance": "styx-canary/StyxCanary/2017-01-01T01"
+        }
+
++ Response 200 (application/json)
+
+        {
+            "workflow_instance": "styx-canary/StyxCanary/2017-01-01T01"
+        }
+
 ## Trigger [/{version}/scheduler/trigger]
 
 + Parameters

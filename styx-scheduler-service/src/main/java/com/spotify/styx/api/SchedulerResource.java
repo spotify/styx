@@ -22,10 +22,13 @@ package com.spotify.styx.api;
 
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
+import static com.spotify.apollo.Status.OK;
 import static com.spotify.styx.util.ParameterUtil.parseAlignedInstant;
 
+import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
+import com.spotify.apollo.StatusType;
 import com.spotify.apollo.entity.EntityMiddleware;
 import com.spotify.apollo.entity.JacksonEntityCodec;
 import com.spotify.apollo.route.AsyncHandler;
@@ -52,6 +55,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import okio.ByteString;
@@ -101,6 +105,14 @@ public class SchedulerResource {
             em.response(WorkflowInstance.class),
             "POST", BASE + "/trigger",
             rc -> this::triggerWorkflowInstance),
+        Route.with(
+            em.response(WorkflowInstance.class),
+            "POST", BASE + "/retry",
+            rc -> payload -> retryWorkflowInstanceAfter(rc, payload)),
+        Route.with(
+            em.response(WorkflowInstance.class),
+            "POST", BASE + "/halt",
+            rc -> this::haltWorkflowInstance),
         Route.with(
             em.response(WorkflowConfiguration.class, Workflow.class),
             "POST", BASE + "/workflows/<cid>",
@@ -155,23 +167,42 @@ public class SchedulerResource {
     return Response.forPayload(workflow);
   }
 
+  private Response<WorkflowInstance> haltWorkflowInstance(WorkflowInstance workflowInstance) {
+    final Event event = Event.halt(workflowInstance);
+    return Response.forStatus(eventInjectorHelper(event)).withPayload(workflowInstance);
+  }
+
+  private Response<WorkflowInstance> retryWorkflowInstanceAfter(RequestContext rc,
+                                                                WorkflowInstance workflowInstance) {
+    final long delay;
+    try {
+      delay = Long.parseLong(rc.request().parameter("delay").orElse("0"));
+    } catch (NumberFormatException e) {
+      return Response.forStatus(BAD_REQUEST.withReasonPhrase(
+          "Delay parameter could not be parsed"));
+    }
+    final Event event = Event.retryAfter(workflowInstance, delay);
+    return Response.forStatus(eventInjectorHelper(event)).withPayload(workflowInstance);
+  }
 
   private Response<Event> injectEvent(Event event) {
-    if (!stateManager.isActiveWorkflowInstance(event.workflowInstance())) {
-      return Response.forStatus(BAD_REQUEST.withReasonPhrase("Workflow instance not found"));
+    if ("dequeue".equals(EventUtil.name(event))) {
+      return Response.forStatus(eventInjectorHelper(
+          Event.retryAfter(event.workflowInstance(), 0L))).withPayload(event);
+    } else {
+      return Response.forStatus(eventInjectorHelper(event)).withPayload(event);
     }
+  }
 
+  private StatusType eventInjectorHelper(Event event) {
     try {
-      if ("dequeue".equals(EventUtil.name(event))) {
-        stateManager.receive(Event.retryAfter(event.workflowInstance(), 0L));
-      } else {
-        stateManager.receive(event);
-      }
-    } catch (IsClosedException isClosedException) {
-      return Response.forStatus(INTERNAL_SERVER_ERROR);
+      stateManager.receive(event).toCompletableFuture().get();
+    } catch (IllegalArgumentException | IllegalStateException e) {
+      return BAD_REQUEST.withReasonPhrase(e.getMessage());
+    } catch (IsClosedException | InterruptedException | ExecutionException e) {
+      return INTERNAL_SERVER_ERROR.withReasonPhrase(e.getMessage());
     }
-
-    return Response.forPayload(event);
+    return OK;
   }
 
   private Response<WorkflowInstance> triggerWorkflowInstance(WorkflowInstance workflowInstance) {
