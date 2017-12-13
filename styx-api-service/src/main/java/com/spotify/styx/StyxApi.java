@@ -49,7 +49,6 @@ import com.typesafe.config.Config;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import okio.ByteString;

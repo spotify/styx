@@ -39,7 +39,6 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
-import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
@@ -98,8 +97,6 @@ public class StyxSchedulerServiceFixture {
   // service and helper
   private StyxScheduler styxScheduler;
   private ServiceHelper serviceHelper;
-
-  private StyxConfig config = mock(StyxConfig.class);
 
   @BeforeClass
   public static void setUpClass() throws Exception {
