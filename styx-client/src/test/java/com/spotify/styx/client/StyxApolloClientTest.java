@@ -93,11 +93,11 @@ public class StyxApolloClientTest {
       "https://foo.bar:443, https://foo.bar",
       "https://foo.bar:17, https://foo.bar:17",
   })
-  public void testHosts(String host, String expectedUriPrefix) throws Exception {
+  public void testHosts(String host, String expectedUriPrefix) {
     final CompletableFuture<Response<ByteString>> responseFuture = new CompletableFuture<>();
     when(client.send(any(Request.class))).thenReturn(responseFuture);
 
-    final StyxApolloClient styx = new StyxApolloClient(client, host);
+    final StyxApolloClient styx = new StyxApolloClient(client, host, auth);
     styx.resourceList();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
 
@@ -106,10 +106,10 @@ public class StyxApolloClientTest {
   }
 
   @Test
-  public void deleteWorkflow() throws Exception {
+  public void deleteWorkflow() {
     when(client.send(any(Request.class))).thenReturn(
         CompletableFuture.completedFuture(Response.forStatus(Status.NO_CONTENT)));
-    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST);
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
     final CompletableFuture<Void> r = styx.deleteWorkflow("foo-comp", "bar-wf").toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
@@ -130,7 +130,7 @@ public class StyxApolloClientTest {
     final Workflow workflow = Workflow.create("foo-comp", config);
     when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
         Response.forStatus(Status.OK).withPayload(Json.serialize(workflow))));
-    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST);
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
     final CompletableFuture<Workflow> r = styx.createOrUpdateWorkflow("foo-comp", config).toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
@@ -141,7 +141,7 @@ public class StyxApolloClientTest {
   }
 
   @Test
-  public void testTokenSuccess() throws Exception {
+  public void testTokenSuccess() {
     when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
         Response.forStatus(Status.OK)));
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
