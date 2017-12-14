@@ -20,6 +20,8 @@
 
 package com.spotify.styx.state;
 
+import static com.spotify.styx.util.FutureUtil.exceptionallyCompletedFuture;
+
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowId;
@@ -52,14 +54,18 @@ public class SyncStateManager implements StateManager {
   @Override
   public CompletionStage<Void> receive(Event event) {
     WorkflowInstance key = event.workflowInstance();
-
     if (!states.containsKey(key)) {
-      throw new IllegalArgumentException("Received event for unknown workflow instance: " + event);
+      return exceptionallyCompletedFuture(
+          new IllegalArgumentException(
+              "Received event for unknown workflow instance: " + event));
     }
-
-    RunState currentState = states.get(key);
-
-    RunState nextState = currentState.transition(event);
+    final RunState currentState = states.get(key);
+    final RunState nextState;
+    try {
+      nextState = currentState.transition(event);
+    } catch (IllegalStateException e) {
+      return exceptionallyCompletedFuture(new IllegalStateException(e.getMessage()));
+    }
 
     if (nextState.state().isTerminal()) {
       states.remove(key);
@@ -68,7 +74,6 @@ public class SyncStateManager implements StateManager {
     }
 
     nextState.outputHandler().transitionInto(nextState);
-
     return CompletableFuture.completedFuture(null);
   }
 

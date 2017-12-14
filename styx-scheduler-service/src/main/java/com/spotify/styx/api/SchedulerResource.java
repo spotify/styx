@@ -203,10 +203,15 @@ public class SchedulerResource {
   private StatusType eventInjectorHelper(Event event) {
     try {
       stateManager.receive(event).toCompletableFuture().get();
-    } catch (IllegalArgumentException | IllegalStateException e) {
-      return BAD_REQUEST.withReasonPhrase(e.getMessage());
-    } catch (IsClosedException | InterruptedException | ExecutionException e) {
+    } catch (IsClosedException | InterruptedException e) {
       return INTERNAL_SERVER_ERROR.withReasonPhrase(e.getMessage());
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof IllegalArgumentException
+          || e.getCause() instanceof IllegalStateException) {
+        return BAD_REQUEST.withReasonPhrase(e.getCause().getMessage());
+      } else {
+        return INTERNAL_SERVER_ERROR.withReasonPhrase(e.getMessage());
+      }
     }
     return OK;
   }
