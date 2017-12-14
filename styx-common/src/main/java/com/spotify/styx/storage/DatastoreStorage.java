@@ -21,6 +21,7 @@
 package com.spotify.styx.storage;
 
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
+import static java.util.stream.Collectors.toList;
 
 import com.google.cloud.Timestamp;
 import com.google.cloud.datastore.Datastore;
@@ -37,6 +38,7 @@ import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
 import com.google.cloud.datastore.StructuredQuery.Filter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
+import com.google.cloud.datastore.Value;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -47,6 +49,7 @@ import com.google.common.collect.Sets;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -58,13 +61,14 @@ import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,6 +90,7 @@ class DatastoreStorage {
   public static final String PROPERTY_CONFIG_DOCKER_RUNNER_ID = "dockerRunnerId";
   public static final String PROPERTY_CONFIG_CONCURRENCY = "concurrency";
   public static final String PROPERTY_CONFIG_CLIENT_BLACKLIST = "clientBlacklist";
+
   public static final String PROPERTY_WORKFLOW_JSON = "json";
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
   public static final String PROPERTY_NEXT_NATURAL_TRIGGER = "nextNaturalTrigger";
@@ -101,7 +106,7 @@ class DatastoreStorage {
   public static final String PROPERTY_SCHEDULE = "schedule";
   public static final String PROPERTY_ALL_TRIGGERED = "allTriggered";
   public static final String PROPERTY_HALTED = "halted";
-  public static final String PROPERTY_DEBUG_ENABLED = "debug";
+  public static final String PROPERTY_CONFIG_DEBUG_ENABLED = "debug";
   public static final String PROPERTY_SUBMISSION_RATE_LIMIT = "submissionRateLimit";
 
   public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
@@ -109,7 +114,7 @@ class DatastoreStorage {
   public static final boolean DEFAULT_CONFIG_ENABLED = true;
   public static final String DEFAULT_CONFIG_DOCKER_RUNNER_ID = "default";
   public static final boolean DEFAULT_WORKFLOW_ENABLED = false;
-  public static final boolean DEFAULT_DEBUG_ENABLED = false;
+  public static final boolean DEFAULT_CONFIG_DEBUG_ENABLED = false;
 
   public static final int MAX_RETRIES = 100;
 
@@ -128,46 +133,23 @@ class DatastoreStorage {
     this.globalConfigKey = datastore.newKeyFactory().setKind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
   }
 
-  private String readConfigString(String property, String defaultValue) {
-    return getOpt(datastore, globalConfigKey)
-        .filter(w -> w.contains(property))
-        .map(config -> config.getString(property))
-        .orElse(defaultValue);
+  StyxConfig config() {
+    final Entity entity = asBuilderOrNew(getOpt(datastore, globalConfigKey), globalConfigKey)
+        .build();
+    return entityToConfig(entity);
   }
 
-  private boolean readConfigBoolean(String property, boolean defaultValue) {
-    return getOpt(datastore, globalConfigKey)
-        .filter(w -> w.contains(property))
-        .map(config -> config.getBoolean(property))
-        .orElse(defaultValue);
-  }
-
-  boolean globalEnabled() throws IOException {
-    return readConfigBoolean(PROPERTY_CONFIG_ENABLED, DEFAULT_CONFIG_ENABLED);
-  }
-
-  boolean debugEnabled() throws IOException {
-    return readConfigBoolean(PROPERTY_DEBUG_ENABLED, DEFAULT_DEBUG_ENABLED);
-  }
-
-  public String globalDockerRunnerId() {
-    return readConfigString(PROPERTY_CONFIG_DOCKER_RUNNER_ID, DEFAULT_CONFIG_DOCKER_RUNNER_ID);
-  }
-
-  boolean setGlobalEnabled(boolean globalEnabled) throws IOException {
-    return storeWithRetries(() -> datastore.runInTransaction(transaction -> {
-      final Optional<Entity> configOpt = getOpt(transaction, globalConfigKey);
-      final Entity.Builder config = asBuilderOrNew(configOpt, globalConfigKey);
-      final boolean oldValue = configOpt
-          .filter(w -> w.contains(PROPERTY_CONFIG_ENABLED))
-          .map(c -> c.getBoolean(PROPERTY_CONFIG_ENABLED))
-          .orElse(DEFAULT_CONFIG_ENABLED);
-
-      config.set(PROPERTY_CONFIG_ENABLED, globalEnabled);
-      transaction.put(config.build());
-
-      return oldValue;
-    }));
+  private StyxConfig entityToConfig(Entity entity) {
+    return StyxConfig.newBuilder()
+        .globalConcurrency(readOpt(entity, PROPERTY_CONFIG_CONCURRENCY))
+        .globalEnabled(read(entity, PROPERTY_CONFIG_ENABLED, DEFAULT_CONFIG_ENABLED))
+        .debugEnabled(read(entity, PROPERTY_CONFIG_DEBUG_ENABLED, DEFAULT_CONFIG_DEBUG_ENABLED))
+        .submissionRateLimit(readOpt(entity, PROPERTY_SUBMISSION_RATE_LIMIT))
+        .globalDockerRunnerId(
+            read(entity, PROPERTY_CONFIG_DOCKER_RUNNER_ID, DEFAULT_CONFIG_DOCKER_RUNNER_ID))
+        .clientBlacklist(this.<String>readStream(entity, PROPERTY_CONFIG_CLIENT_BLACKLIST)
+            .collect(toList()))
+        .build();
   }
 
   boolean enabled(WorkflowId workflowId) throws IOException {
@@ -693,22 +675,19 @@ class DatastoreStorage {
     return builder.build();
   }
 
-  Optional<Long> globalConcurrency() {
-    return getOpt(datastore, globalConfigKey)
-        .filter(e -> e.contains(PROPERTY_CONFIG_CONCURRENCY))
-        .map(e -> e.getLong(PROPERTY_CONFIG_CONCURRENCY));
+
+  private <T> Stream<T> readStream(Entity entity, String property) {
+    return read(entity, property, Collections.<Value<T>>emptyList()).stream()
+        .map(Value::get);
   }
 
-  Optional<Double> submissionRate() {
-    return getOpt(datastore, globalConfigKey)
-        .filter(e -> e.contains(PROPERTY_SUBMISSION_RATE_LIMIT))
-        .map(e -> e.getDouble(PROPERTY_SUBMISSION_RATE_LIMIT));
+  private <T> Optional<T> readOpt(Entity entity, String property) {
+    return entity.contains(property)
+        ? Optional.of(entity.<Value<T>>getValue(property).get())
+        : Optional.empty();
   }
 
-  Optional<List<String>> clientBlacklist() {
-    return getOpt(datastore, globalConfigKey)
-        .filter(e -> e.contains(PROPERTY_CONFIG_CLIENT_BLACKLIST))
-        .map(e -> e.getList(PROPERTY_CONFIG_CLIENT_BLACKLIST).stream().map(v -> (String) v.get())
-            .collect(Collectors.toList()));
+  private <T> T read(Entity entity, String property, T defaultValue) {
+    return this.<T>readOpt(entity, property).orElse(defaultValue);
   }
 }

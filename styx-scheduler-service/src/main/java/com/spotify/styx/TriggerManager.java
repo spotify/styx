@@ -66,7 +66,7 @@ public class TriggerManager {
 
   void tick() {
     try {
-      if (!storage.globalEnabled()) {
+      if (!storage.config().globalEnabled()) {
         LOG.info("Triggering has been disabled globally.");
         return;
       }

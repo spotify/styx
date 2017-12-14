@@ -27,6 +27,7 @@ import com.google.common.collect.Sets;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -52,9 +53,6 @@ import java.util.stream.Stream;
  */
 public class InMemStorage implements Storage {
 
-  private boolean globalEnabled = true;
-  private Optional<Long> globalConcurrency = Optional.empty();
-  private Optional<Double> submissionRate = Optional.empty();
   private final Set<WorkflowId> enabledWorkflows = Sets.newConcurrentHashSet();
   private final ConcurrentMap<WorkflowId, Workflow> workflowStore = Maps.newConcurrentMap();
   private final ConcurrentMap<String, Resource> resourceStore = Maps.newConcurrentMap();
@@ -76,30 +74,11 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public boolean globalEnabled() {
-    return globalEnabled;
-  }
-
-  @Override
-  public boolean debugEnabled() throws IOException {
-    throw new UnsupportedOperationException("Unsupported Operation!");
-  }
-
-  @Override
-  public Optional<Double> submissionRateLimit() throws IOException {
-    return submissionRate;
-  }
-
-  @Override
-  public boolean setGlobalEnabled(boolean enabled) {
-    final boolean oldValue = globalEnabled();
-    this.globalEnabled = enabled;
-    return oldValue;
-  }
-
-  @Override
-  public String globalDockerRunnerId() throws IOException {
-    return "default";
+  public StyxConfig config() {
+    return StyxConfig.newBuilder()
+        .globalEnabled(true)
+        .globalDockerRunnerId("default")
+        .build();
   }
 
   @Override
@@ -322,11 +301,6 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public Optional<Long> globalConcurrency() throws IOException {
-    return globalConcurrency;
-  }
-
-  @Override
   public void writeActiveState(WorkflowInstance workflowInstance, long counter) {
     activeStatesMap.put(workflowInstance, counter);
   }
@@ -352,10 +326,5 @@ public class InMemStorage implements Storage {
   public Optional<Long> getCounterFromActiveStates(WorkflowInstance workflowInstance)
       throws IOException {
     return Optional.ofNullable(activeStatesMap.get(workflowInstance));
-  }
-
-  @Override
-  public Optional<List<String>> clientBlacklist() {
-    return Optional.empty();
   }
 }

@@ -37,8 +37,8 @@ import com.spotify.styx.api.BackfillResource;
 import com.spotify.styx.api.ResourceResource;
 import com.spotify.styx.api.SchedulerProxyResource;
 import com.spotify.styx.api.StatusResource;
-import com.spotify.styx.api.StyxConfigResource;
 import com.spotify.styx.api.WorkflowResource;
+import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
@@ -49,7 +49,6 @@ import com.typesafe.config.Config;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import okio.ByteString;
@@ -120,19 +119,19 @@ public class StyxApi implements AppInit {
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
                                                                    storage);
     final ResourceResource resourceResource = new ResourceResource(storage);
-    final StyxConfigResource styxConfigResource = new StyxConfigResource(storage);
     final StatusResource statusResource = new StatusResource(storage);
     final SchedulerProxyResource schedulerProxyResource = new SchedulerProxyResource(
         schedulerServiceBaseUrl, environment.client());
 
-    final Supplier<Optional<List<String>>> clientBlacklistSupplier =
-        new CachedSupplier<>(storage::clientBlacklist, Instant::now);
+    final Supplier<StyxConfig> configSupplier =
+        new CachedSupplier<>(storage::config, Instant::now);
+    final Supplier<List<String>> clientBlacklistSupplier =
+        () -> configSupplier.get().clientBlacklist();
 
     final Stream<Route<AsyncHandler<Response<ByteString>>>> routes = StreamUtil.cat(
         workflowResource.routes(),
         backfillResource.routes(),
         resourceResource.routes(),
-        styxConfigResource.routes(),
         statusResource.routes(),
         schedulerProxyResource.routes()
     ).map(r -> r.withMiddleware(authValidator()));

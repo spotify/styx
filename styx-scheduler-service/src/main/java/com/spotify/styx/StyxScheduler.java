@@ -57,6 +57,7 @@ import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -317,8 +318,9 @@ public class StyxScheduler implements AppInit {
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
 
-    final Supplier<String> dockerId = new CachedSupplier<>(storage::globalDockerRunnerId, time);
-    final Debug debug = new CachedSupplier<>(storage::debugEnabled, time)::get;
+    final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
+    final Supplier<String> dockerId = () -> styxConfig.get().globalDockerRunnerId();
+    final Debug debug = () -> styxConfig.get().debugEnabled();
     final DockerRunner routingDockerRunner = DockerRunner.routing(
         id -> dockerRunnerFactory.create(id, environment, stateManager, executor, stats, debug),
         dockerId);
@@ -361,7 +363,7 @@ public class StyxScheduler implements AppInit {
     startTriggerManager(triggerManager, executor);
     startBackfillTriggerManager(backfillTriggerManager, executor);
     startScheduler(scheduler, executor);
-    startRuntimeConfigUpdate(storage, executor, dequeueRateLimiter);
+    startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
     startCleaner(cleaner, executor);
     setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats);
 
@@ -483,25 +485,25 @@ public class StyxScheduler implements AppInit {
         TimeUnit.SECONDS);
   }
 
-  private static void startRuntimeConfigUpdate(Storage storage, ScheduledExecutorService exec,
+  private static void startRuntimeConfigUpdate(Supplier<StyxConfig> config, ScheduledExecutorService exec,
       RateLimiter submissionRateLimiter) {
     exec.scheduleAtFixedRate(
-        guard(() -> updateRuntimeConfig(storage, submissionRateLimiter)),
+        guard(() -> updateRuntimeConfig(config, submissionRateLimiter)),
         0,
         RUNTIME_CONFIG_UPDATE_INTERVAL_SECONDS,
         TimeUnit.SECONDS);
   }
 
-  private static void updateRuntimeConfig(Storage storage, RateLimiter rateLimiter) {
+  private static void updateRuntimeConfig(Supplier<StyxConfig> config, RateLimiter rateLimiter) {
     try {
       double currentRate = rateLimiter.getRate();
-      Double updatedRate = storage.submissionRateLimit().orElse(
+      Double updatedRate = config.get().submissionRateLimit().orElse(
           StyxScheduler.DEFAULT_SUBMISSION_RATE_PER_SEC);
       if (Math.abs(updatedRate - currentRate) >= 0.1) {
         LOG.info("Updating submission rate limit: {} -> {}", currentRate, updatedRate);
         rateLimiter.setRate(updatedRate);
       }
-    } catch (IOException e) {
+    } catch (Exception e) {
       LOG.warn("Failed to fetch the submission rate config from storage, "
           + "skipping RateLimiter update");
     }

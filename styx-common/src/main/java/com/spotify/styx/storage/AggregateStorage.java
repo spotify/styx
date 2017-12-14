@@ -24,6 +24,7 @@ import com.google.cloud.datastore.Datastore;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -70,8 +71,8 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public Optional<Long> globalConcurrency() throws IOException {
-    return datastoreStorage.globalConcurrency();
+  public StyxConfig config() throws IOException {
+    return datastoreStorage.config();
   }
 
   @Override
@@ -92,31 +93,6 @@ public class AggregateStorage implements Storage {
   @Override
   public void deleteActiveState(WorkflowInstance workflowInstance) throws IOException {
     datastoreStorage.deleteActiveState(workflowInstance);
-  }
-
-  @Override
-  public boolean globalEnabled() throws IOException {
-    return datastoreStorage.globalEnabled();
-  }
-
-  @Override
-  public boolean debugEnabled() throws IOException {
-    return datastoreStorage.debugEnabled();
-  }
-
-  @Override
-  public Optional<Double> submissionRateLimit() throws IOException {
-    return datastoreStorage.submissionRate();
-  }
-
-  @Override
-  public boolean setGlobalEnabled(boolean enabled) throws IOException {
-    return datastoreStorage.setGlobalEnabled(enabled);
-  }
-
-  @Override
-  public String globalDockerRunnerId() throws IOException {
-    return datastoreStorage.globalDockerRunnerId();
   }
 
   @Override
@@ -246,10 +222,5 @@ public class AggregateStorage implements Storage {
   @Override
   public Optional<Backfill> backfill(String id) throws IOException {
     return datastoreStorage.getBackfill(id);
-  }
-
-  @Override
-  public Optional<List<String>> clientBlacklist() {
-    return datastoreStorage.clientBlacklist();
   }
 }

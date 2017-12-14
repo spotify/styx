@@ -244,14 +244,6 @@ public class StyxSchedulerServiceFixture {
     }
   }
 
-  void givenTheGlobalEnableFlagIs(boolean enabled) {
-    try {
-      storage.setGlobalEnabled(enabled);
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
-  }
-
   void givenActiveStateAtSequenceCount(WorkflowInstance workflowInstance, long count) {
     try {
       storage.writeActiveState(workflowInstance, count);

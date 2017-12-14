@@ -28,8 +28,8 @@ import com.spotify.apollo.Response;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import okio.ByteString;
@@ -53,12 +53,12 @@ public final class Api {
 
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
       Stream<Route<AsyncHandler<Response<ByteString>>>> routes) {
-    return withCommonMiddleware(routes, Optional::empty);
+    return withCommonMiddleware(routes, Collections::emptyList);
   }
 
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
       Stream<Route<AsyncHandler<Response<ByteString>>>> routes,
-      Supplier<Optional<List<String>>> clientBlacklistSupplier) {
+      Supplier<List<String>> clientBlacklistSupplier) {
     return routes.map(r -> r
         .withMiddleware(auditLogger())
         .withMiddleware(clientValidator(clientBlacklistSupplier))

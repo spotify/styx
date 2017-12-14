@@ -29,7 +29,6 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HttpHeaders;
 import com.spotify.apollo.Request;
@@ -111,10 +110,11 @@ public final class Middlewares {
   }
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> clientValidator(
-      Supplier<Optional<List<String>>> supplier) {
+      Supplier<List<String>> supplier) {
     return innerHandler -> requestContext -> {
       if (requestContext.request().header("User-Agent")
-          .map(header -> supplier.get().orElse(ImmutableList.of()).contains(header))
+          // TODO: should the blacklist be a set so this lookup is O(1) instead of O(n) ?
+          .map(header -> supplier.get().contains(header))
           .orElse(false)) {
         // TODO: fire some stats
         return
