@@ -29,6 +29,7 @@ import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.INVALID_SHA;
+import static com.spotify.styx.util.FutureUtil.exceptionallyCompletedFuture;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.CoreMatchers.startsWith;
@@ -41,7 +42,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
-import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.test.ServiceHelper;
@@ -127,23 +127,25 @@ public class SchedulerResourceTest {
   }
 
   @Rule
-  public ServiceHelper serviceHelper = ServiceHelper.create(this::init, "styx");
+  public ServiceHelper serviceHelper = getServiceHelper(stateManager, storage);
 
-  void init(Environment environment) {
-    final SchedulerResource schedulerResource = new SchedulerResource(
-        stateManager,
-        (workflow, trigger, instant) -> {
-          this.triggeredWorkflow = Optional.of(workflow);
-          this.trigger = Optional.of(trigger);
-          this.triggeredInstant = Optional.of(instant);
-          return CompletableFuture.completedFuture(null);
-        },
-        this::workflowChangeListener, this::workflowRemoveListener, storage,
-        () -> Instant.parse("2015-12-31T23:59:10.000Z"),
-        dockerImageValidator);
+  private ServiceHelper getServiceHelper(StateManager stateManager, Storage storage) {
+    return ServiceHelper.create((environment) -> {
+      final SchedulerResource schedulerResource = new SchedulerResource(
+          stateManager,
+          (workflow, trigger1, instant) -> {
+            this.triggeredWorkflow = Optional.of(workflow);
+            this.trigger = Optional.of(trigger1);
+            this.triggeredInstant = Optional.of(instant);
+            return CompletableFuture.completedFuture(null);
+          },
+          this::workflowChangeListener, this::workflowRemoveListener, storage,
+          () -> Instant.parse("2015-12-31T23:59:10.000Z"),
+          dockerImageValidator);
 
-    environment.routingEngine()
-        .registerRoutes(schedulerResource.routes());
+      environment.routingEngine()
+          .registerRoutes(schedulerResource.routes());
+    }, "styx");
   }
 
   private Response<ByteString> requestAndWaitTriggerWorkflowInstance(WorkflowInstance toTrigger)
@@ -288,11 +290,58 @@ public class SchedulerResourceTest {
   }
 
   @Test
-  public void shouldFailOnInjectEventForUnknownWorkflowInstance() throws Exception {
-    Event injectedEvent = Event.dequeue(WFI);
-    ByteString eventPayload = serialize(injectedEvent);
+  public void shouldFailOnForbiddenTransitionForEvent() throws Exception {
+    RunState initialState = RunState.create(WFI, RunState.State.RUNNING);
+    stateManager.initialize(initialState);
+
+    ByteString eventPayload = serialize(WFI);
     CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/events", eventPayload);
+        serviceHelper.request("POST", SchedulerResource.BASE + "/retry", eventPayload);
+
+    final Response<ByteString> response = post.toCompletableFuture().get();
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
+  }
+
+  @Test
+  public void injectEventShouldReturnServerErrorIfExceptionalFuture() throws Exception {
+    StateManager failingStateManager = mock(SyncStateManager.class);
+    when(failingStateManager.receive(any())).thenReturn(
+        exceptionallyCompletedFuture(new RuntimeException("test")));
+
+    ServiceHelper serviceHelper = getServiceHelper(failingStateManager, storage);
+    serviceHelper.start();
+
+    ByteString eventPayload = serialize(WFI);
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/retry", eventPayload);
+
+    final Response<ByteString> response = post.toCompletableFuture().get();
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
+    System.out.println(response);
+  }
+
+  @Test
+  public void injectEventShouldReturnServerErrorIfRuntimeException() throws Exception {
+    StateManager failingStateManager = mock(SyncStateManager.class);
+    when(failingStateManager.receive(any())).thenThrow(new RuntimeException("test"));
+
+    ServiceHelper serviceHelper = getServiceHelper(failingStateManager, storage);
+    serviceHelper.start();
+
+    ByteString eventPayload = serialize(WFI);
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/retry", eventPayload);
+
+    final Response<ByteString> response = post.toCompletableFuture().get();
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
+    System.out.println(response);
+  }
+
+  @Test
+  public void shouldFailOnInjectEventForUnknownWorkflowInstance() throws Exception {
+    ByteString eventPayload = serialize(WFI);
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", SchedulerResource.BASE + "/retry", eventPayload);
 
     final Response<ByteString> response = post.toCompletableFuture().get();
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
@@ -478,22 +527,7 @@ public class SchedulerResourceTest {
     Storage failingStorage = mock(Storage.class);
     when(failingStorage.workflow(any(WorkflowId.class))).thenThrow(new IOException("Error"));
 
-    ServiceHelper serviceHelper = ServiceHelper.create((environment) -> {
-      final SchedulerResource schedulerResource = new SchedulerResource(
-          stateManager,
-          (workflow, trigger, instant) -> {
-            this.triggeredWorkflow = Optional.of(workflow);
-            this.trigger = Optional.of(trigger);
-            this.triggeredInstant = Optional.of(instant);
-            return CompletableFuture.completedFuture(null);
-          },
-          this::workflowChangeListener, this::workflowRemoveListener, failingStorage,
-          () -> Instant.parse("2015-12-31T23:59:10.000Z"),
-          dockerImageValidator);
-
-      environment.routingEngine()
-          .registerRoutes(schedulerResource.routes());
-    }, "styx");
+    ServiceHelper serviceHelper = getServiceHelper(stateManager, failingStorage);
     serviceHelper.start();
 
     WorkflowInstance toTrigger = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-12-31T23");
