@@ -220,6 +220,27 @@ public class RunStateTest {
   }
 
   @Test
+  public void testRetryDelayFromQueued() throws Exception {
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
+    transitioner.receive(eventFactory.dequeue());
+    transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
+    transitioner.receive(eventFactory.retryAfter(777));
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), hasValue(777L));
+
+    transitioner.receive(eventFactory.retryAfter(0));
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), hasValue(0L));
+
+    transitioner.receive(eventFactory.dequeue());
+
+    assertThat(outputs, contains(QUEUED, PREPARE, FAILED, QUEUED, QUEUED, PREPARE));
+  }
+
+  @Test
   public void testRetryFromRunError() throws Exception {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));

@@ -228,6 +228,25 @@ public class SchedulerTest {
   }
 
   @Test
+  public void shouldExecuteRetryIfDelayIsReset() throws Exception {
+    setUp(20);
+    initWorkflow(workflowUsingResources(WORKFLOW_ID1));
+
+    StateData stateData = StateData.newBuilder().retryDelayMillis(15_000L).tries(10).build();
+    init(RunState.create(INSTANCE, State.QUEUED, stateData, time));
+
+    now = now.plus(10, ChronoUnit.SECONDS);
+    scheduler.tick();
+
+    assertThat(stateManager.get(INSTANCE).state(), is(State.QUEUED));
+
+    stateManager.receive(Event.retryAfter(INSTANCE, 0L));
+    scheduler.tick();
+
+    assertThat(stateManager.get(INSTANCE).state(), is(State.PREPARE));
+  }
+
+  @Test
   public void shouldExecuteNewTriggers() throws Exception {
     setUp(20);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
