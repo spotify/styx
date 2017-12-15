@@ -26,8 +26,10 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.contains;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
@@ -53,6 +55,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import junitparams.JUnitParamsRunner;
+import junitparams.Parameters;
 import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Rule;
@@ -60,9 +64,10 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.mockito.runners.MockitoJUnitRunner;
 
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(JUnitParamsRunner.class)
 public class CliMainTest {
 
   @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
@@ -73,6 +78,8 @@ public class CliMainTest {
 
   @Before
   public void setUp() throws Exception {
+    MockitoAnnotations.initMocks(this);
+
     when(cliContext.createClient(any(), any())).thenReturn(client);
     when(cliContext.output(any())).thenReturn(cliOutput);
     when(cliContext.env()).thenReturn(
@@ -120,7 +127,77 @@ public class CliMainTest {
 
     when(client.deleteWorkflow(any(), any())).thenReturn(CompletableFuture.completedFuture(null));
 
-    CliMain.run(cliContext, "workflow", "delete", "quux", "foo", "bar");
+    CliMain.run(cliContext, "workflow", "delete", component, "foo", "bar");
+
+    verify(client).deleteWorkflow(component, "foo");
+    verify(client).deleteWorkflow(component, "bar");
+
+    verify(cliOutput).printMessage("Workflow foo in component " + component + " deleted.");
+    verify(cliOutput).printMessage("Workflow bar in component " + component + " deleted.");
+  }
+
+  @Test
+  @Parameters({
+      "n",
+      "N",
+      "Y",
+      "",
+      "  ",
+      "dfgdfgd",
+  })
+  public void testWorkflowDeleteInteractive_No(String reply) throws Exception {
+    when(cliContext.hasConsole()).thenReturn(true);
+    when(cliContext.consoleReadLine(any())).thenReturn(reply);
+
+    try {
+      CliMain.run(cliContext, "workflow", "delete", "quux", "foo", "bar");
+      fail();
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.UnknownError));
+    }
+
+    verify(cliContext).consoleReadLine(
+        "Sure you want to delete the workflows foo, bar in component quux? [y/N] ");
+  }
+
+  @Test
+  @Parameters({
+      "y",
+      " y",
+      "y ",
+      " y ",
+  })
+  public void testWorkflowDeleteInteractive_Yes(String reply) throws Exception {
+    final String component = "quux";
+
+    when(cliContext.hasConsole()).thenReturn(true);
+    when(cliContext.consoleReadLine(any())).thenReturn(reply);
+
+    when(client.deleteWorkflow(any(), any())).thenReturn(CompletableFuture.completedFuture(null));
+
+    CliMain.run(cliContext, "workflow", "delete", component, "foo", "bar");
+
+    verify(cliContext).consoleReadLine(
+        "Sure you want to delete the workflows foo, bar in component quux? [y/N] ");
+
+    verify(client).deleteWorkflow(component, "foo");
+    verify(client).deleteWorkflow(component, "bar");
+
+    verify(cliOutput).printMessage("Workflow foo in component " + component + " deleted.");
+    verify(cliOutput).printMessage("Workflow bar in component " + component + " deleted.");
+  }
+
+  @Test
+  public void testWorkflowDeleteInteractive_Force() throws Exception {
+    final String component = "quux";
+
+    when(cliContext.hasConsole()).thenReturn(true);
+
+    when(client.deleteWorkflow(any(), any())).thenReturn(CompletableFuture.completedFuture(null));
+
+    CliMain.run(cliContext, "workflow", "delete", component, "foo", "bar", "--force");
+
+    verify(cliContext, never()).consoleReadLine(any());
 
     verify(client).deleteWorkflow(component, "foo");
     verify(client).deleteWorkflow(component, "bar");
