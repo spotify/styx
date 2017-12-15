@@ -299,6 +299,8 @@ public final class CliMain {
         cliOutput.printError(getStackTraceAsString(cause));
         throw CliExitException.of(ExitStatus.ClientError);
       }
+    } catch (CliExitException e) {
+      throw e;
     } catch (Exception e) {
       cliOutput.printError(getStackTraceAsString(e));
       throw CliExitException.of(ExitStatus.UnknownError);
