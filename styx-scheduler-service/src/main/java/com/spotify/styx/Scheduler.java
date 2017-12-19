@@ -143,7 +143,7 @@ public class Scheduler {
     final Map<String, Long> currentResourceUsage =
         activeStates.parallelStream()
             .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
-            .filter(entry -> entry.runState().state() != State.QUEUED)
+            .filter(entry -> isConsumingResources(entry.runState().state()))
             .flatMap(instanceState -> pairWithResources(globalConcurrency, instanceState))
             .collect(groupingByConcurrent(
                 ResourceWithInstance::resource,
@@ -168,6 +168,10 @@ public class Scheduler {
     }
 
     updateStats(resources, currentResourceUsage);
+  }
+
+  private boolean isConsumingResources(State state) {
+    return state != State.NEW && state != State.QUEUED;
   }
 
   private void updateStats(Map<String, Resource> resources,
