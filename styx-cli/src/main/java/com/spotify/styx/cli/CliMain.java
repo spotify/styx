@@ -96,6 +96,7 @@ public final class CliMain {
   private final String apiHost;
   private final Service cliService;
   private final CliOutput cliOutput;
+  private final CliContext cliContext;
   private StyxClient styxClient;
 
   private CliMain(
@@ -103,12 +104,14 @@ public final class CliMain {
       Namespace namespace,
       String apiHost,
       Service cliService,
-      CliOutput cliOutput) {
+      CliOutput cliOutput,
+      CliContext cliContext) {
     this.parser = Objects.requireNonNull(parser);
     this.namespace = Objects.requireNonNull(namespace);
     this.apiHost = Objects.requireNonNull(apiHost);
     this.cliService = Objects.requireNonNull(cliService);
     this.cliOutput = Objects.requireNonNull(cliOutput);
+    this.cliContext = Objects.requireNonNull(cliContext);
   }
 
   public static void main(String... args) {
@@ -163,10 +166,10 @@ public final class CliMain {
       cliOutput = cliContext.output(Output.PRETTY);
     }
 
-    new CliMain(parser, namespace, apiHost, cliService, cliOutput).run(cliContext);
+    new CliMain(parser, namespace, apiHost, cliService, cliOutput, cliContext).run();
   }
 
-  private void run(CliContext cliContext) {
+  private void run() {
     final Command command = namespace.get(COMMAND_DEST);
 
     try (Service.Instance instance = cliService.start()) {
@@ -314,11 +317,11 @@ public final class CliMain {
 
     // TODO: allow reading workflow ID's from file?
 
-    if (System.console() != null && !force) {
-      final String reply = System.console().readLine(
+    if (cliContext.hasConsole() && !force) {
+      final String reply = cliContext.consoleReadLine(
           "Sure you want to delete the workflow" + (workflows.size() > 1 ? "s" : "") + " "
               + workflows.stream().collect(joining(", "))
-              + "in component " + component + "? [yN]").trim();
+              + " in component " + component + "? [y/N] ").trim();
       if (!reply.equals("y")) {
         throw CliExitException.of(ExitStatus.UnknownError);
       }
@@ -828,6 +831,8 @@ public final class CliMain {
 
   interface CliContext {
 
+
+
     enum Output {
       JSON,
       PLAIN,
@@ -839,6 +844,10 @@ public final class CliMain {
     Map<String, String> env();
 
     StyxClient createClient(Client client, String host);
+
+    boolean hasConsole();
+
+    String consoleReadLine(String prompt);
 
     CliContext DEFAULT = new CliContext() {
       @Override
@@ -863,6 +872,19 @@ public final class CliMain {
       @Override
       public Map<String, String> env() {
         return System.getenv();
+      }
+
+      @Override
+      public boolean hasConsole() {
+        return System.console() != null;
+      }
+
+      @Override
+      public String consoleReadLine(String prompt) {
+        if (!hasConsole()) {
+          throw new IllegalStateException();
+        }
+        return System.console().readLine(prompt);
       }
     };
   }
