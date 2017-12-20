@@ -143,7 +143,7 @@ public class Scheduler {
     final Map<String, Long> currentResourceUsage =
         activeStates.parallelStream()
             .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
-            .filter(entry -> entry.runState().state() != State.QUEUED)
+            .filter(entry -> isConsumingResources(entry.runState().state()))
             .flatMap(instanceState -> pairWithResources(globalConcurrency, instanceState))
             .collect(groupingByConcurrent(
                 ResourceWithInstance::resource,
@@ -168,6 +168,17 @@ public class Scheduler {
     }
 
     updateStats(resources, currentResourceUsage);
+  }
+
+  /**
+   * We'll keep counting terminal states as if they consume resources. They are transient states and
+   * should go away fairly quickly. If they don't, then we might be having some trouble cleaning up
+   * the containers. In that case it's better to be conservative on resource usage.
+   *
+   * @return true if the state consumes resources, otherwise false.
+   */
+  private static boolean isConsumingResources(State state) {
+    return state != State.NEW && state != State.QUEUED;
   }
 
   private void updateStats(Map<String, Resource> resources,

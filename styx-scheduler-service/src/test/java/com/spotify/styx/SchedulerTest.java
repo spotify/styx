@@ -29,6 +29,7 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anySetOf;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Matchers.longThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -365,22 +366,29 @@ public class SchedulerTest {
 
     assertThat(countInState(State.QUEUED), is(1));
     assertThat(countInState(State.PREPARE), is(3));
+    verify(stats).recordResourceUsed("r1", 3L);
   }
 
   @Test
-  public void shouldCountResourcesOnNonQueuedStates() throws Exception {
+  public void shouldCountResourcesOnStatesConsumingResources() throws Exception {
     setUp(20);
     setResourceLimit("r1", 3);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
 
-    init(RunState.create(instance(WORKFLOW_ID1, "i0"), State.QUEUED, time));
-    init(RunState.create(instance(WORKFLOW_ID1, "i1"), State.SUBMITTING, time));
-    init(RunState.create(instance(WORKFLOW_ID1, "i2"), State.PREPARE, time));
-    init(RunState.create(instance(WORKFLOW_ID1, "i3"), State.TERMINATED, time));
+    // do not consume resources
+    init(RunState.create(instance(WORKFLOW_ID1, "i0"), State.NEW, time));
+    init(RunState.create(instance(WORKFLOW_ID1, "i1"), State.QUEUED, time));
+
+    // consume resources
+    init(RunState.create(instance(WORKFLOW_ID1, "i2"), State.SUBMITTING, time));
+    init(RunState.create(instance(WORKFLOW_ID1, "i3"), State.PREPARE, time));
+    init(RunState.create(instance(WORKFLOW_ID1, "i4"), State.TERMINATED, time));
 
     scheduler.tick();
 
+    assertThat(countInState(State.NEW), is(1));
     assertThat(countInState(State.QUEUED), is(1));
+    verify(stats).recordResourceUsed("r1", 3L);
   }
 
   @Test
@@ -389,14 +397,26 @@ public class SchedulerTest {
     setResourceLimit("r1", 3);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
 
-    init(RunState.create(instance(WORKFLOW_ID1, "i0"), State.QUEUED, time));
-    init(RunState.create(instance(WORKFLOW_ID1, "i1"), State.PREPARE, time));
+    // do not consume resources
+    init(RunState.create(instance(WORKFLOW_ID1, "i0"), State.NEW, time));
+    init(RunState.create(instance(WORKFLOW_ID1, "i1"), State.QUEUED, time));
+
+    // consume resources
     init(RunState.create(instance(WORKFLOW_ID1, "i2"), State.PREPARE, time));
     init(RunState.create(instance(WORKFLOW_ID1, "i3"), State.PREPARE, time));
+    init(RunState.create(instance(WORKFLOW_ID1, "i4"), State.PREPARE, time));
 
     scheduler.tick();
 
+    assertThat(countInState(State.NEW), is(1));
     assertThat(countInState(State.QUEUED), is(1));
+    verify(stats).recordResourceUsed("r1", 3L);
+
+    scheduler.tick();
+
+    assertThat(countInState(State.NEW), is(1));
+    assertThat(countInState(State.QUEUED), is(1));
+    verify(stats, times(2)).recordResourceUsed("r1", 3L);
   }
 
   @Test
@@ -407,14 +427,16 @@ public class SchedulerTest {
     initWorkflow(workflowUsingResources(WORKFLOW_ID2, "r1"));
 
     for (int i = 0; i < 4; i++) {
-      init(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.QUEUED, time));
+      init(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.NEW, time));
       init(RunState.create(instance(WORKFLOW_ID2, "i" + i), State.QUEUED, time));
     }
 
     scheduler.tick();
 
-    assertThat(countInState(State.QUEUED), is(5));
+    assertThat(countInState(State.NEW), is(4));
+    assertThat(countInState(State.QUEUED), is(1));
     assertThat(countInState(State.PREPARE), is(3));
+    verify(stats).recordResourceUsed("r1", 3L);
   }
 
   @Test
@@ -433,11 +455,15 @@ public class SchedulerTest {
 
     assertThat(countInState(State.QUEUED), is(2));
     assertThat(countInState(State.PREPARE), is(2));
+    verify(stats).recordResourceUsed("r1", 2L);
+    verify(stats).recordResourceUsed("r2", 2L);
 
     scheduler.tick();
 
     assertThat(countInState(State.QUEUED), is(2));
     assertThat(countInState(State.PREPARE), is(2));
+    verify(stats, times(2)).recordResourceUsed("r1", 2L);
+    verify(stats, times(2)).recordResourceUsed("r2", 2L);
   }
 
   @Test
@@ -460,6 +486,9 @@ public class SchedulerTest {
     assertThat(countInState(State.PREPARE), is(4));
     assertThat(countInState(WORKFLOW_ID1, State.PREPARE), is(greaterThanOrEqualTo(2)));
     assertThat(countInState(WORKFLOW_ID2, State.PREPARE), is(greaterThanOrEqualTo(1)));
+    verify(stats).recordResourceUsed(eq("r1"), longThat(is(greaterThanOrEqualTo(1L))));
+    verify(stats).recordResourceUsed(eq("r2"), longThat(is(greaterThanOrEqualTo(1L))));
+    verify(stats).recordResourceUsed("common", 4L);
   }
 
   @Test
