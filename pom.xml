@@ -230,7 +230,7 @@
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-container</artifactId>
-        <version>v1-rev15-1.22.0</version>
+        <version>v1beta1-rev38-1.22.0</version>
       </dependency>
       <dependency>
         <groupId>com.google.cloud</groupId>

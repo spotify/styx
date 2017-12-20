@@ -37,9 +37,9 @@ import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
-import com.google.api.services.container.Container;
-import com.google.api.services.container.ContainerScopes;
-import com.google.api.services.container.model.Cluster;
+import com.google.api.services.container.v1beta1.Container;
+import com.google.api.services.container.v1beta1.ContainerScopes;
+import com.google.api.services.container.v1beta1.model.Cluster;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.IamScopes;
 import com.google.cloud.datastore.Datastore;
@@ -692,10 +692,11 @@ public class StyxScheduler implements AppInit {
           .getConfig(GKE_CLUSTER_PATH)
           .getConfig(id);
 
-      final Cluster cluster = gke.projects().zones().clusters()
-          .get(config.getString(GKE_CLUSTER_PROJECT_ID),
-               config.getString(GKE_CLUSTER_ZONE),
-               config.getString(GKE_CLUSTER_ID)).execute();
+      final Cluster cluster = gke.projects().locations().clusters()
+          .get(String.format("projects/%s/locations/%s/clusters/%s",
+                             config.getString(GKE_CLUSTER_PROJECT_ID),
+                             config.getString(GKE_CLUSTER_ZONE),
+                             config.getString(GKE_CLUSTER_ID))).execute();
 
       final io.fabric8.kubernetes.client.Config kubeConfig = new ConfigBuilder()
           .withMasterUrl("https://" + cluster.getEndpoint())
