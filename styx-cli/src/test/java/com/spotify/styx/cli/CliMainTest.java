@@ -26,7 +26,6 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.contains;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -65,7 +64,6 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.mockito.runners.MockitoJUnitRunner;
 
 @RunWith(JUnitParamsRunner.class)
 public class CliMainTest {
@@ -145,7 +143,7 @@ public class CliMainTest {
       "  ",
       "dfgdfgd",
   })
-  public void testWorkflowDeleteInteractive_No(String reply) throws Exception {
+  public void testWorkflowDeleteInteractiveNo(String reply) throws Exception {
     when(cliContext.hasConsole()).thenReturn(true);
     when(cliContext.consoleReadLine(any())).thenReturn(reply);
 
@@ -167,7 +165,7 @@ public class CliMainTest {
       "y ",
       " y ",
   })
-  public void testWorkflowDeleteInteractive_Yes(String reply) throws Exception {
+  public void testWorkflowDeleteInteractiveYes(String reply) throws Exception {
     final String component = "quux";
 
     when(cliContext.hasConsole()).thenReturn(true);
@@ -188,7 +186,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testWorkflowDeleteInteractive_Force() throws Exception {
+  public void testWorkflowDeleteInteractiveForce() throws Exception {
     final String component = "quux";
 
     when(cliContext.hasConsole()).thenReturn(true);
