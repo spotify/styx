@@ -370,7 +370,7 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldCountResourcesOnStatesNotConsumingResources() throws Exception {
+  public void shouldCountResourcesOnStatesConsumingResources() throws Exception {
     setUp(20);
     setResourceLimit("r1", 3);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
