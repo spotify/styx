@@ -1,9 +1,9 @@
 version: 2
 jobs:
-  build:
+  test_jdk8_with_coverage:
     working_directory: ~/styx
     docker:
-      - image: maven:3.5.0-jdk-8
+      - image: maven:3.5.2-jdk-8
     steps:
       - checkout
       - restore_cache:
@@ -23,3 +23,26 @@ jobs:
       - store_artifacts:
           path: styx-report/target/site/jacoco-aggregate/
           destination: jacoco-aggregate
+
+  test_jdk9:
+    working_directory: ~/styx
+    docker:
+      - image: maven:3.5.2-jdk-9-slim
+    steps:
+      - checkout
+      - restore_cache:
+          key: v1-deps-jdk9-{{ checksum "pom.xml" }}
+      - run: mvn dependency:go-offline compile
+      - save_cache:
+          key: v1-deps-jdk9-{{ checksum "pom.xml" }}
+          paths:
+            - ~/.m2
+      - run: mvn verify
+
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - test_jdk8_with_coverage
+      - test_jdk9
