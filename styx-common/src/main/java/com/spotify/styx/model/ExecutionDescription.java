@@ -30,22 +30,11 @@ import java.util.Optional;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public interface ExecutionDescription {
 
-  @JsonProperty("docker_image")
   String dockerImage();
-
-  @JsonProperty("docker_args")
   List<String> dockerArgs();
-
-  @JsonProperty("docker_termination_logging")
   boolean dockerTerminationLogging();
-
-  @JsonProperty("secret")
   Optional<WorkflowConfiguration.Secret> secret();
-
-  @JsonProperty("service_account")
   Optional<String> serviceAccount();
-
-  @JsonProperty("commit_sha")
   Optional<String> commitSha();
 
   static ExecutionDescriptionBuilder builder() {
