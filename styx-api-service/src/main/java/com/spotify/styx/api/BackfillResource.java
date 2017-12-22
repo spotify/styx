@@ -29,6 +29,7 @@ import static com.spotify.styx.util.StreamUtil.cat;
 import static java.util.stream.Collectors.toList;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.cloud.Tuple;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -328,7 +329,7 @@ public final class BackfillResource {
     final List<RunStateData> processedStates;
     final List<RunStateData> waitingStates;
 
-    Map<WorkflowInstance, Long> activeWorkflowInstances;
+    Map<WorkflowInstance, Tuple<Long, RunState>> activeWorkflowInstances;
     try {
       activeWorkflowInstances = storage.readActiveWorkflowInstances();
     } catch (IOException e) {

@@ -24,12 +24,10 @@ import static com.spotify.styx.monitoring.MeteredProxy.instrument;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.GuardedRunnable.guard;
-import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static com.spotify.styx.util.ReplayEvents.transitionLogger;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.stream.Collectors.toMap;
 
 import com.codahale.metrics.Gauge;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
@@ -42,6 +40,7 @@ import com.google.api.services.container.v1beta1.ContainerScopes;
 import com.google.api.services.container.v1beta1.model.Cluster;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.IamScopes;
+import com.google.cloud.Tuple;
 import com.google.cloud.datastore.Datastore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
@@ -442,17 +441,11 @@ public class StyxScheduler implements AppInit {
       StateManager stateManager,
       DockerRunner dockerRunner) {
     try {
-      final Map<WorkflowInstance, Long> activeInstances =
+      final Map<WorkflowInstance, Tuple<Long, RunState>> activeInstances =
           storage.readActiveWorkflowInstances();
 
-      replayActiveStates(activeInstances, storage, true)
-          .entrySet().stream()
-          .collect(toMap(
-              e -> e.getKey()
-                  .withHandlers(outputHandlers)
-                  .withTime(time),
-              Map.Entry::getValue))
-          .forEach(stateManager::restore);
+      activeInstances.forEach((wfi, stateTuple) -> stateManager
+          .restore(stateTuple.y().withHandlers(outputHandlers).withTime(time), stateTuple.x()));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }

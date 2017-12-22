@@ -20,6 +20,7 @@
 
 package com.spotify.styx.storage;
 
+import com.google.cloud.Tuple;
 import com.google.cloud.datastore.Datastore;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
@@ -30,6 +31,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Duration;
@@ -76,18 +78,20 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public Map<WorkflowInstance, Long> readActiveWorkflowInstances() throws IOException {
+  public Map<WorkflowInstance, Tuple<Long, RunState>> readActiveWorkflowInstances() throws IOException {
     return datastoreStorage.allActiveStates();
   }
 
   @Override
-  public Map<WorkflowInstance, Long> readActiveWorkflowInstances(String componentId) throws IOException {
+  public Map<WorkflowInstance, Tuple<Long, RunState>> readActiveWorkflowInstances(String componentId)
+      throws IOException {
     return datastoreStorage.activeStates(componentId);
   }
 
   @Override
-  public void writeActiveState(WorkflowInstance workflowInstance, long counter) throws IOException {
-    datastoreStorage.writeActiveState(workflowInstance, counter);
+  public void writeActiveState(WorkflowInstance workflowInstance,
+                               RunState state, long counter) throws IOException {
+    datastoreStorage.writeActiveState(workflowInstance, state, counter);
   }
 
   @Override

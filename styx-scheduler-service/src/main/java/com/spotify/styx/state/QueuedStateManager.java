@@ -286,7 +286,7 @@ public class QueuedStateManager implements StateManager {
         states.remove(key); // racy when states are re-initialized concurrent with termination
         storeDeactivation(key);
       } else {
-        storeActivation(key, counterPosition);
+        storeActivation(key, state, counterPosition);
       }
 
     } catch (IOException e) {
@@ -322,8 +322,9 @@ public class QueuedStateManager implements StateManager {
     storage.writeEvent(sequenceEvent);
   }
 
-  private void storeActivation(WorkflowInstance workflowInstance, long lastProcessedCount) throws IOException {
-    storage.writeActiveState(workflowInstance, lastProcessedCount);
+  private void storeActivation(WorkflowInstance workflowInstance, RunState state, long lastProcessedCount)
+      throws IOException {
+    storage.writeActiveState(workflowInstance, state, lastProcessedCount);
   }
 
   private void storeDeactivation(WorkflowInstance workflowInstance) throws IOException {

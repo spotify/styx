@@ -20,6 +20,7 @@
 
 package com.spotify.styx.storage;
 
+import com.google.cloud.Tuple;
 import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
@@ -30,6 +31,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Instant;
@@ -127,11 +129,12 @@ public interface Storage {
 
   /**
    * Stores information about an active {@link WorkflowInstance} to be tracked.
-   *
-   * @param workflowInstance  The {@link WorkflowInstance} that entered an active state
+   *  @param workflowInstance  The {@link WorkflowInstance} that entered an active state
+   * @param state              The current {@link RunState} for the given {@link WorkflowInstance}
    * @param counter           The last processed event count for the {@link WorkflowInstance}
    */
-  void writeActiveState(WorkflowInstance workflowInstance, long counter) throws IOException;
+  void writeActiveState(WorkflowInstance workflowInstance, RunState state,
+                        long counter) throws IOException;
 
   /**
    * Removes a reference to active {@link WorkflowInstance}, to be called when the instance enters
@@ -146,12 +149,12 @@ public interface Storage {
    *
    * <p>A {@link WorkflowInstance} is active if there has been at least one call to
    *
-   * {@link #writeActiveState(WorkflowInstance, long)} and no calls to
+   * {@link #writeActiveState(WorkflowInstance, RunState, long)} and no calls to
    * {@link #deleteActiveState(WorkflowInstance)}.
    *
    * @return The map of workflow instances to sequence counts
    */
-  Map<WorkflowInstance, Long> readActiveWorkflowInstances() throws IOException;
+  Map<WorkflowInstance, Tuple<Long, RunState>> readActiveWorkflowInstances() throws IOException;
 
   /**
    * Return a map of all active {@link WorkflowInstance}s to their last consumed sequence count,
@@ -159,12 +162,12 @@ public interface Storage {
    *
    * <p>A {@link WorkflowInstance} is active if there has been at least one call to
    *
-   * {@link #writeActiveState(WorkflowInstance, long)} and no calls to
+   * {@link #writeActiveState(WorkflowInstance, RunState, long)} and no calls to
    * {@link #deleteActiveState(WorkflowInstance)}.
    *
    * @return The map of workflow instances to sequence counts
    */
-  Map<WorkflowInstance, Long> readActiveWorkflowInstances(String componentId) throws IOException;
+  Map<WorkflowInstance, Tuple<Long, RunState>> readActiveWorkflowInstances(String componentId) throws IOException;
 
   /**
    * Get execution information for a {@link WorkflowInstance}.

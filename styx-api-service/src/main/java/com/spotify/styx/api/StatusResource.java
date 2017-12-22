@@ -25,6 +25,7 @@ import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static java.util.stream.Collectors.toList;
 
 import com.google.api.client.util.Lists;
+import com.google.cloud.Tuple;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
@@ -91,7 +92,7 @@ public class StatusResource {
     final List<RunStateDataPayload.RunStateData> runStates = Lists.newArrayList();
     try {
 
-      final Map<WorkflowInstance, Long> activeStates = componentOpt.isPresent()
+      final Map<WorkflowInstance, Tuple<Long, RunState>> activeStates = componentOpt.isPresent()
           ? storage.readActiveWorkflowInstances(componentOpt.get())
           : storage.readActiveWorkflowInstances();
 

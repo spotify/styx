@@ -24,6 +24,7 @@ import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static java.util.stream.Collectors.toList;
 
 import com.google.cloud.Timestamp;
+import com.google.cloud.Tuple;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.DatastoreReader;
@@ -55,6 +56,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.FnWithException;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TimeUtil;
@@ -111,6 +113,7 @@ class DatastoreStorage {
   public static final String PROPERTY_DESCRIPTION = "description";
   public static final String PROPERTY_CONFIG_DEBUG_ENABLED = "debug";
   public static final String PROPERTY_SUBMISSION_RATE_LIMIT = "submissionRateLimit";
+  public static final String PROPERTY_RUN_STATE = "runState";
 
   public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
 
@@ -338,14 +341,14 @@ class DatastoreStorage {
     return workflows;
   }
 
-  Map<WorkflowInstance, Long> allActiveStates() throws IOException {
+  Map<WorkflowInstance, Tuple<Long, RunState>> allActiveStates() throws IOException {
     final EntityQuery query =
         Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE).build();
 
     return queryActiveStates(query);
   }
 
-  Map<WorkflowInstance, Long> activeStates(String componentId) throws IOException {
+  Map<WorkflowInstance, Tuple<Long, RunState>> activeStates(String componentId) throws IOException {
     final EntityQuery query =
         Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE)
             .setFilter(PropertyFilter.eq(PROPERTY_COMPONENT, componentId))
@@ -354,27 +357,35 @@ class DatastoreStorage {
     return queryActiveStates(query);
   }
 
-  private Map<WorkflowInstance, Long> queryActiveStates(EntityQuery activeStatesQuery) throws IOException {
-    final ImmutableMap.Builder<WorkflowInstance, Long> mapBuilder = ImmutableMap.builder();
+  private Map<WorkflowInstance, Tuple<Long, RunState>> queryActiveStates(EntityQuery activeStatesQuery)
+      throws IOException {
+    final ImmutableMap.Builder<WorkflowInstance, Tuple<Long, RunState>> mapBuilder = ImmutableMap.builder();
     final QueryResults<Entity> results = datastore.run(activeStatesQuery);
     while (results.hasNext()) {
       final Entity entity = results.next();
       final long counter = entity.getLong(PROPERTY_COUNTER);
       final WorkflowInstance instance = parseWorkflowInstance(entity);
-
-      mapBuilder.put(instance, counter);
+      final RunState state;
+      if (entity.contains(PROPERTY_RUN_STATE)) {
+        state = OBJECT_MAPPER.readValue(entity.getString(PROPERTY_RUN_STATE), RunState.class);
+      } else {
+        state = null;
+      }
+      mapBuilder.put(instance, Tuple.of(counter, state));
     }
 
     return mapBuilder.build();
   }
 
-  void writeActiveState(WorkflowInstance workflowInstance, long counter) throws IOException {
+  void writeActiveState(WorkflowInstance workflowInstance, RunState state,
+                        long counter) throws IOException {
     storeWithRetries(() -> {
       final Key key = activeWorkflowInstanceKey(workflowInstance);
       final Entity entity = Entity.newBuilder(key)
           .set(PROPERTY_COMPONENT, workflowInstance.workflowId().componentId())
           .set(PROPERTY_WORKFLOW, workflowInstance.workflowId().id())
           .set(PROPERTY_PARAMETER, workflowInstance.parameter())
+          .set(PROPERTY_RUN_STATE, OBJECT_MAPPER.writeValueAsString(state))
           .set(PROPERTY_COUNTER, counter)
           .build();
 

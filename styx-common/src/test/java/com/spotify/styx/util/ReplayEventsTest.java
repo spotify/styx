@@ -32,6 +32,7 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.Tuple;
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
@@ -73,8 +74,8 @@ public class ReplayEventsTest {
 
     RunState restoredRunState =
         ReplayEvents
-            .getBackfillRunState(WORKFLOW_INSTANCE, ImmutableMap.of(WORKFLOW_INSTANCE, 6L), storage,
-                                 "bf-1").get();
+            .getBackfillRunState(WORKFLOW_INSTANCE, ImmutableMap.of(WORKFLOW_INSTANCE,
+                                      Tuple.of(6L, null)), storage,"bf-1").get();
 
     assertThat(restoredRunState.state(), is(RUNNING));
     assertThat(restoredRunState.data().trigger(), isPresent());
@@ -115,7 +116,7 @@ public class ReplayEventsTest {
 
     Optional<RunState> restoredRunState =
         ReplayEvents
-            .getBackfillRunState(WORKFLOW_INSTANCE, ImmutableMap.of(WORKFLOW_INSTANCE, 2L), storage,
+            .getBackfillRunState(WORKFLOW_INSTANCE, ImmutableMap.of(WORKFLOW_INSTANCE, Tuple.of(2L, null)), storage,
                                  "erroneous-id");
 
     assertThat(restoredRunState, is(Optional.empty()));
@@ -139,7 +140,7 @@ public class ReplayEventsTest {
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
 
     Map<RunState, Long> runStates = ReplayEvents.replayActiveStates(
-        ImmutableMap.of(WORKFLOW_INSTANCE, counter), storage, printLogs);
+        ImmutableMap.of(WORKFLOW_INSTANCE, Tuple.of(counter, null)), storage, printLogs);
 
     assertThat(runStates.size(), is(1));
 
