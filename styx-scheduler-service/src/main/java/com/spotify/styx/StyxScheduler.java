@@ -581,6 +581,12 @@ public class StyxScheduler implements AppInit {
       workflowInitializer.inspectChange(workflow);
       cache.store(workflow);
       workflowConsumer.accept(oldWorkflowOptional, Optional.of(workflow));
+      if (oldWorkflowOptional.isPresent()) {
+        LOG.info("Workflow modified, old config: {}, new config: {}", oldWorkflowOptional.get(),
+            workflow);
+      } else {
+        LOG.info("Workflow added: {}", workflow);
+      }
     };
   }
 
@@ -597,6 +603,7 @@ public class StyxScheduler implements AppInit {
       }
       cache.remove(workflow);
       workflowConsumer.accept(Optional.of(workflow), Optional.empty());
+      LOG.info("Workflow removed: {}", workflow);
     });
   }
 
