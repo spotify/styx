@@ -23,13 +23,14 @@ package com.spotify.styx;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.theInstance;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.api.services.container.Container;
-import com.google.api.services.container.model.Cluster;
-import com.google.api.services.container.model.MasterAuth;
+import com.google.api.services.container.v1beta1.Container;
+import com.google.api.services.container.v1beta1.model.Cluster;
+import com.google.api.services.container.v1beta1.model.MasterAuth;
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.StyxScheduler.KubernetesClientFactory;
 import com.typesafe.config.Config;
@@ -50,19 +51,13 @@ public class StyxSchedulerTest {
 
   @Mock KubernetesClientFactory kubernetesClientFactory;
   @Mock NamespacedKubernetesClient kubernetesClient;
-  @Mock Container gkeClient;
-  @Mock Container.Projects gkeProjects;
-  @Mock Container.Projects.Zones gkeZones;
-  @Mock Container.Projects.Zones.Clusters gkeClusters;
-  @Mock Container.Projects.Zones.Clusters.Get gkeClusterGet;
+  @Mock(answer = RETURNS_DEEP_STUBS) Container gkeClient;
+  @Mock Container.Projects.Locations.Clusters.Get gkeClusterGet;
 
   @Before
   public void setUp() throws Exception {
     when(kubernetesClientFactory.apply(any())).thenReturn(kubernetesClient);
-    when(gkeClient.projects()).thenReturn(gkeProjects);
-    when(gkeProjects.zones()).thenReturn(gkeZones);
-    when(gkeZones.clusters()).thenReturn(gkeClusters);
-    when(gkeClusters.get(any(), any(), any())).thenReturn(gkeClusterGet);
+    when(gkeClient.projects().locations().clusters().get(any())).thenReturn(gkeClusterGet);
   }
 
   @Test
