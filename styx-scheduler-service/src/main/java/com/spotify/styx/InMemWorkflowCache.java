@@ -40,12 +40,13 @@ public class InMemWorkflowCache implements WorkflowCache {
 
   @Override
   public void store(Workflow workflow) {
-    LOG.info("Storing {}", workflow);
+    LOG.debug("Adding to cache: {}", workflow);
     workflowStore.put(workflow.id(), workflow);
   }
 
   @Override
   public void remove(Workflow workflow) {
+    LOG.debug("Removing from cache: {}", workflow);
     workflowStore.remove(workflow.id());
   }
 
