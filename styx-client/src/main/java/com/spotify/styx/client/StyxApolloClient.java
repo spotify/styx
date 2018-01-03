@@ -205,6 +205,24 @@ class StyxApolloClient implements StyxClient {
   }
 
   @Override
+  public CompletionStage<WorkflowState> updateWorkflowState(String componentId, String workflowId,
+                                                            WorkflowState workflowState) {
+    final HttpUrl.Builder urlBuilder = getUrlBuilder()
+        .addPathSegment("workflows")
+        .addPathSegment(componentId)
+        .addPathSegment(workflowId)
+        .addPathSegment("state");
+    final ByteString payload;
+    try {
+      payload = serialize(workflowState);
+    } catch (JsonProcessingException e) {
+      return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
+    }
+    return executeRequest(Request.forUri(urlBuilder.build().toString(), "PATCH")
+                              .withPayload(payload), WorkflowState.class);
+  }
+
+  @Override
   public CompletionStage<Void> triggerWorkflowInstance(String componentId,
                                                        String workflowId,
                                                        String parameter) {

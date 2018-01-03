@@ -33,31 +33,48 @@ public interface StyxWorkflowClient {
   /**
    * Get a {@link Workflow}
    *
-   * @param componentId componentId id
-   * @param workflowId  workflowId id
+   * @param componentId component id
+   * @param workflowId  workflow id
+   * @return the {@link Workflow}
    */
   CompletionStage<Workflow> workflow(final String componentId, final String workflowId);
 
   /**
-   * Create or update a workflow.
-   * @param componentId The component that the workflow belongs to.
-   * @param workflowConfig The workflow configuration.
-   * @return The created {@link Workflow}.
+   * Create or update a workflow
+   *
+   * @param componentId    component id
+   * @param workflowConfig workflow configuration
+   * @return the created {@link Workflow}
    */
-  CompletionStage<Workflow> createOrUpdateWorkflow(String componentId, WorkflowConfiguration workflowConfig);
+  CompletionStage<Workflow> createOrUpdateWorkflow(String componentId,
+                                                   WorkflowConfiguration workflowConfig);
 
   /**
    * Delete a {@link Workflow}
-   * @param componentId The component that the workflow belongs to.
-   * @param workflowId The workflow to delete.
+   *
+   * @param componentId component id
+   * @param workflowId  workflow id
    */
   CompletionStage<Void> deleteWorkflow(String componentId, String workflowId);
 
   /**
    * Get a {@link WorkflowState}
    *
-   * @param componentId componentId id
-   * @param workflowId  workflowId id
+   * @param componentId component id
+   * @param workflowId  workflow id
+   * @return the {@link WorkflowState}
    */
   CompletionStage<WorkflowState> workflowState(final String componentId, final String workflowId);
+
+  /**
+   * Update {@link WorkflowState}
+   *
+   * @param componentId   component id
+   * @param workflowId    workflow id
+   * @param workflowState workflow state
+   * @return the updated {@link WorkflowState}
+   */
+  CompletionStage<WorkflowState> updateWorkflowState(final String componentId,
+                                                     final String workflowId,
+                                                     final WorkflowState workflowState);
 }

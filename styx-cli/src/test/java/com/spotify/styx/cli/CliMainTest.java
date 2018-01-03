@@ -27,6 +27,7 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.contains;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -48,6 +49,7 @@ import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.serialization.Json;
 import java.io.File;
 import java.io.IOException;
@@ -79,7 +81,7 @@ public class CliMainTest {
   @Mock CliOutput cliOutput;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     MockitoAnnotations.initMocks(this);
 
     when(cliContext.createClient(any(), any())).thenReturn(client);
@@ -89,7 +91,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testList() throws Exception {
+  public void testList() {
     final RunStateDataPayload payload = mock(RunStateDataPayload.class);
     when(client.activeStates(Optional.empty()))
         .thenReturn(CompletableFuture.completedFuture(payload));
@@ -124,7 +126,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testWorkflowDelete() throws Exception {
+  public void testWorkflowDelete() {
     final String component = "quux";
 
     when(client.deleteWorkflow(any(), any())).thenReturn(CompletableFuture.completedFuture(null));
@@ -202,7 +204,7 @@ public class CliMainTest {
       "  ",
       "dfgdfgd",
   })
-  public void testWorkflowDeleteInteractiveNo(String reply) throws Exception {
+  public void testWorkflowDeleteInteractiveNo(String reply) {
     when(cliContext.hasConsole()).thenReturn(true);
     when(cliContext.consoleReadLine(any())).thenReturn(reply);
 
@@ -224,7 +226,7 @@ public class CliMainTest {
       "y ",
       " y ",
   })
-  public void testWorkflowDeleteInteractiveYes(String reply) throws Exception {
+  public void testWorkflowDeleteInteractiveYes(String reply) {
     final String component = "quux";
 
     when(cliContext.hasConsole()).thenReturn(true);
@@ -245,7 +247,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testWorkflowDeleteInteractiveForce() throws Exception {
+  public void testWorkflowDeleteInteractiveForce() {
     final String component = "quux";
 
     when(cliContext.hasConsole()).thenReturn(true);
@@ -264,7 +266,75 @@ public class CliMainTest {
   }
 
   @Test
-  public void testClientError() throws Exception {
+  public void testWorkflowEnable() {
+    final String component = "quux";
+    final WorkflowState workflowState = WorkflowState.builder()
+        .enabled(true)
+        .build();
+
+    when(client.updateWorkflowState(any(), any(), eq(workflowState)))
+        .thenReturn(CompletableFuture.completedFuture(workflowState));
+
+    CliMain.run(cliContext, "workflow", "enable", component, "foo", "bar");
+
+    verify(client).updateWorkflowState(component, "foo", workflowState);
+    verify(client).updateWorkflowState(component, "bar", workflowState);
+    verify(cliOutput).printMessage("Workflow foo in component " + component + " enabled.");
+    verify(cliOutput).printMessage("Workflow bar in component " + component + " enabled.");
+  }
+
+  @Test
+  public void testWorkflowDisable() {
+    final String component = "quux";
+    final WorkflowState workflowState = WorkflowState.builder()
+        .enabled(false)
+        .build();
+
+    when(client.updateWorkflowState(any(), any(), eq(workflowState)))
+        .thenReturn(CompletableFuture.completedFuture(workflowState));
+
+    CliMain.run(cliContext, "workflow", "disable", component, "foo", "bar");
+
+    verify(client).updateWorkflowState(component, "foo", workflowState);
+    verify(client).updateWorkflowState(component, "bar", workflowState);
+    verify(cliOutput).printMessage("Workflow foo in component " + component + " disabled.");
+    verify(cliOutput).printMessage("Workflow bar in component " + component + " disabled.");
+  }
+
+  @Test
+  public void shouldHandleWorkflowNotFoundWhenEnabling() {
+    final String component = "quux";
+    final WorkflowState workflowState = WorkflowState.builder()
+        .enabled(true)
+        .build();
+
+    final ApiErrorException exception = new ApiErrorException("not found", 404, true);
+    when(client.updateWorkflowState(any(), any(), eq(workflowState)))
+        .thenReturn(exceptionallyCompletedFuture(exception));
+
+    CliMain.run(cliContext, "workflow", "enable", component, "foo", "bar");
+    verify(cliOutput).printMessage("Workflow foo in component " + component + " not found.");
+    verify(cliOutput).printMessage("Workflow bar in component " + component + " not found.");
+  }
+
+  @Test
+  public void shouldHandleWorkflowNotFoundWhenDisabling() {
+    final String component = "quux";
+    final WorkflowState workflowState = WorkflowState.builder()
+        .enabled(false)
+        .build();
+
+    final ApiErrorException exception = new ApiErrorException("not found", 404, true);
+    when(client.updateWorkflowState(any(), any(), eq(workflowState)))
+        .thenReturn(exceptionallyCompletedFuture(exception));
+
+    CliMain.run(cliContext, "workflow", "disable", component, "foo", "bar");
+    verify(cliOutput).printMessage("Workflow foo in component " + component + " not found.");
+    verify(cliOutput).printMessage("Workflow bar in component " + component + " not found.");
+  }
+
+  @Test
+  public void testClientError() {
     final ClientErrorException exception = new ClientErrorException(
         "foo failure", new IOException());
     when(client.triggerWorkflowInstance(any(), any(), any()))
@@ -281,7 +351,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testApiError() throws Exception {
+  public void testApiError() {
     final ApiErrorException exception = new ApiErrorException("bar failure", 500, true);
     when(client.triggerWorkflowInstance(any(), any(), any()))
         .thenReturn(exceptionallyCompletedFuture(exception));
@@ -297,7 +367,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testClientUnknownError() throws Exception {
+  public void testClientUnknownError() {
     final NullPointerException exception = new NullPointerException();
     when(client.triggerWorkflowInstance(any(), any(), any()))
         .thenReturn(CompletableFutures.exceptionallyCompletedFuture(exception));
@@ -314,7 +384,7 @@ public class CliMainTest {
 
 
   @Test
-  public void testUnknownError() throws Exception {
+  public void testUnknownError() {
     final NullPointerException exception = new NullPointerException();
     when(client.triggerWorkflowInstance(any(), any(), any()))
         .thenThrow(exception);
@@ -330,7 +400,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testMissingCredentialsHelpMessage() throws Exception {
+  public void testMissingCredentialsHelpMessage() {
     when(client.triggerWorkflowInstance(any(), any(), any()))
         .thenReturn(exceptionallyCompletedFuture(new ApiErrorException("foo", 401, false)));
 
@@ -345,7 +415,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testUnauthorizedMessage() throws Exception {
+  public void testUnauthorizedMessage() {
     when(client.triggerWorkflowInstance(any(), any(), any()))
         .thenReturn(exceptionallyCompletedFuture(new ApiErrorException("foo", 401, true)));
 
@@ -360,7 +430,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testHelp() throws Exception {
+  public void testHelp() {
     try {
       CliMain.run(cliContext, "--help");
       fail();
@@ -379,7 +449,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testArgumentError() throws Exception {
+  public void testArgumentError() {
     try {
       CliMain.run(cliContext, "foozbarz");
       fail();

@@ -46,6 +46,7 @@ import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.serialization.Json;
 import java.io.IOException;
 import java.time.Instant;
@@ -180,8 +181,8 @@ public class StyxApolloClientTest {
   public void shouldCreateBackfillWithDescription() throws Exception {
     final Instant start = Instant.parse("2017-01-01T00:00:00Z");
     final Instant end = Instant.parse("2017-01-30T00:00:00Z");
-    final BackfillInput backfillInput = BackfillInput.create(start, end,"foo-comp", "bar-wf",
-         1, Optional.of("Description"));
+    final BackfillInput backfillInput = BackfillInput.create(start, end, "foo-comp", "bar-wf",
+                                                             1, Optional.of("Description"));
 
     final Backfill backfill = Backfill.newBuilder()
         .id("backfill-2")
@@ -197,15 +198,37 @@ public class StyxApolloClientTest {
         Response.forStatus(Status.OK).withPayload(Json.serialize(backfill))));
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
     final CompletableFuture<Backfill> r = styx.backfillCreate("foo-comp", "bar-wf",
-        "2017-01-01T00:00:00Z", "2017-01-30T00:00:00Z", 1, "Description")
+                                                              "2017-01-01T00:00:00Z",
+                                                              "2017-01-30T00:00:00Z", 1,
+                                                              "Description")
         .toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
     assertThat(request.uri(), is(API_URL + "/backfills"));
     assertThat(Json.deserialize(request.payload().get(), BackfillInput.class),
-        equalTo(backfillInput));
+               equalTo(backfillInput));
     assertThat(request.method(), is("POST"));
+  }
+
+  @Test
+  public void shouldUpdateWorkflowState() throws Exception {
+    final WorkflowState workflowState = WorkflowState.builder()
+        .enabled(true)
+        .nextNaturalTrigger(Instant.parse("2017-01-03T21:00:00Z"))
+        .nextNaturalTrigger(Instant.parse("2017-01-03T22:00:00Z"))
+        .build();
+    when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
+        Response.forStatus(Status.OK).withPayload(Json.serialize(workflowState))));
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+    final CompletableFuture<WorkflowState> r =
+        styx.updateWorkflowState("foo-comp", "bar-wf", workflowState).toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    assertThat(request.uri(), is(API_URL + "/workflows/foo-comp/bar-wf/state"));
+    assertThat(Json.deserialize(request.payload().get(), WorkflowState.class), is(workflowState));
+    assertThat(request.method(), is("PATCH"));
   }
 
   @Test
