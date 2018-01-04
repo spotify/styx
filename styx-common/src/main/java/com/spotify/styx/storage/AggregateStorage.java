@@ -20,7 +20,6 @@
 
 package com.spotify.styx.storage;
 
-import com.google.cloud.Tuple;
 import com.google.cloud.datastore.Datastore;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
@@ -41,6 +40,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
+import javaslang.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
 
 /**
@@ -78,12 +78,12 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public Map<WorkflowInstance, Tuple<Long, RunState>> readActiveWorkflowInstances() throws IOException {
+  public Map<WorkflowInstance, Tuple2<Long, RunState>> readActiveWorkflowInstances() throws IOException {
     return datastoreStorage.allActiveStates();
   }
 
   @Override
-  public Map<WorkflowInstance, Tuple<Long, RunState>> readActiveWorkflowInstances(String componentId)
+  public Map<WorkflowInstance, Tuple2<Long, RunState>> readActiveWorkflowInstances(String componentId)
       throws IOException {
     return datastoreStorage.activeStates(componentId);
   }

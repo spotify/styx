@@ -40,7 +40,6 @@ import com.google.api.services.container.v1beta1.ContainerScopes;
 import com.google.api.services.container.v1beta1.model.Cluster;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.IamScopes;
-import com.google.cloud.Tuple;
 import com.google.cloud.datastore.Datastore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
@@ -109,6 +108,7 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import javaslang.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -441,11 +441,11 @@ public class StyxScheduler implements AppInit {
       StateManager stateManager,
       DockerRunner dockerRunner) {
     try {
-      final Map<WorkflowInstance, Tuple<Long, RunState>> activeInstances =
+      final Map<WorkflowInstance, Tuple2<Long, RunState>> activeInstances =
           storage.readActiveWorkflowInstances();
 
       activeInstances.forEach((wfi, stateTuple) -> stateManager
-          .restore(stateTuple.y().withHandlers(outputHandlers).withTime(time), stateTuple.x()));
+          .restore(stateTuple._2.withHandlers(outputHandlers).withTime(time), stateTuple._1));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }

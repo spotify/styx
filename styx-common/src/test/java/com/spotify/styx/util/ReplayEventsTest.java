@@ -32,7 +32,6 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.cloud.Tuple;
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
@@ -44,6 +43,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.SortedSet;
+import javaslang.Tuple;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.Before;

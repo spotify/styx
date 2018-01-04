@@ -20,7 +20,6 @@
 
 package com.spotify.styx.storage;
 
-import com.google.cloud.Tuple;
 import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
@@ -40,6 +39,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
+import javaslang.Tuple2;
 
 /**
  * The interface to the persistence layer.
@@ -154,7 +154,7 @@ public interface Storage {
    *
    * @return The map of workflow instances to sequence counts
    */
-  Map<WorkflowInstance, Tuple<Long, RunState>> readActiveWorkflowInstances() throws IOException;
+  Map<WorkflowInstance, Tuple2<Long, RunState>> readActiveWorkflowInstances() throws IOException;
 
   /**
    * Return a map of all active {@link WorkflowInstance}s to their last consumed sequence count,
@@ -167,7 +167,7 @@ public interface Storage {
    *
    * @return The map of workflow instances to sequence counts
    */
-  Map<WorkflowInstance, Tuple<Long, RunState>> readActiveWorkflowInstances(String componentId) throws IOException;
+  Map<WorkflowInstance, Tuple2<Long, RunState>> readActiveWorkflowInstances(String componentId) throws IOException;
 
   /**
    * Get execution information for a {@link WorkflowInstance}.

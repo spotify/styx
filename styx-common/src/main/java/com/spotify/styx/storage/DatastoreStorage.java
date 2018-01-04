@@ -24,7 +24,6 @@ import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static java.util.stream.Collectors.toList;
 
 import com.google.cloud.Timestamp;
-import com.google.cloud.Tuple;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.DatastoreReader;
@@ -72,6 +71,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
+import javaslang.Tuple;
+import javaslang.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -341,14 +342,14 @@ class DatastoreStorage {
     return workflows;
   }
 
-  Map<WorkflowInstance, Tuple<Long, RunState>> allActiveStates() throws IOException {
+  Map<WorkflowInstance, Tuple2<Long, RunState>> allActiveStates() throws IOException {
     final EntityQuery query =
         Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE).build();
 
     return queryActiveStates(query);
   }
 
-  Map<WorkflowInstance, Tuple<Long, RunState>> activeStates(String componentId) throws IOException {
+  Map<WorkflowInstance, Tuple2<Long, RunState>> activeStates(String componentId) throws IOException {
     final EntityQuery query =
         Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE)
             .setFilter(PropertyFilter.eq(PROPERTY_COMPONENT, componentId))
@@ -357,9 +358,9 @@ class DatastoreStorage {
     return queryActiveStates(query);
   }
 
-  private Map<WorkflowInstance, Tuple<Long, RunState>> queryActiveStates(EntityQuery activeStatesQuery)
+  private Map<WorkflowInstance, Tuple2<Long, RunState>> queryActiveStates(EntityQuery activeStatesQuery)
       throws IOException {
-    final ImmutableMap.Builder<WorkflowInstance, Tuple<Long, RunState>> mapBuilder = ImmutableMap.builder();
+    final ImmutableMap.Builder<WorkflowInstance, Tuple2<Long, RunState>> mapBuilder = ImmutableMap.builder();
     final QueryResults<Entity> results = datastore.run(activeStatesQuery);
     while (results.hasNext()) {
       final Entity entity = results.next();

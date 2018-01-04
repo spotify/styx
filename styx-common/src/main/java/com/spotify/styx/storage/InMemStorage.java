@@ -20,7 +20,6 @@
 
 package com.spotify.styx.storage;
 
-import com.google.cloud.Tuple;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -49,6 +48,8 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javaslang.Tuple;
+import javaslang.Tuple2;
 
 /**
  * A Storage implementation with state stored in memory. For testing.
@@ -63,7 +64,7 @@ public class InMemStorage implements Storage {
       .newConcurrentMap();
 
   public final List<SequenceEvent> writtenEvents = Lists.newCopyOnWriteArrayList();
-  public final Map<WorkflowInstance, Tuple<Long, RunState>> activeStatesMap = Maps.newHashMap();
+  public final Map<WorkflowInstance, Tuple2<Long, RunState>> activeStatesMap = Maps.newHashMap();
 
   public final CountDownLatch countDown;
 
@@ -287,7 +288,8 @@ public class InMemStorage implements Storage {
   @Override
   public void writeEvent(SequenceEvent sequenceEvent) {
     writtenEvents.add(sequenceEvent);
-    activeStatesMap.computeIfPresent(sequenceEvent.event().workflowInstance(), (k, v) -> Tuple.of(v.x() + 1, v.y()));
+    activeStatesMap.computeIfPresent(sequenceEvent.event().workflowInstance(),
+        (k, v) -> Tuple.of(v._1 + 1, v._2));
   }
 
   @Override
@@ -314,12 +316,12 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public Map<WorkflowInstance, Tuple<Long, RunState>> readActiveWorkflowInstances() throws IOException {
+  public Map<WorkflowInstance, Tuple2<Long, RunState>> readActiveWorkflowInstances() throws IOException {
     return activeStatesMap;
   }
 
   @Override
-  public Map<WorkflowInstance, Tuple<Long, RunState>> readActiveWorkflowInstances(String componentId)
+  public Map<WorkflowInstance, Tuple2<Long, RunState>> readActiveWorkflowInstances(String componentId)
       throws IOException {
     return activeStatesMap.entrySet().stream()
         .filter((entry) -> componentId.equals(entry.getKey().workflowId().componentId()))
@@ -329,6 +331,7 @@ public class InMemStorage implements Storage {
   public Optional<Long> getCounterFromActiveStates(WorkflowInstance workflowInstance)
       throws IOException {
     return Optional.ofNullable(activeStatesMap.get(workflowInstance) != null
-                               ? activeStatesMap.get(workflowInstance).x() : null);
+                               ? activeStatesMap.get(workflowInstance)._1
+                               : null);
   }
 }

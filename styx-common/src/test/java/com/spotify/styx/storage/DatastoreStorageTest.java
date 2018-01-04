@@ -40,7 +40,6 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.same;
 
 import com.google.bigtable.repackaged.com.google.common.collect.ImmutableList;
-import com.google.cloud.Tuple;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;

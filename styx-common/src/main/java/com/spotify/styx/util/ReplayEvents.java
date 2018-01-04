@@ -47,7 +47,7 @@ public final class ReplayEvents {
   }
 
   public static Map<RunState, Long> replayActiveStates(
-      Map<WorkflowInstance, com.google.cloud.Tuple<Long, RunState>> instances,
+      Map<WorkflowInstance, Tuple2<Long, RunState>> instances,
       Storage storage,
       boolean printLogs) throws IOException {
     LOG.info("Replaying active states");
@@ -56,8 +56,8 @@ public final class ReplayEvents {
 
     return instances.entrySet().parallelStream().map(entry -> {
       final WorkflowInstance workflowInstance = entry.getKey();
-      final long lastConsumedEvent = entry.getValue().x();
-      final RunState runState = entry.getValue().y();
+      final long lastConsumedEvent = entry.getValue()._1;
+      final RunState runState = entry.getValue()._2;
       final SettableTime time = new SettableTime();
       if (printLogs) {
         LOG.debug("Replaying {} up to #{}", workflowInstance.toKey(), lastConsumedEvent);
@@ -104,7 +104,7 @@ public final class ReplayEvents {
 
   public static Optional<RunState> getBackfillRunState(
       WorkflowInstance workflowInstance,
-      Map<WorkflowInstance, com.google.cloud.Tuple<Long, RunState>> activeWorkflowInstances,
+      Map<WorkflowInstance, Tuple2<Long, RunState>> activeWorkflowInstances,
       Storage storage,
       String backfillId) {
     final SettableTime time = new SettableTime();
@@ -125,7 +125,7 @@ public final class ReplayEvents {
 
     final long lastConsumedEvent =
         activeWorkflowInstances.getOrDefault(workflowInstance,
-          com.google.cloud.Tuple.of(sequenceEvents.last().counter(), restoredState)).x();
+          Tuple.of(sequenceEvents.last().counter(), restoredState))._1;
 
     for (SequenceEvent sequenceEvent : sequenceEvents) {
       // The active state event counters are read before the events themselves and styx is 
