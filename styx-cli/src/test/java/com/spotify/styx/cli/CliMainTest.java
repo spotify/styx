@@ -284,6 +284,23 @@ public class CliMainTest {
   }
 
   @Test
+  public void shouldFailToEnableWorkflow() {
+    final String component = "quux";
+    final WorkflowState workflowState = WorkflowState.builder()
+        .enabled(true)
+        .build();
+
+    when(client.updateWorkflowState(any(), any(), eq(workflowState)))
+        .thenReturn(
+            CompletableFuture.completedFuture(WorkflowState.builder().enabled(false).build()));
+
+    CliMain.run(cliContext, "workflow", "enable", component, "foo");
+
+    verify(client).updateWorkflowState(component, "foo", workflowState);
+    verify(cliOutput).printMessage("Failed to enable workflow foo in component " + component + ".");
+  }
+
+  @Test
   public void testWorkflowDisable() {
     final String component = "quux";
     final WorkflowState workflowState = WorkflowState.builder()
@@ -299,6 +316,23 @@ public class CliMainTest {
     verify(client).updateWorkflowState(component, "bar", workflowState);
     verify(cliOutput).printMessage("Workflow foo in component " + component + " disabled.");
     verify(cliOutput).printMessage("Workflow bar in component " + component + " disabled.");
+  }
+
+  @Test
+  public void shouldFailToDisableWorkflow() {
+    final String component = "quux";
+    final WorkflowState workflowState = WorkflowState.builder()
+        .enabled(false)
+        .build();
+
+    when(client.updateWorkflowState(any(), any(), eq(workflowState)))
+        .thenReturn(
+            CompletableFuture.completedFuture(WorkflowState.builder().enabled(true).build()));
+
+    CliMain.run(cliContext, "workflow", "disable", component, "foo");
+
+    verify(client).updateWorkflowState(component, "foo", workflowState);
+    verify(cliOutput).printMessage("Failed to disable workflow foo in component " + component + ".");
   }
 
   @Test
