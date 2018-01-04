@@ -96,21 +96,21 @@ public class ServiceAccountKeyManagerTest {
     sakm.keyExists("foo");
   }
 
-  @Test(expected = GoogleJsonResponseException.class)
-  public void deleteKeyShouldThrowUnknownExceptions() throws Exception {
+  @Test
+  public void deleteKeyShouldIgnoreUnknownExceptions() throws Exception {
     when(delete.execute()).thenThrow(INTERNAL_SERVER_ERROR);
-    sakm.deleteKey("foo");
+    sakm.tryDeleteKey("foo");
   }
 
   @Test
   public void deleteKeyShouldIgnorePermissionDenied() throws Exception {
     when(delete.execute()).thenThrow(PERMISSION_DENIED);
-    sakm.deleteKey("foo");
+    sakm.tryDeleteKey("foo");
   }
 
   @Test
   public void deleteKeyShouldIgnoreNotFound() throws Exception {
     when(delete.execute()).thenThrow(NOT_FOUND);
-    sakm.deleteKey("foo");
+    sakm.tryDeleteKey("foo");
   }
 }
