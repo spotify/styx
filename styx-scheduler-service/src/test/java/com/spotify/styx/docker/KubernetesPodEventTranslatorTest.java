@@ -327,7 +327,8 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   static PodStatus podStatusNoContainer(String phase) {
-    return new PodStatus(emptyList(), Lists.newArrayList(), "", "", phase, "", "", "");
+    return new PodStatus(emptyList(), Lists.newArrayList(), "", emptyList(), "", phase, "", "", "",
+                         "");
   }
 
   private Pod podWithTerminationLogging() {
