@@ -30,7 +30,6 @@ import static net.sourceforge.argparse4j.impl.Arguments.fileType;
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.core.Service;
 import com.spotify.apollo.core.Services;
@@ -57,6 +56,7 @@ import com.spotify.styx.util.ParameterUtil;
 import java.io.File;
 import java.io.IOException;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -417,7 +417,7 @@ public final class CliMain {
         .collect(toList());
 
     final List<Tuple2<String, WorkflowState>> updatedWorkflowStates =
-        Lists.newArrayListWithCapacity(futures.size());
+        new ArrayList<>(futures.size());
     for (Tuple2<String, CompletionStage<WorkflowState>> future : futures) {
       final String workflow = future._1;
       try {
