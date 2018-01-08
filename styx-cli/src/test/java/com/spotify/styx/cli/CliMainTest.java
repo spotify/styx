@@ -284,7 +284,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void shouldFailToEnableWorkflow() {
+  public void shouldFailWhenReturningUnexpectedStateWhenEnablingWorkflow() {
     final String component = "quux";
     final WorkflowState workflowState = WorkflowState.builder()
         .enabled(true)
@@ -319,7 +319,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void shouldFailToDisableWorkflow() {
+  public void shouldFailWhenReturningUnexpectedStateWhenDisablingWorkflow() {
     final String component = "quux";
     final WorkflowState workflowState = WorkflowState.builder()
         .enabled(false)

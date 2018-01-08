@@ -850,10 +850,10 @@ public final class CliMain {
 
   private enum WorkflowCommand {
     SHOW("get", "Show info about a specific workflow"),
-    CREATE("", "Create or update a workflow"),
-    DELETE("", "Delete a workflow"),
-    ENABLE("", "Enable a workflow"),
-    DISABLE("", "Disable a workflow");
+    CREATE("", "Create or update workflow(s)"),
+    DELETE("", "Delete workflow(s)"),
+    ENABLE("", "Enable workflow(s)"),
+    DISABLE("", "Disable workflow(s)");
 
     private final String alias;
     private final String description;
