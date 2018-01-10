@@ -7,9 +7,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -62,6 +62,7 @@ import com.spotify.styx.serialization.PersistentWorkflowInstanceStateBuilder;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
+import com.spotify.styx.util.CounterUtil;
 import com.spotify.styx.util.FnWithException;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TimeUtil;
@@ -147,6 +148,7 @@ class DatastoreStorage {
 
   private final Datastore datastore;
   private final Duration retryBaseDelay;
+<<<<<<< 724cf4e8b937ccc672e3843d087a8540233c2dbc
   private final Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory;
 
   DatastoreStorage(Datastore datastore, Duration retryBaseDelay) {
@@ -158,6 +160,21 @@ class DatastoreStorage {
     this.datastore = Objects.requireNonNull(datastore);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
     this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
+=======
+  private final CounterUtil counterUtil;
+  private final KeyFactory componentKeyFactory;
+
+  @VisibleForTesting
+  final Key globalConfigKey;
+
+  DatastoreStorage(Datastore datastore, Duration retryBaseDelay, CounterUtil counterUtil) {
+    this.datastore = Objects.requireNonNull(datastore);
+    this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
+    this.counterUtil = Objects.requireNonNull(counterUtil);
+
+    this.componentKeyFactory = datastore.newKeyFactory().setKind(KIND_COMPONENT);
+    this.globalConfigKey = datastore.newKeyFactory().setKind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
+>>>>>>> Add draft CounterUtil
   }
 
   StyxConfig config() {
@@ -620,7 +637,11 @@ class DatastoreStorage {
   }
 
   void postResource(Resource resource) throws IOException {
-    storeWithRetries(() -> datastore.put(resourceToEntity(resource)));
+    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
+        counterUtil.updateLimit(transaction, resource.id(), resource.concurrency());
+        return transaction.put(resourceToEntity(resource));
+        // TODO store just in one place, eliminate one of the two calls ^?
+      }));
   }
 
   List<Resource> getResources() {
