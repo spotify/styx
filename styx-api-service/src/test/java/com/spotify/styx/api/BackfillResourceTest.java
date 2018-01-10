@@ -67,6 +67,7 @@ import com.spotify.styx.storage.BigtableStorage;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -406,7 +407,8 @@ public class BackfillResourceTest extends VersionedApiTest {
         BACKFILL_1.end(),
         BACKFILL_1.workflowId().componentId(),
         BACKFILL_1.workflowId().id(),
-        BACKFILL_1.concurrency());
+        BACKFILL_1.concurrency(),
+        BACKFILL_1.description());
 
     storage.writeActiveState(WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01"), 0L);
 

@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.norberg.automatter.AutoMatter;
 import java.time.Instant;
+import java.util.Optional;
 
 @AutoMatter
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -44,16 +45,20 @@ public interface BackfillInput {
   @JsonProperty
   int concurrency();
 
+  @JsonProperty
+  Optional<String> description();
+
   BackfillInputBuilder builder();
 
   static BackfillInput create(Instant start, Instant end, String component, String workflow,
-                              int concurrency) {
+                              int concurrency, Optional<String> description) {
     return newBuilder()
         .start(start)
         .end(end)
         .component(component)
         .workflow(workflow)
         .concurrency(concurrency)
+        .description(description)
         .build();
   }
 

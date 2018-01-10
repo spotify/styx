@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.norberg.automatter.AutoMatter;
 import java.time.Instant;
+import java.util.Optional;
 
 @AutoMatter
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -55,6 +56,9 @@ public interface Backfill {
 
   @JsonProperty
   boolean halted();
+
+  @JsonProperty
+  Optional<String> description();
 
   BackfillBuilder builder();
 

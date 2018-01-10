@@ -386,9 +386,10 @@ public final class CliMain {
     final String start = namespace.getString(parser.backfillCreateStart.getDest());
     final String end = namespace.getString(parser.backfillCreateEnd.getDest());
     final int concurrency = namespace.getInt(parser.backfillCreateConcurrency.getDest());
+    final String description = namespace.getString(parser.backfillCreateDescription.getDest());
 
     final Backfill backfill =
-        styxClient.backfillCreate(component, workflow, start, end, concurrency)
+        styxClient.backfillCreate(component, workflow, start, end, concurrency, description)
             .toCompletableFuture().get();
     cliOutput.printBackfill(backfill);
   }
@@ -579,6 +580,9 @@ public final class CliMain {
         backfillCreate.addArgument("end").help("End date/datehour (exclusive)").action(partitionAction);
     final Argument backfillCreateConcurrency =
         backfillCreate.addArgument("concurrency").help("The number of jobs to run in parallel").type(Integer.class);
+    final Argument backfillCreateDescription =
+        backfillCreate.addArgument("-d", "--description")
+            .help("a description of the backfill");
 
 
     final Subparsers resourceParser =

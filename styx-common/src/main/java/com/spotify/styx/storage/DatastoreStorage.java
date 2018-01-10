@@ -47,6 +47,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.StyxConfig;
@@ -106,6 +107,7 @@ class DatastoreStorage {
   public static final String PROPERTY_SCHEDULE = "schedule";
   public static final String PROPERTY_ALL_TRIGGERED = "allTriggered";
   public static final String PROPERTY_HALTED = "halted";
+  public static final String PROPERTY_DESCRIPTION = "description";
   public static final String PROPERTY_CONFIG_DEBUG_ENABLED = "debug";
   public static final String PROPERTY_SUBMISSION_RATE_LIMIT = "submissionRateLimit";
 
@@ -641,7 +643,7 @@ class DatastoreStorage {
     final WorkflowId workflowId = WorkflowId.create(entity.getString(PROPERTY_COMPONENT),
                                                     entity.getString(PROPERTY_WORKFLOW));
 
-    return Backfill.newBuilder()
+    final BackfillBuilder builder = Backfill.newBuilder()
         .id(entity.getKey().getName())
         .start(timestampToInstant(entity.getTimestamp(PROPERTY_START)))
         .end(timestampToInstant(entity.getTimestamp(PROPERTY_END)))
@@ -650,8 +652,13 @@ class DatastoreStorage {
         .nextTrigger(timestampToInstant(entity.getTimestamp(PROPERTY_NEXT_TRIGGER)))
         .schedule(Schedule.parse(entity.getString(PROPERTY_SCHEDULE)))
         .allTriggered(entity.getBoolean(PROPERTY_ALL_TRIGGERED))
-        .halted(entity.getBoolean(PROPERTY_HALTED))
-        .build();
+        .halted(entity.getBoolean(PROPERTY_HALTED));
+
+    if (entity.contains(PROPERTY_DESCRIPTION)) {
+      builder.description(entity.getString(PROPERTY_DESCRIPTION));
+    }
+
+    return builder.build();
   }
 
   void storeBackfill(Backfill backfill) throws IOException {
@@ -671,6 +678,9 @@ class DatastoreStorage {
         .set(PROPERTY_NEXT_TRIGGER, instantToTimestamp(backfill.nextTrigger()))
         .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())
         .set(PROPERTY_HALTED, backfill.halted());
+
+    backfill.description().ifPresent(x -> builder.set(PROPERTY_DESCRIPTION, StringValue
+        .newBuilder(x).setExcludeFromIndexes(true).build()));
 
     return builder.build();
   }
