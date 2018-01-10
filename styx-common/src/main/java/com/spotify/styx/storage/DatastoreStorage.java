@@ -63,6 +63,7 @@ import com.spotify.styx.serialization.PersistentWorkflowInstanceStateBuilder;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
+import com.spotify.styx.util.CounterUtil;
 import com.spotify.styx.util.FnWithException;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TimeUtil;
@@ -146,14 +147,16 @@ class DatastoreStorage {
 
   private final Datastore datastore;
   private final Duration retryBaseDelay;
+  private final CounterUtil counterUtil;
   private final KeyFactory componentKeyFactory;
 
   @VisibleForTesting
   final Key globalConfigKey;
 
-  DatastoreStorage(Datastore datastore, Duration retryBaseDelay) {
+  DatastoreStorage(Datastore datastore, Duration retryBaseDelay, CounterUtil counterUtil) {
     this.datastore = Objects.requireNonNull(datastore);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
+    this.counterUtil = Objects.requireNonNull(counterUtil);
 
     this.componentKeyFactory = datastore.newKeyFactory().setKind(KIND_COMPONENT);
     this.globalConfigKey = datastore.newKeyFactory().setKind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
@@ -623,7 +626,11 @@ class DatastoreStorage {
   }
 
   void postResource(Resource resource) throws IOException {
-    storeWithRetries(() -> datastore.put(resourceToEntity(resource)));
+    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
+        counterUtil.updateLimit(transaction, resource.id(), resource.concurrency());
+        return transaction.put(resourceToEntity(resource));
+        // TODO store just in one place, eliminate one of the two calls ^?
+      }));
   }
 
   List<Resource> getResources() {
@@ -786,7 +793,6 @@ class DatastoreStorage {
   private <T> T read(Entity entity, String property, T defaultValue) {
     return this.<T>readOpt(entity, property).orElse(defaultValue);
   }
-
   private StringValue jsonValue(Object o) throws JsonProcessingException {
     return StringValue
         .newBuilder(OBJECT_MAPPER.writeValueAsString(o))
