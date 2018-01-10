@@ -100,8 +100,15 @@ public class ServiceAccountKeyManagerTest {
     verify(iam.projects().serviceAccounts().keys()).get("foo");
   }
 
+  @Test(expected = GoogleJsonResponseException.class)
+  public void deleteKeyShouldThrowUnknownExceptions() throws Exception {
+    when(delete.execute()).thenThrow(INTERNAL_SERVER_ERROR);
+    sakm.deleteKey("foo");
+    verify(iam.projects().serviceAccounts().keys()).delete("foo");
+  }
+
   @Test
-  public void deleteKeyShouldIgnoreUnknownExceptions() throws Exception {
+  public void tryDeleteKeyShouldIgnoreUnknownExceptions() throws Exception {
     when(delete.execute()).thenThrow(INTERNAL_SERVER_ERROR);
     sakm.tryDeleteKey("foo");
     verify(iam.projects().serviceAccounts().keys()).delete("foo");
@@ -110,14 +117,14 @@ public class ServiceAccountKeyManagerTest {
   @Test
   public void deleteKeyShouldIgnorePermissionDenied() throws Exception {
     when(delete.execute()).thenThrow(PERMISSION_DENIED);
-    sakm.tryDeleteKey("foo");
+    sakm.deleteKey("foo");
     verify(iam.projects().serviceAccounts().keys()).delete("foo");
   }
 
   @Test
   public void deleteKeyShouldIgnoreNotFound() throws Exception {
     when(delete.execute()).thenThrow(NOT_FOUND);
-    sakm.tryDeleteKey("foo");
+    sakm.deleteKey("foo");
     verify(iam.projects().serviceAccounts().keys()).delete("foo");
   }
 }

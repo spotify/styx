@@ -76,20 +76,23 @@ public class ServiceAccountKeyManager {
     }
   }
 
-  private ServiceAccountKey createKey(String serviceAccount,
-      CreateServiceAccountKeyRequest request)
-      throws IOException {
+  private ServiceAccountKey createKey(
+      String serviceAccount,
+      CreateServiceAccountKeyRequest request) throws IOException {
     return iam.projects().serviceAccounts().keys()
         .create("projects/-/serviceAccounts/" + serviceAccount, request)
         .execute();
   }
 
-  /**
-   * Attempt to delete a service account key as a best effort procedure. Exceptions are logged but
-   * not re-thrown.
-   * @param keyName The fully qualified name of the key to delete.
-   */
   public void tryDeleteKey(String keyName) {
+    try {
+      deleteKey(keyName);
+    } catch (IOException e) {
+      LOG.debug("Ignoring error while deleting key {}", keyName, e);
+    }
+  }
+
+  public void deleteKey(String keyName) throws IOException {
     LOG.info("[AUDIT] Deleting service account key: {}", keyName);
     try {
       iam.projects().serviceAccounts().keys()
@@ -102,8 +105,10 @@ public class ServiceAccountKeyManager {
         return;
       }
       LOG.warn("[AUDIT] Failed to delete key {}", keyName, e);
-    } catch (Exception e) {
+      throw e;
+    } catch (IOException e) {
       LOG.warn("[AUDIT] Failed to delete key {}", keyName, e);
+      throw e;
     }
   }
 }

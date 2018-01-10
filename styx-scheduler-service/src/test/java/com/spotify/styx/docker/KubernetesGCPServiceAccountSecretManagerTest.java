@@ -178,6 +178,26 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     assertThat(createdSecret.getData(), hasEntry("styx-wf-sa.p12", p12Key.getPrivateKeyData()));
   }
 
+  @Test(expected = RuntimeException.class)
+  public void shouldCleanupKeysIfKeyCreationFails() throws IsClosedException, IOException {
+    when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(true);
+
+    ServiceAccountKey jsonKey = new ServiceAccountKey();
+    jsonKey.setName("key.json");
+    jsonKey.setPrivateKeyData("json-private-key-data");
+    ServiceAccountKey p12Key = new ServiceAccountKey();
+    p12Key.setName("key.p12");
+    p12Key.setPrivateKeyData("p12-private-key-data");
+    when(serviceAccountKeyManager.createJsonKey(any(String.class))).thenReturn(jsonKey);
+    when(serviceAccountKeyManager.createP12Key(any(String.class))).thenThrow(new IOException());
+
+    sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(), SERVICE_ACCOUNT);
+
+    verify(serviceAccountKeyManager).createJsonKey(SERVICE_ACCOUNT);
+    verify(serviceAccountKeyManager).createP12Key(SERVICE_ACCOUNT);
+    verify(serviceAccountKeyManager).tryDeleteKey(jsonKey.getName());
+  }
+
   @Test
   public void shouldDeleteGCPKeysIfSecretAlreadyExists() throws IsClosedException, IOException {
     when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(true);
@@ -197,8 +217,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
     verify(serviceAccountKeyManager).createJsonKey(SERVICE_ACCOUNT);
     verify(serviceAccountKeyManager).createP12Key(SERVICE_ACCOUNT);
-    verify(serviceAccountKeyManager).tryDeleteKey("key.json");
-    verify(serviceAccountKeyManager).tryDeleteKey("key.p12");
+    verify(serviceAccountKeyManager).tryDeleteKey(jsonKey.getName());
+    verify(serviceAccountKeyManager).tryDeleteKey(p12Key.getName());
   }
 
   @Test
@@ -269,8 +289,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     // Verify that an unused service account key secret is deleted
     when(podList.getItems()).thenReturn(ImmutableList.of());
     sut.cleanup();
-    verify(serviceAccountKeyManager).tryDeleteKey(keyName(SERVICE_ACCOUNT, "json-key"));
-    verify(serviceAccountKeyManager).tryDeleteKey(keyName(SERVICE_ACCOUNT, "p12-key"));
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key"));
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key"));
     verify(secrets).delete(secret);
   }
 
@@ -294,9 +314,42 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
     when(podList.getItems()).thenReturn(ImmutableList.of());
     sut.cleanup();
-    verify(serviceAccountKeyManager).tryDeleteKey(keyName(SERVICE_ACCOUNT, "json-key"));
-    verify(serviceAccountKeyManager).tryDeleteKey(keyName(SERVICE_ACCOUNT, "p12-key"));
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key"));
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key"));
     verify(secrets).delete(secret);
+  }
+
+  @Test
+  public void shouldHandleErrorsWhenDeletingServiceAccountKeysAndSecret() throws Exception {
+    final Secret secret1 = fakeServiceAccountKeySecret(
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-1", "p12-key-1", EXPIRED_CREATION_TIMESTAMP.toString());
+    final Secret secret2 = fakeServiceAccountKeySecret(
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-2", "p12-key-2", EXPIRED_CREATION_TIMESTAMP.toString());
+    final Secret secret3 = fakeServiceAccountKeySecret(
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-3", "p12-key-3", EXPIRED_CREATION_TIMESTAMP.toString());
+
+    when(podList.getItems()).thenReturn(ImmutableList.of());
+    when(k8sClient.secrets()).thenReturn(secrets);
+    when(secrets.list()).thenReturn(secretList);
+    when(secretList.getItems()).thenReturn(ImmutableList.of(secret1, secret2, secret3));
+
+    when(secrets.delete(secret1)).thenThrow(new KubernetesClientException("fail delete secret1"));
+    doThrow(new IOException("fail delete json-key-2")).when(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT,"json-key-2"));
+    doThrow(new IOException("fail delete p12-key-3")).when(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT,"p12-key-3"));
+
+    sut.cleanup();
+
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key-1"));
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key-1"));
+    verify(secrets).delete(secret1);
+
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key-2"));
+    verify(serviceAccountKeyManager, never()).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key-2"));
+    verify(secrets, never()).delete(secret2);
+
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key-3"));
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key-3"));
+    verify(secrets, never()).delete(secret3);
   }
 
   @Test
@@ -315,7 +368,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     pod.setStatus(podStatus("Running"));
     when(podList.getItems()).thenReturn(ImmutableList.of(pod));
     sut.cleanup();
-    verify(serviceAccountKeyManager, never()).tryDeleteKey(anyString());
+    verify(serviceAccountKeyManager, never()).deleteKey(anyString());
     verify(secrets, never()).delete(any(Secret.class));
   }
 
@@ -331,8 +384,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
     sut.cleanup();
 
-    verify(serviceAccountKeyManager).tryDeleteKey(keyName(SERVICE_ACCOUNT, "old-json-key"));
-    verify(serviceAccountKeyManager).tryDeleteKey(keyName(SERVICE_ACCOUNT, "old-p12-key"));
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "old-json-key"));
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "old-p12-key"));
     verify(secrets).delete(secret);
   }
 
@@ -350,7 +403,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
     sut.cleanup();
 
-    verify(serviceAccountKeyManager, never()).tryDeleteKey(anyString());
+    verify(serviceAccountKeyManager, never()).deleteKey(anyString());
     verify(secrets, never()).delete(any(Secret.class));
   }
 
@@ -442,8 +495,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
     sut.ensureServiceAccountKeySecret(WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT);
 
-    verify(serviceAccountKeyManager).tryDeleteKey(keyName(SERVICE_ACCOUNT, jsonKeyId));
-    verify(serviceAccountKeyManager).tryDeleteKey(keyName(SERVICE_ACCOUNT, p12KeyId));
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, jsonKeyId));
+    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, p12KeyId));
     verify(serviceAccountKeyManager).createJsonKey(SERVICE_ACCOUNT);
     verify(serviceAccountKeyManager).createP12Key(SERVICE_ACCOUNT);
     verify(secrets).delete(secret);
