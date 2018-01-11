@@ -50,18 +50,20 @@ public class PrettyCliOutputTest {
 
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
 
+  private PrintStream old;
+
   private CliOutput cliOutput;
 
   @Before
   public void setUp() {
+    old = System.out;
     System.setOut(new PrintStream(outContent));
     cliOutput = new PrettyCliOutput();
   }
 
   @After
   public void tearDown() {
-    System.setOut(null);
-    System.setErr(null);
+    System.setOut(old);
   }
 
   @Test
