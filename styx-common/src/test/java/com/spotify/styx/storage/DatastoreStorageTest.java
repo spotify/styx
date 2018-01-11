@@ -48,7 +48,6 @@ import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -453,7 +452,7 @@ public class DatastoreStorageTest {
         .workflowId(WorkflowId.create("component", "workflow2"))
         .concurrency(2)
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
-        .schedule(Schedule.DAYS)
+        .schedule(DAYS)
         .build();
 
     storage.storeBackfill(backfill);
@@ -470,7 +469,7 @@ public class DatastoreStorageTest {
         .concurrency(2)
         .description("Description")
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
-        .schedule(Schedule.DAYS)
+        .schedule(DAYS)
         .build();
 
     storage.storeBackfill(backfill);
