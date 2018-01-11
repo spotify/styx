@@ -27,6 +27,7 @@ import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
@@ -46,6 +47,8 @@ import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -439,6 +442,39 @@ public class DatastoreStorageTest {
         .build();
 
     assertThat(storage.config(), is(expectedConfig));
+  }
+
+  @Test
+  public void shouldStoreAndReadBackfill() throws Exception {
+    final Backfill backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(Instant.parse("2017-01-01T00:00:00Z"))
+        .end(Instant.parse("2017-01-02T00:00:00Z"))
+        .workflowId(WorkflowId.create("component", "workflow2"))
+        .concurrency(2)
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+
+    storage.storeBackfill(backfill);
+    assertThat(storage.getBackfill(backfill.id()), equalTo(Optional.of(backfill)));
+  }
+
+  @Test
+  public void shouldStoreAndReadBackfillWithDescription() throws Exception {
+    final Backfill backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(Instant.parse("2017-01-01T00:00:00Z"))
+        .end(Instant.parse("2017-01-02T00:00:00Z"))
+        .workflowId(WorkflowId.create("component", "workflow2"))
+        .concurrency(2)
+        .description("Description")
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+
+    storage.storeBackfill(backfill);
+    assertThat(storage.getBackfill(backfill.id()), equalTo(Optional.of(backfill)));
   }
 
   private Workflow workflow(WorkflowId workflowId) {

@@ -375,6 +375,37 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(postedBackfill.end(), equalTo(Instant.parse("2017-02-01T00:00:00Z")));
     assertThat(postedBackfill.workflowId(), equalTo(WorkflowId.create("component", "workflow2")));
     assertThat(postedBackfill.concurrency(), equalTo(1));
+    assertThat(postedBackfill.description(), equalTo(Optional.empty()));
+    assertThat(postedBackfill.nextTrigger(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
+    assertThat(postedBackfill.schedule(), equalTo(Schedule.HOURS));
+    assertThat(postedBackfill.allTriggered(), equalTo(false));
+    assertThat(postedBackfill.halted(), equalTo(false));
+  }
+
+  @Test
+  public void shouldPostBackfillWithDescription() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final String json = "{\"start\":\"2017-01-01T00:00:00Z\"," +
+                        "\"end\":\"2017-02-01T00:00:00Z\"," +
+                        "\"component\":\"component\"," +
+                        "\"workflow\":\"workflow2\","+
+                        "\"concurrency\":1," +
+                        "\"description\":\"Description\"}";
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path(""), ByteString.encodeUtf8(json)));
+
+    assertThat(response.status().reasonPhrase(),
+               response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
+        response.payload().get().toByteArray(), Backfill.class);
+    assertThat(postedBackfill.id().matches("backfill-[\\d-]+"), is(true));
+    assertThat(postedBackfill.start(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
+    assertThat(postedBackfill.end(), equalTo(Instant.parse("2017-02-01T00:00:00Z")));
+    assertThat(postedBackfill.workflowId(), equalTo(WorkflowId.create("component", "workflow2")));
+    assertThat(postedBackfill.concurrency(), equalTo(1));
+    assertThat(postedBackfill.description(), equalTo(Optional.of("Description")));
     assertThat(postedBackfill.nextTrigger(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
     assertThat(postedBackfill.schedule(), equalTo(Schedule.HOURS));
     assertThat(postedBackfill.allTriggered(), equalTo(false));

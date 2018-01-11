@@ -387,7 +387,6 @@ public final class CliMain {
     final String end = namespace.getString(parser.backfillCreateEnd.getDest());
     final int concurrency = namespace.getInt(parser.backfillCreateConcurrency.getDest());
     final String description = namespace.getString(parser.backfillCreateDescription.getDest());
-
     final Backfill backfill =
         styxClient.backfillCreate(component, workflow, start, end, concurrency, description)
             .toCompletableFuture().get();

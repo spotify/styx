@@ -46,6 +46,9 @@ public interface Backfill {
   int concurrency();
 
   @JsonProperty
+  Optional<String> description();
+
+  @JsonProperty
   Instant nextTrigger();
 
   @JsonProperty
@@ -56,9 +59,6 @@ public interface Backfill {
 
   @JsonProperty
   boolean halted();
-
-  @JsonProperty
-  Optional<String> description();
 
   BackfillBuilder builder();
 
