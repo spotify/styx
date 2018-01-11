@@ -21,7 +21,6 @@
 package com.spotify.styx.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import io.norberg.automatter.AutoMatter;
 import java.time.Instant;
 import java.util.Optional;
@@ -30,22 +29,16 @@ import java.util.Optional;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public interface BackfillInput {
 
-  @JsonProperty
   Instant start();
 
-  @JsonProperty
   Instant end();
 
-  @JsonProperty
   String component();
 
-  @JsonProperty
   String workflow();
 
-  @JsonProperty
   int concurrency();
 
-  @JsonProperty
   Optional<String> description();
 
   BackfillInputBuilder builder();
