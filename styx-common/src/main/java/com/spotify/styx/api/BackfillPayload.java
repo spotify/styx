@@ -38,7 +38,7 @@ public abstract class BackfillPayload {
   public abstract Optional<RunStateDataPayload> statuses();
 
   @JsonCreator
-  static BackfillPayload create(
+  public static BackfillPayload create(
       @JsonProperty("backfill") Backfill backfill,
       @JsonProperty("statuses") Optional<RunStateDataPayload> statuses) {
     return new AutoValue_BackfillPayload(backfill, statuses);
