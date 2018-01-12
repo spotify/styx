@@ -23,6 +23,7 @@ package com.spotify.styx;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.api.client.googleapis.json.GoogleJsonError;
@@ -82,35 +83,48 @@ public class ServiceAccountKeyManagerTest {
   public void keyExistsTreatsPermissionDeniedAsNotFound() throws Exception {
     when(get.execute()).thenThrow(PERMISSION_DENIED);
     assertThat(sakm.keyExists("foo"), is(false));
+    verify(iam.projects().serviceAccounts().keys()).get("foo");
   }
 
   @Test
   public void keyExistsReturnsFalseForNotFound() throws Exception {
     when(get.execute()).thenThrow(NOT_FOUND);
     assertThat(sakm.keyExists("foo"), is(false));
+    verify(iam.projects().serviceAccounts().keys()).get("foo");
   }
 
   @Test(expected = GoogleJsonResponseException.class)
   public void keyExistsShouldThrowUnknownExceptions() throws Exception {
     when(get.execute()).thenThrow(INTERNAL_SERVER_ERROR);
     sakm.keyExists("foo");
+    verify(iam.projects().serviceAccounts().keys()).get("foo");
   }
 
   @Test(expected = GoogleJsonResponseException.class)
   public void deleteKeyShouldThrowUnknownExceptions() throws Exception {
     when(delete.execute()).thenThrow(INTERNAL_SERVER_ERROR);
     sakm.deleteKey("foo");
+    verify(iam.projects().serviceAccounts().keys()).delete("foo");
+  }
+
+  @Test
+  public void tryDeleteKeyShouldIgnoreUnknownExceptions() throws Exception {
+    when(delete.execute()).thenThrow(INTERNAL_SERVER_ERROR);
+    sakm.tryDeleteKey("foo");
+    verify(iam.projects().serviceAccounts().keys()).delete("foo");
   }
 
   @Test
   public void deleteKeyShouldIgnorePermissionDenied() throws Exception {
     when(delete.execute()).thenThrow(PERMISSION_DENIED);
     sakm.deleteKey("foo");
+    verify(iam.projects().serviceAccounts().keys()).delete("foo");
   }
 
   @Test
   public void deleteKeyShouldIgnoreNotFound() throws Exception {
     when(delete.execute()).thenThrow(NOT_FOUND);
     sakm.deleteKey("foo");
+    verify(iam.projects().serviceAccounts().keys()).delete("foo");
   }
 }

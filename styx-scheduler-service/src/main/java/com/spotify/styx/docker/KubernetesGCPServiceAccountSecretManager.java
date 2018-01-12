@@ -22,7 +22,6 @@ package com.spotify.styx.docker;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.services.iam.v1.model.ServiceAccountKey;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
@@ -56,7 +55,7 @@ import org.slf4j.LoggerFactory;
 
 class KubernetesGCPServiceAccountSecretManager {
 
-  private static final Logger logger = LoggerFactory.getLogger(KubernetesGCPServiceAccountSecretManager.class);
+  private static final Logger LOG = LoggerFactory.getLogger(KubernetesGCPServiceAccountSecretManager.class);
 
   private static final String STYX_WORKFLOW_SA_ID_ANNOTATION = "styx-wf-sa";
   private static final String STYX_WORKFLOW_SA_EPOCH_ANNOTATION = "styx-wf-sa-epoch";
@@ -96,7 +95,8 @@ class KubernetesGCPServiceAccountSecretManager {
     this.clock = Objects.requireNonNull(clock);
   }
 
-  KubernetesGCPServiceAccountSecretManager(NamespacedKubernetesClient client,
+  KubernetesGCPServiceAccountSecretManager(
+      NamespacedKubernetesClient client,
       ServiceAccountKeyManager keyManager) {
     this(client, keyManager, DEFAULT_SECRET_EPOCH_PROVIDER, DEFAULT_CLOCK);
   }
@@ -105,8 +105,8 @@ class KubernetesGCPServiceAccountSecretManager {
     final long epoch = epochProvider.epoch(clock.millis(), serviceAccount);
     final String secretName = buildSecretName(serviceAccount, epoch);
 
-    logger.info("[AUDIT] Workflow {} refers to secret {} storing keys of {}",
-             workflowId, secretName, serviceAccount);
+    LOG.info("[AUDIT] Workflow {} refers to secret {} storing keys of {}",
+        workflowId, secretName, serviceAccount);
 
     try {
       return serviceAccountSecretCache.get(serviceAccount, () ->
@@ -130,7 +130,7 @@ class KubernetesGCPServiceAccountSecretManager {
     // Check that the service account exists
     final boolean serviceAccountExists = keyManager.serviceAccountExists(serviceAccount);
     if (!serviceAccountExists) {
-      logger.warn("[AUDIT] Workflow {} refers to non-existent service account {}", workflowId, serviceAccount);
+      LOG.warn("[AUDIT] Workflow {} refers to non-existent service account {}", workflowId, serviceAccount);
       throw new InvalidExecutionException("Referenced service account " + serviceAccount + " was not found");
     }
 
@@ -145,29 +145,35 @@ class KubernetesGCPServiceAccountSecretManager {
         return secretName;
       }
 
-      logger.info("[AUDIT] Service account keys have been deleted for {}, recreating", serviceAccount);
+      LOG.info("[AUDIT] Service account keys have been deleted for {}, recreating", serviceAccount);
 
       // Delete secret and any lingering key before creating new keys
       keyManager.deleteKey(jsonKeyName);
       keyManager.deleteKey(p12KeyName);
-      client.secrets().delete(existingSecret);
+      deleteSecret(existingSecret);
     }
 
     // Create service account keys and secret
-    createSecret(workflowId, serviceAccount, epoch, secretName);
+    createKeysAndSecret(workflowId, serviceAccount, epoch, secretName);
 
     return secretName;
   }
 
-  private void createSecret(String workflowId, String serviceAccount, long epoch, String secretName)
+  private void createKeysAndSecret(String workflowId, String serviceAccount, long epoch, String secretName)
       throws IOException {
     final ServiceAccountKey jsonKey;
     final ServiceAccountKey p12Key;
     try {
       jsonKey = keyManager.createJsonKey(serviceAccount);
-      p12Key = keyManager.createP12Key(serviceAccount);
+      try {
+        p12Key = keyManager.createP12Key(serviceAccount);
+      } catch (IOException e) {
+        // Best effort to rollback the creation of the first key to avoid lingering keys
+        keyManager.tryDeleteKey(jsonKey.getName());
+        throw e;
+      }
     } catch (IOException e) {
-      logger.warn("[AUDIT] Failed to create keys for {}", serviceAccount, e);
+      LOG.warn("[AUDIT] Failed to create keys for {}", serviceAccount, e);
       throw e;
     }
 
@@ -191,9 +197,16 @@ class KubernetesGCPServiceAccountSecretManager {
         .withData(keys)
         .build();
 
-    client.secrets().create(newSecret);
+    try {
+      client.secrets().create(newSecret);
+    } catch (KubernetesClientException e) {
+      // Best effort delete of the generated keys since another entity already created the secret
+      keyManager.tryDeleteKey(jsonKey.getName());
+      keyManager.tryDeleteKey(p12Key.getName());
+      return;
+    }
 
-    logger.info("[AUDIT] Secret {} created to store keys of {} referred by workflow {}, jsonKey: {}, p12Key: {}",
+    LOG.info("[AUDIT] Secret {} created to store keys of {} referred by workflow {}, jsonKey: {}, p12Key: {}",
         secretName, serviceAccount, workflowId, jsonKey.getName(), p12Key.getName());
   }
 
@@ -232,25 +245,14 @@ class KubernetesGCPServiceAccountSecretManager {
 
     // Delete keys and secrets for all inactive service accounts and let them be recreated by future executions
     for (Secret secret : inactiveServiceAccountSecrets) {
-      final String name = secret.getMetadata().getName();
-      final String serviceAcount = serviceAccount(secret);
-
+      final Map<String, String> annotations = secret.getMetadata().getAnnotations();
       try {
-        final Map<String, String> annotations = secret.getMetadata().getAnnotations();
-        final String jsonKeyName = annotations.get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION);
-        final String p12KeyName = annotations.get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION);
-
-        logger.info("[AUDIT] Deleting service account key: {}", jsonKeyName);
-        tryDeleteServiceAccountKey(jsonKeyName);
-
-        logger.info("[AUDIT] Deleting service account key: {}", p12KeyName);
-        tryDeleteServiceAccountKey(p12KeyName);
-
-        logger.info("[AUDIT] Deleting service account {} secret {}", serviceAcount, name);
-        client.secrets().delete(secret);
-      } catch (IOException | KubernetesClientException e) {
-        logger.warn("[AUDIT] Failed to delete service account {} keys and/or secret {}",
-            serviceAcount, name);
+        keyManager.deleteKey(annotations.get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION));
+        keyManager.deleteKey(annotations.get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION));
+        deleteSecret(secret);
+      } catch (KubernetesClientException | IOException ignored) {
+        LOG.warn("Failed to cleanup secret or keys for service account {}",
+            annotations.get(STYX_WORKFLOW_SA_ID_ANNOTATION));
       }
     }
   }
@@ -273,18 +275,16 @@ class KubernetesGCPServiceAccountSecretManager {
     return secret.getMetadata().getAnnotations().get(STYX_WORKFLOW_SA_ID_ANNOTATION);
   }
 
-  /**
-   * Try to delete a service account key, giving up with a warning if permission was denied.
-   * @param keyName The fully qualified name of the key to delete.
-   */
-  private void tryDeleteServiceAccountKey(String keyName) throws IOException {
+  private void deleteSecret(Secret secret) {
+    LOG.info("[AUDIT] Deleting service account {} secret {}", serviceAccount(secret),
+        secret.getMetadata().getName());
     try {
-      keyManager.deleteKey(keyName);
-    } catch (GoogleJsonResponseException e) {
-      if (GcpUtil.isPermissionDenied(e)) {
-        logger.warn("[AUDIT] Permission denied when trying to delete unused service account key {}",
-                    keyName);
+      client.secrets().delete(secret);
+    } catch (KubernetesClientException e) {
+      if (e.getCode() == 404) {
+        LOG.debug("Couldn't find secret to delete {}", secret.getMetadata().getName());
       } else {
+        LOG.warn("[AUDIT] Failed to delete secret {}", secret.getMetadata().getName());
         throw e;
       }
     }

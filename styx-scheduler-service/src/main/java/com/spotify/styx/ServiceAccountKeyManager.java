@@ -25,8 +25,12 @@ import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.model.CreateServiceAccountKeyRequest;
 import com.google.api.services.iam.v1.model.ServiceAccountKey;
 import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ServiceAccountKeyManager {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ServiceAccountKeyManager.class);
 
   private final Iam iam;
 
@@ -72,15 +76,24 @@ public class ServiceAccountKeyManager {
     }
   }
 
-  private ServiceAccountKey createKey(String serviceAccount,
-      CreateServiceAccountKeyRequest request)
-      throws IOException {
+  private ServiceAccountKey createKey(
+      String serviceAccount,
+      CreateServiceAccountKeyRequest request) throws IOException {
     return iam.projects().serviceAccounts().keys()
         .create("projects/-/serviceAccounts/" + serviceAccount, request)
         .execute();
   }
 
+  public void tryDeleteKey(String keyName) {
+    try {
+      deleteKey(keyName);
+    } catch (IOException e) {
+      LOG.debug("Ignoring error while deleting key {}", keyName, e);
+    }
+  }
+
   public void deleteKey(String keyName) throws IOException {
+    LOG.info("[AUDIT] Deleting service account key: {}", keyName);
     try {
       iam.projects().serviceAccounts().keys()
           .delete(keyName)
@@ -88,8 +101,13 @@ public class ServiceAccountKeyManager {
     } catch (GoogleJsonResponseException e) {
       // TODO: handle 403 correctly once google fixes their API
       if (e.getStatusCode() == 403 || e.getStatusCode() == 404) {
+        LOG.debug("Couldn't find key to delete {}", keyName);
         return;
       }
+      LOG.warn("[AUDIT] Failed to delete key {}", keyName, e);
+      throw e;
+    } catch (IOException e) {
+      LOG.warn("[AUDIT] Failed to delete key {}", keyName, e);
       throw e;
     }
   }
