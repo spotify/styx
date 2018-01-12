@@ -43,14 +43,18 @@ import com.spotify.styx.cli.CliMain.CliContext;
 import com.spotify.styx.client.ApiErrorException;
 import com.spotify.styx.client.ClientErrorException;
 import com.spotify.styx.client.StyxClient;
+import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.serialization.Json;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -132,6 +136,61 @@ public class CliMainTest {
 
     verify(cliOutput).printMessage("Workflow foo in component " + component + " deleted.");
     verify(cliOutput).printMessage("Workflow bar in component " + component + " deleted.");
+  }
+
+  @Test
+  public void testBackfillCreate() throws Exception {
+    final String component = "quux";
+    final String start = "2017-01-01T00:00:00Z";
+    final String end = "2017-01-30T00:00:00Z";
+
+    final Backfill backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(Instant.parse(start))
+        .end(Instant.parse(end))
+        .workflowId(WorkflowId.create(component, "foo"))
+        .concurrency(1)
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+
+    when(client.backfillCreate(component, "foo", start,
+        end, 1, null))
+        .thenReturn(CompletableFuture.completedFuture(backfill));
+
+    CliMain.run(cliContext, "backfill", "create", component, "foo", "2017-01-01", "2017-01-30",
+        "1");
+
+    verify(client).backfillCreate(component, "foo", start, end, 1, null);
+    verify(cliOutput).printBackfill(backfill);
+  }
+
+  @Test
+  public void testBackfillCreateWithDescription() throws Exception {
+    final String component = "quux";
+    final String start = "2017-01-01T00:00:00Z";
+    final String end = "2017-01-30T00:00:00Z";
+
+    final Backfill backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(Instant.parse(start))
+        .end(Instant.parse(end))
+        .workflowId(WorkflowId.create(component, "foo"))
+        .concurrency(1)
+        .description("Description")
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+
+    when(client.backfillCreate(component, "foo", start,
+        end, 1, "Description"))
+        .thenReturn(CompletableFuture.completedFuture(backfill));
+
+    CliMain.run(cliContext, "backfill", "create", component, "foo", "2017-01-01", "2017-01-30",
+        "1", "-d", "Description");
+
+    verify(client).backfillCreate(component, "foo", start, end, 1, "Description");
+    verify(cliOutput).printBackfill(backfill);
   }
 
   @Test

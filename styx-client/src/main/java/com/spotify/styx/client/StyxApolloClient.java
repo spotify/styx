@@ -308,10 +308,19 @@ class StyxApolloClient implements StyxClient {
   public CompletionStage<Backfill> backfillCreate(String componentId, String workflowId,
                                                   String start, String end,
                                                   int concurrency) {
+    return backfillCreate(componentId, workflowId, start, end, concurrency, null);
+  }
+
+  @Override
+  public CompletionStage<Backfill> backfillCreate(String componentId, String workflowId,
+                                                  String start, String end,
+                                                  int concurrency,
+                                                  String description) {
     final HttpUrl.Builder urlBuilder = getUrlBuilder().addPathSegment("backfills");
     try {
       final ByteString payload = serialize(BackfillInput.create(
-          Instant.parse(start), Instant.parse(end), componentId, workflowId, concurrency));
+          Instant.parse(start), Instant.parse(end), componentId, workflowId, concurrency,
+          Optional.ofNullable(description)));
       return executeRequest(Request.forUri(urlBuilder.build().toString(), "POST")
           .withPayload(payload), Backfill.class);
     } catch (JsonProcessingException e) {

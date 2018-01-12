@@ -67,6 +67,7 @@ import com.spotify.styx.storage.BigtableStorage;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -374,6 +375,37 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(postedBackfill.end(), equalTo(Instant.parse("2017-02-01T00:00:00Z")));
     assertThat(postedBackfill.workflowId(), equalTo(WorkflowId.create("component", "workflow2")));
     assertThat(postedBackfill.concurrency(), equalTo(1));
+    assertThat(postedBackfill.description(), equalTo(Optional.empty()));
+    assertThat(postedBackfill.nextTrigger(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
+    assertThat(postedBackfill.schedule(), equalTo(Schedule.HOURS));
+    assertThat(postedBackfill.allTriggered(), equalTo(false));
+    assertThat(postedBackfill.halted(), equalTo(false));
+  }
+
+  @Test
+  public void shouldPostBackfillWithDescription() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final String json = "{\"start\":\"2017-01-01T00:00:00Z\"," +
+                        "\"end\":\"2017-02-01T00:00:00Z\"," +
+                        "\"component\":\"component\"," +
+                        "\"workflow\":\"workflow2\","+
+                        "\"concurrency\":1," +
+                        "\"description\":\"Description\"}";
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path(""), ByteString.encodeUtf8(json)));
+
+    assertThat(response.status().reasonPhrase(),
+               response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
+        response.payload().get().toByteArray(), Backfill.class);
+    assertThat(postedBackfill.id().matches("backfill-[\\d-]+"), is(true));
+    assertThat(postedBackfill.start(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
+    assertThat(postedBackfill.end(), equalTo(Instant.parse("2017-02-01T00:00:00Z")));
+    assertThat(postedBackfill.workflowId(), equalTo(WorkflowId.create("component", "workflow2")));
+    assertThat(postedBackfill.concurrency(), equalTo(1));
+    assertThat(postedBackfill.description(), equalTo(Optional.of("Description")));
     assertThat(postedBackfill.nextTrigger(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
     assertThat(postedBackfill.schedule(), equalTo(Schedule.HOURS));
     assertThat(postedBackfill.allTriggered(), equalTo(false));
@@ -406,7 +438,8 @@ public class BackfillResourceTest extends VersionedApiTest {
         BACKFILL_1.end(),
         BACKFILL_1.workflowId().componentId(),
         BACKFILL_1.workflowId().id(),
-        BACKFILL_1.concurrency());
+        BACKFILL_1.concurrency(),
+        BACKFILL_1.description());
 
     storage.writeActiveState(WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01"), 0L);
 

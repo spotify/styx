@@ -47,6 +47,25 @@ public interface StyxBackfillClient {
                                            final String end,
                                            final int concurrency);
 
+
+  /**
+   * Create a {@link Backfill}
+   *
+   * @param componentId componentId id
+   * @param workflowId  workflowId id
+   * @param start       beginning of backfill range, inclusive
+   * @param end         end of backfill range, exclusive
+   * @param concurrency maximum number of concurrent active states for the backfill
+   * @param description descriptive message of backfill purpose
+   * @return The created {@link Backfill}
+   */
+  CompletionStage<Backfill> backfillCreate(final String componentId,
+                                           final String workflowId,
+                                           final String start,
+                                           final String end,
+                                           final int concurrency,
+                                           final String description);
+
   /**
    * Edit concurrency value of existing {@link Backfill}
    *

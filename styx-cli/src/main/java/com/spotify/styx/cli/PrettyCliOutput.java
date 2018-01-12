@@ -45,12 +45,14 @@ import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import org.fusesource.jansi.Ansi;
 
 class PrettyCliOutput implements CliOutput {
 
-  private static final String BACKFILL_FORMAT = "%28s  %6s  %13s %12s  %-13s  %-13s  %-13s  %s  %s";
+  private static final String BACKFILL_FORMAT =
+      "%28s  %6s  %13s %12s  %-13s  %-13s  %-13s  %-<cid-length>s  %-<wid-length>s %s";
 
   @Override
   public void printStates(RunStateDataPayload runStateDataPayload) {
@@ -101,10 +103,20 @@ class PrettyCliOutput implements CliOutput {
 
   @Override
   public void printBackfill(Backfill backfill) {
+    printBackfill(backfill,
+                  backfill.workflowId().componentId().length(),
+                  backfill.workflowId().id().length());
+  }
+
+  private void printBackfill(Backfill backfill, int cidLength, int widLength) {
     final Schedule schedule = backfill.schedule();
     final WorkflowId workflowId = backfill.workflowId();
 
-    System.out.println(String.format(BACKFILL_FORMAT,
+    final String format = BACKFILL_FORMAT
+        .replaceAll("<cid-length>", String.valueOf(cidLength))
+        .replaceAll("<wid-length>", String.valueOf(widLength));
+
+    System.out.println(String.format(format,
                                      backfill.id(),
                                      backfill.halted(),
                                      backfill.allTriggered(),
@@ -113,11 +125,16 @@ class PrettyCliOutput implements CliOutput {
                                      toParameter(schedule, backfill.end()),
                                      toParameter(schedule, backfill.nextTrigger()),
                                      workflowId.componentId(),
-                                     workflowId.id()));
+                                     workflowId.id(),
+                                     backfill.description().orElse("N/A")));
   }
 
-  private void printBackfillHeader() {
-    System.out.println(String.format(BACKFILL_FORMAT,
+  private void printBackfillHeader(int cidLength, int widLength) {
+    final String format = BACKFILL_FORMAT
+        .replaceAll("<cid-length>", String.valueOf(cidLength))
+        .replaceAll("<wid-length>", String.valueOf(widLength));
+
+    System.out.println(String.format(format,
                                      "BACKFILL ID",
                                      "HALTED",
                                      "ALL TRIGGERED",
@@ -126,12 +143,14 @@ class PrettyCliOutput implements CliOutput {
                                      "END (EXCL)",
                                      "NEXT TRIGGER",
                                      "COMPONENT",
-                                     "WORKFLOW"));
+                                     "WORKFLOW",
+                                     "DESCRIPTION"));
   }
 
   @Override
   public void printBackfillPayload(BackfillPayload backfillPayload) {
-    printBackfillHeader();
+    printBackfillHeader(backfillPayload.backfill().workflowId().componentId().length(),
+                        backfillPayload.backfill().workflowId().id().length());
 
     printBackfill(backfillPayload.backfill());
     if (backfillPayload.statuses().isPresent()) {
@@ -143,10 +162,19 @@ class PrettyCliOutput implements CliOutput {
 
   @Override
   public void printBackfills(List<BackfillPayload> backfills) {
-    printBackfillHeader();
+    final int cidLength = backfills.stream()
+        .map(x -> x.backfill().workflowId().componentId().length())
+        .max(Comparator.naturalOrder())
+        .orElse(1);
+    final int widLength = backfills.stream()
+        .map(x -> x.backfill().workflowId().id().length())
+        .max(Comparator.naturalOrder())
+        .orElse(1);
+
+    printBackfillHeader(cidLength, widLength);
 
     for (BackfillPayload backfillPayload : backfills) {
-      printBackfill(backfillPayload.backfill());
+      printBackfill(backfillPayload.backfill(), cidLength, widLength);
       if (backfillPayload.statuses().isPresent()) {
         System.out.println();
         System.out.println();

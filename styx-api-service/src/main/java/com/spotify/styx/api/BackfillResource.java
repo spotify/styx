@@ -293,6 +293,7 @@ public final class BackfillResource {
         .end(input.end())
         .schedule(schedule)
         .nextTrigger(input.start())
+        .description(input.description())
         .halted(false);
 
     final Backfill backfill = builder.build();

@@ -22,6 +22,7 @@ package com.spotify.styx.client;
 
 import static com.google.common.collect.Iterables.getLast;
 import static java.util.Arrays.asList;
+import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
@@ -39,11 +40,15 @@ import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.styx.api.Api;
 import com.spotify.styx.client.auth.GoogleIdTokenAuth;
+import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.serialization.Json;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -137,6 +142,69 @@ public class StyxApolloClientTest {
     final Request request = requestCaptor.getValue();
     assertThat(request.uri(), is(API_URL + "/workflows/foo-comp"));
     assertThat(Json.deserialize(request.payload().get(), WorkflowConfiguration.class), is(config));
+    assertThat(request.method(), is("POST"));
+  }
+
+  @Test
+  public void shouldCreateBackfill() throws Exception {
+    final Instant start = Instant.parse("2017-01-01T00:00:00Z");
+    final Instant end = Instant.parse("2017-01-30T00:00:00Z");
+    final BackfillInput backfillInput = BackfillInput.create(start, end,"foo-comp", "bar-wf",
+         1, Optional.empty());
+
+    final Backfill backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(start)
+        .end(end)
+        .workflowId(WorkflowId.create("foo-comp", "bar-wf"))
+        .concurrency(1)
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+    when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
+        Response.forStatus(Status.OK).withPayload(Json.serialize(backfill))));
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+    final CompletableFuture<Backfill> r = styx.backfillCreate("foo-comp", "bar-wf",
+        "2017-01-01T00:00:00Z", "2017-01-30T00:00:00Z", 1)
+        .toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    assertThat(request.uri(), is(API_URL + "/backfills"));
+    assertThat(Json.deserialize(request.payload().get(), BackfillInput.class),
+        equalTo(backfillInput));
+    assertThat(request.method(), is("POST"));
+  }
+
+  @Test
+  public void shouldCreateBackfillWithDescription() throws Exception {
+    final Instant start = Instant.parse("2017-01-01T00:00:00Z");
+    final Instant end = Instant.parse("2017-01-30T00:00:00Z");
+    final BackfillInput backfillInput = BackfillInput.create(start, end,"foo-comp", "bar-wf",
+         1, Optional.of("Description"));
+
+    final Backfill backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(start)
+        .end(end)
+        .workflowId(WorkflowId.create("foo-comp", "bar-wf"))
+        .concurrency(1)
+        .description("Description")
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+    when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
+        Response.forStatus(Status.OK).withPayload(Json.serialize(backfill))));
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+    final CompletableFuture<Backfill> r = styx.backfillCreate("foo-comp", "bar-wf",
+        "2017-01-01T00:00:00Z", "2017-01-30T00:00:00Z", 1, "Description")
+        .toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    assertThat(request.uri(), is(API_URL + "/backfills"));
+    assertThat(Json.deserialize(request.payload().get(), BackfillInput.class),
+        equalTo(backfillInput));
     assertThat(request.method(), is("POST"));
   }
 

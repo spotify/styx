@@ -21,39 +21,32 @@
 package com.spotify.styx.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import io.norberg.automatter.AutoMatter;
 import java.time.Instant;
+import java.util.Optional;
 
 @AutoMatter
 @JsonIgnoreProperties(ignoreUnknown = true)
 public interface Backfill {
 
-  @JsonProperty
   String id();
 
-  @JsonProperty
   Instant start();
 
-  @JsonProperty
   Instant end();
 
-  @JsonProperty
   WorkflowId workflowId();
 
-  @JsonProperty
   int concurrency();
 
-  @JsonProperty
+  Optional<String> description();
+
   Instant nextTrigger();
 
-  @JsonProperty
   Schedule schedule();
 
-  @JsonProperty
   boolean allTriggered();
 
-  @JsonProperty
   boolean halted();
 
   BackfillBuilder builder();
