@@ -128,7 +128,7 @@ class PrettyCliOutput implements CliOutput {
                                      toParameter(schedule, backfill.nextTrigger()),
                                      workflowId.componentId(),
                                      workflowId.id(),
-                                     this.formatDescription(backfill.description(), noTruncate)));
+                                     formatDescription(backfill.description(), noTruncate)));
   }
 
   private void printBackfillHeader(int cidLength, int widLength) {
