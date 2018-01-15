@@ -162,7 +162,7 @@ public class CliMainTest {
         "1");
 
     verify(client).backfillCreate(component, "foo", start, end, 1, null);
-    verify(cliOutput).printBackfill(backfill);
+    verify(cliOutput).printBackfill(backfill, true);
   }
 
   @Test
@@ -190,7 +190,7 @@ public class CliMainTest {
         "1", "-d", "Description");
 
     verify(client).backfillCreate(component, "foo", start, end, 1, "Description");
-    verify(cliOutput).printBackfill(backfill);
+    verify(cliOutput).printBackfill(backfill, true);
   }
 
   @Test

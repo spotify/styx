@@ -47,12 +47,13 @@ import com.spotify.styx.state.StateData;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import org.fusesource.jansi.Ansi;
 
 class PrettyCliOutput implements CliOutput {
 
   private static final String BACKFILL_FORMAT =
-      "%28s  %6s  %13s %12s  %-13s  %-13s  %-13s  %-<cid-length>s  %-<wid-length>s %s";
+      "%28s  %6s  %13s %12s  %-20s  %-20s  %-20s  %-<cid-length>s  %-<wid-length>s %s";
 
   @Override
   public void printStates(RunStateDataPayload runStateDataPayload) {
@@ -102,13 +103,14 @@ class PrettyCliOutput implements CliOutput {
   }
 
   @Override
-  public void printBackfill(Backfill backfill) {
+  public void printBackfill(Backfill backfill, boolean noTruncate) {
     printBackfill(backfill,
                   backfill.workflowId().componentId().length(),
-                  backfill.workflowId().id().length());
+                  backfill.workflowId().id().length(),
+                  noTruncate);
   }
 
-  private void printBackfill(Backfill backfill, int cidLength, int widLength) {
+  private void printBackfill(Backfill backfill, int cidLength, int widLength, boolean noTruncate) {
     final Schedule schedule = backfill.schedule();
     final WorkflowId workflowId = backfill.workflowId();
 
@@ -126,7 +128,7 @@ class PrettyCliOutput implements CliOutput {
                                      toParameter(schedule, backfill.nextTrigger()),
                                      workflowId.componentId(),
                                      workflowId.id(),
-                                     backfill.description().orElse("N/A")));
+                                     this.formatDescription(backfill.description(), noTruncate)));
   }
 
   private void printBackfillHeader(int cidLength, int widLength) {
@@ -148,11 +150,11 @@ class PrettyCliOutput implements CliOutput {
   }
 
   @Override
-  public void printBackfillPayload(BackfillPayload backfillPayload) {
+  public void printBackfillPayload(BackfillPayload backfillPayload, boolean noTruncate) {
     printBackfillHeader(backfillPayload.backfill().workflowId().componentId().length(),
                         backfillPayload.backfill().workflowId().id().length());
 
-    printBackfill(backfillPayload.backfill());
+    printBackfill(backfillPayload.backfill(), noTruncate);
     if (backfillPayload.statuses().isPresent()) {
       System.out.println();
       System.out.println();
@@ -161,7 +163,7 @@ class PrettyCliOutput implements CliOutput {
   }
 
   @Override
-  public void printBackfills(List<BackfillPayload> backfills) {
+  public void printBackfills(List<BackfillPayload> backfills, boolean noTruncate) {
     final int cidLength = backfills.stream()
         .map(x -> x.backfill().workflowId().componentId().length())
         .max(Comparator.naturalOrder())
@@ -174,7 +176,7 @@ class PrettyCliOutput implements CliOutput {
     printBackfillHeader(cidLength, widLength);
 
     for (BackfillPayload backfillPayload : backfills) {
-      printBackfill(backfillPayload.backfill(), cidLength, widLength);
+      printBackfill(backfillPayload.backfill(), cidLength, widLength, noTruncate);
       if (backfillPayload.statuses().isPresent()) {
         System.out.println();
         System.out.println();
@@ -217,6 +219,18 @@ class PrettyCliOutput implements CliOutput {
   @Override
   public void printError(String message) {
     System.err.println(message);
+  }
+
+  private String formatDescription(Optional<String> description, boolean noTruncate) {
+    if (description.isPresent()) {
+      if (noTruncate) {
+        return description.get();
+      } else {
+        return description.get().substring(0, 20) + "...";
+      }
+    } else {
+      return "N/A";
+    }
   }
 
   private Ansi getAnsiForState(RunStateDataPayload.RunStateData RunStateData) {

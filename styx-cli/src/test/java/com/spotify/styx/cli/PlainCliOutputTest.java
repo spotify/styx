@@ -65,7 +65,7 @@ public class PlainCliOutputTest {
         .schedule(Schedule.DAYS)
         .build();
 
-    cliOutput.printBackfill(backfill);
+    cliOutput.printBackfill(backfill, true);
     assertEquals("backfill-2 component workflow2 false false 2 2017-01-01T00:00:00Z"
                  + " 2017-01-02T00:00:00Z 2017-01-01T00:00:00Z Description\n",
         outContent.toString());
