@@ -222,17 +222,13 @@ class PrettyCliOutput implements CliOutput {
   }
 
   private String formatDescription(Optional<String> description, boolean noTruncate) {
-    if (description.isPresent()) {
-      final String descriptionString = description.get();
-
-      if (noTruncate || descriptionString.length() <= 20) {
-        return descriptionString;
+    return description.map(x -> {
+      if (noTruncate || x.length() <= 20) {
+        return x;
       } else {
-        return descriptionString.substring(0, 20) + "...";
+        return x.substring(0, 20) + "...";
       }
-    } else {
-      return "N/A";
-    }
+    }).orElse("N/A");
   }
 
   private Ansi getAnsiForState(RunStateDataPayload.RunStateData RunStateData) {

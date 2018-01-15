@@ -37,7 +37,7 @@ import org.junit.Test;
 
 public class PrettyCliOutputTest {
 
-  private Backfill BACKFILL(String description) {
+  private Backfill backfill(String description) {
     return Backfill.newBuilder()
         .id("backfill-2")
         .start(Instant.parse("2017-01-01T00:00:00Z"))
@@ -50,8 +50,9 @@ public class PrettyCliOutputTest {
         .build();
   }
 
-  private static final String longDescription = "Description which is long enough to truncate";
-  private static final String expectedHeader =
+  private static final String SHORT_DESCRIPTION = "Description";
+  private static final String LONG_DESCRIPTION = "Description which is long enough to truncate";
+  private static final String EXPECTED_HEADER =
       "                 BACKFILL ID  HALTED  ALL TRIGGERED  CONCURRENCY  "
       + "START (INCL)          END (EXCL)            NEXT TRIGGER          COMPONENT"
       + "  WORKFLOW  DESCRIPTION\n";
@@ -76,7 +77,7 @@ public class PrettyCliOutputTest {
 
   @Test
   public void shouldPrintBackfill() {
-    cliOutput.printBackfill(BACKFILL(longDescription), false);
+    cliOutput.printBackfill(backfill(LONG_DESCRIPTION), false);
     assertEquals("                  backfill-2   false          false            2  "
                  + "2017-01-01            2017-01-02            2017-01-01            component  "
                  + "workflow2 Description which is...\n",
@@ -84,8 +85,17 @@ public class PrettyCliOutputTest {
   }
 
   @Test
+  public void shouldPrintBackfillWithShortDescription() {
+    cliOutput.printBackfill(backfill(SHORT_DESCRIPTION), false);
+    assertEquals("                  backfill-2   false          false            2  "
+                 + "2017-01-01            2017-01-02            2017-01-01            component  "
+                 + "workflow2 Description\n",
+        outContent.toString());
+  }
+
+  @Test
   public void shouldPrintBackfillWithoutTruncating() {
-    cliOutput.printBackfill(BACKFILL(longDescription), true);
+    cliOutput.printBackfill(backfill(LONG_DESCRIPTION), true);
     assertEquals("                  backfill-2   false          false            2  "
                  + "2017-01-01            2017-01-02            2017-01-01            component  "
                  + "workflow2 Description which is long enough to truncate\n",
@@ -96,9 +106,9 @@ public class PrettyCliOutputTest {
   public void shouldPrintBackfills() {
 
     cliOutput.printBackfills(
-        ImmutableList.of(BackfillPayload.create(BACKFILL(longDescription), Optional.empty())),
+        ImmutableList.of(BackfillPayload.create(backfill(LONG_DESCRIPTION), Optional.empty())),
         false);
-    assertEquals(expectedHeader
+    assertEquals(EXPECTED_HEADER
                  + "                  backfill-2   false          false            2  "
                  + "2017-01-01            2017-01-02            2017-01-01            component  "
                  + "workflow2 Description which is...\n",
@@ -108,11 +118,11 @@ public class PrettyCliOutputTest {
   @Test
   public void shouldPrintBackfillsWithoutTruncating() {
 
-    cliOutput.printBackfills(ImmutableList.of(BackfillPayload.create(BACKFILL(longDescription), Optional
+    cliOutput.printBackfills(ImmutableList.of(BackfillPayload.create(backfill(LONG_DESCRIPTION), Optional
             .empty
             ())),
         true);
-    assertEquals(expectedHeader
+    assertEquals(EXPECTED_HEADER
                  + "                  backfill-2   false          false            2  "
                  + "2017-01-01            2017-01-02            2017-01-01            component  "
                  + "workflow2 Description which is long enough to truncate\n",
@@ -122,10 +132,10 @@ public class PrettyCliOutputTest {
   @Test
   public void shouldPrintNAWhenBackfillLacksDescription() {
 
-    cliOutput.printBackfills(ImmutableList.of(BackfillPayload.create(BACKFILL(null),
+    cliOutput.printBackfills(ImmutableList.of(BackfillPayload.create(backfill(null),
         Optional.empty()))
         , false);
-    assertEquals(expectedHeader
+    assertEquals(EXPECTED_HEADER
                  + "                  backfill-2   false          false            2  "
                  + "2017-01-01            2017-01-02            2017-01-01            "
                  + "component  workflow2 N/A\n",

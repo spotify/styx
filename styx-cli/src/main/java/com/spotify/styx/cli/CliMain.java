@@ -551,7 +551,7 @@ public final class CliMain {
         .addArgument("--no-trunc")
         .setDefault(false)
         .action(Arguments.storeTrue())
-        .help("don't truncate description");
+        .help("don't truncate output");
 
     final Subparser backfillEdit = BackfillCommand.EDIT.parser(backfillParser);
     final Argument backfillEditId =
@@ -578,7 +578,7 @@ public final class CliMain {
             .addArgument("--no-trunc")
             .setDefault(false)
             .action(Arguments.storeTrue())
-            .help("don't truncate descriptions");
+            .help("don't truncate output");
 
     final Subparser backfillCreate = BackfillCommand.CREATE.parser(backfillParser);
     final Argument backfillCreateComponent =
