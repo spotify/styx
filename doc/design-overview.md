@@ -25,9 +25,9 @@ See [`RunState.java`](../styx-common/src/main/java/com/spotify/styx/state/RunSta
 
 Each workflow instance will be executed until completion or until the maximum number of retries is reached. This means that one or more actual docker runs will happen per workflow instance. How many depends on the exit codes of the runs:
 - _**Exit code 0**_ is treated as a successful run and the associated workflow instance is removed from the active set;
-- _**Exit code 20**_ is considered by Styx as a run that failed due to missing dependencies that are expected to be present in the following executions. The approach in this case is to schedule a retry after a fixed timeout;
+- _**Exit code 20**_ is considered by Styx as a run that failed due to missing dependencies that are expected to be present in the following executions. The approach in this case is to schedule a retry after a fixed timeout (10 minutes);
 - _**Exit code 50**_ will cause an immediate failure of the workflow instance (no re-try will be scheduled). This can be used by workflow to indicate an unrecoverable failure and instruct Styx not to retry.
-- _**Other exit codes**_ are treated as generic execution errors. In this case Styx reruns the workflow instance after a timeout that increases with the number of attempts.
+- _**Other exit codes**_ are treated as generic execution errors. In this case Styx reruns the workflow instance after a timeout that increases with the number of attempts (exponential backoff).
 
 This whole process follows this state graph:
 
