@@ -62,9 +62,9 @@ import com.spotify.styx.serialization.PersistentWorkflowInstanceStateBuilder;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
-import com.spotify.styx.util.CounterUtil;
 import com.spotify.styx.util.FnWithException;
 import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.TriggerInstantSpec;
 import com.spotify.styx.util.TriggerUtil;
@@ -148,33 +148,19 @@ class DatastoreStorage {
 
   private final Datastore datastore;
   private final Duration retryBaseDelay;
-<<<<<<< 724cf4e8b937ccc672e3843d087a8540233c2dbc
+  private final ShardedCounter shardedCounter;
   private final Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory;
 
-  DatastoreStorage(Datastore datastore, Duration retryBaseDelay) {
-    this(datastore, retryBaseDelay, DatastoreStorageTransaction::new);
+  DatastoreStorage(Datastore datastore, Duration retryBaseDelay, ShardedCounter shardedCounter) {
+    this(datastore, retryBaseDelay, shardedCounter, DatastoreStorageTransaction::new);
   }
 
-  DatastoreStorage(Datastore datastore, Duration retryBaseDelay,
+  DatastoreStorage(Datastore datastore, Duration retryBaseDelay, ShardedCounter shardedCounter,
       Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory) {
     this.datastore = Objects.requireNonNull(datastore);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
+    this.shardedCounter = Objects.requireNonNull(shardedCounter);
     this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
-=======
-  private final CounterUtil counterUtil;
-  private final KeyFactory componentKeyFactory;
-
-  @VisibleForTesting
-  final Key globalConfigKey;
-
-  DatastoreStorage(Datastore datastore, Duration retryBaseDelay, CounterUtil counterUtil) {
-    this.datastore = Objects.requireNonNull(datastore);
-    this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
-    this.counterUtil = Objects.requireNonNull(counterUtil);
-
-    this.componentKeyFactory = datastore.newKeyFactory().setKind(KIND_COMPONENT);
-    this.globalConfigKey = datastore.newKeyFactory().setKind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
->>>>>>> Add draft CounterUtil
   }
 
   StyxConfig config() {
@@ -638,7 +624,7 @@ class DatastoreStorage {
 
   void postResource(Resource resource) throws IOException {
     storeWithRetries(() -> datastore.runInTransaction(transaction -> {
-        counterUtil.updateLimit(transaction, resource.id(), resource.concurrency());
+        shardedCounter.updateLimit(transaction, resource.id(), resource.concurrency());
         return transaction.put(resourceToEntity(resource));
         // TODO store just in one place, eliminate one of the two calls ^?
       }));
