@@ -223,10 +223,12 @@ class PrettyCliOutput implements CliOutput {
 
   private String formatDescription(Optional<String> description, boolean noTruncate) {
     if (description.isPresent()) {
-      if (noTruncate) {
-        return description.get();
+      final String descriptionString = description.get();
+
+      if (noTruncate || descriptionString.length() <= 20) {
+        return descriptionString;
       } else {
-        return description.get().substring(0, 20) + "...";
+        return descriptionString.substring(0, 20) + "...";
       }
     } else {
       return "N/A";
