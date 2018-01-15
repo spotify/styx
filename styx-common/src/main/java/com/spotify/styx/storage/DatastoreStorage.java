@@ -91,6 +91,7 @@ class DatastoreStorage {
   public static final String PROPERTY_CONFIG_DOCKER_RUNNER_ID = "dockerRunnerId";
   public static final String PROPERTY_CONFIG_CONCURRENCY = "concurrency";
   public static final String PROPERTY_CONFIG_CLIENT_BLACKLIST = "clientBlacklist";
+  public static final String PROPERTY_CONFIG_EXECUTION_GATING = "executionGating";
 
   public static final String PROPERTY_WORKFLOW_JSON = "json";
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
@@ -117,6 +118,7 @@ class DatastoreStorage {
   public static final String DEFAULT_CONFIG_DOCKER_RUNNER_ID = "default";
   public static final boolean DEFAULT_WORKFLOW_ENABLED = false;
   public static final boolean DEFAULT_CONFIG_DEBUG_ENABLED = false;
+  public static final boolean DEFAULT_CONFIG_EXECUTION_GATING_ENABLED = false;
 
   public static final int MAX_RETRIES = 100;
 
@@ -151,6 +153,8 @@ class DatastoreStorage {
             read(entity, PROPERTY_CONFIG_DOCKER_RUNNER_ID, DEFAULT_CONFIG_DOCKER_RUNNER_ID))
         .clientBlacklist(this.<String>readStream(entity, PROPERTY_CONFIG_CLIENT_BLACKLIST)
             .collect(toList()))
+        .executionGatingEnabled(
+            read(entity, PROPERTY_CONFIG_EXECUTION_GATING, DEFAULT_CONFIG_EXECUTION_GATING_ENABLED))
         .build();
   }
 

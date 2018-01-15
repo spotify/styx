@@ -42,6 +42,12 @@ public interface StyxConfig {
   boolean debugEnabled();
 
   /**
+   * Controls whether workflow instance execution gating should be performed. If set to false,
+   * instances will be executed without checking for blockers.
+   */
+  boolean executionGatingEnabled();
+
+  /**
    * Get the global concurrency for Styx.
    */
   Optional<Long> globalConcurrency();

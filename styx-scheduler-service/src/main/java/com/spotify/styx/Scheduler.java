@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.WorkflowExecutionGate.NOOP;
 import static com.spotify.styx.WorkflowExecutionGate.NO_BLOCKER;
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
@@ -38,8 +39,8 @@ import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.WorkflowExecutionGate.ExecutionBlocker;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -119,9 +120,11 @@ public class Scheduler {
   void tick() {
     final Map<String, Resource> resources;
     final Optional<Long> globalConcurrency;
+    final StyxConfig config;
     try {
       resources = storage.resources().stream().collect(toMap(Resource::id, identity()));
-      globalConcurrency = storage.config().globalConcurrency();
+      config = storage.config();
+      globalConcurrency = config.globalConcurrency();
     } catch (IOException e) {
       LOG.warn("Failed to get resource limits", e);
       return;
@@ -170,14 +173,20 @@ public class Scheduler {
 
     timedOutInstances.forEach(this::sendTimeout);
 
-    limitAndDequeue(resources, workflowResourceReferences, currentResourceUsage, eligibleInstances);
+    limitAndDequeue(config, resources, workflowResourceReferences, currentResourceUsage,
+        eligibleInstances);
 
     updateStats(resources, currentResourceUsage);
   }
 
-  private void limitAndDequeue(Map<String, Resource> resources,
+  private void limitAndDequeue(
+      StyxConfig config,
+      Map<String, Resource> resources,
       Map<WorkflowId, Set<String>> workflowResourceReferences,
       Map<String, Long> currentResourceUsage, List<InstanceState> eligibleInstances) {
+
+    // Enable gating unless disabled in runtime config
+    final WorkflowExecutionGate gate = config.executionGatingEnabled() ? this.gate : NOOP;
 
     // Process the eligible instances in batches in order to parallelize execution blocker lookup
     for (List<InstanceState> batch : Lists.partition(eligibleInstances, SCHEDULING_BATCH_SIZE)) {

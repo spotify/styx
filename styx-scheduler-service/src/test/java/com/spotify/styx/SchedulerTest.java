@@ -34,6 +34,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
@@ -623,6 +624,8 @@ public class SchedulerTest {
 
   @Test
   public void shouldRetryLaterOnExecutionBlockers() throws Exception {
+    when(config.executionGatingEnabled()).thenReturn(true);
+
     final ExecutionBlocker blocker = ExecutionBlocker.of("missing dep", Duration.ofMinutes(17));
     when(gate.executionBlocker(any())).thenReturn(
         CompletableFuture.completedFuture(Optional.of(blocker)));
@@ -636,8 +639,6 @@ public class SchedulerTest {
     final RunState runState = RunState.create(INSTANCE, State.QUEUED, stateData, time);
 
     stateManager.initialize(runState);
-
-    now = now.plus(Duration.ofMinutes(20));
 
     scheduler.tick();
 
@@ -653,6 +654,26 @@ public class SchedulerTest {
     verify(gate, times(2)).executionBlocker(INSTANCE);
 
     verify(stateManager).receive(Event.dequeue(INSTANCE));
+  }
+
+  @Test
+  public void shouldNotGateExecutionIfDisabled() throws Exception {
+    when(config.executionGatingEnabled()).thenReturn(false);
+
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+
+    setUp(20);
+    initWorkflow(workflow);
+
+    final StateData stateData = StateData.newBuilder().tries(0).build();
+    final RunState runState = RunState.create(INSTANCE, State.QUEUED, stateData, time);
+
+    stateManager.initialize(runState);
+
+    scheduler.tick();
+
+    verify(stateManager).receive(Event.dequeue(INSTANCE));
+    verifyZeroInteractions(gate);
   }
 
   private WorkflowInstance instance(WorkflowId id, String instanceId) {
