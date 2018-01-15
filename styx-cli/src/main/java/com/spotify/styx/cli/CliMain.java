@@ -381,28 +381,16 @@ public final class CliMain {
     final String component = namespace.getString(parser.workflowEnableComponentId.getDest());
     final List<String> workflows = namespace.getList(parser.workflowEnableWorkflowId.getDest());
     workflowStateUpdate(component, workflows, WorkflowState.patchEnabled(true))
-        .forEach(t -> {
-          if (t._2.enabled().orElse(false)) {
-            cliOutput.printMessage("Workflow " + t._1 + " in component " + component + " enabled.");
-          } else {
-            cliOutput.printMessage(
-                "Failed to enable workflow " + t._1 + " in component " + component + ".");
-          }
-        });
+        .forEach(t -> cliOutput
+            .printMessage("Workflow " + t._1 + " in component " + component + " enabled."));
   }
 
   private void workflowDisable() throws ExecutionException, InterruptedException {
     final String component = namespace.getString(parser.workflowDisableComponentId.getDest());
     final List<String> workflows = namespace.getList(parser.workflowDisableWorkflowId.getDest());
     workflowStateUpdate(component, workflows, WorkflowState.patchEnabled(false))
-        .forEach(t -> {
-          if (!t._2.enabled().orElse(false)) {
-            cliOutput.printMessage("Workflow " + t._1 + " in component " + component + " disabled.");
-          } else {
-            cliOutput.printMessage(
-                "Failed to disable workflow " + t._1 + " in component " + component + ".");
-          }
-        });
+        .forEach(t -> cliOutput
+            .printMessage("Workflow " + t._1 + " in component " + component + " disabled."));
   }
 
   private List<Tuple2<String, WorkflowState>> workflowStateUpdate(String component,
