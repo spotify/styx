@@ -56,6 +56,7 @@ import com.spotify.styx.util.ParameterUtil;
 import java.io.File;
 import java.io.IOException;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -258,6 +259,12 @@ public final class CliMain {
             case DELETE:
               workflowDelete();
               break;
+            case ENABLE:
+              workflowEnable();
+              break;
+            case DISABLE:
+              workflowDisable();
+              break;
             default:
               // parsing unknown command will fail so this would only catch non-exhaustive switches
               throw new ArgumentParserException(
@@ -337,17 +344,7 @@ public final class CliMain {
         future._2.toCompletableFuture().get();
         cliOutput.printMessage("Workflow " + workflow + " in component " + component + " deleted.");
       } catch (ExecutionException e) {
-        final Throwable cause = e.getCause();
-        if (cause instanceof ApiErrorException) {
-          final ApiErrorException apiError = (ApiErrorException) cause;
-          if (apiError.getCode() == NOT_FOUND.code()) {
-            cliOutput.printMessage("Workflow " + workflow + " in component " + component + " not found.");
-          } else {
-            throw e;
-          }
-        } else {
-          throw e;
-        }
+        handleWorkflowNotFound(component, workflow, e);
       }
     }
   }
@@ -377,6 +374,62 @@ public final class CliMain {
       final Workflow created = future.toCompletableFuture().get();
       cliOutput.printMessage("Workflow " + created.workflowId() + " in component "
           + created.componentId() + " created.");
+    }
+  }
+
+  private void workflowEnable() throws ExecutionException, InterruptedException {
+    final String component = namespace.getString(parser.workflowEnableComponentId.getDest());
+    final List<String> workflows = namespace.getList(parser.workflowEnableWorkflowId.getDest());
+    workflowStateUpdate(component, workflows, WorkflowState.patchEnabled(true))
+        .forEach(t -> cliOutput
+            .printMessage("Workflow " + t._1 + " in component " + component + " enabled."));
+  }
+
+  private void workflowDisable() throws ExecutionException, InterruptedException {
+    final String component = namespace.getString(parser.workflowDisableComponentId.getDest());
+    final List<String> workflows = namespace.getList(parser.workflowDisableWorkflowId.getDest());
+    workflowStateUpdate(component, workflows, WorkflowState.patchEnabled(false))
+        .forEach(t -> cliOutput
+            .printMessage("Workflow " + t._1 + " in component " + component + " disabled."));
+  }
+
+  private List<Tuple2<String, WorkflowState>> workflowStateUpdate(String component,
+                                                                  List<String> workflows,
+                                                                  WorkflowState workflowState)
+      throws ExecutionException, InterruptedException {
+    final List<Tuple2<String, CompletionStage<WorkflowState>>> futures = workflows.stream()
+        .map(workflow -> Tuple.of(workflow,
+                                  styxClient.updateWorkflowState(component,
+                                                                 workflow,
+                                                                 workflowState)))
+        .collect(toList());
+
+    final List<Tuple2<String, WorkflowState>> updatedWorkflowStates =
+        new ArrayList<>(futures.size());
+    for (Tuple2<String, CompletionStage<WorkflowState>> future : futures) {
+      final String workflow = future._1;
+      try {
+        updatedWorkflowStates.add(Tuple.of(workflow, future._2.toCompletableFuture().get()));
+      } catch (ExecutionException e) {
+        handleWorkflowNotFound(component, workflow, e);
+      }
+    }
+
+    return updatedWorkflowStates;
+  }
+
+  private void handleWorkflowNotFound(String component, String workflow, ExecutionException e)
+      throws ExecutionException {
+    final Throwable cause = e.getCause();
+    if (cause instanceof ApiErrorException) {
+      final ApiErrorException apiError = (ApiErrorException) cause;
+      if (apiError.getCode() == NOT_FOUND.code()) {
+        cliOutput.printMessage("Workflow " + workflow + " in component " + component + " not found.");
+      } else {
+        throw e;
+      }
+    } else {
+      throw e;
     }
   }
 
@@ -639,6 +692,18 @@ public final class CliMain {
             .setDefault(false)
             .action(Arguments.storeTrue());
 
+    final Subparser workflowEnable = WorkflowCommand.ENABLE.parser(workflowParser);
+    final Argument workflowEnableComponentId =
+        workflowEnable.addArgument("component").help("Component ID");
+    final Argument workflowEnableWorkflowId =
+        workflowEnable.addArgument("workflow").nargs("+").help("Workflow IDs");
+
+    final Subparser workflowDisable = WorkflowCommand.DISABLE.parser(workflowParser);
+    final Argument workflowDisableComponentId =
+        workflowDisable.addArgument("component").help("Component ID");
+    final Argument workflowDisableWorkflowId =
+        workflowDisable.addArgument("workflow").nargs("+").help("Workflow IDs");
+
     final Subparser list = Command.LIST.parser(subCommands);
     final Argument listComponent = list.addArgument("-c", "--component")
         .help("only show instances for COMPONENT");
@@ -773,8 +838,10 @@ public final class CliMain {
 
   private enum WorkflowCommand {
     SHOW("get", "Show info about a specific workflow"),
-    CREATE("", "Create or update a workflow"),
-    DELETE("", "Delete a workflow");
+    CREATE("", "Create or update workflow(s)"),
+    DELETE("", "Delete workflow(s)"),
+    ENABLE("", "Enable workflow(s)"),
+    DISABLE("", "Disable workflow(s)");
 
     private final String alias;
     private final String description;
