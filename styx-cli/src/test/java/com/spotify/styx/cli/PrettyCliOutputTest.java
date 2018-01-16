@@ -31,28 +31,39 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.time.Instant;
 import java.util.Optional;
+import javax.swing.text.html.Option;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 public class PrettyCliOutputTest {
 
-  private static final Backfill BACKFILL = Backfill.newBuilder()
-      .id("backfill-2")
-      .start(Instant.parse("2017-01-01T00:00:00Z"))
-      .end(Instant.parse("2017-01-02T00:00:00Z"))
-      .workflowId(WorkflowId.create("component", "workflow2"))
-      .concurrency(2)
-      .description("Description")
-      .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
-      .schedule(Schedule.DAYS)
-      .build();
+  private static final String SHORT_DESCRIPTION = "Description";
+  private static final String LONG_DESCRIPTION = "Description which is long enough to truncate";
+  private static final String EXPECTED_HEADER =
+      "                 BACKFILL ID  HALTED  ALL TRIGGERED  CONCURRENCY  "
+      + "START (INCL)          END (EXCL)            NEXT TRIGGER          COMPONENT"
+      + "  WORKFLOW  DESCRIPTION\n";
+
+  private static Backfill backfill(String description) {
+    return Backfill.newBuilder()
+        .id("backfill-2")
+        .start(Instant.parse("2017-01-01T00:00:00Z"))
+        .end(Instant.parse("2017-01-02T00:00:00Z"))
+        .workflowId(WorkflowId.create("component", "workflow2"))
+        .concurrency(2)
+        .description(description)
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+  }
 
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
 
   private PrintStream old;
 
   private CliOutput cliOutput;
+
 
   @Before
   public void setUp() {
@@ -68,41 +79,99 @@ public class PrettyCliOutputTest {
 
   @Test
   public void shouldPrintBackfill() {
-    cliOutput.printBackfill(BACKFILL);
+    cliOutput.printBackfill(backfill(LONG_DESCRIPTION), false);
     assertEquals("                  backfill-2   false          false            2  "
-                 + "2017-01-01     2017-01-02     2017-01-01     component  workflow2 Description\n",
+                 + "2017-01-01            2017-01-02            2017-01-01            component  "
+                 + "workflow2 Description which is...\n",
+        outContent.toString());
+  }
+
+  @Test
+  public void shouldPrintBackfillWithShortDescription() {
+    cliOutput.printBackfill(backfill(SHORT_DESCRIPTION), false);
+    assertEquals("                  backfill-2   false          false            2  "
+                 + "2017-01-01            2017-01-02            2017-01-01            component  "
+                 + "workflow2 Description\n",
+        outContent.toString());
+  }
+
+  @Test
+  public void shouldPrintBackfillWithoutTruncating() {
+    cliOutput.printBackfill(backfill(LONG_DESCRIPTION), true);
+    assertEquals("                  backfill-2   false          false            2  "
+                 + "2017-01-01            2017-01-02            2017-01-01            component  "
+                 + "workflow2 Description which is long enough to truncate\n",
+        outContent.toString());
+  }
+
+  @Test
+  public void shouldPrintBackfillPayload() {
+    cliOutput.printBackfillPayload(BackfillPayload.create(backfill(LONG_DESCRIPTION),
+        Optional.empty()), false);
+    assertEquals(EXPECTED_HEADER +
+                 "                  backfill-2   false          false          " 
+                 + "  2  "
+                 + "2017-01-01            2017-01-02            2017-01-01            component  "
+                 + "workflow2 Description which is...\n",
+        outContent.toString());
+  }
+
+  @Test
+  public void shouldPrintBackfillPayloadWithShortDescription() {
+    cliOutput.printBackfillPayload(BackfillPayload.create(backfill(SHORT_DESCRIPTION),
+        Optional.empty()), false);
+    assertEquals(EXPECTED_HEADER +
+                 "                  backfill-2   false          false          " 
+                 + "  2  "
+                 + "2017-01-01            2017-01-02            2017-01-01            component  "
+                 + "workflow2 Description\n",
+        outContent.toString());
+  }
+
+  @Test
+  public void shouldPrintBackfillPayloadWithoutTruncating() {
+    cliOutput.printBackfillPayload(BackfillPayload.create(backfill(LONG_DESCRIPTION),
+        Optional.empty()), true);
+    assertEquals( EXPECTED_HEADER +
+        "                  backfill-2   false          false            2  "
+                 + "2017-01-01            2017-01-02            2017-01-01            component  "
+                 + "workflow2 Description which is long enough to truncate\n",
         outContent.toString());
   }
 
   @Test
   public void shouldPrintBackfills() {
-
-    cliOutput.printBackfills(ImmutableList.of(BackfillPayload.create(BACKFILL, Optional.empty())));
-    assertEquals("                 BACKFILL ID  HALTED  ALL TRIGGERED  CONCURRENCY  "
-                 + "START (INCL)   END (EXCL)     NEXT TRIGGER   COMPONENT  WORKFLOW  DESCRIPTION\n"
+    cliOutput.printBackfills(
+        ImmutableList.of(BackfillPayload.create(backfill(LONG_DESCRIPTION), Optional.empty())),
+        false);
+    assertEquals(EXPECTED_HEADER
                  + "                  backfill-2   false          false            2  "
-                 + "2017-01-01     2017-01-02     2017-01-01     component  workflow2 Description\n",
+                 + "2017-01-01            2017-01-02            2017-01-01            component  "
+                 + "workflow2 Description which is...\n",
+        outContent.toString());
+  }
+
+  @Test
+  public void shouldPrintBackfillsWithoutTruncating() {
+    cliOutput.printBackfills(
+        ImmutableList.of(BackfillPayload.create(backfill(LONG_DESCRIPTION), Optional.empty())),
+        true);
+    assertEquals(EXPECTED_HEADER
+                 + "                  backfill-2   false          false            2  "
+                 + "2017-01-01            2017-01-02            2017-01-01            component  "
+                 + "workflow2 Description which is long enough to truncate\n",
         outContent.toString());
   }
 
   @Test
   public void shouldPrintNAWhenBackfillLacksDescription() {
-
-    final Backfill backfill = Backfill.newBuilder()
-        .id("backfill-2")
-        .start(Instant.parse("2017-01-01T00:00:00Z"))
-        .end(Instant.parse("2017-01-02T00:00:00Z"))
-        .workflowId(WorkflowId.create("component", "workflow2"))
-        .concurrency(2)
-        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
-        .schedule(Schedule.DAYS)
-        .build();
-
-    cliOutput.printBackfills(ImmutableList.of(BackfillPayload.create(backfill, Optional.empty())));
-    assertEquals("                 BACKFILL ID  HALTED  ALL TRIGGERED  CONCURRENCY  "
-                 + "START (INCL)   END (EXCL)     NEXT TRIGGER   COMPONENT  WORKFLOW  DESCRIPTION\n"
+    cliOutput.printBackfills(
+        ImmutableList.of(BackfillPayload.create(backfill(null), Optional.empty()))
+        , false);
+    assertEquals(EXPECTED_HEADER
                  + "                  backfill-2   false          false            2  "
-                 + "2017-01-01     2017-01-02     2017-01-01     component  workflow2 N/A\n",
+                 + "2017-01-01            2017-01-02            2017-01-01            "
+                 + "component  workflow2 N/A\n",
         outContent.toString());
   }
 }

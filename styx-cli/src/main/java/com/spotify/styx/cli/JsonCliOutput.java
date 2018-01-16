@@ -57,17 +57,17 @@ class JsonCliOutput implements CliOutput {
   }
 
   @Override
-  public void printBackfill(Backfill backfill) {
+  public void printBackfill(Backfill backfill, boolean ignored) {
     printJson(backfill);
   }
 
   @Override
-  public void printBackfillPayload(BackfillPayload backfillPayload) {
+  public void printBackfillPayload(BackfillPayload backfillPayload, boolean ignored) {
     printJson(backfillPayload);
   }
 
   @Override
-  public void printBackfills(List<BackfillPayload> backfills) {
+  public void printBackfills(List<BackfillPayload> backfills, boolean ignored) {
     printJson(backfills);
   }
 

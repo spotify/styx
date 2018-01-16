@@ -20,7 +20,7 @@
 
 package com.spotify.styx.cli;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 import com.google.common.collect.ImmutableList;
 import com.spotify.styx.api.BackfillPayload;
@@ -35,8 +35,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-public class PlainCliOutputTest {
-
+public class JsonCliOutputTest {
+  
   private static final Backfill BACKFILL = Backfill.newBuilder()
       .id("backfill-2")
       .start(Instant.parse("2017-01-01T00:00:00Z"))
@@ -47,9 +47,23 @@ public class PlainCliOutputTest {
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
       .schedule(Schedule.DAYS)
       .build();
-  private static final String EXPECTED_OUTPUT =
-      "backfill-2 component workflow2 false false 2 2017-01-01T00:00:00Z"
-        + " 2017-01-02T00:00:00Z 2017-01-01T00:00:00Z Description\n";
+  
+  private static final String EXPECTED_OUTPUT = "{\"id\":\"backfill-2\"," 
+                                               + "\"start\":\"2017-01-01T00:00:00Z\"," 
+                                               + "\"end\":\"2017-01-02T00:00:00Z\"," 
+                                               + "\"workflow_id\":" 
+                                               + "{\"component_id\":\"component\"," 
+                                               + "\"id\":\"workflow2\"}," 
+                                               + "\"concurrency\":2," 
+                                               + "\"description\":\"Description\"," 
+                                               + "\"next_trigger\":\"2017-01-01T00:00:00Z\"," 
+                                               + "\"schedule\":\"days\"," 
+                                               + "\"all_triggered\":false," 
+                                               + "\"halted\":false}";
+
+  private static final String EXPECTED_OUTPUT_WITH_STATUS = "{\"backfill\":"
+                                                            + EXPECTED_OUTPUT
+                                                            + ",\"statuses\":null}";
 
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
 
@@ -61,7 +75,7 @@ public class PlainCliOutputTest {
   public void setUp() {
     old = System.out;
     System.setOut(new PrintStream(outContent));
-    cliOutput = new PlainCliOutput();
+    cliOutput = new JsonCliOutput();
   }
 
   @After
@@ -72,8 +86,7 @@ public class PlainCliOutputTest {
   @Test
   public void shouldPrintBackfill() {
     cliOutput.printBackfill(BACKFILL, true);
-    assertEquals(EXPECTED_OUTPUT,
-        outContent.toString());
+    assertEquals(EXPECTED_OUTPUT + "\n", outContent.toString());
   }
 
   @Test
@@ -81,14 +94,12 @@ public class PlainCliOutputTest {
     cliOutput.printBackfills(
         ImmutableList.of(BackfillPayload.create(BACKFILL, Optional.empty())),
         true);
-    assertEquals(EXPECTED_OUTPUT,
-        outContent.toString());
+    assertEquals("[" + EXPECTED_OUTPUT_WITH_STATUS + "]\n", outContent.toString());
   }
 
   @Test
   public void shouldPrintBackfillPayload() {
     cliOutput.printBackfillPayload(BackfillPayload.create(BACKFILL, Optional.empty()), true);
-    assertEquals(EXPECTED_OUTPUT,
-        outContent.toString());
+    assertEquals(EXPECTED_OUTPUT_WITH_STATUS + "\n", outContent.toString());
   }
 }

@@ -38,11 +38,11 @@ interface CliOutput {
 
   void printEvents(List<EventInfo> eventInfos);
 
-  void printBackfill(Backfill backfill);
+  void printBackfill(Backfill backfill, boolean noTruncate);
 
-  void printBackfillPayload(BackfillPayload backfillPayload);
+  void printBackfillPayload(BackfillPayload backfillPayload, boolean noTruncate);
 
-  void printBackfills(List<BackfillPayload> backfills);
+  void printBackfills(List<BackfillPayload> backfills, boolean noTruncate);
 
   void printResources(List<Resource> resources);
 

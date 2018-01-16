@@ -443,7 +443,7 @@ public final class CliMain {
     final Backfill backfill =
         styxClient.backfillCreate(component, workflow, start, end, concurrency, description)
             .toCompletableFuture().get();
-    cliOutput.printBackfill(backfill);
+    cliOutput.printBackfill(backfill, true);
   }
 
   private void backfillEdit() throws ExecutionException, InterruptedException {
@@ -453,7 +453,7 @@ public final class CliMain {
     if (concurrency != null) {
       final Backfill backfill =
           styxClient.backfillEditConcurrency(id, concurrency).toCompletableFuture().get();
-      cliOutput.printBackfill(backfill);
+      cliOutput.printBackfill(backfill, true);
     }
   }
 
@@ -467,9 +467,10 @@ public final class CliMain {
 
   private void backfillShow() throws ExecutionException, InterruptedException {
     final String id = namespace.getString(parser.backfillShowId.getDest());
+    final boolean noTruncate = namespace.getBoolean((parser.backfillShowNoTruncate.getDest()));
 
     final BackfillPayload backfillPayload = styxClient.backfill(id, true).toCompletableFuture().get();
-    cliOutput.printBackfillPayload(backfillPayload);
+    cliOutput.printBackfillPayload(backfillPayload, noTruncate);
   }
 
   private void backfillList() throws ExecutionException, InterruptedException {
@@ -478,11 +479,12 @@ public final class CliMain {
     final Optional<String> workflow =
         Optional.ofNullable(namespace.getString(parser.backfillListWorkflow.getDest()));
     final boolean showAll = namespace.getBoolean(parser.backfillListShowAll.getDest());
+    final boolean noTruncate = namespace.getBoolean(parser.backfillListNoTruncate.getDest());
 
     final BackfillsPayload backfillsPayload =
         styxClient.backfillList(component, workflow, showAll, false)
             .toCompletableFuture().get();
-    cliOutput.printBackfills(backfillsPayload.backfills());
+    cliOutput.printBackfills(backfillsPayload.backfills(), noTruncate);
   }
 
   private void resourceCreate() throws ExecutionException, InterruptedException {
@@ -598,6 +600,11 @@ public final class CliMain {
     final Subparser backfillShow = BackfillCommand.SHOW.parser(backfillParser);
     final Argument backfillShowId =
         backfillShow.addArgument("backfill").help("Backfill ID");
+    final Argument backfillShowNoTruncate = backfillShow
+        .addArgument("--no-trunc")
+        .setDefault(false)
+        .action(Arguments.storeTrue())
+        .help("don't truncate output (only for pretty printing)");
 
     final Subparser backfillEdit = BackfillCommand.EDIT.parser(backfillParser);
     final Argument backfillEditId =
@@ -620,6 +627,11 @@ public final class CliMain {
             .setDefault(false)
             .action(Arguments.storeTrue())
             .help("show all backfills, even halted and all-triggered ones");
+    final Argument backfillListNoTruncate = backfillList
+            .addArgument("--no-trunc")
+            .setDefault(false)
+            .action(Arguments.storeTrue())
+            .help("don't truncate output (only for pretty printing)");
 
     final Subparser backfillCreate = BackfillCommand.CREATE.parser(backfillParser);
     final Argument backfillCreateComponent =
@@ -635,7 +647,6 @@ public final class CliMain {
     final Argument backfillCreateDescription =
         backfillCreate.addArgument("-d", "--description")
             .help("a description of the backfill");
-
 
     final Subparsers resourceParser =
         Command.RESOURCE.parser(subCommands)

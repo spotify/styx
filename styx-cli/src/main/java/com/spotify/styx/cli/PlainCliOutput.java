@@ -88,7 +88,7 @@ class PlainCliOutput implements CliOutput {
   }
 
   @Override
-  public void printBackfill(Backfill backfill) {
+  public void printBackfill(Backfill backfill, boolean ignored) {
     System.out.println(String.format("%s %s %s %s %s %s %s %s %s %s",
                                      backfill.id(),
                                      backfill.workflowId().componentId(),
@@ -103,16 +103,16 @@ class PlainCliOutput implements CliOutput {
   }
 
   @Override
-  public void printBackfillPayload(BackfillPayload backfillPayload) {
-    printBackfill(backfillPayload.backfill());
+  public void printBackfillPayload(BackfillPayload backfillPayload, boolean ignored) {
+    printBackfill(backfillPayload.backfill(), true);
     if (backfillPayload.statuses().isPresent()) {
       printStates(backfillPayload.statuses().get());
     }
   }
 
   @Override
-  public void printBackfills(List<BackfillPayload> backfills) {
-    backfills.forEach(this::printBackfillPayload);
+  public void printBackfills(List<BackfillPayload> backfills, boolean ignored) {
+    backfills.forEach(backfill -> printBackfillPayload(backfill, true));
   }
 
   @Override
