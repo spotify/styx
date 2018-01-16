@@ -37,7 +37,14 @@ import org.junit.Test;
 
 public class PrettyCliOutputTest {
 
-  private Backfill backfill(String description) {
+  private static final String SHORT_DESCRIPTION = "Description";
+  private static final String LONG_DESCRIPTION = "Description which is long enough to truncate";
+  private static final String EXPECTED_HEADER =
+      "                 BACKFILL ID  HALTED  ALL TRIGGERED  CONCURRENCY  "
+      + "START (INCL)          END (EXCL)            NEXT TRIGGER          COMPONENT"
+      + "  WORKFLOW  DESCRIPTION\n";
+
+  private static Backfill backfill(String description) {
     return Backfill.newBuilder()
         .id("backfill-2")
         .start(Instant.parse("2017-01-01T00:00:00Z"))
@@ -50,18 +57,12 @@ public class PrettyCliOutputTest {
         .build();
   }
 
-  private static final String SHORT_DESCRIPTION = "Description";
-  private static final String LONG_DESCRIPTION = "Description which is long enough to truncate";
-  private static final String EXPECTED_HEADER =
-      "                 BACKFILL ID  HALTED  ALL TRIGGERED  CONCURRENCY  "
-      + "START (INCL)          END (EXCL)            NEXT TRIGGER          COMPONENT"
-      + "  WORKFLOW  DESCRIPTION\n";
-
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
 
   private PrintStream old;
 
   private CliOutput cliOutput;
+
 
   @Before
   public void setUp() {
@@ -118,9 +119,8 @@ public class PrettyCliOutputTest {
   @Test
   public void shouldPrintBackfillsWithoutTruncating() {
 
-    cliOutput.printBackfills(ImmutableList.of(BackfillPayload.create(backfill(LONG_DESCRIPTION), Optional
-            .empty
-            ())),
+    cliOutput.printBackfills(
+        ImmutableList.of(BackfillPayload.create(backfill(LONG_DESCRIPTION), Optional.empty())),
         true);
     assertEquals(EXPECTED_HEADER
                  + "                  backfill-2   false          false            2  "
@@ -132,8 +132,8 @@ public class PrettyCliOutputTest {
   @Test
   public void shouldPrintNAWhenBackfillLacksDescription() {
 
-    cliOutput.printBackfills(ImmutableList.of(BackfillPayload.create(backfill(null),
-        Optional.empty()))
+    cliOutput.printBackfills(
+        ImmutableList.of(BackfillPayload.create(backfill(null), Optional.empty()))
         , false);
     assertEquals(EXPECTED_HEADER
                  + "                  backfill-2   false          false            2  "
