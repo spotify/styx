@@ -40,6 +40,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.RateLimiter;
+import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.WorkflowExecutionGate.ExecutionBlocker;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
@@ -671,6 +672,31 @@ public class SchedulerTest {
     stateManager.initialize(runState);
 
     scheduler.tick();
+
+    verify(stateManager).receive(Event.dequeue(INSTANCE));
+    verifyZeroInteractions(gate);
+  }
+
+  @Test
+  public void shouldIgnoreGatingFailure() throws Exception {
+    when(config.executionGatingEnabled()).thenReturn(true);
+
+    when(gate.executionBlocker(any())).thenReturn(
+        CompletableFutures.exceptionallyCompletedFuture(new Exception()));
+
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+
+    setUp(20);
+    initWorkflow(workflow);
+
+    final StateData stateData = StateData.newBuilder().tries(0).build();
+    final RunState runState = RunState.create(INSTANCE, State.QUEUED, stateData, time);
+
+    stateManager.initialize(runState);
+
+    scheduler.tick();
+
+    verify(gate).executionBlocker(INSTANCE);
 
     verify(stateManager).receive(Event.dequeue(INSTANCE));
     verifyZeroInteractions(gate);

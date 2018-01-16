@@ -236,15 +236,14 @@ public class Scheduler {
       CompletionStage<Optional<ExecutionBlocker>> executionBlockerFuture) {
 
     // Check for execution blockers
-    final Optional<ExecutionBlocker> blocker;
+    Optional<ExecutionBlocker> blocker = Optional.empty();
     try {
       blocker = executionBlockerFuture.toCompletableFuture().get(30, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       LOG.debug("Interrupted");
       return false;
     } catch (ExecutionException | TimeoutException e) {
-      LOG.error("Failed to check for missing dependencies", e);
-      return true;
+      LOG.warn("Failed to check execution blockers for {}", instance.workflowInstance(), e);
     }
 
     if (blocker.isPresent()) {
