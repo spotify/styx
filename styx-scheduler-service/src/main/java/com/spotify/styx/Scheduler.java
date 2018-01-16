@@ -37,6 +37,7 @@ import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -57,6 +58,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,32 +88,36 @@ public class Scheduler {
   private final TimeoutConfig ttls;
   private final StateManager stateManager;
   private final WorkflowCache workflowCache;
-  private final Storage storage;
   private final WorkflowResourceDecorator resourceDecorator;
   private final Stats stats;
   private final RateLimiter dequeueRateLimiter;
+  private final Supplier<StyxConfig> config;
+  private final Supplier<List<Resource>> resources;
 
   public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager,
-      WorkflowCache workflowCache, Storage storage,
+      WorkflowCache workflowCache,
       WorkflowResourceDecorator resourceDecorator,
-      Stats stats, RateLimiter dequeueRateLimiter) {
+      Stats stats, RateLimiter dequeueRateLimiter,
+      Supplier<StyxConfig> config,
+      Supplier<List<Resource>> resources) {
     this.time = Objects.requireNonNull(time);
     this.ttls = Objects.requireNonNull(ttls);
     this.stateManager = Objects.requireNonNull(stateManager);
     this.workflowCache = Objects.requireNonNull(workflowCache);
-    this.storage = Objects.requireNonNull(storage);
     this.resourceDecorator = Objects.requireNonNull(resourceDecorator);
     this.stats = Objects.requireNonNull(stats);
     this.dequeueRateLimiter = Objects.requireNonNull(dequeueRateLimiter, "dequeueRateLimiter");
+    this.config = Objects.requireNonNull(config, "config");
+    this.resources = Objects.requireNonNull(resources, "resources");
   }
 
   void tick() {
     final Map<String, Resource> resources;
     final Optional<Long> globalConcurrency;
     try {
-      resources = storage.resources().stream().collect(toMap(Resource::id, identity()));
-      globalConcurrency = storage.config().globalConcurrency();
-    } catch (IOException e) {
+      resources = this.resources.get().stream().collect(toMap(Resource::id, identity()));
+      globalConcurrency = this.config.get().globalConcurrency();
+    } catch (Exception e) {
       LOG.warn("Failed to get resource limits", e);
       return;
     }
