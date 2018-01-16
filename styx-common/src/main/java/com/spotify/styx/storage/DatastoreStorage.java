@@ -56,6 +56,8 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.RunState.State;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.FnWithException;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TimeUtil;
@@ -114,7 +116,9 @@ class DatastoreStorage {
   public static final String PROPERTY_DESCRIPTION = "description";
   public static final String PROPERTY_CONFIG_DEBUG_ENABLED = "debug";
   public static final String PROPERTY_SUBMISSION_RATE_LIMIT = "submissionRateLimit";
-  public static final String PROPERTY_RUN_STATE = "runState";
+  public static final String PROPERTY_STATE = "state";
+  public static final String PROPERTY_STATE_TIMESTAMP = "stateTimestamp";
+  public static final String PROPERTY_STATE_DATA = "stateData";
 
   public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
 
@@ -366,13 +370,17 @@ class DatastoreStorage {
       final Entity entity = results.next();
       final long counter = entity.getLong(PROPERTY_COUNTER);
       final WorkflowInstance instance = parseWorkflowInstance(entity);
-      final RunState state;
-      if (entity.contains(PROPERTY_RUN_STATE)) {
-        state = OBJECT_MAPPER.readValue(entity.getString(PROPERTY_RUN_STATE), RunState.class);
+      final RunState runState;
+      if (entity.contains(PROPERTY_STATE)) {
+        final State state = State.valueOf(entity.getString(PROPERTY_STATE));
+        final long timestamp = entity.getLong(PROPERTY_STATE_TIMESTAMP);
+        final StateData stateData = OBJECT_MAPPER.readValue(
+            entity.getString(PROPERTY_STATE_DATA), StateData.class);
+        runState = RunState.create(instance, state, stateData, timestamp);
       } else {
-        state = null;
+        runState = null;
       }
-      mapBuilder.put(instance, Tuple.of(counter, state));
+      mapBuilder.put(instance, Tuple.of(counter, runState));
     }
 
     return mapBuilder.build();
@@ -386,7 +394,12 @@ class DatastoreStorage {
           .set(PROPERTY_COMPONENT, workflowInstance.workflowId().componentId())
           .set(PROPERTY_WORKFLOW, workflowInstance.workflowId().id())
           .set(PROPERTY_PARAMETER, workflowInstance.parameter())
-          .set(PROPERTY_RUN_STATE, OBJECT_MAPPER.writeValueAsString(state))
+          .set(PROPERTY_STATE, state.state().toString())
+          .set(PROPERTY_STATE_TIMESTAMP, state.timestamp())
+          .set(PROPERTY_STATE_DATA, StringValue
+              .newBuilder(OBJECT_MAPPER.writeValueAsString(state.data()))
+              .setExcludeFromIndexes(true)
+              .build())
           .set(PROPERTY_COUNTER, counter)
           .build();
 

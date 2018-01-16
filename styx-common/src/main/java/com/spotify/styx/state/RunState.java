@@ -57,7 +57,6 @@ import java.util.Optional;
  * defined by the {@link Event} enum and outputs defined by the methods of {@link OutputHandler}.
  */
 @AutoValue
-@JsonIgnoreProperties(ignoreUnknown = true)
 public abstract class RunState {
 
   public static final int SUCCESS_EXIT_CODE = 0;
@@ -91,18 +90,12 @@ public abstract class RunState {
     }
   }
 
-  @JsonProperty("workflow_instance")
   public abstract WorkflowInstance workflowInstance();
-  @JsonProperty("state")
   public abstract State state();
-  @JsonProperty("timestamp")
   public abstract long timestamp();
-  @JsonProperty("data")
   public abstract StateData data();
 
-  @JsonIgnore
   abstract Time time();
-  @JsonIgnore
   abstract OutputHandler outputHandler();
 
   public static RunState fresh(
@@ -451,14 +444,14 @@ public abstract class RunState {
         workflowInstance, state, time.get().toEpochMilli(), stateData, time, fanOutput(outputHandler));
   }
 
-  @JsonCreator
   public static RunState create(
-      @JsonProperty("workflow_instance") WorkflowInstance workflowInstance,
-      @JsonProperty("state") State state,
-      @JsonProperty("data") StateData stateData,
-      @JsonProperty("timestamp") long timestamp) {
+      WorkflowInstance workflowInstance,
+      State state,
+      StateData stateData,
+      long timestamp,
+      OutputHandler... outputHandler) {
     return new AutoValue_RunState(
-        workflowInstance, state, timestamp, stateData, Instant::now, OutputHandler.NOOP);
+        workflowInstance, state, timestamp, stateData, Instant::now, fanOutput(outputHandler));
   }
 
   public static RunState create(
