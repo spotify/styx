@@ -34,9 +34,12 @@ import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Resources;
 import com.spotify.futures.CompletableFutures;
+import com.spotify.styx.api.BackfillPayload;
+import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.cli.CliExitException.ExitStatus;
 import com.spotify.styx.cli.CliMain.CliContext;
@@ -58,6 +61,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import jdk.nashorn.internal.ir.annotations.Immutable;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.hamcrest.Matchers;
@@ -191,6 +195,144 @@ public class CliMainTest {
 
     verify(client).backfillCreate(component, "foo", start, end, 1, "Description");
     verify(cliOutput).printBackfill(backfill, true);
+  }
+  
+  @Test
+  public void testBackfillShow() throws Exception {
+    final String backfillId = "backfill-2";
+
+    final Backfill backfill = Backfill.newBuilder()
+        .id(backfillId)
+        .start(Instant.parse("2017-01-01T00:00:00Z"))
+        .end(Instant.parse("2017-01-30T00:00:00Z"))
+        .workflowId(WorkflowId.create("quux", backfillId))
+        .concurrency(1)
+        .description("Description")
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+    
+    final BackfillPayload backfillPayload = BackfillPayload.create(backfill,
+        Optional.empty());
+
+    when(client.backfill(backfillId, true))
+        .thenReturn(CompletableFuture.completedFuture(backfillPayload));
+
+    CliMain.run(cliContext, "backfill", "show", backfillId, "--no-trunc");
+    
+    verify(client).backfill(backfillId, true);
+    verify(cliOutput).printBackfillPayload(backfillPayload, true);
+  }
+
+  @Test
+  public void testBackfillShowTruncating() throws Exception {
+    final String backfillId = "backfill-2";
+
+    final Backfill backfill = Backfill.newBuilder()
+        .id(backfillId)
+        .start(Instant.parse("2017-01-01T00:00:00Z"))
+        .end(Instant.parse("2017-01-30T00:00:00Z"))
+        .workflowId(WorkflowId.create("quux", backfillId))
+        .concurrency(1)
+        .description("Description")
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+    
+    final BackfillPayload backfillPayload = BackfillPayload.create(backfill,
+        Optional.empty());
+
+    when(client.backfill(backfillId, true))
+        .thenReturn(CompletableFuture.completedFuture(backfillPayload));
+
+    CliMain.run(cliContext, "backfill", "show", backfillId);
+    
+    verify(client).backfill(backfillId, true);
+    verify(cliOutput).printBackfillPayload(backfillPayload, false);
+  }
+
+  @Test
+  public void testBackfillEdit() throws Exception {
+    final String backfillId = "backfill-2";
+
+    final Backfill backfill = Backfill.newBuilder()
+        .id(backfillId)
+        .start(Instant.parse("2017-01-01T00:00:00Z"))
+        .end(Instant.parse("2017-01-30T00:00:00Z"))
+        .workflowId(WorkflowId.create("quux", backfillId))
+        .concurrency(1)
+        .description("Description")
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+
+    when(client.backfillEditConcurrency(backfillId, 1))
+        .thenReturn(CompletableFuture.completedFuture(backfill));
+
+    CliMain.run(cliContext, "backfill", "edit", backfillId, "--concurrency", "1");
+
+    verify(client).backfillEditConcurrency(backfillId, 1);
+    verify(cliOutput).printBackfill(backfill, true);
+  }
+
+  @Test
+  public void testBackfillList() throws Exception {
+    final String component = "quux";
+    final String workflow = "foo";
+    final String start = "2017-01-01T00:00:00Z";
+    final String end = "2017-01-30T00:00:00Z";
+
+    final Backfill backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(Instant.parse(start))
+        .end(Instant.parse(end))
+        .workflowId(WorkflowId.create(component, workflow))
+        .concurrency(1)
+        .description("Description")
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+    
+    final BackfillsPayload backfillsPayload = BackfillsPayload.create(
+        ImmutableList.of(BackfillPayload.create(backfill, Optional.empty())));
+
+    when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false))
+        .thenReturn(CompletableFuture.completedFuture(backfillsPayload));
+
+    CliMain.run(cliContext, "backfill", "list", "-c", component, "-w", workflow, "--no-trunc");
+
+    verify(client).backfillList(Optional.of(component), Optional.of(workflow), false, false);
+    verify(cliOutput).printBackfills(backfillsPayload.backfills(), true);
+  }
+
+  @Test
+  public void testBackfillListTruncating() throws Exception {
+    final String component = "quux";
+    final String workflow = "foo";
+    final String start = "2017-01-01T00:00:00Z";
+    final String end = "2017-01-30T00:00:00Z";
+
+    final Backfill backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(Instant.parse(start))
+        .end(Instant.parse(end))
+        .workflowId(WorkflowId.create(component, workflow))
+        .concurrency(1)
+        .description("Description")
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+    
+    final BackfillsPayload backfillsPayload = BackfillsPayload.create(
+        ImmutableList.of(BackfillPayload.create(backfill, Optional.empty())));
+
+    when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false))
+        .thenReturn(CompletableFuture.completedFuture(backfillsPayload));
+
+    CliMain.run(cliContext, "backfill", "list", "-c", component, "-w", workflow);
+
+    verify(client).backfillList(Optional.of(component), Optional.of(workflow), false, false);
+    verify(cliOutput).printBackfills(backfillsPayload.backfills(), false);
   }
 
   @Test

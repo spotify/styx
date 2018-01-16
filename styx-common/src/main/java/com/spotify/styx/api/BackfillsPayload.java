@@ -34,7 +34,7 @@ public abstract class BackfillsPayload {
   public abstract List<BackfillPayload> backfills();
 
   @JsonCreator
-  static BackfillsPayload create(
+  public static BackfillsPayload create(
       @JsonProperty("backfills") List<BackfillPayload> backfills) {
     return new AutoValue_BackfillsPayload(backfills);
   }

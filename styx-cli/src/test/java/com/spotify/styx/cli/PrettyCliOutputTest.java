@@ -31,6 +31,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.time.Instant;
 import java.util.Optional;
+import javax.swing.text.html.Option;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -104,8 +105,42 @@ public class PrettyCliOutputTest {
   }
 
   @Test
-  public void shouldPrintBackfills() {
+  public void shouldPrintBackfillPayload() {
+    cliOutput.printBackfillPayload(BackfillPayload.create(backfill(LONG_DESCRIPTION),
+        Optional.empty()), false);
+    assertEquals(EXPECTED_HEADER +
+                 "                  backfill-2   false          false          " 
+                 + "  2  "
+                 + "2017-01-01            2017-01-02            2017-01-01            component  "
+                 + "workflow2 Description which is...\n",
+        outContent.toString());
+  }
 
+  @Test
+  public void shouldPrintBackfillPayloadWithShortDescription() {
+    cliOutput.printBackfillPayload(BackfillPayload.create(backfill(SHORT_DESCRIPTION),
+        Optional.empty()), false);
+    assertEquals(EXPECTED_HEADER +
+                 "                  backfill-2   false          false          " 
+                 + "  2  "
+                 + "2017-01-01            2017-01-02            2017-01-01            component  "
+                 + "workflow2 Description\n",
+        outContent.toString());
+  }
+
+  @Test
+  public void shouldPrintBackfillPayloadWithoutTruncating() {
+    cliOutput.printBackfillPayload(BackfillPayload.create(backfill(LONG_DESCRIPTION),
+        Optional.empty()), true);
+    assertEquals( EXPECTED_HEADER +
+        "                  backfill-2   false          false            2  "
+                 + "2017-01-01            2017-01-02            2017-01-01            component  "
+                 + "workflow2 Description which is long enough to truncate\n",
+        outContent.toString());
+  }
+
+  @Test
+  public void shouldPrintBackfills() {
     cliOutput.printBackfills(
         ImmutableList.of(BackfillPayload.create(backfill(LONG_DESCRIPTION), Optional.empty())),
         false);
@@ -118,7 +153,6 @@ public class PrettyCliOutputTest {
 
   @Test
   public void shouldPrintBackfillsWithoutTruncating() {
-
     cliOutput.printBackfills(
         ImmutableList.of(BackfillPayload.create(backfill(LONG_DESCRIPTION), Optional.empty())),
         true);
@@ -131,7 +165,6 @@ public class PrettyCliOutputTest {
 
   @Test
   public void shouldPrintNAWhenBackfillLacksDescription() {
-
     cliOutput.printBackfills(
         ImmutableList.of(BackfillPayload.create(backfill(null), Optional.empty()))
         , false);
