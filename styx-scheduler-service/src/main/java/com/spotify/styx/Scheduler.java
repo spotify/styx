@@ -241,7 +241,7 @@ public class Scheduler {
       blocker = executionBlockerFuture.toCompletableFuture().get(30, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       LOG.debug("Interrupted");
-      return true;
+      return false;
     } catch (ExecutionException | TimeoutException e) {
       LOG.error("Failed to check for missing dependencies", e);
       return true;
