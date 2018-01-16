@@ -18,6 +18,7 @@
     <jackson.version>2.8.8</jackson.version>
     <checkstyle.config.location>checkstyle.xml</checkstyle.config.location>
     <checkstyle.version>2.17</checkstyle.version>
+    <semantic-metrics.version>0.11.2</semantic-metrics.version>
   </properties>
 
   <modules>
@@ -179,6 +180,16 @@
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
         <version>1.7.25</version>
+      </dependency>
+      <dependency>
+        <groupId>com.spotify.metrics</groupId>
+        <artifactId>semantic-metrics-core</artifactId>
+        <version>${semantic-metrics.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.spotify.metrics</groupId>
+        <artifactId>semantic-metrics-ffwd-reporter</artifactId>
+        <version>${semantic-metrics.version}</version>
       </dependency>
 
       <!-- cli -->
