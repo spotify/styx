@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.function.Supplier;
 import org.apache.hadoop.hbase.client.Connection;
 
 /**
@@ -48,10 +49,12 @@ public class AggregateStorage implements Storage {
 
   private final BigtableStorage bigtableStorage;
   private final DatastoreStorage datastoreStorage;
+  private final Supplier<DatastoreTransactionalStorage> transactionSupplier;
 
   public AggregateStorage(Connection connection, Datastore datastore, Duration retryBaseDelay) {
     this.bigtableStorage = new BigtableStorage(connection, retryBaseDelay);
     this.datastoreStorage = new DatastoreStorage(datastore, retryBaseDelay);
+    this.transactionSupplier =  () -> new DatastoreTransactionalStorage(datastore.newTransaction());
   }
 
   @Override
@@ -222,5 +225,10 @@ public class AggregateStorage implements Storage {
   @Override
   public Optional<Backfill> backfill(String id) throws IOException {
     return datastoreStorage.getBackfill(id);
+  }
+
+  @Override
+  public TransactionalStorage newTransactionalStorage() {
+    return transactionSupplier.get();
   }
 }

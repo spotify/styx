@@ -255,4 +255,11 @@ public interface Storage {
   Optional<Backfill> backfill(String id) throws IOException;
 
   void storeBackfill(Backfill backfill) throws IOException;
+
+  /**
+   * Get a new transaction object that can execute multiple storage operations in a transaction.
+   *
+   * @return the {@link TransactionalStorage} instance
+   */
+  TransactionalStorage newTransactionalStorage();
 }
