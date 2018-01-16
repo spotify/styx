@@ -34,7 +34,6 @@ import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -158,11 +157,6 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public void updateNextNaturalTriggerOld(WorkflowId workflowId, Instant instant) throws IOException {
-    datastoreStorage.updateNextNaturalTrigger(workflowId, instant);
-  }
-
-  @Override
   public Map<Workflow, TriggerInstantSpec> workflowsWithNextNaturalTrigger() throws IOException {
     return datastoreStorage.workflowsWithNextNaturalTrigger();
   }
@@ -230,5 +224,10 @@ public class AggregateStorage implements Storage {
   @Override
   public Optional<Backfill> backfill(String id) throws IOException {
     return datastoreStorage.getBackfill(id);
+  }
+
+  @Override
+  public <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f) throws IOException, E {
+    return datastoreStorage.runInTransaction(f);
   }
 }

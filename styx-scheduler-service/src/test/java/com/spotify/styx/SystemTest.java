@@ -277,21 +277,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @Test
-  public void shouldConvertOldTriggerConfigurationToNew() throws Exception {
-    givenTheTimeIs("2016-03-14T10:59:01Z");
-    givenWorkflow(HOURLY_WORKFLOW);
-    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-    givenNextNaturalTriggerOld(HOURLY_WORKFLOW, "2016-03-14T11:00:00Z");
-
-    styxStarts();
-    timeJumps(1, MINUTES);
-    tickTriggerManager();
-    awaitWorkflowInstanceState(
-        WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T10"),
-        RunState.State.QUEUED);
-  }
-
-  @Test
   public void testTriggerBackfillsWithinResourceLimit() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
     givenWorkflow(HOURLY_WORKFLOW);
