@@ -59,6 +59,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -66,6 +67,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -113,8 +115,12 @@ public class SchedulerTest {
   }
 
   private void setUp(int timeoutSeconds) throws IsClosedException, IOException {
+    setUp(Duration.ofSeconds(timeoutSeconds));
+  }
+
+  private void setUp(Duration timeout) throws IsClosedException, IOException {
     workflowCache = new InMemWorkflowCache();
-    TimeoutConfig timeoutConfig = createWithDefaultTtl(ofSeconds(timeoutSeconds));
+    TimeoutConfig timeoutConfig = createWithDefaultTtl(timeout);
 
     storage = mock(Storage.class);
     when(storage.resources()).thenReturn(resourceLimits);
@@ -275,7 +281,7 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldIssueInfoIfGlobalResourceDepleted() throws Exception {
+  public void shouldIssueInfoAndRetryLaterIfGlobalResourceDepleted() throws Exception {
     setUp(20);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
     when(config.globalConcurrency()).thenReturn(Optional.of(0L));
@@ -283,15 +289,20 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    assertThat(
-        stateManager.get(INSTANCE).data().messages().get(0).line(),
-        is(String.format("Resource limit reached for: [Resource{id=%s, concurrency=%d}]",
-                         Scheduler.GLOBAL_RESOURCE_ID, 0)));
-    assertThat(stateManager.get(INSTANCE).state(), is(State.QUEUED));
+    final String expectedMessage = String.format("Resource limit reached for: [Resource{id=%s, concurrency=%d}]",
+        Scheduler.GLOBAL_RESOURCE_ID, 0);
+
+    verify(stateManager).receiveIgnoreClosed(Event.info(INSTANCE, Message.info(expectedMessage)));
+    verify(stateManager).receiveIgnoreClosed(Event.retryAfter(INSTANCE, TimeUnit.MINUTES.toMillis(1)));
+
+    final RunState runState = stateManager.get(INSTANCE);
+    assertThat(runState.data().messages().get(0).line(), is(expectedMessage));
+    assertThat(runState.data().retryDelayMillis(), is(Optional.of(TimeUnit.MINUTES.toMillis(1))));
+    assertThat(runState.state(), is(State.QUEUED));
   }
 
   @Test
-  public void shouldIssueInfoIfResourceDepleted() throws Exception {
+  public void shouldIssueInfoAndRetryLaterIfResourceDepleted() throws Exception {
     setUp(20);
     setResourceLimit("r1", 0);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
@@ -299,10 +310,15 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    assertThat(
-        stateManager.get(INSTANCE).data().messages().get(0).line(),
-        is("Resource limit reached for: [Resource{id=r1, concurrency=0}]"));
-    assertThat(stateManager.get(INSTANCE).state(), is(State.QUEUED));
+    final String expectedMessage = "Resource limit reached for: [Resource{id=r1, concurrency=0}]";
+
+    verify(stateManager).receiveIgnoreClosed(Event.info(INSTANCE, Message.info(expectedMessage)));
+    verify(stateManager).receiveIgnoreClosed(Event.retryAfter(INSTANCE, TimeUnit.MINUTES.toMillis(1)));
+
+    final RunState runState = stateManager.get(INSTANCE);
+    assertThat(runState.data().messages().get(0).line(), is(expectedMessage));
+    assertThat(runState.data().retryDelayMillis(), is(Optional.of(TimeUnit.MINUTES.toMillis(1))));
+    assertThat(runState.state(), is(State.QUEUED));
   }
 
   @Test
@@ -337,7 +353,7 @@ public class SchedulerTest {
 
   @Test
   public void shouldDequeueIfResourceValueIsIncreased() throws Exception {
-    setUp(20);
+    setUp(Scheduler.RESOURCE_EXHAUSTED_RETRY_DELAY.multipliedBy(2));
     setResourceLimit("r1", 0);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
     init(RunState.create(INSTANCE, State.QUEUED, time));
@@ -345,6 +361,8 @@ public class SchedulerTest {
     scheduler.tick();
 
     assertThat(stateManager.get(INSTANCE).state(), is(State.QUEUED));
+
+    now = now.plus(Duration.ofMinutes(1));
 
     setResourceLimit("r1", 1);
     scheduler.tick();
@@ -468,7 +486,7 @@ public class SchedulerTest {
 
   @Test
   public void shouldLimitConcurrencyUsingMultipleResourcesAcrossWorkflows() throws Exception {
-    setUp(20);
+    setUp(Scheduler.RESOURCE_EXHAUSTED_RETRY_DELAY.multipliedBy(2));
     setResourceLimit("r1", 3);
     setResourceLimit("r2", 2);
     setResourceLimit("common", 4);
@@ -511,6 +529,8 @@ public class SchedulerTest {
     }
 
     assertThat(completed1 + completed2, is(4));
+
+    now = now.plus(Duration.ofMinutes(1));
 
     scheduler.tick();
 
