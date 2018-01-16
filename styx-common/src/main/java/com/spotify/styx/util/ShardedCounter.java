@@ -33,9 +33,10 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Stream;
+import java.util.Random;
 
 /**
  * Implementation of a resource counter on Datastore. Sharded in a way to support increment,
@@ -52,14 +53,12 @@ public class ShardedCounter {
 
   // Ought to be enough (parallelism) for everyone. We could make it dynamic with extra effort.
   private static final int NUM_SHARDS = 128;
-
   private static final long CACHE_EXPIRY_MILLIS = 1000;
 
   private final Datastore datastore;
   public static final String KIND_COUNTER_LIMIT = "CounterLimit";
   public static final String PROPERTY_LIMIT = "limit";
   public static final String KIND_COUNTER_SHARD = "CounterShard";
-  public static final String SHARD_PREFIX = "shard";
   public static final String PROPERTY_SHARD = "shard";
 
   private static class CounterSnapshot {
@@ -73,28 +72,28 @@ public class ShardedCounter {
       final Key limitKey = datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId);
       final Entity limit = datastore.get(limitKey);
       if (limit == null) {
-        return null;
-        // IllegalStateException("No limit found in Datastore for " + counterId);?
-        // or should we instead assume infinite limit?
+        snapshot.limit = Long.MAX_VALUE;
+        // Or IllegalStateException("No limit found in Datastore for " + counterId);?
+      } else {
+        snapshot.limit = limit.getLong(PROPERTY_LIMIT);
       }
-      snapshot.limit = limit.getLong(PROPERTY_LIMIT);
 
       final EntityQuery queryShards = EntityQuery.newEntityQueryBuilder()
           .setKind(KIND_COUNTER_SHARD)
           .setFilter(CompositeFilter.and(
-              PropertyFilter.ge("__key__", SHARD_PREFIX + "-1"),
-              PropertyFilter.le("__key__", SHARD_PREFIX + "-" + NUM_SHARDS)))
+              PropertyFilter.ge("__key__", counterId + "-0"),
+              PropertyFilter.lt("__key__", counterId + "-" + NUM_SHARDS)))
           .setOrderBy(OrderBy.asc("__key__"))
           .setLimit(NUM_SHARDS + 1)
           .build();
       final QueryResults<Entity> shards = datastore.run(queryShards);
       while (shards.hasNext()) {
-        Long nextShard = shards.next().getLong(PROPERTY_SHARD);
+        long nextShard = shards.next().getLong(PROPERTY_SHARD);
         snapshot.shards.add(nextShard);
       }
       if (snapshot.shards.size() != NUM_SHARDS) {
-        return null;
-        // IllegalStateException("Wrong number of shards found in Datastore for " + counterId);?
+        // This could occur as part of normal operation, due to eventual consistency. Do nothing?
+        // Or IllegalStateException("Wrong number of shards found in Datastore for " + counterId);?
       }
 
       snapshot.updatedAt = Instant.now();
@@ -103,6 +102,27 @@ public class ShardedCounter {
 
     private boolean isRecent() {
       return updatedAt.plus(CACHE_EXPIRY_MILLIS, ChronoUnit.MILLIS).isAfter(Instant.now());
+    }
+
+    private long shardCapacity(int shardIndex) {
+      return limit / NUM_SHARDS + (shardIndex < limit % NUM_SHARDS ? 1 : 0);
+    }
+
+    private int pickShardWithSpareCapacity() {
+      List<Integer> candidates = new ArrayList<>();
+
+      for (int i = 0; i < shards.size(); i++) {
+        if (shards.get(i) < shardCapacity(i)) {
+          candidates.add(i);
+        }
+      }
+
+      if (candidates.isEmpty()) {
+        return new Random().nextInt(NUM_SHARDS);
+        // Or return -1 (and use that to abort the transaction early)?
+      } else {
+        return candidates.get(new Random().nextInt(candidates.size()));
+      }
     }
   }
 
@@ -133,8 +153,10 @@ public class ShardedCounter {
    * there has been no preceding successful updateLimit operation, no limit is applied in
    * updateCounter operations on this counter.
    */
-  public void updateLimit(DatastoreReaderWriter transaction, String counterName, long limit) {
-    transaction.put()
+  public void updateLimit(DatastoreReaderWriter transaction, String counterId, long limit) {
+    final Key limitKey = datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId);
+
+    transaction.put(Entity.newBuilder(limitKey).set(PROPERTY_LIMIT, limit).build());
   }
 
   /**
@@ -150,8 +172,19 @@ public class ShardedCounter {
    * (TODO: what about decrements below zero - make fail?)
    */
   public void updateCounter(DatastoreReaderWriter transaction, String counterId, long delta) {
-    CounterSnapshot snapshot = getCounterSnapshot(counterId);
-    // Or read them asynchronously outside of this?
+    final CounterSnapshot snapshot = getCounterSnapshot(counterId);
+    final int shardIndex = snapshot.pickShardWithSpareCapacity();
+    final Key shardKey = datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD)
+        .newKey(counterId + "-" + shardIndex);
+    final Entity shard = transaction.get(shardKey);
+
+    if (shard != null && shard.getLong(PROPERTY_SHARD) < snapshot.shardCapacity(shardIndex)) {
+      transaction.put(Entity.newBuilder(shard)
+          .set(PROPERTY_SHARD, shard.getLong(PROPERTY_SHARD) + delta)
+          .build());
+    } else {
+      // TODO fail the transaction
+    }
   }
 
   /**
@@ -160,7 +193,12 @@ public class ShardedCounter {
    * larger than the corresponding limit is possible without error.)
    */
   public long getCounter(String counterId) {
-    CounterSnapshot snapshot = getCounterSnapshot(counterId);
+    final CounterSnapshot snapshot = getCounterSnapshot(counterId);
+    long result = 0;
 
+    for (long shard: snapshot.shards) {
+      result += shard;
+    }
+    return result;
   }
 }
