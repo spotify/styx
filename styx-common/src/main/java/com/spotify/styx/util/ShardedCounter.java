@@ -32,11 +32,12 @@ import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.ConcurrentModificationException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Implementation of a resource counter on Datastore. Sharded in a way to support increment,
@@ -66,6 +67,27 @@ public class ShardedCounter {
     Long limit;
     ArrayList<Long> shards;
 
+    /**
+     * Idempotent initialization, so that we don't reset an existing shard to zero - counterId may
+     * have already been initialized and incremented by another process.
+     */
+    private static void initialize(Datastore datastore, String counterId) {
+      for (int i = 0; i < NUM_SHARDS; i++) {
+        final Key shardKey = datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD)
+            .newKey(counterId + "-" + i);
+        datastore.runInTransaction(transaction -> {
+          final Entity shard = transaction.get(shardKey);
+          if (shard == null) {
+            transaction.put(Entity.newBuilder(shard).set(PROPERTY_SHARD, 0).build());
+          }
+          return null;
+        });
+      }
+    }
+
+    /**
+     * Gets the counter state. Creates it in Datastore if it doesn't exist yet.
+     */
     private static CounterSnapshot fromDatastore(Datastore datastore, String counterId) {
       CounterSnapshot snapshot = new CounterSnapshot();
 
@@ -84,16 +106,23 @@ public class ShardedCounter {
               PropertyFilter.ge("__key__", counterId + "-0"),
               PropertyFilter.lt("__key__", counterId + "-" + NUM_SHARDS)))
           .setOrderBy(OrderBy.asc("__key__"))
-          .setLimit(NUM_SHARDS + 1)
+          .setLimit(NUM_SHARDS)
           .build();
       final QueryResults<Entity> shards = datastore.run(queryShards);
-      while (shards.hasNext()) {
+      snapshot.shards = new ArrayList<Long>(NUM_SHARDS);
+      int i;
+      for (i = 0; shards.hasNext(); i++) {
         long nextShard = shards.next().getLong(PROPERTY_SHARD);
-        snapshot.shards.add(nextShard);
+
+        // TODO shards.next().getKey() jāņem vērā?
+        snapshot.shards.set(i, nextShard);
       }
-      if (snapshot.shards.size() != NUM_SHARDS) {
-        // This could occur as part of normal operation, due to eventual consistency. Do nothing?
-        // Or IllegalStateException("Wrong number of shards found in Datastore for " + counterId);?
+      if (i < NUM_SHARDS) {
+        // The counter probably has not been initialized (so we have empty QueryResults). Also
+        // possible that a prior initialize() crashed halfway, or we got a partial list of shards in
+        // QueryResults due to eventual consistency. In any case, repeated initialization eventually
+        // creates all NUM_SHARDS shards.
+        initialize(datastore, counterId);
       }
 
       snapshot.updatedAt = Instant.now();
@@ -108,11 +137,16 @@ public class ShardedCounter {
       return limit / NUM_SHARDS + (shardIndex < limit % NUM_SHARDS ? 1 : 0);
     }
 
-    private int pickShardWithSpareCapacity() {
+    /**
+     * Returns shard index which _likely_ could be successfully updated by delta, according to our
+     * cached view of the state in Datastore.
+     */
+    private int pickShardWithSpareCapacity(long delta) {
       List<Integer> candidates = new ArrayList<>();
 
       for (int i = 0; i < shards.size(); i++) {
-        if (shards.get(i) < shardCapacity(i)) {
+        if (shards.get(i) + delta >= 0 &&
+            shards.get(i) + delta <= shardCapacity(i)) {
           candidates.add(i);
         }
       }
@@ -133,7 +167,7 @@ public class ShardedCounter {
 
   public ShardedCounter(Datastore datastore) {
     this.datastore = Objects.requireNonNull(datastore);
-    this.counterCache = new HashMap<>();
+    this.counterCache = new ConcurrentHashMap<>();
   }
 
   /**
@@ -166,31 +200,32 @@ public class ShardedCounter {
    * spurious failures are possible.
    *
    * Delta should be +/-1 for graceful behavior, due to how sharding is currently implemented.
-   * Updates with a larger delta are prone to spuriously fail even when counter is not near to
+   * Updates with a larger delta are prone to spuriously fail even when the counter is not near to
    * exceeding its limit. Failures are certain when delta >= limit / NUM_SHARDS + 1.
-   *
-   * (TODO: what about decrements below zero - make fail?)
    */
   public void updateCounter(DatastoreReaderWriter transaction, String counterId, long delta) {
     final CounterSnapshot snapshot = getCounterSnapshot(counterId);
-    final int shardIndex = snapshot.pickShardWithSpareCapacity();
+    final int shardIndex = snapshot.pickShardWithSpareCapacity(delta);
     final Key shardKey = datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD)
         .newKey(counterId + "-" + shardIndex);
     final Entity shard = transaction.get(shardKey);
 
-    if (shard != null && shard.getLong(PROPERTY_SHARD) < snapshot.shardCapacity(shardIndex)) {
+    if (shard != null &&
+        shard.getLong(PROPERTY_SHARD) + delta >= 0 &&
+        shard.getLong(PROPERTY_SHARD) + delta <= snapshot.shardCapacity(shardIndex)) {
       transaction.put(Entity.newBuilder(shard)
           .set(PROPERTY_SHARD, shard.getLong(PROPERTY_SHARD) + delta)
           .build());
     } else {
-      // TODO fail the transaction
+      // TODO fail (rollback) the transaction
+      throw new ConcurrentModificationException("Chosen shard has no spare capacity anymoar, pls rollback kths");
     }
   }
 
   /**
    * Returns the current value of the counter referred to by counterId, a weakly consistent
    * estimate. (May have not truly been the counter value at any point in time. Even a return value
-   * larger than the corresponding limit is possible without error.)
+   * larger than the corresponding limit might be possible without error.)
    */
   public long getCounter(String counterId) {
     final CounterSnapshot snapshot = getCounterSnapshot(counterId);
@@ -201,4 +236,6 @@ public class ShardedCounter {
     }
     return result;
   }
+
+  // TODO support deleteCounter(String counterId)? Disclaimers about consistency ensue?
 }
