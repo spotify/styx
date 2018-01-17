@@ -242,7 +242,8 @@ public class Scheduler {
       LOG.debug("Interrupted");
       return false;
     } catch (ExecutionException | TimeoutException e) {
-      LOG.warn("Failed to check execution blockers for {}", instance.workflowInstance(), e);
+      LOG.warn("Failed to check execution blocker for {}, assuming there is no blocker",
+          instance.workflowInstance(), e);
     }
 
     if (blocker.isPresent()) {
