@@ -20,7 +20,7 @@
 
 package com.spotify.styx.storage;
 
-import java.io.IOException;
+import com.spotify.styx.util.TransactionFailedException;
 
 /**
  * The interface to the persistence layer where the same transaction can be used across storage operations.
@@ -32,7 +32,7 @@ public interface TransactionalStorage {
   /**
    * This should commit or rollback all the storage operations previously called.
    *
-   * @throws IOException if the commit fails and the rollback is performed
+   * @throws TransactionFailedException if the commit fails and the rollback is performed
    */
-  void commit() throws IOException;
+  void commit() throws TransactionFailedException;
 }

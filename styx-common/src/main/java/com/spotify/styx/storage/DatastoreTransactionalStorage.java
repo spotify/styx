@@ -21,7 +21,8 @@
 package com.spotify.styx.storage;
 
 import com.google.cloud.datastore.Transaction;
-import java.io.IOException;
+import com.google.common.annotations.VisibleForTesting;
+import com.spotify.styx.util.TransactionFailedException;
 import java.util.Objects;
 
 class DatastoreTransactionalStorage implements TransactionalStorage {
@@ -33,13 +34,21 @@ class DatastoreTransactionalStorage implements TransactionalStorage {
   }
 
   @Override
-  public void commit() throws IOException {
+  public void commit() throws TransactionFailedException {
     try {
       transaction.commit();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     } finally {
       if (transaction.isActive()) {
-        transaction.rollback();
+        rollback();
       }
     }
+  }
+
+  @VisibleForTesting
+  private void rollback() throws TransactionFailedException {
+    transaction.rollback();
+    throw new TransactionFailedException();
   }
 }
