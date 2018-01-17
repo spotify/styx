@@ -202,7 +202,7 @@ public class Scheduler {
         final boolean proceed = limitAndDequeue(resources, workflowResourceReferences,
             currentResourceUsage, batch.get(i), blockers.get(i));
 
-        // Stop processing if rate limit was hit
+        // Stop processing if rate limit was hit or thread was interrupted
         if (!proceed) {
           return;
         }
