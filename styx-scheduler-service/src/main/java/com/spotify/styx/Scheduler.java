@@ -21,7 +21,6 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.WorkflowExecutionGate.NOOP;
-import static com.spotify.styx.WorkflowExecutionGate.NO_BLOCKER;
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
@@ -192,16 +191,16 @@ public class Scheduler {
     for (List<InstanceState> batch : Lists.partition(eligibleInstances, SCHEDULING_BATCH_SIZE)) {
 
       // Asynchronously look up execution blockers for a batch of instances
-      final Map<WorkflowInstance, CompletionStage<Optional<ExecutionBlocker>>> executionBlockers =
-          batch.stream()
-              .map(InstanceState::workflowInstance)
-              .collect(toMap(identity(), gate::executionBlocker));
+      final List<CompletionStage<Optional<ExecutionBlocker>>> blockers = batch.stream()
+          .map(InstanceState::workflowInstance)
+          .map(gate::executionBlocker)
+          .collect(toList());
 
       // Evaluate each instance in the batch for dequeuing
-      for (InstanceState instance : batch) {
-        final boolean proceed = limitAndDequeue(
-            resources, workflowResourceReferences, currentResourceUsage, instance,
-            executionBlockers.getOrDefault(instance.workflowInstance(), NO_BLOCKER));
+      for (int i = 0; i < batch.size(); i++) {
+
+        final boolean proceed = limitAndDequeue(resources, workflowResourceReferences,
+            currentResourceUsage, batch.get(i), blockers.get(i));
 
         // Stop processing if rate limit was hit
         if (!proceed) {
