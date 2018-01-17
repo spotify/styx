@@ -56,6 +56,7 @@ import com.spotify.styx.api.Api;
 import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -354,8 +355,11 @@ public class StyxScheduler implements AppInit {
     final Consumer<Workflow> workflowChangeListener =
         workflowChanged(workflowCache, workflowInitializer, stats, stateManager, workflowConsumer);
 
-    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
-                                              storage, resourceDecorator, stats, dequeueRateLimiter);
+    final Supplier<List<Resource>> resources = new CachedSupplier<>(storage::resources, time);
+    final Scheduler scheduler = new Scheduler(
+        time, timeoutConfig, stateManager, workflowCache,
+        resourceDecorator, stats, dequeueRateLimiter,
+        styxConfig, resources);
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
