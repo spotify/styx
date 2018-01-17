@@ -20,6 +20,7 @@
 
 package com.spotify.styx.monitoring;
 
+import com.codahale.metrics.Counter;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
@@ -66,6 +67,9 @@ public final class MetricsStats implements Stats {
 
   static final MetricId EXIT_CODE_RATE = BASE
       .tagged("what", "exit-code-rate");
+
+  static final MetricId EXIT_CODE_COUNTER = BASE
+      .tagged("what", "exit-code-counter");
 
   static final MetricId STORAGE_DURATION = BASE
       .tagged("what", "storage-operation-duration")
@@ -144,6 +148,7 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Histogram> dockerOperationHistograms;
   private final ConcurrentMap<String, Meter> dockerOperationMeters;
   private final ConcurrentMap<WorkflowId, Gauge> activeStatesPerWorkflowGauges;
+  private final ConcurrentMap<Tuple2<WorkflowId, Integer>, Counter> exitCodePerWorkflowCounters;
   private final ConcurrentMap<Tuple2<WorkflowId, Integer>, Meter> exitCodePerWorkflowMeters;
   private final ConcurrentMap<Tuple3<String, String, Integer>, Meter> dockerOperationErrorMeters;
   private final ConcurrentMap<String, Histogram> resourceConfiguredHistograms;
@@ -167,6 +172,7 @@ public final class MetricsStats implements Stats {
     this.dockerOperationHistograms = new ConcurrentHashMap<>();
     this.dockerOperationMeters = new ConcurrentHashMap<>();
     this.activeStatesPerWorkflowGauges = new ConcurrentHashMap<>();
+    this.exitCodePerWorkflowCounters = new ConcurrentHashMap<>();
     this.exitCodePerWorkflowMeters = new ConcurrentHashMap<>();
     this.dockerOperationErrorMeters = new ConcurrentHashMap<>();
     this.resourceConfiguredHistograms = new ConcurrentHashMap<>();
@@ -231,6 +237,7 @@ public final class MetricsStats implements Stats {
 
   @Override
   public void recordExitCode(WorkflowId workflowId, int exitCode) {
+    exitCodeCounter(workflowId, exitCode).inc();
     exitCodeMeter(workflowId, exitCode).mark();
   }
 
@@ -287,6 +294,15 @@ public final class MetricsStats implements Stats {
   @Override
   public void recordWorkflowConsumerError() {
     workflowConsumerErrorMeter.mark();
+  }
+
+  private Counter exitCodeCounter(WorkflowId workflowId, int exitCode) {
+    return exitCodePerWorkflowCounters
+        .computeIfAbsent(Tuple.of(workflowId, exitCode), (tuple) ->
+            registry.counter(EXIT_CODE_COUNTER.tagged(
+                "component-id", tuple._1.componentId(),
+                "workflow-id", tuple._1.id(),
+                "exit-code", String.valueOf(tuple._2))));
   }
 
   private Meter exitCodeMeter(WorkflowId workflowId, int exitCode) {

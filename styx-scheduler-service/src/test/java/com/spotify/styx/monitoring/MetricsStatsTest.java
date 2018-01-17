@@ -27,6 +27,7 @@ import static com.spotify.styx.monitoring.MetricsStats.DOCKER_ERROR_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.DOCKER_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.EVENT_CONSUMER_ERROR_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.EVENT_CONSUMER_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_COUNTER;
 import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_MISMATCH;
 import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.NATURAL_TRIGGER_RATE;
@@ -47,6 +48,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.codahale.metrics.Counter;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
@@ -73,6 +75,9 @@ public class MetricsStatsTest {
 
   @Mock
   private Histogram histogram;
+
+  @Mock
+  private Counter counter;
 
   @Mock
   private Meter meter;
@@ -162,11 +167,16 @@ public class MetricsStatsTest {
   @Test
   public void shouldRecordExitCode() throws Exception {
     WorkflowId workflowId = WorkflowId.create("component", "workflow");
+    when(registry.counter(EXIT_CODE_COUNTER.tagged(
+        "component-id", workflowId.componentId(),
+        "workflow-id", workflowId.id(),
+        "exit-code", "0"))).thenReturn(counter);
     when(registry.meter(EXIT_CODE_RATE.tagged(
         "component-id", workflowId.componentId(),
         "workflow-id", workflowId.id(),
         "exit-code", "0"))).thenReturn(meter);
     stats.recordExitCode(workflowId, 0);
+    verify(counter).inc();
     verify(meter).mark();
   }
 
