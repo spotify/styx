@@ -113,7 +113,7 @@ public class Scheduler {
     this.resourceDecorator = Objects.requireNonNull(resourceDecorator);
     this.stats = Objects.requireNonNull(stats);
     this.dequeueRateLimiter = Objects.requireNonNull(dequeueRateLimiter, "dequeueRateLimiter");
-    this.gate = Objects.requireNonNull(gate, "gate");;
+    this.gate = Objects.requireNonNull(gate, "gate");
   }
 
   void tick() {
@@ -234,7 +234,7 @@ public class Scheduler {
       Map<String, Long> currentResourceUsage, InstanceState instance,
       CompletionStage<Optional<ExecutionBlocker>> executionBlockerFuture) {
 
-    // Check for execution blockers
+    // Check for execution blocker
     Optional<ExecutionBlocker> blocker = Optional.empty();
     try {
       blocker = executionBlockerFuture.toCompletableFuture().get(30, TimeUnit.SECONDS);
