@@ -141,6 +141,26 @@ public class StyxScheduler implements AppInit {
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxScheduler.class);
 
+  private final Time time;
+  private final StorageFactory storageFactory;
+  private final DockerRunnerFactory dockerRunnerFactory;
+  private final StatsFactory statsFactory;
+  private final ExecutorFactory executorFactory;
+  private final PublisherFactory publisherFactory;
+  private final RetryUtil retryUtil;
+  private final WorkflowResourceDecorator resourceDecorator;
+  private final EventConsumerFactory eventConsumerFactory;
+  private final WorkflowConsumerFactory workflowConsumerFactory;
+  private final WorkflowExecutionGateFactory executionGateFactory;
+
+  private StateManager stateManager;
+  private Scheduler scheduler;
+  private TriggerManager triggerManager;
+  private BackfillTriggerManager backfillTriggerManager;
+
+  private Consumer<Workflow> workflowRemoveListener;
+  private Consumer<Workflow> workflowChangeListener;
+
   // === Type aliases for dependency injectors ====================================================
   public interface StateFactory extends Function<WorkflowInstance, RunState> { }
   public interface StatsFactory extends Function<Environment, Stats> { }
@@ -251,27 +271,6 @@ public class StyxScheduler implements AppInit {
   }
 
   // ==============================================================================================
-
-  private final Time time;
-  private final StorageFactory storageFactory;
-  private final DockerRunnerFactory dockerRunnerFactory;
-  private final StatsFactory statsFactory;
-  private final ExecutorFactory executorFactory;
-  private final PublisherFactory publisherFactory;
-  private final RetryUtil retryUtil;
-  private final WorkflowResourceDecorator resourceDecorator;
-  private final EventConsumerFactory eventConsumerFactory;
-  private final WorkflowConsumerFactory workflowConsumerFactory;
-  private final WorkflowExecutionGateFactory executionGateFactory;
-
-
-  private StateManager stateManager;
-  private Scheduler scheduler;
-  private TriggerManager triggerManager;
-  private BackfillTriggerManager backfillTriggerManager;
-
-  private Consumer<Workflow> workflowRemoveListener;
-  private Consumer<Workflow> workflowChangeListener;
 
   private StyxScheduler(Builder builder) {
     this.time = requireNonNull(builder.time);
