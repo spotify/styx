@@ -49,6 +49,7 @@ import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -57,6 +58,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,6 +83,8 @@ public class Scheduler {
 
   @VisibleForTesting
   static final String GLOBAL_RESOURCE_ID = "GLOBAL_STYX_CLUSTER";
+
+  static final Duration RESOURCE_EXHAUSTED_RETRY_DELAY = Duration.ofMinutes(1);
 
   private final Time time;
   private final TimeoutConfig ttls;
@@ -230,6 +234,9 @@ public class Scheduler {
       if (messages.size() == 0 || !message.equals(messages.get(messages.size() - 1))) {
         stateManager.receiveIgnoreClosed(Event.info(instance.workflowInstance(), message));
       }
+      stateManager.receiveIgnoreClosed(
+          Event.retryAfter(instance.workflowInstance(),
+          RESOURCE_EXHAUSTED_RETRY_DELAY.toMillis()));
     } else {
       if (!dequeueRateLimiter.tryAcquire()) {
         LOG.debug("Dequeue rate limited");
