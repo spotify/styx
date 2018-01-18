@@ -707,7 +707,7 @@ class DatastoreStorage {
     } catch (TransactionException ex) {
       tx.rollback();
       throw ex;
-    } catch (IOException | DatastoreException ex) {
+    } catch (DatastoreException ex) {
       tx.rollback();
       throw new TransactionException(false, ex);
     } finally {
