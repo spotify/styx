@@ -23,11 +23,10 @@ package com.spotify.styx.storage;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_JSON;
 
-import com.google.cloud.datastore.DatastoreException;
+import com.google.cloud.datastore.DatastoreReaderWriter;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.StringValue;
-import com.google.cloud.datastore.Transaction;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import java.io.IOException;
@@ -36,42 +35,18 @@ import java.util.Optional;
 
 class DatastoreTransactionalStorage implements TransactionalStorage {
 
-  private final Transaction tx;
+  private final DatastoreReaderWriter tx;
   private final DatastoreStorage storage;
 
   DatastoreTransactionalStorage(DatastoreStorage storage,
-      Transaction transaction) {
+      DatastoreReaderWriter transaction) {
     this.storage = Objects.requireNonNull(storage);
     this.tx = Objects.requireNonNull(transaction);
   }
 
   @Override
-  public void commit() throws TransactionException {
-    try {
-      tx.commit();
-    } catch (DatastoreException e) {
-      final boolean conflict = e.getCode() == 10;
-      throw new TransactionException(conflict, e);
-    }
-  }
-
-  @Override
-  public void rollback() throws TransactionException {
-    try {
-      tx.rollback();
-    } catch (DatastoreException e) {
-      throw new TransactionException(false, e);
-    }
-  }
-
-  @Override
-  public boolean isActive() {
-    return tx.isActive();
-  }
-
-  @Override
   public WorkflowId store(Workflow workflow) throws IOException {
-    final Key componentKey = storage.componentKeyFactory.newKey(workflow.componentId());
+    final Key componentKey = storage.getComponentKey((workflow.componentId()));
     if (tx.get(componentKey) == null) {
       tx.put(Entity.newBuilder(componentKey).build());
     }

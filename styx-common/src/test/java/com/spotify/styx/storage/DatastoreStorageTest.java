@@ -36,15 +36,12 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.bigtable.repackaged.com.google.common.collect.ImmutableList;
 import com.google.cloud.datastore.Datastore;
+import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
@@ -53,9 +50,7 @@ import com.google.cloud.datastore.KeyQuery;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
-import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
-import com.google.inject.matcher.Matchers;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -64,6 +59,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.util.TriggerInstantSpec;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -71,15 +67,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.BiFunction;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
@@ -106,11 +99,8 @@ public class DatastoreStorageTest {
   private static LocalDatastoreHelper helper;
   private DatastoreStorage storage;
 
-  @Mock Transaction transaction;
-  @Mock Datastore datastore;
-  @Mock DatastoreTransactionalStorage transactionalStorage;
-  @Mock TransactionFunction<String, FooException> transactionFunction;
-  @Mock BiFunction<DatastoreStorage, Transaction, DatastoreTransactionalStorage> transactionalStorageFactory;
+  @Mock
+  private Datastore datastore;
 
   @BeforeClass
   public static void setUpClass() throws Exception {
@@ -370,7 +360,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void getsGlobalDockerRunnerId() throws Exception {
-    Entity config = Entity.newBuilder(storage.globalConfigKey)
+    Entity config = Entity.newBuilder(storage.getGlobalConfigKey())
         .set(DatastoreStorage.PROPERTY_CONFIG_DOCKER_RUNNER_ID, "foobar")
         .build();
     helper.getOptions().getService().put(config);
@@ -380,7 +370,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldReturnEmptyClientBlacklist() {
-    Entity config = Entity.newBuilder(storage.globalConfigKey)
+    Entity config = Entity.newBuilder(storage.getGlobalConfigKey())
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
             ImmutableList.of()).build();
     helper.getOptions().getService().put(config);
@@ -389,7 +379,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldReturnClientBlacklist() {
-    Entity config = Entity.newBuilder(storage.globalConfigKey)
+    Entity config = Entity.newBuilder(storage.getGlobalConfigKey())
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
             ImmutableList.of(StringValue.of("v1"), StringValue.of("v2"), StringValue.of("v3")))
         .build();
@@ -508,48 +498,23 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void runInTransactionShouldCallFunctionAndCommit() throws Exception {
-    when(datastore.newKeyFactory()).thenReturn(new KeyFactory("foo", "bar"));
-    final DatastoreStorage storage = new DatastoreStorage(
-        datastore, Duration.ZERO, transactionalStorageFactory);
-    when(transactionalStorageFactory.apply(storage, transaction))
-        .thenReturn(transactionalStorage);
-    when(datastore.newTransaction()).thenReturn(transaction);
-    when(transactionFunction.apply(any())).thenReturn("foo");
-
-    String result = storage.runInTransaction(transactionFunction);
-
-    assertThat(result, is("foo"));
-    verify(transactionFunction).apply(transactionalStorage);
-    verify(transactionalStorage).commit();
-    verify(transactionalStorage, never()).rollback();
+  public void basicRunInTransaction() throws Exception {
+    TransactionFunction<String, Exception> f = (tx) -> "foo";
+    final String string = storage.runInTransaction(f);
+    assertThat(string, is("foo"));
   }
 
-  @Test
-  public void runInTransactionShouldCallFunctionAndRollbackOnFailure() throws Exception {
-    when(datastore.newKeyFactory()).thenReturn(new KeyFactory("foo", "bar"));
-    final DatastoreStorage storage = new DatastoreStorage(
-        datastore, Duration.ZERO, transactionalStorageFactory);
-    when(transactionalStorageFactory.apply(storage, transaction))
-        .thenReturn(transactionalStorage);
-    when(datastore.newTransaction()).thenReturn(transaction);
-    final Exception expectedException = new FooException();
-    when(transactionFunction.apply(any())).thenThrow(expectedException);
-    when(transactionalStorage.isActive()).thenReturn(true);
-
-    try {
-      storage.runInTransaction(transactionFunction);
-      fail("Expected exception!");
-    } catch (FooException e) {
-      assertThat(e, is(expectedException));
-    }
-
-    verify(transactionFunction).apply(transactionalStorage);
-    verify(transactionalStorage, never()).commit();
-    verify(transactionalStorage).rollback();
+  @Test(expected = TransactionException.class)
+  public void shouldThrowIfDatastoreError() throws Exception {
+    when(datastore.runInTransaction(any())).thenThrow(new DatastoreException(10, "", ""));
+    DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO);
+    TransactionFunction<String, IOException> f = (tx) -> "foo";
+    storage.runInTransaction(f);
   }
 
-  private static class FooException extends Exception {
-
+  @Test(expected = IOException.class)
+  public void shouldThrowIfUnknownErrorInFunction() throws Exception {
+    TransactionFunction<String, IOException> f = (tx) -> { throw new IOException(); };
+    storage.runInTransaction(f);
   }
 }

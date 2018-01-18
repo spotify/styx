@@ -30,7 +30,6 @@ import com.google.cloud.datastore.DatastoreReader;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
-import com.google.cloud.datastore.KeyFactory;
 import com.google.cloud.datastore.PathElement;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
@@ -38,7 +37,6 @@ import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
 import com.google.cloud.datastore.StructuredQuery.Filter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
-import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.Value;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
@@ -70,8 +68,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,28 +121,22 @@ class DatastoreStorage {
 
   private final Datastore datastore;
   private final Duration retryBaseDelay;
-  private final BiFunction<DatastoreStorage, Transaction, DatastoreTransactionalStorage> transactionalStorageFactory;
-  final KeyFactory componentKeyFactory;
-
-  @VisibleForTesting
-  final Key globalConfigKey;
 
   DatastoreStorage(Datastore datastore, Duration retryBaseDelay) {
-    this(datastore, retryBaseDelay, DatastoreTransactionalStorage::new);
-  }
-
-  DatastoreStorage(Datastore datastore, Duration retryBaseDelay,
-      BiFunction<DatastoreStorage, Transaction, DatastoreTransactionalStorage> transactionalStorageFactory) {
     this.datastore = Objects.requireNonNull(datastore);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
-    this.transactionalStorageFactory = Objects.requireNonNull(transactionalStorageFactory);
+  }
 
-    this.componentKeyFactory = datastore.newKeyFactory().setKind(KIND_COMPONENT);
-    this.globalConfigKey = datastore.newKeyFactory().setKind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
+  Key getComponentKey(String componentId) {
+    return datastore.newKeyFactory().setKind(KIND_COMPONENT).newKey(componentId);
+  }
+
+  Key getGlobalConfigKey() {
+    return datastore.newKeyFactory().setKind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
   }
 
   StyxConfig config() {
-    final Entity entity = asBuilderOrNew(getOpt(datastore, globalConfigKey), globalConfigKey)
+    final Entity entity = asBuilderOrNew(getOpt(datastore, getGlobalConfigKey()), getGlobalConfigKey())
         .build();
     return entityToConfig(entity);
   }
@@ -304,7 +294,7 @@ class DatastoreStorage {
   }
 
   public List<Workflow> workflows(String componentId) throws IOException {
-    final Key componentKey = componentKeyFactory.newKey(componentId);
+    final Key componentKey = getComponentKey(componentId);
 
     final List<Workflow> workflows = Lists.newArrayList();
     final EntityQuery query = Query.newEntityQueryBuilder()
@@ -405,8 +395,8 @@ class DatastoreStorage {
     final Optional<Entity> workflowEntity = getOpt(datastore, workflowKey(workflowId));
 
     builder.enabled(workflowEntity.filter(w -> w.contains(PROPERTY_WORKFLOW_ENABLED))
-                        .map(workflow -> workflow.getBoolean(PROPERTY_WORKFLOW_ENABLED))
-                        .orElse(DEFAULT_WORKFLOW_ENABLED));
+        .map(workflow -> workflow.getBoolean(PROPERTY_WORKFLOW_ENABLED))
+        .orElse(DEFAULT_WORKFLOW_ENABLED));
     getOptInstantProperty(workflowEntity, PROPERTY_NEXT_NATURAL_TRIGGER)
         .ifPresent(builder::nextNaturalTrigger);
     getOptInstantProperty(workflowEntity, PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER)
@@ -611,7 +601,7 @@ class DatastoreStorage {
 
   List<Backfill> getBackfillsForComponent(boolean showAll, String component) {
     final EntityQuery query = backfillQueryBuilder(showAll,
-                                                   PropertyFilter.eq(PROPERTY_COMPONENT, component))
+        PropertyFilter.eq(PROPERTY_COMPONENT, component))
         .build();
 
     return backfillsForQuery(query);
@@ -619,7 +609,7 @@ class DatastoreStorage {
 
   List<Backfill> getBackfillsForWorkflow(boolean showAll, String workflow) {
     final EntityQuery query = backfillQueryBuilder(showAll,
-                                                   PropertyFilter.eq(PROPERTY_WORKFLOW, workflow))
+        PropertyFilter.eq(PROPERTY_WORKFLOW, workflow))
         .build();
 
     return backfillsForQuery(query);
@@ -637,7 +627,7 @@ class DatastoreStorage {
 
   private Backfill entityToBackfill(Entity entity) {
     final WorkflowId workflowId = WorkflowId.create(entity.getString(PROPERTY_COMPONENT),
-                                                    entity.getString(PROPERTY_WORKFLOW));
+        entity.getString(PROPERTY_WORKFLOW));
 
     final BackfillBuilder builder = Backfill.newBuilder()
         .id(entity.getKey().getName())
@@ -689,8 +679,8 @@ class DatastoreStorage {
 
   private <T> Optional<T> readOpt(Entity entity, String property) {
     return entity.contains(property)
-        ? Optional.of(entity.<Value<T>>getValue(property).get())
-        : Optional.empty();
+           ? Optional.of(entity.<Value<T>>getValue(property).get())
+           : Optional.empty();
   }
 
   private <T> T read(Entity entity, String property, T defaultValue) {
@@ -698,29 +688,16 @@ class DatastoreStorage {
   }
 
   public <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
-      throws TransactionException, E {
-    final TransactionalStorage tx = newTransaction();
+      throws TransactionException {
     try {
-      final T value = f.apply(tx);
-      tx.commit();
-      return value;
-    } catch (DatastoreException ex) {
-      tx.rollback();
-      throw new TransactionException(false, ex);
-    } finally {
-      if (tx.isActive()) {
-        tx.rollback();
-      }
-    }
-  }
-
-  public TransactionalStorage newTransaction() throws TransactionException {
-    final Transaction transaction;
-    try {
-      transaction = datastore.newTransaction();
+      return datastore.runInTransaction(tx -> {
+        final DatastoreTransactionalStorage transactionalStorage =
+            new DatastoreTransactionalStorage(this, tx);
+        return f.apply(transactionalStorage);
+      });
     } catch (DatastoreException e) {
-      throw new TransactionException(false, e);
+      final boolean conflict = e.getCode() == 10;
+      throw new TransactionException(conflict, e);
     }
-    return transactionalStorageFactory.apply(this, transaction);
   }
 }
