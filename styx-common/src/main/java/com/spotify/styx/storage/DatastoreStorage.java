@@ -38,6 +38,7 @@ import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
 import com.google.cloud.datastore.StructuredQuery.Filter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
+import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.Value;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
@@ -69,6 +70,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -122,14 +125,21 @@ class DatastoreStorage {
 
   private final Datastore datastore;
   private final Duration retryBaseDelay;
+  private final BiFunction<DatastoreStorage, Transaction, DatastoreTransactionalStorage> transactionalStorageFactory;
   final KeyFactory componentKeyFactory;
 
   @VisibleForTesting
   final Key globalConfigKey;
 
   DatastoreStorage(Datastore datastore, Duration retryBaseDelay) {
+    this(datastore, retryBaseDelay, DatastoreTransactionalStorage::new);
+  }
+
+  DatastoreStorage(Datastore datastore, Duration retryBaseDelay,
+      BiFunction<DatastoreStorage, Transaction, DatastoreTransactionalStorage> transactionalStorageFactory) {
     this.datastore = Objects.requireNonNull(datastore);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
+    this.transactionalStorageFactory = Objects.requireNonNull(transactionalStorageFactory);
 
     this.componentKeyFactory = datastore.newKeyFactory().setKind(KIND_COMPONENT);
     this.globalConfigKey = datastore.newKeyFactory().setKind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
@@ -697,7 +707,7 @@ class DatastoreStorage {
     } catch (TransactionException ex) {
       tx.rollback();
       throw ex;
-    } catch (Exception ex) {
+    } catch (IOException | DatastoreException ex) {
       tx.rollback();
       throw new TransactionException(false, ex);
     } finally {
@@ -708,10 +718,12 @@ class DatastoreStorage {
   }
 
   public TransactionalStorage newTransaction() throws TransactionException {
+    final Transaction transaction;
     try {
-      return new DatastoreTransactionalStorage(this, datastore.newTransaction());
+      transaction = datastore.newTransaction();
     } catch (DatastoreException e) {
       throw new TransactionException(false, e);
     }
+    return transactionalStorageFactory.apply(this, transaction);
   }
 }
