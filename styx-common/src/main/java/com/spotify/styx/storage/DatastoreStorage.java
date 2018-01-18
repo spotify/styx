@@ -699,14 +699,11 @@ class DatastoreStorage {
 
   public <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
       throws TransactionException, E {
-    TransactionalStorage tx = newTransaction();
+    final TransactionalStorage tx = newTransaction();
     try {
-      T value = f.apply(tx);
+      final T value = f.apply(tx);
       tx.commit();
       return value;
-    } catch (TransactionException ex) {
-      tx.rollback();
-      throw ex;
     } catch (DatastoreException ex) {
       tx.rollback();
       throw new TransactionException(false, ex);
