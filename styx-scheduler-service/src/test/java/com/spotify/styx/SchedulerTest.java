@@ -34,11 +34,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.RateLimiter;
+import com.spotify.futures.CompletableFutures;
+import com.spotify.styx.WorkflowExecutionGate.ExecutionBlocker;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
@@ -59,13 +62,16 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -101,10 +107,14 @@ public class SchedulerTest {
   @Mock RateLimiter rateLimiter;
   @Mock Stats stats;
   @Mock StyxConfig config;
+  @Mock WorkflowExecutionGate gate;
 
   @Before
   public void setUp() throws Exception {
     when(rateLimiter.tryAcquire()).thenReturn(true);
+
+    when(gate.executionBlocker(any()))
+        .thenReturn(WorkflowExecutionGate.NO_BLOCKER);
   }
 
   @After
@@ -112,7 +122,7 @@ public class SchedulerTest {
     executor.shutdownNow();
   }
 
-  private void setUp(int timeoutSeconds) throws IsClosedException, IOException {
+  private void setUp(long timeoutSeconds) throws IsClosedException, IOException {
     workflowCache = new InMemWorkflowCache();
     TimeoutConfig timeoutConfig = createWithDefaultTtl(ofSeconds(timeoutSeconds));
 
@@ -127,7 +137,7 @@ public class SchedulerTest {
 
     stateManager = Mockito.spy(new SyncStateManager());
     scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage, resourceDecorator,
-                              stats, rateLimiter);
+                              stats, rateLimiter, gate);
   }
 
   private void setResourceLimit(String resourceId, long limit) {
@@ -613,6 +623,84 @@ public class SchedulerTest {
     assertThat(countInState(State.QUEUED), is(1));
   }
 
+  @Test
+  public void shouldRetryLaterOnExecutionBlockers() throws Exception {
+    when(config.executionGatingEnabled()).thenReturn(true);
+
+    final ExecutionBlocker blocker = ExecutionBlocker.of("missing dep", Duration.ofMinutes(17));
+    when(gate.executionBlocker(any())).thenReturn(
+        CompletableFuture.completedFuture(Optional.of(blocker)));
+
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+
+    setUp(TimeUnit.DAYS.toSeconds(2));
+    initWorkflow(workflow);
+
+    final StateData stateData = StateData.newBuilder().tries(0).build();
+    final RunState runState = RunState.create(INSTANCE, State.QUEUED, stateData, time);
+
+    stateManager.initialize(runState);
+
+    scheduler.tick();
+
+    verify(gate).executionBlocker(INSTANCE);
+    verify(stateManager).receive(Event.retryAfter(INSTANCE, blocker.delay().toMillis()));
+    verify(stateManager, never()).receive(Event.dequeue(INSTANCE));
+
+    now = now.plus(blocker.delay());
+    when(gate.executionBlocker(any())).thenReturn(WorkflowExecutionGate.NO_BLOCKER);
+
+    scheduler.tick();
+
+    verify(gate, times(2)).executionBlocker(INSTANCE);
+
+    verify(stateManager).receive(Event.dequeue(INSTANCE));
+  }
+
+  @Test
+  public void shouldNotGateExecutionIfDisabled() throws Exception {
+    when(config.executionGatingEnabled()).thenReturn(false);
+
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+
+    setUp(20);
+    initWorkflow(workflow);
+
+    final StateData stateData = StateData.newBuilder().tries(0).build();
+    final RunState runState = RunState.create(INSTANCE, State.QUEUED, stateData, time);
+
+    stateManager.initialize(runState);
+
+    scheduler.tick();
+
+    verify(stateManager).receive(Event.dequeue(INSTANCE));
+    verifyZeroInteractions(gate);
+  }
+
+  @Test
+  public void shouldIgnoreGatingFailure() throws Exception {
+    when(config.executionGatingEnabled()).thenReturn(true);
+
+    when(gate.executionBlocker(any())).thenReturn(
+        CompletableFutures.exceptionallyCompletedFuture(new Exception()));
+
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+
+    setUp(20);
+    initWorkflow(workflow);
+
+    final StateData stateData = StateData.newBuilder().tries(0).build();
+    final RunState runState = RunState.create(INSTANCE, State.QUEUED, stateData, time);
+
+    stateManager.initialize(runState);
+
+    scheduler.tick();
+
+    verify(gate).executionBlocker(INSTANCE);
+
+    verify(stateManager).receive(Event.dequeue(INSTANCE));
+    verifyZeroInteractions(gate);
+  }
 
   private WorkflowInstance instance(WorkflowId id, String instanceId) {
     return WorkflowInstance.create(id, instanceId);

@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.WorkflowExecutionGate.NOOP;
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
@@ -35,8 +36,10 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.RateLimiter;
+import com.spotify.styx.WorkflowExecutionGate.ExecutionBlocker;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -56,7 +59,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,6 +89,8 @@ public class Scheduler {
   @VisibleForTesting
   static final String GLOBAL_RESOURCE_ID = "GLOBAL_STYX_CLUSTER";
 
+  private static final int SCHEDULING_BATCH_SIZE = 32;
+
   private final Time time;
   private final TimeoutConfig ttls;
   private final StateManager stateManager;
@@ -90,11 +99,12 @@ public class Scheduler {
   private final WorkflowResourceDecorator resourceDecorator;
   private final Stats stats;
   private final RateLimiter dequeueRateLimiter;
+  private final WorkflowExecutionGate gate;
 
   public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager,
       WorkflowCache workflowCache, Storage storage,
       WorkflowResourceDecorator resourceDecorator,
-      Stats stats, RateLimiter dequeueRateLimiter) {
+      Stats stats, RateLimiter dequeueRateLimiter, WorkflowExecutionGate gate) {
     this.time = Objects.requireNonNull(time);
     this.ttls = Objects.requireNonNull(ttls);
     this.stateManager = Objects.requireNonNull(stateManager);
@@ -103,14 +113,17 @@ public class Scheduler {
     this.resourceDecorator = Objects.requireNonNull(resourceDecorator);
     this.stats = Objects.requireNonNull(stats);
     this.dequeueRateLimiter = Objects.requireNonNull(dequeueRateLimiter, "dequeueRateLimiter");
+    this.gate = Objects.requireNonNull(gate, "gate");
   }
 
   void tick() {
     final Map<String, Resource> resources;
     final Optional<Long> globalConcurrency;
+    final StyxConfig config;
     try {
       resources = storage.resources().stream().collect(toMap(Resource::id, identity()));
-      globalConcurrency = storage.config().globalConcurrency();
+      config = storage.config();
+      globalConcurrency = config.globalConcurrency();
     } catch (IOException e) {
       LOG.warn("Failed to get resource limits", e);
       return;
@@ -159,15 +172,42 @@ public class Scheduler {
 
     timedOutInstances.forEach(this::sendTimeout);
 
-    for (InstanceState eligibleInstance : eligibleInstances) {
-      final boolean proceed = limitAndDequeue(
-          resources, workflowResourceReferences, currentResourceUsage, eligibleInstance);
-      if (!proceed) {
-        break;
-      }
-    }
+    limitAndDequeue(config, resources, workflowResourceReferences, currentResourceUsage,
+        eligibleInstances);
 
     updateStats(resources, currentResourceUsage);
+  }
+
+  private void limitAndDequeue(
+      StyxConfig config,
+      Map<String, Resource> resources,
+      Map<WorkflowId, Set<String>> workflowResourceReferences,
+      Map<String, Long> currentResourceUsage, List<InstanceState> eligibleInstances) {
+
+    // Enable gating unless disabled in runtime config
+    final WorkflowExecutionGate gate = config.executionGatingEnabled() ? this.gate : NOOP;
+
+    // Process the eligible instances in batches in order to parallelize execution blocker lookup
+    for (List<InstanceState> batch : Lists.partition(eligibleInstances, SCHEDULING_BATCH_SIZE)) {
+
+      // Asynchronously look up execution blockers for a batch of instances
+      final List<CompletionStage<Optional<ExecutionBlocker>>> blockers = batch.stream()
+          .map(InstanceState::workflowInstance)
+          .map(gate::executionBlocker)
+          .collect(toList());
+
+      // Evaluate each instance in the batch for dequeuing
+      for (int i = 0; i < batch.size(); i++) {
+
+        final boolean proceed = limitAndDequeue(resources, workflowResourceReferences,
+            currentResourceUsage, batch.get(i), blockers.get(i));
+
+        // Stop processing if rate limit was hit or thread was interrupted
+        if (!proceed) {
+          return;
+        }
+      }
+    }
   }
 
   /**
@@ -191,7 +231,29 @@ public class Scheduler {
 
   private boolean limitAndDequeue(Map<String, Resource> resources,
       Map<WorkflowId, Set<String>> workflowResourceReferences,
-      Map<String, Long> currentResourceUsage, InstanceState instance) {
+      Map<String, Long> currentResourceUsage, InstanceState instance,
+      CompletionStage<Optional<ExecutionBlocker>> executionBlockerFuture) {
+
+    // Check for execution blocker
+    Optional<ExecutionBlocker> blocker = Optional.empty();
+    try {
+      blocker = executionBlockerFuture.toCompletableFuture().get(30, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      LOG.debug("Interrupted");
+      return false;
+    } catch (ExecutionException | TimeoutException e) {
+      LOG.warn("Failed to check execution blocker for {}, assuming there is no blocker",
+          instance.workflowInstance(), e);
+    }
+
+    if (blocker.isPresent()) {
+      stateManager.receiveIgnoreClosed(Event.retryAfter(
+          instance.workflowInstance(),
+          blocker.get().delay().toMillis()));
+      LOG.debug("Dequeue rescheduled: {}: {}", instance.workflowInstance(), blocker.get());
+      return true;
+    }
+
     final Set<String> workflowResourceRefs =
         workflowResourceReferences.getOrDefault(instance.workflowInstance().workflowId(), emptySet());
 
