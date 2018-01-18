@@ -20,19 +20,46 @@
 
 package com.spotify.styx.storage;
 
-import com.spotify.styx.util.TransactionFailedException;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowId;
+import java.io.IOException;
 
 /**
- * The interface to the persistence layer where the same transaction can be used across storage operations.
- * A new {@link TransactionalStorage} object has to be created for each transaction, and the method
- * {@link TransactionalStorage#commit()} must be called explicitly to commit the storage operations.
+ * The interface to the persistence layer where the same transaction can be used across storage
+ * operations.
+ *
+ * <p>Use the {@link Storage#runInTransaction(TransactionFunction)} method for automatic
+ * commit/rollback handling.
+ *
+ * <p>For manual transaction handling, create a new {@link TransactionalStorage} using
+ * {@link Storage#newTransaction()} and call {@link TransactionalStorage#commit()} after the desired storage
+ * operation calls.
  */
 public interface TransactionalStorage {
 
   /**
-   * This should commit or rollback all the storage operations previously called.
+   * Stores a Workflow definition.
    *
-   * @throws TransactionFailedException if the commit fails and the rollback is performed
+   * @param workflow the workflow to store
    */
-  void commit() throws TransactionFailedException;
+  WorkflowId store(Workflow workflow) throws IOException;
+
+  /**
+   * Commit all the storage operations previously called.
+   *
+   * @throws TransactionException if the commit fails.
+   */
+  void commit() throws TransactionException;
+
+  /**
+   * Roll back the transaction.
+   *
+   * @throws TransactionException if rollback fails.
+   */
+  void rollback() throws TransactionException;
+
+  /**
+   * Check if this transaction is still active (not yet committed or rolled back).
+   */
+  boolean isActive();
 }

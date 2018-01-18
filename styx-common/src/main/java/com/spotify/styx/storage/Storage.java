@@ -261,5 +261,7 @@ public interface Storage {
    *
    * @return the {@link TransactionalStorage} instance
    */
-  TransactionalStorage newTransactionalStorage();
+  TransactionalStorage newTransaction() throws IOException;
+
+  <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f) throws IOException, E;
 }

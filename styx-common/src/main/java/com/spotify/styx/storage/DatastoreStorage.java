@@ -122,7 +122,7 @@ class DatastoreStorage {
 
   private final Datastore datastore;
   private final Duration retryBaseDelay;
-  private final KeyFactory componentKeyFactory;
+  final KeyFactory componentKeyFactory;
 
   @VisibleForTesting
   final Key globalConfigKey;
@@ -183,22 +183,8 @@ class DatastoreStorage {
     return enabledWorkflows;
   }
 
-  void store(Workflow workflow) throws IOException {
-    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
-      final Key componentKey = componentKeyFactory.newKey(workflow.componentId());
-      if (transaction.get(componentKey) == null) {
-        transaction.put(Entity.newBuilder(componentKey).build());
-      }
-
-      final String json = OBJECT_MAPPER.writeValueAsString(workflow);
-      final Key workflowKey = workflowKey(workflow.id());
-      final Optional<Entity> workflowOpt = getOpt(transaction, workflowKey);
-      final Entity workflowEntity = asBuilderOrNew(workflowOpt, workflowKey)
-          .set(PROPERTY_WORKFLOW_JSON, StringValue.newBuilder(json).setExcludeFromIndexes(true).build())
-          .build();
-
-      return transaction.put(workflowEntity);
-    }));
+  WorkflowId store(Workflow workflow) throws IOException {
+    return storeWithRetries(() -> runInTransaction(tx -> tx.store(workflow)));
   }
 
   Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
@@ -449,7 +435,7 @@ class DatastoreStorage {
     throw new IOException("This should never happen");
   }
 
-  private Key workflowKey(WorkflowId workflowId) {
+  Key workflowKey(WorkflowId workflowId) {
     return datastore.newKeyFactory()
         .addAncestor(PathElement.of(KIND_COMPONENT, workflowId.componentId()))
         .setKind(KIND_WORKFLOW)
@@ -494,7 +480,7 @@ class DatastoreStorage {
    * @param key              The key to get
    * @return an optional containing the entity if it existed, empty otherwise.
    */
-  private Optional<Entity> getOpt(DatastoreReader datastoreReader, Key key) {
+  Optional<Entity> getOpt(DatastoreReader datastoreReader, Key key) {
     return Optional.ofNullable(datastoreReader.get(key));
   }
 
@@ -516,7 +502,7 @@ class DatastoreStorage {
    * @param key        The key for which to create a new builder if the entity is not present
    * @return an entity builder either based of the given entity or a new one using the key.
    */
-  private Entity.Builder asBuilderOrNew(Optional<Entity> entityOpt, Key key) {
+  Entity.Builder asBuilderOrNew(Optional<Entity> entityOpt, Key key) {
     return entityOpt
         .map(c -> Entity.newBuilder(c))
         .orElse(Entity.newBuilder(key));
@@ -699,5 +685,33 @@ class DatastoreStorage {
 
   private <T> T read(Entity entity, String property, T defaultValue) {
     return this.<T>readOpt(entity, property).orElse(defaultValue);
+  }
+
+  public <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
+      throws TransactionException, E {
+    TransactionalStorage tx = newTransaction();
+    try {
+      T value = f.apply(tx);
+      tx.commit();
+      return value;
+    } catch (TransactionException ex) {
+      tx.rollback();
+      throw ex;
+    } catch (Exception ex) {
+      tx.rollback();
+      throw new TransactionException(false, ex);
+    } finally {
+      if (tx.isActive()) {
+        tx.rollback();
+      }
+    }
+  }
+
+  public TransactionalStorage newTransaction() throws TransactionException {
+    try {
+      return new DatastoreTransactionalStorage(this, datastore.newTransaction());
+    } catch (DatastoreException e) {
+      throw new TransactionException(false, e);
+    }
   }
 }

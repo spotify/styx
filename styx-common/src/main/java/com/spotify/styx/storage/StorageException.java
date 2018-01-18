@@ -1,8 +1,8 @@
-/*-
+/*
  * -\-\-
- * Spotify Styx Common
+ * Spotify Styx Scheduler Service
  * --
- * Copyright (C) 2016 - 2018 Spotify AB
+ * Copyright (C) 2018 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,13 +18,21 @@
  * -/-/-
  */
 
-package com.spotify.styx.util;
+package com.spotify.styx.storage;
 
-import com.spotify.styx.storage.TransactionalStorage;
 import java.io.IOException;
 
-/**
- * Exception that signal that a transaction from {@link TransactionalStorage} failed
- */
-public class TransactionFailedException extends IOException {
+public class StorageException extends IOException {
+
+  public StorageException(String message) {
+    super(message);
+  }
+
+  public StorageException(String message, Throwable cause) {
+    super(message, cause);
+  }
+
+  public StorageException(Throwable cause) {
+    super(cause);
+  }
 }

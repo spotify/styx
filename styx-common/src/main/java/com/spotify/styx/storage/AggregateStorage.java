@@ -49,12 +49,10 @@ public class AggregateStorage implements Storage {
 
   private final BigtableStorage bigtableStorage;
   private final DatastoreStorage datastoreStorage;
-  private final Supplier<DatastoreTransactionalStorage> transactionSupplier;
 
   public AggregateStorage(Connection connection, Datastore datastore, Duration retryBaseDelay) {
     this.bigtableStorage = new BigtableStorage(connection, retryBaseDelay);
     this.datastoreStorage = new DatastoreStorage(datastore, retryBaseDelay);
-    this.transactionSupplier =  () -> new DatastoreTransactionalStorage(datastore.newTransaction());
   }
 
   @Override
@@ -228,7 +226,13 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public TransactionalStorage newTransactionalStorage() {
-    return transactionSupplier.get();
+  public TransactionalStorage newTransaction() throws TransactionException {
+    return datastoreStorage.newTransaction();
+  }
+
+  @Override
+  public <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
+      throws IOException, E {
+    return datastoreStorage.runInTransaction(f);
   }
 }

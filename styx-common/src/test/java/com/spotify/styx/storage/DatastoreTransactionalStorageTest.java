@@ -28,16 +28,21 @@ import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.KeyFactory;
 import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
-import com.spotify.styx.util.TransactionFailedException;
 import java.io.IOException;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.runners.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.class)
 public class DatastoreTransactionalStorageTest {
 
   private static LocalDatastoreHelper helper;
   private static Datastore datastore;
+
+  @Mock DatastoreStorage storage;
 
   @BeforeClass
   public static void setUpClass() throws Exception {
@@ -53,28 +58,28 @@ public class DatastoreTransactionalStorageTest {
   @Test
   public void shouldCommitEmptyTransaction() throws IOException {
     final Transaction transaction = datastore.newTransaction();
-    DatastoreTransactionalStorage transactionalStorage = new DatastoreTransactionalStorage(transaction);
+    DatastoreTransactionalStorage transactionalStorage = new DatastoreTransactionalStorage(storage, transaction);
     transactionalStorage.commit();
     assertFalse(transaction.isActive());
   }
 
-  @Test(expected = RuntimeException.class)
+  @Test(expected = TransactionException.class)
   public void shouldThrowIfUnexpectedDatastoreError() throws IOException {
     final Transaction transaction = datastore.newTransaction();
-    DatastoreTransactionalStorage transactionalStorage = new DatastoreTransactionalStorage(transaction);
+    DatastoreTransactionalStorage transactionalStorage = new DatastoreTransactionalStorage(storage, transaction);
 
     transaction.rollback();
     transactionalStorage.commit();
   }
 
-  @Test(expected = TransactionFailedException.class)
-  public void shouldThrowIfTransactionFailed() throws TransactionFailedException {
+  @Test(expected = TransactionException.class)
+  public void shouldThrowIfTransactionFailed() throws TransactionException {
     Transaction transaction1 = datastore.newTransaction();
     Transaction transaction2 = datastore.newTransaction();
     Transaction transaction3 = datastore.newTransaction();
-    DatastoreTransactionalStorage transactionalStorage1 = new DatastoreTransactionalStorage(transaction1);
-    DatastoreTransactionalStorage transactionalStorage2 = new DatastoreTransactionalStorage(transaction2);
-    DatastoreTransactionalStorage transactionalStorage3 = new DatastoreTransactionalStorage(transaction3);
+    DatastoreTransactionalStorage transactionalStorage1 = new DatastoreTransactionalStorage(storage, transaction1);
+    DatastoreTransactionalStorage transactionalStorage2 = new DatastoreTransactionalStorage(storage, transaction2);
+    DatastoreTransactionalStorage transactionalStorage3 = new DatastoreTransactionalStorage(storage, transaction3);
 
     // Store first entity
     KeyFactory keyFactory1 = datastore.newKeyFactory().setKind("MyKind");
