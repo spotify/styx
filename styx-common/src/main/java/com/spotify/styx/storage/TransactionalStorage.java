@@ -28,7 +28,7 @@ import java.io.IOException;
  * The interface to the persistence layer where the same transaction can be used across storage
  * operations.
  *
- * <p>Use the {@link Storage#runInTransaction(TransactionFunction)} method for automatic
+ * <p>Use the {@link Storage#runInTransaction(ThrowingTransactionFunction)} method for automatic
  * commit/rollback handling.
  */
 public interface TransactionalStorage {

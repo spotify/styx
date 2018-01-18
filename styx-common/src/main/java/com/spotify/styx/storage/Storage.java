@@ -264,6 +264,6 @@ public interface Storage {
    * @throws E                    If an exception is thrown from the function
    * @throws TransactionException If the transaction is unsuccessful, for conflict or other reasons
    */
-  <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
+  <T, E extends Exception> T runInTransaction(ThrowingTransactionFunction<T, E> f)
       throws E, TransactionException;
 }

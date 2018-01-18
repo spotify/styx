@@ -45,7 +45,6 @@ import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
-import com.google.cloud.datastore.KeyFactory;
 import com.google.cloud.datastore.KeyQuery;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
@@ -499,7 +498,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void basicRunInTransaction() throws Exception {
-    TransactionFunction<String, Exception> f = (tx) -> "foo";
+    ThrowingTransactionFunction<String, Exception> f = (tx) -> "foo";
     final String string = storage.runInTransaction(f);
     assertThat(string, is("foo"));
   }
@@ -508,13 +507,13 @@ public class DatastoreStorageTest {
   public void shouldThrowIfDatastoreError() throws Exception {
     when(datastore.runInTransaction(any())).thenThrow(new DatastoreException(10, "", ""));
     DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO);
-    TransactionFunction<String, IOException> f = (tx) -> "foo";
+    ThrowingTransactionFunction<String, IOException> f = (tx) -> "foo";
     storage.runInTransaction(f);
   }
 
   @Test(expected = IOException.class)
   public void shouldThrowIfUnknownErrorInFunction() throws Exception {
-    TransactionFunction<String, IOException> f = (tx) -> { throw new IOException(); };
+    ThrowingTransactionFunction<String, IOException> f = (tx) -> { throw new IOException(); };
     storage.runInTransaction(f);
   }
 }

@@ -20,7 +20,7 @@
 
 package com.spotify.styx.storage;
 
-public interface TransactionFunction<T, E extends Exception> {
+public interface TransactionFunction<T> {
 
-  T apply(TransactionalStorage tx) throws E;
+  T apply(TransactionalStorage tx) ;
 }

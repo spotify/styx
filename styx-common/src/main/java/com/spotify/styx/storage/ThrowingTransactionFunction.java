@@ -20,9 +20,7 @@
 
 package com.spotify.styx.storage;
 
-import java.io.IOException;
+public interface ThrowingTransactionFunction<T, E extends Exception> {
 
-public interface ThrowingTransactionFunction<T, X extends Exception> {
-
-  T apply(TransactionalStorage tx) throws IOException, X;
+  T apply(TransactionalStorage tx) throws E;
 }
