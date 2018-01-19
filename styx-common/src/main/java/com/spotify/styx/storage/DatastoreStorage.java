@@ -397,14 +397,18 @@ class DatastoreStorage {
           .set(PROPERTY_COMPONENT, workflowInstance.workflowId().componentId())
           .set(PROPERTY_WORKFLOW, workflowInstance.workflowId().id())
           .set(PROPERTY_PARAMETER, workflowInstance.parameter())
-          .set(PROPERTY_COUNTER, state.counter())
-          // Although these fields are @Nullable they should not be null when passed in to this method
-          .set(PROPERTY_STATE, state.state().toString())
-          .set(PROPERTY_STATE_TIMESTAMP, state.timestamp().toEpochMilli())
-          .set(PROPERTY_STATE_DATA, StringValue
-              .newBuilder(OBJECT_MAPPER.writeValueAsString(state.data()))
-              .setExcludeFromIndexes(true)
-              .build());
+          .set(PROPERTY_COUNTER, state.counter());
+
+      // TODO: always write these fields when event-only replay tests have been removed
+      if (state.state() != null) {
+        entity
+            .set(PROPERTY_STATE, state.state().toString())
+            .set(PROPERTY_STATE_TIMESTAMP, state.timestamp().toEpochMilli())
+            .set(PROPERTY_STATE_DATA, StringValue
+                .newBuilder(OBJECT_MAPPER.writeValueAsString(state.data()))
+                .setExcludeFromIndexes(true)
+                .build());
+      }
 
       return datastore.put(entity.build());
     });
