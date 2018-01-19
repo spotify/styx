@@ -448,10 +448,10 @@ public abstract class RunState {
       WorkflowInstance workflowInstance,
       State state,
       StateData stateData,
-      long timestamp,
+      Instant timestamp,
       OutputHandler... outputHandler) {
     return new AutoValue_RunState(
-        workflowInstance, state, timestamp, stateData, Instant::now, fanOutput(outputHandler));
+        workflowInstance, state, timestamp.toEpochMilli(), stateData, Instant::now, fanOutput(outputHandler));
   }
 
   public static RunState create(

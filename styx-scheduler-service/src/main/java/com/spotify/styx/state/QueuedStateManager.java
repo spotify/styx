@@ -29,6 +29,7 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.IsClosedException;
@@ -324,7 +325,7 @@ public class QueuedStateManager implements StateManager {
 
   private void storeActivation(WorkflowInstance workflowInstance, RunState state, long lastProcessedCount)
       throws IOException {
-    storage.writeActiveState(workflowInstance, state, lastProcessedCount);
+    storage.writeActiveState(workflowInstance, PersistentWorkflowInstanceState.of(state, lastProcessedCount));
   }
 
   private void storeDeactivation(WorkflowInstance workflowInstance) throws IOException {

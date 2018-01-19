@@ -38,6 +38,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.util.List;
@@ -46,7 +47,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
-import javaslang.Tuple2;
 import okio.ByteString;
 
 /**
@@ -92,7 +92,7 @@ public class StatusResource {
     final List<RunStateDataPayload.RunStateData> runStates = Lists.newArrayList();
     try {
 
-      final Map<WorkflowInstance, Tuple2<Long, RunState>> activeStates = componentOpt.isPresent()
+      final Map<WorkflowInstance, PersistentWorkflowInstanceState> activeStates = componentOpt.isPresent()
           ? storage.readActiveWorkflowInstances(componentOpt.get())
           : storage.readActiveWorkflowInstances();
 

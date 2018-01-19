@@ -27,17 +27,14 @@ import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
-import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasItem;
-import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.same;
 
 import com.google.bigtable.repackaged.com.google.common.collect.ImmutableList;
 import com.google.cloud.datastore.Datastore;
@@ -56,10 +53,10 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.TriggerInstantSpec;
-import java.sql.Time;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -72,7 +69,6 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.mockito.Matchers;
 
 public class DatastoreStorageTest {
 
@@ -274,8 +270,8 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldWriteActiveWorkflowInstance() throws Exception {
-    storage.writeActiveState(WORKFLOW_INSTANCE, RUN_STATE, 42L);
+  public void shouldWriteActiveWorkflowInstanceWithState() throws Exception {
+    storage.writeActiveState(WORKFLOW_INSTANCE, PersistentWorkflowInstanceState.of(RUN_STATE, 42L));
 
     List<Entity> activeInstances = entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE);
     assertThat(activeInstances, hasSize(1));
@@ -289,8 +285,10 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldDeleteActiveWorkflowInstance() throws Exception {
-    storage.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE1, 42L);
-    storage.writeActiveState(WORKFLOW_INSTANCE2, RUN_STATE2, 84L);
+    storage.writeActiveState(WORKFLOW_INSTANCE1,
+        PersistentWorkflowInstanceState.of(RUN_STATE1, 42L));
+    storage.writeActiveState(WORKFLOW_INSTANCE2,
+        PersistentWorkflowInstanceState.of(RUN_STATE2, 84L));
 
     assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
 
@@ -330,8 +328,8 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldWriteActiveStatesWithSamePartitionAsSeparateEntities() throws Exception {
-    storage.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE1, 42L);
-    storage.writeActiveState(WORKFLOW_INSTANCE2, RUN_STATE2, 84L);
+    storage.writeActiveState(WORKFLOW_INSTANCE1, PersistentWorkflowInstanceState.of(RUN_STATE1, 42L));
+    storage.writeActiveState(WORKFLOW_INSTANCE2, PersistentWorkflowInstanceState.of(RUN_STATE2, 84L));
 
     assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
   }

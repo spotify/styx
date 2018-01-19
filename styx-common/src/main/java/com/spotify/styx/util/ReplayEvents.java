@@ -27,6 +27,7 @@ import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.time.Instant;
@@ -47,7 +48,7 @@ public final class ReplayEvents {
   }
 
   public static Map<RunState, Long> replayActiveStates(
-      Map<WorkflowInstance, Tuple2<Long, RunState>> instances,
+      Map<WorkflowInstance, PersistentWorkflowInstanceState> instances,
       Storage storage,
       boolean printLogs) throws IOException {
     LOG.info("Replaying active states");
@@ -56,8 +57,19 @@ public final class ReplayEvents {
 
     return instances.entrySet().parallelStream().map(entry -> {
       final WorkflowInstance workflowInstance = entry.getKey();
-      final long lastConsumedEvent = entry.getValue()._1;
-      final RunState runState = entry.getValue()._2;
+      final PersistentWorkflowInstanceState persistentState = entry.getValue();
+      final long lastConsumedEvent = persistentState.counter();
+
+      // TODO: always use the persistent state from datastore when it has been migrated
+      if (persistentState.state() != null) {
+        if (printLogs) {
+          LOG.debug("Using persistent state instead of replaying events");
+        }
+        final RunState runState = RunState.create(workflowInstance, persistentState.state(),
+            persistentState.data(), persistentState.timestamp());
+        return Tuple.of(runState, lastConsumedEvent);
+      }
+
       final SettableTime time = new SettableTime();
       if (printLogs) {
         LOG.debug("Replaying {} up to #{}", workflowInstance.toKey(), lastConsumedEvent);
@@ -104,7 +116,7 @@ public final class ReplayEvents {
 
   public static Optional<RunState> getBackfillRunState(
       WorkflowInstance workflowInstance,
-      Map<WorkflowInstance, Tuple2<Long, RunState>> activeWorkflowInstances,
+      Map<WorkflowInstance, PersistentWorkflowInstanceState> activeWorkflowInstances,
       Storage storage,
       String backfillId) {
     final SettableTime time = new SettableTime();
@@ -124,8 +136,9 @@ public final class ReplayEvents {
     RunState restoredState = RunState.fresh(workflowInstance, time);
 
     final long lastConsumedEvent =
-        activeWorkflowInstances.getOrDefault(workflowInstance,
-          Tuple.of(sequenceEvents.last().counter(), restoredState))._1;
+        Optional.ofNullable(activeWorkflowInstances.get(workflowInstance))
+            .map(PersistentWorkflowInstanceState::counter)
+            .orElse(sequenceEvents.last().counter());
 
     for (SequenceEvent sequenceEvent : sequenceEvents) {
       // The active state event counters are read before the events themselves and styx is 

@@ -38,12 +38,12 @@ import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.SortedSet;
-import javaslang.Tuple;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.Before;
@@ -72,10 +72,10 @@ public class ReplayEventsTest {
 
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
 
-    RunState restoredRunState =
-        ReplayEvents
-            .getBackfillRunState(WORKFLOW_INSTANCE, ImmutableMap.of(WORKFLOW_INSTANCE,
-                                      Tuple.of(6L, null)), storage,"bf-1").get();
+    RunState restoredRunState = ReplayEvents.getBackfillRunState(
+        WORKFLOW_INSTANCE,
+        ImmutableMap.of(WORKFLOW_INSTANCE, PersistentWorkflowInstanceState.of(6L)),
+        storage, "bf-1").get();
 
     assertThat(restoredRunState.state(), is(RUNNING));
     assertThat(restoredRunState.data().trigger(), isPresent());
@@ -114,10 +114,10 @@ public class ReplayEventsTest {
 
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
 
-    Optional<RunState> restoredRunState =
-        ReplayEvents
-            .getBackfillRunState(WORKFLOW_INSTANCE, ImmutableMap.of(WORKFLOW_INSTANCE, Tuple.of(2L, null)), storage,
-                                 "erroneous-id");
+    Optional<RunState> restoredRunState = ReplayEvents.getBackfillRunState(
+        WORKFLOW_INSTANCE,
+        ImmutableMap.of(WORKFLOW_INSTANCE, PersistentWorkflowInstanceState.of(2L)),
+        storage, "erroneous-id");
 
     assertThat(restoredRunState, is(Optional.empty()));
   }
@@ -140,7 +140,8 @@ public class ReplayEventsTest {
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
 
     Map<RunState, Long> runStates = ReplayEvents.replayActiveStates(
-        ImmutableMap.of(WORKFLOW_INSTANCE, Tuple.of(counter, null)), storage, printLogs);
+        ImmutableMap.of(WORKFLOW_INSTANCE, PersistentWorkflowInstanceState.of(counter)),
+        storage, printLogs);
 
     assertThat(runStates.size(), is(1));
 

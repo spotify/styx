@@ -30,7 +30,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
-import com.spotify.styx.state.RunState;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Duration;
@@ -40,7 +40,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
-import javaslang.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
 
 /**
@@ -78,20 +77,20 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public Map<WorkflowInstance, Tuple2<Long, RunState>> readActiveWorkflowInstances() throws IOException {
+  public Map<WorkflowInstance, PersistentWorkflowInstanceState> readActiveWorkflowInstances() throws IOException {
     return datastoreStorage.allActiveStates();
   }
 
   @Override
-  public Map<WorkflowInstance, Tuple2<Long, RunState>> readActiveWorkflowInstances(String componentId)
+  public Map<WorkflowInstance, PersistentWorkflowInstanceState> readActiveWorkflowInstances(String componentId)
       throws IOException {
     return datastoreStorage.activeStates(componentId);
   }
 
   @Override
   public void writeActiveState(WorkflowInstance workflowInstance,
-                               RunState state, long counter) throws IOException {
-    datastoreStorage.writeActiveState(workflowInstance, state, counter);
+                               PersistentWorkflowInstanceState state) throws IOException {
+    datastoreStorage.writeActiveState(workflowInstance, state);
   }
 
   @Override

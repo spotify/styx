@@ -24,10 +24,12 @@ import static com.spotify.styx.monitoring.MeteredProxy.instrument;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.GuardedRunnable.guard;
+import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static com.spotify.styx.util.ReplayEvents.transitionLogger;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.Collectors.toMap;
 
 import com.codahale.metrics.Gauge;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
@@ -74,6 +76,7 @@ import com.spotify.styx.state.handlers.PublisherHandler;
 import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.InMemStorage;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.Debug;
@@ -108,7 +111,6 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import javaslang.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -441,11 +443,17 @@ public class StyxScheduler implements AppInit {
       StateManager stateManager,
       DockerRunner dockerRunner) {
     try {
-      final Map<WorkflowInstance, Tuple2<Long, RunState>> activeInstances =
+      final Map<WorkflowInstance, PersistentWorkflowInstanceState> activeInstances =
           storage.readActiveWorkflowInstances();
 
-      activeInstances.forEach((wfi, stateTuple) -> stateManager
-          .restore(stateTuple._2.withHandlers(outputHandlers).withTime(time), stateTuple._1));
+      replayActiveStates(activeInstances, storage, true)
+          .entrySet().stream()
+          .collect(toMap(
+              e -> e.getKey()
+                  .withHandlers(outputHandlers)
+                  .withTime(time),
+              Map.Entry::getValue))
+          .forEach(stateManager::restore);
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }

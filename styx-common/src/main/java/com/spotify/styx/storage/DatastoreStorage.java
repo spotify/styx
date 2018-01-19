@@ -55,7 +55,8 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.state.RunState;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceStateBuilder;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.FnWithException;
@@ -73,8 +74,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
-import javaslang.Tuple;
-import javaslang.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -346,14 +345,14 @@ class DatastoreStorage {
     return workflows;
   }
 
-  Map<WorkflowInstance, Tuple2<Long, RunState>> allActiveStates() throws IOException {
+  Map<WorkflowInstance, PersistentWorkflowInstanceState> allActiveStates() throws IOException {
     final EntityQuery query =
         Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE).build();
 
     return queryActiveStates(query);
   }
 
-  Map<WorkflowInstance, Tuple2<Long, RunState>> activeStates(String componentId) throws IOException {
+  Map<WorkflowInstance, PersistentWorkflowInstanceState> activeStates(String componentId) throws IOException {
     final EntityQuery query =
         Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE)
             .setFilter(PropertyFilter.eq(PROPERTY_COMPONENT, componentId))
@@ -362,48 +361,52 @@ class DatastoreStorage {
     return queryActiveStates(query);
   }
 
-  private Map<WorkflowInstance, Tuple2<Long, RunState>> queryActiveStates(EntityQuery activeStatesQuery)
+  private Map<WorkflowInstance, PersistentWorkflowInstanceState> queryActiveStates(EntityQuery activeStatesQuery)
       throws IOException {
-    final ImmutableMap.Builder<WorkflowInstance, Tuple2<Long, RunState>> mapBuilder = ImmutableMap.builder();
+    final ImmutableMap.Builder<WorkflowInstance, PersistentWorkflowInstanceState> mapBuilder = ImmutableMap.builder();
     final QueryResults<Entity> results = datastore.run(activeStatesQuery);
     while (results.hasNext()) {
       final Entity entity = results.next();
       final long counter = entity.getLong(PROPERTY_COUNTER);
       final WorkflowInstance instance = parseWorkflowInstance(entity);
-      final RunState runState;
+      final PersistentWorkflowInstanceStateBuilder persistentState =
+          PersistentWorkflowInstanceState.builder()
+              .counter(counter);
       if (entity.contains(PROPERTY_STATE)) {
         final State state = State.valueOf(entity.getString(PROPERTY_STATE));
         final long timestamp = entity.getLong(PROPERTY_STATE_TIMESTAMP);
         final StateData stateData = OBJECT_MAPPER.readValue(
             entity.getString(PROPERTY_STATE_DATA), StateData.class);
-        runState = RunState.create(instance, state, stateData, timestamp);
-      } else {
-        runState = null;
+        persistentState
+            .state(state)
+            .data(stateData)
+            .timestamp(Instant.ofEpochMilli(timestamp))
+            .build();
       }
-      mapBuilder.put(instance, Tuple.of(counter, runState));
+      mapBuilder.put(instance, persistentState.build());
     }
 
     return mapBuilder.build();
   }
 
-  void writeActiveState(WorkflowInstance workflowInstance, RunState state,
-                        long counter) throws IOException {
+  void writeActiveState(WorkflowInstance workflowInstance, PersistentWorkflowInstanceState state)
+      throws IOException {
     storeWithRetries(() -> {
       final Key key = activeWorkflowInstanceKey(workflowInstance);
-      final Entity entity = Entity.newBuilder(key)
+      final Entity.Builder entity = Entity.newBuilder(key)
           .set(PROPERTY_COMPONENT, workflowInstance.workflowId().componentId())
           .set(PROPERTY_WORKFLOW, workflowInstance.workflowId().id())
           .set(PROPERTY_PARAMETER, workflowInstance.parameter())
+          .set(PROPERTY_COUNTER, state.counter())
+          // Although these fields are @Nullable they should not be null when passed in to this method
           .set(PROPERTY_STATE, state.state().toString())
-          .set(PROPERTY_STATE_TIMESTAMP, state.timestamp())
+          .set(PROPERTY_STATE_TIMESTAMP, state.timestamp().toEpochMilli())
           .set(PROPERTY_STATE_DATA, StringValue
               .newBuilder(OBJECT_MAPPER.writeValueAsString(state.data()))
               .setExcludeFromIndexes(true)
-              .build())
-          .set(PROPERTY_COUNTER, counter)
-          .build();
+              .build());
 
-      return datastore.put(entity);
+      return datastore.put(entity.build());
     });
   }
 

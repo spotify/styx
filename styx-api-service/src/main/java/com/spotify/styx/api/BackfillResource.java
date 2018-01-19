@@ -52,6 +52,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.ReplayEvents;
@@ -68,7 +69,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import javaslang.Tuple2;
 import okio.ByteString;
 
 public final class BackfillResource {
@@ -329,7 +329,7 @@ public final class BackfillResource {
     final List<RunStateData> processedStates;
     final List<RunStateData> waitingStates;
 
-    Map<WorkflowInstance, Tuple2<Long, RunState>> activeWorkflowInstances;
+    Map<WorkflowInstance, PersistentWorkflowInstanceState> activeWorkflowInstances;
     try {
       activeWorkflowInstances = storage.readActiveWorkflowInstances();
     } catch (IOException e) {

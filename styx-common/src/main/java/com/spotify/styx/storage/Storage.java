@@ -1,15 +1,15 @@
-/*-
+/*
  * -\-\-
- * Spotify Styx Common
+ * Spotify Styx Scheduler Service
  * --
- * Copyright (C) 2016 Spotify AB
+ * Copyright (C) 2018 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -30,7 +30,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
-import com.spotify.styx.state.RunState;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Instant;
@@ -39,7 +39,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
-import javaslang.Tuple2;
 
 /**
  * The interface to the persistence layer.
@@ -129,12 +128,11 @@ public interface Storage {
 
   /**
    * Stores information about an active {@link WorkflowInstance} to be tracked.
-   *  @param workflowInstance  The {@link WorkflowInstance} that entered an active state
-   * @param state              The current {@link RunState} for the given {@link WorkflowInstance}
-   * @param counter           The last processed event count for the {@link WorkflowInstance}
+   * @param workflowInstance  The {@link WorkflowInstance} that entered an active state
+   * @param state              The current state for the given {@link WorkflowInstance}
    */
-  void writeActiveState(WorkflowInstance workflowInstance, RunState state,
-                        long counter) throws IOException;
+  void writeActiveState(WorkflowInstance workflowInstance, PersistentWorkflowInstanceState state)
+      throws IOException;
 
   /**
    * Removes a reference to active {@link WorkflowInstance}, to be called when the instance enters
@@ -148,26 +146,25 @@ public interface Storage {
    * Return a map of all active {@link WorkflowInstance}s to their last consumed sequence count.
    *
    * <p>A {@link WorkflowInstance} is active if there has been at least one call to
-   *
-   * {@link #writeActiveState(WorkflowInstance, RunState, long)} and no calls to
+   * {@link #writeActiveState(WorkflowInstance, PersistentWorkflowInstanceState)} and no calls to
    * {@link #deleteActiveState(WorkflowInstance)}.
    *
    * @return The map of workflow instances to sequence counts
    */
-  Map<WorkflowInstance, Tuple2<Long, RunState>> readActiveWorkflowInstances() throws IOException;
+  Map<WorkflowInstance, PersistentWorkflowInstanceState> readActiveWorkflowInstances() throws IOException;
 
   /**
    * Return a map of all active {@link WorkflowInstance}s to their last consumed sequence count,
    * for workflows that belong to a given component id.
    *
    * <p>A {@link WorkflowInstance} is active if there has been at least one call to
-   *
-   * {@link #writeActiveState(WorkflowInstance, RunState, long)} and no calls to
+   * {@link #writeActiveState(WorkflowInstance, PersistentWorkflowInstanceState)} and no calls to
    * {@link #deleteActiveState(WorkflowInstance)}.
    *
    * @return The map of workflow instances to sequence counts
    */
-  Map<WorkflowInstance, Tuple2<Long, RunState>> readActiveWorkflowInstances(String componentId) throws IOException;
+  Map<WorkflowInstance, PersistentWorkflowInstanceState> readActiveWorkflowInstances(String componentId)
+      throws IOException;
 
   /**
    * Get execution information for a {@link WorkflowInstance}.

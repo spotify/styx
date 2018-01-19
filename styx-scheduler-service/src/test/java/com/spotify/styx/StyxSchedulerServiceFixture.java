@@ -48,6 +48,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
@@ -247,7 +248,8 @@ public class StyxSchedulerServiceFixture {
 
   void givenActiveStateAtSequenceCount(WorkflowInstance workflowInstance, long count) {
     try {
-      storage.writeActiveState(workflowInstance, RunState.fresh(workflowInstance, OutputHandler.NOOP), count);
+      storage.writeActiveState(workflowInstance,
+          PersistentWorkflowInstanceState.of(RunState.fresh(workflowInstance, OutputHandler.NOOP), count));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
@@ -255,7 +257,8 @@ public class StyxSchedulerServiceFixture {
 
   void givenActiveStateAtSequenceCount(WorkflowInstance workflowInstance, RunState state, long count) {
     try {
-      storage.writeActiveState(workflowInstance, state, count);
+      storage.writeActiveState(workflowInstance,
+          PersistentWorkflowInstanceState.of(state, count));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
