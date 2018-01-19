@@ -37,6 +37,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
@@ -51,8 +52,12 @@ public class AggregateStorage implements Storage {
   private final DatastoreStorage datastoreStorage;
 
   public AggregateStorage(Connection connection, Datastore datastore, Duration retryBaseDelay) {
-    this.bigtableStorage = new BigtableStorage(connection, retryBaseDelay);
-    this.datastoreStorage = new DatastoreStorage(datastore, retryBaseDelay);
+    this(new BigtableStorage(connection, retryBaseDelay), new DatastoreStorage(datastore, retryBaseDelay));
+  }
+
+  AggregateStorage(BigtableStorage bigtableStorage, DatastoreStorage datastoreStorage) {
+    this.bigtableStorage = Objects.requireNonNull(bigtableStorage, "bigtableStorage");
+    this.datastoreStorage = Objects.requireNonNull(datastoreStorage, "datastoreStorage");
   }
 
   @Override
