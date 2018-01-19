@@ -37,6 +37,7 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 import com.google.bigtable.repackaged.com.google.common.collect.ImmutableList;
+import com.google.bigtable.repackaged.com.google.common.collect.ImmutableMap;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
@@ -295,36 +296,35 @@ public class DatastoreStorageTest {
     storage.deleteActiveState(WORKFLOW_INSTANCE1);
     assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(1));
   }
-  //TODO: when storage deserializes RunState, it initializes the outputHandlers to NOOP, instead of fanOutput(...)
-  // so this tests fails when comparing the RunStates
-//  @Test
-//  public void shouldReturnAllActiveStates() throws Exception {
-//    storage.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE1, 42L);
-//    storage.writeActiveState(WORKFLOW_INSTANCE2, RUN_STATE2, 84L);
-//
-//    Map<WorkflowInstance, Tuple<Long, RunState>> activeStates = storage.allActiveStates();
-//    assertThat(activeStates.entrySet(), hasSize(2));
-//    assertThat(activeStates, hasKey(WORKFLOW_INSTANCE1));
-//    assertThat(activeStates.get(WORKFLOW_INSTANCE1).x(), is(42L));
-//    assertThat(activeStates.get(WORKFLOW_INSTANCE1).y(), is(RUN_STATE1));
-//    assertThat(activeStates, hasKey(WORKFLOW_INSTANCE2));
-//    assertThat(activeStates.get(WORKFLOW_INSTANCE2).x(), is(84L));
-//    assertThat(activeStates.get(WORKFLOW_INSTANCE2).y(), is(RUN_STATE2));
-//  }
 
-  //TODO: when storage deserializes RunState, it initializes the outputHandlers to NOOP, instead of fanOutput(...)
-  // so this tests fails when comparing the RunStates
-//  @Test
-//  public void shouldReturnAllActiveStatesForAComponent() throws Exception {
-//    storage.writeActiveState(WORKFLOW_INSTANCE2, RUN_STATE2, 42L);
-//    storage.writeActiveState(WORKFLOW_INSTANCE3, RUN_STATE3, 84L);
-//
-//    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
-//
-//    Map<WorkflowInstance, Tuple<Long, RunState>> activeStates = storage.activeStates(WORKFLOW_ID1.componentId());
-//    assertThat(activeStates.entrySet(), hasSize(1));
-//    assertThat(activeStates, hasEntry(WORKFLOW_INSTANCE2, Tuple.of(42L, RUN_STATE2)));
-//  }
+  @Test
+  public void shouldReturnAllActiveStates() throws Exception {
+    final PersistentWorkflowInstanceState persistentState1 = PersistentWorkflowInstanceState.of(RUN_STATE1, 42L);
+    final PersistentWorkflowInstanceState persistentState2 = PersistentWorkflowInstanceState.of(RUN_STATE2, 84L);
+    storage.writeActiveState(WORKFLOW_INSTANCE1, persistentState1);
+    storage.writeActiveState(WORKFLOW_INSTANCE2, persistentState2);
+
+    final Map<WorkflowInstance, PersistentWorkflowInstanceState> activeStates = storage.allActiveStates();
+    assertThat(activeStates, is(ImmutableMap.of(
+        WORKFLOW_INSTANCE1, persistentState1,
+        WORKFLOW_INSTANCE2, persistentState2)));
+  }
+
+  @Test
+  public void shouldReturnAllActiveStatesForAComponent() throws Exception {
+    final PersistentWorkflowInstanceState persistentState2 = PersistentWorkflowInstanceState.of(RUN_STATE2, 42L);
+    final PersistentWorkflowInstanceState persistentState3 = PersistentWorkflowInstanceState.of(RUN_STATE3, 84L);
+
+    storage.writeActiveState(WORKFLOW_INSTANCE2, persistentState2);
+    storage.writeActiveState(WORKFLOW_INSTANCE3, persistentState3);
+
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
+
+    final Map<WorkflowInstance, PersistentWorkflowInstanceState> activeStates =
+        storage.activeStates(WORKFLOW_ID1.componentId());
+
+    assertThat(activeStates, is(ImmutableMap.of(WORKFLOW_INSTANCE2, persistentState2)));
+  }
 
   @Test
   public void shouldWriteActiveStatesWithSamePartitionAsSeparateEntities() throws Exception {
