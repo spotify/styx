@@ -22,7 +22,7 @@ package com.spotify.styx.serialization;
 
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.testdata.TestData;
