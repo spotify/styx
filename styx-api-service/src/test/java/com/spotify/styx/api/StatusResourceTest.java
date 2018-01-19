@@ -36,11 +36,13 @@ import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.RunState.State;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.InMemStorage;
-import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.storage.Storage;
 import java.time.Instant;
 import okio.ByteString;
@@ -57,10 +59,18 @@ public class StatusResourceTest extends VersionedApiTest {
       WorkflowInstance.create(WorkflowId.create(COMPONENT_ID, ID), PARAMETER);
   private static final WorkflowInstance OTHER_WFI =
       WorkflowInstance.create(WorkflowId.create(OTHER_COMPONENT_ID, ID), PARAMETER);
-  private static final RunState RUN_STATE = RunState.create(WFI, RunState.State.RUNNING, ()->Instant.now(),
-                                                            OutputHandler.NOOP);
-  private static final RunState OTHER_RUN_STATE = RunState.create(OTHER_WFI, RunState.State.RUNNING, ()->Instant.now(),
-                                                                  OutputHandler.NOOP);
+
+  public static final PersistentWorkflowInstanceState PERSISTENT_STATE = PersistentWorkflowInstanceState.builder()
+      .timestamp(Instant.now())
+      .state(State.RUNNING)
+      .data(StateData.zero())
+      .counter(42L).build();
+
+  public static final PersistentWorkflowInstanceState OTHER_PERSISTENT_STATE = PersistentWorkflowInstanceState.builder()
+      .timestamp(Instant.now())
+      .state(State.RUNNING)
+      .data(StateData.zero())
+      .counter(84L).build();
 
   private Storage storage = new InMemStorage();
 
@@ -101,8 +111,8 @@ public class StatusResourceTest extends VersionedApiTest {
   public void testGetAllActiveStates() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.writeActiveState(WFI, PersistentWorkflowInstanceState.of(RUN_STATE, 42L));
-    storage.writeActiveState(OTHER_WFI, PersistentWorkflowInstanceState.of(OTHER_RUN_STATE, 84L));
+    storage.writeActiveState(WFI, PERSISTENT_STATE);
+    storage.writeActiveState(OTHER_WFI, OTHER_PERSISTENT_STATE);
     assertThat(storage.readActiveWorkflowInstances().entrySet(), hasSize(2));
 
     Response<ByteString> response =
@@ -124,8 +134,8 @@ public class StatusResourceTest extends VersionedApiTest {
     WorkflowInstance OTHER_WFI =
         WorkflowInstance.create(WorkflowId.create(COMPONENT_ID + "-other", ID), PARAMETER);
 
-    storage.writeActiveState(WFI, PersistentWorkflowInstanceState.of(RUN_STATE, 42L));
-    storage.writeActiveState(OTHER_WFI, PersistentWorkflowInstanceState.of(OTHER_RUN_STATE, 84L));
+    storage.writeActiveState(WFI, PERSISTENT_STATE);
+    storage.writeActiveState(OTHER_WFI, OTHER_PERSISTENT_STATE);
     assertThat(storage.readActiveWorkflowInstances().entrySet(), hasSize(2));
 
     Response<ByteString> response =

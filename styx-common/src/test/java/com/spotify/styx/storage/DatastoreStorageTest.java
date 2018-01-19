@@ -55,8 +55,8 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
-import com.spotify.styx.state.OutputHandler;
-import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.RunState.State;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.time.Duration;
 import java.time.Instant;
@@ -81,11 +81,35 @@ public class DatastoreStorageTest {
   private static final WorkflowInstance WORKFLOW_INSTANCE2 = WorkflowInstance.create(WORKFLOW_ID2, "2016-09-01");
   private static final WorkflowInstance WORKFLOW_INSTANCE3 = WorkflowInstance.create(WORKFLOW_ID3, "2016-09-01");
 
-  private static final RunState RUN_STATE1 = RunState.fresh(WORKFLOW_INSTANCE1, OutputHandler.NOOP);
-  private static final RunState RUN_STATE2 = RunState.fresh(WORKFLOW_INSTANCE2, OutputHandler.NOOP);
-  private static final RunState RUN_STATE3 = RunState.fresh(WORKFLOW_INSTANCE3, OutputHandler.NOOP);
+  private static final PersistentWorkflowInstanceState PERSISTENT_STATE1 = PersistentWorkflowInstanceState.builder()
+      .state(State.NEW)
+      .data(StateData.zero())
+      .timestamp(Instant.now())
+      .counter(42L)
+      .build();
 
-  private static final RunState RUN_STATE = RunState.fresh(WORKFLOW_INSTANCE, OutputHandler.NOOP);
+  private static final PersistentWorkflowInstanceState PERSISTENT_STATE2 = PersistentWorkflowInstanceState.builder()
+      .state(State.NEW)
+      .data(StateData.zero())
+      .timestamp(Instant.now())
+      .counter(84L)
+      .build();
+
+  private static final PersistentWorkflowInstanceState PERSISTENT_STATE3 = PersistentWorkflowInstanceState.builder()
+      .state(State.NEW)
+      .data(StateData.zero())
+      .timestamp(Instant.now())
+      .counter(17L)
+      .build();
+
+
+  private static final PersistentWorkflowInstanceState PERSISTENT_STATE = PersistentWorkflowInstanceState.builder()
+      .state(State.NEW)
+      .data(StateData.zero())
+      .timestamp(Instant.now())
+      .counter(42L)
+      .build();
+
 
   private static final WorkflowId WORKFLOW_ID = WorkflowId.create("dockerComp", "dockerEndpoint");
 
@@ -272,13 +296,13 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldWriteActiveWorkflowInstanceWithState() throws Exception {
-    storage.writeActiveState(WORKFLOW_INSTANCE, PersistentWorkflowInstanceState.of(RUN_STATE, 42L));
+    storage.writeActiveState(WORKFLOW_INSTANCE, PERSISTENT_STATE);
 
     List<Entity> activeInstances = entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE);
     assertThat(activeInstances, hasSize(1));
 
     Entity instance = activeInstances.get(0);
-    assertThat(instance.getLong(DatastoreStorage.PROPERTY_COUNTER), is(42L));
+    assertThat(instance.getLong(DatastoreStorage.PROPERTY_COUNTER), is(PERSISTENT_STATE.counter()));
     assertThat(instance.getString(DatastoreStorage.PROPERTY_COMPONENT), is(WORKFLOW_INSTANCE.workflowId().componentId()));
     assertThat(instance.getString(DatastoreStorage.PROPERTY_WORKFLOW), is(WORKFLOW_INSTANCE.workflowId().id()));
     assertThat(instance.getString(DatastoreStorage.PROPERTY_PARAMETER), is(WORKFLOW_INSTANCE.parameter()));
@@ -286,10 +310,8 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldDeleteActiveWorkflowInstance() throws Exception {
-    storage.writeActiveState(WORKFLOW_INSTANCE1,
-        PersistentWorkflowInstanceState.of(RUN_STATE1, 42L));
-    storage.writeActiveState(WORKFLOW_INSTANCE2,
-        PersistentWorkflowInstanceState.of(RUN_STATE2, 84L));
+    storage.writeActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1);
+    storage.writeActiveState(WORKFLOW_INSTANCE2, PERSISTENT_STATE2);
 
     assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
 
@@ -299,37 +321,32 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldReturnAllActiveStates() throws Exception {
-    final PersistentWorkflowInstanceState persistentState1 = PersistentWorkflowInstanceState.of(RUN_STATE1, 42L);
-    final PersistentWorkflowInstanceState persistentState2 = PersistentWorkflowInstanceState.of(RUN_STATE2, 84L);
-    storage.writeActiveState(WORKFLOW_INSTANCE1, persistentState1);
-    storage.writeActiveState(WORKFLOW_INSTANCE2, persistentState2);
+    storage.writeActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1);
+    storage.writeActiveState(WORKFLOW_INSTANCE2, PERSISTENT_STATE2);
 
     final Map<WorkflowInstance, PersistentWorkflowInstanceState> activeStates = storage.allActiveStates();
     assertThat(activeStates, is(ImmutableMap.of(
-        WORKFLOW_INSTANCE1, persistentState1,
-        WORKFLOW_INSTANCE2, persistentState2)));
+        WORKFLOW_INSTANCE1, PERSISTENT_STATE1,
+        WORKFLOW_INSTANCE2, PERSISTENT_STATE2)));
   }
 
   @Test
   public void shouldReturnAllActiveStatesForAComponent() throws Exception {
-    final PersistentWorkflowInstanceState persistentState2 = PersistentWorkflowInstanceState.of(RUN_STATE2, 42L);
-    final PersistentWorkflowInstanceState persistentState3 = PersistentWorkflowInstanceState.of(RUN_STATE3, 84L);
-
-    storage.writeActiveState(WORKFLOW_INSTANCE2, persistentState2);
-    storage.writeActiveState(WORKFLOW_INSTANCE3, persistentState3);
+    storage.writeActiveState(WORKFLOW_INSTANCE2, PERSISTENT_STATE2);
+    storage.writeActiveState(WORKFLOW_INSTANCE3, PERSISTENT_STATE3);
 
     assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
 
     final Map<WorkflowInstance, PersistentWorkflowInstanceState> activeStates =
         storage.activeStates(WORKFLOW_ID1.componentId());
 
-    assertThat(activeStates, is(ImmutableMap.of(WORKFLOW_INSTANCE2, persistentState2)));
+    assertThat(activeStates, is(ImmutableMap.of(WORKFLOW_INSTANCE2, PERSISTENT_STATE2)));
   }
 
   @Test
   public void shouldWriteActiveStatesWithSamePartitionAsSeparateEntities() throws Exception {
-    storage.writeActiveState(WORKFLOW_INSTANCE1, PersistentWorkflowInstanceState.of(RUN_STATE1, 42L));
-    storage.writeActiveState(WORKFLOW_INSTANCE2, PersistentWorkflowInstanceState.of(RUN_STATE2, 84L));
+    storage.writeActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1);
+    storage.writeActiveState(WORKFLOW_INSTANCE2, PERSISTENT_STATE2);
 
     assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
   }
