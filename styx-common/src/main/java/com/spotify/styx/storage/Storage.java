@@ -129,7 +129,7 @@ public interface Storage {
   /**
    * Stores information about an active {@link WorkflowInstance} to be tracked.
    * @param workflowInstance  The {@link WorkflowInstance} that entered an active state
-   * @param state              The current state for the given {@link WorkflowInstance}
+   * @param state             The current state for the given {@link WorkflowInstance}
    */
   void writeActiveState(WorkflowInstance workflowInstance, PersistentWorkflowInstanceState state)
       throws IOException;
