@@ -62,13 +62,15 @@ public class StatusResourceTest extends VersionedApiTest {
       .timestamp(Instant.now())
       .state(State.RUNNING)
       .data(StateData.zero())
-      .counter(42L).build();
+      .counter(42L)
+      .build();
 
   public static final PersistentWorkflowInstanceState OTHER_PERSISTENT_STATE = PersistentWorkflowInstanceState.builder()
       .timestamp(Instant.now())
       .state(State.RUNNING)
       .data(StateData.zero())
-      .counter(84L).build();
+      .counter(84L)
+      .build();
 
   private Storage storage = new InMemStorage();
 

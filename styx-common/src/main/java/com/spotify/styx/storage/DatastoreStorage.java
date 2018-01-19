@@ -372,6 +372,8 @@ class DatastoreStorage {
       final PersistentWorkflowInstanceStateBuilder persistentState =
           PersistentWorkflowInstanceState.builder()
               .counter(counter);
+
+      // TODO: always read these state fields when all active state entities have been migrated
       if (entity.contains(PROPERTY_STATE)) {
         final State state = State.valueOf(entity.getString(PROPERTY_STATE));
         final long timestamp = entity.getLong(PROPERTY_STATE_TIMESTAMP);
@@ -383,6 +385,7 @@ class DatastoreStorage {
             .timestamp(Instant.ofEpochMilli(timestamp))
             .build();
       }
+
       mapBuilder.put(instance, persistentState.build());
     }
 
