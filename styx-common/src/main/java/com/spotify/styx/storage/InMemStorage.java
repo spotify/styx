@@ -286,6 +286,8 @@ public class InMemStorage implements Storage {
   @Override
   public void writeEvent(SequenceEvent sequenceEvent) {
     writtenEvents.add(sequenceEvent);
+    activeStatesMap.computeIfPresent(sequenceEvent.event().workflowInstance(),
+        (k, v) -> v.toBuilder().counter(v.counter() + 1).build());
   }
 
   @Override

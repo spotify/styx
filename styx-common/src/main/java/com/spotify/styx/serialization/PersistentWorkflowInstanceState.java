@@ -40,6 +40,10 @@ public interface PersistentWorkflowInstanceState {
 
   @Nullable StateData data();
 
+  default PersistentWorkflowInstanceStateBuilder toBuilder() {
+    return PersistentWorkflowInstanceStateBuilder.from(this);
+  }
+
   static PersistentWorkflowInstanceStateBuilder builder() {
     return new PersistentWorkflowInstanceStateBuilder();
   }
