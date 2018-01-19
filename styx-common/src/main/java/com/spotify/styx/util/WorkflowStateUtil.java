@@ -25,7 +25,9 @@ import java.util.Optional;
 
 public final class WorkflowStateUtil {
 
-  private WorkflowStateUtil() { }
+  private WorkflowStateUtil() {
+    throw new UnsupportedOperationException();
+  }
 
   public static WorkflowState patchWorkflowState(
       final Optional<WorkflowState> originalWorkflowState,

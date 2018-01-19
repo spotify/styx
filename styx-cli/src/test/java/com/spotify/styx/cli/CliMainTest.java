@@ -63,7 +63,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import jdk.nashorn.internal.ir.annotations.Immutable;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.hamcrest.Matchers;
@@ -104,7 +103,7 @@ public class CliMainTest {
     verify(cliOutput).printStates(payload);
   }
 
-  public void testWorkflowCreate() throws Exception {
+  private void testWorkflowCreate() throws Exception {
     final String component = "quux";
 
     final Path workflowsFile = fileFromResource("workflows.yaml");

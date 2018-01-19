@@ -31,6 +31,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import javax.annotation.Nullable;
 
 class WFIExecutionBuilder {
 
@@ -38,15 +39,15 @@ class WFIExecutionBuilder {
   private List<Execution> executionList = new ArrayList<>();
   private List<ExecStatus> executionStatusList = new ArrayList<>();
 
-  private WorkflowInstance currWorkflowInstance;
-  private String currExecutionId;
-  private String currTriggerId;
-  private String currDockerImg;
+  @Nullable private WorkflowInstance currWorkflowInstance;
+  @Nullable private String currExecutionId;
+  @Nullable private String currTriggerId;
+  @Nullable private String currDockerImg;
 
   private boolean completed;
 
-  private Instant triggerTs;
-  private Instant eventTs;
+  @Nullable private Instant triggerTs;
+  @Nullable private Instant eventTs;
 
   private void closeExecution() {
     final Execution execution = Execution.create(

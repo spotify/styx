@@ -31,7 +31,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.time.Instant;
 import java.util.Optional;
-import javax.swing.text.html.Option;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;

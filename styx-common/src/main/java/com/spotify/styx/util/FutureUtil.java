@@ -25,6 +25,10 @@ import java.util.concurrent.CompletionStage;
 
 public class FutureUtil {
 
+  private FutureUtil() {
+    throw new UnsupportedOperationException();
+  }
+
   public static <T> CompletionStage<T> exceptionallyCompletedFuture(final Throwable t) {
     CompletableFuture<T> future = new CompletableFuture<>();
     future.completeExceptionally(t);

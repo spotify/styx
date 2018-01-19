@@ -54,6 +54,7 @@ public final class ParameterUtil {
   private static final Pattern YEAR_MONTH_PATTERN = Pattern.compile("(\\d{4})-(\\d{2})");
 
   private ParameterUtil() {
+    throw new UnsupportedOperationException();
   }
 
   private static final int MIN_YEAR_WIDTH = 4;

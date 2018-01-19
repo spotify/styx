@@ -27,6 +27,10 @@ import com.spotify.apollo.Client;
  */
 public class StyxClientFactory {
 
+  private StyxClientFactory() {
+    throw new UnsupportedOperationException();
+  }
+
   public static StyxClient create(Client client, String apiHost) {
     return new StyxApolloClient(client, apiHost);
   }
