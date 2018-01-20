@@ -103,7 +103,8 @@ public class CliMainTest {
     verify(cliOutput).printStates(payload);
   }
 
-  private void testWorkflowCreate() throws Exception {
+  @Test
+  public void testWorkflowCreate() throws Exception {
     final String component = "quux";
 
     final Path workflowsFile = fileFromResource("workflows.yaml");
