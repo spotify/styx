@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 public final class EventUtil {
 
   private EventUtil() {
+    throw new UnsupportedOperationException();
   }
 
   public static String name(Event event) {

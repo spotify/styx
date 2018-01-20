@@ -41,6 +41,10 @@ import java.time.temporal.TemporalAmount;
  */
 public class TimeUtil {
 
+  private TimeUtil() {
+    throw new UnsupportedOperationException();
+  }
+
   private static final String HOURLY_CRON = "0 * * * *";
   private static final String DAILY_CRON = "0 0 * * *";
   private static final String WEEKLY_CRON = "0 0 * * MON";

@@ -35,6 +35,7 @@ public class TriggerUtil {
   public static final String NATURAL_TRIGGER_ID = "natural-trigger";
 
   private TriggerUtil() {
+    throw new UnsupportedOperationException();
   }
 
   public static boolean isBackfill(Trigger trigger) {

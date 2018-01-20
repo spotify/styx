@@ -21,7 +21,6 @@
 package com.spotify.styx.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import io.norberg.automatter.AutoMatter;
 import java.util.List;
 import java.util.Optional;

@@ -26,6 +26,10 @@ import java.util.Optional;
 
 public class GcpUtil {
 
+  private GcpUtil() {
+    throw new UnsupportedOperationException();
+  }
+
   public static boolean isPermissionDenied(Throwable t) {
     return t instanceof GoogleJsonResponseException
         && isPermissionDenied((GoogleJsonResponseException) t);

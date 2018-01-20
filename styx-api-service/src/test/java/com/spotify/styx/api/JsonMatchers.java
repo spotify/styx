@@ -33,6 +33,10 @@ import org.hamcrest.TypeSafeMatcher;
 
 public class JsonMatchers {
 
+  private JsonMatchers() {
+    throw new UnsupportedOperationException();
+  }
+
   public static <T> void assertJson(Response<ByteString> response, String jsonPath,
                                     Matcher<T> matcher) {
     assertThat(response, hasPayload(asByteString(hasJsonPath(jsonPath, matcher))));

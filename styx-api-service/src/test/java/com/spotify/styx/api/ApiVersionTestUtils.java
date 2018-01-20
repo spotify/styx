@@ -29,6 +29,10 @@ import org.hamcrest.TypeSafeMatcher;
  */
 class ApiVersionTestUtils {
 
+  private ApiVersionTestUtils() {
+    throw new UnsupportedOperationException();
+  }
+
   static Api.Version[] ALL_VERSIONS = Api.Version.values();
 
   /**

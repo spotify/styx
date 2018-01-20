@@ -26,6 +26,7 @@ import java.util.stream.Stream;
 public final class StreamUtil {
 
   private StreamUtil() {
+    throw new UnsupportedOperationException();
   }
 
   /**
