@@ -54,12 +54,14 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.serialization.Json;
+import com.spotify.styx.util.WorkflowValidator;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -82,11 +84,15 @@ public class CliMainTest {
   @Mock CliContext cliContext;
   @Mock StyxClient client;
   @Mock CliOutput cliOutput;
+  @Mock WorkflowValidator validator;
 
   @Before
   public void setUp() {
     MockitoAnnotations.initMocks(this);
 
+    when(cliContext.workflowValidator()).thenReturn(validator);
+    when(validator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
+    when(validator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(cliContext.createClient(any(), any())).thenReturn(client);
     when(cliContext.output(any())).thenReturn(cliOutput);
     when(cliContext.env()).thenReturn(
@@ -127,6 +133,38 @@ public class CliMainTest {
       verify(cliOutput).printMessage("Workflow " + workflowConfiguration.id() + " in component "
           + component + " created.");
     }
+  }
+
+  @Test
+  public void testWorkflowCreateInvalid() throws Exception {
+    final String component = "quux";
+
+    final Path workflowsFile = fileFromResource("workflows.yaml");
+    final List<WorkflowConfiguration> expected = Json.YAML_MAPPER
+        .reader().forType(WorkflowConfiguration.class)
+        .<WorkflowConfiguration>readValues(workflowsFile.toFile())
+        .readAll();
+    assertThat(expected, is(not(Matchers.empty())));
+
+    for (WorkflowConfiguration configuration : expected) {
+      when(validator.validateWorkflowConfiguration(configuration)).thenReturn(
+          ImmutableList.of("bad-" + configuration.id(), "cfg-" + configuration.id()));
+    }
+
+    try {
+      CliMain.run(cliContext, "workflow", "create", component, "-f", workflowsFile.toString());
+      fail();
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.ArgumentError));
+    }
+
+    for (WorkflowConfiguration configuration : expected) {
+      verify(cliOutput).printError("Invalid workflow configuration: " + configuration.id());
+      verify(cliOutput).printError("  error: bad-" + configuration.id());
+      verify(cliOutput).printError("  error: cfg-" + configuration.id());
+    }
+
+    verify(client, never()).createOrUpdateWorkflow(any(), any());
   }
 
   @Test

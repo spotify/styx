@@ -42,8 +42,8 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
@@ -60,7 +60,8 @@ public final class WorkflowResource {
   private static final String BASE = "/workflows";
   private static final int DEFAULT_PAGE_LIMIT = 24 * 7;
   private static final String SCHEDULER_BASE_PATH = "/api/v0";
-  private final DockerImageValidator dockerImageValidator;
+
+  private final WorkflowValidator workflowValidator;
 
   private final String schedulerServiceBaseUrl;
   private final Storage storage;
@@ -68,10 +69,10 @@ public final class WorkflowResource {
 
 
   public WorkflowResource(Storage storage, String schedulerServiceBaseUrl,
-                          DockerImageValidator dockerImageValidator,
+                          WorkflowValidator workflowValidator,
                           Client forwardingClient) {
     this.storage = Objects.requireNonNull(storage);
-    this.dockerImageValidator = Objects.requireNonNull(dockerImageValidator, "dockerImageValidator");
+    this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
     this.forwardingClient = Objects.requireNonNull(forwardingClient);
   }
@@ -144,10 +145,10 @@ public final class WorkflowResource {
 
     final Optional<String> dockerImage = workflowConfig.dockerImage();
     if (dockerImage.isPresent()) {
-      final Collection<String> errors = dockerImageValidator.validateImageReference(dockerImage.get());
+      final Collection<String> errors = workflowValidator.validateWorkflowConfiguration(workflowConfig);
       if (!errors.isEmpty()) {
         return CompletableFuture.completedFuture(
-            Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors)));
+            Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: " + errors)));
       }
     }
 
