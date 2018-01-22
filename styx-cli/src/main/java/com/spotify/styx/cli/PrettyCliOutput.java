@@ -32,7 +32,6 @@ import static org.fusesource.jansi.Ansi.Color.GREEN;
 import static org.fusesource.jansi.Ansi.Color.RED;
 import static org.fusesource.jansi.Ansi.Color.YELLOW;
 
-import com.google.common.collect.Iterables;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
@@ -73,8 +72,8 @@ class PrettyCliOutput implements CliOutput {
         final StateData stateData = runStateData.stateData();
         final Ansi ansiState = getAnsiForState(runStateData);
 
-        final Message lastMessage = Iterables.getLast(
-            stateData.messages(), Message.create(Message.MessageLevel.UNKNOWN, "No info"));
+        final Message lastMessage =
+            stateData.message().orElse(Message.create(Message.MessageLevel.UNKNOWN, "No info"));
         final Ansi ansiMessage = colored(messageColor(lastMessage.level()),
                                          lastMessage.line());
 

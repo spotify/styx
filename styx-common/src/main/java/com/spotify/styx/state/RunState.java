@@ -40,7 +40,6 @@ import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message.MessageLevel;
 import com.spotify.styx.util.Time;
-import com.spotify.styx.util.TriggerUtil;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -145,7 +144,6 @@ public abstract class RunState {
               SUBMITTED,
               data().builder()
                   .trigger(Trigger.unknown("UNKNOWN"))
-                  .triggerId("UNKNOWN") // for backwards compatibility
                   .build());
 
         default:
@@ -161,7 +159,6 @@ public abstract class RunState {
               QUEUED,
               data().builder()
                   .trigger(trigger)
-                  .triggerId(TriggerUtil.triggerId(trigger)) // for backwards compatibility
                   .build());
 
         default:
@@ -195,7 +192,7 @@ public abstract class RunState {
           return state(
               QUEUED,
               data().builder()
-                  .addMessage(message)
+                  .message(message)
                   .build());
 
         default:
@@ -277,7 +274,7 @@ public abstract class RunState {
               .retryCost(data().retryCost() + cost)
               .lastExit(exitCode)
               .consecutiveFailures(consecutiveFailures)
-              .addMessage(Message.create(level, "Exit code: " + exitCode.map(String::valueOf).orElse("-")))
+              .message(Message.create(level, "Exit code: " + exitCode.map(String::valueOf).orElse("-")))
               .build();
 
           return state(TERMINATED, newStateData);
@@ -331,7 +328,7 @@ public abstract class RunState {
               .retryCost(data().retryCost() + FAILURE_COST)
               .lastExit(empty())
               .consecutiveFailures(data().consecutiveFailures() + 1)
-              .addMessage(Message.error(message))
+              .message(Message.error(message))
               .build();
 
           return state(FAILED, newStateData);

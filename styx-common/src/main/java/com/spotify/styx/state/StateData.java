@@ -22,7 +22,9 @@ package com.spotify.styx.state;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.util.TriggerUtil;
 import io.norberg.automatter.AutoMatter;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,10 +44,16 @@ public interface StateData {
   Optional<Long> retryDelayMillis();
   Optional<Integer> lastExit();
   Optional<Trigger> trigger();
-  Optional<String> triggerId(); //for backwards compatibility
   Optional<String> executionId();
   Optional<ExecutionDescription> executionDescription();
-  List<Message> messages();
+  Optional<Message> message();
+
+  @Deprecated default Optional<String> triggerId() {
+    return trigger().map(TriggerUtil::triggerId);
+  }
+  @Deprecated default List<Message> messages() {
+    return message().map(Collections::singletonList).orElseGet(Collections::emptyList);
+  }
 
   StateDataBuilder builder();
 

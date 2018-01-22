@@ -48,32 +48,19 @@ class PlainCliOutput implements CliOutput {
     SortedMap<WorkflowId, SortedSet<RunStateDataPayload.RunStateData>> groupedStates =
         CliUtil.groupStates(runStateDataPayload.activeStates());
 
-    groupedStates.entrySet().forEach(entry -> {
-      WorkflowId workflowId = entry.getKey();
-      entry.getValue().forEach(RunStateData -> {
-        final StateData stateData = RunStateData.stateData();
-        final List<Message> messages = stateData.messages();
-
-        final String lastMessage;
-        if (messages.isEmpty()) {
-          lastMessage = "No info";
-        } else {
-          final Message message = messages.get(messages.size() - 1);
-          lastMessage = message.line();
-        }
-
-        System.out.println(String.format(
-            "%s %s %s %s %s %d %s",
-            workflowId.componentId(),
-            workflowId.id(),
-            RunStateData.workflowInstance().parameter(),
-            RunStateData.state(),
-            stateData.executionId().orElse("<no-execution-id>"),
-            stateData.tries(),
-            lastMessage
-        ));
-      });
-    });
+    groupedStates.forEach((workflowId, value) -> value.forEach(RunStateData -> {
+      final StateData stateData = RunStateData.stateData();
+      System.out.println(String.format(
+          "%s %s %s %s %s %d %s",
+          workflowId.componentId(),
+          workflowId.id(),
+          RunStateData.workflowInstance().parameter(),
+          RunStateData.state(),
+          stateData.executionId().orElse("<no-execution-id>"),
+          stateData.tries(),
+          stateData.message().map(Message::line).orElse("No info")
+      ));
+    }));
   }
 
   @Override
