@@ -32,6 +32,7 @@ import static com.spotify.styx.state.RunState.State.SUBMITTING;
 import static com.spotify.styx.state.RunState.State.TERMINATED;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.WorkflowInstanceEventFactory;
@@ -495,10 +496,7 @@ public class RunStateTest {
 
     assertThat(
         transitioner.get(WORKFLOW_INSTANCE).data().messages(),
-        contains(
-            Message.create(Message.MessageLevel.WARNING, "Exit code: 20"),
-            Message.create(Message.MessageLevel.ERROR, "Error")
-        ));
+        contains(Message.create(Message.MessageLevel.ERROR, "Error")));
   }
 
   @Test
@@ -510,9 +508,7 @@ public class RunStateTest {
 
     assertThat(
         transitioner.get(WORKFLOW_INSTANCE).data().messages(),
-        contains(
-            Message.info("info message"),
-            Message.warning("warning message")));
+        contains(Message.warning("warning message")));
   }
 
   @Test

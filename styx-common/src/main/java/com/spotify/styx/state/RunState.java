@@ -195,7 +195,7 @@ public abstract class RunState {
           return state(
               QUEUED,
               data().builder()
-                  .addMessage(message)
+                  .messages(message)
                   .build());
 
         default:
@@ -277,7 +277,7 @@ public abstract class RunState {
               .retryCost(data().retryCost() + cost)
               .lastExit(exitCode)
               .consecutiveFailures(consecutiveFailures)
-              .addMessage(Message.create(level, "Exit code: " + exitCode.map(String::valueOf).orElse("-")))
+              .messages(Message.create(level, "Exit code: " + exitCode.map(String::valueOf).orElse("-")))
               .build();
 
           return state(TERMINATED, newStateData);
@@ -331,7 +331,7 @@ public abstract class RunState {
               .retryCost(data().retryCost() + FAILURE_COST)
               .lastExit(empty())
               .consecutiveFailures(data().consecutiveFailures() + 1)
-              .addMessage(Message.error(message))
+              .messages(Message.error(message))
               .build();
 
           return state(FAILED, newStateData);
