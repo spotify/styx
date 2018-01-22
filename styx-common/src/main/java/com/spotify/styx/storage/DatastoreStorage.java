@@ -23,6 +23,8 @@ package com.spotify.styx.storage;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static java.util.stream.Collectors.toList;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.cloud.Timestamp;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
@@ -48,6 +50,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
+import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.StyxConfig;
@@ -57,6 +60,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.serialization.PersistentWorkflowInstanceStateBuilder;
+import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.FnWithException;
@@ -118,10 +122,18 @@ class DatastoreStorage {
   public static final String PROPERTY_SUBMISSION_RATE_LIMIT = "submissionRateLimit";
   public static final String PROPERTY_STATE = "state";
   public static final String PROPERTY_STATE_TIMESTAMP = "stateTimestamp";
-  public static final String PROPERTY_STATE_DATA = "stateData";
+
   public static final String PROPERTY_STATE_TRIGGER_TYPE = "triggerType";
   public static final String PROPERTY_STATE_TRIGGER_ID = "triggerId";
+  public static final String PROPERTY_STATE_TRIES = "tries";
+  public static final String PROPERTY_STATE_CONSECUTIVE_FAILURES = "consecutiveFailures";
+  public static final String PROPERTY_STATE_RETRY_COST = "retryCost";
+  public static final String PROPERTY_STATE_MESSAGES = "messages";
+  public static final String PROPERTY_STATE_RETRY_DELAY_MILLIS = "retryDelayMillis";
+  public static final String PROPERTY_STATE_LAST_EXIT = "lastExit";
   public static final String PROPERTY_STATE_EXECUTION_ID = "executionId";
+  public static final String PROPERTY_STATE_EXECUTION_DESCRIPTION = "executionDescription";
+
 
   public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
 
@@ -381,13 +393,26 @@ class DatastoreStorage {
       if (entity.contains(PROPERTY_STATE)) {
         final State state = State.valueOf(entity.getString(PROPERTY_STATE));
         final long timestamp = entity.getLong(PROPERTY_STATE_TIMESTAMP);
-        final StateData stateData = OBJECT_MAPPER.readValue(
-            entity.getString(PROPERTY_STATE_DATA), StateData.class);
+
+        final StateData data = StateData.newBuilder()
+            .tries((int) entity.getLong(PROPERTY_STATE_TRIES))
+            .consecutiveFailures((int) entity.getLong(PROPERTY_STATE_CONSECUTIVE_FAILURES))
+            .retryCost(entity.getDouble(PROPERTY_STATE_RETRY_COST))
+            .trigger(this.<String>readOpt(entity, PROPERTY_STATE_TRIGGER_TYPE).map(type ->
+                TriggerUtil.trigger(type, entity.getString(PROPERTY_STATE_TRIGGER_ID))))
+            .messages(OBJECT_MAPPER.<List<Message>>readValue(entity.getString(PROPERTY_STATE_MESSAGES),
+                new TypeReference<List<Message>>() { }))
+            .retryDelayMillis(readOpt(entity, PROPERTY_STATE_RETRY_DELAY_MILLIS))
+            .lastExit(readOpt(entity, PROPERTY_STATE_LAST_EXIT))
+            .executionId(readOpt(entity, PROPERTY_STATE_EXECUTION_ID))
+            .executionDescription(readOptJson(entity, PROPERTY_STATE_EXECUTION_DESCRIPTION,
+                ExecutionDescription.class))
+            .build();
+
         persistentState
             .state(state)
-            .data(stateData)
-            .timestamp(Instant.ofEpochMilli(timestamp))
-            .build();
+            .data(data)
+            .timestamp(Instant.ofEpochMilli(timestamp));
       }
 
       mapBuilder.put(instance, persistentState.build());
@@ -411,19 +436,23 @@ class DatastoreStorage {
         entity
             .set(PROPERTY_STATE, state.state().toString())
             .set(PROPERTY_STATE_TIMESTAMP, state.timestamp().toEpochMilli())
-            .set(PROPERTY_STATE_DATA, StringValue
-                .newBuilder(OBJECT_MAPPER.writeValueAsString(state.data()))
-                .setExcludeFromIndexes(true)
-                .build());
+            .set(PROPERTY_STATE_TRIES, state.data().tries())
+            .set(PROPERTY_STATE_CONSECUTIVE_FAILURES, state.data().consecutiveFailures())
+            .set(PROPERTY_STATE_RETRY_COST, state.data().retryCost())
+            // TODO: consider making this list bounded or not storing it here to avoid exceeding entity size limit
+            .set(PROPERTY_STATE_MESSAGES, jsonValue(state.data().messages()));
 
-        // Write trigger type/name & execution id as properties to allow querying against them
+        state.data().retryDelayMillis().ifPresent(v -> entity.set(PROPERTY_STATE_RETRY_DELAY_MILLIS, v));
+        state.data().lastExit().ifPresent(v -> entity.set(PROPERTY_STATE_LAST_EXIT, v));
         state.data().trigger().ifPresent(trigger -> {
           entity.set(PROPERTY_STATE_TRIGGER_TYPE, TriggerUtil.triggerType(trigger));
           entity.set(PROPERTY_STATE_TRIGGER_ID, TriggerUtil.triggerId(trigger));
         });
-        state.data().executionId().ifPresent(executionId -> {
-          entity.set(PROPERTY_STATE_EXECUTION_ID, executionId);
-        });
+        state.data().executionId().ifPresent(v -> entity.set(PROPERTY_STATE_EXECUTION_ID, v));
+
+        if (state.data().executionDescription().isPresent()) {
+          entity.set(PROPERTY_STATE_EXECUTION_DESCRIPTION, jsonValue(state.data().executionDescription().get()));
+        }
       }
 
       return datastore.put(entity.build());
@@ -749,7 +778,20 @@ class DatastoreStorage {
         : Optional.empty();
   }
 
+  private <T> Optional<T> readOptJson(Entity entity, String property, Class<T> cls) throws IOException {
+    return entity.contains(property)
+        ? Optional.of(OBJECT_MAPPER.readValue(entity.getString(property), cls))
+        : Optional.empty();
+  }
+
   private <T> T read(Entity entity, String property, T defaultValue) {
     return this.<T>readOpt(entity, property).orElse(defaultValue);
+  }
+
+  private StringValue jsonValue(Object o) throws JsonProcessingException {
+    return StringValue
+        .newBuilder(OBJECT_MAPPER.writeValueAsString(o))
+        .setExcludeFromIndexes(true)
+        .build();
   }
 }
