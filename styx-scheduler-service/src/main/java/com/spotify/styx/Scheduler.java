@@ -287,6 +287,9 @@ public class Scheduler {
           String.format("Resource limit reached for: %s",
               depletedResources.stream()
                   .map(resources::get)
+                  // Sort resource descriptions to get deterministic message contents
+                  .map(Resource::toString)
+                  .sorted()
                   .collect(toList())));
       if (!instance.runState().data().message().map(message::equals).orElse(false)) {
         stateManager.receiveIgnoreClosed(Event.info(instance.workflowInstance(), message));
