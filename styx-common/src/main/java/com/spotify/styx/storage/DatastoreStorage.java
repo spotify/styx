@@ -63,6 +63,7 @@ import com.spotify.styx.util.FnWithException;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.TriggerInstantSpec;
+import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -118,6 +119,9 @@ class DatastoreStorage {
   public static final String PROPERTY_STATE = "state";
   public static final String PROPERTY_STATE_TIMESTAMP = "stateTimestamp";
   public static final String PROPERTY_STATE_DATA = "stateData";
+  public static final String PROPERTY_STATE_TRIGGER_TYPE = "triggerType";
+  public static final String PROPERTY_STATE_TRIGGER_ID = "triggerId";
+  public static final String PROPERTY_STATE_EXECUTION_ID = "executionId";
 
   public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
 
@@ -411,6 +415,15 @@ class DatastoreStorage {
                 .newBuilder(OBJECT_MAPPER.writeValueAsString(state.data()))
                 .setExcludeFromIndexes(true)
                 .build());
+
+        // Write trigger type/name & execution id as properties to allow querying against them
+        state.data().trigger().ifPresent(trigger -> {
+          entity.set(PROPERTY_STATE_TRIGGER_TYPE, TriggerUtil.triggerType(trigger));
+          entity.set(PROPERTY_STATE_TRIGGER_ID, TriggerUtil.triggerId(trigger));
+        });
+        state.data().executionId().ifPresent(executionId -> {
+          entity.set(PROPERTY_STATE_EXECUTION_ID, executionId);
+        });
       }
 
       return datastore.put(entity.build());
