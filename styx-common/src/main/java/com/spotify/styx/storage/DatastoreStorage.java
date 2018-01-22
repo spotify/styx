@@ -120,9 +120,9 @@ class DatastoreStorage {
   public static final String PROPERTY_DESCRIPTION = "description";
   public static final String PROPERTY_CONFIG_DEBUG_ENABLED = "debug";
   public static final String PROPERTY_SUBMISSION_RATE_LIMIT = "submissionRateLimit";
+
   public static final String PROPERTY_STATE = "state";
   public static final String PROPERTY_STATE_TIMESTAMP = "stateTimestamp";
-
   public static final String PROPERTY_STATE_TRIGGER_TYPE = "triggerType";
   public static final String PROPERTY_STATE_TRIGGER_ID = "triggerId";
   public static final String PROPERTY_STATE_TRIES = "tries";
@@ -133,7 +133,6 @@ class DatastoreStorage {
   public static final String PROPERTY_STATE_LAST_EXIT = "lastExit";
   public static final String PROPERTY_STATE_EXECUTION_ID = "executionId";
   public static final String PROPERTY_STATE_EXECUTION_DESCRIPTION = "executionDescription";
-
 
   public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
 
