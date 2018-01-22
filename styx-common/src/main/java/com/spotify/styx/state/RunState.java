@@ -194,9 +194,7 @@ public abstract class RunState {
         case QUEUED:
           return state(
               QUEUED,
-              data().builder()
-                  .addMessage(message)
-                  .build());
+              data().withAddedMessage(message));
 
         default:
           throw illegalTransition("info");
@@ -277,8 +275,8 @@ public abstract class RunState {
               .retryCost(data().retryCost() + cost)
               .lastExit(exitCode)
               .consecutiveFailures(consecutiveFailures)
-              .addMessage(Message.create(level, "Exit code: " + exitCode.map(String::valueOf).orElse("-")))
-              .build();
+              .build()
+              .withAddedMessage(Message.create(level, "Exit code: " + exitCode.map(String::valueOf).orElse("-")));
 
           return state(TERMINATED, newStateData);
 
@@ -331,8 +329,8 @@ public abstract class RunState {
               .retryCost(data().retryCost() + FAILURE_COST)
               .lastExit(empty())
               .consecutiveFailures(data().consecutiveFailures() + 1)
-              .addMessage(Message.error(message))
-              .build();
+              .build()
+              .withAddedMessage(Message.error(message));
 
           return state(FAILED, newStateData);
 
