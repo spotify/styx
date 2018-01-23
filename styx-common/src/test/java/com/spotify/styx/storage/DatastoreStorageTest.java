@@ -49,15 +49,20 @@ import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
+import com.spotify.styx.state.Message;
+import com.spotify.styx.state.Message.MessageLevel;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.time.Duration;
 import java.time.Instant;
@@ -109,6 +114,33 @@ public class DatastoreStorageTest {
       .data(StateData.zero())
       .timestamp(Instant.now())
       .counter(42L)
+      .build();
+
+  private static final PersistentWorkflowInstanceState FULL_PERSISTENT_STATE = PersistentWorkflowInstanceState.builder()
+      .state(State.QUEUED)
+      .timestamp(Instant.now())
+      .counter(42L)
+      .data(StateData.newBuilder()
+          .tries(17)
+          .consecutiveFailures(89)
+          .retryCost(2.0)
+          .retryDelayMillis(4711L)
+          .lastExit(13)
+          .trigger(Trigger.adhoc("foobar"))
+          .executionId("foo-bar-17")
+          .executionDescription(ExecutionDescription.builder()
+              .dockerImage("foo/bar:34234")
+              .dockerArgs("foo", "the", "bar", "baz")
+              .dockerTerminationLogging(true)
+              .secret(Secret.create("foobar", "/var/quux/baz"))
+              .serviceAccount("foo@bar.baz")
+              .commitSha("2d2bfa926b94508de5aab47b5f305659ead2274a")
+              .build())
+          .addMessage(Message.info("foo"))
+          .addMessage(Message.warning("bar"))
+          .addMessage(Message.error("baz"))
+          .addMessage(Message.create(MessageLevel.UNKNOWN, "quux"))
+          .build())
       .build();
 
 
@@ -307,6 +339,15 @@ public class DatastoreStorageTest {
     assertThat(instance.getString(DatastoreStorage.PROPERTY_COMPONENT), is(WORKFLOW_INSTANCE.workflowId().componentId()));
     assertThat(instance.getString(DatastoreStorage.PROPERTY_WORKFLOW), is(WORKFLOW_INSTANCE.workflowId().id()));
     assertThat(instance.getString(DatastoreStorage.PROPERTY_PARAMETER), is(WORKFLOW_INSTANCE.parameter()));
+  }
+
+  @Test
+  public void testFullPersistentStatePersistence() throws Exception {
+    storage.writeActiveState(WORKFLOW_INSTANCE, FULL_PERSISTENT_STATE);
+    final PersistentWorkflowInstanceState read = storage
+        .activeStates(WORKFLOW_INSTANCE.workflowId().componentId())
+        .get(WORKFLOW_INSTANCE);
+    assertThat(read, is(FULL_PERSISTENT_STATE));
   }
 
   @Test

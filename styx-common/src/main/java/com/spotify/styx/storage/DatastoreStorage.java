@@ -402,7 +402,7 @@ class DatastoreStorage {
             .messages(OBJECT_MAPPER.<List<Message>>readValue(entity.getString(PROPERTY_STATE_MESSAGES),
                 new TypeReference<List<Message>>() { }))
             .retryDelayMillis(readOpt(entity, PROPERTY_STATE_RETRY_DELAY_MILLIS))
-            .lastExit(readOpt(entity, PROPERTY_STATE_LAST_EXIT))
+            .lastExit(this.<Long>readOpt(entity, PROPERTY_STATE_LAST_EXIT).map(Long::intValue))
             .executionId(readOpt(entity, PROPERTY_STATE_EXECUTION_ID))
             .executionDescription(readOptJson(entity, PROPERTY_STATE_EXECUTION_DESCRIPTION,
                 ExecutionDescription.class))
