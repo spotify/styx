@@ -63,7 +63,7 @@ public final class ReplayEvents {
       // TODO: always use the persistent state from datastore when it has been migrated
       if (persistentState.state() != null) {
         if (printLogs) {
-          LOG.debug("Using persistent state instead of replaying events");
+          LOG.debug("Using persistent state instead of replaying events: {}", workflowInstance.toKey());
         }
         final RunState runState = RunState.create(workflowInstance, persistentState.state(),
             persistentState.data(), persistentState.timestamp());
