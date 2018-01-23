@@ -32,7 +32,7 @@ import static org.junit.Assert.assertThat;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.serialization.Json;
-import com.spotify.styx.util.TriggerUtil;
+import java.util.Optional;
 import org.junit.Test;
 
 public class StateDataSerializationTest {
@@ -58,11 +58,7 @@ public class StateDataSerializationTest {
       + "\"retry_delay_millis\": 600000,"
       + "\"tries\": 4,"
       + "\"trigger\":{\"@type\":\"natural\"},"
-      + "\"trigger_id\": \"natural-trigger\","
-      + "\"messages\": ["
-      + "  {\"level\":\"INFO\",\"line\":\"Message 1\"},"
-      + "  {\"level\":\"WARNING\",\"line\":\"Message 2\"}"
-      + "],"
+      + "\"message\": {\"level\":\"WARNING\",\"line\":\"Message!\"},"
       + "\"unknown_field\": \"foo\""
       + "}";
 
@@ -87,11 +83,7 @@ public class StateDataSerializationTest {
       + "\"retry_delay_millis\": 600000,"
       + "\"tries\": 4,"
       + "\"trigger\":{\"@type\":\"backfill\",\"trigger_id\":\"backfill-1\"},"
-      + "\"trigger_id\": \"backfill-1\","
-      + "\"messages\": ["
-      + "  {\"level\":\"INFO\",\"line\":\"Message 1\"},"
-      + "  {\"level\":\"WARNING\",\"line\":\"Message 2\"}"
-      + "],"
+      + "\"message\": {\"level\":\"WARNING\",\"line\":\"Message!\"},"
       + "\"unknown_field\": \"foo\""
       + "}";
 
@@ -107,19 +99,16 @@ public class StateDataSerializationTest {
           .secret(WorkflowConfiguration.Secret.create("pipeline-core-secret", "/etc/keys"))
           .commitSha("474339ec18d3d04d5d513856bc8ca1d4f1aed03f")
           .build())
-      .addMessage(Message.info("Message 1"))
-      .addMessage(Message.warning("Message 2"))
+      .message(Message.warning("Message!"))
       .build();
 
   private static final StateData EXPECTED_NATURAL_TRIGGER =
       EXPECTED_NO_TRIGGER.builder()
-          .triggerId(TriggerUtil.NATURAL_TRIGGER_ID)
           .trigger(Trigger.natural())
           .build();
 
   private static final StateData EXPECTED_BACKFILL_TRIGGER =
       EXPECTED_NO_TRIGGER.builder()
-          .triggerId("backfill-1")
           .trigger(Trigger.backfill("backfill-1"))
           .build();
 
@@ -129,12 +118,10 @@ public class StateDataSerializationTest {
     String jsonBackfillTrigger = Json.OBJECT_MAPPER.writeValueAsString(EXPECTED_BACKFILL_TRIGGER);
 
     assertStateDataJsonNoTrigger(jsonNaturalTrigger);
-    assertThat(jsonNaturalTrigger, hasJsonPath("trigger_id", equalTo(TriggerUtil.NATURAL_TRIGGER_ID)));
     assertThat(jsonNaturalTrigger, hasJsonPath("trigger.@type", equalTo("natural")));
     assertThat(jsonNaturalTrigger, isJson(withoutJsonPath("trigger.trigger_id")));
 
     assertStateDataJsonNoTrigger(jsonBackfillTrigger);
-    assertThat(jsonBackfillTrigger, hasJsonPath("trigger_id", equalTo("backfill-1")));
     assertThat(jsonBackfillTrigger, hasJsonPath("trigger.@type", equalTo("backfill")));
     assertThat(jsonBackfillTrigger, hasJsonPath("trigger.trigger_id", equalTo("backfill-1")));
   }
@@ -146,10 +133,8 @@ public class StateDataSerializationTest {
     assertThat(json, hasJsonPath("last_exit", equalTo(20)));
     assertThat(json, hasJsonPath("execution_id", equalTo("styx-run-12172683-c62f-4f32-899a-63a9741b73f9")));
     assertThat(json, hasJsonPath("execution_description"));
-    assertThat(json, hasJsonPath("messages.[0].level", equalTo("INFO")));
-    assertThat(json, hasJsonPath("messages.[0].line", equalTo("Message 1")));
-    assertThat(json, hasJsonPath("messages.[1].level", equalTo("WARNING")));
-    assertThat(json, hasJsonPath("messages.[1].line", equalTo("Message 2")));
+    assertThat(json, hasJsonPath("message.level", equalTo("WARNING")));
+    assertThat(json, hasJsonPath("message.line", equalTo("Message!")));
   }
 
   @Test
@@ -173,6 +158,7 @@ public class StateDataSerializationTest {
     assertThat(stateData.retryDelayMillis(), isEmpty());
     assertThat(stateData.executionId(), isEmpty());
     assertThat(stateData.executionDescription(), isEmpty());
+    assertThat(stateData.message(), is(Optional.empty()));
     assertThat(stateData.messages(), is(empty()));
   }
 

@@ -59,6 +59,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -276,20 +277,21 @@ public class Scheduler {
           final long usage = currentResourceUsage.getOrDefault(resourceId, 0L);
           return usage >= resource.concurrency();
         })
-        .collect(toSet());
+        // Use TreeSet to ensure elements are ordered
+        .collect(toCollection(TreeSet::new));
 
     if (!unknownResources.isEmpty()) {
       stateManager.receiveIgnoreClosed(Event.runError(
           instance.workflowInstance(),
           String.format("Referenced resources not found: %s", unknownResources)));
     } else if (!depletedResources.isEmpty()) {
+      // Ordered set ensures deterministic message contents
       final Message message = Message.info(
           String.format("Resource limit reached for: %s",
               depletedResources.stream()
                   .map(resources::get)
                   .collect(toList())));
-      final List<Message> messages = instance.runState().data().messages();
-      if (messages.size() == 0 || !message.equals(messages.get(messages.size() - 1))) {
+      if (!instance.runState().data().message().map(message::equals).orElse(false)) {
         stateManager.receiveIgnoreClosed(Event.info(instance.workflowInstance(), message));
       }
     } else {
