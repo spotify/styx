@@ -160,7 +160,7 @@ public class ReplayEventsTest {
 
   @Test
   @Parameters({"true", "false",})
-  public void restoreRunStateForActiveInstanceFromPersistentSate(boolean printLogs) throws Exception {
+  public void restoreRunStateForActiveInstanceFromPersistentState(boolean printLogs) throws Exception {
 
     final PersistentWorkflowInstanceState persistentState = PersistentWorkflowInstanceState.builder()
         .state(SUBMITTED)
