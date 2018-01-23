@@ -46,7 +46,9 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.Debug;
+import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
+import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import io.fabric8.kubernetes.api.model.ContainerBuilder;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
@@ -72,7 +74,6 @@ import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
@@ -81,6 +82,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -111,7 +114,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
   private static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
   private static final int DEFAULT_POD_DELETION_DELAY_SECONDS = 120;
-  private static final Clock DEFAULT_CLOCK = Clock.systemUTC();
+  private static final Time DEFAULT_TIME = Instant::now;
   static final String STYX_WORKFLOW_SA_ENV_VARIABLE = "GOOGLE_APPLICATION_CREDENTIALS";
   static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
   private static final String STYX_WORKFLOW_SA_JSON_KEY = "styx-wf-sa.json";
@@ -133,14 +136,15 @@ class KubernetesDockerRunner implements DockerRunner {
   private final Debug debug;
   private final int pollPodsIntervalSeconds;
   private final int podDeletionDelaySeconds;
-  private final Clock clock;
+  private final Time time;
+  private final ConcurrentMap<String, Long> submissions = new ConcurrentHashMap<>();
 
   private Watch watch;
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
                          Debug debug, int pollPodsIntervalSeconds, int podDeletionDelaySeconds,
-                         Clock clock) {
+                         Time time) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client);
     this.stats = Objects.requireNonNull(stats);
@@ -148,19 +152,20 @@ class KubernetesDockerRunner implements DockerRunner {
     this.debug = debug;
     this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
     this.podDeletionDelaySeconds = podDeletionDelaySeconds;
-    this.clock = Objects.requireNonNull(clock);
+    this.time = Objects.requireNonNull(time);
   }
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
                          Debug debug) {
     this(client, stateManager, stats, serviceAccountSecretManager, debug,
-        DEFAULT_POLL_PODS_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_CLOCK);
+        DEFAULT_POLL_PODS_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_TIME);
   }
 
   @Override
   public void start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
     final KubernetesSecretSpec secretSpec = ensureSecrets(workflowInstance, runSpec);
+    submissions.put(runSpec.executionId(), time.nanoTime());
     try {
       client.pods().create(createPod(workflowInstance, runSpec, secretSpec));
     } catch (KubernetesClientException kce) {
@@ -379,7 +384,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private boolean isNonDeletePeriodExpired(ContainerStatus containerStatus) {
     return Optional.ofNullable(containerStatus.getState().getTerminated().getFinishedAt())
         .map(finishedAt -> Instant.parse(finishedAt)
-            .isBefore(clock.instant().minus(
+            .isBefore(time.get().minus(
                 Duration.ofSeconds(podDeletionDelaySeconds))))
         .orElse(true);
   }
@@ -478,7 +483,6 @@ class KubernetesDockerRunner implements DockerRunner {
     final PodList list = client.pods().list();
     examineRunningWFISandAssociatedPods(runningWorkflowInstances, list);
 
-
     for (Pod pod : list.getItems()) {
       logEvent(Watcher.Action.MODIFIED, pod, list.getMetadata().getResourceVersion(), true);
       final Optional<WorkflowInstance> workflowInstance = readPodWorkflowInstance(pod);
@@ -540,6 +544,11 @@ class KubernetesDockerRunner implements DockerRunner {
     for (Event event : events) {
       if (event.accept(new PullImageErrorMatcher())) {
         stats.recordPullImageError();
+      }
+      if (EventUtil.name(event).equals("started")) {
+        final long runningNanos = time.nanoTime();
+        runState.data().executionId().map(submissions::remove).ifPresent(submissionNanos ->
+            stats.recordSubmitToRunningTime(TimeUnit.NANOSECONDS.toSeconds(runningNanos - submissionNanos)));
       }
 
       try {

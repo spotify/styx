@@ -42,7 +42,6 @@ import java.time.Instant;
 import java.util.Optional;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Matchers;
 import org.mockito.Mockito;
 
 public class MonitoringHandlerTest {
@@ -61,20 +60,7 @@ public class MonitoringHandlerTest {
     time = () -> i;
     stats = Mockito.mock(Stats.class);
     i = Instant.parse("2015-12-31T23:59:10.000Z");
-    outputHandler = new MonitoringHandler(time, stats);
-  }
-
-  @Test
-  public void shouldUpdateOnDefaultCase() throws Exception {
-    RunState state = RunState.create(WORKFLOW_INSTANCE, RunState.State.NEW, time, outputHandler);
-    stateManager.initialize(state);
-
-    stateManager.receive(Event.timeTrigger(state.workflowInstance()));
-
-    i = Instant.parse("2015-12-31T23:59:12.000Z");
-    stateManager.receive(Event.started(state.workflowInstance()));
-
-    verify(stats).recordSubmitToRunningTime(Matchers.eq(2L));
+    outputHandler = new MonitoringHandler(stats);
   }
 
   @Test
@@ -105,24 +91,5 @@ public class MonitoringHandlerTest {
     stateManager.receive(Event.terminate(state.workflowInstance(), Optional.empty()));
 
     verify(stats, never()).recordExitCode(any(WorkflowId.class), anyInt());
-  }
-
-  @Test
-  public void shouldUpdateAfterAFail() throws Exception {
-    RunState state = RunState.create(WORKFLOW_INSTANCE, RunState.State.NEW, time, outputHandler);
-    stateManager.initialize(state);
-
-    stateManager.receive(Event.timeTrigger(state.workflowInstance()));
-    stateManager.receive(Event.runError(state.workflowInstance(), "error"));
-    stateManager.receive(Event.retryAfter(state.workflowInstance(), 0));
-
-    i = Instant.parse("2015-12-31T23:59:15.000Z");
-    stateManager.receive(Event.dequeue(state.workflowInstance()));
-    stateManager.receive(Event.created(state.workflowInstance(), "test_execution_id", "img"));
-
-    i = Instant.parse("2015-12-31T23:59:16.000Z");
-    stateManager.receive(Event.started(state.workflowInstance()));
-
-    verify(stats).recordSubmitToRunningTime(Matchers.eq(1L));
   }
 }

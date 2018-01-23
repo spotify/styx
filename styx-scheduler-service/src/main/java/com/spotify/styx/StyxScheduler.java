@@ -342,7 +342,7 @@ public class StyxScheduler implements AppInit {
         new DockerRunnerHandler(
             dockerRunner, stateManager),
         new TerminationHandler(retryUtil, stateManager),
-        new MonitoringHandler(time, stats),
+        new MonitoringHandler(stats),
         new PublisherHandler(publisher),
         new ExecutionDescriptionHandler(storage, stateManager, new DockerImageValidator())
     };
