@@ -635,7 +635,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       "true, true",
       "true, false",
       "false, true",})
-  public void restoresActiveStatesFromBigtable(boolean withEvents, boolean withPersistentState) throws Exception {
+  public void restoresActiveStates(boolean withEvents, boolean withPersistentState) throws Exception {
     WorkflowInstance workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
 
     givenTheTimeIs("2016-03-14T15:17:45Z");
