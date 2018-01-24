@@ -32,7 +32,6 @@ import static com.spotify.styx.state.RunState.State.SUBMITTING;
 import static com.spotify.styx.state.RunState.State.TERMINATED;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.WorkflowInstanceEventFactory;
