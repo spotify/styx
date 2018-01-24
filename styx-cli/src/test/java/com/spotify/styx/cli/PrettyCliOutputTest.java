@@ -20,13 +20,27 @@
 
 package com.spotify.styx.cli;
 
+import static com.spotify.styx.cli.CliUtil.colored;
+import static com.spotify.styx.cli.CliUtil.coloredBright;
+import static org.fusesource.jansi.Ansi.Color.BLACK;
+import static org.fusesource.jansi.Ansi.Color.BLUE;
+import static org.fusesource.jansi.Ansi.Color.CYAN;
+import static org.fusesource.jansi.Ansi.Color.GREEN;
+import static org.fusesource.jansi.Ansi.Color.YELLOW;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableList;
 import com.spotify.styx.api.BackfillPayload;
+import com.spotify.styx.api.RunStateDataPayload;
+import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.Message;
+import com.spotify.styx.state.StateData;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.time.Instant;
@@ -172,5 +186,37 @@ public class PrettyCliOutputTest {
                  + "2017-01-01            2017-01-02            2017-01-01            "
                  + "component  workflow2 N/A\n",
         outContent.toString());
+  }
+
+  @Test
+  public void shouldPrintStates() throws Exception {
+    final RunStateDataPayload states = RunStateDataPayload.create(ImmutableList.of(
+        RunStateData.create(
+            WorkflowInstance.create(WorkflowId.create("c0", "w0"), "2016-09-01"),
+            "QUEUED",
+            StateData.newBuilder()
+                .messages(Message.info("foo"))
+                .executionId("e0")
+                .tries(17)
+                .build()),
+        RunStateData.create(
+            WorkflowInstance.create(WorkflowId.create("c1", "w1"), "2016-09-02"),
+            "SUBMITTED",
+            StateData.newBuilder()
+                .messages(Message.warning("baz"))
+                .executionId("e1")
+                .tries(3)
+                .build())));
+    cliOutput.printStates(states);
+    assertThat(outContent.toString(),
+        is("  WORKFLOW INSTANCE    STATE        EXECUTION ID                                    TRIES   PREVIOUS EXECUTION MESSAGE\n"
+            + "\n"
+            + colored(CYAN, "c0") + " " + colored(BLUE, "w0") + "\n"
+            + "  2016-09-01           " + coloredBright(BLACK, "QUEUED") + "       e0                                  "
+            + "            17      " + colored(GREEN, "foo") + "\n"
+            + "\n"
+            + colored(CYAN, "c1") + " " + colored(BLUE, "w1") + "\n"
+            + "  2016-09-02           " + colored(CYAN,        "SUBMITTED") + "    e1                                  "
+            + "            3       " + colored(YELLOW, "baz") + "\n"));
   }
 }
