@@ -242,7 +242,7 @@ class KubernetesDockerRunner implements DockerRunner {
     runSpec.memLimit().ifPresent(s -> resourceRequirements.addToLimits("memory", new Quantity(s)));
 
     final ContainerBuilder containerBuilder = new ContainerBuilder()
-        .withName(STYX_RUN)
+        .withName(runSpec.executionId())
         .withImage(imageWithTag)
         .withArgs(runSpec.args())
         .withEnv(buildEnv(workflowInstance, runSpec))
