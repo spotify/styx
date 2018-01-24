@@ -25,6 +25,7 @@ import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
 import static com.spotify.apollo.Status.OK;
 import static com.spotify.styx.util.ParameterUtil.parseAlignedInstant;
 
+import com.google.common.base.Joiner;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
@@ -44,11 +45,11 @@ import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.Time;
+import com.spotify.styx.util.WorkflowValidator;
 import com.spotify.styx.workflow.WorkflowInitializationException;
 import java.io.IOException;
 import java.time.Instant;
@@ -71,7 +72,7 @@ public class SchedulerResource {
   private final Consumer<Workflow> workflowRemoveListener;
   private final Storage storage;
   private final Time time;
-  private final DockerImageValidator dockerImageValidator;
+  private final WorkflowValidator workflowValidator;
 
   private final RandomGenerator randomGenerator = RandomGenerator.DEFAULT;
 
@@ -82,14 +83,14 @@ public class SchedulerResource {
       Consumer<Workflow> workflowRemoveListener,
       Storage storage,
       Time time,
-      DockerImageValidator dockerImageValidator) {
+      WorkflowValidator workflowValidator) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.triggerListener = Objects.requireNonNull(triggerListener);
     this.workflowChangeListener = workflowChangeListener;
     this.workflowRemoveListener = workflowRemoveListener;
     this.storage = Objects.requireNonNull(storage);
     this.time = Objects.requireNonNull(time);
-    this.dockerImageValidator = Objects.requireNonNull(dockerImageValidator, "dockerImageValidator");
+    this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -145,10 +146,10 @@ public class SchedulerResource {
     if (!configuration.dockerImage().isPresent()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing docker image"));
     }
-    final Collection<String> errors = dockerImageValidator.validateImageReference(
-        configuration.dockerImage().get());
+    final Collection<String> errors = workflowValidator.validateWorkflowConfiguration(configuration);
     if (!errors.isEmpty()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid docker image: " + errors));
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: " +
+          Joiner.on(", ").join(errors)));
     }
 
     if (configuration.commitSha().isPresent()
@@ -233,6 +234,14 @@ public class SchedulerResource {
       return Response.forStatus(
           INTERNAL_SERVER_ERROR.withReasonPhrase(
               "An error occurred while retrieving workflow specifications"));
+    }
+    if (!workflow.configuration().dockerImage().isPresent()) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing docker image"));
+    }
+    final Collection<String> errors = workflowValidator.validateWorkflow(workflow);
+    if (!errors.isEmpty()) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: " +
+          Joiner.on(", ").join(errors)));
     }
 
     // Verifying instant
