@@ -148,8 +148,8 @@ public class SchedulerResource {
     }
     final Collection<String> errors = workflowValidator.validateWorkflowConfiguration(configuration);
     if (!errors.isEmpty()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: " +
-          Joiner.on(", ").join(errors)));
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
+          + Joiner.on(", ").join(errors)));
     }
 
     if (configuration.commitSha().isPresent()
@@ -240,8 +240,8 @@ public class SchedulerResource {
     }
     final Collection<String> errors = workflowValidator.validateWorkflow(workflow);
     if (!errors.isEmpty()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: " +
-          Joiner.on(", ").join(errors)));
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
+          + Joiner.on(", ").join(errors)));
     }
 
     // Verifying instant
