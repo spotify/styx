@@ -20,6 +20,8 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.apollo.Status.BAD_REQUEST;
+import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
 import static com.spotify.apollo.StatusType.Family.SUCCESSFUL;
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.serialization.Json.serialize;
@@ -29,6 +31,7 @@ import static com.spotify.styx.util.StreamUtil.cat;
 import static java.util.stream.Collectors.toList;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.base.Joiner;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -56,8 +59,10 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.ReplayEvents;
 import com.spotify.styx.util.TimeUtil;
+import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -79,10 +84,13 @@ public final class BackfillResource {
 
   private final Storage storage;
   private final String schedulerServiceBaseUrl;
+  private final WorkflowValidator workflowValidator;
 
-  public BackfillResource(String schedulerServiceBaseUrl, Storage storage) {
+  public BackfillResource(String schedulerServiceBaseUrl, Storage storage,
+      WorkflowValidator workflowValidator) {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
     this.storage = Objects.requireNonNull(storage);
+    this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -247,6 +255,21 @@ public final class BackfillResource {
     final Schedule schedule;
 
     final WorkflowId workflowId = WorkflowId.create(input.component(), input.workflow());
+
+    final Workflow workflow;
+    try {
+      final Optional<Workflow> workflowResult = storage.workflow(workflowId);
+      if (workflowResult.isPresent()) {
+        workflow = workflowResult.get();
+      } else {
+        return Response.forStatus(
+            BAD_REQUEST.withReasonPhrase("The specified workflow is not found in the scheduler"));
+      }
+    } catch (IOException e) {
+      return Response.forStatus(
+          INTERNAL_SERVER_ERROR.withReasonPhrase(
+              "An error occurred while retrieving workflow specifications"));
+    }
     final Set<WorkflowInstance> activeWorkflowInstances;
     try {
       activeWorkflowInstances = storage.readActiveWorkflowInstances(input.component()).keySet();
@@ -257,6 +280,14 @@ public final class BackfillResource {
       schedule = workflowOpt.get().configuration().schedule();
     } catch (Exception e) {
       throw new RuntimeException(e);
+    }
+    if (!workflow.configuration().dockerImage().isPresent()) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing docker image"));
+    }
+    final Collection<String> errors = workflowValidator.validateWorkflow(workflow);
+    if (!errors.isEmpty()) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
+          + Joiner.on(", ").join(errors)));
     }
 
     if (!TimeUtil.isAligned(input.start(), schedule)) {
