@@ -46,7 +46,9 @@ public interface Stats {
 
   void recordDockerOperationError(String operation, String type, int code, long durationMillis);
 
-  void recordSubmitToRunningTime(long durationSeconds);
+  void recordSubmission(String executionId);
+
+  void recordRunning(String executionId);
 
   void recordExitCode(WorkflowId workflowId, int exitCode);
 

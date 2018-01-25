@@ -22,11 +22,6 @@ package com.spotify.styx.monitoring;
 
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.util.Time;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -35,35 +30,20 @@ import java.util.Objects;
  */
 public class MonitoringHandler implements OutputHandler {
 
-  private final Time time;
   private final Stats stats;
 
-  private final Map<String, Instant> map = new HashMap<>();
-
-  public MonitoringHandler(Time time, Stats stats) {
-    this.time = Objects.requireNonNull(time);
+  public MonitoringHandler(Stats stats) {
     this.stats = Objects.requireNonNull(stats);
   }
 
   @Override
   public void transitionInto(RunState state) {
     switch (state.state()) {
-      case SUBMITTED:
-        final Instant submittedTime = time.get();
-        map.put(state.workflowInstance().toKey(), submittedTime);
-        break;
-
       case TERMINATED:
         if (state.data().lastExit().isPresent()) {
           stats.recordExitCode(state.workflowInstance().workflowId(), state.data().lastExit().get());
         }
         break;
-
-      case RUNNING:
-        final Instant a = time.get();
-        final Instant b = map.remove(state.workflowInstance().toKey());
-        final long durationSeconds = b.until(a, ChronoUnit.SECONDS);
-        stats.recordSubmitToRunningTime(durationSeconds);
 
       default:
         // do nothing

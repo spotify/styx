@@ -24,4 +24,8 @@ import java.time.Instant;
 import java.util.function.Supplier;
 
 public interface Time extends Supplier<Instant> {
+
+  default long nanoTime() {
+    return System.nanoTime();
+  }
 }

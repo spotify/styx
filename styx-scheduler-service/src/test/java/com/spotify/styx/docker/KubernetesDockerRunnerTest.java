@@ -52,6 +52,7 @@ import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.IsClosedException;
+import com.spotify.styx.util.Time;
 import io.fabric8.kubernetes.api.model.ContainerState;
 import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
@@ -76,14 +77,13 @@ import io.fabric8.kubernetes.client.dsl.MixedOperation;
 import io.fabric8.kubernetes.client.dsl.PodResource;
 import io.fabric8.kubernetes.client.dsl.Resource;
 import java.io.IOException;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -136,7 +136,6 @@ public class KubernetesDockerRunnerTest {
   private static final int NO_POLL = Integer.MAX_VALUE;
   private static final int POD_DELETION_DELAY_SECONDS = 120;
   private static final Instant FIXED_INSTANT = Instant.parse("2017-09-01T01:00:00Z");
-  private static final Clock CLOCK = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
 
   @Mock NamespacedKubernetesClient k8sClient;
   @Mock KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
@@ -152,6 +151,7 @@ public class KubernetesDockerRunnerTest {
   @Mock ListMeta listMeta;
   @Mock Watch watch;
   @Mock Debug debug;
+  @Mock Time time;
 
   @Captor ArgumentCaptor<Watcher<Pod>> watchCaptor;
   @Captor ArgumentCaptor<Pod> podCaptor;
@@ -183,8 +183,10 @@ public class KubernetesDockerRunnerTest {
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT))
         .thenReturn(SERVICE_ACCOUNT_SECRET);
 
+    when(time.get()).thenReturn(FIXED_INSTANT);
+
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug, NO_POLL,
-                                     POD_DELETION_DELAY_SECONDS, CLOCK);
+                                     POD_DELETION_DELAY_SECONDS, time);
     kdr.init();
 
     podWatcher = watchCaptor.getValue();
@@ -623,17 +625,26 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldGenerateStartedWhenContainerIsReady() throws Exception {
+  public void shouldGenerateStartedAndRecordSubmitToRunningTimeWhenContainerIsReady() throws Exception {
+    when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(17));
+    kdr.start(WORKFLOW_INSTANCE, RunSpec.simple(POD_NAME, "busybox"));
+    verify(stats).recordSubmission(POD_NAME);
+
+    when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(18));
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
     stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
 
+    when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(19));
     createdPod.setStatus(running(/* ready= */ false));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
     assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.SUBMITTED));
 
+    when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(4711));
     createdPod.setStatus(running(/* ready= */ true));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
     assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.RUNNING));
+
+    verify(stats).recordRunning(POD_NAME);
   }
 
   @Test
@@ -660,7 +671,7 @@ public class KubernetesDockerRunnerTest {
 
     // Start a new runner
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, NO_POLL, 0, CLOCK);
+        debug, NO_POLL, 0, time);
     kdr.init();
 
     // Make the runner poll states for all pods
@@ -680,7 +691,7 @@ public class KubernetesDockerRunnerTest {
     // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
     kdr.close();
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, 1, 0, CLOCK);
+        debug, 1, 0, time);
     kdr.init();
     kdr.restore();
 
