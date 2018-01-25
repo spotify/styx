@@ -62,10 +62,12 @@ final class NoopStats implements Stats {
 
   @Override
   public void recordSubmission(String executionId) {
+    // nop
   }
 
   @Override
   public void recordRunning(String executionId) {
+    // nop
   }
 
   @Override
