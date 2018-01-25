@@ -23,15 +23,19 @@ package com.spotify.styx.monitoring;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.spotify.metrics.core.MetricId;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.EventUtil;
+import com.spotify.styx.util.Time;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import javaslang.Tuple;
 import javaslang.Tuple2;
 import javaslang.Tuple3;
@@ -131,6 +135,7 @@ public final class MetricsStats implements Stats {
   private static final String STATUS = "status";
 
   private final SemanticMetricRegistry registry;
+  private final Time time;
 
   private final Histogram submitToRunning;
   private final Meter pullImageErrorMeter;
@@ -152,8 +157,16 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Meter> eventConsumerMeters;
   private final ConcurrentMap<String, Meter> workflowConsumerMeters;
 
-  public MetricsStats(SemanticMetricRegistry registry) {
+  /**
+   * Submission timestamps (nanotime) keyed on execution id.
+   */
+  private final Cache<String, Long> submissionTimestamps = CacheBuilder.newBuilder()
+      .maximumSize(100_000)
+      .build();
+
+  public MetricsStats(SemanticMetricRegistry registry, Time time) {
     this.registry = Objects.requireNonNull(registry);
+    this.time = Objects.requireNonNull(time, "time");
 
     this.submitToRunning = registry.histogram(TRANSITIONING_DURATION);
     this.pullImageErrorMeter = registry.meter(PULL_IMAGE_ERROR_RATE);
@@ -225,8 +238,18 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
-  public void recordSubmitToRunningTime(long durationSeconds) {
-    submitToRunning.update(durationSeconds);
+  public void recordSubmission(String executionId) {
+    submissionTimestamps.put(executionId, time.nanoTime());
+  }
+
+  @Override
+  public void recordRunning(String executionId) {
+    final Long submissionNanos = submissionTimestamps.getIfPresent(executionId);
+    if (submissionNanos != null) {
+      final long runningNanos = time.nanoTime();
+      submissionTimestamps.invalidate(executionId);
+      submitToRunning.update(TimeUnit.NANOSECONDS.toSeconds(runningNanos - submissionNanos));
+    }
   }
 
   @Override

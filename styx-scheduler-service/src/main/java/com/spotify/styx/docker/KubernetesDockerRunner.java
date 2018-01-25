@@ -34,8 +34,6 @@ import com.github.rholder.retry.RetryerBuilder;
 import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.WaitStrategies;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
@@ -138,13 +136,6 @@ class KubernetesDockerRunner implements DockerRunner {
   private final int podDeletionDelaySeconds;
   private final Time time;
 
-  /**
-   * Submission timestamps (nanotime) keyed on execution id.
-   */
-  private final Cache<String, Long> submissionTimestamps = CacheBuilder.newBuilder()
-      .maximumSize(100_000)
-      .build();
-
   private Watch watch;
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
@@ -171,7 +162,7 @@ class KubernetesDockerRunner implements DockerRunner {
   @Override
   public void start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
     final KubernetesSecretSpec secretSpec = ensureSecrets(workflowInstance, runSpec);
-    submissionTimestamps.put(runSpec.executionId(), time.nanoTime());
+    stats.recordSubmission(runSpec.executionId());
     try {
       client.pods().create(createPod(workflowInstance, runSpec, secretSpec));
     } catch (KubernetesClientException kce) {
@@ -552,14 +543,7 @@ class KubernetesDockerRunner implements DockerRunner {
         stats.recordPullImageError();
       }
       if (EventUtil.name(event).equals("started")) {
-        final long runningNanos = time.nanoTime();
-        runState.data().executionId().ifPresent(executionId -> {
-          final Long submissionNanos = submissionTimestamps.getIfPresent(executionId);
-          if (submissionNanos != null) {
-            submissionTimestamps.invalidate(executionId);
-            stats.recordSubmitToRunningTime(TimeUnit.NANOSECONDS.toSeconds(runningNanos - submissionNanos));
-          }
-        });
+        runState.data().executionId().ifPresent(stats::recordRunning);
       }
 
       try {

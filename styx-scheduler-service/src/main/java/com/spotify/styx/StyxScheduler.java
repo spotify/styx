@@ -618,7 +618,7 @@ public class StyxScheduler implements AppInit {
   }
 
   private static Stats stats(Environment environment) {
-    return new MetricsStats(environment.resolve(SemanticMetricRegistry.class));
+    return new MetricsStats(environment.resolve(SemanticMetricRegistry.class), Instant::now);
   }
 
   private static StorageFactory storage(StorageFactory storage) {

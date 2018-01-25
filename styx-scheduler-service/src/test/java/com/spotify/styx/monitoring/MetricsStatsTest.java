@@ -43,6 +43,7 @@ import static com.spotify.styx.monitoring.MetricsStats.TRANSITIONING_DURATION;
 import static com.spotify.styx.monitoring.MetricsStats.WORKFLOW_CONSUMER_ERROR_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.WORKFLOW_CONSUMER_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.WORKFLOW_COUNT;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,6 +58,8 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.Time;
+import java.time.Instant;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -80,8 +83,12 @@ public class MetricsStatsTest {
   @Mock
   private Gauge<Long> gauge;
 
+  @Mock Time time;
+
   @Before
   public void setUp() throws Exception {
+    when(time.nanoTime()).then(a -> System.nanoTime());
+    when(time.get()).then(a -> Instant.now());
     when(registry.histogram(TRANSITIONING_DURATION)).thenReturn(histogram);
     when(registry.meter(PULL_IMAGE_ERROR_RATE)).thenReturn(meter);
     when(registry.meter(NATURAL_TRIGGER_RATE)).thenReturn(meter);
@@ -89,7 +96,7 @@ public class MetricsStatsTest {
     when(registry.meter(TERMINATION_LOG_INVALID)).thenReturn(meter);
     when(registry.meter(EXIT_CODE_MISMATCH)).thenReturn(meter);
     when(registry.meter(WORKFLOW_CONSUMER_ERROR_RATE)).thenReturn(meter);
-    stats = new MetricsStats(registry);
+    stats = new MetricsStats(registry, time);
   }
 
   @Test
@@ -126,8 +133,11 @@ public class MetricsStatsTest {
 
   @Test
   public void shouldRecordSubmitToRunningTime() throws Exception {
-    stats.recordSubmitToRunningTime(1000L);
-    verify(histogram).update(1000L);
+    when(time.nanoTime()).thenReturn(SECONDS.toNanos(17L));
+    stats.recordSubmission("foo");
+    when(time.nanoTime()).thenReturn(SECONDS.toNanos(4711L));
+    stats.recordRunning("foo");
+    verify(histogram).update(4711L - 17L);
   }
 
   @Test

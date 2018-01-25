@@ -628,6 +628,7 @@ public class KubernetesDockerRunnerTest {
   public void shouldGenerateStartedAndRecordSubmitToRunningTimeWhenContainerIsReady() throws Exception {
     when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(17));
     kdr.start(WORKFLOW_INSTANCE, RunSpec.simple(POD_NAME, "busybox"));
+    verify(stats).recordSubmission(POD_NAME);
 
     when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(18));
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
@@ -643,7 +644,7 @@ public class KubernetesDockerRunnerTest {
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
     assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.RUNNING));
 
-    verify(stats).recordSubmitToRunningTime(4711 - 17);
+    verify(stats).recordRunning(POD_NAME);
   }
 
   @Test
