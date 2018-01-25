@@ -21,6 +21,7 @@
 package com.spotify.styx.state;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.google.common.collect.Iterables;
 import com.spotify.styx.model.ExecutionDescription;
 import io.norberg.automatter.AutoMatter;
 import java.util.List;
@@ -45,7 +46,17 @@ public interface StateData {
   Optional<String> triggerId(); //for backwards compatibility
   Optional<String> executionId();
   Optional<ExecutionDescription> executionDescription();
-  List<Message> messages();
+
+  /**
+   * This field is deprecated and kept only for backwards compatibility.
+   *
+   * @deprecated Use {@link #message()} instead.
+   */
+  @Deprecated List<Message> messages();
+
+  default Optional<Message> message() {
+    return messages().isEmpty() ? Optional.empty() : Optional.of(Iterables.getLast(messages()));
+  }
 
   StateDataBuilder builder();
 

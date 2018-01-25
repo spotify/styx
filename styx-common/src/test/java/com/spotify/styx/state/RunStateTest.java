@@ -32,11 +32,13 @@ import static com.spotify.styx.state.RunState.State.SUBMITTING;
 import static com.spotify.styx.state.RunState.State.TERMINATED;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.WorkflowInstanceEventFactory;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.Message.MessageLevel;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.TriggerUtil;
 import java.util.LinkedList;
@@ -481,7 +483,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testAccumulatesMessages() throws Exception {
+  public void testRunErrorEmitsMessage() throws Exception {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue());
@@ -493,26 +495,21 @@ public class RunStateTest {
     transitioner.receive(eventFactory.dequeue());
     transitioner.receive(eventFactory.runError("Error"));
 
-    assertThat(
-        transitioner.get(WORKFLOW_INSTANCE).data().messages(),
-        contains(
-            Message.create(Message.MessageLevel.WARNING, "Exit code: 20"),
-            Message.create(Message.MessageLevel.ERROR, "Error")
-        ));
+    final Message expectedMessage = Message.create(MessageLevel.ERROR, "Error");
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().messages(), contains(expectedMessage));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().message().get(), is(expectedMessage));
   }
 
   @Test
-  public void testAccumulatesMessagesWithInfo() throws Exception {
+  public void testKeepsLastMessage() throws Exception {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.info(Message.info("info message")));
     transitioner.receive(eventFactory.info(Message.warning("warning message")));
 
-    assertThat(
-        transitioner.get(WORKFLOW_INSTANCE).data().messages(),
-        contains(
-            Message.info("info message"),
-            Message.warning("warning message")));
+    final Message expectedMessage = Message.warning("warning message");
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().messages(), contains(expectedMessage));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().message().get(), is(expectedMessage));
   }
 
   @Test

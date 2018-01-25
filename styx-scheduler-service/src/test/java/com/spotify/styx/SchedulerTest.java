@@ -279,7 +279,7 @@ public class SchedulerTest {
     scheduler.tick();
 
     assertThat(
-    stateManager.get(INSTANCE).data().messages().get(0).line(),
+    stateManager.get(INSTANCE).data().message().get().line(),
         is("Referenced resources not found: [unknown]"));
     assertThat(stateManager.get(INSTANCE).state(), is(State.FAILED));
   }
@@ -294,7 +294,7 @@ public class SchedulerTest {
     scheduler.tick();
 
     assertThat(
-        stateManager.get(INSTANCE).data().messages().get(0).line(),
+        stateManager.get(INSTANCE).data().message().get().line(),
         is(String.format("Resource limit reached for: [Resource{id=%s, concurrency=%d}]",
                          Scheduler.GLOBAL_RESOURCE_ID, 0)));
     assertThat(stateManager.get(INSTANCE).state(), is(State.QUEUED));
@@ -310,7 +310,7 @@ public class SchedulerTest {
     scheduler.tick();
 
     assertThat(
-        stateManager.get(INSTANCE).data().messages().get(0).line(),
+        stateManager.get(INSTANCE).data().message().get().line(),
         is("Resource limit reached for: [Resource{id=r1, concurrency=0}]"));
     assertThat(stateManager.get(INSTANCE).state(), is(State.QUEUED));
   }
@@ -326,7 +326,7 @@ public class SchedulerTest {
     scheduler.tick();
 
     assertThat(
-        stateManager.get(INSTANCE).data().messages().get(0).line(),
+        stateManager.get(INSTANCE).data().message().get().line(),
         is("Referenced resources not found: [r2, r3]"));
     assertThat(stateManager.get(INSTANCE).state(), is(State.FAILED));
   }
@@ -341,7 +341,7 @@ public class SchedulerTest {
     scheduler.tick();
     scheduler.tick();
 
-    assertThat(stateManager.get(INSTANCE).data().messages().size(), is(1));
+    assertThat(stateManager.get(INSTANCE).data().message().isPresent(), is(true));
     assertThat(stateManager.get(INSTANCE).state(), is(State.QUEUED));
   }
 

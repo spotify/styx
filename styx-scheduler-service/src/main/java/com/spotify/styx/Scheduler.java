@@ -288,8 +288,7 @@ public class Scheduler {
               depletedResources.stream()
                   .map(resources::get)
                   .collect(toList())));
-      final List<Message> messages = instance.runState().data().messages();
-      if (messages.size() == 0 || !message.equals(messages.get(messages.size() - 1))) {
+      if (!instance.runState().data().message().map(message::equals).orElse(false)) {
         stateManager.receiveIgnoreClosed(Event.info(instance.workflowInstance(), message));
       }
     } else {
