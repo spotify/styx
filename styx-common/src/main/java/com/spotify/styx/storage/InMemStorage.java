@@ -33,6 +33,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TriggerInstantSpec;
 import com.spotify.styx.util.WorkflowStateUtil;
@@ -61,7 +62,7 @@ public class InMemStorage implements Storage {
       .newConcurrentMap();
 
   public final List<SequenceEvent> writtenEvents = Lists.newCopyOnWriteArrayList();
-  public final Map<WorkflowInstance, Long> activeStatesMap = Maps.newHashMap();
+  public final Map<WorkflowInstance, PersistentWorkflowInstanceState> activeStatesMap = Maps.newHashMap();
 
   public final CountDownLatch countDown;
 
@@ -285,7 +286,8 @@ public class InMemStorage implements Storage {
   @Override
   public void writeEvent(SequenceEvent sequenceEvent) {
     writtenEvents.add(sequenceEvent);
-    activeStatesMap.computeIfPresent(sequenceEvent.event().workflowInstance(), (k, v) -> v + 1);
+    activeStatesMap.computeIfPresent(sequenceEvent.event().workflowInstance(),
+        (k, v) -> v.toBuilder().counter(v.counter() + 1).build());
   }
 
   @Override
@@ -301,8 +303,9 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public void writeActiveState(WorkflowInstance workflowInstance, long counter) {
-    activeStatesMap.put(workflowInstance, counter);
+  public void writeActiveState(WorkflowInstance workflowInstance,
+      PersistentWorkflowInstanceState state) {
+    activeStatesMap.put(workflowInstance, state);
   }
 
   @Override
@@ -311,12 +314,12 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public Map<WorkflowInstance, Long> readActiveWorkflowInstances() throws IOException {
+  public Map<WorkflowInstance, PersistentWorkflowInstanceState> readActiveWorkflowInstances() throws IOException {
     return activeStatesMap;
   }
 
   @Override
-  public Map<WorkflowInstance, Long> readActiveWorkflowInstances(String componentId)
+  public Map<WorkflowInstance, PersistentWorkflowInstanceState> readActiveWorkflowInstances(String componentId)
       throws IOException {
     return activeStatesMap.entrySet().stream()
         .filter((entry) -> componentId.equals(entry.getKey().workflowId().componentId()))
@@ -325,6 +328,7 @@ public class InMemStorage implements Storage {
 
   public Optional<Long> getCounterFromActiveStates(WorkflowInstance workflowInstance)
       throws IOException {
-    return Optional.ofNullable(activeStatesMap.get(workflowInstance));
+    return Optional.ofNullable(activeStatesMap.get(workflowInstance))
+        .map(PersistentWorkflowInstanceState::counter);
   }
 }

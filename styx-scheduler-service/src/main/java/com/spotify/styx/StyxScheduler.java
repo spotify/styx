@@ -65,6 +65,7 @@ import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.MonitoringHandler;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.QueuedStateManager;
 import com.spotify.styx.state.RunState;
@@ -442,7 +443,7 @@ public class StyxScheduler implements AppInit {
       StateManager stateManager,
       DockerRunner dockerRunner) {
     try {
-      final Map<WorkflowInstance, Long> activeInstances =
+      final Map<WorkflowInstance, PersistentWorkflowInstanceState> activeInstances =
           storage.readActiveWorkflowInstances();
 
       replayActiveStates(activeInstances, storage, true)

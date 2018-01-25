@@ -133,4 +133,20 @@ public class TriggerUtil {
       return triggerId;
     }
   }
+
+  public static Trigger trigger(String type, String triggerId) {
+    switch (type) {
+      case "natural":
+        return Trigger.natural();
+      case "adhoc":
+        return Trigger.adhoc(triggerId);
+      case "backfill":
+        return Trigger.backfill(triggerId);
+      case "unknown":
+        return Trigger.unknown(triggerId);
+
+      default:
+        throw new IllegalArgumentException("Unknown trigger type: " + type);
+    }
+  }
 }

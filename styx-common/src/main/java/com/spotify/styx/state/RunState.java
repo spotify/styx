@@ -442,6 +442,16 @@ public abstract class RunState {
       WorkflowInstance workflowInstance,
       State state,
       StateData stateData,
+      Instant timestamp,
+      OutputHandler... outputHandler) {
+    return new AutoValue_RunState(
+        workflowInstance, state, timestamp.toEpochMilli(), stateData, Instant::now, fanOutput(outputHandler));
+  }
+
+  public static RunState create(
+      WorkflowInstance workflowInstance,
+      State state,
+      StateData stateData,
       OutputHandler... outputHandler) {
     return new AutoValue_RunState(
         workflowInstance, state, currentTimeMillis(), stateData, Instant::now, fanOutput(outputHandler));

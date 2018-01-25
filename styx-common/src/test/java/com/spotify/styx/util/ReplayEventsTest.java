@@ -25,6 +25,7 @@ import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Sets.newTreeSet;
 import static com.spotify.styx.state.RunState.State.DONE;
 import static com.spotify.styx.state.RunState.State.RUNNING;
+import static com.spotify.styx.state.RunState.State.SUBMITTED;
 import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.core.Is.is;
@@ -35,11 +36,15 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.SortedSet;
@@ -71,10 +76,10 @@ public class ReplayEventsTest {
 
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
 
-    RunState restoredRunState =
-        ReplayEvents
-            .getBackfillRunState(WORKFLOW_INSTANCE, ImmutableMap.of(WORKFLOW_INSTANCE, 6L), storage,
-                                 "bf-1").get();
+    RunState restoredRunState = ReplayEvents.getBackfillRunState(
+        WORKFLOW_INSTANCE,
+        ImmutableMap.of(WORKFLOW_INSTANCE, PersistentWorkflowInstanceState.of(6L)),
+        storage, "bf-1").get();
 
     assertThat(restoredRunState.state(), is(RUNNING));
     assertThat(restoredRunState.data().trigger(), isPresent());
@@ -113,10 +118,10 @@ public class ReplayEventsTest {
 
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
 
-    Optional<RunState> restoredRunState =
-        ReplayEvents
-            .getBackfillRunState(WORKFLOW_INSTANCE, ImmutableMap.of(WORKFLOW_INSTANCE, 2L), storage,
-                                 "erroneous-id");
+    Optional<RunState> restoredRunState = ReplayEvents.getBackfillRunState(
+        WORKFLOW_INSTANCE,
+        ImmutableMap.of(WORKFLOW_INSTANCE, PersistentWorkflowInstanceState.of(2L)),
+        storage, "erroneous-id");
 
     assertThat(restoredRunState, is(Optional.empty()));
   }
@@ -139,7 +144,8 @@ public class ReplayEventsTest {
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
 
     Map<RunState, Long> runStates = ReplayEvents.replayActiveStates(
-        ImmutableMap.of(WORKFLOW_INSTANCE, counter), storage, printLogs);
+        ImmutableMap.of(WORKFLOW_INSTANCE, PersistentWorkflowInstanceState.of(counter)),
+        storage, printLogs);
 
     assertThat(runStates.size(), is(1));
 
@@ -148,6 +154,36 @@ public class ReplayEventsTest {
 
     assertThat(restoredCounter, is(counter));
     assertThat(restoredRunState.state(), is(expectedState));
+    assertThat(restoredRunState.data().trigger(), isPresent());
+    assertThat(restoredRunState.data().trigger().get(), is(Trigger.natural()));
+  }
+
+  @Test
+  @Parameters({"true", "false",})
+  public void restoreRunStateForActiveInstanceFromPersistentState(boolean printLogs) throws Exception {
+
+    final PersistentWorkflowInstanceState persistentState = PersistentWorkflowInstanceState.builder()
+        .state(SUBMITTED)
+        .data(StateData.newBuilder().executionId("exec-1")
+            .trigger(Trigger.natural())
+            .build())
+        .counter(3)
+        .timestamp(Instant.now())
+        .build();
+
+    final Map<WorkflowInstance, PersistentWorkflowInstanceState> activeInstances =
+        ImmutableMap.of(WORKFLOW_INSTANCE, persistentState);
+
+    Map<RunState, Long> runStates = ReplayEvents.replayActiveStates(
+        activeInstances, storage, printLogs);
+
+    assertThat(runStates.size(), is(1));
+
+    RunState restoredRunState = getOnlyElement(runStates.keySet());
+    long restoredCounter = getOnlyElement(runStates.values());
+
+    assertThat(restoredCounter, is(persistentState.counter()));
+    assertThat(restoredRunState.state(), is(persistentState.state()));
     assertThat(restoredRunState.data().trigger(), isPresent());
     assertThat(restoredRunState.data().trigger().get(), is(Trigger.natural()));
   }

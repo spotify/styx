@@ -60,6 +60,10 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
+import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.RunState.State;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
@@ -315,7 +319,12 @@ public class BackfillResourceTest extends VersionedApiTest {
     storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"),          3L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                              4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                          5L, 5L));
-    storage.writeActiveState(wfi, 5L);
+    storage.writeActiveState(wfi, PersistentWorkflowInstanceState.builder()
+        .state(State.RUNNING)
+        .data(StateData.zero())
+        .timestamp(Instant.now())
+        .counter(5L)
+        .build());
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/" + BACKFILL_1.id())));
@@ -441,7 +450,13 @@ public class BackfillResourceTest extends VersionedApiTest {
         BACKFILL_1.concurrency(),
         BACKFILL_1.description());
 
-    storage.writeActiveState(WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01"), 0L);
+    WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_1.workflowId(),"2017-01-01T01");
+    storage.writeActiveState(wfi, PersistentWorkflowInstanceState.builder()
+        .state(State.RUNNING)
+        .data(StateData.zero())
+        .timestamp(Instant.now())
+        .counter(0L)
+        .build());
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("POST", path(""), Json.serialize(backfillInput)));
@@ -486,7 +501,12 @@ public class BackfillResourceTest extends VersionedApiTest {
     storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"),          3L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                              4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                          5L, 5L));
-    storage.writeActiveState(wfi, 5L);
+    storage.writeActiveState(wfi, PersistentWorkflowInstanceState.builder()
+        .state(State.RUNNING)
+        .data(StateData.zero())
+        .timestamp(Instant.now())
+        .counter(5L)
+        .build());
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("DELETE", path("/" + BACKFILL_1.id())));
@@ -513,8 +533,18 @@ public class BackfillResourceTest extends VersionedApiTest {
     storage.writeEvent(SequenceEvent.create(Event.submit(wfi1, EXECUTION_DESCRIPTION, "exec-1"),          3L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.submitted(wfi1, "exec-1"),                              4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi1),                                          5L, 5L));
-    storage.writeActiveState(wfi1, 5L);
-    storage.writeActiveState(wfi2, 5L);
+    storage.writeActiveState(wfi1, PersistentWorkflowInstanceState.builder()
+        .state(RunState.State.RUNNING)
+        .data(StateData.zero())
+        .timestamp(Instant.now())
+        .counter(5L)
+        .build());
+    storage.writeActiveState(wfi2, PersistentWorkflowInstanceState.builder()
+        .state(RunState.State.RUNNING)
+        .data(StateData.zero())
+        .timestamp(Instant.now())
+        .counter(5L)
+        .build());
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("DELETE", path("/" + BACKFILL_1.id())));
@@ -555,8 +585,18 @@ public class BackfillResourceTest extends VersionedApiTest {
     storage.writeEvent(SequenceEvent.create(Event.submitted(wfi2, "exec-2"),                              4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi2),                                          5L, 5L));
 
-    storage.writeActiveState(wfi1, 5L);
-    storage.writeActiveState(wfi2, 5L);
+    storage.writeActiveState(wfi1, PersistentWorkflowInstanceState.builder()
+        .state(State.RUNNING)
+        .data(StateData.zero())
+        .timestamp(Instant.now())
+        .counter(5L)
+        .build());
+    storage.writeActiveState(wfi2, PersistentWorkflowInstanceState.builder()
+        .state(State.RUNNING)
+        .data(StateData.zero())
+        .timestamp(Instant.now())
+        .counter(5L)
+        .build());
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("DELETE", path("/" + BACKFILL_1.id())));
