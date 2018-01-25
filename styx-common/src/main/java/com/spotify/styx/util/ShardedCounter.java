@@ -112,10 +112,10 @@ public class ShardedCounter {
       snapshot.shards = new ArrayList<Long>(NUM_SHARDS);
       int i;
       for (i = 0; shards.hasNext(); i++) {
-        long nextShard = shards.next().getLong(PROPERTY_SHARD);
-
-        // TODO shards.next().getKey() jāņem vērā?
-        snapshot.shards.set(i, nextShard);
+        Entity shard = shards.next();
+        String shardKey = shard.getKey().toString();
+        int shardIndex = Integer.valueOf(shardKey.substring(shardKey.indexOf('-') + 1));
+        snapshot.shards.set(shardIndex, shard.getLong(PROPERTY_SHARD));
       }
       if (i < NUM_SHARDS) {
         // The counter probably has not been initialized (so we have empty QueryResults). Also
