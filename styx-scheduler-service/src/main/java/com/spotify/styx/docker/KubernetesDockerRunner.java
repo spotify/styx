@@ -34,6 +34,8 @@ import com.github.rholder.retry.RetryerBuilder;
 import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.WaitStrategies;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
@@ -137,7 +139,13 @@ class KubernetesDockerRunner implements DockerRunner {
   private final int pollPodsIntervalSeconds;
   private final int podDeletionDelaySeconds;
   private final Time time;
-  private final ConcurrentMap<String, Long> submissions = new ConcurrentHashMap<>();
+
+  /**
+   * Submission timestamps (nanotime) keyed on execution id.
+   */
+  private final Cache<String, Long> submissionTimestamps = CacheBuilder.newBuilder()
+      .maximumSize(100_000)
+      .build();
 
   private Watch watch;
 
@@ -165,7 +173,7 @@ class KubernetesDockerRunner implements DockerRunner {
   @Override
   public void start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
     final KubernetesSecretSpec secretSpec = ensureSecrets(workflowInstance, runSpec);
-    submissions.put(runSpec.executionId(), time.nanoTime());
+    submissionTimestamps.put(runSpec.executionId(), time.nanoTime());
     try {
       client.pods().create(createPod(workflowInstance, runSpec, secretSpec));
     } catch (KubernetesClientException kce) {
@@ -547,8 +555,13 @@ class KubernetesDockerRunner implements DockerRunner {
       }
       if (EventUtil.name(event).equals("started")) {
         final long runningNanos = time.nanoTime();
-        runState.data().executionId().map(submissions::remove).ifPresent(submissionNanos ->
-            stats.recordSubmitToRunningTime(TimeUnit.NANOSECONDS.toSeconds(runningNanos - submissionNanos)));
+        runState.data().executionId().ifPresent(executionId -> {
+          final Long submissionNanos = submissionTimestamps.getIfPresent(executionId);
+          if (submissionNanos != null) {
+            submissionTimestamps.invalidate(executionId);
+            stats.recordSubmitToRunningTime(TimeUnit.NANOSECONDS.toSeconds(runningNanos - submissionNanos));
+          }
+        });
       }
 
       try {
