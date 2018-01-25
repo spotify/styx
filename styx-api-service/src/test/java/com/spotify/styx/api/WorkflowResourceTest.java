@@ -84,15 +84,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   private static LocalDatastoreHelper localDatastore;
 
-  private Datastore datastore = localDatastore.getOptions().getService();
-  private Connection bigtable = setupBigTableMockTable();
-  private AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
-
-  public WorkflowResourceTest(Api.Version version) {
-    super("/workflows", version, "workflow-test");
-    MockitoAnnotations.initMocks(this);
-  }
-
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
           .id("bar")
@@ -122,6 +113,15 @@ public class WorkflowResourceTest extends VersionedApiTest {
       ByteString.encodeUtf8("{\"The BAD\"}");
 
   @Mock DockerImageValidator dockerImageValidator;
+
+  private Datastore datastore = localDatastore.getOptions().getService();
+  private Connection bigtable = setupBigTableMockTable();
+  private AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
+
+  public WorkflowResourceTest(Api.Version version) {
+    super("/workflows", version, "workflow-test");
+    MockitoAnnotations.initMocks(this);
+  }
 
   @Override
   protected void init(Environment environment) {

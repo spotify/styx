@@ -25,6 +25,7 @@ import com.spotify.styx.model.ExecutionDescription;
 import io.norberg.automatter.AutoMatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * A value type for holding data related to the various states of the {@link RunState}.
@@ -35,6 +36,8 @@ import java.util.Optional;
 @AutoMatter
 @JsonIgnoreProperties(ignoreUnknown = true)
 public interface StateData {
+
+  int MAX_MESSAGES = 5;
 
   int tries();
   int consecutiveFailures();
@@ -55,5 +58,14 @@ public interface StateData {
 
   static StateData zero() {
     return newBuilder().build();
+  }
+
+  default StateData withAddedMessage(Message message) {
+    return builder()
+        .messages(messages().stream()
+            .skip(Math.max(0, messages().size() - MAX_MESSAGES + 1))
+            .collect(Collectors.toList()))
+        .addMessage(message)
+        .build();
   }
 }
