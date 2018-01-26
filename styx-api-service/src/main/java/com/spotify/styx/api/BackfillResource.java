@@ -257,19 +257,6 @@ public final class BackfillResource {
     final WorkflowId workflowId = WorkflowId.create(input.component(), input.workflow());
 
     final Workflow workflow;
-    try {
-      final Optional<Workflow> workflowResult = storage.workflow(workflowId);
-      if (workflowResult.isPresent()) {
-        workflow = workflowResult.get();
-      } else {
-        return Response.forStatus(
-            BAD_REQUEST.withReasonPhrase("The specified workflow is not found in the scheduler"));
-      }
-    } catch (IOException e) {
-      return Response.forStatus(
-          INTERNAL_SERVER_ERROR.withReasonPhrase(
-              "An error occurred while retrieving workflow specifications"));
-    }
     final Set<WorkflowInstance> activeWorkflowInstances;
     try {
       activeWorkflowInstances = storage.readActiveWorkflowInstances(input.component()).keySet();
@@ -277,7 +264,8 @@ public final class BackfillResource {
       if (!workflowOpt.isPresent()) {
         return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("workflow not found"));
       }
-      schedule = workflowOpt.get().configuration().schedule();
+      workflow = workflowOpt.get();
+      schedule = workflow.configuration().schedule();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
