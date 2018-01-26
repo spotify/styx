@@ -90,6 +90,8 @@ public abstract class RunState {
   public abstract StateData data();
 
   abstract Time time();
+
+  // TODO: remove the unused outputHandler field
   abstract OutputHandler outputHandler();
 
   public static RunState fresh(
@@ -106,6 +108,13 @@ public abstract class RunState {
     return fresh(workflowInstance, time, fanOutput(outputHandlers));
   }
 
+  public static RunState fresh(
+      WorkflowInstance workflowInstance,
+      Time time,
+      Iterable<OutputHandler> outputHandlers) {
+    return fresh(workflowInstance, time, fanOutput(outputHandlers));
+  }
+
   public static RunState fresh(WorkflowInstance workflowInstance, OutputHandler... outputHandlers) {
     return fresh(workflowInstance, Instant::now, fanOutput(outputHandlers));
   }
@@ -115,6 +124,11 @@ public abstract class RunState {
   }
 
   public RunState withHandlers(OutputHandler[] outputHandlers) {
+    return new AutoValue_RunState(
+        workflowInstance(), state(), timestamp(), data(), time(), fanOutput(outputHandlers));
+  }
+
+  public RunState withHandlers(Iterable<OutputHandler> outputHandlers) {
     return new AutoValue_RunState(
         workflowInstance(), state(), timestamp(), data(), time(), fanOutput(outputHandlers));
   }

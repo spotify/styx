@@ -24,8 +24,9 @@ import static com.spotify.styx.util.FutureUtil.exceptionallyCompletedFuture;
 
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.RunState.State;
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -42,13 +43,12 @@ public class SyncStateManager implements StateManager {
   private final Map<WorkflowInstance, RunState> states = new ConcurrentHashMap<>();
 
   @Override
-  public void initialize(RunState runState) {
-    states.put(runState.workflowInstance(), runState);
-  }
-
-  @Override
-  public void restore(RunState runState, long count) {
-    initialize(runState);
+  public CompletableFuture<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger) {
+    final RunState runState = RunState.create(workflowInstance, State.QUEUED, StateData.newBuilder()
+        .trigger(trigger)
+        .build());
+    states.put(workflowInstance, runState);
+    return CompletableFuture.completedFuture(null);
   }
 
   @Override
@@ -85,27 +85,8 @@ public class SyncStateManager implements StateManager {
   }
 
   @Override
-  public long getActiveStatesCount() {
-    return states.size();
-  }
-
-  @Override
   public long getQueuedEventsCount() {
     return 0; // synchronous event handling, no queue
-  }
-
-  @Override
-  public long getActiveStatesCount(WorkflowId workflowId) {
-    return states
-        .keySet()
-        .stream()
-        .filter(workflowInstance -> workflowInstance.workflowId().equals(workflowId))
-        .count();
-  }
-
-  @Override
-  public boolean isActiveWorkflowInstance(WorkflowInstance workflowInstance) {
-    return states.containsKey(workflowInstance);
   }
 
   @Override

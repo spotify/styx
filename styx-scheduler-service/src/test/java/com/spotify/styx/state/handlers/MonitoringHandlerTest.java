@@ -66,7 +66,7 @@ public class MonitoringHandlerTest {
   @Test
   public void shouldMarkExitCode() throws Exception {
     RunState state = RunState.create(WORKFLOW_INSTANCE, RunState.State.NEW, time, outputHandler);
-    stateManager.initialize(state);
+    stateManager.trigger(state, trigger);
 
     stateManager.receive(Event.triggerExecution(state.workflowInstance(), Trigger.natural()));
     stateManager.receive(Event.dequeue(state.workflowInstance()));
@@ -81,7 +81,7 @@ public class MonitoringHandlerTest {
   @Test
   public void shouldNotMarkExitCodeIfNotPresent() throws Exception {
     RunState state = RunState.create(WORKFLOW_INSTANCE, RunState.State.NEW, time, outputHandler);
-    stateManager.initialize(state);
+    stateManager.trigger(state, trigger);
 
     stateManager.receive(Event.triggerExecution(state.workflowInstance(), Trigger.natural()));
     stateManager.receive(Event.dequeue(state.workflowInstance()));

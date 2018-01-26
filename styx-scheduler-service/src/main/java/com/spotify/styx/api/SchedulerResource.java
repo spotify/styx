@@ -55,6 +55,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -252,13 +253,6 @@ public class SchedulerResource {
       return Response.forStatus(BAD_REQUEST.withReasonPhrase(e.getMessage()));
     }
 
-    // Verifying active
-    if (stateManager.isActiveWorkflowInstance(workflowInstance)) {
-      return Response.forStatus(
-          BAD_REQUEST.withReasonPhrase("The specified instance is already "
-                                       + "active in the scheduler"));
-    }
-
     // Verifying future
     if (instant.isAfter(time.get())) {
       return Response.forStatus(BAD_REQUEST.withReasonPhrase(
@@ -266,7 +260,24 @@ public class SchedulerResource {
     }
 
     final String triggerId = randomGenerator.generateUniqueId(AD_HOC_CLI_TRIGGER_PREFIX);
-    triggerListener.event(workflow, Trigger.adhoc(triggerId), instant);
+    final CompletionStage<Void> triggered = triggerListener.event(workflow, Trigger.adhoc(triggerId), instant);
+
+    // TODO: return future instead of blocking
+    try {
+      triggered.toCompletableFuture().get();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof IllegalStateException) {
+        // Illegal state, already active?
+        // TODO: raise a more specific exception
+        return Response.forStatus(
+            BAD_REQUEST.withReasonPhrase("The specified instance is already "
+                + "active in the scheduler"));
+
+      }
+    }
 
     // todo: change payload to a struct returning the triggerId as well so the user can refer to it
     return Response.forPayload(workflowInstance);

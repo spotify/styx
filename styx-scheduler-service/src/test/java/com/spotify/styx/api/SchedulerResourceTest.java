@@ -167,7 +167,7 @@ public class SchedulerResourceTest {
   public void testRetry() throws Exception {
     RunState initialState = RunState.create(
         WFI, RunState.State.QUEUED, StateData.newBuilder().retryDelayMillis(1000L).build());
-    stateManager.initialize(initialState);
+    stateManager.trigger(initialState, trigger);
 
     ByteString wfiPayload = serialize(WFI);
     CompletionStage<Response<ByteString>> post =
@@ -187,7 +187,7 @@ public class SchedulerResourceTest {
   public void testRetryWithDelayParameter() throws Exception {
     RunState initialState = RunState.create(
         WFI, RunState.State.QUEUED, StateData.newBuilder().retryDelayMillis(1000L).build());
-    stateManager.initialize(initialState);
+    stateManager.trigger(initialState, trigger);
 
     ByteString wfiPayload = serialize(WFI);
     CompletionStage<Response<ByteString>> post =
@@ -207,7 +207,7 @@ public class SchedulerResourceTest {
   public void testRetryWithWrongDelayParameter() throws Exception {
     RunState initialState = RunState.create(
         WFI, RunState.State.QUEUED, StateData.newBuilder().retryDelayMillis(1000L).build());
-    stateManager.initialize(initialState);
+    stateManager.trigger(initialState, trigger);
 
     ByteString wfiPayload = serialize(WFI);
     CompletionStage<Response<ByteString>> post =
@@ -226,7 +226,7 @@ public class SchedulerResourceTest {
   @Test
   public void testHalt() throws Exception {
     RunState initialState = RunState.create(WFI, RunState.State.RUNNING);
-    stateManager.initialize(initialState);
+    stateManager.trigger(initialState, trigger);
 
     ByteString wfiPayload = serialize(WFI);
     CompletionStage<Response<ByteString>> post =
@@ -244,7 +244,7 @@ public class SchedulerResourceTest {
   public void testInjectDequeueEvent() throws Exception {
     RunState initialState = RunState.create(
         WFI, RunState.State.QUEUED, StateData.newBuilder().retryDelayMillis(1000L).build());
-    stateManager.initialize(initialState);
+    stateManager.trigger(initialState, trigger);
 
     Event injectedEvent = Event.dequeue(WFI);
     ByteString eventPayload = serialize(injectedEvent);
@@ -264,7 +264,7 @@ public class SchedulerResourceTest {
   @Test
   public void testInjectHaltEvent() throws Exception {
     RunState initialState = RunState.create(WFI, RunState.State.RUNNING);
-    stateManager.initialize(initialState);
+    stateManager.trigger(initialState, trigger);
 
     Event injectedEvent = Event.halt(WFI);
     ByteString eventPayload = serialize(injectedEvent);
@@ -283,7 +283,7 @@ public class SchedulerResourceTest {
   public void shouldFailOnInjectRetryEvent() throws Exception {
     RunState initialState = RunState.create(
         WFI, RunState.State.QUEUED, StateData.newBuilder().retryDelayMillis(1000L).build());
-    stateManager.initialize(initialState);
+    stateManager.trigger(initialState, trigger);
 
     Event injectedEvent = Event.retry(WFI);
     ByteString eventPayload = serialize(injectedEvent);
@@ -297,7 +297,7 @@ public class SchedulerResourceTest {
   @Test
   public void shouldFailOnForbiddenTransitionForEvent() throws Exception {
     RunState initialState = RunState.create(WFI, RunState.State.RUNNING);
-    stateManager.initialize(initialState);
+    stateManager.trigger(initialState, trigger);
 
     ByteString eventPayload = serialize(WFI);
     CompletionStage<Response<ByteString>> post =
@@ -605,7 +605,7 @@ public class SchedulerResourceTest {
   public void testTriggerAlreadyActiveWorkflowInstance() throws Exception {
     storage.storeWorkflow(DAILY_WORKFLOW);
     WorkflowInstance toTrigger = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2015-12-31");
-    stateManager.initialize(RunState.fresh(toTrigger));
+    stateManager.trigger(RunState.fresh(toTrigger), trigger);
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 

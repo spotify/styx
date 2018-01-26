@@ -198,7 +198,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.getMetadata().setResourceVersion("1001");
 
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
+    stateManager.trigger(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData), trigger);
   }
 
   @After
@@ -509,7 +509,7 @@ public class KubernetesDockerRunnerTest {
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT)).thenReturn(SERVICE_ACCOUNT_SECRET);
 
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
+    stateManager.trigger(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData), trigger);
 
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
 
@@ -632,7 +632,7 @@ public class KubernetesDockerRunnerTest {
 
     when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(18));
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
+    stateManager.trigger(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData), trigger);
 
     when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(19));
     createdPod.setStatus(running(/* ready= */ false));
