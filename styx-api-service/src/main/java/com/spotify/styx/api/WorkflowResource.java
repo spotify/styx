@@ -143,13 +143,10 @@ public final class WorkflowResource {
                                  .withReasonPhrase("Invalid payload. " + e.getMessage())));
     }
 
-    final Optional<String> dockerImage = workflowConfig.dockerImage();
-    if (dockerImage.isPresent()) {
-      final Collection<String> errors = workflowValidator.validateWorkflowConfiguration(workflowConfig);
-      if (!errors.isEmpty()) {
-        return CompletableFuture.completedFuture(
-            Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: " + errors)));
-      }
+    final Collection<String> errors = workflowValidator.validateWorkflowConfiguration(workflowConfig);
+    if (!errors.isEmpty()) {
+      return CompletableFuture.completedFuture(
+          Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: " + errors)));
     }
 
     // TODO: handle workflow crud directly in api service instead of proxying to scheduler
