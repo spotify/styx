@@ -121,7 +121,6 @@ public class ExecutionDescriptionHandler implements OutputHandler {
           workflowId, workflowInstance, errors));
     }
 
-
     final List<String> dockerArgs = workflow.configuration().dockerArgs()
         .orElse(Collections.emptyList());
 
