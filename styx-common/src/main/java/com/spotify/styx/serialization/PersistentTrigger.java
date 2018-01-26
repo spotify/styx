@@ -42,53 +42,9 @@ class PersistentTrigger {
 
   private static final TriggerSerializerVisitor SERIALIZER_VISITOR = new TriggerSerializerVisitor();
 
-  public static PersistentTrigger wrap(Trigger trigger) {
-    return trigger.accept(SERIALIZER_VISITOR);
-  }
-
-  private static class TriggerSerializerVisitor implements TriggerVisitor<PersistentTrigger> {
-
-    @Override
-    public PersistentTrigger natural() {
-      return new PersistentTrigger("natural");
-    }
-
-    @Override
-    public PersistentTrigger adhoc(String triggerId) {
-      return new PersistentTriggerWithId("adhoc", triggerId);
-    }
-
-    @Override
-    public PersistentTrigger backfill(String triggerId) {
-      return new PersistentTriggerWithId("backfill", triggerId);
-    }
-
-    @Override
-    public PersistentTrigger unknown(String triggerId) {
-      return new PersistentTriggerWithId("unknown", triggerId);
-    }
-  }
-
   @JsonTypeId
   @JsonProperty("@type") // from Id.NAME
   public final String type;
-
-  @JsonCreator
-  PersistentTrigger(
-      @JsonProperty("@type") String type) {
-    this.type = type;
-  }
-
-  public Trigger toTrigger() {
-    switch (type) {
-      case "natural":
-        return Trigger.natural();
-
-      default:
-        throw new IllegalStateException(
-            "Trigger type " + type + " not covered by base PersistentTrigger class");
-    }
-  }
 
   public static class PersistentTriggerWithId extends PersistentTrigger {
 
@@ -115,6 +71,50 @@ class PersistentTrigger {
         default:
           return super.toTrigger();
       }
+    }
+  }
+
+  private static class TriggerSerializerVisitor implements TriggerVisitor<PersistentTrigger> {
+
+    @Override
+    public PersistentTrigger natural() {
+      return new PersistentTrigger("natural");
+    }
+
+    @Override
+    public PersistentTrigger adhoc(String triggerId) {
+      return new PersistentTriggerWithId("adhoc", triggerId);
+    }
+
+    @Override
+    public PersistentTrigger backfill(String triggerId) {
+      return new PersistentTriggerWithId("backfill", triggerId);
+    }
+
+    @Override
+    public PersistentTrigger unknown(String triggerId) {
+      return new PersistentTriggerWithId("unknown", triggerId);
+    }
+  }
+
+  @JsonCreator
+  PersistentTrigger(
+      @JsonProperty("@type") String type) {
+    this.type = type;
+  }
+
+  public static PersistentTrigger wrap(Trigger trigger) {
+    return trigger.accept(SERIALIZER_VISITOR);
+  }
+
+  public Trigger toTrigger() {
+    switch (type) {
+      case "natural":
+        return Trigger.natural();
+
+      default:
+        throw new IllegalStateException(
+            "Trigger type " + type + " not covered by base PersistentTrigger class");
     }
   }
 }

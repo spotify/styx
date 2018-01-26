@@ -32,6 +32,7 @@ class QuietDeterministicScheduler extends DeterministicScheduler {
 
   @Override
   public void shutdown() {
+    // nop
   }
 
   @Override

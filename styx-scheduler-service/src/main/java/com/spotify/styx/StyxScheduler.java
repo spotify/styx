@@ -106,7 +106,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -469,7 +468,7 @@ public class StyxScheduler implements AppInit {
         guard(cleaner::tick),
         0,
         CLEANER_TICK_INTERVAL_SECONDS,
-        TimeUnit.SECONDS);
+        SECONDS);
   }
 
   private static void startTriggerManager(TriggerManager triggerManager, ScheduledExecutorService exec) {
@@ -477,7 +476,7 @@ public class StyxScheduler implements AppInit {
         guard(triggerManager::tick),
         TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
         TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
-        TimeUnit.SECONDS);
+        SECONDS);
   }
 
   private static void startBackfillTriggerManager(BackfillTriggerManager backfillTriggerManager,
@@ -486,7 +485,7 @@ public class StyxScheduler implements AppInit {
         guard(backfillTriggerManager::tick),
         TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
         TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
-        TimeUnit.SECONDS);
+        SECONDS);
   }
 
   private static void startScheduler(Scheduler scheduler, ScheduledExecutorService exec) {
@@ -494,7 +493,7 @@ public class StyxScheduler implements AppInit {
         guard(scheduler::tick),
         SCHEDULER_TICK_INTERVAL_SECONDS,
         SCHEDULER_TICK_INTERVAL_SECONDS,
-        TimeUnit.SECONDS);
+        SECONDS);
   }
 
   private static void startRuntimeConfigUpdate(Supplier<StyxConfig> config, ScheduledExecutorService exec,
@@ -503,7 +502,7 @@ public class StyxScheduler implements AppInit {
         guard(() -> updateRuntimeConfig(config, submissionRateLimiter)),
         0,
         RUNTIME_CONFIG_UPDATE_INTERVAL_SECONDS,
-        TimeUnit.SECONDS);
+        SECONDS);
   }
 
   private static void updateRuntimeConfig(Supplier<StyxConfig> config, RateLimiter rateLimiter) {

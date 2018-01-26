@@ -37,9 +37,6 @@ public final class TestData {
   public static final String VALID_SHA = "00000ef508c1cb905e360590ce3e7e9193f6b370";
   public static final String INVALID_SHA = "XXXXXef508c1cb905e360590ce3e7e9193f6b370";
 
-  private TestData() {
-  }
-
   public static final WorkflowId WORKFLOW_ID =
       WorkflowId.create("styx", "styx.TestEndpoint");
 
@@ -117,4 +114,8 @@ public final class TestData {
           .secret(WorkflowConfiguration.Secret.create("secret", "/dev/null"))
           .commitSha(VALID_SHA)
           .build();
+
+  private TestData() {
+    throw new UnsupportedOperationException();
+  }
 }

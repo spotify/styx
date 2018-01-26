@@ -234,11 +234,9 @@ public final class Middlewares {
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authValidator() {
     return h -> rc -> {
-      if (!"GET".equals(rc.request().method())) {
-        if (!auth(rc).user().isPresent()) {
-          return completedFuture(
-              Response.forStatus(Status.UNAUTHORIZED.withReasonPhrase("Unauthorized access")));
-        }
+      if (!"GET".equals(rc.request().method()) && !auth(rc).user().isPresent()) {
+        return completedFuture(
+            Response.forStatus(Status.UNAUTHORIZED.withReasonPhrase("Unauthorized access")));
       }
 
       return h.invoke(rc);

@@ -161,7 +161,7 @@ public class ExecutionDescriptionHandlerTest {
   @Test
   public void shouldHaltIfMissingWorkflow() throws Exception {
     WorkflowInstance workflowInstance = WorkflowInstance.create(WorkflowId.create("c", "e"), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
+    RunState runState = RunState.create(workflowInstance, PREPARE);
 
     stateManager.initialize(runState);
     toTest.transitionInto(runState);
@@ -178,7 +178,7 @@ public class ExecutionDescriptionHandlerTest {
             .build();
     Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
+    RunState runState = RunState.create(workflowInstance, PREPARE);
 
     storage.storeWorkflow(workflow);
     stateManager.initialize(runState);
@@ -194,7 +194,7 @@ public class ExecutionDescriptionHandlerTest {
 
     Workflow workflow = Workflow.create("id", FULL_WORKFLOW_CONFIGURATION);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
+    RunState runState = RunState.create(workflowInstance, PREPARE);
 
     storage.storeWorkflow(workflow);
     stateManager.initialize(runState);

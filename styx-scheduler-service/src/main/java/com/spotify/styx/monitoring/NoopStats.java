@@ -29,35 +29,43 @@ final class NoopStats implements Stats {
 
   @Override
   public void registerQueuedEventsMetric(Gauge<Long> queuedEventsCount) {
+    // nop
   }
 
   @Override
   public void registerActiveStatesMetric(RunState.State state, String triggerName,
                                          Gauge<Long> activeStatesCount) {
+    // nop
   }
 
   @Override
   public void registerActiveStatesMetric(WorkflowId workflowId, Gauge<Long> activeStatesCount) {
+    // nop
   }
 
   @Override
   public void registerWorkflowCountMetric(String status, Gauge<Long> workflowCount) {
+    // nop
   }
 
   @Override
   public void registerSubmissionRateLimitMetric(Gauge<Double> submissionRateLimit) {
+    // nop
   }
 
   @Override
   public void recordStorageOperation(String operation, long durationMillis, String status) {
+    // nop
   }
 
   @Override
   public void recordDockerOperation(String operation, long durationMillis, String status) {
+    // nop
   }
 
   @Override
   public void recordDockerOperationError(String operation, String type, int code, long durationMillis) {
+    // nop
   }
 
   @Override
@@ -72,49 +80,61 @@ final class NoopStats implements Stats {
 
   @Override
   public void recordExitCode(WorkflowId workflowId, int exitCode) {
+    // nop
   }
 
   @Override
   public void recordPullImageError() {
+    // nop
   }
 
   @Override
   public void recordNaturalTrigger() {
+    // nop
   }
 
   @Override
   public void recordTerminationLogMissing() {
+    // nop
   }
 
   @Override
   public void recordTerminationLogInvalid() {
+    // nop
   }
 
   @Override
   public void recordExitCodeMismatch() {
+    // nop
   }
 
   @Override
   public void recordResourceConfigured(String resource, long configured) {
+    // nop
   }
 
   @Override
   public void recordResourceUsed(String resource, long used) {
+    // nop
   }
 
   @Override
   public void recordEventConsumer(SequenceEvent event) {
+    // nop
   }
 
   @Override
   public void recordEventConsumerError(SequenceEvent event) {
+    // nop
   }
 
   @Override
   public void recordWorkflowConsumer(String action) {
+    // nop
   }
 
   @Override
   public void recordWorkflowConsumerError() {
+    // nop
   }
 }

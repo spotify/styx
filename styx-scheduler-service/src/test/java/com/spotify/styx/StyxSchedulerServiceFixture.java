@@ -330,7 +330,8 @@ public class StyxSchedulerServiceFixture {
       }
 
       @Override
-      public void cleanup() throws IOException {
+      public void cleanup() {
+        // nop
       }
 
       @Override
@@ -339,7 +340,8 @@ public class StyxSchedulerServiceFixture {
       }
 
       @Override
-      public void close() throws IOException {
+      public void close() {
+        // nop
       }
     };
   }

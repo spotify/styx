@@ -92,6 +92,7 @@ public class FakeScheduledExecutorService implements ScheduledExecutorService {
 
   @Override
   public void shutdown() {
+    // nop
   }
 
   @Override

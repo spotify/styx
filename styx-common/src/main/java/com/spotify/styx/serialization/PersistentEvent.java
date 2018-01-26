@@ -60,9 +60,11 @@ class PersistentEvent {
 
   private static final SerializerVisitor SERIALIZER_VISITOR = new SerializerVisitor();
 
-  public static PersistentEvent wrap(Event event) {
-    return event.accept(SERIALIZER_VISITOR);
-  }
+  @JsonTypeId
+  @JsonProperty("@type") // from Id.NAME
+  public final String type;
+
+  public final String workflowInstance;
 
   public static class SerializerVisitor implements EventVisitor<PersistentEvent> {
 
@@ -148,17 +150,16 @@ class PersistentEvent {
     }
   }
 
-  @JsonTypeId
-  @JsonProperty("@type") // from Id.NAME
-  public final String type;
-  public final String workflowInstance;
-
   @JsonCreator
   PersistentEvent(
       @JsonProperty("@type") String type,
       @JsonProperty("workflow_instance") String workflowInstance) {
     this.type = type;
     this.workflowInstance = workflowInstance;
+  }
+
+  public static PersistentEvent wrap(Event event) {
+    return event.accept(SERIALIZER_VISITOR);
   }
 
   public Event toEvent() {

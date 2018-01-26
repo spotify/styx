@@ -148,7 +148,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     styxStarts();
     tickTriggerManager();
     awaitWorkflowInstanceState(
-        WorkflowInstance.create(customWorkflow.id(), "2016-03-14T12:45:00Z"),
+        create(customWorkflow.id(), "2016-03-14T12:45:00Z"),
         RunState.State.QUEUED);
     tickScheduler();
     awaitNumberOfDockerRuns(1);
@@ -159,7 +159,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     tickTriggerManager();
     awaitWorkflowInstanceState(
-        WorkflowInstance.create(customWorkflow.id(), "2016-03-14T15:15:00Z"),
+        create(customWorkflow.id(), "2016-03-14T15:15:00Z"),
         RunState.State.QUEUED);
     tickScheduler();
     awaitNumberOfDockerRuns(2);
@@ -186,7 +186,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenNextNaturalTrigger(customWorkflow, "2016-03-14T12:45:00Z");
 
     WorkflowInstance wfi =
-        WorkflowInstance.create(customWorkflow.id(), "2016-03-14T12:45:00Z");
+        create(customWorkflow.id(), "2016-03-14T12:45:00Z");
     styxStarts();
     tickTriggerManager();
 
@@ -244,7 +244,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     styxStarts();
     tickTriggerManager();
     awaitWorkflowInstanceState(
-        WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T12"),
+        create(HOURLY_WORKFLOW.id(), "2016-03-14T12"),
         RunState.State.QUEUED);
     tickScheduler();
     awaitNumberOfDockerRuns(1);
@@ -255,7 +255,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     tickTriggerManager();
     awaitWorkflowInstanceState(
-        WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T13"),
+        create(HOURLY_WORKFLOW.id(), "2016-03-14T13"),
         RunState.State.QUEUED);
     tickScheduler();
     awaitNumberOfDockerRuns(2);
@@ -266,7 +266,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     tickTriggerManager();
     awaitWorkflowInstanceState(
-        WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T14"),
+        create(HOURLY_WORKFLOW.id(), "2016-03-14T14"),
         RunState.State.QUEUED);
     tickScheduler();
     awaitNumberOfDockerRuns(3);
@@ -287,10 +287,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     styxStarts();
     tickBackfillTriggerManager();
     awaitWorkflowInstanceState(
-        WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2015-01-01T00"),
+        create(HOURLY_WORKFLOW.id(), "2015-01-01T00"),
         RunState.State.QUEUED);
     awaitWorkflowInstanceState(
-        WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2015-01-01T01"),
+        create(HOURLY_WORKFLOW.id(), "2015-01-01T01"),
         RunState.State.QUEUED);
     tickScheduler();
     awaitNumberOfDockerRuns(2);
@@ -309,7 +309,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     styxStarts();
     tickBackfillTriggerManager();
     awaitWorkflowInstanceState(
-        WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2015-01-01T00"),
+        create(HOURLY_WORKFLOW.id(), "2015-01-01T00"),
         RunState.State.QUEUED);
     tickScheduler();
     awaitNumberOfDockerRuns(1);
@@ -330,8 +330,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T13:00:00Z");
 
-    WorkflowInstance instance1 = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T13");
-    WorkflowInstance instance2 = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
+    WorkflowInstance instance1 = create(HOURLY_WORKFLOW.id(), "2016-03-14T13");
+    WorkflowInstance instance2 = create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
 
     styxStarts();
     tickTriggerManager();
@@ -354,7 +354,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T14:00:00Z");
     WorkflowInstance workflowInstance =
-        WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
+        create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
 
     styxStarts();
     tickTriggerManager();
@@ -365,7 +365,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     workflowInstance = dockerRuns.get(0)._1;
     assertThat(workflowInstance.parameter(), is("2016-03-14T14"));
 
-    workflowInstance = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14");
+    workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14");
     // this should store a new value for nextNaturalTrigger, 2016-03-14
     workflowChanges(DAILY_WORKFLOW);
     timeJumps(1, DAYS); // to 2016-03-15
@@ -385,7 +385,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T14:00:00Z");
     WorkflowInstance workflowInstance =
-        WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
+        create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
 
     Workflow workflow;
     TriggerInstantSpec triggerInstantSpec;
@@ -414,7 +414,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(triggerInstantSpec.offsetInstant(),
                is(Instant.parse("2016-03-14T16:00:00Z")));
 
-    workflowInstance = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T15");
+    workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T15");
     // this should store a new value for nextNaturalTrigger, 2016-03-14T15
     workflowChanges(HOURLY_WORKFLOW_WITH_ZERO_OFFSET);
     workflow = storage.workflow(workflowInstance.workflowId()).get();
@@ -447,7 +447,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(DAILY_WORKFLOW, true);
     givenNextNaturalTrigger(DAILY_WORKFLOW, "2016-03-13T00:00:00Z");
     WorkflowInstance workflowInstance =
-        WorkflowInstance.create(DAILY_WORKFLOW.id(), "2016-03-13");
+        create(DAILY_WORKFLOW.id(), "2016-03-13");
 
     styxStarts();
     tickTriggerManager();
@@ -458,7 +458,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     workflowInstance = dockerRuns.get(0)._1;
     assertThat(workflowInstance.parameter(), is("2016-03-13"));
 
-    workflowInstance = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-03-14T15");
+    workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T15");
     // this should store a new value for nextNaturalTrigger, 2016-03-14T15
     workflowChanges(HOURLY_WORKFLOW);
     timeJumps(1, HOURS); // to 16:30
