@@ -25,7 +25,6 @@ import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
 import static com.spotify.apollo.Status.OK;
 import static com.spotify.styx.util.ParameterUtil.parseAlignedInstant;
 
-import com.google.common.base.Joiner;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
@@ -149,7 +148,7 @@ public class SchedulerResource {
     final Collection<String> errors = workflowValidator.validateWorkflowConfiguration(configuration);
     if (!errors.isEmpty()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
-          + Joiner.on(", ").join(errors)));
+          + String.join(", ", errors)));
     }
 
     if (configuration.commitSha().isPresent()
@@ -241,7 +240,7 @@ public class SchedulerResource {
     final Collection<String> errors = workflowValidator.validateWorkflow(workflow);
     if (!errors.isEmpty()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
-          + Joiner.on(", ").join(errors)));
+          + String.join(", ", errors)));
     }
 
     // Verifying instant
