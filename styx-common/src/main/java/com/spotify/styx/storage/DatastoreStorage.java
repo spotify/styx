@@ -7,9 +7,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * 
  *      http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -627,10 +627,10 @@ class DatastoreStorage {
 
   void postResource(Resource resource) throws IOException {
     storeWithRetries(() -> datastore.runInTransaction(transaction -> {
-        shardedCounter.updateLimit(transaction, resource.id(), resource.concurrency());
-        return transaction.put(resourceToEntity(resource));
-        // TODO store just in one place, eliminate one of the two calls ^?
-      }));
+      shardedCounter.updateLimit(transaction, resource.id(), resource.concurrency());
+      return transaction.put(resourceToEntity(resource));
+      // TODO store just in one place, eliminate one of the two calls ^?
+    }));
   }
 
   List<Resource> getResources() {

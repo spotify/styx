@@ -7,9 +7,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * 
  *      http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -44,9 +44,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * decrement and capping of a counter to a limit, with increased throughput (compared to the 1 write
  * per second limit on a single entity group) and strong consistency.
  *
- * Note that getCounter is supported specifically _without_ strong consistency.
+ * <p>Note that getCounter is supported specifically _without_ strong consistency.
  *
- * Note that the ShardedCounter stores state in the same Datastore database that the caller of this
+ * <p>Note that the ShardedCounter stores state in the same Datastore database that the caller of this
  * class can access, too; guarantees don't apply if something else than ShardedCounter updates the
  * stored state.
  */
@@ -110,14 +110,14 @@ public class ShardedCounter {
           .build();
       final QueryResults<Entity> shards = datastore.run(queryShards);
       snapshot.shards = new ArrayList<Long>(NUM_SHARDS);
-      int i;
-      for (i = 0; shards.hasNext(); i++) {
+      int shardCount;
+      for (shardCount = 0; shards.hasNext(); shardCount++) {
         Entity shard = shards.next();
         String shardKey = shard.getKey().toString();
         int shardIndex = Integer.valueOf(shardKey.substring(shardKey.indexOf('-') + 1));
         snapshot.shards.set(shardIndex, shard.getLong(PROPERTY_SHARD));
       }
-      if (i < NUM_SHARDS) {
+      if (shardCount < NUM_SHARDS) {
         // The counter probably has not been initialized (so we have empty QueryResults). Also
         // possible that a prior initialize() crashed halfway, or we got a partial list of shards in
         // QueryResults due to eventual consistency. In any case, repeated initialization eventually
@@ -145,8 +145,8 @@ public class ShardedCounter {
       List<Integer> candidates = new ArrayList<>();
 
       for (int i = 0; i < shards.size(); i++) {
-        if (shards.get(i) + delta >= 0 &&
-            shards.get(i) + delta <= shardCapacity(i)) {
+        if (shards.get(i) + delta >= 0
+            && shards.get(i) + delta <= shardCapacity(i)) {
           candidates.add(i);
         }
       }
@@ -183,7 +183,7 @@ public class ShardedCounter {
   /**
    * Must be called within a TransactionCallable. (?)
    *
-   * Augments the transaction with operations to persist the given limit in Datastore. So long as
+   * <p>Augments the transaction with operations to persist the given limit in Datastore. So long as
    * there has been no preceding successful updateLimit operation, no limit is applied in
    * updateCounter operations on this counter.
    */
@@ -199,7 +199,7 @@ public class ShardedCounter {
    * cause the transaction to fail to commit if the counter's associated limit is exceeded. Also
    * spurious failures are possible.
    *
-   * Delta should be +/-1 for graceful behavior, due to how sharding is currently implemented.
+   * <p>Delta should be +/-1 for graceful behavior, due to how sharding is currently implemented.
    * Updates with a larger delta are prone to spuriously fail even when the counter is not near to
    * exceeding its limit. Failures are certain when delta >= limit / NUM_SHARDS + 1.
    */
@@ -210,9 +210,9 @@ public class ShardedCounter {
         .newKey(counterId + "-" + shardIndex);
     final Entity shard = transaction.get(shardKey);
 
-    if (shard != null &&
-        shard.getLong(PROPERTY_SHARD) + delta >= 0 &&
-        shard.getLong(PROPERTY_SHARD) + delta <= snapshot.shardCapacity(shardIndex)) {
+    if (shard != null
+        && shard.getLong(PROPERTY_SHARD) + delta >= 0
+        && shard.getLong(PROPERTY_SHARD) + delta <= snapshot.shardCapacity(shardIndex)) {
       transaction.put(Entity.newBuilder(shard)
           .set(PROPERTY_SHARD, shard.getLong(PROPERTY_SHARD) + delta)
           .build());
