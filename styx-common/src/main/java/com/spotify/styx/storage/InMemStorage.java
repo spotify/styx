@@ -325,6 +325,11 @@ public class InMemStorage implements Storage {
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
+  @Override
+  public Optional<PersistentWorkflowInstanceState> readActiveWorkflowInstance(WorkflowInstance workflowInstance) {
+    return Optional.ofNullable(activeStatesMap.get(workflowInstance));
+  }
+
   public Optional<Long> getCounterFromActiveStates(WorkflowInstance workflowInstance)
       throws IOException {
     return Optional.ofNullable(activeStatesMap.get(workflowInstance))

@@ -92,6 +92,12 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
+  public Optional<PersistentWorkflowInstanceState> readActiveWorkflowInstance(WorkflowInstance workflowInstance)
+      throws IOException {
+    return datastoreStorage.activeState(workflowInstance);
+  }
+
+  @Override
   public void writeActiveState(WorkflowInstance workflowInstance,
                                PersistentWorkflowInstanceState state) throws IOException {
     datastoreStorage.writeActiveState(workflowInstance, state);

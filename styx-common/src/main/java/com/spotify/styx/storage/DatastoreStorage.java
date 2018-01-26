@@ -338,82 +338,100 @@ class DatastoreStorage {
       throws IOException {
     final ImmutableMap.Builder<WorkflowInstance, PersistentWorkflowInstanceState> mapBuilder = ImmutableMap.builder();
     final QueryResults<Entity> results = datastore.run(activeStatesQuery);
+
     while (results.hasNext()) {
       final Entity entity = results.next();
-      final long counter = entity.getLong(PROPERTY_COUNTER);
       final WorkflowInstance instance = parseWorkflowInstance(entity);
-      final PersistentWorkflowInstanceStateBuilder persistentState =
-          PersistentWorkflowInstanceState.builder()
-              .counter(counter);
-
-      // TODO: always read these state fields when all active state entities have been migrated
-      if (entity.contains(PROPERTY_STATE)) {
-        final State state = State.valueOf(entity.getString(PROPERTY_STATE));
-        final long timestamp = entity.getLong(PROPERTY_STATE_TIMESTAMP);
-
-        final StateData data = StateData.newBuilder()
-            .tries((int) entity.getLong(PROPERTY_STATE_TRIES))
-            .consecutiveFailures((int) entity.getLong(PROPERTY_STATE_CONSECUTIVE_FAILURES))
-            .retryCost(entity.getDouble(PROPERTY_STATE_RETRY_COST))
-            .trigger(this.<String>readOpt(entity, PROPERTY_STATE_TRIGGER_TYPE).map(type ->
-                TriggerUtil.trigger(type, entity.getString(PROPERTY_STATE_TRIGGER_ID))))
-            .messages(OBJECT_MAPPER.<List<Message>>readValue(entity.getString(PROPERTY_STATE_MESSAGES),
-                new TypeReference<List<Message>>() { }))
-            .retryDelayMillis(readOpt(entity, PROPERTY_STATE_RETRY_DELAY_MILLIS))
-            .lastExit(this.<Long>readOpt(entity, PROPERTY_STATE_LAST_EXIT).map(Long::intValue))
-            .executionId(readOpt(entity, PROPERTY_STATE_EXECUTION_ID))
-            .executionDescription(readOptJson(entity, PROPERTY_STATE_EXECUTION_DESCRIPTION,
-                ExecutionDescription.class))
-            .build();
-
-        persistentState
-            .state(state)
-            .data(data)
-            .timestamp(Instant.ofEpochMilli(timestamp));
-      }
-
-      mapBuilder.put(instance, persistentState.build());
+      mapBuilder.put(instance, readPersistentWorkflowInstanceState(entity));
     }
 
     return mapBuilder.build();
   }
 
+  Optional<PersistentWorkflowInstanceState> activeState(WorkflowInstance instance) throws IOException {
+    final Entity entity = datastore.get(activeWorkflowInstanceKey(instance));
+    if (entity == null) {
+      return Optional.empty();
+    } else {
+      return Optional.of(readPersistentWorkflowInstanceState(entity));
+    }
+  }
+
+  static PersistentWorkflowInstanceState readPersistentWorkflowInstanceState(Entity entity)
+      throws IOException {
+    final long counter = entity.getLong(PROPERTY_COUNTER);
+    final PersistentWorkflowInstanceStateBuilder persistentState =
+        PersistentWorkflowInstanceState.builder()
+            .counter(counter);
+
+    // TODO: always read these state fields when all active state entities have been migrated
+    if (entity.contains(PROPERTY_STATE)) {
+      final State state = State.valueOf(entity.getString(PROPERTY_STATE));
+      final long timestamp = entity.getLong(PROPERTY_STATE_TIMESTAMP);
+
+      final StateData data = StateData.newBuilder()
+          .tries((int) entity.getLong(PROPERTY_STATE_TRIES))
+          .consecutiveFailures((int) entity.getLong(PROPERTY_STATE_CONSECUTIVE_FAILURES))
+          .retryCost(entity.getDouble(PROPERTY_STATE_RETRY_COST))
+          .trigger(DatastoreStorage.<String>readOpt(entity, PROPERTY_STATE_TRIGGER_TYPE).map(type ->
+              TriggerUtil.trigger(type, entity.getString(PROPERTY_STATE_TRIGGER_ID))))
+          .messages(OBJECT_MAPPER.<List<Message>>readValue(entity.getString(PROPERTY_STATE_MESSAGES),
+              new TypeReference<List<Message>>() { }))
+          .retryDelayMillis(readOpt(entity, PROPERTY_STATE_RETRY_DELAY_MILLIS))
+          .lastExit(DatastoreStorage.<Long>readOpt(entity, PROPERTY_STATE_LAST_EXIT).map(Long::intValue))
+          .executionId(readOpt(entity, PROPERTY_STATE_EXECUTION_ID))
+          .executionDescription(readOptJson(entity, PROPERTY_STATE_EXECUTION_DESCRIPTION,
+              ExecutionDescription.class))
+          .build();
+
+      persistentState
+          .state(state)
+          .data(data)
+          .timestamp(Instant.ofEpochMilli(timestamp));
+    }
+
+    return persistentState.build();
+  }
+
   void writeActiveState(WorkflowInstance workflowInstance, PersistentWorkflowInstanceState state)
       throws IOException {
-    storeWithRetries(() -> {
-      final Key key = activeWorkflowInstanceKey(workflowInstance);
-      final Entity.Builder entity = Entity.newBuilder(key)
-          .set(PROPERTY_COMPONENT, workflowInstance.workflowId().componentId())
-          .set(PROPERTY_WORKFLOW, workflowInstance.workflowId().id())
-          .set(PROPERTY_PARAMETER, workflowInstance.parameter())
-          .set(PROPERTY_COUNTER, state.counter());
+    storeWithRetries(() -> datastore.put(activeStateToEntity(datastore.newKeyFactory(), workflowInstance, state)));
+  }
 
-      // TODO: always write these fields when event-only replay tests have been removed
-      if (state.state() != null) {
-        entity
-            .set(PROPERTY_STATE, state.state().toString())
-            .set(PROPERTY_STATE_TIMESTAMP, state.timestamp().toEpochMilli())
-            .set(PROPERTY_STATE_TRIES, state.data().tries())
-            .set(PROPERTY_STATE_CONSECUTIVE_FAILURES, state.data().consecutiveFailures())
-            .set(PROPERTY_STATE_RETRY_COST, state.data().retryCost())
-            // TODO: consider making this list bounded or not storing it here to avoid exceeding entity size limit
-            .set(PROPERTY_STATE_MESSAGES, jsonValue(state.data().messages()));
+  static Entity activeStateToEntity(KeyFactory keyFactory, WorkflowInstance workflowInstance, PersistentWorkflowInstanceState state)
+      throws JsonProcessingException {
+    final Key key = activeWorkflowInstanceKey(keyFactory, workflowInstance);
+    final Entity.Builder entity = Entity.newBuilder(key)
+        .set(PROPERTY_COMPONENT, workflowInstance.workflowId().componentId())
+        .set(PROPERTY_WORKFLOW, workflowInstance.workflowId().id())
+        .set(PROPERTY_PARAMETER, workflowInstance.parameter())
+        .set(PROPERTY_COUNTER, state.counter());
 
-        state.data().retryDelayMillis().ifPresent(v -> entity.set(PROPERTY_STATE_RETRY_DELAY_MILLIS, v));
-        state.data().lastExit().ifPresent(v -> entity.set(PROPERTY_STATE_LAST_EXIT, v));
-        state.data().trigger().ifPresent(trigger -> {
-          entity.set(PROPERTY_STATE_TRIGGER_TYPE, TriggerUtil.triggerType(trigger));
-          entity.set(PROPERTY_STATE_TRIGGER_ID, TriggerUtil.triggerId(trigger));
-        });
-        state.data().executionId().ifPresent(v -> entity.set(PROPERTY_STATE_EXECUTION_ID, v));
+    // TODO: always write these fields when event-only replay tests have been removed
+    if (state.state() != null) {
+      entity
+          .set(PROPERTY_STATE, state.state().toString())
+          .set(PROPERTY_STATE_TIMESTAMP, state.timestamp().toEpochMilli())
+          .set(PROPERTY_STATE_TRIES, state.data().tries())
+          .set(PROPERTY_STATE_CONSECUTIVE_FAILURES, state.data().consecutiveFailures())
+          .set(PROPERTY_STATE_RETRY_COST, state.data().retryCost())
+          // TODO: consider making this list bounded or not storing it here to avoid exceeding entity size limit
+          .set(PROPERTY_STATE_MESSAGES, jsonValue(state.data().messages()));
 
-        if (state.data().executionDescription().isPresent()) {
-          entity.set(PROPERTY_STATE_EXECUTION_DESCRIPTION, jsonValue(state.data().executionDescription().get()));
-        }
+      state.data().retryDelayMillis().ifPresent(v -> entity.set(PROPERTY_STATE_RETRY_DELAY_MILLIS, v));
+      state.data().lastExit().ifPresent(v -> entity.set(PROPERTY_STATE_LAST_EXIT, v));
+      state.data().trigger().ifPresent(trigger -> {
+        entity.set(PROPERTY_STATE_TRIGGER_TYPE, TriggerUtil.triggerType(trigger));
+        entity.set(PROPERTY_STATE_TRIGGER_ID, TriggerUtil.triggerId(trigger));
+      });
+      state.data().executionId().ifPresent(v -> entity.set(PROPERTY_STATE_EXECUTION_ID, v));
+
+      if (state.data().executionDescription().isPresent()) {
+        entity.set(PROPERTY_STATE_EXECUTION_DESCRIPTION, jsonValue(state.data().executionDescription().get()));
       }
+    }
 
-      return datastore.put(entity.build());
-    });
+    return entity.build();
   }
 
   void deleteActiveState(WorkflowInstance workflowInstance) throws IOException {
@@ -473,7 +491,11 @@ class DatastoreStorage {
   }
 
   private Key activeWorkflowInstanceKey(WorkflowInstance workflowInstance) {
-    return datastore.newKeyFactory()
+    return activeWorkflowInstanceKey(datastore.newKeyFactory(), workflowInstance);
+  }
+
+  static Key activeWorkflowInstanceKey(KeyFactory keyFactory, WorkflowInstance workflowInstance) {
+    return keyFactory
         .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE)
         .newKey(workflowInstance.toKey());
   }
@@ -721,13 +743,13 @@ class DatastoreStorage {
         .map(Value::get);
   }
 
-  private <T> Optional<T> readOpt(Entity entity, String property) {
+  static <T> Optional<T> readOpt(Entity entity, String property) {
     return entity.contains(property)
         ? Optional.of(entity.<Value<T>>getValue(property).get())
         : Optional.empty();
   }
 
-  private <T> Optional<T> readOptJson(Entity entity, String property, Class<T> cls) throws IOException {
+  static <T> Optional<T> readOptJson(Entity entity, String property, Class<T> cls) throws IOException {
     return entity.contains(property)
         ? Optional.of(OBJECT_MAPPER.readValue(entity.getString(property), cls))
         : Optional.empty();
@@ -737,7 +759,7 @@ class DatastoreStorage {
     return this.<T>readOpt(entity, property).orElse(defaultValue);
   }
 
-  private StringValue jsonValue(Object o) throws JsonProcessingException {
+  static StringValue jsonValue(Object o) throws JsonProcessingException {
     return StringValue
         .newBuilder(OBJECT_MAPPER.writeValueAsString(o))
         .setExcludeFromIndexes(true)

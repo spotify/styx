@@ -90,9 +90,9 @@ public class QueuedStateManagerTest {
     }
 
     storage = new InMemStorage();
-    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2);
+    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2, outputHandlers);
 
-    stateManager.initialize(initial);
+    stateManager.trigger(initial, trigger);
     assertTrue(stateManager.awaitIdle(1000));
   }
 
@@ -128,7 +128,7 @@ public class QueuedStateManagerTest {
     stateManager.receive(Event.halt(INSTANCE));
     assertTrue(stateManager.awaitIdle(1000));
 
-    stateManager.initialize(RunState.fresh(INSTANCE));
+    stateManager.trigger(RunState.fresh(INSTANCE), trigger);
     stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER2));
     stateManager.receive(Event.dequeue(INSTANCE));
     stateManager.receive(Event.created(INSTANCE, TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -136,7 +136,7 @@ public class QueuedStateManagerTest {
     stateManager.receive(Event.halt(INSTANCE));
     assertTrue(stateManager.awaitIdle(1000));
 
-    stateManager.initialize(RunState.fresh(INSTANCE));
+    stateManager.trigger(RunState.fresh(INSTANCE), trigger);
     stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER3));
     assertTrue(stateManager.awaitIdle(1000));
 
@@ -151,7 +151,7 @@ public class QueuedStateManagerTest {
   public void shouldFailInitializeWFIfAlreadyActive() throws Exception {
     setUp();
 
-    stateManager.initialize(RunState.fresh(INSTANCE));
+    stateManager.trigger(RunState.fresh(INSTANCE), trigger);
   }
 
   @Test(expected = IsClosedException.class)
@@ -159,7 +159,7 @@ public class QueuedStateManagerTest {
     setUp();
 
     stateManager.close();
-    stateManager.initialize(RunState.fresh(INSTANCE));
+    stateManager.trigger(RunState.fresh(INSTANCE), trigger);
   }
 
   @Test(expected = IsClosedException.class)
@@ -280,7 +280,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldRestoreStateAtCount() throws Exception {
-    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2);
+    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2, outputHandlers);
 
     stateManager.restore(RunState.fresh(INSTANCE), 7L);
     stateManager.receive(Event.timeTrigger(INSTANCE));  // 8
@@ -293,13 +293,13 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldHandleThrowingOutputHandler() throws Exception {
-    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2);
+    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2, outputHandlers);
 
     OutputHandler throwing = (state) -> {
       throw new RuntimeException();
     };
 
-    stateManager.initialize(RunState.fresh(INSTANCE, throwing));
+    stateManager.trigger(RunState.fresh(INSTANCE, throwing), trigger);
     stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER1));
 
     assertTrue(stateManager.awaitIdle(5000));
@@ -307,11 +307,11 @@ public class QueuedStateManagerTest {
 
   @Test
   public void testGetActiveWorkflowInstance() throws Exception {
-    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2);
+    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2, outputHandlers);
 
     assertThat(stateManager.isActiveWorkflowInstance(INSTANCE), is(false));
 
-    stateManager.initialize(RunState.fresh(INSTANCE, transitions::push));
+    stateManager.trigger(RunState.fresh(INSTANCE, transitions::push), trigger);
 
     assertTrue(stateManager.awaitIdle(1000));
     assertThat(stateManager.isActiveWorkflowInstance(INSTANCE), is(true));
@@ -351,7 +351,7 @@ public class QueuedStateManagerTest {
         WorkflowInstance instance = wfi.apply(jj);
 
         try {
-          stateManager.initialize(RunState.fresh(instance));
+          stateManager.trigger(RunState.fresh(instance), trigger);
           stateManager.receive(Event.triggerExecution(instance, TRIGGER1));
           stateManager.receive(Event.dequeue(instance));
         } catch (IsClosedException ignored) {

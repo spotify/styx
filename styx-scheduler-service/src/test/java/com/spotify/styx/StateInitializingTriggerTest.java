@@ -63,7 +63,7 @@ public class StateInitializingTriggerTest {
 
   private SyncStateManager stateManager = new SyncStateManager();
   private TriggerListener
-      trigger = new StateInitializingTrigger(RunState::fresh, stateManager);
+      trigger = new StateInitializingTrigger(stateManager);
 
   @Test
   public void shouldInitializeWorkflowInstance() throws Exception {

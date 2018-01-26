@@ -36,8 +36,6 @@ public interface Stats {
 
   void registerActiveStatesMetric(RunState.State state, String triggerName, Gauge<Long> activeStatesCount);
 
-  void registerActiveStatesMetric(WorkflowId workflowId, Gauge<Long> activeStatesCount);
-
   void registerWorkflowCountMetric(String status, Gauge<Long> workflowCount);
 
   void registerSubmissionRateLimitMetric(Gauge<Double> submissionRateLimit);
