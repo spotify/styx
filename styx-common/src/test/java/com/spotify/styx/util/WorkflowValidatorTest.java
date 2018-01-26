@@ -24,7 +24,6 @@ import static com.spotify.styx.util.WorkflowValidator.MAX_COMMIT_SHA_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_ID_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_RESOURCES;
 import static com.spotify.styx.util.WorkflowValidator.MAX_RESOURCE_LENGTH;
-import static com.spotify.styx.util.WorkflowValidator.MAX_SCHEDULE_EXPRESSION_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_SECRET_MOUNT_PATH_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_SECRET_NAME_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_SERVICE_ACCOUNT_LENGTH;
@@ -44,17 +43,20 @@ import com.google.common.collect.ImmutableList;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
+import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.testdata.TestData;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.IntStream;
+import junitparams.JUnitParamsRunner;
+import junitparams.Parameters;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.MockitoAnnotations;
 
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(JUnitParamsRunner.class)
 public class WorkflowValidatorTest {
 
   @Mock DockerImageValidator dockerImageValidator;
@@ -63,6 +65,7 @@ public class WorkflowValidatorTest {
 
   @Before
   public void setUp() throws Exception {
+    MockitoAnnotations.initMocks(this);
     when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Collections.emptyList());
     sut = new WorkflowValidator(dockerImageValidator);
   }
@@ -70,6 +73,25 @@ public class WorkflowValidatorTest {
   @Test
   public void validateValidWorkflow() throws Exception {
     assertThat(sut.validateWorkflowConfiguration(TestData.FULL_WORKFLOW_CONFIGURATION), is(empty()));
+  }
+
+  @Test
+  @Parameters({
+      "*/15 10 * * 6",
+      "* *  *  * *",
+      "@hourly", "hourly", "hours",
+      "@daily", "daily", "days",
+      "@weekly", "weekly", "weeks",
+      "@monthly", "monthly", "months",
+      "@annually", "annually", "@yearly",
+      "yearly", "years",
+  })
+  public void validateValidCron(String expression) throws Exception {
+    assertThat(sut.validateWorkflowConfiguration(
+        WorkflowConfigurationBuilder.from(TestData.FULL_WORKFLOW_CONFIGURATION)
+            .schedule(Schedule.parse(expression))
+            .build()),
+        is(empty()));
   }
 
   @Test
@@ -116,7 +138,7 @@ public class WorkflowValidatorTest {
 
     final List<String> expectedErrors = ImmutableList.<String>builder()
         .add(limit("id too long", id.length(), MAX_ID_LENGTH))
-        .add(limit("schedule expression too long", schedule.length(), MAX_SCHEDULE_EXPRESSION_LENGTH))
+        .add("invalid schedule")
         .add(limit("commitSha too long", commitSha.length(), MAX_COMMIT_SHA_LENGTH))
         .add(limit("secret name too long", secret.name().length(), MAX_SECRET_NAME_LENGTH))
         .add(limit("secret mount path too long", secret.mountPath().length(), MAX_SECRET_MOUNT_PATH_LENGTH))

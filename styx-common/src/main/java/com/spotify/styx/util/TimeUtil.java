@@ -168,7 +168,7 @@ public class TimeUtil {
     return time.plus(dateAmount).plus(timeAmount);
   }
 
-  private static Cron cron(Schedule schedule) {
+  public static Cron cron(Schedule schedule) {
     final CronDefinition cronDefinition = instanceDefinitionFor(CronType.UNIX);
     return new CronParser(cronDefinition).parse(cronExpression(schedule));
   }

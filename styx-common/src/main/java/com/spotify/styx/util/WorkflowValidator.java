@@ -40,7 +40,6 @@ public class WorkflowValidator {
   static final int MAX_SECRET_NAME_LENGTH = 253;
   static final int MAX_SECRET_MOUNT_PATH_LENGTH = 4096;
   static final int MAX_SERVICE_ACCOUNT_LENGTH = 256;
-  static final int MAX_SCHEDULE_EXPRESSION_LENGTH = 256;
 
   private final DockerImageValidator dockerImageValidator;
 
@@ -56,10 +55,9 @@ public class WorkflowValidator {
   public List<String> validateWorkflowConfiguration(WorkflowConfiguration cfg) {
     final List<String> e = new ArrayList<>();
 
-    // TODO: also validate contents
+    // TODO: validate more of the contents
 
     limit(e, cfg.id().length(), MAX_ID_LENGTH, "id too long");
-    limit(e, cfg.schedule().expression().length(), MAX_SCHEDULE_EXPRESSION_LENGTH, "schedule expression too long");
     limit(e, cfg.commitSha().map(String::length), MAX_COMMIT_SHA_LENGTH, "commitSha too long");
     limit(e, cfg.secret().map(s -> s.name().length()), MAX_SECRET_NAME_LENGTH, "secret name too long");
     limit(e, cfg.secret().map(s -> s.mountPath().length()), MAX_SECRET_MOUNT_PATH_LENGTH, "secret mount path too long");
@@ -84,6 +82,12 @@ public class WorkflowValidator {
         e.add(format("invalid offset: %s", ex.getMessage()));
       }
     });
+
+    try {
+      TimeUtil.cron(cfg.schedule());
+    } catch (IllegalArgumentException ex) {
+      e.add("invalid schedule");
+    }
 
     return e;
   }
