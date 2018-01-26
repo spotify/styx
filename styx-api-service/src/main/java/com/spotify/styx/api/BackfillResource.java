@@ -272,7 +272,7 @@ public final class BackfillResource {
     final Collection<String> errors = workflowValidator.validateWorkflow(workflow);
     if (!errors.isEmpty()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
-          + String.join(", ", errors));
+          + String.join(", ", errors)));
     }
 
     if (!TimeUtil.isAligned(input.start(), schedule)) {
