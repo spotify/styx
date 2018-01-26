@@ -38,7 +38,7 @@ public class WorkflowValidator {
   static final int MAX_RESOURCE_LENGTH = 256;
   static final int MAX_COMMIT_SHA_LENGTH = 256;
   static final int MAX_SECRET_NAME_LENGTH = 253;
-  static final int MAX_SECRET_MOUNT_PATH_LENGTH = 4096;
+  static final int MAX_SECRET_MOUNT_PATH_LENGTH = 1024;
   static final int MAX_SERVICE_ACCOUNT_LENGTH = 256;
 
   private final DockerImageValidator dockerImageValidator;
