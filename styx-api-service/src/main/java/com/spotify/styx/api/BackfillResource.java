@@ -20,8 +20,6 @@
 
 package com.spotify.styx.api;
 
-import static com.spotify.apollo.Status.BAD_REQUEST;
-import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
 import static com.spotify.apollo.StatusType.Family.SUCCESSFUL;
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.serialization.Json.serialize;
@@ -31,7 +29,6 @@ import static com.spotify.styx.util.StreamUtil.cat;
 import static java.util.stream.Collectors.toList;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.base.Joiner;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -275,7 +272,7 @@ public final class BackfillResource {
     final Collection<String> errors = workflowValidator.validateWorkflow(workflow);
     if (!errors.isEmpty()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
-          + Joiner.on(", ").join(errors)));
+          + String.join(", ", errors));
     }
 
     if (!TimeUtil.isAligned(input.start(), schedule)) {
