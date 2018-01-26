@@ -22,9 +22,12 @@ package com.spotify.styx.storage;
 
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
+import java.util.Optional;
 
 /**
  * The interface to the persistence layer where the same transaction is used across storage
@@ -60,6 +63,22 @@ public interface StorageTransaction {
    * @param state       The state object with optional fields to patch
    */
   WorkflowId patchState(WorkflowId workflowId, WorkflowState state) throws IOException;
+
+  /**
+   * Read an active workflow instance state.
+   */
+  Optional<PersistentWorkflowInstanceState> activeState(WorkflowInstance instance) throws IOException;
+
+  /**
+   * Write an active workflow instance state.
+   */
+  WorkflowInstance writeActiveState(WorkflowInstance instance, PersistentWorkflowInstanceState state)
+      throws IOException;
+
+  /**
+   * Remove an active workflow instance state.
+   */
+  WorkflowInstance deleteActiveState(WorkflowInstance instance);
 
   /**
    * Commit all the storage operations previously called.

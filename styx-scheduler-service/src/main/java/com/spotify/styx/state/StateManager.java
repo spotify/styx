@@ -25,8 +25,11 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.util.IsClosedException;
 import java.io.Closeable;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,20 +41,11 @@ public interface StateManager extends Closeable {
   Logger LOG = LoggerFactory.getLogger(StateManager.class);
 
   /**
-   * Initializes a {@link RunState} which makes it actively tracked.
+   * Triggers a workflow instance to run.
    *
-   * @param runState The state to initialize
    * @throws IsClosedException if the state receiver is closed and can not handle events
    */
-  void initialize(RunState runState) throws IsClosedException;
-
-  /**
-   * Restore a {@link RunState} and track it from the given sequence count.
-   *
-   * @param runState The state to initialize
-   * @param count    The sequence count to restore the state at
-   */
-  void restore(RunState runState, long count);
+  CompletableFuture<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger) throws IsClosedException;
 
   /**
    * Receive an {@link Event} and route it to the corresponding active {@link RunState} based on
@@ -68,28 +62,10 @@ public interface StateManager extends Closeable {
   Map<WorkflowInstance, RunState> activeStates();
 
   /**
-   * Returns the number of current active {@link RunState}.
-   */
-  long getActiveStatesCount();
-
-  /**
    * Returns the number of queued, unprocessed events. These are events that are sent to
    * {@link #receive(Event)} or {@link #receiveIgnoreClosed(Event)}, and are pending.
    */
   long getQueuedEventsCount();
-
-  /**
-   * Returns the number of current active {@link RunState} for a specific {@link WorkflowId}.
-   */
-  long getActiveStatesCount(WorkflowId workflowId);
-
-  /**
-   * Check if a {@link WorkflowInstance} is currently active.
-   *
-   * @param workflowInstance The {@link WorkflowInstance} to inspect
-   * @return A boolean indicating if the {@link WorkflowInstance} is active
-   */
-  boolean isActiveWorkflowInstance(WorkflowInstance workflowInstance);
 
   /**
    * Like {@link #receive(Event)} but ignoring the {@link IsClosedException} exception.

@@ -68,7 +68,7 @@ public class TerminationHandlerTest {
   public void shouldCompleteOnZeroExitCode() throws Exception {
     StateData data = data(1, 1.0, Optional.of(0));
     RunState zeroTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, transitions::add);
-    stateManager.initialize(zeroTerm);
+    stateManager.trigger(zeroTerm, trigger);
     outputHandler.transitionInto(zeroTerm);
 
     RunState nextState = transitions.get(0);
@@ -79,7 +79,7 @@ public class TerminationHandlerTest {
   public void shouldScheduleRetryOnNonZero() throws Exception {
     StateData data = data(1, 1.0, Optional.of(1));
     RunState nonZeroTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, transitions::add);
-    stateManager.initialize(nonZeroTerm);
+    stateManager.trigger(nonZeroTerm, trigger);
     outputHandler.transitionInto(nonZeroTerm);
 
     RunState nextState = transitions.get(0);
@@ -90,7 +90,7 @@ public class TerminationHandlerTest {
   public void shouldScheduleRetryOnMissingExitCode() throws Exception {
     StateData data = data(1, 1.0, Optional.empty());
     RunState nonZeroTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, transitions::add);
-    stateManager.initialize(nonZeroTerm);
+    stateManager.trigger(nonZeroTerm, trigger);
     outputHandler.transitionInto(nonZeroTerm);
 
     RunState nextState = transitions.get(0);
@@ -101,7 +101,7 @@ public class TerminationHandlerTest {
   public void shouldScheduleRetryOnFail() throws Exception {
     StateData data = data(1, 1.0, Optional.of(1));
     RunState failed = RunState.create(WORKFLOW_INSTANCE, FAILED, data, transitions::add);
-    stateManager.initialize(failed);
+    stateManager.trigger(failed, trigger);
     outputHandler.transitionInto(failed);
 
     RunState nextState = transitions.get(0);
@@ -112,7 +112,7 @@ public class TerminationHandlerTest {
   public void shouldFailOnNonZeroMaxRetriesReached() throws Exception {
     StateData data = data(400, MAX_RETRY_COST, Optional.of(1));
     RunState maxedTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, transitions::add);
-    stateManager.initialize(maxedTerm);
+    stateManager.trigger(maxedTerm, trigger);
     outputHandler.transitionInto(maxedTerm);
 
     RunState nextState = transitions.get(0);
@@ -123,7 +123,7 @@ public class TerminationHandlerTest {
   public void shouldFailOnFailMaxRetriesReached() throws Exception {
     StateData data = data(400, MAX_RETRY_COST, Optional.of(1));
     RunState maxedTerm = RunState.create(WORKFLOW_INSTANCE, FAILED, data, transitions::add);
-    stateManager.initialize(maxedTerm);
+    stateManager.trigger(maxedTerm, trigger);
     outputHandler.transitionInto(maxedTerm);
 
     RunState nextState = transitions.get(0);
@@ -134,7 +134,7 @@ public class TerminationHandlerTest {
   public void shouldScheduleRetryOf10MinutesOnMissingDependencies() throws Exception {
     StateData data = data(1, 1.0, Optional.of(20));
     RunState missingDeps = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, transitions::add);
-    stateManager.initialize(missingDeps);
+    stateManager.trigger(missingDeps, trigger);
     outputHandler.transitionInto(missingDeps);
 
     RunState nextState = transitions.get(0);
@@ -147,7 +147,7 @@ public class TerminationHandlerTest {
   public void shouldFailOnFailFastExitCodeReceived() throws Exception {
     StateData data = data(1, 1.0, Optional.of(50));
     RunState maxedTerm = RunState.create(WORKFLOW_INSTANCE, FAILED, data, transitions::add);
-    stateManager.initialize(maxedTerm);
+    stateManager.trigger(maxedTerm, trigger);
     outputHandler.transitionInto(maxedTerm);
 
     RunState nextState = transitions.get(0);

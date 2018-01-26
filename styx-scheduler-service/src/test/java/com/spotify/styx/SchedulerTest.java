@@ -149,7 +149,7 @@ public class SchedulerTest {
   }
 
   private void init(RunState runState) throws IsClosedException {
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
   }
 
   private Workflow workflowUsingResources(WorkflowId id, String... resources) {
@@ -638,7 +638,7 @@ public class SchedulerTest {
     final StateData stateData = StateData.newBuilder().tries(0).build();
     final RunState runState = RunState.create(INSTANCE, State.QUEUED, stateData, time);
 
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
 
     scheduler.tick();
 
@@ -668,7 +668,7 @@ public class SchedulerTest {
     final StateData stateData = StateData.newBuilder().tries(0).build();
     final RunState runState = RunState.create(INSTANCE, State.QUEUED, stateData, time);
 
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
 
     scheduler.tick();
 
@@ -691,7 +691,7 @@ public class SchedulerTest {
     final StateData stateData = StateData.newBuilder().tries(0).build();
     final RunState runState = RunState.create(INSTANCE, State.QUEUED, stateData, time);
 
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
 
     scheduler.tick();
 
