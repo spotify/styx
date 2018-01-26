@@ -174,8 +174,8 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(namedPod1.get()).thenReturn(createdPod1);
     when(namedPod2.get()).thenReturn(createdPod2);
 
-    setStatusAndState(createdPod1);
-    setStatusAndState(createdPod2);
+    setStatusAndState(createdPod1, RUN_SPEC.executionId());
+    setStatusAndState(createdPod2, RUN_SPEC_2.executionId());
 
     kdr.pollPods();
 
@@ -183,10 +183,10 @@ public class KubernetesDockerRunnerPodPollerTest {
     verify(namedPod2).delete();
   }
 
-  private void setStatusAndState(Pod createdPod) {
+  private void setStatusAndState(Pod createdPod, String containerName) {
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
-    when(containerStatus.getName()).thenReturn(KubernetesDockerRunner.STYX_RUN);
+    when(containerStatus.getName()).thenReturn(containerName);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
   }

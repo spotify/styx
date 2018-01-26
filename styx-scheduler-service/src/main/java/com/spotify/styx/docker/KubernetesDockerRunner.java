@@ -94,7 +94,6 @@ import java.util.function.Consumer;
  */
 class KubernetesDockerRunner implements DockerRunner {
 
-  static final String STYX_RUN = "styx-run";
   static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
   static final String DOCKER_TERMINATION_LOGGING_ANNOTATION = "styx-docker-termination-logging";
   static final String COMPONENT_ID = "STYX_COMPONENT_ID";
@@ -324,8 +323,8 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @VisibleForTesting
   void cleanupWithRunState(WorkflowInstance workflowInstance, String executionId) {
-    cleanup(workflowInstance, executionId, containerStatuses ->
-        getStyxContainer(containerStatuses).ifPresent(containerStatus -> {
+    cleanup(workflowInstance, executionId, pod ->
+        getStyxContainer(pod).ifPresent(containerStatus -> {
           if (hasPullImageError(containerStatus)) {
             deletePod(workflowInstance, executionId);
           } else {
@@ -338,8 +337,8 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @VisibleForTesting
   void cleanupWithoutRunState(WorkflowInstance workflowInstance, String executionId) {
-    cleanup(workflowInstance, executionId, containerStatuses -> 
-        getStyxContainer(containerStatuses).ifPresent(containerStatus -> {
+    cleanup(workflowInstance, executionId, pod ->
+        getStyxContainer(pod).ifPresent(containerStatus -> {
           if (containerStatus.getState().getTerminated() != null) {
             deletePodIfNonDeletePeriodExpired(workflowInstance, executionId, containerStatus);
           } else {
@@ -360,11 +359,11 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private void cleanup(WorkflowInstance workflowInstance, String executionId, 
-                       Consumer<List<ContainerStatus>> cleaner) {
+                       Consumer<Pod> cleaner) {
     Optional.ofNullable(client.pods().withName(executionId).get()).ifPresent(pod -> {
       final List<ContainerStatus> containerStatuses = pod.getStatus().getContainerStatuses();
       if (!containerStatuses.isEmpty()) {
-        cleaner.accept(containerStatuses);
+        cleaner.accept(pod);
       } else {
         // for some cases such as evicted pod, there is no container status, so we delete directly
         deletePod(workflowInstance, executionId);
@@ -372,10 +371,9 @@ class KubernetesDockerRunner implements DockerRunner {
     });
   }
   
-  private static Optional<ContainerStatus> getStyxContainer(List<ContainerStatus> containerStatuses) {
-    return containerStatuses.stream()
-        .filter(containerStatus -> containerStatus.getName().equals(STYX_RUN))
-        .findFirst();
+  static Optional<ContainerStatus> getStyxContainer(Pod pod) {
+    return readPodWorkflowInstance(pod)
+        .flatMap(wfi -> pod.getStatus().getContainerStatuses().stream().findFirst());
   }
   
   private boolean isNonDeletePeriodExpired(ContainerStatus containerStatus) {
@@ -496,7 +494,7 @@ class KubernetesDockerRunner implements DockerRunner {
     }
   }
 
-  private Optional<WorkflowInstance> readPodWorkflowInstance(Pod pod) {
+  private static Optional<WorkflowInstance> readPodWorkflowInstance(Pod pod) {
     final Map<String, String> annotations = pod.getMetadata().getAnnotations();
     final String podName = pod.getMetadata().getName();
     if (!annotations.containsKey(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION)) {
