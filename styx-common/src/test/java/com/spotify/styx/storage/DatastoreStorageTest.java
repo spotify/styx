@@ -87,24 +87,27 @@ public class DatastoreStorageTest {
   private static final WorkflowInstance WORKFLOW_INSTANCE2 = WorkflowInstance.create(WORKFLOW_ID2, "2016-09-01");
   private static final WorkflowInstance WORKFLOW_INSTANCE3 = WorkflowInstance.create(WORKFLOW_ID3, "2016-09-01");
 
+  private static final Instant TIMESTAMP = Instant.parse("2017-01-01T00:00:00Z");
+
+
   private static final PersistentWorkflowInstanceState PERSISTENT_STATE1 = PersistentWorkflowInstanceState.builder()
       .state(State.NEW)
       .data(StateData.zero())
-      .timestamp(Instant.now())
+      .timestamp(TIMESTAMP)
       .counter(42L)
       .build();
 
   private static final PersistentWorkflowInstanceState PERSISTENT_STATE2 = PersistentWorkflowInstanceState.builder()
       .state(State.NEW)
       .data(StateData.zero())
-      .timestamp(Instant.now())
+      .timestamp(TIMESTAMP)
       .counter(84L)
       .build();
 
   private static final PersistentWorkflowInstanceState PERSISTENT_STATE3 = PersistentWorkflowInstanceState.builder()
       .state(State.NEW)
       .data(StateData.zero())
-      .timestamp(Instant.now())
+      .timestamp(TIMESTAMP)
       .counter(17L)
       .build();
 
@@ -112,13 +115,13 @@ public class DatastoreStorageTest {
   private static final PersistentWorkflowInstanceState PERSISTENT_STATE = PersistentWorkflowInstanceState.builder()
       .state(State.NEW)
       .data(StateData.zero())
-      .timestamp(Instant.now())
+      .timestamp(TIMESTAMP)
       .counter(42L)
       .build();
 
   private static final PersistentWorkflowInstanceState FULL_PERSISTENT_STATE = PersistentWorkflowInstanceState.builder()
       .state(State.QUEUED)
-      .timestamp(Instant.now())
+      .timestamp(TIMESTAMP)
       .counter(42L)
       .data(StateData.newBuilder()
           .tries(17)
@@ -464,15 +467,13 @@ public class DatastoreStorageTest {
     Workflow workflow2 = workflow(WORKFLOW_ID2);
     Workflow workflow3 = workflow(WORKFLOW_ID3);
 
-    Instant now = Instant.now();
-
     storage.store(workflow1);
     storage.store(workflow2);
     storage.store(workflow3);
 
     storage.setEnabled(WORKFLOW_ID1, true);
     storage.setEnabled(WORKFLOW_ID2, false);
-    storage.updateNextNaturalTrigger(WORKFLOW_ID3, TriggerInstantSpec.create(now, now.plus(Duration.ofHours(1))));
+    storage.updateNextNaturalTrigger(WORKFLOW_ID3, TriggerInstantSpec.create(TIMESTAMP, TIMESTAMP.plus(Duration.ofHours(1))));
 
     assertThat(storage.workflows().size(), is(3));
     assertThat(storage.workflows(), hasEntry(WORKFLOW_ID1, workflow1));
