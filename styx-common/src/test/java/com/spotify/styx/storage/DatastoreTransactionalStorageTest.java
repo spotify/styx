@@ -55,7 +55,7 @@ public class DatastoreTransactionalStorageTest {
   @Test
   public void shouldCommitEmptyTransaction() throws IOException {
     final Transaction transaction = datastore.newTransaction();
-    DatastoreTransactionalStorage transactionalStorage = new DatastoreTransactionalStorage(transaction);
+    DatastoreTransactionalStorage transactionalStorage = new DatastoreTransactionalStorage(datastore, transaction);
     transactionalStorage.commit();
     assertFalse(transaction.isActive());
   }
@@ -63,7 +63,7 @@ public class DatastoreTransactionalStorageTest {
   @Test(expected = TransactionException.class)
   public void shouldThrowIfUnexpectedDatastoreError() throws IOException {
     final Transaction transaction = datastore.newTransaction();
-    DatastoreTransactionalStorage transactionalStorage = new DatastoreTransactionalStorage(transaction);
+    DatastoreTransactionalStorage transactionalStorage = new DatastoreTransactionalStorage(datastore, transaction);
 
     transaction.rollback();
     transactionalStorage.commit();
@@ -74,9 +74,9 @@ public class DatastoreTransactionalStorageTest {
     Transaction transaction1 = datastore.newTransaction();
     Transaction transaction2 = datastore.newTransaction();
     Transaction transaction3 = datastore.newTransaction();
-    DatastoreTransactionalStorage transactionalStorage1 = new DatastoreTransactionalStorage(transaction1);
-    DatastoreTransactionalStorage transactionalStorage2 = new DatastoreTransactionalStorage(transaction2);
-    DatastoreTransactionalStorage transactionalStorage3 = new DatastoreTransactionalStorage(transaction3);
+    DatastoreTransactionalStorage transactionalStorage1 = new DatastoreTransactionalStorage(datastore, transaction1);
+    DatastoreTransactionalStorage transactionalStorage2 = new DatastoreTransactionalStorage(datastore, transaction2);
+    DatastoreTransactionalStorage transactionalStorage3 = new DatastoreTransactionalStorage(datastore, transaction3);
 
     // Store first entity
     KeyFactory keyFactory1 = datastore.newKeyFactory().setKind("MyKind");

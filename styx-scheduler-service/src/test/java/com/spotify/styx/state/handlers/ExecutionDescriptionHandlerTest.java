@@ -97,7 +97,7 @@ public class ExecutionDescriptionHandlerTest {
 
     storage.storeWorkflow(workflow);
     storage.patchState(workflow.id(), workflowState);
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
     stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
     stateManager.receive(Event.dequeue(workflowInstance));
 
@@ -122,7 +122,7 @@ public class ExecutionDescriptionHandlerTest {
 
     storage.storeWorkflow(workflow);
     storage.patchState(workflow.id(), workflowState);
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
     stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
     stateManager.receive(Event.dequeue(workflowInstance));
 
@@ -151,7 +151,7 @@ public class ExecutionDescriptionHandlerTest {
     storage.patchState(workflow.id(), workflowState);
 
     RunState runState = RunState.fresh(workflowInstance, toTest);
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
     stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
     stateManager.receive(Event.dequeue(workflowInstance));
 
@@ -164,7 +164,7 @@ public class ExecutionDescriptionHandlerTest {
     WorkflowInstance workflowInstance = WorkflowInstance.create(WorkflowId.create("c", "e"), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
     toTest.transitionInto(runState);
 
     RunState halted = stateManager.get(workflowInstance);
@@ -182,7 +182,7 @@ public class ExecutionDescriptionHandlerTest {
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
     storage.storeWorkflow(workflow);
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
     toTest.transitionInto(runState);
 
     RunState halted = stateManager.get(workflowInstance);
@@ -198,7 +198,7 @@ public class ExecutionDescriptionHandlerTest {
     RunState runState = RunState.create(workflowInstance, RunState.State.PREPARE);
 
     storage.storeWorkflow(workflow);
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
     toTest.transitionInto(runState);
 
     RunState halted = stateManager.get(workflowInstance);
@@ -219,7 +219,7 @@ public class ExecutionDescriptionHandlerTest {
 
     storage.storeWorkflow(workflow);
     storage.patchState(workflow.id(), workflowState);
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
     stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
     stateManager.receive(Event.dequeue(workflowInstance));
 

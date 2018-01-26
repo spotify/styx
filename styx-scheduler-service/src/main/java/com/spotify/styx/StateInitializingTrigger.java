@@ -45,11 +45,9 @@ final class StateInitializingTrigger implements TriggerListener {
 
   private static final Logger LOG = LoggerFactory.getLogger(StateInitializingTrigger.class);
 
-  private final StateFactory stateFactory;
   private final StateManager stateManager;
 
-  StateInitializingTrigger(StateFactory stateFactory, StateManager stateManager) {
-    this.stateFactory = Objects.requireNonNull(stateFactory);
+  StateInitializingTrigger(StateManager stateManager) {
     this.stateManager = Objects.requireNonNull(stateManager);
   }
 
@@ -62,12 +60,9 @@ final class StateInitializingTrigger implements TriggerListener {
 
     final String parameter = toParameter(workflow.configuration().schedule(), instant);
     final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), parameter);
-    final RunState initialState = stateFactory.apply(workflowInstance);
 
     try {
-      stateManager.initialize(initialState);
-      return stateManager.receive(
-          Event.triggerExecution(workflowInstance, trigger));
+      return stateManager.trigger(workflowInstance, trigger);
     } catch (IsClosedException isClosedException) {
       LOG.warn("State receiver is closed when processing workflow {} for trigger {} at {}",
                workflow, trigger, instant, isClosedException);

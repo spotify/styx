@@ -83,7 +83,7 @@ public class DockerRunnerHandlerTest {
             .executionId(TEST_EXECUTION_ID)
             .build());
 
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
     dockerRunnerHandler.transitionInto(runState);
 
     verify(dockerRunner, timeout(60_000)).start(instanceCaptor.capture(), runSpecCaptor.capture());
@@ -100,7 +100,7 @@ public class DockerRunnerHandlerTest {
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
         StateData.newBuilder().executionDescription(EXECUTION_DESCRIPTION).build());
 
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
     dockerRunnerHandler.transitionInto(runState);
 
     verify(dockerRunner, timeout(60_000)).start(instanceCaptor.capture(), runSpecCaptor.capture());
@@ -115,7 +115,7 @@ public class DockerRunnerHandlerTest {
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.NEW, dockerRunnerHandler);
 
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
     stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
     stateManager.receive(Event.dequeue(workflowInstance));
     stateManager.receive(Event.submit(workflowInstance, EXECUTION_DESCRIPTION, TEST_EXECUTION_ID));
@@ -142,7 +142,7 @@ public class DockerRunnerHandlerTest {
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
         StateData.newBuilder().executionDescription(EXECUTION_DESCRIPTION).build());
 
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
     dockerRunnerHandler.transitionInto(runState);
 
     // Verify that the state manager receives two events:
@@ -159,7 +159,7 @@ public class DockerRunnerHandlerTest {
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING);
 
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
     dockerRunnerHandler.transitionInto(runState);
 
     verify(stateManager, timeout(60_000)).receive(any(Event.class));
@@ -175,7 +175,7 @@ public class DockerRunnerHandlerTest {
     RunState runState = RunState.create(workflowInstance, RunState.State.FAILED,
         StateData.newBuilder().executionId(TEST_EXECUTION_ID).build());
 
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
     dockerRunnerHandler.transitionInto(runState);
 
     verify(dockerRunner, timeout(60_000)).cleanup(workflowInstance, TEST_EXECUTION_ID);
@@ -188,7 +188,7 @@ public class DockerRunnerHandlerTest {
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.NEW, dockerRunnerHandler);
 
-    stateManager.initialize(runState);
+    stateManager.trigger(runState, trigger);
     stateManager.receive(Event.triggerExecution(workflowInstance, TRIGGER));
     stateManager.receive(Event.dequeue(workflowInstance));
     stateManager.receive(Event.submit(workflowInstance, EXECUTION_DESCRIPTION, TEST_EXECUTION_ID));

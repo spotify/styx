@@ -21,6 +21,7 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.monitoring.MeteredProxy.instrument;
+import static com.spotify.styx.state.OutputHandler.fanOutput;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.GuardedRunnable.guard;
@@ -45,6 +46,7 @@ import com.google.api.services.iam.v1.IamScopes;
 import com.google.cloud.datastore.Datastore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -96,6 +98,7 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -321,9 +324,11 @@ public class StyxScheduler implements AppInit {
 
     warmUpCache(workflowCache, storage);
 
+    // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to take StateManager as argument instead?
+    final List<OutputHandler> outputHandlers = new ArrayList<>();
     final QueuedStateManager stateManager = closer.register(
         new QueuedStateManager(time, outputHandlerExecutor, storage,
-            eventConsumerFactory.apply(environment, stats), eventConsumerExecutor));
+            eventConsumerFactory.apply(environment, stats), eventConsumerExecutor, fanOutput(outputHandlers)));
 
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
@@ -338,7 +343,7 @@ public class StyxScheduler implements AppInit {
 
     final RateLimiter dequeueRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
 
-    final OutputHandler[] outputHandlers = new OutputHandler[] {
+    outputHandlers.addAll(ImmutableList.of(
         transitionLogger(""),
         new DockerRunnerHandler(
             dockerRunner, stateManager),
@@ -346,12 +351,10 @@ public class StyxScheduler implements AppInit {
         new MonitoringHandler(stats),
         new PublisherHandler(publisher),
         new ExecutionDescriptionHandler(storage, stateManager, new DockerImageValidator())
-    };
-    final StateFactory stateFactory =
-        (workflowInstance) -> RunState.fresh(workflowInstance, time, outputHandlers);
+    ));
 
     final TriggerListener trigger =
-        new StateInitializingTrigger(stateFactory, stateManager);
+        new StateInitializingTrigger(stateManager);
     final TriggerManager triggerManager = new TriggerManager(trigger, time, storage, stats);
     final BackfillTriggerManager backfillTriggerManager =
         new BackfillTriggerManager(stateManager, workflowCache, storage, trigger);
@@ -370,7 +373,6 @@ public class StyxScheduler implements AppInit {
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
-    restoreState(storage, outputHandlers, stateManager, dockerRunner);
     startTriggerManager(triggerManager, executor);
     startBackfillTriggerManager(backfillTriggerManager, executor);
     startScheduler(scheduler, executor);
@@ -435,32 +437,6 @@ public class StyxScheduler implements AppInit {
     } catch (IOException e) {
       LOG.warn("Failed to get workflows from storage", e);
     }
-  }
-
-  private void restoreState(
-      Storage storage,
-      OutputHandler[] outputHandlers,
-      StateManager stateManager,
-      DockerRunner dockerRunner) {
-    try {
-      final Map<WorkflowInstance, PersistentWorkflowInstanceState> activeInstances =
-          storage.readActiveWorkflowInstances();
-
-      replayActiveStates(activeInstances, storage, true)
-          .entrySet().stream()
-          .collect(toMap(
-              e -> e.getKey()
-                  .withHandlers(outputHandlers)
-                  .withTime(time),
-              Map.Entry::getValue))
-          .forEach(stateManager::restore);
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
-
-    // Eagerly fetch container state before starting the scheduler in order to recover executions
-    // that completed while styx was offline and avoiding re-running WFIs due to state timeouts.
-    dockerRunner.restore();
   }
 
   private static void startCleaner(Cleaner cleaner, ScheduledExecutorService exec) {
@@ -569,10 +545,6 @@ public class StyxScheduler implements AppInit {
               .count());
     });
 
-    workflowCache.all().forEach(workflow -> stats.registerActiveStatesMetric(
-        workflow.id(),
-        () -> stateManager.getActiveStatesCount(workflow.id())));
-
     stats.registerSubmissionRateLimitMetric(submissionRateLimiter::getRate);
   }
 
@@ -583,10 +555,6 @@ public class StyxScheduler implements AppInit {
       StateManager stateManager,
       BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
     return (workflow) -> {
-      stats.registerActiveStatesMetric(
-          workflow.id(),
-          () -> stateManager.getActiveStatesCount(workflow.id()));
-
       final Optional<Workflow> oldWorkflowOptional = cache.workflow(workflow.id());
 
       workflowInitializer.inspectChange(workflow);

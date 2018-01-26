@@ -159,9 +159,9 @@ public class BackfillTriggerManagerTest {
                                       .nextTrigger(Instant.parse("2016-12-03T00:00:00Z"))
                                       .build()));
 
-    stateManager.initialize
+    stateManager.trigger
         (RunState.fresh(
-            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23")));
+            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23")), trigger);
     stateManager.receive(
         Event.triggerExecution(
             WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23"),
@@ -213,16 +213,16 @@ public class BackfillTriggerManagerTest {
     initWorkflow(workflow);
     when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(BACKFILL_1));
 
-    stateManager.initialize(
+    stateManager.trigger(
         RunState.fresh(
-            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T22")));
+            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T22")), trigger);
     stateManager.receive(
         Event.triggerExecution(
             WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T22"),
             Trigger.backfill("backfill-1")));
-    stateManager.initialize
+    stateManager.trigger
         (RunState.fresh(
-            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23")));
+            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23")), trigger);
     stateManager.receive(
         Event.triggerExecution(
             WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23"),

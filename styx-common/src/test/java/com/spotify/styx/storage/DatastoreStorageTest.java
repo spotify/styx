@@ -38,6 +38,7 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -79,6 +80,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -177,7 +179,7 @@ public class DatastoreStorageTest {
   @Mock Datastore datastore;
   @Mock DatastoreTransactionalStorage transactionalStorage;
   @Mock TransactionFunction<String, FooException> transactionFunction;
-  @Mock Function<Transaction, DatastoreTransactionalStorage> transactionalStorageFactory;
+  @Mock BiFunction<Datastore, Transaction, DatastoreTransactionalStorage> transactionalStorageFactory;
 
   @BeforeClass
   public static void setUpClass() throws Exception {
@@ -200,6 +202,7 @@ public class DatastoreStorageTest {
   public void setUp() throws Exception {
     Datastore datastore = helper.getOptions().getService();
     storage = new DatastoreStorage(datastore, Duration.ZERO);
+    when(this.datastore.newKeyFactory()).then(a -> datastore.newKeyFactory());
   }
 
   @After
@@ -587,7 +590,7 @@ public class DatastoreStorageTest {
     when(datastore.newKeyFactory()).thenReturn(new KeyFactory("foo", "bar"));
     final DatastoreStorage storage = new DatastoreStorage(
         datastore, Duration.ZERO, transactionalStorageFactory);
-    when(transactionalStorageFactory.apply(transaction))
+    when(transactionalStorageFactory.apply(datastore, transaction))
         .thenReturn(transactionalStorage);
     when(datastore.newTransaction()).thenReturn(transaction);
     when(transactionFunction.apply(any())).thenReturn("foo");
@@ -605,7 +608,7 @@ public class DatastoreStorageTest {
     when(datastore.newKeyFactory()).thenReturn(new KeyFactory("foo", "bar"));
     final DatastoreStorage storage = new DatastoreStorage(
         datastore, Duration.ZERO, transactionalStorageFactory);
-    when(transactionalStorageFactory.apply(transaction))
+    when(transactionalStorageFactory.apply(datastore, transaction))
         .thenReturn(transactionalStorage);
     when(datastore.newTransaction()).thenReturn(transaction);
     final Exception expectedException = new FooException();
@@ -632,7 +635,7 @@ public class DatastoreStorageTest {
     when(datastore.newKeyFactory()).thenReturn(new KeyFactory("foo", "bar"));
     final DatastoreStorage storage = new DatastoreStorage(
         datastore, Duration.ZERO, transactionalStorageFactory);
-    when(transactionalStorageFactory.apply(transaction))
+    when(transactionalStorageFactory.apply(datastore, transaction))
         .thenReturn(transactionalStorage);
     when(datastore.newTransaction()).thenReturn(transaction);
     final TransactionException expectedException = new TransactionException(true, null);
