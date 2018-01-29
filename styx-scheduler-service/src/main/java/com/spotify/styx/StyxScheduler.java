@@ -86,6 +86,7 @@ import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
+import com.spotify.styx.util.WorkflowValidator;
 import com.spotify.styx.workflow.WorkflowInitializer;
 import com.typesafe.config.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
@@ -345,7 +346,7 @@ public class StyxScheduler implements AppInit {
         new TerminationHandler(retryUtil, stateManager),
         new MonitoringHandler(stats),
         new PublisherHandler(publisher),
-        new ExecutionDescriptionHandler(storage, stateManager, new DockerImageValidator())
+        new ExecutionDescriptionHandler(storage, stateManager, new WorkflowValidator(new DockerImageValidator()))
     };
     final StateFactory stateFactory =
         (workflowInstance) -> RunState.fresh(workflowInstance, time, outputHandlers);
@@ -380,7 +381,7 @@ public class StyxScheduler implements AppInit {
 
     final SchedulerResource schedulerResource =
         new SchedulerResource(stateManager, trigger, workflowChangeListener, workflowRemoveListener,
-                              storage, time, new DockerImageValidator());
+                              storage, time, new WorkflowValidator(new DockerImageValidator()));
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))

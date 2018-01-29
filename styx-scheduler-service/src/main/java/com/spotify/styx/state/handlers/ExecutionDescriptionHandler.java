@@ -32,10 +32,10 @@ import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.MissingRequiredPropertyException;
 import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
@@ -52,15 +52,15 @@ public class ExecutionDescriptionHandler implements OutputHandler {
 
   private final Storage storage;
   private final StateManager stateManager;
-  private final DockerImageValidator dockerImageValidator;
+  private final WorkflowValidator validator;
 
   public ExecutionDescriptionHandler(
       Storage storage,
       StateManager stateManager,
-      DockerImageValidator dockerImageValidator) {
+      WorkflowValidator validator) {
     this.storage = requireNonNull(storage);
     this.stateManager = requireNonNull(stateManager);
-    this.dockerImageValidator = requireNonNull(dockerImageValidator);
+    this.validator = requireNonNull(validator);
   }
 
   @Override
@@ -114,10 +114,10 @@ public class ExecutionDescriptionHandler implements OutputHandler {
                                                           workflowInstance))
     );
 
-    final Collection<String> errors = dockerImageValidator.validateImageReference(dockerImage);
+    final Collection<String> errors = validator.validateWorkflow(workflow);
     if (!errors.isEmpty()) {
       throw new MissingRequiredPropertyException(format(
-          "%s has an invalid docker image reference, halting %s. Errors: %s",
+          "%s configuration is invalid, halting %s. Errors: %s",
           workflowId, workflowInstance, errors));
     }
 

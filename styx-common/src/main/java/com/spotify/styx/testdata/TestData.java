@@ -56,6 +56,7 @@ public final class TestData {
           .dockerImage("busybox")
           .schedule(HOURS)
           .build();
+
   public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_INVALID_OFFSET =
       WorkflowConfiguration.builder()
           .id("styx.TestEndpoint")
@@ -106,6 +107,7 @@ public final class TestData {
           .dockerImage("busybox")
           .dockerArgs(ImmutableList.of("x", "y"))
           .secret(Secret.create("name", "/path"))
+          .serviceAccount("foo@bar.baz.quux")
           .build();
 
   public static final ExecutionDescription EXECUTION_DESCRIPTION =

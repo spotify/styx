@@ -33,6 +33,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.mockito.internal.verification.VerificationModeFactory.times;
 
 import com.google.cloud.datastore.Datastore;
@@ -68,9 +69,11 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
+import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Optional;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
@@ -122,6 +125,8 @@ public class BackfillResourceTest extends VersionedApiTest {
       .schedule(Schedule.DAYS)
       .build();
 
+  private final WorkflowValidator workflowValidator = mock(WorkflowValidator.class);
+
   public BackfillResourceTest(Api.Version version) {
     super(BackfillResource.BASE, version, "backfill-test", spy(StubClient.class));
   }
@@ -130,7 +135,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   protected void init(Environment environment) {
     environment.routingEngine()
         .registerRoutes(Api.withCommonMiddleware(
-            new BackfillResource(SCHEDULER_BASE, storage).routes()));
+            new BackfillResource(SCHEDULER_BASE, storage, workflowValidator).routes()));
   }
 
   @BeforeClass
@@ -152,17 +157,21 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Before
   public void setUp() throws Exception {
+    when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
+    when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
     storage.storeWorkflow(Workflow.create(
         BACKFILL_1.workflowId().componentId(),
         WorkflowConfiguration.builder()
             .id(BACKFILL_1.workflowId().id())
             .schedule(Schedule.HOURS)
+            .dockerImage("foobar")
             .build()));
     storage.storeWorkflow(Workflow.create(
         BACKFILL_2.workflowId().componentId(),
         WorkflowConfiguration.builder()
             .id(BACKFILL_2.workflowId().id())
             .schedule(Schedule.HOURS)
+            .dockerImage("foobar")
             .build()));
     storage.storeWorkflow(Workflow.create(
         BACKFILL_3.workflowId().componentId(),
@@ -620,6 +629,42 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     assertThat(response.status().reasonPhrase(),
                response, hasStatus(belongsToFamily(StatusType.Family.CLIENT_ERROR)));
+  }
+
+  @Test
+  public void shouldReturnBadRequestForPostBackfillIfInvalidWorkflowConfiguration() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final String json = "{\"start\":\"2017-01-01T00:00:00Z\"," +
+        "\"end\":\"2017-02-01T00:00:00Z\"," +
+        "\"component\":\"component\"," +
+        "\"workflow\":\"workflow2\","+
+        "\"concurrency\":1}";
+
+    when(workflowValidator.validateWorkflow(any())).thenReturn(ImmutableList.of("bad", "f00d"));
+
+    final Response<ByteString> response = awaitResponse(
+        serviceHelper.request("POST", path(""), ByteString.encodeUtf8(json)));
+
+    assertThat(response.status(),
+        is(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: bad, f00d")));
+  }
+
+  @Test
+  public void shouldReturnBadRequestForPostBackfillIfMissingImage() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final String json = "{\"start\":\"2017-01-01T00:00:00Z\"," +
+        "\"end\":\"2017-02-01T00:00:00Z\"," +
+        "\"component\":\"other_component\"," +
+        "\"workflow\":\"other_workflow\","+
+        "\"concurrency\":1}";
+
+    final Response<ByteString> response = awaitResponse(
+        serviceHelper.request("POST", path(""), ByteString.encodeUtf8(json)));
+
+    assertThat(response.status(),
+        is(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing docker image")));
   }
 
   private Connection setupBigTableMockTable() {
