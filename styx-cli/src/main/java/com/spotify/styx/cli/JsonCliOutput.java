@@ -20,6 +20,8 @@
 
 package com.spotify.styx.cli;
 
+import static java.util.stream.Collectors.toMap;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
@@ -32,6 +34,7 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.serialization.Json;
 import java.util.List;
+import java.util.Map.Entry;
 
 /**
  * Cli output printer that prints json output
@@ -48,7 +51,8 @@ class JsonCliOutput implements CliOutput {
 
   @Override
   public void printStates(RunStateDataPayload runStateDataPayload) {
-    printJson(CliUtil.groupStates(runStateDataPayload.activeStates()));
+    printJson(CliUtil.groupStates(runStateDataPayload.activeStates()).entrySet().stream()
+        .collect(toMap(e -> e.getKey().toKey(), Entry::getValue)));
   }
 
   @Override
