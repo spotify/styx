@@ -143,17 +143,17 @@ public class SchedulerResource {
 
   private Response<Workflow> createOrUpdateWorkflow(String componentId, WorkflowConfiguration configuration) {
     if (!configuration.dockerImage().isPresent()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing docker image"));
+      return Response.forStatus(BAD_REQUEST.withReasonPhrase("Missing docker image"));
     }
     final Collection<String> errors = workflowValidator.validateWorkflowConfiguration(configuration);
     if (!errors.isEmpty()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
+      return Response.forStatus(BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
           + String.join(", ", errors)));
     }
 
     if (configuration.commitSha().isPresent()
         && !isValidSHA1(configuration.commitSha().get())) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid commit sha"));
+      return Response.forStatus(BAD_REQUEST.withReasonPhrase("Invalid commit sha"));
     }
 
     final Workflow workflow = Workflow.create(componentId, configuration);
@@ -161,7 +161,7 @@ public class SchedulerResource {
     try {
       workflowChangeListener.accept(workflow);
     } catch (WorkflowInitializationException e) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(e.getMessage()));
+      return Response.forStatus(BAD_REQUEST.withReasonPhrase(e.getMessage()));
     }
 
     return Response.forPayload(workflow);
@@ -235,11 +235,11 @@ public class SchedulerResource {
               "An error occurred while retrieving workflow specifications"));
     }
     if (!workflow.configuration().dockerImage().isPresent()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing docker image"));
+      return Response.forStatus(BAD_REQUEST.withReasonPhrase("Workflow is missing docker image"));
     }
     final Collection<String> errors = workflowValidator.validateWorkflow(workflow);
     if (!errors.isEmpty()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
+      return Response.forStatus(BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
           + String.join(", ", errors)));
     }
 
