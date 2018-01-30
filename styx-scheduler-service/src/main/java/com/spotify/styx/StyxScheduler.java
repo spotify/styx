@@ -327,7 +327,8 @@ public class StyxScheduler implements AppInit {
 
     warmUpCache(workflowCache, storage);
 
-    // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to take StateManager as argument instead?
+    // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
+    //       take StateManager as argument instead?
     final List<OutputHandler> outputHandlers = new ArrayList<>();
     final QueuedStateManager stateManager = closer.register(
         new QueuedStateManager(time, outputHandlerExecutor, storage,
