@@ -26,7 +26,6 @@ import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState.State;
-import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -43,7 +42,7 @@ public class SyncStateManager implements StateManager {
   private final Map<WorkflowInstance, RunState> states = new ConcurrentHashMap<>();
 
   @Override
-  public CompletableFuture<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger) {
+  public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger) {
     final RunState runState = RunState.create(workflowInstance, State.QUEUED, StateData.newBuilder()
         .trigger(trigger)
         .build());
@@ -82,11 +81,6 @@ public class SyncStateManager implements StateManager {
     final ImmutableMap.Builder<WorkflowInstance, RunState> builder = ImmutableMap.builder();
     states.entrySet().forEach(entry -> builder.put(entry.getKey(), entry.getValue()));
     return builder.build();
-  }
-
-  @Override
-  public long getQueuedEventsCount() {
-    return 0; // synchronous event handling, no queue
   }
 
   @Override
