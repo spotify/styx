@@ -25,12 +25,10 @@ import static com.spotify.styx.state.OutputHandler.fanOutput;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.GuardedRunnable.guard;
-import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static com.spotify.styx.util.ReplayEvents.transitionLogger;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.stream.Collectors.toMap;
 
 import com.codahale.metrics.Gauge;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
@@ -67,7 +65,6 @@ import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.MonitoringHandler;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
-import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.QueuedStateManager;
 import com.spotify.styx.state.RunState;
@@ -101,13 +98,15 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -313,7 +312,11 @@ public class StyxScheduler implements AppInit {
 
     final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
     closer.register(executorCloser("scheduler", executor));
-    final ExecutorService outputHandlerExecutor = Executors.newFixedThreadPool(16, eventTf);
+    final BlockingQueue<Runnable> outputHandlerExecutorQueue = new LinkedBlockingQueue<>();
+    final ExecutorService outputHandlerExecutor = new ThreadPoolExecutor(16, 16,
+        0L, TimeUnit.MILLISECONDS,
+        outputHandlerExecutorQueue,
+        eventTf);
     closer.register(executorCloser("output-handler", outputHandlerExecutor));
     final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
     closer.register(executorCloser("event-consumer", eventConsumerExecutor));
@@ -378,7 +381,7 @@ public class StyxScheduler implements AppInit {
     startScheduler(scheduler, executor);
     startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
     startCleaner(cleaner, executor);
-    setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats);
+    setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats, outputHandlerExecutorQueue);
 
     final SchedulerResource schedulerResource =
         new SchedulerResource(stateManager, trigger, workflowChangeListener, workflowRemoveListener,
@@ -501,9 +504,10 @@ public class StyxScheduler implements AppInit {
       WorkflowCache workflowCache,
       Storage storage,
       RateLimiter submissionRateLimiter,
-      Stats stats) {
+      Stats stats,
+      BlockingQueue<Runnable> outputHandlerExecutorQueue) {
 
-    stats.registerQueuedEventsMetric(stateManager::getQueuedEventsCount);
+    stats.registerQueuedEventsMetric(() -> (long) outputHandlerExecutorQueue.size());
 
     stats.registerWorkflowCountMetric("all", () -> (long) workflowCache.all().size());
 
