@@ -39,6 +39,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -445,7 +446,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void getsGlobalDockerRunnerId() throws Exception {
-    Entity config = Entity.newBuilder(storage.globalConfigKey)
+    Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
         .set(DatastoreStorage.PROPERTY_CONFIG_DOCKER_RUNNER_ID, "foobar")
         .build();
     helper.getOptions().getService().put(config);
@@ -455,7 +456,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldReturnEmptyClientBlacklist() {
-    Entity config = Entity.newBuilder(storage.globalConfigKey)
+    Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
             ImmutableList.of()).build();
     helper.getOptions().getService().put(config);
@@ -464,7 +465,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldReturnClientBlacklist() {
-    Entity config = Entity.newBuilder(storage.globalConfigKey)
+    Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
             ImmutableList.of(StringValue.of("v1"), StringValue.of("v2"), StringValue.of("v3")))
         .build();
@@ -665,7 +666,24 @@ public class DatastoreStorageTest {
     verify(storageTransaction).rollback();
   }
 
-  private static class FooException extends Exception {
+  @Test
+  public void runInTransactionShouldThrowIfDatastoreNewTransactionFails() throws Exception {
+    Datastore datastore = mock(Datastore.class);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    when(datastore.newTransaction()).thenThrow(new DatastoreException(1, "", ""));
 
+    when(transactionFunction.apply(any())).thenReturn("");
+
+    try {
+      storage.runInTransaction(transactionFunction);
+      fail("Expected exception!");
+    } catch (TransactionException e) {
+      assertFalse(e.isConflict());
+    }
+
+    verify(transactionFunction, never()).apply(any());
+  }
+
+  private static class FooException extends Exception {
   }
 }

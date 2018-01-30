@@ -42,7 +42,6 @@ import com.google.cloud.datastore.StructuredQuery.Filter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.Value;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -150,9 +149,6 @@ class DatastoreStorage {
   private final Duration retryBaseDelay;
   private final Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory;
 
-  @VisibleForTesting
-  final Key globalConfigKey;
-
   DatastoreStorage(Datastore datastore, Duration retryBaseDelay) {
     this(datastore, retryBaseDelay, DatastoreStorageTransaction::new);
   }
@@ -162,12 +158,12 @@ class DatastoreStorage {
     this.datastore = Objects.requireNonNull(datastore);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
     this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
-
-    this.globalConfigKey = datastore.newKeyFactory().setKind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
   }
 
   StyxConfig config() {
-    final Entity entity = asBuilderOrNew(getOpt(datastore, globalConfigKey), globalConfigKey)
+    final Entity entity = asBuilderOrNew(
+        getOpt(datastore, globalConfigKey(datastore.newKeyFactory())),
+        globalConfigKey(datastore.newKeyFactory()))
         .build();
     return entityToConfig(entity);
   }
@@ -550,6 +546,10 @@ class DatastoreStorage {
 
   static Key componentKey(KeyFactory keyFactory, String componentId) {
     return keyFactory.setKind(KIND_COMPONENT).newKey(componentId);
+  }
+
+  static Key globalConfigKey(KeyFactory keyFactory) {
+    return keyFactory.setKind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
   }
 
   void setEnabled(WorkflowId workflowId1, boolean enabled) throws IOException {
