@@ -121,9 +121,16 @@ public class QueuedStateManager implements StateManager {
             throw new RuntimeException(e);
           }
 
-          // Emit event
+          // Write event to bigtable
           final Event event = Event.triggerExecution(workflowInstance, trigger);
           final SequenceEvent sequenceEvent = SequenceEvent.create(event, nextCounter, runState.timestamp());
+          try {
+            storage.writeEvent(sequenceEvent);
+          } catch (IOException e) {
+            LOG.warn("Error writing event {}", sequenceEvent, e);
+          }
+
+          // Emit event
           try {
             eventConsumerExecutor.execute(() -> eventConsumer.accept(sequenceEvent, runState));
           } catch (Exception e) {
@@ -154,6 +161,7 @@ public class QueuedStateManager implements StateManager {
           queuedEvents.decrement();
           final Tuple2<SequenceEvent, RunState> next;
           try {
+            // Perform transactional state transition
             next = storage.runInTransaction(tx -> {
 
               // Read active state from datastore
@@ -194,24 +202,32 @@ public class QueuedStateManager implements StateManager {
             throw new RuntimeException(e);
           }
 
-          // Emit event
+          final SequenceEvent sequenceEvent = next._1;
+          final RunState runState = next._2;
+
+          // Write event to bigtable
           try {
-            eventConsumerExecutor.execute(() -> eventConsumer.accept(next._1, next._2));
-          } catch (Exception e) {
-            LOG.warn("Error while consuming event {}", next._1, e);
+            storage.writeEvent(sequenceEvent);
+          } catch (IOException e) {
+            LOG.warn("Error writing event {}", sequenceEvent, e);
           }
 
-          return next;
-        }, outputHandlerExecutor)
-        .thenApply(next -> {
+          // Emit event
+          try {
+            eventConsumerExecutor.execute(() -> eventConsumer.accept(sequenceEvent, runState));
+          } catch (Exception e) {
+            LOG.warn("Error while consuming event {}", sequenceEvent, e);
+          }
+
           try {
             outputHandler.transitionInto(next._2);
           } catch (Throwable e) {
             LOG.warn("Output handler threw", e);
             throw new RuntimeException(e);
           }
+
           return null;
-        });
+        }, outputHandlerExecutor);
 
     future.whenComplete((v, e) -> activeEvents.decrement());
 
