@@ -46,6 +46,14 @@ public interface StorageTransaction {
   WorkflowId store(Workflow workflow) throws IOException;
 
   /**
+   * Get a {@link Workflow} definition.
+   *
+   * @param workflowId  The workflow to get
+   * @return Optionally a workflow, if one was found for te given id
+   */
+  Optional<Workflow> workflow(WorkflowId workflowId) throws IOException;
+
+  /**
    * Updates the next natural trigger for a {@link Workflow}.
    *
    * @param workflowId  The {@link WorkflowId} to update the next natural trigger for.
@@ -70,9 +78,15 @@ public interface StorageTransaction {
   Optional<PersistentWorkflowInstanceState> activeState(WorkflowInstance instance) throws IOException;
 
   /**
-   * Write an active workflow instance state.
+   * Insert a new active workflow instance state. Fails if the state already exists.
    */
-  WorkflowInstance writeActiveState(WorkflowInstance instance, PersistentWorkflowInstanceState state)
+  WorkflowInstance insertActiveState(WorkflowInstance instance, PersistentWorkflowInstanceState state)
+      throws IOException;
+
+  /**
+   * Update an existing active workflow instance state. Fails if the state does not exist.
+   */
+  WorkflowInstance updateActiveState(WorkflowInstance instance, PersistentWorkflowInstanceState state)
       throws IOException;
 
   /**

@@ -181,6 +181,7 @@ public class DatastoreStorageTest {
 
   @BeforeClass
   public static void setUpClass() throws Exception {
+    // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
     helper = LocalDatastoreHelper.create(1.0); // 100% global consistency
     helper.start();
   }
@@ -200,7 +201,6 @@ public class DatastoreStorageTest {
   public void setUp() throws Exception {
     datastore = helper.getOptions().getService();
     storage = new DatastoreStorage(datastore, Duration.ZERO);
-    when(this.datastore.newKeyFactory()).then(a -> datastore.newKeyFactory());
   }
 
   @After
@@ -708,6 +708,29 @@ public class DatastoreStorageTest {
     }
 
     verify(transactionFunction, never()).apply(any());
+  }
+
+  @Test
+  public void insertActiveStateShouldFailIfAlreadyExists() throws Exception {
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO);
+    storage.runInTransaction(tx -> tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1));
+    try {
+      storage.runInTransaction(tx -> tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1));
+      fail("Expected exception!");
+    } catch (TransactionException e) {
+      assertThat(e.isAlreadyExists(), is(true));
+    }
+  }
+
+  @Test
+  public void updateActiveStateShouldFailIfNotAlreadyExists() throws Exception {
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO);
+    try {
+      storage.runInTransaction(tx -> tx.updateActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1));
+      fail("Expected exception!");
+    } catch (TransactionException e) {
+      assertThat(e.isNotFound(), is(true));
+    }
   }
 
   private static class FooException extends Exception {

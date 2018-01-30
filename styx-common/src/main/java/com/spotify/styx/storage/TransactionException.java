@@ -34,7 +34,25 @@ public class TransactionException extends StorageException {
     this.conflict = conflict;
   }
 
+  // TODO: represent the failure cause using an enum instead
+
   public boolean isConflict() {
     return conflict;
   }
+
+  public boolean isAlreadyExists() {
+    // TODO: This is a horrible hack to paper over difference between datastore emulator and real service behavior
+    return messageStartsWith("entity already exists");
+  }
+
+  public boolean isNotFound() {
+    // TODO: This is a horrible hack to paper over difference between datastore emulator and real service behavior
+    return messageStartsWith("no entity to update");
+  }
+
+  private boolean messageStartsWith(String prefix) {
+    final String message = getMessage();
+    return message != null && message.startsWith(prefix);
+  }
+
 }

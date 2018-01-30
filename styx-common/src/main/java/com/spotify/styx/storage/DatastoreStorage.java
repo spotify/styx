@@ -398,7 +398,8 @@ class DatastoreStorage {
     storeWithRetries(() -> datastore.put(activeStateToEntity(datastore.newKeyFactory(), workflowInstance, state)));
   }
 
-  static Entity activeStateToEntity(KeyFactory keyFactory, WorkflowInstance workflowInstance, PersistentWorkflowInstanceState state)
+  static Entity activeStateToEntity(KeyFactory keyFactory, WorkflowInstance workflowInstance,
+      PersistentWorkflowInstanceState state)
       throws JsonProcessingException {
     final Key key = activeWorkflowInstanceKey(keyFactory, workflowInstance);
     final Entity.Builder entity = Entity.newBuilder(key)
@@ -515,7 +516,7 @@ class DatastoreStorage {
     return WorkflowId.create(componentId, id);
   }
 
-  private Workflow parseWorkflowJson(Entity entity, WorkflowId workflowId) {
+  static Workflow parseWorkflowJson(Entity entity, WorkflowId workflowId) {
     try {
       return OBJECT_MAPPER
           .readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
@@ -776,7 +777,7 @@ class DatastoreStorage {
     } catch (DatastoreException ex) {
       tx.rollback();
       final boolean conflict = ex.getCode() == 10;
-      throw new TransactionException(conflict, ex);
+      throw new TransactionException(ex.getMessage(), conflict, ex);
     } finally {
       if (tx.isActive()) {
         tx.rollback();
@@ -789,7 +790,7 @@ class DatastoreStorage {
     try {
       transaction = datastore.newTransaction();
     } catch (DatastoreException e) {
-      throw new TransactionException(false, e);
+      throw new TransactionException(e.getMessage(), false, e);
     }
     return storageTransactionFactory.apply(transaction);
   }

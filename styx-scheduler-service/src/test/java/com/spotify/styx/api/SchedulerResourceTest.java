@@ -21,14 +21,14 @@
 package com.spotify.styx.api;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
-import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresent;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
+import static com.spotify.styx.api.SchedulerResource.BASE;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.INVALID_SHA;
-import static com.spotify.styx.util.FutureUtil.exceptionallyCompletedFuture;
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.startsWith;
 import static org.junit.Assert.assertThat;
@@ -38,6 +38,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
@@ -53,7 +54,6 @@ import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.StateManager;
-import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
@@ -63,23 +63,21 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 import okio.ByteString;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.mockito.runners.MockitoJUnitRunner;
 
 /**
  * API endpoints for interacting directly with the scheduler
  */
-@RunWith(MockitoJUnitRunner.class)
 public class SchedulerResourceTest {
 
   private static final WorkflowInstance WFI = WorkflowInstance
@@ -117,10 +115,13 @@ public class SchedulerResourceTest {
 
   public SchedulerResourceTest() {
     MockitoAnnotations.initMocks(this);
+    serviceHelper = getServiceHelper(stateManager, storage);
   }
 
   @Before
   public void setUp() throws Exception {
+    when(stateManager.receive(any())).thenReturn(CompletableFuture.completedFuture(null));
+    when(triggerListener.event(any(), any(), any())).thenReturn(CompletableFuture.completedFuture(null));
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
   }
@@ -144,7 +145,7 @@ public class SchedulerResourceTest {
 
     ByteString eventPayload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(toTrigger));
     CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/trigger", eventPayload);
+        serviceHelper.request("POST", BASE + "/trigger", eventPayload);
 
     return post.toCompletableFuture().get();
   }
@@ -153,11 +154,11 @@ public class SchedulerResourceTest {
   public void testRetry() throws Exception {
     ByteString wfiPayload = serialize(WFI);
     CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/retry", wfiPayload);
+        serviceHelper.request("POST", BASE + "/retry", wfiPayload);
 
-    post.toCompletableFuture().get(); // block until done
+    post.toCompletableFuture().get(1, MINUTES); // block until done
 
-    verify(stateManager, times(1))
+    verify(stateManager)
         .receive(Event.retryAfter(WFI, 0L));
   }
 
@@ -165,18 +166,18 @@ public class SchedulerResourceTest {
   public void testRetryWithDelayParameter() throws Exception {
     ByteString wfiPayload = serialize(WFI);
     CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/retry?delay=500", wfiPayload);
+        serviceHelper.request("POST", BASE + "/retry?delay=500", wfiPayload);
 
-    post.toCompletableFuture().get(); // block until done
+    post.toCompletableFuture().get(1, MINUTES); // block until done
 
-    verify(stateManager, times(1)).receive(Event.retryAfter(WFI, 500L));
+    verify(stateManager).receive(Event.retryAfter(WFI, 500L));
   }
 
   @Test
   public void testRetryWithWrongDelayParameter() throws Exception {
     ByteString wfiPayload = serialize(WFI);
     CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/retry?delay=abc", wfiPayload);
+        serviceHelper.request("POST", BASE + "/retry?delay=abc", wfiPayload);
 
     final Response<ByteString> response = post.toCompletableFuture().get();
 
@@ -189,11 +190,11 @@ public class SchedulerResourceTest {
   public void testHalt() throws Exception {
     ByteString wfiPayload = serialize(WFI);
     CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/halt", wfiPayload);
+        serviceHelper.request("POST", BASE + "/halt", wfiPayload);
 
-    post.toCompletableFuture().get(); // block until done
+    post.toCompletableFuture().get(1, MINUTES); // block until done
 
-    verify(stateManager, times(1))
+    verify(stateManager)
         .receive(Event.halt(WFI));
   }
 
@@ -202,11 +203,11 @@ public class SchedulerResourceTest {
     Event injectedEvent = Event.dequeue(WFI);
     ByteString eventPayload = serialize(injectedEvent);
     CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/events", eventPayload);
+        serviceHelper.request("POST", BASE + "/events", eventPayload);
 
-    post.toCompletableFuture().get(); // block until done
+    post.toCompletableFuture().get(1, MINUTES); // block until done
 
-    verify(stateManager, times(1)).receive(Event.retryAfter(WFI, 0L));
+    verify(stateManager).receive(Event.retryAfter(WFI, 0L));
   }
 
   @Test
@@ -214,11 +215,11 @@ public class SchedulerResourceTest {
     Event injectedEvent = Event.halt(WFI);
     ByteString eventPayload = serialize(injectedEvent);
     CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/events", eventPayload);
+        serviceHelper.request("POST", BASE + "/events", eventPayload);
 
-    post.toCompletableFuture().get(); // block until done
+    post.toCompletableFuture().get(1, MINUTES); // block until done
 
-    verify(stateManager, times(1)).receive(Event.halt(WFI));
+    verify(stateManager).receive(Event.halt(WFI));
   }
 
   @Test
@@ -226,76 +227,46 @@ public class SchedulerResourceTest {
     Event injectedEvent = Event.retry(WFI);
     ByteString eventPayload = serialize(injectedEvent);
     CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/events", eventPayload);
+        serviceHelper.request("POST", BASE + "/events", eventPayload);
 
     final Response<ByteString> response = post.toCompletableFuture().get();
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
-  }
-
-  @Test
-  public void shouldFailOnForbiddenTransitionForEvent() throws Exception {
-    ByteString eventPayload = serialize(WFI);
-    CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/retry", eventPayload);
-
-    final Response<ByteString> response = post.toCompletableFuture().get();
-    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
-  }
-
-  @Test
-  public void injectEventShouldReturnServerErrorIfExceptionalFuture() throws Exception {
-    StateManager failingStateManager = mock(SyncStateManager.class);
-    when(failingStateManager.receive(any())).thenReturn(
-        exceptionallyCompletedFuture(new RuntimeException("test")));
-
-    ServiceHelper serviceHelper = getServiceHelper(failingStateManager, storage);
-    serviceHelper.start();
-
-    ByteString eventPayload = serialize(WFI);
-    CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/retry", eventPayload);
-
-    final Response<ByteString> response = post.toCompletableFuture().get();
-    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
-    System.out.println(response);
   }
 
   @Test
   public void injectEventShouldReturnServerErrorIfRuntimeException() throws Exception {
-    StateManager failingStateManager = mock(SyncStateManager.class);
-    when(failingStateManager.receive(any())).thenThrow(new RuntimeException("test"));
-
-    ServiceHelper serviceHelper = getServiceHelper(failingStateManager, storage);
-    serviceHelper.start();
-
-    ByteString eventPayload = serialize(WFI);
-    CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/retry", eventPayload);
-
-    final Response<ByteString> response = post.toCompletableFuture().get();
-    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
-    System.out.println(response);
+    assertThat(retryFailureResponse(new RuntimeException("test")), hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
   }
 
   @Test
-  public void shouldFailOnInjectEventForUnknownWorkflowInstance() throws Exception {
+  public void injectEventShouldReturnBadRequestOnIllegalArgumentException() throws Exception {
+    assertThat(retryFailureResponse(new IllegalArgumentException("badf00d!")), hasStatus(withCode(Status.BAD_REQUEST)));
+  }
+
+  @Test
+  public void injectEventShouldReturnBadRequestOnIllegalStateException() throws Exception {
+    assertThat(retryFailureResponse(new IllegalStateException("badf00d!")), hasStatus(withCode(Status.BAD_REQUEST)));
+  }
+
+  private Response<ByteString> retryFailureResponse(Throwable cause) throws Exception {
+    when(stateManager.receive(any())).thenReturn(
+        CompletableFutures.exceptionallyCompletedFuture(cause));
+
     ByteString eventPayload = serialize(WFI);
     CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/retry", eventPayload);
+        serviceHelper.request("POST", BASE + "/retry", eventPayload);
 
-    final Response<ByteString> response = post.toCompletableFuture().get();
-    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
+    return post.toCompletableFuture().get();
   }
 
   @Test
   public void testCreateWorkflow() throws Exception {
     final Response<ByteString> r = serviceHelper.request(
-        "POST", SchedulerResource.BASE + "/workflows/styx",
+        "POST", BASE + "/workflows/styx",
         serialize(FULL_DAILY_WORKFLOW.configuration())).toCompletableFuture().get();
     assertThat(r, hasStatus(withCode(Status.OK)));
-    assertThat(storage.workflow(FULL_DAILY_WORKFLOW.id()), isPresent());
     verify(workflowValidator).validateWorkflowConfiguration(FULL_DAILY_WORKFLOW.configuration());
-    storage.delete(FULL_DAILY_WORKFLOW.id());
+    verify(workflowChangeListener).accept(FULL_DAILY_WORKFLOW);
   }
 
   @Test
@@ -304,17 +275,17 @@ public class SchedulerResourceTest {
         WorkflowConfigurationBuilder.from(FULL_DAILY_WORKFLOW.configuration())
             .dockerImage(Optional.empty()).build();
     final Response<ByteString> r = serviceHelper.request(
-        "POST", SchedulerResource.BASE + "/workflows/styx",
+        "POST", BASE + "/workflows/styx",
         serialize(workflowConfiguration)).toCompletableFuture().get();
     assertThat(r, hasStatus(withCode(Status.BAD_REQUEST)));
-    assertThat(storage.workflow(FULL_DAILY_WORKFLOW.id()), isEmpty());
+    verify(workflowChangeListener, never()).accept(any());
   }
 
   @Test
   public void testCreateWorkflowInvalidConfiguration() throws Exception {
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(ImmutableList.of("bad", "f00d"));
     final Response<ByteString> r = serviceHelper.request(
-        "POST", SchedulerResource.BASE + "/workflows/styx",
+        "POST", BASE + "/workflows/styx",
         serialize(FULL_DAILY_WORKFLOW.configuration())).toCompletableFuture().get();
     assertThat(r.status(),
         is(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: bad, f00d")));
@@ -324,38 +295,38 @@ public class SchedulerResourceTest {
   @Test
   public void testUpdateWorkflow() throws Exception {
     ByteString workflowPayload = serialize(HOURLY_WORKFLOW.configuration());
-    CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows/styx", workflowPayload);
+    CompletionStage<Response<ByteString>> post = serviceHelper.request(
+        "POST", BASE + "/workflows/" + HOURLY_WORKFLOW.componentId(), workflowPayload);
 
     assertThat(post.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
-    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
+    verify(workflowChangeListener).accept(HOURLY_WORKFLOW);
 
-    CompletionStage<Response<ByteString>> post2 =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows/styx", workflowPayload);
+    CompletionStage<Response<ByteString>> post2 = serviceHelper.request(
+        "POST", BASE + "/workflows/" + HOURLY_WORKFLOW.componentId(), workflowPayload);
 
     assertThat(post2.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
-    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
-    storage.delete(HOURLY_WORKFLOW.id());
+    verify(workflowChangeListener, times(2)).accept(HOURLY_WORKFLOW);
   }
 
   @Test
-  public void testUpdateWorkflowWithInvalidOffset() throws Exception {
+  public void testUpdateWorkflowWithInvalidConfiguration() throws Exception {
     ByteString workflowPayload = serialize(HOURLY_WORKFLOW.configuration());
-    CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows/styx", workflowPayload);
+    CompletionStage<Response<ByteString>> post = serviceHelper.request(
+        "POST", BASE + "/workflows/" + HOURLY_WORKFLOW.componentId(), workflowPayload);
 
     assertThat(post.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
-    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
+    verify(workflowChangeListener).accept(HOURLY_WORKFLOW);
+
+    when(workflowValidator.validateWorkflowConfiguration(any()))
+        .thenReturn(ImmutableList.of("bad", "f00d"));
 
     ByteString workflowWithInvalidOffset =
         serialize(HOURLY_WORKFLOW_WITH_INVALID_OFFSET.configuration());
-    CompletionStage<Response<ByteString>> post2 =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows/styx",
-                              workflowWithInvalidOffset);
+    CompletionStage<Response<ByteString>> post2 = serviceHelper.request(
+        "POST", BASE + "/workflows/" + HOURLY_WORKFLOW_WITH_INVALID_OFFSET.componentId(), workflowWithInvalidOffset);
 
     assertThat(post2.toCompletableFuture().get(), hasStatus(withCode(Status.BAD_REQUEST)));
-    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isPresent());
-    storage.delete(HOURLY_WORKFLOW.id());
+    verifyNoMoreInteractions(workflowChangeListener);
   }
 
   @Test
@@ -366,7 +337,7 @@ public class SchedulerResourceTest {
             .build();
     ByteString workflowPayload = serialize(workflowConfiguration);
     CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/workflows/styx", workflowPayload);
+        serviceHelper.request("POST", BASE + "/workflows/styx", workflowPayload);
 
     assertThat(post.toCompletableFuture().get(), hasStatus(withCode(Status.BAD_REQUEST)));
   }
@@ -375,30 +346,19 @@ public class SchedulerResourceTest {
   public void testDeleteWorkflowWhenPresent() throws Exception {
     when(storage.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
     Response<ByteString> response = serviceHelper.request("DELETE", String
-        .join("/", SchedulerResource.BASE, "workflows", HOURLY_WORKFLOW.componentId(),
+        .join("/", BASE, "workflows", HOURLY_WORKFLOW.componentId(),
               HOURLY_WORKFLOW.workflowId())).toCompletableFuture().get();
     assertThat(response, hasStatus(withCode(Status.NO_CONTENT)));
-    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isEmpty());
+    verify(workflowRemoveListener).accept(HOURLY_WORKFLOW);
   }
 
   @Test
   public void testDeleteWorkflowWhenNotPresent() throws Exception {
+    when(storage.workflow(any())).thenReturn(Optional.empty());
     Response<ByteString> response = serviceHelper.request("DELETE", String
-        .join("/", SchedulerResource.BASE, "workflows", HOURLY_WORKFLOW.componentId(),
+        .join("/", BASE, "workflows", HOURLY_WORKFLOW.componentId(),
               HOURLY_WORKFLOW.workflowId())).toCompletableFuture().get();
     assertThat(response, hasStatus(withCode(Status.NOT_FOUND)));
-    assertThat(storage.workflow(HOURLY_WORKFLOW.id()), isEmpty());
-  }
-
-  @Test
-  public void testRejectUnknownWorkflowInstance() throws Exception {
-    ByteString eventPayload = serialize(WFI);
-    CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/retry", eventPayload);
-
-    final Response<ByteString> response = post.toCompletableFuture().get();
-
-    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
   }
 
   @Test
@@ -430,30 +390,32 @@ public class SchedulerResourceTest {
 
   @Test
   public void testTriggerWorkflowInstanceDaily() throws Exception {
-    storage.storeWorkflow(DAILY_WORKFLOW);
+    when(storage.workflow(DAILY_WORKFLOW.id())).thenReturn(Optional.of(DAILY_WORKFLOW));
     WorkflowInstance toTrigger = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2014-12-31");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
     assertThat(response.status(), is(Status.OK));
-    final Instant expectedInstant = Instant.parse("2014-12-31T23:00:00.00Z");
-    verify(triggerListener).event(eq(HOURLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant));
+    final Instant expectedInstant = Instant.parse("2014-12-31T00:00:00.00Z");
+    verify(triggerListener).event(eq(DAILY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant));
   }
 
   @Test
   public void testTriggerWorkflowInstanceWeekly() throws Exception {
-    storage.storeWorkflow(WEEKLY_WORKFLOW);
+    when(storage.workflow(WEEKLY_WORKFLOW.id())).thenReturn(Optional.of(WEEKLY_WORKFLOW));
     WorkflowInstance toTrigger = WorkflowInstance.create(WEEKLY_WORKFLOW.id(), "2016-01-03");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
     assertThat(response.status(), is(Status.OK));
-    final Instant expectedInstant = Instant.parse("2014-12-31T23:00:00.00Z");
-    verify(triggerListener).event(eq(HOURLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant));
+    final Instant expectedInstant = Instant.parse("2015-12-28T00:00:00.000Z");
+    verify(triggerListener).event(eq(WEEKLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant));
   }
 
   @Test
   public void testTriggerWorkflowInstanceMissingStorage() throws Exception {
+    when(storage.workflow(any())).thenReturn(Optional.empty());
+
     WorkflowInstance toTrigger = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-12-31T23");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
@@ -476,7 +438,7 @@ public class SchedulerResourceTest {
     WorkflowInstance toTrigger = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-12-31T23");
     ByteString eventPayload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(toTrigger));
     CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", SchedulerResource.BASE + "/trigger", eventPayload);
+        serviceHelper.request("POST", BASE + "/trigger", eventPayload);
     Response<ByteString> response = post.toCompletableFuture().get();
 
     assertThat(response.status(),
@@ -488,7 +450,7 @@ public class SchedulerResourceTest {
 
   @Test
   public void testTriggerWorkflowInstanceUnsupportedSchedule() throws Exception {
-    storage.storeWorkflow(MONTHLY_WORKFLOW);
+    when(storage.workflow(DAILY_WORKFLOW.id())).thenReturn(Optional.of(MONTHLY_WORKFLOW));
     WorkflowInstance toTrigger = WorkflowInstance.create(MONTHLY_WORKFLOW.id(), "2014-12-01");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
@@ -540,18 +502,18 @@ public class SchedulerResourceTest {
 
   @Test
   public void testTriggerAlreadyActiveWorkflowInstance() throws Exception {
+    final IllegalStateException cause = new IllegalStateException("already active!");
+
+    when(storage.workflow(DAILY_WORKFLOW.id())).thenReturn(Optional.of(DAILY_WORKFLOW));
     WorkflowInstance toTrigger = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2015-12-31");
 
-    when(stateManager.trigger(any(), any())).thenReturn(
-        CompletableFutures.exceptionallyCompletedFuture(new IllegalStateException()));
+    when(triggerListener.event(any(), any(), any())).thenReturn(
+        CompletableFutures.exceptionallyCompletedFuture(cause));
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
     assertThat(response.status(),
-               is(Status.BAD_REQUEST.withReasonPhrase("The specified instance is already "
-                                                      + "active in the scheduler")));
-
-    verify(triggerListener, never()).event(any(), any(), any());
+               is(Status.BAD_REQUEST.withReasonPhrase(cause.getMessage())));
   }
 
   @Test
@@ -560,7 +522,7 @@ public class SchedulerResourceTest {
         WorkflowConfigurationBuilder.from(FULL_DAILY_WORKFLOW.configuration())
             .dockerImage(Optional.empty()).build();
     final Workflow workflow = Workflow.create("styx", workflowConfiguration);
-    storage.storeWorkflow(workflow);
+    when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
     WorkflowInstance toTrigger = WorkflowInstance.create(workflow.id(), "2015-12-31");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
@@ -575,7 +537,7 @@ public class SchedulerResourceTest {
   public void testTriggerInvalidWorkflowConfiguration() throws Exception {
     when(workflowValidator.validateWorkflow(DAILY_WORKFLOW)).thenReturn(ImmutableList.of("bad", "f00d"));
 
-    storage.storeWorkflow(DAILY_WORKFLOW);
+    when(storage.workflow(DAILY_WORKFLOW.id())).thenReturn(Optional.of(DAILY_WORKFLOW));
     WorkflowInstance toTrigger = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2015-12-31");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);

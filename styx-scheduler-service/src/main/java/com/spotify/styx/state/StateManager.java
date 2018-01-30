@@ -21,15 +21,11 @@
 package com.spotify.styx.state;
 
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.util.IsClosedException;
 import java.io.Closeable;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +41,7 @@ public interface StateManager extends Closeable {
    *
    * @throws IsClosedException if the state receiver is closed and can not handle events
    */
-  CompletableFuture<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger) throws IsClosedException;
+  CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger) throws IsClosedException;
 
   /**
    * Receive an {@link Event} and route it to the corresponding active {@link RunState} based on
@@ -60,12 +56,6 @@ public interface StateManager extends Closeable {
    * Get a map of all active {@link WorkflowInstance} states.
    */
   Map<WorkflowInstance, RunState> activeStates();
-
-  /**
-   * Returns the number of queued, unprocessed events. These are events that are sent to
-   * {@link #receive(Event)} or {@link #receiveIgnoreClosed(Event)}, and are pending.
-   */
-  long getQueuedEventsCount();
 
   /**
    * Like {@link #receive(Event)} but ignoring the {@link IsClosedException} exception.
