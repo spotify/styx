@@ -20,7 +20,6 @@
 
 package com.spotify.styx.storage;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
@@ -33,7 +32,6 @@ import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -110,10 +108,6 @@ public interface Storage {
    *                    be instantiated.
    */
   void updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec triggerSpec) throws IOException;
-
-  @Deprecated
-  @VisibleForTesting
-  void updateNextNaturalTriggerOld(WorkflowId workflowId, Instant instant) throws IOException;
 
   /**
    * Get {@link Workflow}s with their respective nextNaturalTrigger. Only workflows that have a nextNaturalTrigger
@@ -255,4 +249,11 @@ public interface Storage {
   Optional<Backfill> backfill(String id) throws IOException;
 
   void storeBackfill(Backfill backfill) throws IOException;
+
+  /**
+   * Run a function in a transaction that is committed if successful. Any exception thrown by the
+   * passed in function will cause the transaction to be rolled back.
+   */
+  <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
+      throws IOException, E;
 }

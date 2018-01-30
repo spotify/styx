@@ -40,8 +40,8 @@ import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
 import com.google.cloud.datastore.StructuredQuery.Filter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
+import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.Value;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -78,6 +78,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,21 +147,23 @@ class DatastoreStorage {
 
   private final Datastore datastore;
   private final Duration retryBaseDelay;
-  private final KeyFactory componentKeyFactory;
-
-  @VisibleForTesting
-  final Key globalConfigKey;
+  private final Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory;
 
   DatastoreStorage(Datastore datastore, Duration retryBaseDelay) {
+    this(datastore, retryBaseDelay, DatastoreStorageTransaction::new);
+  }
+
+  DatastoreStorage(Datastore datastore, Duration retryBaseDelay,
+      Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory) {
     this.datastore = Objects.requireNonNull(datastore);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
-
-    this.componentKeyFactory = datastore.newKeyFactory().setKind(KIND_COMPONENT);
-    this.globalConfigKey = datastore.newKeyFactory().setKind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
+    this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
   }
 
   StyxConfig config() {
-    final Entity entity = asBuilderOrNew(getOpt(datastore, globalConfigKey), globalConfigKey)
+    final Entity entity = asBuilderOrNew(
+        getOpt(datastore, globalConfigKey(datastore.newKeyFactory())),
+        globalConfigKey(datastore.newKeyFactory()))
         .build();
     return entityToConfig(entity);
   }
@@ -181,7 +184,7 @@ class DatastoreStorage {
   }
 
   boolean enabled(WorkflowId workflowId) throws IOException {
-    final Key workflowKey = workflowKey(workflowId);
+    final Key workflowKey = workflowKey(datastore.newKeyFactory(), workflowId);
 
     return getOpt(datastore, workflowKey)
         .filter(w -> w.contains(PROPERTY_WORKFLOW_ENABLED))
@@ -210,69 +213,24 @@ class DatastoreStorage {
   }
 
   void store(Workflow workflow) throws IOException {
-    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
-      final Key componentKey = componentKeyFactory.newKey(workflow.componentId());
-      if (transaction.get(componentKey) == null) {
-        transaction.put(Entity.newBuilder(componentKey).build());
-      }
-
-      final String json = OBJECT_MAPPER.writeValueAsString(workflow);
-      final Key workflowKey = workflowKey(workflow.id());
-      final Optional<Entity> workflowOpt = getOpt(transaction, workflowKey);
-      final Entity workflowEntity = asBuilderOrNew(workflowOpt, workflowKey)
-          .set(PROPERTY_WORKFLOW_JSON, StringValue.newBuilder(json).setExcludeFromIndexes(true).build())
-          .build();
-
-      return transaction.put(workflowEntity);
-    }));
+    storeWithRetries(() -> runInTransaction(tx -> tx.store(workflow)));
   }
 
   Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
-    return getOpt(datastore, workflowKey(workflowId))
+    return getOpt(datastore, workflowKey(datastore.newKeyFactory(), workflowId))
         .filter(e -> e.contains(PROPERTY_WORKFLOW_JSON))
         .map(e -> parseWorkflowJson(e, workflowId));
   }
 
   void delete(WorkflowId workflowId) throws IOException {
     storeWithRetries(() -> {
-      datastore.delete(workflowKey(workflowId));
+      datastore.delete(workflowKey(datastore.newKeyFactory(), workflowId));
       return null;
     });
   }
 
   public void updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec triggerSpec) throws IOException {
-    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
-      final Key workflowKey = workflowKey(workflowId);
-      final Optional<Entity> workflowOpt = getOpt(transaction, workflowKey);
-      if (!workflowOpt.isPresent()) {
-        throw new ResourceNotFoundException(
-            String.format("%s:%s doesn't exist.", workflowId.componentId(), workflowId.id()));
-      }
-
-      final Entity.Builder builder = Entity
-          .newBuilder(workflowOpt.get())
-          .set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToTimestamp(triggerSpec.instant()))
-          .set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, instantToTimestamp(triggerSpec.offsetInstant()));
-      return transaction.put(builder.build());
-    }));
-  }
-
-  @Deprecated
-  @VisibleForTesting
-  public void updateNextNaturalTrigger(WorkflowId workflowId, Instant instant) throws IOException {
-    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
-      final Key workflowKey = workflowKey(workflowId);
-      final Optional<Entity> workflowOpt = getOpt(transaction, workflowKey);
-      if (!workflowOpt.isPresent()) {
-        throw new ResourceNotFoundException(
-            String.format("%s:%s doesn't exist.", workflowId.componentId(), workflowId.id()));
-      }
-
-      final Entity.Builder builder = Entity
-          .newBuilder(workflowOpt.get())
-          .set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToTimestamp(instant));
-      return transaction.put(builder.build());
-    }));
+    storeWithRetries(() -> runInTransaction(tx -> tx.updateNextNaturalTrigger(workflowId, triggerSpec)));
   }
 
   public Map<Workflow, TriggerInstantSpec> workflowsWithNextNaturalTrigger() throws IOException {
@@ -334,7 +292,7 @@ class DatastoreStorage {
   }
 
   public List<Workflow> workflows(String componentId) throws IOException {
-    final Key componentKey = componentKeyFactory.newKey(componentId);
+    final Key componentKey = componentKey(datastore.newKeyFactory(), componentId);
 
     final List<Workflow> workflows = Lists.newArrayList();
     final EntityQuery query = Query.newEntityQueryBuilder()
@@ -466,27 +424,12 @@ class DatastoreStorage {
   }
 
   void patchState(WorkflowId workflowId, WorkflowState state) throws IOException {
-    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
-      final Key workflowKey = workflowKey(workflowId);
-      final Optional<Entity> workflowOpt = getOpt(transaction, workflowKey);
-      if (!workflowOpt.isPresent()) {
-        throw new ResourceNotFoundException(
-            String.format("%s:%s doesn't exist.", workflowId.componentId(), workflowId.id()));
-      }
-
-      final Entity.Builder builder = Entity.newBuilder(workflowOpt.get());
-      state.enabled().ifPresent(x -> builder.set(PROPERTY_WORKFLOW_ENABLED, x));
-      state.nextNaturalTrigger()
-          .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToTimestamp(x)));
-      state.nextNaturalOffsetTrigger()
-          .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, instantToTimestamp(x)));
-      return transaction.put(builder.build());
-    }));
+    storeWithRetries(() -> runInTransaction(tx -> tx.patchState(workflowId, state)));
   }
 
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
     final WorkflowState.Builder builder = WorkflowState.builder();
-    final Optional<Entity> workflowEntity = getOpt(datastore, workflowKey(workflowId));
+    final Optional<Entity> workflowEntity = getOpt(datastore, workflowKey(datastore.newKeyFactory(), workflowId));
 
     builder.enabled(workflowEntity.filter(w -> w.contains(PROPERTY_WORKFLOW_ENABLED))
                         .map(workflow -> workflow.getBoolean(PROPERTY_WORKFLOW_ENABLED))
@@ -529,13 +472,6 @@ class DatastoreStorage {
     throw new IOException("This should never happen");
   }
 
-  private Key workflowKey(WorkflowId workflowId) {
-    return datastore.newKeyFactory()
-        .addAncestor(PathElement.of(KIND_COMPONENT, workflowId.componentId()))
-        .setKind(KIND_WORKFLOW)
-        .newKey(workflowId.id());
-  }
-
   private Key activeWorkflowInstanceKey(WorkflowInstance workflowInstance) {
     return datastore.newKeyFactory()
         .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE)
@@ -574,7 +510,7 @@ class DatastoreStorage {
    * @param key              The key to get
    * @return an optional containing the entity if it existed, empty otherwise.
    */
-  private Optional<Entity> getOpt(DatastoreReader datastoreReader, Key key) {
+  static Optional<Entity> getOpt(DatastoreReader datastoreReader, Key key) {
     return Optional.ofNullable(datastoreReader.get(key));
   }
 
@@ -583,7 +519,7 @@ class DatastoreStorage {
    *
    * @return an optional containing the property value if it existed, empty otherwise.
    */
-  private Optional<Instant> getOptInstantProperty(Optional<Entity> entity, String property) {
+  static Optional<Instant> getOptInstantProperty(Optional<Entity> entity, String property) {
     return entity
         .filter(w -> w.contains(property))
         .map(workflow -> timestampToInstant(workflow.getTimestamp(property)));
@@ -596,17 +532,31 @@ class DatastoreStorage {
    * @param key        The key for which to create a new builder if the entity is not present
    * @return an entity builder either based of the given entity or a new one using the key.
    */
-  private Entity.Builder asBuilderOrNew(Optional<Entity> entityOpt, Key key) {
+  static Entity.Builder asBuilderOrNew(Optional<Entity> entityOpt, Key key) {
     return entityOpt
         .map(c -> Entity.newBuilder(c))
         .orElse(Entity.newBuilder(key));
+  }
+
+  static Key workflowKey(KeyFactory keyFactory, WorkflowId workflowId) {
+    return keyFactory.addAncestor(PathElement.of(KIND_COMPONENT, workflowId.componentId()))
+        .setKind(KIND_WORKFLOW)
+        .newKey(workflowId.id());
+  }
+
+  static Key componentKey(KeyFactory keyFactory, String componentId) {
+    return keyFactory.setKind(KIND_COMPONENT).newKey(componentId);
+  }
+
+  static Key globalConfigKey(KeyFactory keyFactory) {
+    return keyFactory.setKind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
   }
 
   void setEnabled(WorkflowId workflowId1, boolean enabled) throws IOException {
     patchState(workflowId1, WorkflowState.patchEnabled(enabled));
   }
 
-  private static Timestamp instantToTimestamp(Instant instant) {
+  static Timestamp instantToTimestamp(Instant instant) {
     return Timestamp.of(Date.from(instant));
   }
 
@@ -792,5 +742,33 @@ class DatastoreStorage {
         .newBuilder(OBJECT_MAPPER.writeValueAsString(o))
         .setExcludeFromIndexes(true)
         .build();
+  }
+
+  public <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
+      throws IOException, E {
+    final StorageTransaction tx = newTransaction();
+    try {
+      final T value = f.apply(tx);
+      tx.commit();
+      return value;
+    } catch (DatastoreException ex) {
+      tx.rollback();
+      final boolean conflict = ex.getCode() == 10;
+      throw new TransactionException(conflict, ex);
+    } finally {
+      if (tx.isActive()) {
+        tx.rollback();
+      }
+    }
+  }
+
+  private StorageTransaction newTransaction() throws TransactionException {
+    final Transaction transaction;
+    try {
+      transaction = datastore.newTransaction();
+    } catch (DatastoreException e) {
+      throw new TransactionException(false, e);
+    }
+    return storageTransactionFactory.apply(transaction);
   }
 }
