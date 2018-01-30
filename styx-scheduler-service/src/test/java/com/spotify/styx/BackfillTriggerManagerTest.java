@@ -42,6 +42,7 @@ import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
@@ -94,7 +95,7 @@ public class BackfillTriggerManagerTest {
   @Mock TriggerListener triggerListener;
   @Mock Storage storage;
   @Mock StyxConfig config;
-  @Mock SyncStateManager stateManager;
+  @Mock StateManager stateManager;
 
   private WorkflowCache workflowCache;
 
