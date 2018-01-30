@@ -31,6 +31,10 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 
 import com.spotify.styx.RepeatRule;
 import com.spotify.styx.model.Event;
@@ -43,7 +47,6 @@ import com.spotify.styx.util.IsClosedException;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.SortedSet;
-import java.util.Stack;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -53,9 +56,16 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.Mock;
+import org.mockito.runners.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.class)
 public class QueuedStateManagerTest {
 
   private static final WorkflowInstance INSTANCE = WorkflowInstance.create(
@@ -75,24 +85,31 @@ public class QueuedStateManagerTest {
   QueuedStateManager stateManager;
   InMemStorage storage = new InMemStorage();
 
-  Stack<RunState> transitions = new Stack<>();
+  @Captor ArgumentCaptor<RunState> runStateCaptor;
 
   @Rule
   public RepeatRule repeatRule = new RepeatRule();
 
-  private void setUp() throws Exception {
-    setUp(RunState.fresh(INSTANCE, transitions::push));
+  @Mock OutputHandler outputHandler;
+
+  @Before
+  public void setUp() throws Exception {
+    doNothing().when(outputHandler).transitionInto(runStateCaptor.capture());
   }
 
-  private void setUp(RunState initial) throws Exception {
+  private void setUpRunState() throws Exception {
+    setUpRunState(RunState.fresh(INSTANCE));
+  }
+
+  private void setUpRunState(RunState initial) throws Exception {
     if (stateManager != null) {
       stateManager.close();
     }
 
     storage = new InMemStorage();
-    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2, outputHandlers);
+    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2, outputHandler);
 
-    stateManager.trigger(initial, trigger);
+//    stateManager.trigger(initial, trigger);
     assertTrue(stateManager.awaitIdle(1000));
   }
 
@@ -105,7 +122,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldNotBeActiveAfterHalt() throws Exception {
-    setUp();
+    setUpRunState();
 
     stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER1));
     stateManager.receive(Event.halt(INSTANCE));
@@ -121,23 +138,21 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldInitializeWFInstanceFromNextCounter() throws Exception {
-    setUp();
+    setUpRunState();
 
     stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER1));
     stateManager.receive(Event.dequeue(INSTANCE));
     stateManager.receive(Event.halt(INSTANCE));
     assertTrue(stateManager.awaitIdle(1000));
 
-    stateManager.trigger(RunState.fresh(INSTANCE), trigger);
-    stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER2));
+    stateManager.trigger(INSTANCE, TRIGGER2);
     stateManager.receive(Event.dequeue(INSTANCE));
     stateManager.receive(Event.created(INSTANCE, TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     stateManager.receive(Event.started(INSTANCE));
     stateManager.receive(Event.halt(INSTANCE));
     assertTrue(stateManager.awaitIdle(1000));
 
-    stateManager.trigger(RunState.fresh(INSTANCE), trigger);
-    stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER3));
+    stateManager.trigger(INSTANCE, TRIGGER3);
     assertTrue(stateManager.awaitIdle(1000));
 
     SortedSet<SequenceEvent> storedEvents = storage.readEvents(INSTANCE);
@@ -149,22 +164,22 @@ public class QueuedStateManagerTest {
 
   @Test(expected = RuntimeException.class)
   public void shouldFailInitializeWFIfAlreadyActive() throws Exception {
-    setUp();
+    setUpRunState();
 
-    stateManager.trigger(RunState.fresh(INSTANCE), trigger);
+    stateManager.trigger(INSTANCE, TRIGGER1);
   }
 
   @Test(expected = IsClosedException.class)
   public void shouldRejectInitializeIfClosed() throws Exception {
-    setUp();
+    setUpRunState();
 
     stateManager.close();
-    stateManager.trigger(RunState.fresh(INSTANCE), trigger);
+    stateManager.trigger(INSTANCE, TRIGGER1);
   }
 
   @Test(expected = IsClosedException.class)
   public void shouldRejectEventIfClosed() throws Exception {
-    setUp();
+    setUpRunState();
 
     stateManager.close();
     stateManager.receive(Event.timeTrigger(INSTANCE));
@@ -172,19 +187,19 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldCloseGracefully() throws Exception {
-    setUp();
+    setUpRunState();
 
     stateManager.receive(Event.timeTrigger(INSTANCE));
     stateManager.close();
 
     assertTrue(stateManager.awaitIdle(1000));
-    assertThat(transitions, hasSize(1));
-    assertThat(transitions.pop().state(), is(RunState.State.SUBMITTED));
+    verify(outputHandler).transitionInto(any());
+    assertThat(runStateCaptor.getValue().state(), is(RunState.State.SUBMITTED));
   }
 
   @Test
   public void shouldWriteEvents() throws Exception {
-    setUp();
+    setUpRunState();
 
     stateManager.receive(Event.timeTrigger(INSTANCE));
     assertTrue(stateManager.awaitIdle(1000));
@@ -211,7 +226,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldRemoveStateIfTerminal() throws Exception {
-    setUp();
+    setUpRunState();
 
     stateManager.receive(Event.timeTrigger(INSTANCE));
     stateManager.receive(Event.started(INSTANCE));
@@ -224,7 +239,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldWriteActiveStateOnEvent() throws Exception {
-    setUp();
+    setUpRunState();
 
     assertThat(storage.activeStatesMap.isEmpty(), is(true));
     assertThat(storage.getCounterFromActiveStates(INSTANCE), isEmpty());
@@ -257,7 +272,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldNotStoreEventOnIllegalStateTransition() throws Exception {
-    setUp();
+    setUpRunState();
 
     stateManager.receive(Event.timeTrigger(INSTANCE));
     assertTrue(stateManager.awaitIdle(1000));
@@ -279,42 +294,13 @@ public class QueuedStateManagerTest {
   }
 
   @Test
-  public void shouldRestoreStateAtCount() throws Exception {
-    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2, outputHandlers);
-
-    stateManager.restore(RunState.fresh(INSTANCE), 7L);
-    stateManager.receive(Event.timeTrigger(INSTANCE));  // 8
-
-    assertTrue(stateManager.awaitIdle(1000));
-    assertThat(storage.activeStatesMap, hasKey(INSTANCE));
-    assertThat(storage.getLatestStoredCounter(INSTANCE), hasValue(8L));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(8L));
-  }
-
-  @Test
   public void shouldHandleThrowingOutputHandler() throws Exception {
-    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2, outputHandlers);
+    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2, outputHandler);
 
-    OutputHandler throwing = (state) -> {
-      throw new RuntimeException();
-    };
-
-    stateManager.trigger(RunState.fresh(INSTANCE, throwing), trigger);
-    stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER1));
+    doThrow(new RuntimeException()).when(outputHandler).transitionInto(any());
+    stateManager.trigger(INSTANCE, TRIGGER1);
 
     assertTrue(stateManager.awaitIdle(5000));
-  }
-
-  @Test
-  public void testGetActiveWorkflowInstance() throws Exception {
-    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2, outputHandlers);
-
-    assertThat(stateManager.isActiveWorkflowInstance(INSTANCE), is(false));
-
-    stateManager.trigger(RunState.fresh(INSTANCE, transitions::push), trigger);
-
-    assertTrue(stateManager.awaitIdle(1000));
-    assertThat(stateManager.isActiveWorkflowInstance(INSTANCE), is(true));
   }
 
   /**
@@ -324,7 +310,7 @@ public class QueuedStateManagerTest {
   @Test
   @RepeatRule.Repeat(times = 50)
   public void testConcurrentEvents() throws Exception {
-    setUp();
+    setUpRunState();
 
     IntFunction<WorkflowInstance > wfi =
         j -> WorkflowInstance.create(TestData.WORKFLOW_ID, "id-" + j);
@@ -351,8 +337,7 @@ public class QueuedStateManagerTest {
         WorkflowInstance instance = wfi.apply(jj);
 
         try {
-          stateManager.trigger(RunState.fresh(instance), trigger);
-          stateManager.receive(Event.triggerExecution(instance, TRIGGER1));
+          stateManager.trigger(instance, TRIGGER1);
           stateManager.receive(Event.dequeue(instance));
         } catch (IsClosedException ignored) {
         }
