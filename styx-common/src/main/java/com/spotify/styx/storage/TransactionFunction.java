@@ -24,5 +24,5 @@ import java.io.IOException;
 
 public interface TransactionFunction<T, E extends Exception> {
 
-  T apply(TransactionalStorage tx) throws IOException, E;
+  T apply(StorageTransaction tx) throws IOException, E;
 }

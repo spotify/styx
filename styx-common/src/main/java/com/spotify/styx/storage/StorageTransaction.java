@@ -27,13 +27,13 @@ import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 
 /**
- * The interface to the persistence layer where the same transaction can be used across storage
+ * The interface to the persistence layer where the same transaction is used across storage
  * operations.
  *
  * <p>Use the {@link Storage#runInTransaction(TransactionFunction)} method for automatic
  * commit/rollback handling.
  */
-public interface TransactionalStorage {
+public interface StorageTransaction {
 
   /**
    * Stores a Workflow definition.

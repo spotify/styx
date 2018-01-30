@@ -36,7 +36,7 @@ import org.junit.runner.RunWith;
 import org.mockito.runners.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
-public class DatastoreTransactionalStorageTest {
+public class DatastoreStorageTransactionTest {
 
   private static LocalDatastoreHelper helper;
   private static Datastore datastore;
@@ -55,18 +55,18 @@ public class DatastoreTransactionalStorageTest {
   @Test
   public void shouldCommitEmptyTransaction() throws IOException {
     final Transaction transaction = datastore.newTransaction();
-    DatastoreTransactionalStorage transactionalStorage = new DatastoreTransactionalStorage(transaction);
-    transactionalStorage.commit();
+    DatastoreStorageTransaction storageTransaction = new DatastoreStorageTransaction(transaction);
+    storageTransaction.commit();
     assertFalse(transaction.isActive());
   }
 
   @Test(expected = TransactionException.class)
   public void shouldThrowIfUnexpectedDatastoreError() throws IOException {
     final Transaction transaction = datastore.newTransaction();
-    DatastoreTransactionalStorage transactionalStorage = new DatastoreTransactionalStorage(transaction);
+    DatastoreStorageTransaction storageTransaction = new DatastoreStorageTransaction(transaction);
 
     transaction.rollback();
-    transactionalStorage.commit();
+    storageTransaction.commit();
   }
 
   @Test(expected = TransactionException.class)
@@ -74,28 +74,28 @@ public class DatastoreTransactionalStorageTest {
     Transaction transaction1 = datastore.newTransaction();
     Transaction transaction2 = datastore.newTransaction();
     Transaction transaction3 = datastore.newTransaction();
-    DatastoreTransactionalStorage transactionalStorage1 = new DatastoreTransactionalStorage(transaction1);
-    DatastoreTransactionalStorage transactionalStorage2 = new DatastoreTransactionalStorage(transaction2);
-    DatastoreTransactionalStorage transactionalStorage3 = new DatastoreTransactionalStorage(transaction3);
+    DatastoreStorageTransaction storageTransaction1 = new DatastoreStorageTransaction(transaction1);
+    DatastoreStorageTransaction storageTransaction2 = new DatastoreStorageTransaction(transaction2);
+    DatastoreStorageTransaction storageTransaction3 = new DatastoreStorageTransaction(transaction3);
 
     // Store first entity
     KeyFactory keyFactory1 = datastore.newKeyFactory().setKind("MyKind");
     Key key1 = datastore.allocateId(keyFactory1.newKey());
     Entity entity1 = Entity.newBuilder(key1).set("key", "firstWrite").build();
     transaction1.put(entity1);
-    transactionalStorage1.commit();
+    storageTransaction1.commit();
 
     // Read first entity then commit a change to the first entity
     Entity entity1read = transaction3.get(key1);
     Entity entity1modified = Entity.newBuilder(key1).set("key", "secondWrite").build();
     transaction2.put(entity1modified);
-    transactionalStorage2.commit();
+    storageTransaction2.commit();
 
     // Used the read first entity to generate a second entity (copy of the first entity)
     KeyFactory keyFactory2 = datastore.newKeyFactory().setKind("MyKindCopy");
     Key key2 = datastore.allocateId(keyFactory2.newKey());
     Entity copyOfEntity1 = Entity.newBuilder(key2).set("key", entity1read.getString("key")).build();
     transaction3.put(copyOfEntity1);
-    transactionalStorage3.commit();
+    storageTransaction3.commit();
   }
 }

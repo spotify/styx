@@ -175,9 +175,9 @@ public class DatastoreStorageTest {
 
   @Mock Transaction transaction;
   @Mock Datastore datastore;
-  @Mock DatastoreTransactionalStorage transactionalStorage;
+  @Mock DatastoreStorageTransaction storageTransaction;
   @Mock TransactionFunction<String, FooException> transactionFunction;
-  @Mock Function<Transaction, DatastoreTransactionalStorage> transactionalStorageFactory;
+  @Mock Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory;
 
   @BeforeClass
   public static void setUpClass() throws Exception {
@@ -586,31 +586,31 @@ public class DatastoreStorageTest {
   public void runInTransactionShouldCallFunctionAndCommit() throws Exception {
     when(datastore.newKeyFactory()).thenReturn(new KeyFactory("foo", "bar"));
     final DatastoreStorage storage = new DatastoreStorage(
-        datastore, Duration.ZERO, transactionalStorageFactory);
-    when(transactionalStorageFactory.apply(transaction))
-        .thenReturn(transactionalStorage);
+        datastore, Duration.ZERO, storageTransactionFactory);
+    when(storageTransactionFactory.apply(transaction))
+        .thenReturn(storageTransaction);
     when(datastore.newTransaction()).thenReturn(transaction);
     when(transactionFunction.apply(any())).thenReturn("foo");
 
     String result = storage.runInTransaction(transactionFunction);
 
     assertThat(result, is("foo"));
-    verify(transactionFunction).apply(transactionalStorage);
-    verify(transactionalStorage).commit();
-    verify(transactionalStorage, never()).rollback();
+    verify(transactionFunction).apply(storageTransaction);
+    verify(storageTransaction).commit();
+    verify(storageTransaction, never()).rollback();
   }
 
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnFailure() throws Exception {
     when(datastore.newKeyFactory()).thenReturn(new KeyFactory("foo", "bar"));
     final DatastoreStorage storage = new DatastoreStorage(
-        datastore, Duration.ZERO, transactionalStorageFactory);
-    when(transactionalStorageFactory.apply(transaction))
-        .thenReturn(transactionalStorage);
+        datastore, Duration.ZERO, storageTransactionFactory);
+    when(storageTransactionFactory.apply(transaction))
+        .thenReturn(storageTransaction);
     when(datastore.newTransaction()).thenReturn(transaction);
     final Exception expectedException = new FooException();
     when(transactionFunction.apply(any())).thenThrow(expectedException);
-    when(transactionalStorage.isActive()).thenReturn(true);
+    when(storageTransaction.isActive()).thenReturn(true);
 
     try {
       storage.runInTransaction(transactionFunction);
@@ -621,9 +621,9 @@ public class DatastoreStorageTest {
       assertThat(e, is(expectedException));
     }
 
-    verify(transactionFunction).apply(transactionalStorage);
-    verify(transactionalStorage, never()).commit();
-    verify(transactionalStorage).rollback();
+    verify(transactionFunction).apply(storageTransaction);
+    verify(storageTransaction, never()).commit();
+    verify(storageTransaction).rollback();
   }
 
 
@@ -631,14 +631,14 @@ public class DatastoreStorageTest {
   public void runInTransactionShouldCallFunctionAndRollbackOnConflict() throws Exception {
     when(datastore.newKeyFactory()).thenReturn(new KeyFactory("foo", "bar"));
     final DatastoreStorage storage = new DatastoreStorage(
-        datastore, Duration.ZERO, transactionalStorageFactory);
-    when(transactionalStorageFactory.apply(transaction))
-        .thenReturn(transactionalStorage);
+        datastore, Duration.ZERO, storageTransactionFactory);
+    when(storageTransactionFactory.apply(transaction))
+        .thenReturn(storageTransaction);
     when(datastore.newTransaction()).thenReturn(transaction);
     final TransactionException expectedException = new TransactionException(true, null);
     when(transactionFunction.apply(any())).thenReturn("");
-    doThrow(expectedException).when(transactionalStorage).commit();
-    when(transactionalStorage.isActive()).thenReturn(true);
+    doThrow(expectedException).when(storageTransaction).commit();
+    when(storageTransaction.isActive()).thenReturn(true);
 
     try {
       storage.runInTransaction(transactionFunction);
@@ -647,8 +647,8 @@ public class DatastoreStorageTest {
       assertThat(e, is(expectedException));
     }
 
-    verify(transactionFunction).apply(transactionalStorage);
-    verify(transactionalStorage).rollback();
+    verify(transactionFunction).apply(storageTransaction);
+    verify(storageTransaction).rollback();
   }
 
   private static class FooException extends Exception {

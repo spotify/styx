@@ -148,20 +148,20 @@ class DatastoreStorage {
 
   private final Datastore datastore;
   private final Duration retryBaseDelay;
-  private final Function<Transaction, DatastoreTransactionalStorage> transactionalStorageFactory;
+  private final Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory;
 
   @VisibleForTesting
   final Key globalConfigKey;
 
   DatastoreStorage(Datastore datastore, Duration retryBaseDelay) {
-    this(datastore, retryBaseDelay, DatastoreTransactionalStorage::new);
+    this(datastore, retryBaseDelay, DatastoreStorageTransaction::new);
   }
 
   DatastoreStorage(Datastore datastore, Duration retryBaseDelay,
-      Function<Transaction, DatastoreTransactionalStorage> transactionalStorageFactory) {
+      Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory) {
     this.datastore = Objects.requireNonNull(datastore);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
-    this.transactionalStorageFactory = Objects.requireNonNull(transactionalStorageFactory);
+    this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
 
     this.globalConfigKey = datastore.newKeyFactory().setKind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
   }
@@ -746,7 +746,7 @@ class DatastoreStorage {
 
   public <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
       throws IOException, E {
-    final TransactionalStorage tx = newTransaction();
+    final StorageTransaction tx = newTransaction();
     try {
       final T value = f.apply(tx);
       tx.commit();
@@ -761,13 +761,13 @@ class DatastoreStorage {
     }
   }
 
-  private TransactionalStorage newTransaction() throws TransactionException {
+  private StorageTransaction newTransaction() throws TransactionException {
     final Transaction transaction;
     try {
       transaction = datastore.newTransaction();
     } catch (DatastoreException e) {
       throw new TransactionException(false, e);
     }
-    return transactionalStorageFactory.apply(transaction);
+    return storageTransactionFactory.apply(transaction);
   }
 }

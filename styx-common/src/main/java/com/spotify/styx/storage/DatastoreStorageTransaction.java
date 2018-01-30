@@ -40,11 +40,11 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.Optional;
 
-class DatastoreTransactionalStorage implements TransactionalStorage {
+class DatastoreStorageTransaction implements StorageTransaction {
 
   private final Transaction tx;
 
-  DatastoreTransactionalStorage(Transaction transaction) {
+  DatastoreStorageTransaction(Transaction transaction) {
     this.tx = Objects.requireNonNull(transaction);
   }
 
