@@ -37,10 +37,6 @@ final class NoopStats implements Stats {
   }
 
   @Override
-  public void registerActiveStatesMetric(WorkflowId workflowId, Gauge<Long> activeStatesCount) {
-  }
-
-  @Override
   public void registerWorkflowCountMetric(String status, Gauge<Long> workflowCount) {
   }
 

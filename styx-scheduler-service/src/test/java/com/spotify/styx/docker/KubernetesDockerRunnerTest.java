@@ -20,18 +20,16 @@
 
 package com.spotify.styx.docker;
 
-import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.podStatusNoContainer;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.running;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminated;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.waiting;
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyListOf;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -39,6 +37,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.Event;
@@ -46,9 +45,9 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
-import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.IsClosedException;
@@ -152,6 +151,7 @@ public class KubernetesDockerRunnerTest {
   @Mock Watch watch;
   @Mock Debug debug;
   @Mock Time time;
+  @Mock StateManager stateManager;
 
   @Captor ArgumentCaptor<Watcher<Pod>> watchCaptor;
   @Captor ArgumentCaptor<Pod> podCaptor;
@@ -159,7 +159,6 @@ public class KubernetesDockerRunnerTest {
   @Rule public ExpectedException exception = ExpectedException.none();
 
   Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, EMPTY_SECRET_SPEC);
-  StateManager stateManager = Mockito.spy(new SyncStateManager());
   Stats stats = Mockito.mock(Stats.class);
 
   KubernetesDockerRunner kdr;
@@ -198,7 +197,10 @@ public class KubernetesDockerRunnerTest {
     createdPod.getMetadata().setResourceVersion("1001");
 
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.SUBMITTED, stateData);
+
+    when(stateManager.activeStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
+    when(stateManager.get(WORKFLOW_INSTANCE)).thenReturn(runState);
   }
 
   @After
@@ -509,7 +511,7 @@ public class KubernetesDockerRunnerTest {
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT)).thenReturn(SERVICE_ACCOUNT_SECRET);
 
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
+//    stateManager.trigger(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData), trigger);
 
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
 
@@ -561,7 +563,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(terminated("Succeeded", 20, null));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
-    assertThat(stateManager.get(WORKFLOW_INSTANCE).data().lastExit(), hasValue(20));
+    verify(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)));
   }
 
   @Test
@@ -569,7 +571,8 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(waiting("Pending", "ErrImagePull"));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
-    assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.FAILED));
+    verify(stateManager).receive(
+        Event.runError(WORKFLOW_INSTANCE, "One or more containers failed to pull their image"));
   }
 
   @Test
@@ -578,7 +581,8 @@ public class KubernetesDockerRunnerTest {
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
     verify(stats, times(1)).recordPullImageError();
-    assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.FAILED));
+    verify(stateManager).receive(
+        Event.runError(WORKFLOW_INSTANCE, "One or more containers failed to pull their image"));
   }
 
   @Test
@@ -587,7 +591,6 @@ public class KubernetesDockerRunnerTest {
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
     verifyNoMoreInteractions(stats);
-    assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.FAILED));
   }
 
   @Test
@@ -595,17 +598,24 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatusNoContainer("Unknown"));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
-    assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.FAILED));
+    verify(stateManager).receive(Event.runError(WORKFLOW_INSTANCE, "Pod entered Unknown phase"));
   }
 
   @Test
   public void shouldIgnoreDeletedEvents() throws Exception {
+    reset(stateManager);
+
+    StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.RUNNING, stateData);
+
+    when(stateManager.activeStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
+    when(stateManager.get(WORKFLOW_INSTANCE)).thenReturn(runState);
+
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
-    stateManager.receive(Event.started(WORKFLOW_INSTANCE));
 
     podWatcher.eventReceived(Watcher.Action.DELETED, createdPod);
 
-    assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.RUNNING));
+    verify(stateManager, never()).receive(any());
   }
 
   @Test
@@ -613,7 +623,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatusNoContainer("Succeeded"));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
-    assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.FAILED));
+    verify(stateManager).receive(Event.runError(WORKFLOW_INSTANCE, "Could not find our container in pod"));
   }
 
   @Test
@@ -621,7 +631,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(waiting("Failed", ""));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
-    assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.FAILED));
+    verify(stateManager).receive(Event.runError(WORKFLOW_INSTANCE, "Unexpected null terminated status"));
   }
 
   @Test
@@ -631,18 +641,16 @@ public class KubernetesDockerRunnerTest {
     verify(stats).recordSubmission(POD_NAME);
 
     when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(18));
-    StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
-    stateManager.initialize(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData));
 
     when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(19));
     createdPod.setStatus(running(/* ready= */ false));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
-    assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.SUBMITTED));
+    verify(stateManager, never()).receive(Event.started(WORKFLOW_INSTANCE));
 
     when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(4711));
     createdPod.setStatus(running(/* ready= */ true));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
-    assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.RUNNING));
+    verify(stateManager).receive(Event.started(WORKFLOW_INSTANCE));
 
     verify(stats).recordRunning(POD_NAME);
   }
@@ -650,7 +658,6 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldDiscardChangesForOldExecutions() throws Exception {
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
-    stateManager.receive(Event.started(WORKFLOW_INSTANCE));
 
     // simulate event from different pod, but still with the same workflow instance annotation
     createdPod.getMetadata().setName(POD_NAME + "-other");
@@ -658,7 +665,7 @@ public class KubernetesDockerRunnerTest {
 
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
-    assertThat(stateManager.get(WORKFLOW_INSTANCE).state(), is(RunState.State.RUNNING));
+    verify(stateManager, never()).receive(any());
   }
 
   @Test
@@ -679,7 +686,6 @@ public class KubernetesDockerRunnerTest {
 
     // Verify that the runner polled and found out that the pods is terminated
     verify(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)));
-    assertThat(stateManager.get(WORKFLOW_INSTANCE).data().lastExit(), hasValue(20));
   }
 
   @Test
@@ -703,7 +709,5 @@ public class KubernetesDockerRunnerTest {
 
     // Verify that the runner eventually polls and finds out that the pod is terminated
     verify(stateManager, timeout(30_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)));
-    await().timeout(30, SECONDS).until(() ->
-        assertThat(stateManager.get(WORKFLOW_INSTANCE).data().lastExit(), hasValue(20)));
   }
 }
