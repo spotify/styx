@@ -40,6 +40,7 @@ import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -50,7 +51,6 @@ import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
-import com.google.cloud.datastore.KeyFactory;
 import com.google.cloud.datastore.KeyQuery;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
@@ -173,10 +173,8 @@ public class DatastoreStorageTest {
 
   private static LocalDatastoreHelper helper;
   private DatastoreStorage storage;
+  private Datastore datastore;
 
-  @Mock Transaction transaction;
-  @Mock Datastore datastore;
-  @Mock DatastoreStorageTransaction storageTransaction;
   @Mock TransactionFunction<String, FooException> transactionFunction;
   @Mock Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory;
 
@@ -199,14 +197,13 @@ public class DatastoreStorageTest {
 
   @Before
   public void setUp() throws Exception {
-    Datastore datastore = helper.getOptions().getService();
+    datastore = helper.getOptions().getService();
     storage = new DatastoreStorage(datastore, Duration.ZERO);
   }
 
   @After
   public void tearDown() throws Exception {
     // clear datastore after each test
-    Datastore datastore = helper.getOptions().getService();
     KeyQuery query = Query.newKeyQueryBuilder().build();
     final QueryResults<Key> keys = datastore.run(query);
     while (keys.hasNext()) {
@@ -585,12 +582,11 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndCommit() throws Exception {
-    when(datastore.newKeyFactory()).thenReturn(new KeyFactory("foo", "bar"));
-    final DatastoreStorage storage = new DatastoreStorage(
-        datastore, Duration.ZERO, storageTransactionFactory);
-    when(storageTransactionFactory.apply(transaction))
-        .thenReturn(storageTransaction);
-    when(datastore.newTransaction()).thenReturn(transaction);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final Transaction transaction = datastore.newTransaction();
+    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
+    when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
+
     when(transactionFunction.apply(any())).thenReturn("foo");
 
     String result = storage.runInTransaction(transactionFunction);
@@ -603,15 +599,13 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnFailure() throws Exception {
-    when(datastore.newKeyFactory()).thenReturn(new KeyFactory("foo", "bar"));
-    final DatastoreStorage storage = new DatastoreStorage(
-        datastore, Duration.ZERO, storageTransactionFactory);
-    when(storageTransactionFactory.apply(transaction))
-        .thenReturn(storageTransaction);
-    when(datastore.newTransaction()).thenReturn(transaction);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final Transaction transaction = datastore.newTransaction();
+    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
+    when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
+
     final Exception expectedException = new FooException();
     when(transactionFunction.apply(any())).thenThrow(expectedException);
-    when(storageTransaction.isActive()).thenReturn(true);
 
     try {
       storage.runInTransaction(transactionFunction);
@@ -629,23 +623,18 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnPreCommitConflict() throws Exception {
-    when(datastore.newKeyFactory()).thenReturn(new KeyFactory("foo", "bar"));
-    final DatastoreStorage storage = new DatastoreStorage(
-        datastore, Duration.ZERO, storageTransactionFactory);
-    when(storageTransactionFactory.apply(transaction))
-        .thenReturn(storageTransaction);
-    when(datastore.newTransaction()).thenReturn(transaction);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final Transaction transaction = datastore.newTransaction();
+    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
+    when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
+
     final Exception expectedException = new DatastoreException(10, "", "");
     when(transactionFunction.apply(any())).thenThrow(expectedException);
-    // Transaction should be inactive after rollback is called on the transaction
-    when(storageTransaction.isActive()).thenReturn(false);
 
     try {
       storage.runInTransaction(transactionFunction);
       fail("Expected exception!");
     } catch (TransactionException e) {
-      // Verify that we can throw a user defined checked exception type inside the transaction
-      // body and catch it
       assertTrue(e.isConflict());
     }
 
@@ -656,16 +645,14 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnCommitConflict() throws Exception {
-    when(datastore.newKeyFactory()).thenReturn(new KeyFactory("foo", "bar"));
-    final DatastoreStorage storage = new DatastoreStorage(
-        datastore, Duration.ZERO, storageTransactionFactory);
-    when(storageTransactionFactory.apply(transaction))
-        .thenReturn(storageTransaction);
-    when(datastore.newTransaction()).thenReturn(transaction);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final Transaction transaction = datastore.newTransaction();
+    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
+    when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
+
     final TransactionException expectedException = new TransactionException(true, null);
     when(transactionFunction.apply(any())).thenReturn("");
     doThrow(expectedException).when(storageTransaction).commit();
-    when(storageTransaction.isActive()).thenReturn(true);
 
     try {
       storage.runInTransaction(transactionFunction);
