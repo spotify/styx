@@ -398,7 +398,8 @@ class DatastoreStorage {
     storeWithRetries(() -> datastore.put(activeStateToEntity(datastore.newKeyFactory(), workflowInstance, state)));
   }
 
-  static Entity activeStateToEntity(KeyFactory keyFactory, WorkflowInstance workflowInstance, PersistentWorkflowInstanceState state)
+  static Entity activeStateToEntity(KeyFactory keyFactory, WorkflowInstance workflowInstance,
+      PersistentWorkflowInstanceState state)
       throws JsonProcessingException {
     final Key key = activeWorkflowInstanceKey(keyFactory, workflowInstance);
     final Entity.Builder entity = Entity.newBuilder(key)
