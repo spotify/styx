@@ -46,6 +46,7 @@ import static org.mockito.Mockito.when;
 import com.google.bigtable.repackaged.com.google.common.collect.ImmutableList;
 import com.google.bigtable.repackaged.com.google.common.collect.ImmutableMap;
 import com.google.cloud.datastore.Datastore;
+import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
@@ -626,9 +627,35 @@ public class DatastoreStorageTest {
     verify(storageTransaction).rollback();
   }
 
+  @Test
+  public void runInTransactionShouldCallFunctionAndRollbackOnPreCommitConflict() throws Exception {
+    when(datastore.newKeyFactory()).thenReturn(new KeyFactory("foo", "bar"));
+    final DatastoreStorage storage = new DatastoreStorage(
+        datastore, Duration.ZERO, storageTransactionFactory);
+    when(storageTransactionFactory.apply(transaction))
+        .thenReturn(storageTransaction);
+    when(datastore.newTransaction()).thenReturn(transaction);
+    final Exception expectedException = new DatastoreException(10, "", "");
+    when(transactionFunction.apply(any())).thenThrow(expectedException);
+    // Transaction should be inactive after rollback is called on the transaction
+    when(storageTransaction.isActive()).thenReturn(false);
+
+    try {
+      storage.runInTransaction(transactionFunction);
+      fail("Expected exception!");
+    } catch (TransactionException e) {
+      // Verify that we can throw a user defined checked exception type inside the transaction
+      // body and catch it
+      assertTrue(e.isConflict());
+    }
+
+    verify(transactionFunction).apply(storageTransaction);
+    verify(storageTransaction, never()).commit();
+    verify(storageTransaction).rollback();
+  }
 
   @Test
-  public void runInTransactionShouldCallFunctionAndRollbackOnConflict() throws Exception {
+  public void runInTransactionShouldCallFunctionAndRollbackOnCommitConflict() throws Exception {
     when(datastore.newKeyFactory()).thenReturn(new KeyFactory("foo", "bar"));
     final DatastoreStorage storage = new DatastoreStorage(
         datastore, Duration.ZERO, storageTransactionFactory);

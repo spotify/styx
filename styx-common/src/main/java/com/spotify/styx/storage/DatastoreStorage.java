@@ -753,7 +753,8 @@ class DatastoreStorage {
       return value;
     } catch (DatastoreException ex) {
       tx.rollback();
-      throw new TransactionException(false, ex);
+      final boolean conflict = ex.getCode() == 10;
+      throw new TransactionException(conflict, ex);
     } finally {
       if (tx.isActive()) {
         tx.rollback();
