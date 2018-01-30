@@ -23,8 +23,6 @@ package com.spotify.styx;
 import static com.spotify.styx.util.FutureUtil.exceptionallyCompletedFuture;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 
-import com.spotify.styx.StyxScheduler.StateFactory;
-import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;

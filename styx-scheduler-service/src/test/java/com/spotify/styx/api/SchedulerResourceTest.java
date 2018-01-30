@@ -20,7 +20,6 @@
 
 package com.spotify.styx.api;
 
-import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresent;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
