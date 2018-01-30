@@ -21,6 +21,8 @@
 package com.spotify.styx.storage;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Entity;
@@ -60,16 +62,35 @@ public class DatastoreStorageTransactionTest {
     assertFalse(transaction.isActive());
   }
 
-  @Test(expected = TransactionException.class)
+  @Test
   public void shouldThrowIfUnexpectedDatastoreError() throws IOException {
     final Transaction transaction = datastore.newTransaction();
     DatastoreStorageTransaction storageTransaction = new DatastoreStorageTransaction(transaction);
 
     transaction.rollback();
-    storageTransaction.commit();
+    try {
+      storageTransaction.commit();
+      fail("Expected exception!");
+    } catch (TransactionException e) {
+      assertFalse(e.isConflict());
+    }
   }
 
-  @Test(expected = TransactionException.class)
+  @Test
+  public void shouldThrowIfRollbackFails() throws IOException {
+    final Transaction transaction = datastore.newTransaction();
+    DatastoreStorageTransaction storageTransaction = new DatastoreStorageTransaction(transaction);
+
+    storageTransaction.commit();
+    try {
+      storageTransaction.rollback();
+      fail("Expected exception!");
+    } catch (TransactionException e) {
+      assertFalse(e.isConflict());
+    }
+  }
+
+  @Test
   public void shouldThrowIfTransactionFailed() throws TransactionException {
     Transaction transaction1 = datastore.newTransaction();
     Transaction transaction2 = datastore.newTransaction();
@@ -96,6 +117,12 @@ public class DatastoreStorageTransactionTest {
     Key key2 = datastore.allocateId(keyFactory2.newKey());
     Entity copyOfEntity1 = Entity.newBuilder(key2).set("key", entity1read.getString("key")).build();
     transaction3.put(copyOfEntity1);
-    storageTransaction3.commit();
+
+    try {
+      storageTransaction3.commit();
+      fail("Expected exception!");
+    } catch (TransactionException e) {
+      assertTrue(e.isConflict());
+    }
   }
 }

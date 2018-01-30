@@ -667,6 +667,31 @@ public class DatastoreStorageTest {
   }
 
   @Test
+  public void runInTransactionShouldThrowIfRollbackFailsAfterConflict() throws Exception {
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final Transaction transaction = datastore.newTransaction();
+    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
+    when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
+
+    when(transactionFunction.apply(any())).thenReturn("");
+
+    doThrow(new TransactionException(true, null)).when(storageTransaction).commit();
+    final TransactionException expectedException = new TransactionException(false, null);
+    doThrow(expectedException).when(storageTransaction).rollback();
+
+    try {
+      storage.runInTransaction(transactionFunction);
+      fail("Expected exception!");
+    } catch (TransactionException e) {
+      assertFalse(e.isConflict());
+      assertThat(e, is(expectedException));
+    }
+
+    verify(transactionFunction).apply(storageTransaction);
+    verify(storageTransaction).rollback();
+  }
+
+  @Test
   public void runInTransactionShouldThrowIfDatastoreNewTransactionFails() throws Exception {
     Datastore datastore = mock(Datastore.class);
     final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
