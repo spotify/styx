@@ -45,6 +45,7 @@ public class DatastoreStorageTransactionTest {
 
   @BeforeClass
   public static void setUpClass() throws Exception {
+    // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
     helper = LocalDatastoreHelper.create(1.0); // 100% global consistency
     helper.start();
   }

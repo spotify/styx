@@ -269,13 +269,13 @@ public class SchedulerResource {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
     } catch (ExecutionException e) {
-      if (e.getCause() instanceof IllegalStateException) {
-        // Illegal state, already active?
-        // TODO: raise a more specific exception
-        return Response.forStatus(
-            BAD_REQUEST.withReasonPhrase("The specified instance is already "
-                + "active in the scheduler"));
-
+      final Throwable cause = e.getCause();
+      if (cause instanceof IllegalStateException
+          || cause instanceof IllegalArgumentException) {
+        // TODO: propagate error information using a more specific exception type
+        return Response.forStatus(BAD_REQUEST.withReasonPhrase(cause.getMessage()));
+      } else {
+        return Response.forStatus(INTERNAL_SERVER_ERROR);
       }
     }
 

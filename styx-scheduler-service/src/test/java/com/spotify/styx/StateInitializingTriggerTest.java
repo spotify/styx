@@ -20,14 +20,16 @@
 
 package com.spotify.styx;
 
-import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.model.Schedule.MONTHS;
 import static com.spotify.styx.model.Schedule.WEEKS;
+import static com.spotify.styx.util.ParameterUtil.toParameter;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -37,16 +39,20 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.state.RunState;
-import com.spotify.styx.state.SyncStateManager;
+import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
-import com.spotify.styx.util.TriggerUtil;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import junitparams.Parameters;
+import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.runners.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.class)
 public class StateInitializingTriggerTest {
 
   private static final Instant TIME = Instant.parse("2016-01-18T09:11:22.333Z");
@@ -61,55 +67,59 @@ public class StateInitializingTriggerTest {
           MONTHS, "2016-01"
       );
 
-  private SyncStateManager stateManager = new SyncStateManager();
-  private TriggerListener
-      trigger = new StateInitializingTrigger(stateManager);
+  @Mock StateManager stateManager;
+
+  private TriggerListener trigger;
+
+  @Before
+  public void setUp() throws Exception {
+    trigger = new StateInitializingTrigger(stateManager);
+  }
 
   @Test
-  public void shouldInitializeWorkflowInstance() throws Exception {
-    WorkflowConfiguration workflowConfiguration = schedule(HOURS);
+  public void shouldTriggerWorkflowInstance() throws Exception {
+    WorkflowConfiguration workflowConfiguration = workflowConfiguration(HOURS);
     Workflow workflow = Workflow.create("id", workflowConfiguration);
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
-    assertThat(stateManager.activeStatesSize(), is(1));
+    verify(stateManager).trigger(
+        WorkflowInstance.create(workflow.id(), toParameter(workflowConfiguration.schedule(), TIME)),
+        Trigger.natural());
   }
 
   @Test
   public void shouldInitializeWorkflowInstanceWithoutDockerArgs() throws Exception {
     WorkflowConfiguration workflowConfiguration =
-        WorkflowConfigurationBuilder.from(schedule(HOURS)).dockerArgs(Optional.empty()).build();
+        WorkflowConfigurationBuilder.from(workflowConfiguration(HOURS)).dockerArgs(Optional.empty()).build();
     Workflow workflow = Workflow.create("id", workflowConfiguration);
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
-    assertThat(stateManager.activeStatesSize(), is(1));
+    WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(),
+        toParameter(workflowConfiguration.schedule(), TIME));
+
+    verify(stateManager).trigger(expectedInstance, Trigger.natural());
   }
 
   @Test
   public void shouldInjectTriggerExecutionEventWithNaturalTrigger() throws Exception {
-    WorkflowConfiguration workflowConfiguration = schedule(HOURS);
+    WorkflowConfiguration workflowConfiguration = workflowConfiguration(HOURS);
     Workflow workflow = Workflow.create("id", workflowConfiguration);
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
     WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(), "2016-01-18T09");
-    RunState state = stateManager.get(expectedInstance);
 
-    assertThat(state.state(), is(RunState.State.QUEUED));
-    assertThat(state.data().triggerId(), hasValue(TriggerUtil.NATURAL_TRIGGER_ID));
-    assertThat(state.data().trigger(), hasValue(Trigger.natural()));
+    verify(stateManager).trigger(expectedInstance, Trigger.natural());
   }
 
   @Test
   public void shouldInjectTriggerExecutionEventWithBackfillTrigger() throws Exception {
-    WorkflowConfiguration workflowConfiguration = schedule(HOURS);
+    WorkflowConfiguration workflowConfiguration = workflowConfiguration(HOURS);
     Workflow workflow = Workflow.create("id", workflowConfiguration);
     trigger.event(workflow, BACKFILL_TRIGGER, TIME);
 
     WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(), "2016-01-18T09");
-    RunState state = stateManager.get(expectedInstance);
 
-    assertThat(state.state(), is(RunState.State.QUEUED));
-    assertThat(state.data().triggerId(), hasValue("trig"));
-    assertThat(state.data().trigger(), hasValue(Trigger.backfill("trig")));
+    verify(stateManager).trigger(expectedInstance, BACKFILL_TRIGGER);
   }
 
   @Test
@@ -121,22 +131,22 @@ public class StateInitializingTriggerTest {
     Workflow workflow = Workflow.create("id", configuration);
     trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
-    assertThat(stateManager.activeStatesSize(), is(0));
+    verifyZeroInteractions(stateManager);
   }
 
   @Test
+  @Parameters()
   public void shouldCreateWorkflowInstanceParameter() throws Exception {
     for (Map.Entry<Schedule, String> scheduleCase : SCHEDULE_ARG_EXPECTS.entrySet()) {
-      WorkflowConfiguration
-          workflowConfiguration = schedule(scheduleCase.getKey(), "--date", "{}", "--bar");
+      reset(stateManager);
+      WorkflowConfiguration workflowConfiguration = workflowConfiguration(
+          scheduleCase.getKey(), "--date", "{}", "--bar");
       Workflow workflow = Workflow.create("id", workflowConfiguration);
       trigger.event(workflow, NATURAL_TRIGGER, TIME);
 
-      RunState runState =
-          stateManager.get(WorkflowInstance.create(workflow.id(), scheduleCase.getValue()));
+      WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(), scheduleCase.getValue());
 
-      assertThat(runState, is(notNullValue()));
-      assertThat(runState.workflowInstance().parameter(), is(scheduleCase.getValue()));
+      verify(stateManager).trigger(expectedInstance, Trigger.natural());
     }
   }
 
@@ -145,7 +155,7 @@ public class StateInitializingTriggerTest {
     assertThat(SCHEDULE_ARG_EXPECTS.keySet(), is(Sets.newHashSet(Schedule.values())));
   }
 
-  private WorkflowConfiguration schedule(Schedule schedule, String... args) {
+  private WorkflowConfiguration workflowConfiguration(Schedule schedule, String... args) {
     return WorkflowConfiguration.builder()
         .id("styx.TestEndpoint")
         .schedule(schedule)

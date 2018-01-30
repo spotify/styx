@@ -101,10 +101,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -309,7 +314,11 @@ public class StyxScheduler implements AppInit {
 
     final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
     closer.register(executorCloser("scheduler", executor));
-    final ExecutorService outputHandlerExecutor = Executors.newFixedThreadPool(16, eventTf);
+    final BlockingQueue<Runnable> outputHandlerExecutorQueue = new LinkedBlockingQueue<>();
+    final ExecutorService outputHandlerExecutor = new ThreadPoolExecutor(16, 16,
+        0L, TimeUnit.MILLISECONDS,
+        outputHandlerExecutorQueue,
+        eventTf);
     closer.register(executorCloser("output-handler", outputHandlerExecutor));
     final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
     closer.register(executorCloser("event-consumer", eventConsumerExecutor));
@@ -320,7 +329,8 @@ public class StyxScheduler implements AppInit {
 
     warmUpCache(workflowCache, storage);
 
-    // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to take StateManager as argument instead?
+    // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
+    //       take StateManager as argument instead?
     final List<OutputHandler> outputHandlers = new ArrayList<>();
     final QueuedStateManager stateManager = closer.register(
         new QueuedStateManager(time, outputHandlerExecutor, storage,
@@ -368,12 +378,15 @@ public class StyxScheduler implements AppInit {
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
+    // TODO: is this still needed?
+    dockerRunner.restore();
+
     startTriggerManager(triggerManager, executor);
     startBackfillTriggerManager(backfillTriggerManager, executor);
     startScheduler(scheduler, executor);
     startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
     startCleaner(cleaner, executor);
-    setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats);
+    setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats, outputHandlerExecutorQueue);
 
     final SchedulerResource schedulerResource =
         new SchedulerResource(stateManager, trigger, workflowChangeListener, workflowRemoveListener,
@@ -392,8 +405,8 @@ public class StyxScheduler implements AppInit {
   }
 
   @VisibleForTesting
-  void receive(Event event) throws IsClosedException {
-    stateManager.receive(event);
+  CompletionStage<Void> receive(Event event) throws IsClosedException {
+    return stateManager.receive(event);
   }
 
   @VisibleForTesting
@@ -496,9 +509,10 @@ public class StyxScheduler implements AppInit {
       WorkflowCache workflowCache,
       Storage storage,
       RateLimiter submissionRateLimiter,
-      Stats stats) {
+      Stats stats,
+      BlockingQueue<Runnable> outputHandlerExecutorQueue) {
 
-    stats.registerQueuedEventsMetric(stateManager::getQueuedEventsCount);
+    stats.registerQueuedEventsMetric(() -> (long) outputHandlerExecutorQueue.size());
 
     stats.registerWorkflowCountMetric("all", () -> (long) workflowCache.all().size());
 
