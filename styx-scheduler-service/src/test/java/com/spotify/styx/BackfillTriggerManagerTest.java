@@ -94,19 +94,14 @@ public class BackfillTriggerManagerTest {
 
   private List<Resource> resourceLimits = Lists.newArrayList();
 
-  @Mock
-  private TriggerListener triggerListener;
-
-  @Mock
-  private Storage storage;
-
+  @Mock TriggerListener triggerListener;
+  @Mock Storage storage;
   @Mock StyxConfig config;
+  @Mock SyncStateManager stateManager;
 
   private WorkflowCache workflowCache;
 
   private BackfillTriggerManager backfillTriggerManager;
-
-  private SyncStateManager stateManager;
 
   private ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -118,7 +113,6 @@ public class BackfillTriggerManagerTest {
     when(config.globalConcurrency()).thenReturn(Optional.empty());
     when(storage.config()).thenReturn(config);
 
-    stateManager = new SyncStateManager();
     workflowCache = new InMemWorkflowCache();
     backfillTriggerManager = new BackfillTriggerManager(stateManager, workflowCache, storage,
                                                         triggerListener);
@@ -159,13 +153,13 @@ public class BackfillTriggerManagerTest {
                                       .nextTrigger(Instant.parse("2016-12-03T00:00:00Z"))
                                       .build()));
 
-    stateManager.trigger
-        (RunState.fresh(
-            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23")), trigger);
-    stateManager.receive(
-        Event.triggerExecution(
-            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23"),
-            Trigger.backfill("backfill-1")));
+//    stateManager.trigger
+//        (RunState.fresh(
+//            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23")), trigger);
+//    stateManager.receive(
+//        Event.triggerExecution(
+//            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23"),
+//            Trigger.backfill("backfill-1")));
 
     backfillTriggerManager.tick();
 
@@ -213,20 +207,20 @@ public class BackfillTriggerManagerTest {
     initWorkflow(workflow);
     when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(BACKFILL_1));
 
-    stateManager.trigger(
-        RunState.fresh(
-            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T22")), trigger);
-    stateManager.receive(
-        Event.triggerExecution(
-            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T22"),
-            Trigger.backfill("backfill-1")));
-    stateManager.trigger
-        (RunState.fresh(
-            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23")), trigger);
-    stateManager.receive(
-        Event.triggerExecution(
-            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23"),
-            Trigger.backfill("backfill-1")));
+//    stateManager.trigger(
+//        RunState.fresh(
+//            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T22")), trigger);
+//    stateManager.receive(
+//        Event.triggerExecution(
+//            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T22"),
+//            Trigger.backfill("backfill-1")));
+//    stateManager.trigger
+//        (RunState.fresh(
+//            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23")), trigger);
+//    stateManager.receive(
+//        Event.triggerExecution(
+//            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23"),
+//            Trigger.backfill("backfill-1")));
 
     backfillTriggerManager.tick();
 
