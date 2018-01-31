@@ -59,7 +59,6 @@ import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
-import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
