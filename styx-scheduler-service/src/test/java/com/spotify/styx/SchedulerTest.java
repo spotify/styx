@@ -94,9 +94,6 @@ public class SchedulerTest {
       WorkflowId.create("styx2", "example2");
   private static final WorkflowInstance INSTANCE_1 =
       WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T01");
-  private static final WorkflowInstance INSTANCE_2 =
-      WorkflowInstance.create(WORKFLOW_ID2, "2016-05-10T04");
-  private static final Trigger TRIGGER = Trigger.natural();
 
   private WorkflowCache workflowCache;
   private Storage storage;

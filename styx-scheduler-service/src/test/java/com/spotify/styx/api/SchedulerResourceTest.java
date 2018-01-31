@@ -32,6 +32,7 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.startsWith;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
@@ -235,20 +236,20 @@ public class SchedulerResourceTest {
 
   @Test
   public void injectEventShouldReturnServerErrorIfRuntimeException() throws Exception {
-    retryShouldReturnErrorOnEventFailure(new RuntimeException("test"), Status.INTERNAL_SERVER_ERROR);
+    assertThat(retryFailureResponse(new RuntimeException("test")), hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
   }
 
   @Test
   public void injectEventShouldReturnBadRequestOnIllegalArgumentException() throws Exception {
-    retryShouldReturnErrorOnEventFailure(new IllegalArgumentException("badf00d!"), Status.BAD_REQUEST);
+    assertThat(retryFailureResponse(new IllegalArgumentException("badf00d!")), hasStatus(withCode(Status.BAD_REQUEST)));
   }
 
   @Test
   public void injectEventShouldReturnBadRequestOnIllegalStateException() throws Exception {
-    retryShouldReturnErrorOnEventFailure(new IllegalStateException("badf00d!"), Status.BAD_REQUEST);
+    assertThat(retryFailureResponse(new IllegalStateException("badf00d!")), hasStatus(withCode(Status.BAD_REQUEST)));
   }
 
-  private void retryShouldReturnErrorOnEventFailure(Throwable cause, Status expectedStatus) throws Exception {
+  private Response<ByteString> retryFailureResponse(Throwable cause) throws Exception {
     when(stateManager.receive(any())).thenReturn(
         CompletableFutures.exceptionallyCompletedFuture(cause));
 
@@ -256,8 +257,7 @@ public class SchedulerResourceTest {
     CompletionStage<Response<ByteString>> post =
         serviceHelper.request("POST", BASE + "/retry", eventPayload);
 
-    final Response<ByteString> response = post.toCompletableFuture().get();
-    assertThat(response, hasStatus(withCode(expectedStatus)));
+    return post.toCompletableFuture().get();
   }
 
   @Test
