@@ -46,6 +46,14 @@ public interface StorageTransaction {
   WorkflowId store(Workflow workflow) throws IOException;
 
   /**
+   * Get a {@link Workflow} definition.
+   *
+   * @param workflowId  The workflow to get
+   * @return Optionally a workflow, if one was found for te given id
+   */
+  Optional<Workflow> workflow(WorkflowId workflowId) throws IOException;
+
+  /**
    * Updates the next natural trigger for a {@link Workflow}.
    *
    * @param workflowId  The {@link WorkflowId} to update the next natural trigger for.

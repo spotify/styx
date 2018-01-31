@@ -74,6 +74,7 @@ import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.TriggerInstantSpec;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -82,6 +83,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import org.hamcrest.Matchers;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -707,6 +709,29 @@ public class DatastoreStorageTest {
     }
 
     verify(transactionFunction, never()).apply(any());
+  }
+
+  @Test
+  public void insertActiveStateShouldFailIfAlreadyExists() throws Exception {
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO);
+    storage.runInTransaction(tx -> tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1));
+    try {
+      storage.runInTransaction(tx -> tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1));
+      fail("Expected exception!");
+    } catch (TransactionException e) {
+      assertThat(e.isAlreadyExists(), is(true));
+    }
+  }
+
+  @Test
+  public void updateActiveStateShouldFailIfNotAlreadyExists() throws Exception {
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO);
+    try {
+      storage.runInTransaction(tx -> tx.updateActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1));
+      fail("Expected exception!");
+    } catch (TransactionException e) {
+      assertThat(e.isNotFound(), is(true));
+    }
   }
 
   private static class FooException extends Exception {

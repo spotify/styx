@@ -149,7 +149,7 @@ public class QueuedStateManagerTest {
   }
 
   @Test
-  public void shouldFailInitializeWFIfAlreadyActive() throws Exception {
+  public void shouldFailTriggerWFIfAlreadyActive() throws Exception {
     reset(storage);
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     final Exception rootCause = new IllegalStateException("Already exists!");

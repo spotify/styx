@@ -26,10 +26,12 @@ import static java.util.stream.Collectors.toMap;
 import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.storage.TransactionException;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
@@ -111,8 +113,17 @@ public class QueuedStateManager implements StateManager {
               .trigger(trigger)
               .build(), time);
           try {
-            storage.runInTransaction(tx ->
-                tx.insertActiveState(workflowInstance, PersistentWorkflowInstanceState.of(runState, nextCounter)));
+            storage.runInTransaction(tx -> {
+              final Optional<Workflow> workflow = tx.workflow(workflowInstance.workflowId());
+              if (!workflow.isPresent()) {
+                throw new IllegalArgumentException("Workflow not found: " + workflowInstance.workflowId().toKey());
+              }
+              return tx.insertActiveState(workflowInstance, PersistentWorkflowInstanceState.of(runState, nextCounter));
+            });
+          } catch (TransactionException e) {
+            if (e.isAlreadyExists()) {
+              throw new IllegalStateException("Workflow instance is already triggered: " + workflowInstance.toKey());
+            }
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
@@ -131,6 +142,8 @@ public class QueuedStateManager implements StateManager {
     ensureRunning();
 
     LOG.debug("Event {}", event);
+
+    // TODO: retry on transaction conflict
 
     // TODO: run on striped executor to get event execution in order.
 
@@ -158,6 +171,8 @@ public class QueuedStateManager implements StateManager {
               try {
                 nextRunState = runState.transition(event);
               } catch (IllegalStateException e) {
+                // TODO: illegal state transitions might become common as multiple scheduler instances concurrently
+                //       consume events from k8s.
                 LOG.warn("Illegal state transition", e);
                 throw e;
               }
