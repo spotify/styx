@@ -114,7 +114,6 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldNotBeActiveAfterHalt() throws Exception {
-
     when(transaction.activeState(INSTANCE)).thenReturn(
         Optional.of(PersistentWorkflowInstanceState
             .builder()
@@ -135,7 +134,6 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldReInitializeWFInstanceFromNextCounter() throws Exception {
-
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.of(17L));
 
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
@@ -249,7 +247,6 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldRemoveStateIfTerminal() throws Exception {
-
     when(transaction.activeState(INSTANCE)).thenReturn(
         Optional.of(PersistentWorkflowInstanceState
             .builder()
