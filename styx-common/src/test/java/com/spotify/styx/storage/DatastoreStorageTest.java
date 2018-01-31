@@ -200,7 +200,6 @@ public class DatastoreStorageTest {
   public void setUp() throws Exception {
     datastore = helper.getOptions().getService();
     storage = new DatastoreStorage(datastore, Duration.ZERO);
-    when(this.datastore.newKeyFactory()).then(a -> datastore.newKeyFactory());
   }
 
   @After

@@ -42,9 +42,9 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.storage.TransactionException;
 import com.spotify.styx.storage.TransactionFunction;
-import com.spotify.styx.storage.TransactionalStorage;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.Time;
@@ -87,7 +87,7 @@ public class QueuedStateManagerTest {
   @Rule public RepeatRule repeatRule = new RepeatRule();
 
   @Mock Storage storage;
-  @Mock TransactionalStorage transactionalStorage;
+  @Mock StorageTransaction transaction;
   @Mock OutputHandler outputHandler;
   @Mock Time time;
 
@@ -95,7 +95,7 @@ public class QueuedStateManagerTest {
   public void setUp() throws Exception {
     when(time.get()).thenReturn(NOW);
     when(storage.runInTransaction(any())).thenAnswer(
-        a -> a.getArgumentAt(0, TransactionFunction.class).apply(transactionalStorage));
+        a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
     doNothing().when(outputHandler).transitionInto(runStateCaptor.capture());
     stateManager = new QueuedStateManager(
         time, outputHandlerExecutor, storage, eventConsumer, eventConsumerExecutor, outputHandler);
@@ -111,7 +111,7 @@ public class QueuedStateManagerTest {
   @Test
   public void shouldNotBeActiveAfterHalt() throws Exception {
 
-    when(transactionalStorage.activeState(INSTANCE)).thenReturn(
+    when(transaction.activeState(INSTANCE)).thenReturn(
         Optional.of(PersistentWorkflowInstanceState
             .builder()
             .counter(17)
@@ -124,7 +124,7 @@ public class QueuedStateManagerTest {
     stateManager.receive(event)
         .toCompletableFuture().get(1, MINUTES);
 
-    verify(transactionalStorage).deleteActiveState(INSTANCE);
+    verify(transaction).deleteActiveState(INSTANCE);
 
     verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
   }
@@ -137,7 +137,7 @@ public class QueuedStateManagerTest {
     stateManager.trigger(INSTANCE, TRIGGER1)
         .toCompletableFuture().get(1, MINUTES);
 
-    verify(transactionalStorage).insertActiveState(INSTANCE, PersistentWorkflowInstanceState.builder()
+    verify(transaction).insertActiveState(INSTANCE, PersistentWorkflowInstanceState.builder()
         .counter(18)
         .state(State.QUEUED)
         .data(StateData.newBuilder().trigger(TRIGGER1).build())
@@ -155,7 +155,7 @@ public class QueuedStateManagerTest {
     final Exception rootCause = new IllegalStateException("Already exists!");
     when(storage.runInTransaction(any())).thenAnswer(a -> {
       a.getArgumentAt(0, TransactionFunction.class)
-          .apply(transactionalStorage);
+          .apply(transaction);
       throw new TransactionException(false, rootCause);
     });
 
@@ -183,7 +183,7 @@ public class QueuedStateManagerTest {
   @Test
   public void shouldCloseGracefully() throws Exception {
 
-    when(transactionalStorage.activeState(INSTANCE)).thenReturn(
+    when(transaction.activeState(INSTANCE)).thenReturn(
         Optional.of(PersistentWorkflowInstanceState
             .builder()
             .counter(17)
@@ -198,7 +198,7 @@ public class QueuedStateManagerTest {
 
     when(storage.runInTransaction(any())).thenAnswer(a -> {
       barrier.get();
-      return a.getArgumentAt(0, TransactionFunction.class).apply(transactionalStorage);
+      return a.getArgumentAt(0, TransactionFunction.class).apply(transaction);
     });
 
     CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE))
@@ -226,7 +226,7 @@ public class QueuedStateManagerTest {
   public void shouldWriteEvents() throws Exception {
     Event event = Event.started(INSTANCE);
 
-    when(transactionalStorage.activeState(INSTANCE))
+    when(transaction.activeState(INSTANCE))
         .then(a -> Optional.of(PersistentWorkflowInstanceState.builder()
             .timestamp(NOW.minusMillis(1))
             .counter(17)
@@ -243,7 +243,7 @@ public class QueuedStateManagerTest {
   @Test
   public void shouldRemoveStateIfTerminal() throws Exception {
 
-    when(transactionalStorage.activeState(INSTANCE)).thenReturn(
+    when(transaction.activeState(INSTANCE)).thenReturn(
         Optional.of(PersistentWorkflowInstanceState
             .builder()
             .counter(17)
@@ -256,7 +256,7 @@ public class QueuedStateManagerTest {
     stateManager.receive(event)
         .toCompletableFuture().get(1, MINUTES);
 
-    verify(transactionalStorage).deleteActiveState(INSTANCE);
+    verify(transaction).deleteActiveState(INSTANCE);
 
     verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
   }
@@ -264,7 +264,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldWriteActiveStateOnEvent() throws Exception {
-    when(transactionalStorage.activeState(INSTANCE)).thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
+    when(transaction.activeState(INSTANCE)).thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
         .counter(17)
         .timestamp(NOW.minusMillis(1))
         .state(State.QUEUED)
@@ -274,7 +274,7 @@ public class QueuedStateManagerTest {
     stateManager.receive(Event.dequeue(INSTANCE))
         .toCompletableFuture().get(1, MINUTES);
 
-    verify(transactionalStorage).updateActiveState(INSTANCE, PersistentWorkflowInstanceState.builder()
+    verify(transaction).updateActiveState(INSTANCE, PersistentWorkflowInstanceState.builder()
         .counter(18)
         .timestamp(NOW)
         .state(State.PREPARE)
@@ -284,7 +284,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldNotStoreEventOnIllegalStateTransition() throws Exception {
-    when(transactionalStorage.activeState(INSTANCE)).thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
+    when(transaction.activeState(INSTANCE)).thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
         .counter(17)
         .timestamp(NOW.minusMillis(1))
         .state(State.QUEUED)
@@ -301,7 +301,7 @@ public class QueuedStateManagerTest {
       assertThat(e.getCause(), instanceOf(IllegalStateException.class));
     }
 
-    verify(transactionalStorage, never()).updateActiveState(any(), any());
+    verify(transaction, never()).updateActiveState(any(), any());
   }
 
   @Test
@@ -320,7 +320,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void receiveShouldHandleThrowingOutputHandler() throws Exception {
-    when(transactionalStorage.activeState(INSTANCE)).thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
+    when(transaction.activeState(INSTANCE)).thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
         .counter(17)
         .timestamp(NOW.minusMillis(1))
         .state(State.QUEUED)
