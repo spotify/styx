@@ -58,7 +58,7 @@ import org.slf4j.LoggerFactory;
  * {@link WorkflowInstance}. This allows event processing to scale across many separate workflow
  * instances while guaranteeing that each state machine progresses sequentially.
  *
- * <p>All {@link RunState#outputHandler()} transitions are also executed on the injected
+ * <p>All {@link #outputHandler} transitions are also executed on the injected
  * {@link Executor}.
  */
 public class QueuedStateManager implements StateManager {
