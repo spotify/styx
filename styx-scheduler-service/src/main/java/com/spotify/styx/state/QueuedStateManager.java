@@ -34,6 +34,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.TransactionException;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.Time;
+import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
@@ -43,7 +44,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
 import javaslang.Tuple;
 import javaslang.Tuple2;
@@ -69,9 +70,10 @@ public class QueuedStateManager implements StateManager {
 
   private static final Duration SHUTDOWN_GRACE_PERIOD = Duration.ofSeconds(5);
 
-  private final Time time;
+  private final LongAdder queuedEvents = new LongAdder();
 
-  private final ExecutorService outputHandlerExecutor;
+  private final Time time;
+  private final StripedExecutorService outputHandlerExecutor;
   private final Storage storage;
   private final BiConsumer<SequenceEvent, RunState> eventConsumer;
   private final Executor eventConsumerExecutor;
@@ -81,7 +83,7 @@ public class QueuedStateManager implements StateManager {
 
   public QueuedStateManager(
       Time time,
-      ExecutorService outputHandlerExecutor,
+      StripedExecutorService outputHandlerExecutor,
       Storage storage,
       BiConsumer<SequenceEvent, RunState> eventConsumer,
       Executor eventConsumerExecutor,
@@ -149,9 +151,11 @@ public class QueuedStateManager implements StateManager {
 
     // TODO: optional retry on transaction conflict
 
-    // TODO: run on striped executor to get event execution in order.
+    queuedEvents.increment();
 
-    return CompletableFuture.supplyAsync(() -> {
+    return Striping.supplyAsyncStriped(() -> {
+      queuedEvents.decrement();
+
       final Tuple2<SequenceEvent, RunState> next;
 
       // Perform transactional state transition
@@ -201,7 +205,7 @@ public class QueuedStateManager implements StateManager {
       emitEvent(next._1, next._2);
 
       return null;
-    }, outputHandlerExecutor);
+    }, event.workflowInstance(), outputHandlerExecutor);
   }
 
   private void emitEvent(SequenceEvent sequenceEvent, RunState runState) {
@@ -280,5 +284,9 @@ public class QueuedStateManager implements StateManager {
     if (!running) {
       throw new IsClosedException();
     }
+  }
+
+  public long queuedEvents() {
+    return queuedEvents.sum();
   }
 }
