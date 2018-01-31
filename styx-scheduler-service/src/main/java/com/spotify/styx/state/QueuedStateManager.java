@@ -105,6 +105,8 @@ public class QueuedStateManager implements StateManager {
       return CompletableFutures.exceptionallyCompletedFuture(e);
     }
 
+    // TODO: retry on transaction conflict
+
     return CompletableFuture
         .supplyAsync(() -> {
 
@@ -123,6 +125,8 @@ public class QueuedStateManager implements StateManager {
           } catch (TransactionException e) {
             if (e.isAlreadyExists()) {
               throw new IllegalStateException("Workflow instance is already triggered: " + workflowInstance.toKey());
+            } else {
+              throw new RuntimeException(e);
             }
           } catch (IOException e) {
             throw new RuntimeException(e);

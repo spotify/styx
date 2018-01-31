@@ -38,6 +38,7 @@ import com.google.common.base.Throwables;
 import com.spotify.styx.RepeatRule;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.RunState.State;
@@ -71,6 +72,9 @@ public class QueuedStateManagerTest {
 
   private static final WorkflowInstance INSTANCE = WorkflowInstance.create(
       TestData.WORKFLOW_ID, "2016-05-01");
+
+  private static final Workflow WORKFLOW =
+      Workflow.create("foo", TestData.FULL_WORKFLOW_CONFIGURATION);
 
   private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
   private static final BiConsumer<SequenceEvent, RunState> eventConsumer = (e, s) -> {};
@@ -134,6 +138,8 @@ public class QueuedStateManagerTest {
 
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.of(17L));
 
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
+
     stateManager.trigger(INSTANCE, TRIGGER1)
         .toCompletableFuture().get(1, MINUTES);
 
@@ -152,6 +158,7 @@ public class QueuedStateManagerTest {
   public void shouldFailTriggerWFIfAlreadyActive() throws Exception {
     reset(storage);
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
     final Exception rootCause = new IllegalStateException("Already exists!");
     when(storage.runInTransaction(any())).thenAnswer(a -> {
       a.getArgumentAt(0, TransactionFunction.class)
@@ -307,6 +314,7 @@ public class QueuedStateManagerTest {
   @Test
   public void triggerShouldHandleThrowingOutputHandler() throws Exception {
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
     final RuntimeException rootCause = new RuntimeException("foo!");
     doThrow(rootCause).when(outputHandler).transitionInto(any());
     CompletableFuture<Void> f = stateManager.trigger(INSTANCE, TRIGGER1).toCompletableFuture();
