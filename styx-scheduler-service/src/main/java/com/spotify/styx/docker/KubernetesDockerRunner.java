@@ -410,6 +410,8 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @Override
   public void restore() {
+    // TODO: is this still needed?
+
     // Failing here means restarting the styx scheduler and replaying all events again. This is quite time consuming
     // and distressing when deploying, so try hard.
     final Retryer<Object> retryer = RetryerBuilder.newBuilder()

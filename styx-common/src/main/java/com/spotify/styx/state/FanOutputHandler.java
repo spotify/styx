@@ -31,9 +31,9 @@ class FanOutputHandler implements OutputHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(FanOutputHandler.class);
 
-  private final OutputHandler[] outputHandlers;
+  private final Iterable<OutputHandler> outputHandlers;
 
-  FanOutputHandler(OutputHandler[] outputHandlers) {
+  FanOutputHandler(Iterable<OutputHandler> outputHandlers) {
     this.outputHandlers = Objects.requireNonNull(outputHandlers);
   }
 
