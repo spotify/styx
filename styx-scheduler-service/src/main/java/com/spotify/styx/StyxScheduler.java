@@ -378,7 +378,9 @@ public class StyxScheduler implements AppInit {
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
+    // TODO: is this still needed?
     dockerRunner.restore();
+
     startTriggerManager(triggerManager, executor);
     startBackfillTriggerManager(backfillTriggerManager, executor);
     startScheduler(scheduler, executor);
