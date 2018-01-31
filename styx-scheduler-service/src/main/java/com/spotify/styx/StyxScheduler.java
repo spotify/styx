@@ -88,6 +88,7 @@ import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import com.spotify.styx.workflow.WorkflowInitializer;
 import com.typesafe.config.Config;
+import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
@@ -102,15 +103,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -304,22 +301,13 @@ public class StyxScheduler implements AppInit {
         .setNameFormat("styx-scheduler-%d")
         .setUncaughtExceptionHandler(uncaughtExceptionHandler)
         .build();
-    final ThreadFactory eventTf = new ThreadFactoryBuilder()
-        .setDaemon(true)
-        .setNameFormat("styx-event-worker-%d")
-        .setUncaughtExceptionHandler(uncaughtExceptionHandler)
-        .build();
 
     final Publisher publisher = publisherFactory.apply(environment);
     closer.register(publisher);
 
     final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
     closer.register(executorCloser("scheduler", executor));
-    final BlockingQueue<Runnable> eventTransitionExecutorQueue = new LinkedBlockingQueue<>();
-    final ExecutorService eventTransitionExecutor = new ThreadPoolExecutor(16, 16,
-        0L, TimeUnit.MILLISECONDS,
-        eventTransitionExecutorQueue,
-        eventTf);
+    final StripedExecutorService eventTransitionExecutor = new StripedExecutorService(16);
     closer.register(executorCloser("event-transition", eventTransitionExecutor));
     final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
     closer.register(executorCloser("event-consumer", eventConsumerExecutor));
@@ -386,7 +374,7 @@ public class StyxScheduler implements AppInit {
     startScheduler(scheduler, executor);
     startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
     startCleaner(cleaner, executor);
-    setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats, eventTransitionExecutorQueue);
+    setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats);
 
     final SchedulerResource schedulerResource =
         new SchedulerResource(stateManager, trigger, workflowChangeListener, workflowRemoveListener,
@@ -506,14 +494,13 @@ public class StyxScheduler implements AppInit {
   }
 
   private void setupMetrics(
-      StateManager stateManager,
+      QueuedStateManager stateManager,
       WorkflowCache workflowCache,
       Storage storage,
       RateLimiter submissionRateLimiter,
-      Stats stats,
-      BlockingQueue<Runnable> eventTransitionExecutorQueue) {
+      Stats stats) {
 
-    stats.registerQueuedEventsMetric(() -> (long) eventTransitionExecutorQueue.size());
+    stats.registerQueuedEventsMetric(stateManager::queuedEvents);
 
     stats.registerWorkflowCountMetric("all", () -> (long) workflowCache.all().size());
 

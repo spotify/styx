@@ -54,6 +54,7 @@ import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.Time;
+import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
@@ -91,7 +92,7 @@ public class QueuedStateManagerTest {
   private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
   private static final BiConsumer<SequenceEvent, RunState> eventConsumer = (e, s) -> {};
 
-  private final ExecutorService eventTransitionExecutor = Executors.newFixedThreadPool(16);
+  private final StripedExecutorService eventTransitionExecutor = new StripedExecutorService(16);
   private final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
 
 
