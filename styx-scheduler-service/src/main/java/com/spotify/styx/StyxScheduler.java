@@ -102,6 +102,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -401,8 +402,8 @@ public class StyxScheduler implements AppInit {
   }
 
   @VisibleForTesting
-  void receive(Event event) throws IsClosedException {
-    stateManager.receive(event);
+  CompletionStage<Void> receive(Event event) throws IsClosedException {
+    return stateManager.receive(event);
   }
 
   @VisibleForTesting
