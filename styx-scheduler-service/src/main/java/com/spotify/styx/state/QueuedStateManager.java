@@ -113,7 +113,7 @@ public class QueuedStateManager implements StateManager {
       // Write active state to datastore
       final RunState runState = RunState.create(workflowInstance, State.QUEUED, StateData.newBuilder()
           .trigger(trigger)
-          .build(), time);
+          .build(), time.get());
       try {
         storage.runInTransaction(tx -> {
           final Optional<Workflow> workflow = tx.workflow(workflowInstance.workflowId());
@@ -169,7 +169,7 @@ public class QueuedStateManager implements StateManager {
 
           // Transition to next state
           final RunState runState = RunState.create(event.workflowInstance(), persistentState.get().state(),
-              persistentState.get().data(), persistentState.get().timestamp(), time);
+              persistentState.get().data(), time.get());
           final RunState nextRunState;
           try {
             nextRunState = runState.transition(event);
@@ -244,7 +244,7 @@ public class QueuedStateManager implements StateManager {
         .collect(toMap(
             Entry::getKey,
             e -> RunState.create(
-                e.getKey(), e.getValue().state(), e.getValue().data(), e.getValue().timestamp(), time)));
+                e.getKey(), e.getValue().state(), e.getValue().data(), e.getValue().timestamp())));
   }
 
   @Override
