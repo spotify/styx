@@ -270,8 +270,8 @@ public class SchedulerResource {
       throw new RuntimeException(e);
     } catch (ExecutionException e) {
       final Throwable cause = e.getCause();
-      if (cause instanceof IllegalStateException ||
-          cause instanceof IllegalArgumentException) {
+      if (cause instanceof IllegalStateException
+          || cause instanceof IllegalArgumentException) {
         // TODO: propagate error information using a more specific exception type
         return Response.forStatus(BAD_REQUEST.withReasonPhrase(cause.getMessage()));
       } else {
