@@ -20,7 +20,6 @@
 
 package com.spotify.styx.state;
 
-import static com.spotify.styx.state.OutputHandler.fanOutput;
 import static com.spotify.styx.state.RunState.State.DONE;
 import static com.spotify.styx.state.RunState.State.ERROR;
 import static com.spotify.styx.state.RunState.State.FAILED;
@@ -91,61 +90,28 @@ public abstract class RunState {
 
   abstract Time time();
 
-  // TODO: remove the unused outputHandler field
-  abstract OutputHandler outputHandler();
-
   public static RunState fresh(
       WorkflowInstance workflowInstance,
-      Time time,
-      OutputHandler outputHandler) {
-    return create(workflowInstance, State.NEW, time, outputHandler);
+      Time time) {
+    return create(workflowInstance, State.NEW, time);
   }
 
-  public static RunState fresh(
-      WorkflowInstance workflowInstance,
-      Time time,
-      OutputHandler... outputHandlers) {
-    return fresh(workflowInstance, time, fanOutput(outputHandlers));
-  }
-
-  public static RunState fresh(
-      WorkflowInstance workflowInstance,
-      Time time,
-      Iterable<OutputHandler> outputHandlers) {
-    return fresh(workflowInstance, time, fanOutput(outputHandlers));
-  }
-
-  public static RunState fresh(WorkflowInstance workflowInstance, OutputHandler... outputHandlers) {
-    return fresh(workflowInstance, Instant::now, fanOutput(outputHandlers));
+  public static RunState fresh(WorkflowInstance workflowInstance) {
+    return fresh(workflowInstance, Instant::now);
   }
 
   public RunState transition(Event event) {
     return event.accept(visitor);
   }
 
-  public RunState withHandlers(OutputHandler[] outputHandlers) {
-    return new AutoValue_RunState(
-        workflowInstance(), state(), timestamp(), data(), time(), fanOutput(outputHandlers));
-  }
-
-  public RunState withHandlers(Iterable<OutputHandler> outputHandlers) {
-    return new AutoValue_RunState(
-        workflowInstance(), state(), timestamp(), data(), time(), fanOutput(outputHandlers));
-  }
-
-  public RunState withTime(Time time) {
-    return new AutoValue_RunState(
-        workflowInstance(), state(), timestamp(), data(), time, outputHandler());
-  }
-
   private RunState state(State state, StateData newStateData) {
     return new AutoValue_RunState(
-        workflowInstance(), state, time().get().toEpochMilli(), newStateData, time(), outputHandler());
+        workflowInstance(), state, time().get().toEpochMilli(), newStateData, time());
   }
 
   private RunState state(State state) {
     return new AutoValue_RunState(
-        workflowInstance(), state, time().get().toEpochMilli(), data(), time(), outputHandler());
+        workflowInstance(), state, time().get().toEpochMilli(), data(), time());
   }
 
   private class TransitionVisitor implements EventVisitor<RunState> {
@@ -430,36 +396,32 @@ public abstract class RunState {
   public static RunState create(
       WorkflowInstance workflowInstance,
       State state,
-      Time time,
-      OutputHandler... outputHandler) {
-    return create(workflowInstance, state, StateData.zero(), time, outputHandler);
+      Time time) {
+    return create(workflowInstance, state, StateData.zero(), time);
   }
 
   public static RunState create(
       WorkflowInstance workflowInstance,
-      State state,
-      OutputHandler... outputHandler) {
-    return create(workflowInstance, state, StateData.zero(), outputHandler);
-  }
-
-  public static RunState create(
-      WorkflowInstance workflowInstance,
-      State state,
-      StateData stateData,
-      Time time,
-      OutputHandler... outputHandler) {
-    return new AutoValue_RunState(
-        workflowInstance, state, time.get().toEpochMilli(), stateData, time, fanOutput(outputHandler));
+      State state) {
+    return create(workflowInstance, state, StateData.zero());
   }
 
   public static RunState create(
       WorkflowInstance workflowInstance,
       State state,
       StateData stateData,
-      Instant timestamp,
-      OutputHandler... outputHandler) {
+      Time time) {
     return new AutoValue_RunState(
-        workflowInstance, state, timestamp.toEpochMilli(), stateData, Instant::now, fanOutput(outputHandler));
+        workflowInstance, state, time.get().toEpochMilli(), stateData, time);
+  }
+
+  public static RunState create(
+      WorkflowInstance workflowInstance,
+      State state,
+      StateData stateData,
+      Instant timestamp) {
+    return new AutoValue_RunState(
+        workflowInstance, state, timestamp.toEpochMilli(), stateData, Instant::now);
   }
 
   public static RunState create(
@@ -467,18 +429,16 @@ public abstract class RunState {
       State state,
       StateData stateData,
       Instant timestamp,
-      Time time,
-      OutputHandler... outputHandler) {
+      Time time) {
     return new AutoValue_RunState(
-        workflowInstance, state, timestamp.toEpochMilli(), stateData, time, fanOutput(outputHandler));
+        workflowInstance, state, timestamp.toEpochMilli(), stateData, time);
   }
 
   public static RunState create(
       WorkflowInstance workflowInstance,
       State state,
-      StateData stateData,
-      OutputHandler... outputHandler) {
+      StateData stateData) {
     return new AutoValue_RunState(
-        workflowInstance, state, currentTimeMillis(), stateData, Instant::now, fanOutput(outputHandler));
+        workflowInstance, state, currentTimeMillis(), stateData, Instant::now);
   }
 }
