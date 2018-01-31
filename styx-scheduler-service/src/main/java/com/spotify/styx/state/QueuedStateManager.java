@@ -105,7 +105,7 @@ public class QueuedStateManager implements StateManager {
       return CompletableFutures.exceptionallyCompletedFuture(e);
     }
 
-    // TODO: retry on transaction conflict
+    // TODO: optional retry on transaction conflict
 
     return CompletableFuture
         .supplyAsync(() -> {
@@ -147,7 +147,7 @@ public class QueuedStateManager implements StateManager {
 
     LOG.debug("Event {}", event);
 
-    // TODO: retry on transaction conflict
+    // TODO: optional retry on transaction conflict
 
     // TODO: run on striped executor to get event execution in order.
 
