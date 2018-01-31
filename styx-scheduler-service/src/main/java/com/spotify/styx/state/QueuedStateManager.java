@@ -34,6 +34,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.TransactionException;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.Time;
+import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
@@ -43,7 +44,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
 import javaslang.Tuple;
 import javaslang.Tuple2;
@@ -69,9 +70,10 @@ public class QueuedStateManager implements StateManager {
 
   private static final Duration SHUTDOWN_GRACE_PERIOD = Duration.ofSeconds(5);
 
-  private final Time time;
+  private final LongAdder queuedEvents = new LongAdder();
 
-  private final ExecutorService eventTransitionExecutor;
+  private final Time time;
+  private final StripedExecutorService eventTransitionExecutor;
   private final Storage storage;
   private final BiConsumer<SequenceEvent, RunState> eventConsumer;
   private final Executor eventConsumerExecutor;
@@ -81,7 +83,7 @@ public class QueuedStateManager implements StateManager {
 
   public QueuedStateManager(
       Time time,
-      ExecutorService eventTransitionExecutor,
+      StripedExecutorService eventTransitionExecutor,
       Storage storage,
       BiConsumer<SequenceEvent, RunState> eventConsumer,
       Executor eventConsumerExecutor,
@@ -126,9 +128,9 @@ public class QueuedStateManager implements StateManager {
 
     // TODO: optional retry on transaction conflict
 
-    // TODO: run on striped executor to get event execution in order.
-
-    return CompletableFuture.supplyAsync(() -> transition(event), eventTransitionExecutor)
+    queuedEvents.increment();
+    return Striping.supplyAsyncStriped(() ->
+        transition(event), event.workflowInstance(), eventTransitionExecutor)
         .thenAccept((tuple) -> postTransition(tuple._1, tuple._2));
   }
 
@@ -170,6 +172,7 @@ public class QueuedStateManager implements StateManager {
   }
 
   private Tuple2<SequenceEvent, RunState> transition(Event event) {
+    queuedEvents.decrement();
     try {
       return storage.runInTransaction(tx -> {
 
@@ -286,5 +289,9 @@ public class QueuedStateManager implements StateManager {
     if (!running) {
       throw new IsClosedException();
     }
+  }
+
+  public Long queuedEvents() {
+    return queuedEvents.sum();
   }
 }
