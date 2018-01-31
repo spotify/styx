@@ -68,7 +68,7 @@ public class RunStateTest {
       new WorkflowInstanceEventFactory(WORKFLOW_INSTANCE);
 
   List<RunState.State> outputs = new LinkedList<>();
-  StateTransitioner transitioner = new StateTransitioner();
+  StateTransitioner transitioner = new StateTransitioner(this::record);
 
   private void record(RunState state) {
     outputs.add(state.state());
@@ -76,7 +76,7 @@ public class RunStateTest {
 
   @Test // for backwards compatibility
   public void testTimeTriggerAndRetry() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.timeTrigger());
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(1));
@@ -93,7 +93,7 @@ public class RunStateTest {
 
   @Test
   public void testTimeTriggerAndRetry2() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue());
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1"));
@@ -115,7 +115,7 @@ public class RunStateTest {
 
   @Test
   public void testRunErrorOnCreating() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.timeTrigger());
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(1));
@@ -136,7 +136,7 @@ public class RunStateTest {
 
   @Test
   public void testSetTrigger() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(NATURAL_TRIGGER1));
 
     assertThat(
@@ -149,7 +149,7 @@ public class RunStateTest {
 
   @Test
   public void testSetExecutionId() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     transitioner.receive(eventFactory.started());
@@ -175,7 +175,7 @@ public class RunStateTest {
 
   @Test
   public void testSubmitSetsExecutionId() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue());
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_1));
@@ -200,7 +200,7 @@ public class RunStateTest {
 
   @Test
   public void testSetsRetryDelay() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
@@ -223,7 +223,7 @@ public class RunStateTest {
 
   @Test
   public void testRetryDelayFromQueued() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue());
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
@@ -244,7 +244,7 @@ public class RunStateTest {
 
   @Test
   public void testRetryFromRunError() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
@@ -260,7 +260,7 @@ public class RunStateTest {
 
   @Test
   public void testManyRetriesFromRunError() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
@@ -279,7 +279,7 @@ public class RunStateTest {
 
   @Test
   public void testMissingDependenciesAddsToCost() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     transitioner.receive(eventFactory.started());
@@ -299,7 +299,7 @@ public class RunStateTest {
 
   @Test
   public void testMissingDependenciesIncrementsTries() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     transitioner.receive(eventFactory.started());
@@ -319,7 +319,7 @@ public class RunStateTest {
 
   @Test
   public void testErrorsAddsToCost() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     transitioner.receive(eventFactory.started());
@@ -338,7 +338,7 @@ public class RunStateTest {
 
   @Test
   public void testFatalFromRunError() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
@@ -351,7 +351,7 @@ public class RunStateTest {
 
   @Test
   public void testSuccessFromTerm() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     transitioner.receive(eventFactory.started());
@@ -367,7 +367,7 @@ public class RunStateTest {
 
   @Test
   public void testRetryFromTerm() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     transitioner.receive(eventFactory.started());
@@ -384,7 +384,7 @@ public class RunStateTest {
 
   @Test
   public void testManyRetriesFromTerm() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     transitioner.receive(eventFactory.started());
@@ -406,7 +406,7 @@ public class RunStateTest {
 
   @Test
   public void testFatalFromTerm() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     transitioner.receive(eventFactory.started());
@@ -421,7 +421,7 @@ public class RunStateTest {
 
   @Test
   public void testRetryFromStartedThenRunError() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     transitioner.receive(eventFactory.started());
@@ -437,7 +437,7 @@ public class RunStateTest {
 
   @Test
   public void testFatalFromStartedThenRunError() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     transitioner.receive(eventFactory.started());
@@ -451,7 +451,7 @@ public class RunStateTest {
 
   @Test
   public void testFailedFromTimeout() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     transitioner.receive(eventFactory.started());
@@ -465,13 +465,13 @@ public class RunStateTest {
 
   @Test
   public void testRetriggerOfPartition() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
     transitioner.receive(eventFactory.stop());
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_2, DOCKER_IMAGE));
     transitioner.receive(eventFactory.started());
@@ -514,7 +514,7 @@ public class RunStateTest {
 
   @Test
   public void testInfoTransitionsToSameState() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.info(Message.info("hello")));
 
@@ -525,7 +525,7 @@ public class RunStateTest {
 
   @Test
   public void testRunErrorFromQueuedState() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.runError("Unknown resources"));
 
@@ -536,7 +536,7 @@ public class RunStateTest {
 
   @Test
   public void testStoresExecutedDockerImage() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE + "1"));
 
@@ -547,7 +547,7 @@ public class RunStateTest {
 
   @Test
   public void testStoresLastExecutedDockerImage() throws Exception {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE, this::record));
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE + "1"));
     transitioner.receive(eventFactory.started());

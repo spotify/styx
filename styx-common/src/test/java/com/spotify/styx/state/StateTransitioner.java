@@ -30,7 +30,12 @@ import java.util.Map;
  */
 public class StateTransitioner {
 
+  private final OutputHandler outputHandler;
   private final Map<WorkflowInstance, RunState> states = Maps.newHashMap();
+
+  public StateTransitioner(OutputHandler outputHandler) {
+    this.outputHandler = outputHandler;
+  }
 
   public void initialize(RunState runState) {
     states.put(runState.workflowInstance(), runState);
@@ -43,7 +48,7 @@ public class StateTransitioner {
     RunState nextState = currentState.transition(event);
     states.put(key, nextState);
 
-    nextState.outputHandler().transitionInto(nextState);
+    outputHandler.transitionInto(nextState);
   }
 
   public RunState get(WorkflowInstance workflowInstance) {
