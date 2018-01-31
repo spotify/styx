@@ -88,12 +88,10 @@ public abstract class RunState {
   public abstract long timestamp();
   public abstract StateData data();
 
-  abstract Time time();
-
   public static RunState fresh(
       WorkflowInstance workflowInstance,
       Time time) {
-    return create(workflowInstance, State.NEW, time);
+    return create(workflowInstance, State.NEW, time.get());
   }
 
   public static RunState fresh(WorkflowInstance workflowInstance) {
@@ -106,12 +104,12 @@ public abstract class RunState {
 
   private RunState state(State state, StateData newStateData) {
     return new AutoValue_RunState(
-        workflowInstance(), state, time().get().toEpochMilli(), newStateData, time());
+        workflowInstance(), state, timestamp(), newStateData);
   }
 
   private RunState state(State state) {
     return new AutoValue_RunState(
-        workflowInstance(), state, time().get().toEpochMilli(), data(), time());
+        workflowInstance(), state, timestamp(), data());
   }
 
   private class TransitionVisitor implements EventVisitor<RunState> {
@@ -395,13 +393,6 @@ public abstract class RunState {
 
   public static RunState create(
       WorkflowInstance workflowInstance,
-      State state,
-      Time time) {
-    return create(workflowInstance, state, StateData.zero(), time);
-  }
-
-  public static RunState create(
-      WorkflowInstance workflowInstance,
       State state) {
     return create(workflowInstance, state, StateData.zero());
   }
@@ -409,10 +400,16 @@ public abstract class RunState {
   public static RunState create(
       WorkflowInstance workflowInstance,
       State state,
-      StateData stateData,
-      Time time) {
+      Instant timestamp) {
+    return create(workflowInstance, state, StateData.zero(), timestamp);
+  }
+
+  public static RunState create(
+      WorkflowInstance workflowInstance,
+      State state,
+      StateData stateData) {
     return new AutoValue_RunState(
-        workflowInstance, state, time.get().toEpochMilli(), stateData, time);
+        workflowInstance, state, currentTimeMillis(), stateData);
   }
 
   public static RunState create(
@@ -421,24 +418,6 @@ public abstract class RunState {
       StateData stateData,
       Instant timestamp) {
     return new AutoValue_RunState(
-        workflowInstance, state, timestamp.toEpochMilli(), stateData, Instant::now);
-  }
-
-  public static RunState create(
-      WorkflowInstance workflowInstance,
-      State state,
-      StateData stateData,
-      Instant timestamp,
-      Time time) {
-    return new AutoValue_RunState(
-        workflowInstance, state, timestamp.toEpochMilli(), stateData, time);
-  }
-
-  public static RunState create(
-      WorkflowInstance workflowInstance,
-      State state,
-      StateData stateData) {
-    return new AutoValue_RunState(
-        workflowInstance, state, currentTimeMillis(), stateData, Instant::now);
+        workflowInstance, state, timestamp.toEpochMilli(), stateData);
   }
 }

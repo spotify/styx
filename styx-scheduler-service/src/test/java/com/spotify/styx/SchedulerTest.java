@@ -185,7 +185,7 @@ public class SchedulerTest {
     setUp(20);
     setResourceLimit("r1", 2);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time));
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
 
     scheduler.tick();
 
@@ -206,7 +206,7 @@ public class SchedulerTest {
   public void shouldTimeoutActiveState() throws Exception {
     setUp(5);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time));
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
 
     now = now.plus(5, ChronoUnit.SECONDS);
     scheduler.tick();
@@ -219,7 +219,7 @@ public class SchedulerTest {
     setUp(0);
 
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
-    populateActiveStates(RunState.create(INSTANCE_1, State.DONE, time));
+    populateActiveStates(RunState.create(INSTANCE_1, State.DONE, time.get()));
 
     scheduler.tick();
     verify(stateManager, never()).receiveIgnoreClosed(any());
@@ -229,7 +229,7 @@ public class SchedulerTest {
   public void shouldNotTransitionIfNotTimedOut() throws Exception {
     setUp(20);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
-    populateActiveStates(RunState.create(INSTANCE_1, State.NEW, time));
+    populateActiveStates(RunState.create(INSTANCE_1, State.NEW, time.get()));
 
     scheduler.tick();
 
@@ -243,7 +243,7 @@ public class SchedulerTest {
 
     StateData stateData = StateData.newBuilder().retryDelayMillis(15_000L).tries(10).build();
 
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time));
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get()));
 
     now = now.plus(15, ChronoUnit.SECONDS);
     scheduler.tick();
@@ -257,7 +257,7 @@ public class SchedulerTest {
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
 
     StateData stateData = StateData.newBuilder().retryDelayMillis(15_000L).tries(10).build();
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time));
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get()));
 
     now = now.plus(10, ChronoUnit.SECONDS);
     scheduler.tick();
@@ -265,7 +265,7 @@ public class SchedulerTest {
     verify(stateManager, never()).receiveIgnoreClosed(any());
 
     stateData = StateData.newBuilder().retryDelayMillis(0L).tries(10).build();
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time));
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get()));
 
     scheduler.tick();
 
@@ -278,7 +278,7 @@ public class SchedulerTest {
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
 
     StateData stateData = StateData.newBuilder().tries(0).build();
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time));
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get()));
 
     scheduler.tick();
 
@@ -289,7 +289,7 @@ public class SchedulerTest {
   public void shouldFailWhenUnknownResourceReference() throws Exception {
     setUp(20);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "unknown"));
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time));
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
 
     scheduler.tick();
 
@@ -302,7 +302,7 @@ public class SchedulerTest {
     setUp(20);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
     when(config.globalConcurrency()).thenReturn(Optional.of(0L));
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time));
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
 
     scheduler.tick();
 
@@ -315,7 +315,7 @@ public class SchedulerTest {
     setUp(20);
     setResourceLimit("r1", 0);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time));
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
 
     scheduler.tick();
 
@@ -329,7 +329,7 @@ public class SchedulerTest {
     setResourceLimit("r1", 0);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1", "r2", "r3"));
 
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time));
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
 
     scheduler.tick();
 
@@ -345,7 +345,7 @@ public class SchedulerTest {
     StateData stateData = StateData.newBuilder()
         .addMessage(Message.info("Resource limit reached for: [Resource{id=r1, concurrency=0}]"))
         .build();
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time));
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get()));
 
     scheduler.tick();
 
@@ -359,7 +359,7 @@ public class SchedulerTest {
     setUp(20);
     setResourceLimit("r1", 0);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time));
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
 
     scheduler.tick();
 
@@ -378,7 +378,7 @@ public class SchedulerTest {
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
 
     for (int i = 0; i < 4; i++) {
-      populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.QUEUED, time));
+      populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.QUEUED, time.get()));
     }
 
     scheduler.tick();
@@ -397,13 +397,13 @@ public class SchedulerTest {
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
 
     // do not consume resources
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i0"), State.NEW, time));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i1"), State.QUEUED, time));
+    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i0"), State.NEW, time.get()));
+    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i1"), State.QUEUED, time.get()));
 
     // consume resources
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i2"), State.SUBMITTING, time));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i3"), State.PREPARE, time));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i4"), State.TERMINATED, time));
+    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i2"), State.SUBMITTING, time.get()));
+    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i3"), State.PREPARE, time.get()));
+    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i4"), State.TERMINATED, time.get()));
 
     scheduler.tick();
 
@@ -421,13 +421,13 @@ public class SchedulerTest {
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
 
     // do not consume resources
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i0"), State.NEW, time));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i1"), State.QUEUED, time));
+    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i0"), State.NEW, time.get()));
+    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i1"), State.QUEUED, time.get()));
 
     // consume resources
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i2"), State.PREPARE, time));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i3"), State.PREPARE, time));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i4"), State.PREPARE, time));
+    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i2"), State.PREPARE, time.get()));
+    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i3"), State.PREPARE, time.get()));
+    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i4"), State.PREPARE, time.get()));
 
     scheduler.tick();
 
@@ -448,8 +448,8 @@ public class SchedulerTest {
     initWorkflow(workflowUsingResources(WORKFLOW_ID2, "r1"));
 
     for (int i = 0; i < 4; i++) {
-      populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.NEW, time));
-      populateActiveStates(RunState.create(instance(WORKFLOW_ID2, "i" + i), State.QUEUED, time));
+      populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.NEW, time.get()));
+      populateActiveStates(RunState.create(instance(WORKFLOW_ID2, "i" + i), State.QUEUED, time.get()));
     }
 
     ArgumentCaptor<Event> capturedEvents = ArgumentCaptor.forClass(Event.class);
@@ -469,7 +469,7 @@ public class SchedulerTest {
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1", "r2"));
 
     for (int i = 0; i < 4; i++) {
-      populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.QUEUED, time));
+      populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.QUEUED, time.get()));
     }
 
     ArgumentCaptor<Event> capturedEvents = ArgumentCaptor.forClass(Event.class);
@@ -491,8 +491,8 @@ public class SchedulerTest {
     initWorkflow(workflowUsingResources(WORKFLOW_ID2, "r2", "common"));
 
     for (int i = 0; i < 4; i++) {
-      populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.QUEUED, time));
-      populateActiveStates(RunState.create(instance(WORKFLOW_ID2, "i" + i), State.QUEUED, time));
+      populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.QUEUED, time.get()));
+      populateActiveStates(RunState.create(instance(WORKFLOW_ID2, "i" + i), State.QUEUED, time.get()));
     }
 
     ArgumentCaptor<Event> capturedEvents = ArgumentCaptor.forClass(Event.class);
@@ -549,7 +549,7 @@ public class SchedulerTest {
     setResourceLimit("baz", 4);
     setResourceLimit("quux", 4);
     initWorkflow(workflow);
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time));
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
 
     scheduler.tick();
 
@@ -572,7 +572,7 @@ public class SchedulerTest {
 
     setResourceLimit("baz", 0);
     initWorkflow(workflow);
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time));
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
 
     scheduler.tick();
 
@@ -606,11 +606,11 @@ public class SchedulerTest {
     WorkflowInstance i4 = instance(WORKFLOW_ID1, "i4");
 
     populateActiveStates(
-        RunState.create(i0, State.QUEUED, time),
-        RunState.create(i1, State.SUBMITTING, time),
-        RunState.create(i2, State.PREPARE, time),
-        RunState.create(i3, State.TERMINATED, time),
-        RunState.create(i4, State.QUEUED, time));
+        RunState.create(i0, State.QUEUED, time.get()),
+        RunState.create(i1, State.SUBMITTING, time.get()),
+        RunState.create(i2, State.PREPARE, time.get()),
+        RunState.create(i3, State.TERMINATED, time.get()),
+        RunState.create(i4, State.QUEUED, time.get()));
 
     scheduler.tick();
 
@@ -637,7 +637,7 @@ public class SchedulerTest {
     initWorkflow(workflow);
 
     final StateData stateData = StateData.newBuilder().tries(0).build();
-    final RunState runState = RunState.create(INSTANCE_1, State.QUEUED, stateData, time);
+    final RunState runState = RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get());
 
     populateActiveStates(runState);
 
@@ -667,7 +667,7 @@ public class SchedulerTest {
     initWorkflow(workflow);
 
     final StateData stateData = StateData.newBuilder().tries(0).build();
-    final RunState runState = RunState.create(INSTANCE_1, State.QUEUED, stateData, time);
+    final RunState runState = RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get());
 
     populateActiveStates(runState);
 
@@ -690,7 +690,7 @@ public class SchedulerTest {
     initWorkflow(workflow);
 
     final StateData stateData = StateData.newBuilder().tries(0).build();
-    final RunState runState = RunState.create(INSTANCE_1, State.QUEUED, stateData, time);
+    final RunState runState = RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get());
 
     populateActiveStates(runState);
 
