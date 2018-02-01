@@ -373,7 +373,6 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
-    when(containerStatus.getName()).thenReturn("foo");
 
     kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name);
     verify(namedPod, never()).delete();
