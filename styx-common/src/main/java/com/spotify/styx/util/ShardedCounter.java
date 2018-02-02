@@ -59,9 +59,8 @@ public class ShardedCounter {
 
   // Ought to be enough (parallelism) for everyone. We could make it dynamic with extra effort.
   private static final int NUM_SHARDS = 128;
-  private static final Instant CACHE_EXPIRY_DURATION = Instant.ofEpochMilli(1000);
+  public static final Instant CACHE_EXPIRY_DURATION = Instant.ofEpochMilli(1000);
 
-  private final Datastore datastore;
   public static final String KIND_COUNTER_LIMIT = "CounterLimit";
   public static final String PROPERTY_LIMIT = "limit";
   public static final String KIND_COUNTER_SHARD = "CounterShard";
@@ -69,14 +68,18 @@ public class ShardedCounter {
   public static final String PROPERTY_SHARD_INDEX = "index";
   public static final String PROPERTY_COUNTER_ID = "counterId";
 
+  private final Time time;
+  private final Datastore datastore;
+
   private static class CounterSnapshot {
 
     final String counterId;
     final Instant updatedAt;
     final Long limit;
     final Map<Integer, Long> shards;
+    final Time time;
 
-    public CounterSnapshot(Datastore datastore, String counterId) {
+    public CounterSnapshot(Datastore datastore, String counterId, Time time) {
       final Key limitKey = datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId);
       final Entity limitEntity = datastore.get(limitKey);
       if (limitEntity == null) {
@@ -96,8 +99,9 @@ public class ShardedCounter {
         fetchedShards = fetchShards(datastore, counterId);
       }
       this.counterId = counterId;
+      this.time = time;
       shards = fetchedShards;
-      updatedAt = Instant.now();
+      updatedAt = time.get();
     }
 
     /**
@@ -115,7 +119,7 @@ public class ShardedCounter {
             transaction.put(Entity.newBuilder(shardKey)
                                 .set(PROPERTY_COUNTER_ID, counterId)
                                 .set(PROPERTY_SHARD_INDEX, shardIndex)
-                                .set(PROPERTY_SHARD_INDEX, 0)
+                                .set(PROPERTY_SHARD_VALUE, 0)
                                 .build());
           }
           return null;
@@ -126,8 +130,8 @@ public class ShardedCounter {
     /**
      * Gets the counter state. Creates it in Datastore if it doesn't exist yet.
      */
-    private static CounterSnapshot fromDatastore(Datastore datastore, String counterId) {
-      return new CounterSnapshot(datastore, counterId);
+    private static CounterSnapshot fromDatastore(Datastore datastore, String counterId, Time time) {
+      return new CounterSnapshot(datastore, counterId, time);
     }
 
     private static Map<Integer, Long> fetchShards(Datastore datastore, String counterId) {
@@ -141,15 +145,15 @@ public class ShardedCounter {
       final Map<Integer, Long> fetchedShards = new HashMap<>();
       while (shards.hasNext()) {
         Entity shard = shards.next();
-        Long shardIndex = shard.getLong(PROPERTY_SHARD_INDEX);
-        fetchedShards.put(shardIndex.intValue(), shard.getLong(PROPERTY_SHARD_INDEX));
+        fetchedShards
+            .put((int) shard.getLong(PROPERTY_SHARD_INDEX), shard.getLong(PROPERTY_SHARD_VALUE));
       }
       return fetchedShards;
     }
 
     private boolean isRecent() {
       return updatedAt.plus(CACHE_EXPIRY_DURATION.toEpochMilli(), ChronoUnit.MILLIS)
-          .isAfter(Instant.now());
+          .isAfter(time.get());
     }
 
     /**
@@ -189,7 +193,8 @@ public class ShardedCounter {
           throw new InvalidShardStateException(
               "Trying to operate with a potentially uninitialized counter. Cache needs to be updated first.");
         } else {
-          throw new CounterFullException();
+          throw new CounterCapacityException("No shard for counter %s has capacity for delta %s",
+                                             counterId, delta);
         }
         // Or return -1 (and use that to abort the transaction early)?
       } else {
@@ -203,9 +208,10 @@ public class ShardedCounter {
    */
   private Map<String, CounterSnapshot> counterCache;
 
-  public ShardedCounter(Datastore datastore) {
+  public ShardedCounter(Datastore datastore, Time time) {
     this.datastore = Objects.requireNonNull(datastore);
     this.counterCache = new ConcurrentHashMap<>();
+    this.time = time;
   }
 
   /**
@@ -223,7 +229,7 @@ public class ShardedCounter {
    * Update cached snapshot with most recent state of counter in Datastore
    */
   private CounterSnapshot refreshCounterSnapshot(String counterId) {
-    final CounterSnapshot newSnapshot = CounterSnapshot.fromDatastore(datastore, counterId);
+    final CounterSnapshot newSnapshot = CounterSnapshot.fromDatastore(datastore, counterId, time);
     counterCache.put(counterId, newSnapshot);
     return newSnapshot;
   }
@@ -271,8 +277,9 @@ public class ShardedCounter {
         .newKey(counterId + "-" + shardIndex);
     final Entity shard = transaction.get(shardKey);
 
-    if (shard != null && Range.closed(0, snapshot.shardCapacity(shardIndex)).contains(shard.getLong(
-        PROPERTY_SHARD_VALUE) + delta)) {
+    if (shard != null && Range.closed(0L, snapshot.shardCapacity(shardIndex))
+        .contains(shard.getLong(
+            PROPERTY_SHARD_VALUE) + delta)) {
       transaction.put(Entity.newBuilder(shard)
                           .set(PROPERTY_SHARD_VALUE,
                                shard.getLong(PROPERTY_SHARD_VALUE) + delta)
