@@ -20,6 +20,13 @@
 
 package com.spotify.styx.util;
 
-public class CounterFullException extends RuntimeException {
+class CounterCapacityException extends RuntimeException {
 
+  CounterCapacityException() {
+    super();
+  }
+
+  CounterCapacityException(String s, Object... args) {
+    super(String.format(s, args));
+  }
 }
