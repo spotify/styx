@@ -74,6 +74,7 @@ import com.spotify.styx.state.Message.MessageLevel;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.time.Duration;
 import java.time.Instant;
@@ -177,6 +178,7 @@ public class DatastoreStorageTest {
   private DatastoreStorage storage;
   private Datastore datastore;
 
+  @Mock private ShardedCounter shardedCounter;
   @Mock TransactionFunction<String, FooException> transactionFunction;
   @Mock Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory;
 
@@ -200,8 +202,8 @@ public class DatastoreStorageTest {
 
   @Before
   public void setUp() throws Exception {
-    datastore = helper.getOptions().getService();
-    storage = new DatastoreStorage(datastore, Duration.ZERO);
+    Datastore datastore = helper.getOptions().getService();
+    storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter);
   }
 
   @After
@@ -609,7 +611,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndCommit() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter, storageTransactionFactory);
     final Transaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
@@ -626,7 +628,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnFailure() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter, storageTransactionFactory);
     final Transaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
@@ -650,7 +652,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnPreCommitConflict() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter, storageTransactionFactory);
     final Transaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
@@ -672,7 +674,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnCommitConflict() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter, storageTransactionFactory);
     final Transaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
@@ -695,7 +697,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldThrowIfRollbackFailsAfterConflict() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter, storageTransactionFactory);
     final Transaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
@@ -721,7 +723,7 @@ public class DatastoreStorageTest {
   @Test
   public void runInTransactionShouldThrowIfDatastoreNewTransactionFails() throws Exception {
     Datastore datastore = mock(Datastore.class);
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter, storageTransactionFactory);
     when(datastore.newTransaction()).thenThrow(new DatastoreException(1, "", ""));
 
     when(transactionFunction.apply(any())).thenReturn("");

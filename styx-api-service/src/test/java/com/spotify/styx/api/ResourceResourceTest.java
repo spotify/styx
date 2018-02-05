@@ -44,6 +44,7 @@ import com.spotify.apollo.Response;
 import com.spotify.apollo.StatusType;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.AggregateStorage;
+import com.spotify.styx.util.ShardedCounter;
 import java.time.Duration;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
@@ -52,25 +53,31 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 public class ResourceResourceTest extends VersionedApiTest {
 
+  @Mock private ShardedCounter shardedCounter;
   private static LocalDatastoreHelper localDatastore;
 
-  private AggregateStorage storage = new AggregateStorage(
-      mock(Connection.class),
-      localDatastore.getOptions().getService(),
-      Duration.ZERO);
+  private AggregateStorage storage;
 
   private static final Resource RESOURCE_1 = Resource.create("resource1", 1);
   private static final Resource RESOURCE_2 = Resource.create("resource2", 2);
 
   public ResourceResourceTest(Api.Version version) {
     super(ResourceResource.BASE, version, "resource-test");
+    MockitoAnnotations.initMocks(this);
   }
 
   @Override
   protected void init(Environment environment) {
+    storage = new AggregateStorage(
+        mock(Connection.class),
+        localDatastore.getOptions().getService(),
+        Duration.ZERO, shardedCounter);
+
     ResourceResource resourceResource = new ResourceResource(storage);
 
     environment.routingEngine()
