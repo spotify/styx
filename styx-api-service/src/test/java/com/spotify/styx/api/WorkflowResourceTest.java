@@ -61,6 +61,11 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
+<<<<<<< f6896e038d07b7c3d2e876bc31b82a9860e13d79
+=======
+import com.spotify.styx.util.DockerImageValidator;
+import com.spotify.styx.util.ShardedCounter;
+>>>>>>> Fix tests
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
@@ -82,6 +87,15 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private static final String SCHEDULER_BASE = "http://localhost:12345";
 
   private static LocalDatastoreHelper localDatastore;
+
+  private Datastore datastore = localDatastore.getOptions().getService();
+  private Connection bigtable = setupBigTableMockTable();
+  private AggregateStorage storage;
+
+  public WorkflowResourceTest(Api.Version version) {
+    super("/workflows", version, "workflow-test");
+    MockitoAnnotations.initMocks(this);
+  }
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
@@ -111,19 +125,15 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private static final ByteString BAD_JSON =
       ByteString.encodeUtf8("{\"The BAD\"}");
 
+  @Mock private ShardedCounter shardedCounter;
   @Mock WorkflowValidator workflowValidator;
 
   private Datastore datastore = localDatastore.getOptions().getService();
   private Connection bigtable = setupBigTableMockTable();
-  private AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
-
-  public WorkflowResourceTest(Api.Version version) {
-    super("/workflows", version, "workflow-test");
-    MockitoAnnotations.initMocks(this);
-  }
 
   @Override
   protected void init(Environment environment) {
+    storage = new AggregateStorage(bigtable, datastore, Duration.ZERO, shardedCounter);
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
     WorkflowResource workflowResource = new WorkflowResource(storage, SCHEDULER_BASE, workflowValidator,

@@ -24,7 +24,7 @@ package com.spotify.styx.docker;
  * An exception that can indicate that an invalid execution request was sent to
  * {@link KubernetesDockerRunner}.
  */
-class InvalidExecutionException extends RuntimeException {
+public class InvalidExecutionException extends RuntimeException {
 
   InvalidExecutionException(String message) {
     super(message);
