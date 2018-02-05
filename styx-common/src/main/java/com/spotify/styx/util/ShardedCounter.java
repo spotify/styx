@@ -28,6 +28,8 @@ import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StructuredQuery.OrderBy;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Range;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -38,7 +40,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
-import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +71,13 @@ public class ShardedCounter {
 
   private final Time time;
   private final Datastore datastore;
+
+  /**
+   * A weakly consistent view of the state in Datastore, refreshed by ShardedCounter on demand.
+   */
+  private final Cache<String, CounterSnapshot> cache = CacheBuilder.newBuilder()
+      .maximumSize(100_000)
+      .build();
 
   private static class CounterSnapshot {
 
@@ -196,14 +204,8 @@ public class ShardedCounter {
     }
   }
 
-  /**
-   * A weakly consistent view of the state in Datastore, refreshed by ShardedCounter on demand.
-   */
-  private Map<String, CounterSnapshot> counterCache;
-
   public ShardedCounter(Datastore datastore, Time time) {
     this.datastore = Objects.requireNonNull(datastore);
-    this.counterCache = new ConcurrentHashMap<>();
     this.time = time;
   }
 
@@ -211,7 +213,7 @@ public class ShardedCounter {
    * Returns a recent snapshot.
    */
   private CounterSnapshot getCounterSnapshot(String counterId) {
-    final CounterSnapshot snapshot = counterCache.get(counterId);
+    final CounterSnapshot snapshot = cache.getIfPresent(counterId);
     if (snapshot != null && snapshot.isRecent()) {
       return snapshot;
     }
@@ -223,7 +225,7 @@ public class ShardedCounter {
    */
   private CounterSnapshot refreshCounterSnapshot(String counterId) {
     final CounterSnapshot newSnapshot = CounterSnapshot.fromDatastore(datastore, counterId, time);
-    counterCache.put(counterId, newSnapshot);
+    cache.put(counterId, newSnapshot);
     return newSnapshot;
   }
 
