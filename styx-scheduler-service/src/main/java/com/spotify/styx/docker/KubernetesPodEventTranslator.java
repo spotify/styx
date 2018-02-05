@@ -195,6 +195,7 @@ final class KubernetesPodEventTranslator {
 
       default:
         // do nothing
+        break;
     }
 
     if (started) {
@@ -202,9 +203,11 @@ final class KubernetesPodEventTranslator {
         case PREPARE:
         case SUBMITTED:
           generatedEvents.add(Event.started(workflowInstance));
+          break;
 
         default:
           // no event
+          break;
       }
     }
 
@@ -221,6 +224,7 @@ final class KubernetesPodEventTranslator {
 
         default:
           // no event
+          break;
       }
     }
 
