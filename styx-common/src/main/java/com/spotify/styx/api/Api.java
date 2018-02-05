@@ -20,9 +20,9 @@
 
 package com.spotify.styx.api;
 
-import static com.spotify.styx.api.Middlewares.httpLogger;
 import static com.spotify.styx.api.Middlewares.clientValidator;
 import static com.spotify.styx.api.Middlewares.exceptionHandler;
+import static com.spotify.styx.api.Middlewares.httpLogger;
 
 import com.spotify.apollo.Response;
 import com.spotify.apollo.route.AsyncHandler;
