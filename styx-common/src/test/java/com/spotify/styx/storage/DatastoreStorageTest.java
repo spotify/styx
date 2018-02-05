@@ -63,6 +63,7 @@ import com.spotify.styx.state.Message.MessageLevel;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.time.Duration;
 import java.time.Instant;
@@ -76,7 +77,11 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.runners.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.class)
 public class DatastoreStorageTest {
 
   private static final WorkflowId WORKFLOW_ID1 = WorkflowId.create("component", "endpoint1");
@@ -159,6 +164,8 @@ public class DatastoreStorageTest {
 
   private static LocalDatastoreHelper helper;
   private DatastoreStorage storage;
+  @Mock
+  private ShardedCounter shardedCounter;
 
   @BeforeClass
   public static void setUpClass() throws Exception {
@@ -180,7 +187,7 @@ public class DatastoreStorageTest {
   @Before
   public void setUp() throws Exception {
     Datastore datastore = helper.getOptions().getService();
-    storage = new DatastoreStorage(datastore, Duration.ZERO);
+    storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter);
   }
 
   @After

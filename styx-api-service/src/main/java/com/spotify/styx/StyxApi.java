@@ -43,6 +43,7 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.DockerImageValidator;
+import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.StreamUtil;
 import com.typesafe.config.Config;
@@ -147,6 +148,7 @@ public class StyxApi implements AppInit {
 
     final Connection bigTable = closer.register(createBigTableConnection(config));
     final Datastore datastore = createDatastore(config);
-    return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
+    final ShardedCounter shardedCounter = new ShardedCounter(datastore, Instant::now);
+    return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT, shardedCounter);
   }
 }

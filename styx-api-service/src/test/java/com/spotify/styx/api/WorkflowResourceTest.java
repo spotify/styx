@@ -62,6 +62,7 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
 import com.spotify.styx.util.DockerImageValidator;
+import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.time.Duration;
@@ -86,7 +87,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   private Datastore datastore = localDatastore.getOptions().getService();
   private Connection bigtable = setupBigTableMockTable();
-  private AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
+  private AggregateStorage storage;
 
   public WorkflowResourceTest(Api.Version version) {
     super("/workflows", version, "workflow-test");
@@ -121,10 +122,12 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private static final ByteString BAD_JSON =
       ByteString.encodeUtf8("{\"The BAD\"}");
 
-  @Mock DockerImageValidator dockerImageValidator;
+  @Mock private DockerImageValidator dockerImageValidator;
+  @Mock private ShardedCounter shardedCounter;
 
   @Override
   protected void init(Environment environment) {
+    storage = new AggregateStorage(bigtable, datastore, Duration.ZERO, shardedCounter);
     when(dockerImageValidator.validateImageReference(Mockito.anyString())).thenReturn(Collections.emptyList());
     WorkflowResource workflowResource = new WorkflowResource(storage, SCHEDULER_BASE, dockerImageValidator,
                                                              environment.client());
