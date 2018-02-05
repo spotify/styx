@@ -80,14 +80,7 @@ public class ShardedCounter {
     final Time time;
 
     public CounterSnapshot(Datastore datastore, String counterId, Time time) {
-      final Key limitKey = datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId);
-      final Entity limitEntity = datastore.get(limitKey);
-      if (limitEntity == null) {
-        limit = Long.MAX_VALUE;
-        // Or IllegalStateException("No limit found in Datastore for " + counterId);?
-      } else {
-        limit = limitEntity.getLong(PROPERTY_LIMIT);
-      }
+      limit = getLimit(datastore, counterId);
 
       Map<Integer, Long> fetchedShards = fetchShards(datastore, counterId);
       if (fetchedShards.size() < NUM_SHARDS) {
@@ -248,6 +241,20 @@ public class ShardedCounter {
   }
 
   /**
+   * Reads the latest limit value from Datastore, for the specified {@param counterId}
+   */
+  private static long getLimit(Datastore datastore, String counterId) {
+    final Key limitKey = datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId);
+    final Entity limitEntity = datastore.get(limitKey);
+    if (limitEntity == null) {
+      return Long.MAX_VALUE;
+      // Or IllegalStateException("No limit found in Datastore for " + counterId);?
+    } else {
+      return limitEntity.getLong(PROPERTY_LIMIT);
+    }
+  }
+
+  /**
    * Must be called within a TransactionCallable. Augments the transaction with certain operations
    * that strongly consistently increment resp. decrement the counter referred to by counterId, and
    * cause the transaction to fail to commit if the counter's associated limit is exceeded. Also
@@ -277,9 +284,9 @@ public class ShardedCounter {
         .newKey(counterId + "-" + shardIndex);
     final Entity shard = transaction.get(shardKey);
 
+    final long newCounterValue = shard.getLong(PROPERTY_SHARD_VALUE) + delta;
     if (shard != null && Range.closed(0L, snapshot.shardCapacity(shardIndex))
-        .contains(shard.getLong(
-            PROPERTY_SHARD_VALUE) + delta)) {
+        .contains(newCounterValue) && newCounterValue <= getLimit(datastore, counterId)) {
       transaction.put(Entity.newBuilder(shard)
                           .set(PROPERTY_SHARD_VALUE,
                                shard.getLong(PROPERTY_SHARD_VALUE) + delta)
