@@ -32,7 +32,6 @@ import com.spotify.styx.model.Schedule;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
@@ -52,10 +51,6 @@ public final class ParameterUtil {
 
   private static final Pattern YEAR_PATTERN = Pattern.compile("(\\d{4})(-\\d{2})?");
   private static final Pattern YEAR_MONTH_PATTERN = Pattern.compile("(\\d{4})-(\\d{2})");
-
-  private ParameterUtil() {
-    throw new UnsupportedOperationException();
-  }
 
   private static final int MIN_YEAR_WIDTH = 4;
   private static final int MAX_YEAR_WIDTH = 10;
@@ -101,15 +96,19 @@ public final class ParameterUtil {
       .appendValue(ChronoField.HOUR_OF_DAY, 2)
       .toFormatter();
 
+  private ParameterUtil() {
+    throw new UnsupportedOperationException();
+  }
+
   public static Instant parseDate(String date) {
     return Instant.from(LocalDate.from(
         DateTimeFormatter.ISO_LOCAL_DATE.parse(date))
-                            .atStartOfDay(ZoneOffset.UTC));
+                            .atStartOfDay(UTC));
   }
 
   public static Instant parseDateHour(String dateHour) {
     return Instant.from(LocalDateTime.from(
-        ISO_LOCAL_DATE_HOUR.parse(dateHour)).atOffset(ZoneOffset.UTC));
+        ISO_LOCAL_DATE_HOUR.parse(dateHour)).atOffset(UTC));
   }
 
   public static String toParameter(Schedule schedule, Instant instant) {

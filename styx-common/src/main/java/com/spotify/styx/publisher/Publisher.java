@@ -30,9 +30,11 @@ import java.io.IOException;
  */
 public interface Publisher extends Closeable {
 
-  void deploying(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) throws IOException;
-
-  void deployed(WorkflowInstance workflowInstance, ExecutionDescription executionDescription) throws IOException;
-
   Publisher NOOP = new NoopPublisher();
+
+  void deploying(WorkflowInstance workflowInstance,
+                 ExecutionDescription executionDescription) throws IOException;
+
+  void deployed(WorkflowInstance workflowInstance,
+                ExecutionDescription executionDescription) throws IOException;
 }

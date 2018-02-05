@@ -92,7 +92,6 @@ public class SchedulerTest {
       WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T01");
 
   private WorkflowCache workflowCache;
-  private Storage storage;
   private StateManager stateManager;
   private Scheduler scheduler;
 
@@ -126,7 +125,7 @@ public class SchedulerTest {
     workflowCache = new InMemWorkflowCache();
     TimeoutConfig timeoutConfig = createWithDefaultTtl(ofSeconds(timeoutSeconds));
 
-    storage = mock(Storage.class);
+    final Storage storage = mock(Storage.class);
     when(storage.resources()).thenReturn(resourceLimits);
     when(config.globalConcurrency()).thenReturn(Optional.empty());
     when(storage.config()).thenReturn(config);
@@ -136,8 +135,8 @@ public class SchedulerTest {
         .thenAnswer(a -> a.getArgumentAt(2, Set.class));
 
     stateManager = Mockito.spy(new SyncStateManager());
-    scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage, resourceDecorator,
-                              stats, rateLimiter, gate);
+    scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage, 
+                              resourceDecorator, stats, rateLimiter, gate);
   }
 
   private void setResourceLimit(String resourceId, long limit) {

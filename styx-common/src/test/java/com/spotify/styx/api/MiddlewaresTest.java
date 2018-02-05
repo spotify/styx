@@ -51,7 +51,6 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import okio.ByteString;
@@ -318,7 +317,7 @@ public class MiddlewaresTest {
 
   public static <T> Response<T> awaitResponse(CompletionStage<Response<T>> completionStage)
       throws Exception {
-    return completionStage.toCompletableFuture().get(5, TimeUnit.SECONDS);
+    return completionStage.toCompletableFuture().get(5, SECONDS);
   }
 
   @AutoValue

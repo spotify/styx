@@ -35,6 +35,8 @@ import org.slf4j.LoggerFactory;
  */
 public interface StateManager extends Closeable {
 
+  Logger LOG = LoggerFactory.getLogger(StateManager.class);
+
   /**
    * Initializes a {@link RunState} which makes it actively tracked.
    *
@@ -109,6 +111,4 @@ public interface StateManager extends Closeable {
    * @return The RunState associated with the workflow instance
    */
   RunState get(WorkflowInstance workflowInstance);
-
-  Logger LOG = LoggerFactory.getLogger(StateManager.class);
 }

@@ -41,15 +41,15 @@ import java.time.temporal.TemporalAmount;
  */
 public class TimeUtil {
 
-  private TimeUtil() {
-    throw new UnsupportedOperationException();
-  }
-
   private static final String HOURLY_CRON = "0 * * * *";
   private static final String DAILY_CRON = "0 0 * * *";
   private static final String WEEKLY_CRON = "0 0 * * MON";
   private static final String MONTHLY_CRON = "0 0 1 * *";
   private static final String YEARLY_CRON = "0 0 1 1 *";
+
+  private TimeUtil() {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Gets the last execution instant for a {@link Schedule}, relative to a given instant. If
@@ -154,6 +154,7 @@ public class TimeUtil {
 
       default:
         periodOffset = offset.substring(0, tPos);
+        break;
     }
 
     if (tPos == -1) {

@@ -107,6 +107,9 @@ public class SchedulerResourceTest {
 
   @Mock WorkflowValidator workflowValidator;
 
+  @Rule
+  public ServiceHelper serviceHelper = getServiceHelper(stateManager, storage);
+
   private void workflowChangeListener(Workflow workflow) {
     if (workflow.equals(HOURLY_WORKFLOW_WITH_INVALID_OFFSET)) {
       throw new WorkflowInitializationException(new RuntimeException());
@@ -130,9 +133,6 @@ public class SchedulerResourceTest {
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
   }
-
-  @Rule
-  public ServiceHelper serviceHelper = getServiceHelper(stateManager, storage);
 
   private ServiceHelper getServiceHelper(StateManager stateManager, Storage storage) {
     return ServiceHelper.create((environment) -> {

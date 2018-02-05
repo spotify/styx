@@ -54,8 +54,6 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Main entrypoint for Styx API Service
@@ -68,8 +66,6 @@ public class StyxApi implements AppInit {
   public static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
-
-  private static final Logger LOG = LoggerFactory.getLogger(StyxApi.class);
 
   public static class Builder {
 

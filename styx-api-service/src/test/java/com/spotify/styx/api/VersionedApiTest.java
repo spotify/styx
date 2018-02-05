@@ -48,13 +48,6 @@ import org.junit.runners.Parameterized;
 @RunWith(Parameterized.class)
 public abstract class VersionedApiTest {
 
-  @Parameterized.Parameters(name = "{0}")
-  public static Collection<Object[]> versions() {
-    return Stream.of(ALL_VERSIONS)
-        .map(v -> new Object[]{v})
-        .collect(Collectors.toList());
-  }
-
   @Rule
   public ServiceHelper serviceHelper;
 
@@ -75,6 +68,13 @@ public abstract class VersionedApiTest {
     this.basePath = basePath;
     this.version = version;
     this.serviceHelper = ServiceHelper.create(this::init, serviceName, stubClient);
+  }
+
+  @Parameterized.Parameters(name = "{0}")
+  public static Collection<Object[]> versions() {
+    return Stream.of(ALL_VERSIONS)
+        .map(v -> new Object[]{v})
+        .collect(Collectors.toList());
   }
 
   /**

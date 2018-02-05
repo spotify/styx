@@ -119,5 +119,6 @@ public class SyncStateManager implements StateManager {
 
   @Override
   public void close() {
+    // nop
   }
 }

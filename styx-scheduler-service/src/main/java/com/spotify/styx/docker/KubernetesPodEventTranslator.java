@@ -47,13 +47,14 @@ import java.util.Optional;
 import java.util.function.Predicate;
 import okio.ByteString;
 
-public final class KubernetesPodEventTranslator {
-
-  private KubernetesPodEventTranslator() {
-  }
+final class KubernetesPodEventTranslator {
 
   private static final Predicate<ContainerStatus> IS_STYX_CONTAINER =
       (cs) -> KubernetesDockerRunner.STYX_RUN.equals(cs.getName());
+
+  private KubernetesPodEventTranslator() {
+    throw new UnsupportedOperationException();
+  }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private static class TerminationLogMessage {
@@ -133,6 +134,7 @@ public final class KubernetesPodEventTranslator {
     }
   }
 
+  // TODO: fix NPath complexity
   static List<Event> translate(
       WorkflowInstance workflowInstance,
       RunState state,
@@ -153,9 +155,11 @@ public final class KubernetesPodEventTranslator {
         case SUBMITTED:
         case RUNNING:
           generatedEvents.add(hasError.get());
+          break;
 
         default:
           // no event
+          break;
       }
 
       return generatedEvents;

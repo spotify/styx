@@ -915,6 +915,7 @@ public final class CliMain {
 
     @Override
     public void onAttach(Argument arg) {
+      // nop
     }
 
     @Override

@@ -38,7 +38,6 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Resources;
-import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.RunStateDataPayload;
@@ -548,9 +547,9 @@ public class CliMainTest {
 
   @Test
   public void testClientUnknownError() {
-    final NullPointerException exception = new NullPointerException();
+    final Exception exception = new UnsupportedOperationException();
     when(client.triggerWorkflowInstance(any(), any(), any()))
-        .thenReturn(CompletableFutures.exceptionallyCompletedFuture(exception));
+        .thenReturn(exceptionallyCompletedFuture(exception));
 
     try {
       CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02");
@@ -565,7 +564,7 @@ public class CliMainTest {
 
   @Test
   public void testUnknownError() {
-    final NullPointerException exception = new NullPointerException();
+    final Exception exception = new UnsupportedOperationException();
     when(client.triggerWorkflowInstance(any(), any(), any()))
         .thenThrow(exception);
 
