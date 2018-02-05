@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
+import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,11 +60,12 @@ public class ShardedCounter {
   private static final Logger LOG = LoggerFactory.getLogger(ShardedCounter.class);
 
   // Ought to be enough (parallelism) for everyone. We could make it dynamic with extra effort.
-  private static final int NUM_SHARDS = 128;
+  public static final int NUM_SHARDS = 128;
   public static final Instant CACHE_EXPIRY_DURATION = Instant.ofEpochMilli(1000);
 
   public static final String KIND_COUNTER_LIMIT = "CounterLimit";
   public static final String PROPERTY_LIMIT = "limit";
+
   public static final String KIND_COUNTER_SHARD = "CounterShard";
   public static final String PROPERTY_SHARD_VALUE = "value";
   public static final String PROPERTY_SHARD_INDEX = "index";
@@ -245,7 +247,7 @@ public class ShardedCounter {
   /**
    * Reads the latest limit value from Datastore, for the specified {@param counterId}
    */
-  private static long getLimit(Datastore datastore, String counterId) {
+  public static long getLimit(Datastore datastore, String counterId) {
     final Key limitKey = datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId);
     final Entity limitEntity = datastore.get(limitKey);
     if (limitEntity == null) {
@@ -315,5 +317,48 @@ public class ShardedCounter {
     return result;
   }
 
-  // TODO support deleteCounter(String counterId)? Disclaimers about consistency ensue?
+  /**
+   * Delete counter by counterId. Deletes both counter shards and counter limit if it exists.
+   *
+   * <p>There may be inconsistencies between instances, as each stores an in-memory cache, whose
+   * state may differ from what's stored in Datastore. Only after a cache expiry will other instances
+   * notice that a counter has been deleted.
+   *
+   * <p>Due to Datastore limitations (modify max 25 entity groups per transaction),
+   * deletion of shards is done in batches of 25 entity groups.
+   *
+   * <p>Behaviour is non-determined if other instances try to access the same counter in the meantime.
+   * Best results are achieved if all usages of the given resource - which the counter is associated with -
+   * are removed before calling deleteCounter. This is so, in order to avoid a scenario where one instance
+   * is trying to delete all shards, while another is creating/updating shards in between the
+   * multiple transactions made by this method.
+   */
+  public void deleteCounter(Datastore datastore, String counterId) {
+    QueryResults<Entity> results = datastore.run(EntityQuery.newEntityQueryBuilder()
+                                                     .setKind(KIND_COUNTER_SHARD)
+                                                     .setFilter(PropertyFilter
+                                                                    .eq(PROPERTY_COUNTER_ID,
+                                                                        counterId))
+                                                     .build());
+    while (results.hasNext()) {
+      removeEntities(datastore, results);
+    }
+
+    // delete limit entry too
+    datastore.runInTransaction(transaction -> {
+      transaction.delete(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId));
+      return null;
+    });
+  }
+
+  private void removeEntities(Datastore datastore, QueryResults<Entity> results) {
+    datastore.runInTransaction(transaction -> {
+      IntStream.range(0, 25).forEach(i -> {
+        if (results.hasNext()) {
+          transaction.delete(results.next().getKey());
+        }
+      });
+      return null;
+    });
+  }
 }
