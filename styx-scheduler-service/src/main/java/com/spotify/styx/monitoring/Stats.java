@@ -30,6 +30,8 @@ import com.spotify.styx.state.RunState;
  */
 public interface Stats {
 
+  Stats NOOP = new NoopStats();
+
   void registerQueuedEventsMetric(Gauge<Long> queuedEventsCount);
 
   void registerActiveStatesMetric(RunState.State state, String triggerName, Gauge<Long> activeStatesCount);
@@ -73,6 +75,4 @@ public interface Stats {
   void recordWorkflowConsumer(String action);
 
   void recordWorkflowConsumerError();
-
-  Stats NOOP = new NoopStats();
 }

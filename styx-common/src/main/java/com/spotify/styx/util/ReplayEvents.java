@@ -47,6 +47,7 @@ public final class ReplayEvents {
   private ReplayEvents() {
   }
 
+  // TODO: fix NPath complexity
   public static Map<RunState, Long> replayActiveStates(
       Map<WorkflowInstance, PersistentWorkflowInstanceState> instances,
       Storage storage,
@@ -114,6 +115,7 @@ public final class ReplayEvents {
     .collect(Collectors.toMap(Tuple2::_1, Tuple2::_2));
   }
 
+  // TODO: fix NPath complexity
   public static Optional<RunState> getBackfillRunState(
       WorkflowInstance workflowInstance,
       Map<WorkflowInstance, PersistentWorkflowInstanceState> activeWorkflowInstances,

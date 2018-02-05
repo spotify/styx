@@ -1,8 +1,8 @@
-/*-
+/*
  * -\-\-
  * Spotify Styx Scheduler Service
  * --
- * Copyright (C) 2016 Spotify AB
+ * Copyright (C) 2018 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,15 +18,23 @@
  * -/-/-
  */
 
-package com.spotify.styx.docker;
+package com.spotify.styx.storage;
 
-/**
- * An exception that can indicate that an invalid execution request was sent to
- * {@link KubernetesDockerRunner}.
- */
-public class InvalidExecutionException extends RuntimeException {
+public class TransactionException extends StorageException {
 
-  public InvalidExecutionException(String message) {
-    super(message);
+  private final boolean conflict;
+
+  public TransactionException(String message, boolean conflict, Throwable cause) {
+    super(message, cause);
+    this.conflict = conflict;
+  }
+
+  public TransactionException(boolean conflict, Throwable cause) {
+    super(cause);
+    this.conflict = conflict;
+  }
+
+  public boolean isConflict() {
+    return conflict;
   }
 }

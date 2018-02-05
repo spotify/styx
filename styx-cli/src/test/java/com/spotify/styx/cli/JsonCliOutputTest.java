@@ -20,16 +20,28 @@
 
 package com.spotify.styx.cli;
 
+import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.api.BackfillPayload;
+import com.spotify.styx.api.RunStateDataPayload;
+import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.StateData;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.After;
 import org.junit.Before;
@@ -101,5 +113,24 @@ public class JsonCliOutputTest {
   public void shouldPrintBackfillPayload() {
     cliOutput.printBackfillPayload(BackfillPayload.create(BACKFILL, Optional.empty()), true);
     assertEquals(EXPECTED_OUTPUT_WITH_STATUS + "\n", outContent.toString());
+  }
+
+  @Test
+  public void shouldPrintStatesKeyedOnWorkflowIdKey() throws IOException {
+    final WorkflowId fooWorkflowId = WorkflowId.create("foo-component", "foo-workflow");
+    final WorkflowId barWorkflowId = WorkflowId.create("bar-component", "bar-workflow");
+    final WorkflowInstance fooWorkflowInstance = WorkflowInstance.create(fooWorkflowId, "foo-param");
+    final WorkflowInstance barWorkflowInstance = WorkflowInstance.create(barWorkflowId, "bar-param");
+    final RunStateData fooRunStateData = RunStateData.create(fooWorkflowInstance, "PREPARE",
+        StateData.newBuilder().executionId("foo-e").build());
+    final RunStateData barRunStateData = RunStateData.create(barWorkflowInstance, "RUNNING",
+        StateData.newBuilder().executionId("bar-e").build());
+    cliOutput.printStates(RunStateDataPayload.create(ImmutableList.of(fooRunStateData, barRunStateData)));
+    final Map<String, List<RunStateData>> expectedOutput = ImmutableMap.of(
+        fooWorkflowId.toKey(), ImmutableList.of(fooRunStateData),
+        barWorkflowId.toKey(), ImmutableList.of(barRunStateData));
+    final Map<String, List<RunStateData>> output = OBJECT_MAPPER.readValue(outContent.toString(),
+        new TypeReference<Map<String, List<RunStateData>>>() { });
+    assertThat(output, is(expectedOutput));
   }
 }

@@ -112,10 +112,12 @@ class LocalDockerRunner implements DockerRunner {
 
   @Override
   public void cleanup() throws IOException {
+    // nop
   }
 
   @Override
   public void cleanup(WorkflowInstance workflowInstance, String executionId) {
+    // nop
   }
 
   private void checkStatuses() {

@@ -71,7 +71,7 @@ public class ServiceAccountKeyManagerTest {
           new GoogleJsonError().set("status", "NOT_FOUND"));
 
   @Before
-  public void setup() throws Exception {
+  public void setUp() throws Exception {
     when(iam.projects().serviceAccounts()).thenReturn(serviceAccounts);
     when(serviceAccounts.keys().get(any())).thenReturn(get);
     when(serviceAccounts.keys().delete(any())).thenReturn(delete);

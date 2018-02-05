@@ -57,8 +57,10 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.ReplayEvents;
 import com.spotify.styx.util.TimeUtil;
+import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -80,10 +82,13 @@ public final class BackfillResource {
 
   private final Storage storage;
   private final String schedulerServiceBaseUrl;
+  private final WorkflowValidator workflowValidator;
 
-  public BackfillResource(String schedulerServiceBaseUrl, Storage storage) {
+  public BackfillResource(String schedulerServiceBaseUrl, Storage storage,
+      WorkflowValidator workflowValidator) {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
     this.storage = Objects.requireNonNull(storage);
+    this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -248,6 +253,8 @@ public final class BackfillResource {
     final Schedule schedule;
 
     final WorkflowId workflowId = WorkflowId.create(input.component(), input.workflow());
+
+    final Workflow workflow;
     final Set<WorkflowInstance> activeWorkflowInstances;
     try {
       activeWorkflowInstances = storage.readActiveWorkflowInstances(input.component()).keySet();
@@ -255,9 +262,18 @@ public final class BackfillResource {
       if (!workflowOpt.isPresent()) {
         return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("workflow not found"));
       }
-      schedule = workflowOpt.get().configuration().schedule();
+      workflow = workflowOpt.get();
+      schedule = workflow.configuration().schedule();
     } catch (Exception e) {
       throw new RuntimeException(e);
+    }
+    if (!workflow.configuration().dockerImage().isPresent()) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing docker image"));
+    }
+    final Collection<String> errors = workflowValidator.validateWorkflow(workflow);
+    if (!errors.isEmpty()) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
+          + String.join(", ", errors)));
     }
 
     if (!TimeUtil.isAligned(input.start(), schedule)) {

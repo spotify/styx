@@ -29,11 +29,11 @@ import org.hamcrest.TypeSafeMatcher;
  */
 class ApiVersionTestUtils {
 
+  static Api.Version[] ALL_VERSIONS = Api.Version.values();
+
   private ApiVersionTestUtils() {
     throw new UnsupportedOperationException();
   }
-
-  static Api.Version[] ALL_VERSIONS = Api.Version.values();
 
   /**
    * A matcher that matches if the inspected {@link Api.Version} is at least as high as the given

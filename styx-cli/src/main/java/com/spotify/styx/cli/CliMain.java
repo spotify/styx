@@ -52,7 +52,9 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.serialization.Json;
+import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.ParameterUtil;
+import com.spotify.styx.util.WorkflowValidator;
 import java.io.File;
 import java.io.IOException;
 import java.time.format.DateTimeParseException;
@@ -364,7 +366,18 @@ public final class CliMain {
 
     final List<WorkflowConfiguration> configurations = iterator.readAll();
 
-    // TODO: validate workflows locally before creating them
+    boolean invalid = false;
+    for (WorkflowConfiguration configuration : configurations) {
+      final Collection<String> errors = cliContext.workflowValidator().validateWorkflowConfiguration(configuration);
+      if (!errors.isEmpty()) {
+        cliOutput.printError("Invalid workflow configuration: " + configuration.id());
+        errors.forEach(error -> cliOutput.printError("  error: " + error));
+        invalid = true;
+      }
+    }
+    if (invalid) {
+      throw CliExitException.of(ExitStatus.ArgumentError);
+    }
 
     final List<CompletionStage<Workflow>> futures = configurations.stream()
         .map(configuration -> styxClient.createOrUpdateWorkflow(component, configuration))
@@ -902,6 +915,7 @@ public final class CliMain {
 
     @Override
     public void onAttach(Argument arg) {
+      // nop
     }
 
     @Override
@@ -911,8 +925,6 @@ public final class CliMain {
   }
 
   interface CliContext {
-
-
 
     enum Output {
       JSON,
@@ -929,6 +941,8 @@ public final class CliMain {
     boolean hasConsole();
 
     String consoleReadLine(String prompt);
+
+    WorkflowValidator workflowValidator();
 
     CliContext DEFAULT = new CliContext() {
       @Override
@@ -966,6 +980,11 @@ public final class CliMain {
           throw new IllegalStateException();
         }
         return System.console().readLine(prompt);
+      }
+
+      @Override
+      public WorkflowValidator workflowValidator() {
+        return new WorkflowValidator(new DockerImageValidator());
       }
     };
   }

@@ -61,9 +61,9 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
-import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.TriggerUtil;
+import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -76,7 +76,6 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 public class WorkflowResourceTest extends VersionedApiTest {
@@ -84,7 +83,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private static final String SCHEDULER_BASE = "http://localhost:12345";
 
   private static LocalDatastoreHelper localDatastore;
-
   private Datastore datastore = localDatastore.getOptions().getService();
   private Connection bigtable = setupBigTableMockTable();
   private AggregateStorage storage;
@@ -122,14 +120,15 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private static final ByteString BAD_JSON =
       ByteString.encodeUtf8("{\"The BAD\"}");
 
-  @Mock private DockerImageValidator dockerImageValidator;
   @Mock private ShardedCounter shardedCounter;
-
+  @Mock WorkflowValidator workflowValidator;
+  
   @Override
   protected void init(Environment environment) {
     storage = new AggregateStorage(bigtable, datastore, Duration.ZERO, shardedCounter);
-    when(dockerImageValidator.validateImageReference(Mockito.anyString())).thenReturn(Collections.emptyList());
-    WorkflowResource workflowResource = new WorkflowResource(storage, SCHEDULER_BASE, dockerImageValidator,
+    when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
+    when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
+    WorkflowResource workflowResource = new WorkflowResource(storage, SCHEDULER_BASE, workflowValidator,
                                                              environment.client());
 
     environment.routingEngine()
@@ -479,7 +478,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
             serviceHelper
                 .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
 
-    verify(dockerImageValidator).validateImageReference(WORKFLOW_CONFIGURATION.dockerImage().get());
+    verify(workflowValidator).validateWorkflowConfiguration(WORKFLOW_CONFIGURATION);
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(deserialize(response.payload().get(), Workflow.class), equalTo(WORKFLOW));
@@ -498,7 +497,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
             serviceHelper
                 .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
 
-    verify(dockerImageValidator).validateImageReference(WORKFLOW_CONFIGURATION.dockerImage().get());
+    verify(workflowValidator).validateWorkflowConfiguration(WORKFLOW_CONFIGURATION);
 
     assertThat(response, hasStatus(withCode(Status.SERVICE_UNAVAILABLE)));
     assertThat(response, hasNoPayload());
@@ -524,12 +523,12 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldFailInvalidWorkflowImageWithoutForwarding() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(dockerImageValidator.validateImageReference(any())).thenReturn(ImmutableList.of("bad", "image"));
+    when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(ImmutableList.of("bad", "image"));
 
     Response<ByteString> response = awaitResponse(serviceHelper
         .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
 
-    verify(dockerImageValidator).validateImageReference(WORKFLOW_CONFIGURATION.dockerImage().get());
+    verify(workflowValidator).validateWorkflowConfiguration(WORKFLOW_CONFIGURATION);
 
     assertThat(serviceHelper.stubClient().sentRequests(), is(empty()));
 

@@ -59,8 +59,8 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
-import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.TriggerUtil;
+import com.spotify.styx.util.WorkflowValidator;
 import com.spotify.styx.workflow.WorkflowInitializationException;
 import java.io.IOException;
 import java.time.Instant;
@@ -72,11 +72,15 @@ import okio.ByteString;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
 import org.mockito.Mockito;
+import org.mockito.runners.MockitoJUnitRunner;
 
 /**
  * API endpoints for interacting directly with the scheduler
  */
+@RunWith(MockitoJUnitRunner.class)
 public class SchedulerResourceTest {
 
   private final InMemStorage storage = new InMemStorage();
@@ -101,7 +105,10 @@ public class SchedulerResourceTest {
   private Optional<Trigger> trigger = Optional.empty();
   private Optional<Instant> triggeredInstant = Optional.empty();
 
-  private final DockerImageValidator dockerImageValidator = mock(DockerImageValidator.class);
+  @Mock WorkflowValidator workflowValidator;
+
+  @Rule
+  public ServiceHelper serviceHelper = getServiceHelper(stateManager, storage);
 
   private void workflowChangeListener(Workflow workflow) {
     if (workflow.equals(HOURLY_WORKFLOW_WITH_INVALID_OFFSET)) {
@@ -123,11 +130,9 @@ public class SchedulerResourceTest {
 
   @Before
   public void setUp() throws Exception {
-    when(dockerImageValidator.validateImageReference(any())).thenReturn(Collections.emptyList());
+    when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
+    when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
   }
-
-  @Rule
-  public ServiceHelper serviceHelper = getServiceHelper(stateManager, storage);
 
   private ServiceHelper getServiceHelper(StateManager stateManager, Storage storage) {
     return ServiceHelper.create((environment) -> {
@@ -141,7 +146,7 @@ public class SchedulerResourceTest {
           },
           this::workflowChangeListener, this::workflowRemoveListener, storage,
           () -> Instant.parse("2015-12-31T23:59:10.000Z"),
-          dockerImageValidator);
+          workflowValidator);
 
       environment.routingEngine()
           .registerRoutes(schedulerResource.routes());
@@ -354,7 +359,7 @@ public class SchedulerResourceTest {
         serialize(FULL_DAILY_WORKFLOW.configuration())).toCompletableFuture().get();
     assertThat(r, hasStatus(withCode(Status.OK)));
     assertThat(storage.workflow(FULL_DAILY_WORKFLOW.id()), isPresent());
-    verify(dockerImageValidator).validateImageReference(FULL_DAILY_WORKFLOW.configuration().dockerImage().get());
+    verify(workflowValidator).validateWorkflowConfiguration(FULL_DAILY_WORKFLOW.configuration());
     storage.delete(FULL_DAILY_WORKFLOW.id());
   }
 
@@ -371,13 +376,14 @@ public class SchedulerResourceTest {
   }
 
   @Test
-  public void testCreateWorkflowInvalidImage() throws Exception {
-    when(dockerImageValidator.validateImageReference(any())).thenReturn(ImmutableList.of("bad", "image"));
+  public void testCreateWorkflowInvalidConfiguration() throws Exception {
+    when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(ImmutableList.of("bad", "f00d"));
     final Response<ByteString> r = serviceHelper.request(
         "POST", SchedulerResource.BASE + "/workflows/styx",
         serialize(FULL_DAILY_WORKFLOW.configuration())).toCompletableFuture().get();
-    assertThat(r, hasStatus(withCode(Status.BAD_REQUEST)));
-    verify(dockerImageValidator).validateImageReference(FULL_DAILY_WORKFLOW.configuration().dockerImage().get());
+    assertThat(r.status(),
+        is(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: bad, f00d")));
+    verify(workflowValidator).validateWorkflowConfiguration(FULL_DAILY_WORKFLOW.configuration());
   }
 
   @Test
@@ -606,6 +612,38 @@ public class SchedulerResourceTest {
     assertThat(response.status(),
                is(Status.BAD_REQUEST.withReasonPhrase("The specified instance is already "
                                                       + "active in the scheduler")));
+    assertThat(triggeredWorkflow, isEmpty());
+    assertThat(triggeredInstant, isEmpty());
+  }
+
+  @Test
+  public void testTriggerMissingImage() throws Exception {
+    final WorkflowConfiguration workflowConfiguration =
+        WorkflowConfigurationBuilder.from(FULL_DAILY_WORKFLOW.configuration())
+            .dockerImage(Optional.empty()).build();
+    final Workflow workflow = Workflow.create("styx", workflowConfiguration);
+    storage.storeWorkflow(workflow);
+    WorkflowInstance toTrigger = WorkflowInstance.create(workflow.id(), "2015-12-31");
+
+    Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
+
+    assertThat(response.status(),
+               is(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing docker image")));
+    assertThat(triggeredWorkflow, isEmpty());
+    assertThat(triggeredInstant, isEmpty());
+  }
+
+  @Test
+  public void testTriggerInvalidWorkflowConfiguration() throws Exception {
+    when(workflowValidator.validateWorkflow(DAILY_WORKFLOW)).thenReturn(ImmutableList.of("bad", "f00d"));
+
+    storage.storeWorkflow(DAILY_WORKFLOW);
+    WorkflowInstance toTrigger = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2015-12-31");
+
+    Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
+
+    assertThat(response.status(),
+               is(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: bad, f00d")));
     assertThat(triggeredWorkflow, isEmpty());
     assertThat(triggeredInstant, isEmpty());
   }

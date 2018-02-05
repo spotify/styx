@@ -49,6 +49,8 @@ class WFIExecutionBuilder {
   @Nullable private Instant triggerTs;
   @Nullable private Instant eventTs;
 
+  private final EventVisitor visitor = new Reducer();
+
   private void closeExecution() {
     final Execution execution = Execution.create(
         Optional.ofNullable(currExecutionId),
@@ -71,8 +73,6 @@ class WFIExecutionBuilder {
     triggerList.add(trigger);
     executionList = new ArrayList<>();
   }
-
-  private final EventVisitor visitor = new Reducer();
 
   private class Reducer implements EventVisitor<Void> {
 
@@ -160,7 +160,7 @@ class WFIExecutionBuilder {
       }).orElse("FAILED");
 
       final Optional<String> message;
-      if (status.equals("FAILED")) {
+      if ("FAILED".equals(status)) {
         message = exitCode
             .map(c -> Optional.of("Exit code: " + c))
             .orElse(Optional.of("Exit code unknown"));

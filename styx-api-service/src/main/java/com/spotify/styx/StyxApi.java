@@ -46,6 +46,7 @@ import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.StreamUtil;
+import com.spotify.styx.util.WorkflowValidator;
 import com.typesafe.config.Config;
 import java.time.Duration;
 import java.time.Instant;
@@ -54,8 +55,6 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Main entrypoint for Styx API Service
@@ -68,8 +67,6 @@ public class StyxApi implements AppInit {
   public static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
-
-  private static final Logger LOG = LoggerFactory.getLogger(StyxApi.class);
 
   public static class Builder {
 
@@ -115,10 +112,11 @@ public class StyxApi implements AppInit {
 
     final WorkflowResource workflowResource = new WorkflowResource(storage,
                                                                    schedulerServiceBaseUrl,
-                                                                   new DockerImageValidator(),
+                                                                   new WorkflowValidator(new DockerImageValidator()),
                                                                    environment.client());
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
-                                                                   storage);
+                                                                   storage,
+                                                                   new WorkflowValidator(new DockerImageValidator()));
     final ResourceResource resourceResource = new ResourceResource(storage);
     final StatusResource statusResource = new StatusResource(storage);
     final SchedulerProxyResource schedulerProxyResource = new SchedulerProxyResource(

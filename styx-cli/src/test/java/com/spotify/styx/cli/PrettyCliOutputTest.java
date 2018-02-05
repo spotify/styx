@@ -58,6 +58,12 @@ public class PrettyCliOutputTest {
       + "START (INCL)          END (EXCL)            NEXT TRIGGER          COMPONENT"
       + "  WORKFLOW  DESCRIPTION\n";
 
+  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+
+  private PrintStream old;
+
+  private CliOutput cliOutput;
+
   private static Backfill backfill(String description) {
     return Backfill.newBuilder()
         .id("backfill-2")
@@ -70,13 +76,6 @@ public class PrettyCliOutputTest {
         .schedule(Schedule.DAYS)
         .build();
   }
-
-  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
-
-  private PrintStream old;
-
-  private CliOutput cliOutput;
-
 
   @Before
   public void setUp() {

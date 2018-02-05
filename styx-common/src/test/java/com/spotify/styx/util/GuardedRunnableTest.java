@@ -21,6 +21,7 @@ package com.spotify.styx.util;
 
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -37,6 +38,7 @@ public class GuardedRunnableTest {
   public void shouldRun() {
     doNothing().when(runnable).run();
     GuardedRunnable.guard(runnable).run();
+    verify(runnable).run();
   }
   
   @Test

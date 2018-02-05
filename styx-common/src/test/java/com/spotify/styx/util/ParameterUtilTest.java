@@ -46,101 +46,6 @@ public class ParameterUtilTest {
 
   private static final Instant TIME = parse("2016-01-19T09:11:22.333Z");
 
-  @Test
-  public void testToParameter() {
-    assertThat(ParameterUtil.toParameter(Schedule.HOURS, TIME), is("2016-01-19T09"));
-    assertThat(ParameterUtil.toParameter(Schedule.DAYS, TIME), is("2016-01-19"));
-    assertThat(ParameterUtil.toParameter(Schedule.WEEKS, TIME), is("2016-01-19"));
-    assertThat(ParameterUtil.toParameter(Schedule.MONTHS, TIME), is("2016-01"));
-    assertThat(ParameterUtil.toParameter(Schedule.YEARS, TIME), is("2016"));
-
-    assertThat(ParameterUtil.toParameter(Schedule.parse("0 * * * *"), TIME),
-        is("2016-01-19T09:11:00Z"));
-  }
-
-  @Test
-  public void shouldParseDateHour() {
-    final Instant instant = ParameterUtil.parseDateHour("2016-01-19T08");
-
-    assertThat(instant, is(parse("2016-01-19T08:00:00.000Z")));
-  }
-
-  @Test
-  public void shouldParseDate() {
-    final Instant instant = ParameterUtil.parseDate("2016-01-19");
-
-    assertThat(instant, is(parse("2016-01-19T00:00:00.000Z")));
-  }
-
-  @Test
-  public void shouldRangeOfInstantsHours() {
-    final Instant startInstant = parse("2016-12-31T23:00:00.00Z");
-    final Instant endInstant = parse("2017-01-01T02:00:00.00Z");
-
-    List<Instant> list = rangeOfInstants(startInstant, endInstant, HOURS);
-    assertThat(list, contains(
-        parse("2016-12-31T23:00:00.00Z"),
-        parse("2017-01-01T00:00:00.00Z"),
-        parse("2017-01-01T01:00:00.00Z"))
-    );
-  }
-
-  @Test
-  public void shouldRangeOfInstantsDays() {
-    final Instant startInstant = parse("2016-12-31T00:00:00.00Z");
-    final Instant endInstant = parse("2017-01-03T00:00:00.00Z");
-
-    List<Instant> list = rangeOfInstants(startInstant, endInstant, Schedule.DAYS);
-    assertThat(list, contains(
-        parse("2016-12-31T00:00:00.00Z"),
-        parse("2017-01-01T00:00:00.00Z"),
-        parse("2017-01-02T00:00:00.00Z"))
-    );
-  }
-
-  @Test
-  public void shouldRangeOfInstantsWeeks() {
-    final Instant startInstant = parse("2016-12-26T00:00:00.00Z");
-    final Instant endInstant = parse("2017-01-16T00:00:00.00Z");
-
-    List<Instant> list = rangeOfInstants(startInstant, endInstant, Schedule.WEEKS);
-    assertThat(list, contains(
-        parse("2016-12-26T00:00:00.00Z"),
-        parse("2017-01-02T00:00:00.00Z"),
-        parse("2017-01-09T00:00:00.00Z"))
-    );
-  }
-
-  @Test
-  public void shouldRangeOfInstantsMonths() {
-    final Instant startInstant = parse("2017-01-01T00:00:00.00Z");
-    final Instant endInstant = parse("2017-04-01T00:00:00.00Z");
-
-    List<Instant> list = rangeOfInstants(startInstant, endInstant, MONTHS);
-    assertThat(list, contains(
-        parse("2017-01-01T00:00:00.00Z"),
-        parse("2017-02-01T00:00:00.00Z"),
-        parse("2017-03-01T00:00:00.00Z"))
-    );
-  }
-
-  @Test
-  public void shouldReturnEmptyListStartEqualsEnd() {
-    final Instant startInstant = parse("2016-12-31T23:00:00.00Z");
-    final Instant endInstant = parse("2016-12-31T23:00:00.00Z");
-
-    List<Instant> list = rangeOfInstants(startInstant, endInstant, HOURS);
-    assertThat(list, hasSize(0));
-  }
-
-  @Test(expected=IllegalArgumentException.class)
-  public void shouldRaiseRangeOfInstantsStartAfterEnd() {
-    final Instant startInstant = parse("2016-12-31T23:00:00.00Z");
-    final Instant endInstant = parse("2016-01-01T01:00:00.00Z");
-
-    rangeOfInstants(startInstant, endInstant, HOURS);
-  }
-
   private static final List<ParseExample> PARSE_EXAMPLES;
   private static final List<ParseExample> UNPARSABLE;
 
@@ -192,13 +97,13 @@ public class ParameterUtilTest {
         example("2016-12-31T23-01:00",       YEARS,  parse("2017-01-01T00:00:00.00Z")),
 
         example("2017-03-25T10:15:25+01:00", Schedule.parse("* * * * *"),
-            parse("2017-03-25T09:15:00Z")),
+                parse("2017-03-25T09:15:00Z")),
         example("2017-03-25T10:15:25", Schedule.parse("0 2 * * *"),
-            parse("2017-03-25T02:00:00Z")),
+                parse("2017-03-25T02:00:00Z")),
         example("2017-03-25T10:15:25", Schedule.parse("* 3,8 1 1 *"),
-            parse("2017-01-01T08:59:00Z")),
+                parse("2017-01-01T08:59:00Z")),
         example("2017-01-01T07:15:25", Schedule.parse("* 3,8 1 1 *"),
-            parse("2017-01-01T03:59:00Z"))
+                parse("2017-01-01T03:59:00Z"))
     );
 
     UNPARSABLE = Arrays.asList(
@@ -206,6 +111,101 @@ public class ParameterUtilTest {
         example("2017-03-26+01:00", WEEKS),
         example("2017-04-31", DAYS)
     );
+  }
+
+  @Test
+  public void testToParameter() {
+    assertThat(ParameterUtil.toParameter(HOURS, TIME), is("2016-01-19T09"));
+    assertThat(ParameterUtil.toParameter(DAYS, TIME), is("2016-01-19"));
+    assertThat(ParameterUtil.toParameter(WEEKS, TIME), is("2016-01-19"));
+    assertThat(ParameterUtil.toParameter(MONTHS, TIME), is("2016-01"));
+    assertThat(ParameterUtil.toParameter(YEARS, TIME), is("2016"));
+
+    assertThat(ParameterUtil.toParameter(Schedule.parse("0 * * * *"), TIME),
+        is("2016-01-19T09:11:00Z"));
+  }
+
+  @Test
+  public void shouldParseDateHour() {
+    final Instant instant = ParameterUtil.parseDateHour("2016-01-19T08");
+
+    assertThat(instant, is(parse("2016-01-19T08:00:00.000Z")));
+  }
+
+  @Test
+  public void shouldParseDate() {
+    final Instant instant = ParameterUtil.parseDate("2016-01-19");
+
+    assertThat(instant, is(parse("2016-01-19T00:00:00.000Z")));
+  }
+
+  @Test
+  public void shouldRangeOfInstantsHours() {
+    final Instant startInstant = parse("2016-12-31T23:00:00.00Z");
+    final Instant endInstant = parse("2017-01-01T02:00:00.00Z");
+
+    List<Instant> list = rangeOfInstants(startInstant, endInstant, HOURS);
+    assertThat(list, contains(
+        parse("2016-12-31T23:00:00.00Z"),
+        parse("2017-01-01T00:00:00.00Z"),
+        parse("2017-01-01T01:00:00.00Z"))
+    );
+  }
+
+  @Test
+  public void shouldRangeOfInstantsDays() {
+    final Instant startInstant = parse("2016-12-31T00:00:00.00Z");
+    final Instant endInstant = parse("2017-01-03T00:00:00.00Z");
+
+    List<Instant> list = rangeOfInstants(startInstant, endInstant, DAYS);
+    assertThat(list, contains(
+        parse("2016-12-31T00:00:00.00Z"),
+        parse("2017-01-01T00:00:00.00Z"),
+        parse("2017-01-02T00:00:00.00Z"))
+    );
+  }
+
+  @Test
+  public void shouldRangeOfInstantsWeeks() {
+    final Instant startInstant = parse("2016-12-26T00:00:00.00Z");
+    final Instant endInstant = parse("2017-01-16T00:00:00.00Z");
+
+    List<Instant> list = rangeOfInstants(startInstant, endInstant, WEEKS);
+    assertThat(list, contains(
+        parse("2016-12-26T00:00:00.00Z"),
+        parse("2017-01-02T00:00:00.00Z"),
+        parse("2017-01-09T00:00:00.00Z"))
+    );
+  }
+
+  @Test
+  public void shouldRangeOfInstantsMonths() {
+    final Instant startInstant = parse("2017-01-01T00:00:00.00Z");
+    final Instant endInstant = parse("2017-04-01T00:00:00.00Z");
+
+    List<Instant> list = rangeOfInstants(startInstant, endInstant, MONTHS);
+    assertThat(list, contains(
+        parse("2017-01-01T00:00:00.00Z"),
+        parse("2017-02-01T00:00:00.00Z"),
+        parse("2017-03-01T00:00:00.00Z"))
+    );
+  }
+
+  @Test
+  public void shouldReturnEmptyListStartEqualsEnd() {
+    final Instant startInstant = parse("2016-12-31T23:00:00.00Z");
+    final Instant endInstant = parse("2016-12-31T23:00:00.00Z");
+
+    List<Instant> list = rangeOfInstants(startInstant, endInstant, HOURS);
+    assertThat(list, hasSize(0));
+  }
+
+  @Test(expected=IllegalArgumentException.class)
+  public void shouldRaiseRangeOfInstantsStartAfterEnd() {
+    final Instant startInstant = parse("2016-12-31T23:00:00.00Z");
+    final Instant endInstant = parse("2016-01-01T01:00:00.00Z");
+
+    rangeOfInstants(startInstant, endInstant, HOURS);
   }
 
   @Test

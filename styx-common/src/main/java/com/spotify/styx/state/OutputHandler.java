@@ -28,11 +28,11 @@ package com.spotify.styx.state;
 @FunctionalInterface
 public interface OutputHandler {
 
+  OutputHandler NOOP = (runState) -> { };
+
   void transitionInto(RunState state);
 
   static OutputHandler fanOutput(OutputHandler... outputHandlers) {
     return new FanOutputHandler(outputHandlers);
   }
-
-  OutputHandler NOOP = (runState) -> { };
 }

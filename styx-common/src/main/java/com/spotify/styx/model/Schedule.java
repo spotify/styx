@@ -118,6 +118,7 @@ public abstract class Schedule {
 
       default:
         normalizedExpression = expression;
+        break;
     }
     return new AutoValue_Schedule(normalizedExpression);
   }

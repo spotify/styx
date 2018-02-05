@@ -155,6 +155,7 @@ public class PublisherHandlerTest {
 
     @Override
     public void close() throws IOException {
+      // nop
     }
   }
 }
