@@ -443,7 +443,8 @@ public class StyxScheduler implements AppInit {
     try {
       storage.workflows().values().forEach(cache::store);
     } catch (IOException e) {
-      LOG.warn("Failed to get workflows from storage", e);
+      LOG.error("Failed to get workflows from storage while warming up the cache");
+      throw new RuntimeException(e);
     }
   }
 
