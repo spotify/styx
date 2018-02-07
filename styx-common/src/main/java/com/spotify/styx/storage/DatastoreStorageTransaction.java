@@ -98,10 +98,14 @@ class DatastoreStorageTransaction implements StorageTransaction {
 
   @Override
   public Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
-    return DatastoreStorage.getOpt(tx, DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflowId))
-        .filter(e -> e.contains(PROPERTY_WORKFLOW_JSON))
-        .map(e -> DatastoreStorage.parseWorkflowJson(e, workflowId));
-
+    final Optional<Entity> entityOptional =
+        DatastoreStorage.getOpt(tx, DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflowId))
+            .filter(e -> e.contains(PROPERTY_WORKFLOW_JSON));
+    if (entityOptional.isPresent()) {
+      return Optional.of(DatastoreStorage.parseWorkflowJson(entityOptional.get(), workflowId));
+    } else {
+      return Optional.empty();
+    }
   }
 
   @Override

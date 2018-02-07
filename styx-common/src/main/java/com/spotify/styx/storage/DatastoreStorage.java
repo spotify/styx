@@ -217,9 +217,14 @@ class DatastoreStorage {
   }
 
   Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
-    return getOpt(datastore, workflowKey(datastore.newKeyFactory(), workflowId))
-        .filter(e -> e.contains(PROPERTY_WORKFLOW_JSON))
-        .map(e -> parseWorkflowJson(e, workflowId));
+    final Optional<Entity> entityOptional =
+        getOpt(datastore, workflowKey(datastore.newKeyFactory(), workflowId))
+            .filter(e -> e.contains(PROPERTY_WORKFLOW_JSON));
+    if (entityOptional.isPresent()) {
+      return Optional.of(parseWorkflowJson(entityOptional.get(), workflowId));
+    } else {
+      return Optional.empty();
+    }
   }
 
   void delete(WorkflowId workflowId) throws IOException {
@@ -516,13 +521,13 @@ class DatastoreStorage {
     return WorkflowId.create(componentId, id);
   }
 
-  static Workflow parseWorkflowJson(Entity entity, WorkflowId workflowId) {
+  static Workflow parseWorkflowJson(Entity entity, WorkflowId workflowId) throws IOException {
     try {
       return OBJECT_MAPPER
           .readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
-    } catch (IOException e1) {
-      LOG.info("Failed to read workflow for {}, {}", workflowId.componentId(), workflowId.id());
-      return null;
+    } catch (IOException e) {
+      LOG.error("Failed to read workflow for {}, {}", workflowId.componentId(), workflowId.id());
+      throw e;
     }
   }
 
