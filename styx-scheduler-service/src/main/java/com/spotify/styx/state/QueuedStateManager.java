@@ -98,10 +98,9 @@ public class QueuedStateManager implements StateManager {
   public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger) throws IsClosedException {
     ensureRunning();
 
-    final long nextCounter;
+    final long counter;
     try {
-      final long counter = storage.getLatestStoredCounter(workflowInstance).orElse(NO_EVENTS_PROCESSED);
-      nextCounter = counter + 1;
+      counter = storage.getLatestStoredCounter(workflowInstance).orElse(NO_EVENTS_PROCESSED);
     } catch (IOException e) {
       return CompletableFutures.exceptionallyCompletedFuture(e);
     }
@@ -111,16 +110,14 @@ public class QueuedStateManager implements StateManager {
     return CompletableFuture.supplyAsync(() -> {
 
       // Write active state to datastore
-      final RunState runState = RunState.create(workflowInstance, State.QUEUED, StateData.newBuilder()
-          .trigger(trigger)
-          .build(), time.get());
+      final RunState runState = RunState.create(workflowInstance, State.NEW, time.get());
       try {
         storage.runInTransaction(tx -> {
           final Optional<Workflow> workflow = tx.workflow(workflowInstance.workflowId());
           if (!workflow.isPresent()) {
             throw new IllegalArgumentException("Workflow not found: " + workflowInstance.workflowId().toKey());
           }
-          return tx.insertActiveState(workflowInstance, PersistentWorkflowInstanceState.of(runState, nextCounter));
+          return tx.insertActiveState(workflowInstance, PersistentWorkflowInstanceState.of(runState, counter));
         });
       } catch (TransactionException e) {
         if (e.isAlreadyExists()) {
@@ -131,14 +128,16 @@ public class QueuedStateManager implements StateManager {
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-
-      final Event event = Event.triggerExecution(workflowInstance, trigger);
-      final SequenceEvent sequenceEvent = SequenceEvent.create(event, nextCounter, runState.timestamp());
-
-      emitEvent(sequenceEvent, runState);
-
       return null;
-    }, outputHandlerExecutor);
+    }, outputHandlerExecutor).thenCompose((nil) -> {
+      final Event event = Event.triggerExecution(workflowInstance, trigger);
+      try {
+        return receive(event);
+      } catch (IsClosedException isClosedException) {
+        LOG.warn("Failed to send 'triggerExecution' event", isClosedException);
+      }
+      return null;
+    });
   }
 
   @Override
