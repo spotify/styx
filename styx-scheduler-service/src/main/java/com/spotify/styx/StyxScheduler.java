@@ -99,6 +99,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -535,6 +536,7 @@ public class StyxScheduler implements AppInit {
             .filter(workflow -> workflow.configuration().dockerTerminationLogging())
             .count());
 
+    final Map<WorkflowInstance, RunState> activeStates = stateManager.activeStates();
     Arrays.stream(RunState.State.values()).forEach(state -> {
       TriggerUtil.triggerTypesList().forEach(triggerType ->
           stats.registerActiveStatesMetric(
@@ -553,6 +555,12 @@ public class StyxScheduler implements AppInit {
               .count());
     });
 
+    workflowCache.all().forEach(workflow -> stats.registerActiveStatesMetric(
+        workflow.id(),
+        () -> activeStates.keySet().stream()
+            .filter(wfi -> workflow.id().equals(wfi.workflowId()))
+            .count()));
+
     stats.registerSubmissionRateLimitMetric(submissionRateLimiter::getRate);
   }
 
@@ -563,6 +571,12 @@ public class StyxScheduler implements AppInit {
       StateManager stateManager,
       BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
     return (workflow) -> {
+      stats.registerActiveStatesMetric(
+          workflow.id(),
+          () -> stateManager.activeStates().keySet().stream()
+              .filter(wfi -> workflow.id().equals(wfi.workflowId()))
+              .count());
+
       final Optional<Workflow> oldWorkflowOptional = cache.workflow(workflow.id());
 
       workflowInitializer.inspectChange(workflow);

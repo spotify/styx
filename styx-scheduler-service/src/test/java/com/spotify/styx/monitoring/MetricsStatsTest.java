@@ -21,6 +21,7 @@
 package com.spotify.styx.monitoring;
 
 import static com.spotify.styx.monitoring.MetricsStats.ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER;
+import static com.spotify.styx.monitoring.MetricsStats.ACTIVE_STATES_PER_WORKFLOW;
 import static com.spotify.styx.monitoring.MetricsStats.DOCKER_DURATION;
 import static com.spotify.styx.monitoring.MetricsStats.DOCKER_ERROR_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.DOCKER_RATE;
@@ -151,6 +152,14 @@ public class MetricsStatsTest {
     stats.registerActiveStatesMetric(state, "triggerName", gauge);
     verify(registry).register(ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER.tagged(
         "state", state.name(), "trigger", "triggerName"), gauge);
+  }
+
+  @Test
+  public void shouldRegisterActiveStatesMetric() throws Exception {
+    WorkflowId workflowId = WorkflowId.create("component", "workflow");
+    stats.registerActiveStatesMetric(workflowId, gauge);
+    verify(registry).register(ACTIVE_STATES_PER_WORKFLOW.tagged(
+        "component-id", workflowId.componentId(), "workflow-id", workflowId.id()), gauge);
   }
 
   @Test

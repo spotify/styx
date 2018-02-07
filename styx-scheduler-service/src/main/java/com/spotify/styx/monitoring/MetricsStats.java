@@ -54,6 +54,10 @@ public final class MetricsStats implements Stats {
       .tagged("what", "active-states-per-runstate-per-trigger-count")
       .tagged("unit", "state");
 
+  static final MetricId ACTIVE_STATES_PER_WORKFLOW = BASE
+      .tagged("what", "active-states-per-workflow-count")
+      .tagged("unit", "state");
+
   static final MetricId WORKFLOW_COUNT = BASE
       .tagged("what", "workflow-count")
       .tagged("unit", "workflow");
@@ -195,6 +199,15 @@ public final class MetricsStats implements Stats {
                                          Gauge<Long> activeStatesCount) {
     registry.register(ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER.tagged(
         "state", state.name(), "trigger", triggerName), activeStatesCount);
+  }
+
+  @Override
+  public void registerActiveStatesMetric(WorkflowId workflowId, Gauge<Long> activeStatesCount) {
+    activeStatesPerWorkflowGauges.computeIfAbsent(
+        workflowId, (ignoreKey) -> registry.register(
+            ACTIVE_STATES_PER_WORKFLOW.tagged(
+                "component-id", workflowId.componentId(), "workflow-id", workflowId.id()),
+            activeStatesCount));
   }
 
   @Override
