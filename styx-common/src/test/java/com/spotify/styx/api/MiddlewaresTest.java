@@ -216,12 +216,12 @@ public class MiddlewaresTest {
   }
 
   @Test
-  public void testAuditLoggingForGet() throws Exception {
+  public void testHTTPLoggingForGet() throws Exception {
     RequestContext requestContext = mock(RequestContext.class);
     Request request = Request.forUri("/", "GET");
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = awaitResponse(Middlewares.auditLogger()
+    Response<Object> response = awaitResponse(Middlewares.httpLogger()
         .apply(mockInnerHandler(requestContext))
         .invoke(requestContext));
     assertThat(response, hasStatus(withCode(Status.OK)));
@@ -234,7 +234,7 @@ public class MiddlewaresTest {
         .withPayload(ByteString.encodeUtf8("hello"));
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = awaitResponse(Middlewares.auditLogger()
+    Response<Object> response = awaitResponse(Middlewares.httpLogger()
         .apply(mockInnerHandler(requestContext))
         .invoke(requestContext));
     assertThat(response, hasStatus(withCode(Status.OK)));
@@ -249,7 +249,7 @@ public class MiddlewaresTest {
         .withPayload(ByteString.encodeUtf8("hello"));
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = Middlewares.auditLogger().and(Middlewares.exceptionHandler())
+    Response<Object> response = Middlewares.httpLogger().and(Middlewares.exceptionHandler())
         .apply(mockInnerHandler(requestContext))
         .invoke(requestContext)
         .toCompletableFuture().get(5, SECONDS);

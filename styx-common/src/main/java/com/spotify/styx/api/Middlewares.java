@@ -156,22 +156,22 @@ public final class Middlewares {
     }
   }
 
-  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> auditLogger() {
+  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> httpLogger() {
     return innerHandler -> requestContext -> {
       final Request request = requestContext.request();
 
-      if (!"GET".equals(request.method())) {
-        LOG.info("[AUDIT] {} {} by {} with headers {} parameters {} and payload {}",
-                 request.method(),
-                 request.uri(),
-                 auth(requestContext).user().map(idToken -> idToken.getPayload()
-                     .getEmail())
-                     .orElse("anonymous"),
-                 filterHeaders(request.headers()),
-                 request.parameters(),
-                 request.payload().map(ByteString::utf8).orElse("")
-                     .replaceAll("\n", " "));
-      }
+      LOG.info("{}{} {} by {} with headers {} parameters {} and payload {}",
+               "GET".equals(request.method()) ? "" : "[AUDIT] ",
+               request.method(),
+               request.uri(),
+               auth(requestContext).user().map(idToken -> idToken.getPayload()
+                   .getEmail())
+                   .orElse("anonymous"),
+               filterHeaders(request.headers()),
+               request.parameters(),
+               request.payload().map(ByteString::utf8).orElse("")
+                   .replaceAll("\n", " "));
+
       return innerHandler.invoke(requestContext);
     };
   }
