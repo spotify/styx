@@ -237,7 +237,7 @@ public class Scheduler {
     // Check for execution blocker
     Optional<ExecutionBlocker> blocker = Optional.empty();
     try {
-      blocker = executionBlockerFuture.toCompletableFuture().get(30, TimeUnit.SECONDS);
+      blocker = executionBlockerFuture.toCompletableFuture().get(10, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       LOG.debug("Interrupted");
       return false;
