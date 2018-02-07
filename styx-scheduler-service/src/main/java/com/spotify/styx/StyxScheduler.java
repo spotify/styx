@@ -315,12 +315,12 @@ public class StyxScheduler implements AppInit {
 
     final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
     closer.register(executorCloser("scheduler", executor));
-    final BlockingQueue<Runnable> outputHandlerExecutorQueue = new LinkedBlockingQueue<>();
-    final ExecutorService outputHandlerExecutor = new ThreadPoolExecutor(16, 16,
+    final BlockingQueue<Runnable> eventTransitionExecutorQueue = new LinkedBlockingQueue<>();
+    final ExecutorService eventTransitionExecutor = new ThreadPoolExecutor(16, 16,
         0L, TimeUnit.MILLISECONDS,
-        outputHandlerExecutorQueue,
+        eventTransitionExecutorQueue,
         eventTf);
-    closer.register(executorCloser("output-handler", outputHandlerExecutor));
+    closer.register(executorCloser("event-transition", eventTransitionExecutor));
     final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
     closer.register(executorCloser("event-consumer", eventConsumerExecutor));
 
@@ -334,7 +334,7 @@ public class StyxScheduler implements AppInit {
     //       take StateManager as argument instead?
     final List<OutputHandler> outputHandlers = new ArrayList<>();
     final QueuedStateManager stateManager = closer.register(
-        new QueuedStateManager(time, outputHandlerExecutor, storage,
+        new QueuedStateManager(time, eventTransitionExecutor, storage,
             eventConsumerFactory.apply(environment, stats), eventConsumerExecutor, fanOutput(outputHandlers)));
 
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
@@ -386,7 +386,7 @@ public class StyxScheduler implements AppInit {
     startScheduler(scheduler, executor);
     startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
     startCleaner(cleaner, executor);
-    setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats, outputHandlerExecutorQueue);
+    setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats, eventTransitionExecutorQueue);
 
     final SchedulerResource schedulerResource =
         new SchedulerResource(stateManager, trigger, workflowChangeListener, workflowRemoveListener,
@@ -511,9 +511,9 @@ public class StyxScheduler implements AppInit {
       Storage storage,
       RateLimiter submissionRateLimiter,
       Stats stats,
-      BlockingQueue<Runnable> outputHandlerExecutorQueue) {
+      BlockingQueue<Runnable> eventTransitionExecutorQueue) {
 
-    stats.registerQueuedEventsMetric(() -> (long) outputHandlerExecutorQueue.size());
+    stats.registerQueuedEventsMetric(() -> (long) eventTransitionExecutorQueue.size());
 
     stats.registerWorkflowCountMetric("all", () -> (long) workflowCache.all().size());
 
