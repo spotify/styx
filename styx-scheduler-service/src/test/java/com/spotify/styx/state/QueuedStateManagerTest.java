@@ -325,6 +325,12 @@ public class QueuedStateManagerTest {
   }
 
   @Test(expected = IsClosedException.class)
+  public void shouldRejectTriggertIfClosed() throws Exception {
+    stateManager.close();
+    stateManager.trigger(INSTANCE, TRIGGER1);
+  }
+
+  @Test(expected = IsClosedException.class)
   public void shouldRejectEventIfClosed() throws Exception {
     stateManager.close();
     stateManager.receive(Event.timeTrigger(INSTANCE));
