@@ -89,7 +89,7 @@ public class Scheduler {
   @VisibleForTesting
   static final String GLOBAL_RESOURCE_ID = "GLOBAL_STYX_CLUSTER";
 
-  private static final int SCHEDULING_BATCH_SIZE = 32;
+  private static final int SCHEDULING_BATCH_SIZE = 16;
 
   private final Time time;
   private final TimeoutConfig ttls;
