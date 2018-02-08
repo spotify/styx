@@ -20,7 +20,11 @@
 
 package com.spotify.styx.storage;
 
+import static com.spotify.styx.storage.DatastoreStorageTest.PERSISTENT_STATE1;
+import static com.spotify.styx.storage.DatastoreStorageTest.WORKFLOW_INSTANCE1;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -31,6 +35,7 @@ import com.google.cloud.datastore.KeyFactory;
 import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import java.io.IOException;
+import java.time.Duration;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -92,7 +97,7 @@ public class DatastoreStorageTransactionTest {
   }
 
   @Test
-  public void shouldThrowIfTransactionFailed() throws TransactionException {
+  public void shouldThrowIfTransactionFailed() throws IOException, InterruptedException {
     Transaction transaction1 = datastore.newTransaction();
     Transaction transaction2 = datastore.newTransaction();
     Transaction transaction3 = datastore.newTransaction();
@@ -125,5 +130,43 @@ public class DatastoreStorageTransactionTest {
     } catch (TransactionException e) {
       assertTrue(e.isConflict());
     }
+
+    // To remove lingering transactions from the Datastore emulator
+    resetDatastore();
+  }
+
+  @Test
+  public void insertActiveStateShouldFailIfAlreadyExists() throws Exception {
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO);
+    storage.runInTransaction(tx -> tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1));
+    try {
+      storage.runInTransaction(tx -> tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1));
+      fail("Expected exception!");
+    } catch (TransactionException e) {
+      assertThat(e.isAlreadyExists(), is(true));
+    }
+  }
+
+  @Test
+  public void updateActiveStateShouldFailIfNotAlreadyExists() throws Exception {
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO);
+    try {
+      storage.runInTransaction(tx -> tx.updateActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1));
+      fail("Expected exception!");
+    } catch (TransactionException e) {
+      assertThat(e.isNotFound(), is(true));
+    }
+  }
+
+  private void resetDatastore() throws IOException, InterruptedException {
+    if (helper != null) {
+      try {
+        helper.stop(org.threeten.bp.Duration.ofSeconds(30));
+      } catch (Throwable e) {
+        e.printStackTrace();
+      }
+    }
+    helper = LocalDatastoreHelper.create(1.0); // 100% global consistency
+    helper.start();
   }
 }
