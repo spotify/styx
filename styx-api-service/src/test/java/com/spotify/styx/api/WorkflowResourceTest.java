@@ -87,10 +87,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private Connection bigtable = setupBigTableMockTable();
   private AggregateStorage storage;
 
-  public WorkflowResourceTest(Api.Version version) {
-    super("/workflows", version, "workflow-test");
-    MockitoAnnotations.initMocks(this);
-  }
+  @Mock private ShardedCounter shardedCounter;
+  @Mock private WorkflowValidator workflowValidator;
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
@@ -120,9 +118,11 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private static final ByteString BAD_JSON =
       ByteString.encodeUtf8("{\"The BAD\"}");
 
-  @Mock private ShardedCounter shardedCounter;
-  @Mock WorkflowValidator workflowValidator;
-  
+  public WorkflowResourceTest(Api.Version version) {
+    super("/workflows", version, "workflow-test");
+    MockitoAnnotations.initMocks(this);
+  }
+
   @Override
   protected void init(Environment environment) {
     storage = new AggregateStorage(bigtable, datastore, Duration.ZERO, shardedCounter);
