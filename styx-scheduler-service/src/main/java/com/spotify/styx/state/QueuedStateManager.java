@@ -96,9 +96,7 @@ public class QueuedStateManager implements StateManager {
   }
 
   @Override
-  public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger) throws IsClosedException {
-    ensureRunning();
-
+  public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger) {
     final long counter;
     try {
       counter = storage.getLatestStoredCounter(workflowInstance).orElse(NO_EVENTS_PROCESSED);
@@ -130,7 +128,7 @@ public class QueuedStateManager implements StateManager {
         throw new RuntimeException(e);
       }
       return null;
-    }, eventTransitionExecutor).thenCompose((nil) -> {
+    }).thenCompose((nil) -> {
       final Event event = Event.triggerExecution(workflowInstance, trigger);
       try {
         return receive(event);
