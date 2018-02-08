@@ -278,10 +278,24 @@ public class QueuedStateManagerTest {
     }
   }
 
-  @Test(expected = IsClosedException.class)
-  public void shouldRejectTriggerIfClosed() throws Exception {
-    stateManager.close();
-    stateManager.trigger(INSTANCE, TRIGGER1);
+  @Test
+  public void shouldFailTriggerIfIsClosedOnReceiveAndFailDeleteActiveState() throws Exception {
+    reset(storage);
+    stateManager = spy(new QueuedStateManager(
+        time, eventTransitionExecutor, storage, eventConsumer,
+        eventConsumerExecutor, outputHandler));
+    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    doThrow(new IOException()).when(storage).deleteActiveState(any());
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
+    when(stateManager.receive(any())).thenThrow(new IsClosedException());
+
+    try {
+      stateManager.trigger(INSTANCE, TRIGGER1)
+          .toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(Throwables.getRootCause(e), is(instanceOf(IsClosedException.class)));
+    }
   }
 
   @Test(expected = IsClosedException.class)
