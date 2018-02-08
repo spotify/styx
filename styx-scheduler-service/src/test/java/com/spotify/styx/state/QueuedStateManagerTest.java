@@ -255,21 +255,6 @@ public class QueuedStateManagerTest {
   }
 
   @Test(expected = IsClosedException.class)
-  public void shouldFailTriggerIfIsClosedOnTrigger() throws Exception {
-    reset(storage);
-    stateManager = spy(new QueuedStateManager(
-        time, eventTransitionExecutor, storage, eventConsumer,
-        eventConsumerExecutor, outputHandler));
-    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
-    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
-    doThrow(new IsClosedException()).when(stateManager).ensureRunning();
-
-    stateManager.trigger(INSTANCE, TRIGGER1)
-        .toCompletableFuture().get(1, MINUTES);
-    fail();
-  }
-
-  @Test(expected = IsClosedException.class)
   public void shouldRejectTriggerIfClosed() throws Exception {
     stateManager.close();
     stateManager.trigger(INSTANCE, TRIGGER1);
