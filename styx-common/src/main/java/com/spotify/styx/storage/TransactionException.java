@@ -54,5 +54,4 @@ public class TransactionException extends StorageException {
     final String message = getMessage();
     return message != null && message.startsWith(prefix);
   }
-
 }
