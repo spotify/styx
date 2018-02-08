@@ -30,7 +30,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
-import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Duration;
@@ -81,25 +81,24 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public Map<WorkflowInstance, PersistentWorkflowInstanceState> readActiveWorkflowInstances() throws IOException {
+  public Map<WorkflowInstance, RunState> readActiveWorkflowInstances() throws IOException {
     return datastoreStorage.allActiveStates();
   }
 
   @Override
-  public Map<WorkflowInstance, PersistentWorkflowInstanceState> readActiveWorkflowInstances(String componentId)
+  public Map<WorkflowInstance, RunState> readActiveWorkflowInstances(String componentId)
       throws IOException {
     return datastoreStorage.activeStates(componentId);
   }
 
   @Override
-  public Optional<PersistentWorkflowInstanceState> readActiveWorkflowInstance(WorkflowInstance workflowInstance)
+  public Optional<RunState> readActiveWorkflowInstance(WorkflowInstance workflowInstance)
       throws IOException {
     return datastoreStorage.activeState(workflowInstance);
   }
 
   @Override
-  public void writeActiveState(WorkflowInstance workflowInstance,
-                               PersistentWorkflowInstanceState state) throws IOException {
+  public void writeActiveState(WorkflowInstance workflowInstance, RunState state) throws IOException {
     datastoreStorage.writeActiveState(workflowInstance, state);
   }
 

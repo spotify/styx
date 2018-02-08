@@ -29,7 +29,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
-import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.util.List;
@@ -125,7 +125,7 @@ public interface Storage {
    * @param workflowInstance  The {@link WorkflowInstance} that entered an active state
    * @param state             The current state for the given {@link WorkflowInstance}
    */
-  void writeActiveState(WorkflowInstance workflowInstance, PersistentWorkflowInstanceState state)
+  void writeActiveState(WorkflowInstance workflowInstance, RunState state)
       throws IOException;
 
   /**
@@ -140,30 +140,30 @@ public interface Storage {
    * Return a map of all active {@link WorkflowInstance}s to their last consumed sequence count.
    *
    * <p>A {@link WorkflowInstance} is active if there has been at least one call to
-   * {@link #writeActiveState(WorkflowInstance, PersistentWorkflowInstanceState)} and no calls to
+   * {@link #writeActiveState(WorkflowInstance, RunState)} and no calls to
    * {@link #deleteActiveState(WorkflowInstance)}.
    *
    * @return The map of workflow instances to sequence counts
    */
-  Map<WorkflowInstance, PersistentWorkflowInstanceState> readActiveWorkflowInstances() throws IOException;
+  Map<WorkflowInstance, RunState> readActiveWorkflowInstances() throws IOException;
 
   /**
    * Return a map of all active {@link WorkflowInstance}s to their last consumed sequence count,
    * for workflows that belong to a given component id.
    *
    * <p>A {@link WorkflowInstance} is active if there has been at least one call to
-   * {@link #writeActiveState(WorkflowInstance, PersistentWorkflowInstanceState)} and no calls to
+   * {@link #writeActiveState(WorkflowInstance, RunState)} and no calls to
    * {@link #deleteActiveState(WorkflowInstance)}.
    *
    * @return The map of workflow instances to sequence counts
    */
-  Map<WorkflowInstance, PersistentWorkflowInstanceState> readActiveWorkflowInstances(String componentId)
+  Map<WorkflowInstance, RunState> readActiveWorkflowInstances(String componentId)
       throws IOException;
 
   /**
    * Read an active workflow instance.
    */
-  Optional<PersistentWorkflowInstanceState> readActiveWorkflowInstance(WorkflowInstance workflowInstance)
+  Optional<RunState> readActiveWorkflowInstance(WorkflowInstance workflowInstance)
       throws IOException;
 
   /**

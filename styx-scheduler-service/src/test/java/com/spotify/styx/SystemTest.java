@@ -42,7 +42,6 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
@@ -583,12 +582,9 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    givenActiveStateAtSequenceCount(workflowInstance, PersistentWorkflowInstanceState.builder()
-        .state(RunState.State.QUEUED)
-        .data(StateData.zero())
-        .timestamp(Instant.ofEpochMilli(timeOffsetSeconds(4)))
-        .counter(3L)
-        .build());
+    givenActiveStateAtSequenceCount(workflowInstance, RunState.create(workflowInstance,
+        RunState.State.QUEUED, StateData.zero(),
+        Instant.ofEpochMilli(timeOffsetSeconds(4)), 3L));
 
     givenTheTimeIs("2016-03-14T16:01:00Z");
     styxStarts();
@@ -608,12 +604,9 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    givenActiveStateAtSequenceCount(workflowInstance, PersistentWorkflowInstanceState.builder()
-        .state(RunState.State.QUEUED)
-        .data(StateData.newBuilder().trigger(TRIGGER1).build())
-        .timestamp(Instant.parse("2016-03-14T15:17:45Z"))
-        .counter(13L)
-        .build());
+    givenActiveStateAtSequenceCount(workflowInstance, RunState.create(workflowInstance,
+        RunState.State.QUEUED, StateData.newBuilder().trigger(TRIGGER1).build(),
+        Instant.parse("2016-03-14T15:17:45Z"), 13L));
 
     styxStarts();
 
@@ -636,12 +629,9 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    givenActiveStateAtSequenceCount(workflowInstance, PersistentWorkflowInstanceState.builder()
-        .state(RunState.State.RUNNING)
-        .data(StateData.newBuilder().trigger(TRIGGER1).build())
-        .timestamp(Instant.parse("2016-03-14T15:17:45Z"))
-        .counter(2L)
-        .build());
+    givenActiveStateAtSequenceCount(workflowInstance, RunState.create(workflowInstance,
+        RunState.State.RUNNING, StateData.newBuilder().trigger(TRIGGER1).build(),
+        Instant.parse("2016-03-14T15:17:45Z"), 2L));
 
     styxStarts();
 

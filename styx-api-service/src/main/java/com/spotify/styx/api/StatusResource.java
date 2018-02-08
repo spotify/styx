@@ -21,7 +21,6 @@
 package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V3;
-import static com.spotify.styx.util.ReplayEvents.replayActiveStates;
 import static java.util.stream.Collectors.toList;
 
 import com.google.api.client.util.Lists;
@@ -37,7 +36,6 @@ import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
-import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
@@ -92,13 +90,12 @@ public class StatusResource {
     final List<RunStateDataPayload.RunStateData> runStates = Lists.newArrayList();
     try {
 
-      final Map<WorkflowInstance, PersistentWorkflowInstanceState> activeStates = componentOpt.isPresent()
+      final Map<WorkflowInstance, RunState> activeStates = componentOpt.isPresent()
           ? storage.readActiveWorkflowInstances(componentOpt.get())
           : storage.readActiveWorkflowInstances();
 
-      final Map<RunState, Long> map = replayActiveStates(activeStates, storage, false);
       runStates.addAll(
-          map.keySet().stream().map(this::runStateToRunStateData).collect(toList()));
+          activeStates.values().stream().map(this::runStateToRunStateData).collect(toList()));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
