@@ -192,6 +192,83 @@ public class QueuedStateManagerTest {
     }
   }
 
+  @Test
+  public void shouldFailTriggerIfGetLatestCounterFails() throws Exception {
+    when(storage.getLatestStoredCounter(any())).thenThrow(new IOException());
+
+    try {
+      stateManager.trigger(INSTANCE, TRIGGER1)
+          .toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(Throwables.getRootCause(e), is(instanceOf(IOException.class)));
+    }
+  }
+
+  @Test
+  public void shouldFailTriggerIfWorkflowNotFound() throws Exception {
+    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
+
+    try {
+      stateManager.trigger(INSTANCE, TRIGGER1)
+          .toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(Throwables.getRootCause(e), is(instanceOf(IllegalArgumentException.class)));
+    }
+  }
+
+  @Test
+  public void shouldFailTriggerIfIOExceptionFromTransaction() throws Exception {
+    reset(storage);
+    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
+    when(storage.runInTransaction(any())).thenThrow(new IOException());
+
+    try {
+      stateManager.trigger(INSTANCE, TRIGGER1)
+          .toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(Throwables.getRootCause(e), is(instanceOf(IOException.class)));
+    }
+  }
+
+  @Test
+  public void shouldFailTriggerIfIsClosedOnReceive() throws Exception {
+    reset(storage);
+    stateManager = spy(new QueuedStateManager(
+        time, eventTransitionExecutor, storage, eventConsumer,
+        eventConsumerExecutor, outputHandler));
+    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
+    when(stateManager.receive(any())).thenThrow(new IsClosedException());
+
+    try {
+      stateManager.trigger(INSTANCE, TRIGGER1)
+          .toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(Throwables.getRootCause(e), is(instanceOf(IsClosedException.class)));
+    }
+  }
+
+  @Test(expected = IsClosedException.class)
+  public void shouldFailTriggerIfIsClosedOnTrigger() throws Exception {
+    reset(storage);
+    stateManager = spy(new QueuedStateManager(
+        time, eventTransitionExecutor, storage, eventConsumer,
+        eventConsumerExecutor, outputHandler));
+    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
+    doThrow(new IsClosedException()).when(stateManager).ensureRunning();
+
+    stateManager.trigger(INSTANCE, TRIGGER1)
+        .toCompletableFuture().get(1, MINUTES);
+    fail();
+  }
+
   @Test(expected = IsClosedException.class)
   public void shouldRejectTriggerIfClosed() throws Exception {
     stateManager.close();

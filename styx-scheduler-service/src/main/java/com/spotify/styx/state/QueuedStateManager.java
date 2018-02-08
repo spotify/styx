@@ -23,6 +23,7 @@ package com.spotify.styx.state;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toMap;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
@@ -135,7 +136,7 @@ public class QueuedStateManager implements StateManager {
         return receive(event);
       } catch (IsClosedException isClosedException) {
         LOG.warn("Failed to send 'triggerExecution' event", isClosedException);
-        return CompletableFuture.completedFuture(null);
+        throw new RuntimeException(isClosedException);
       }
     });
   }
@@ -274,7 +275,8 @@ public class QueuedStateManager implements StateManager {
     }
   }
 
-  private void ensureRunning() throws IsClosedException {
+  @VisibleForTesting
+  void ensureRunning() throws IsClosedException {
     if (!running) {
       throw new IsClosedException();
     }
