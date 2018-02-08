@@ -113,7 +113,7 @@ public class QueuedStateManagerTest {
     doNothing().when(outputHandler).transitionInto(runStateCaptor.capture());
     stateManager = new QueuedStateManager(
         time, eventTransitionExecutor, storage, eventConsumer,
-        eventConsumerExecutor, outputHandler);
+        eventConsumerExecutor, OutputHandler.fanOutput(outputHandler));
   }
 
   @After

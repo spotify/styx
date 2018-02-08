@@ -227,12 +227,7 @@ public class QueuedStateManager implements StateManager {
     }
 
     // Execute output handler(s)
-    try {
-      outputHandler.transitionInto(runState);
-    } catch (Throwable e) {
-      LOG.warn("Output handler threw", e);
-      throw new RuntimeException(e);
-    }
+    outputHandler.transitionInto(runState);
   }
 
   @Override
