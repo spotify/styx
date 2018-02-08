@@ -20,6 +20,8 @@
 
 package com.spotify.styx.util;
 
+import static com.spotify.styx.util.ShardedCounter.CACHE_EXPIRY_DURATION;
+import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_SHARD;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_COUNTER_ID;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_LIMIT;
@@ -100,7 +102,7 @@ public class ShardedCounterTest {
   public void shouldCreateLimit() {
     final Key
         limitKey =
-        datastore.newKeyFactory().setKind(ShardedCounter.KIND_COUNTER_LIMIT).newKey(COUNTER_ID1);
+        datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(COUNTER_ID1);
     assertNull(datastore.get(limitKey));
 
     datastore.runInTransaction(transaction -> {
@@ -226,7 +228,7 @@ public class ShardedCounterTest {
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
     // create limit
     final Key limitKey =
-        datastore.newKeyFactory().setKind(ShardedCounter.KIND_COUNTER_LIMIT).newKey(COUNTER_ID1);
+        datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(COUNTER_ID1);
     datastore.runInTransaction(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 10);
       return null;
@@ -257,7 +259,7 @@ public class ShardedCounterTest {
                                                                         COUNTER_ID1)).build());
     assertFalse(results.hasNext());
     assertNull(datastore.get(
-        datastore.newKeyFactory().setKind(ShardedCounter.KIND_COUNTER_LIMIT).newKey(COUNTER_ID1)));
+        datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(COUNTER_ID1)));
   }
 
 
@@ -278,13 +280,13 @@ public class ShardedCounterTest {
 
 
   private Instant afterCacheExpiryDuration(Instant now) {
-    return now.plus(ShardedCounter.CACHE_EXPIRY_DURATION.toEpochMilli(), ChronoUnit.MILLIS);
+    return now.plus(CACHE_EXPIRY_DURATION.toEpochMilli(), ChronoUnit.MILLIS);
   }
 
 
   private static void clearDatastore() {
     deleteAllOfKind(KIND_COUNTER_SHARD);
-    deleteAllOfKind(ShardedCounter.KIND_COUNTER_LIMIT);
+    deleteAllOfKind(KIND_COUNTER_LIMIT);
   }
 
   private static void deleteAllOfKind(String kind) {
