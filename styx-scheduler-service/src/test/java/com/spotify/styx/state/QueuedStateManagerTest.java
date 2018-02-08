@@ -30,6 +30,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -174,10 +175,12 @@ public class QueuedStateManagerTest {
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
     final Exception rootCause = new IllegalStateException("Already exists!");
+    final TransactionException transactionException = spy(new TransactionException(false, rootCause));
+    when(transactionException.isAlreadyExists()).thenReturn(true);
     when(storage.runInTransaction(any())).thenAnswer(a -> {
       a.getArgumentAt(0, TransactionFunction.class)
           .apply(transaction);
-      throw new TransactionException(false, rootCause);
+      throw transactionException;
     });
 
     try {
@@ -185,7 +188,7 @@ public class QueuedStateManagerTest {
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
-      assertThat(Throwables.getRootCause(e), is(rootCause));
+      assertThat(Throwables.getRootCause(e), is(instanceOf(IllegalStateException.class)));
     }
   }
 
