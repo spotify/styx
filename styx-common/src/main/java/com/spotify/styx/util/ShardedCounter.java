@@ -26,7 +26,6 @@ import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.QueryResults;
-import com.google.cloud.datastore.StructuredQuery.OrderBy;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -130,18 +129,10 @@ public class ShardedCounter {
       }
     }
 
-    /**
-     * Gets the counter state. Creates it in Datastore if it doesn't exist yet.
-     */
-    private static CounterSnapshot fromDatastore(Datastore datastore, String counterId, Time time) {
-      return new CounterSnapshot(datastore, counterId, time);
-    }
-
     private static Map<Integer, Long> fetchShards(Datastore datastore, String counterId) {
       final EntityQuery queryShards = EntityQuery.newEntityQueryBuilder()
           .setKind(KIND_COUNTER_SHARD)
           .setFilter(PropertyFilter.eq(PROPERTY_COUNTER_ID, counterId))
-          .setOrderBy(OrderBy.asc("__key__"))
           .setLimit(NUM_SHARDS)
           .build();
       final QueryResults<Entity> shards = datastore.run(queryShards);
@@ -169,9 +160,6 @@ public class ShardedCounter {
      * then the distribution of capacity between the 3 shards will be [2, 2, 1]
      */
     private long shardCapacity(int shardIndex) {
-      // The shard's capacity is calculated as:
-      // 1/NUM_SHARDS part of the total count capacity
-      // plus an extra 1 unit of the remainder (whenever limit % NUM_SHARDS > 0) depending on the shardIndex
       return limit / NUM_SHARDS + (shardIndex < limit % NUM_SHARDS ? 1 : 0);
     }
 
@@ -179,7 +167,7 @@ public class ShardedCounter {
      * Returns shard index which _likely_ could be successfully updated by delta, according to our
      * cached view of the state in Datastore.
      */
-    private int pickShardWithSpareCapacity(long delta) throws InvalidShardStateException {
+    private int pickShardWithSpareCapacity(long delta) {
       List<Integer> candidates = new ArrayList<>();
 
       for (int i : shards.keySet()) {
@@ -193,8 +181,10 @@ public class ShardedCounter {
 
       if (candidates.isEmpty()) {
         if (shards.size() == 0) {
-          throw new InvalidShardStateException(
-              "Trying to operate with a potentially uninitialized counter. Cache needs to be updated first.");
+          LOG.info(
+              "Trying to operate with a potentially uninitialized counter {}. Cache needs to be updated first.",
+              counterId);
+          return new Random().nextInt(NUM_SHARDS);
         } else {
           throw new CounterCapacityException("No shard for counter %s has capacity for delta %s",
                                              counterId, delta);
@@ -212,7 +202,7 @@ public class ShardedCounter {
   }
 
   /**
-   * Returns a recent snapshot.
+   * Returns a recent snapshot, possibly read from cache.
    */
   private CounterSnapshot getCounterSnapshot(String counterId) {
     final CounterSnapshot snapshot = cache.getIfPresent(counterId);
@@ -223,10 +213,10 @@ public class ShardedCounter {
   }
 
   /**
-   * Update cached snapshot with most recent state of counter in Datastore
+   * Update cached snapshot with most recent state of counter in Datastore.
    */
   private CounterSnapshot refreshCounterSnapshot(String counterId) {
-    final CounterSnapshot newSnapshot = CounterSnapshot.fromDatastore(datastore, counterId, time);
+    final CounterSnapshot newSnapshot = new CounterSnapshot(datastore, counterId, time);
     cache.put(counterId, newSnapshot);
     return newSnapshot;
   }
@@ -270,35 +260,27 @@ public class ShardedCounter {
    */
   public void updateCounter(DatastoreReaderWriter transaction, String counterId, long delta) {
     CounterSnapshot snapshot = getCounterSnapshot(counterId);
-    int shardIndex;
-    try {
-      shardIndex = snapshot.pickShardWithSpareCapacity(delta);
-    } catch (InvalidShardStateException e) {
-      try {
-        snapshot = refreshCounterSnapshot(counterId);
-        shardIndex = snapshot.pickShardWithSpareCapacity(delta);
-      } catch (InvalidShardStateException e1) {
-        LOG.warn(
-            "Invalid shard state for counter {} but cache has already been reloaded for counter. {}",
-            counterId, e1);
-        return;
-      }
-    }
+    int shardIndex = snapshot.pickShardWithSpareCapacity(delta);
+
     final Key shardKey = datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD)
         .newKey(counterId + "-" + shardIndex);
     final Entity shard = transaction.get(shardKey);
 
-    final long newCounterValue = shard.getLong(PROPERTY_SHARD_VALUE) + delta;
-    if (shard != null && Range.closed(0L, snapshot.shardCapacity(shardIndex))
-        .contains(newCounterValue) && newCounterValue <= getLimit(datastore, counterId)) {
-      transaction.put(Entity.newBuilder(shard)
-                          .set(PROPERTY_SHARD_VALUE,
-                               shard.getLong(PROPERTY_SHARD_VALUE) + delta)
-                          .build());
+    if (shard != null) {
+      final long newShardValue = shard.getLong(PROPERTY_SHARD_VALUE) + delta;
+      if (Range.closed(0L, snapshot.shardCapacity(shardIndex))
+          .contains(newShardValue)) {
+        transaction.put(Entity.newBuilder(shard)
+                            .set(PROPERTY_SHARD_VALUE,
+                                 shard.getLong(PROPERTY_SHARD_VALUE) + delta)
+                            .build());
+      } else {
+        // TODO fail (rollback) the transaction
+        throw new ConcurrentModificationException(
+            "Chosen shard has no spare capacity anymoar, pls rollback kths");
+      }
     } else {
-      // TODO fail (rollback) the transaction
-      throw new ConcurrentModificationException(
-          "Chosen shard has no spare capacity anymoar, pls rollback kths");
+      throw new ShardNotFoundException(shardKey.getName());
     }
   }
 
@@ -320,12 +302,8 @@ public class ShardedCounter {
   /**
    * Delete counter by counterId. Deletes both counter shards and counter limit if it exists.
    *
-   * <p>There may be inconsistencies between instances, as each stores an in-memory cache, whose
-   * state may differ from what's stored in Datastore. Only after a cache expiry will other instances
-   * notice that a counter has been deleted.
-   *
    * <p>Due to Datastore limitations (modify max 25 entity groups per transaction),
-   * deletion of shards is done in batches of 25 entity groups.
+   * deletion of shards is done in batches of 25 shards.
    *
    * <p>Behaviour is non-determined if other instances try to access the same counter in the meantime.
    * Best results are achieved if all usages of the given resource - which the counter is associated with -
@@ -341,23 +319,20 @@ public class ShardedCounter {
                                                                         counterId))
                                                      .build());
     while (results.hasNext()) {
-      removeEntities(datastore, results);
+      // remove max 25 entities per transaction
+      datastore.runInTransaction(transaction -> {
+        IntStream.range(0, 25).forEach(i -> {
+          if (results.hasNext()) {
+            transaction.delete(results.next().getKey());
+          }
+        });
+        return null;
+      });
     }
 
     // delete limit entry too
     datastore.runInTransaction(transaction -> {
       transaction.delete(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId));
-      return null;
-    });
-  }
-
-  private void removeEntities(Datastore datastore, QueryResults<Entity> results) {
-    datastore.runInTransaction(transaction -> {
-      IntStream.range(0, 25).forEach(i -> {
-        if (results.hasNext()) {
-          transaction.delete(results.next().getKey());
-        }
-      });
       return null;
     });
   }
