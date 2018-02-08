@@ -139,7 +139,7 @@ public class ShardedCounterTest {
 
   private void updateCounterInTransaction(String counterId1, long delta) {
     datastore.runInTransaction(rw -> {
-      shardedCounter.updateCounter(rw, COUNTER_ID1, delta);
+      shardedCounter.updateCounter(rw, counterId1, delta);
       return null;
     });
   }

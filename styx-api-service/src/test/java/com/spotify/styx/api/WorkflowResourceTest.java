@@ -7,9 +7,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -61,11 +61,7 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
-<<<<<<< f6896e038d07b7c3d2e876bc31b82a9860e13d79
-=======
-import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.ShardedCounter;
->>>>>>> Fix tests
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
@@ -92,10 +88,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private Connection bigtable = setupBigTableMockTable();
   private AggregateStorage storage;
 
-  public WorkflowResourceTest(Api.Version version) {
-    super("/workflows", version, "workflow-test");
-    MockitoAnnotations.initMocks(this);
-  }
+  @Mock private ShardedCounter shardedCounter;
+  @Mock private WorkflowValidator workflowValidator;
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
@@ -125,11 +119,10 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private static final ByteString BAD_JSON =
       ByteString.encodeUtf8("{\"The BAD\"}");
 
-  @Mock private ShardedCounter shardedCounter;
-  @Mock WorkflowValidator workflowValidator;
-
-  private Datastore datastore = localDatastore.getOptions().getService();
-  private Connection bigtable = setupBigTableMockTable();
+  public WorkflowResourceTest(Api.Version version) {
+    super("/workflows", version, "workflow-test");
+    MockitoAnnotations.initMocks(this);
+  }
 
   @Override
   protected void init(Environment environment) {
