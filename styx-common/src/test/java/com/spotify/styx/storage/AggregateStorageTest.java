@@ -29,6 +29,7 @@ import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -59,6 +60,13 @@ public class AggregateStorageTest {
     when(datastore.allActiveStates()).thenReturn(activeStates);
     assertThat(sut.readActiveWorkflowInstances(), is(activeStates));
     verify(datastore).allActiveStates();
+  }
+
+  @Test
+  public void readActiveWorkflowInstance() throws Exception {
+    when(datastore.activeState(workflowInstance)).thenReturn(Optional.of(persistentState));
+    assertThat(sut.readActiveWorkflowInstance(workflowInstance), is(Optional.of(persistentState)));
+    verify(datastore).activeState(workflowInstance);
   }
 
   @Test
