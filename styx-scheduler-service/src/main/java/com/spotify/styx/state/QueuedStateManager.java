@@ -137,6 +137,12 @@ public class QueuedStateManager implements StateManager {
         return receive(event);
       } catch (IsClosedException isClosedException) {
         LOG.warn("Failed to send 'triggerExecution' event", isClosedException);
+        // Best effort attempt to rollback the creation of the NEW state
+        try {
+          storage.deleteActiveState(workflowInstance);
+        } catch (IOException e) {
+          LOG.warn("Failed to remove dangling NEW state for: {}", workflowInstance);
+        }
         throw new RuntimeException(isClosedException);
       }
     });
