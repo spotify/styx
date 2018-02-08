@@ -94,32 +94,32 @@ import org.mockito.runners.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class DatastoreStorageTest {
 
-  private static final WorkflowId WORKFLOW_ID1 = WorkflowId.create("component", "endpoint1");
-  private static final WorkflowId WORKFLOW_ID2 = WorkflowId.create("component", "endpoint2");
-  private static final WorkflowId WORKFLOW_ID3 = WorkflowId.create("component2", "pointless");
+  static final WorkflowId WORKFLOW_ID1 = WorkflowId.create("component", "endpoint1");
+  static final WorkflowId WORKFLOW_ID2 = WorkflowId.create("component", "endpoint2");
+  static final WorkflowId WORKFLOW_ID3 = WorkflowId.create("component2", "pointless");
 
-  private static final WorkflowInstance WORKFLOW_INSTANCE1 = WorkflowInstance.create(WORKFLOW_ID1, "2016-09-01");
-  private static final WorkflowInstance WORKFLOW_INSTANCE2 = WorkflowInstance.create(WORKFLOW_ID2, "2016-09-01");
-  private static final WorkflowInstance WORKFLOW_INSTANCE3 = WorkflowInstance.create(WORKFLOW_ID3, "2016-09-01");
+  static final WorkflowInstance WORKFLOW_INSTANCE1 = WorkflowInstance.create(WORKFLOW_ID1, "2016-09-01");
+  static final WorkflowInstance WORKFLOW_INSTANCE2 = WorkflowInstance.create(WORKFLOW_ID2, "2016-09-01");
+  static final WorkflowInstance WORKFLOW_INSTANCE3 = WorkflowInstance.create(WORKFLOW_ID3, "2016-09-01");
 
-  private static final Instant TIMESTAMP = Instant.parse("2017-01-01T00:00:00Z");
+  static final Instant TIMESTAMP = Instant.parse("2017-01-01T00:00:00Z");
 
 
-  private static final PersistentWorkflowInstanceState PERSISTENT_STATE1 = PersistentWorkflowInstanceState.builder()
+  static final PersistentWorkflowInstanceState PERSISTENT_STATE1 = PersistentWorkflowInstanceState.builder()
       .state(State.NEW)
       .data(StateData.zero())
       .timestamp(TIMESTAMP)
       .counter(42L)
       .build();
 
-  private static final PersistentWorkflowInstanceState PERSISTENT_STATE2 = PersistentWorkflowInstanceState.builder()
+  static final PersistentWorkflowInstanceState PERSISTENT_STATE2 = PersistentWorkflowInstanceState.builder()
       .state(State.NEW)
       .data(StateData.zero())
       .timestamp(TIMESTAMP)
       .counter(84L)
       .build();
 
-  private static final PersistentWorkflowInstanceState PERSISTENT_STATE3 = PersistentWorkflowInstanceState.builder()
+  static final PersistentWorkflowInstanceState PERSISTENT_STATE3 = PersistentWorkflowInstanceState.builder()
       .state(State.NEW)
       .data(StateData.zero())
       .timestamp(TIMESTAMP)
@@ -127,14 +127,14 @@ public class DatastoreStorageTest {
       .build();
 
 
-  private static final PersistentWorkflowInstanceState PERSISTENT_STATE = PersistentWorkflowInstanceState.builder()
+  static final PersistentWorkflowInstanceState PERSISTENT_STATE = PersistentWorkflowInstanceState.builder()
       .state(State.NEW)
       .data(StateData.zero())
       .timestamp(TIMESTAMP)
       .counter(42L)
       .build();
 
-  private static final PersistentWorkflowInstanceState FULL_PERSISTENT_STATE = PersistentWorkflowInstanceState.builder()
+  static final PersistentWorkflowInstanceState FULL_PERSISTENT_STATE = PersistentWorkflowInstanceState.builder()
       .state(State.QUEUED)
       .timestamp(TIMESTAMP)
       .counter(42L)
@@ -162,14 +162,14 @@ public class DatastoreStorageTest {
       .build();
 
 
-  private static final WorkflowId WORKFLOW_ID = WorkflowId.create("dockerComp", "dockerEndpoint");
+  static final WorkflowId WORKFLOW_ID = WorkflowId.create("dockerComp", "dockerEndpoint");
 
-  private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
+  static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
           .id(WORKFLOW_ID.id())
           .schedule(DAYS)
           .build();
-  private static final Workflow WORKFLOW = Workflow.create(WORKFLOW_ID.componentId(),
+  static final Workflow WORKFLOW = Workflow.create(WORKFLOW_ID.componentId(),
                                                            WORKFLOW_CONFIGURATION);
 
   private static LocalDatastoreHelper helper;
@@ -708,29 +708,6 @@ public class DatastoreStorageTest {
     }
 
     verify(transactionFunction, never()).apply(any());
-  }
-
-  @Test
-  public void insertActiveStateShouldFailIfAlreadyExists() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO);
-    storage.runInTransaction(tx -> tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1));
-    try {
-      storage.runInTransaction(tx -> tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1));
-      fail("Expected exception!");
-    } catch (TransactionException e) {
-      assertThat(e.isAlreadyExists(), is(true));
-    }
-  }
-
-  @Test
-  public void updateActiveStateShouldFailIfNotAlreadyExists() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO);
-    try {
-      storage.runInTransaction(tx -> tx.updateActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1));
-      fail("Expected exception!");
-    } catch (TransactionException e) {
-      assertThat(e.isNotFound(), is(true));
-    }
   }
 
   private static class FooException extends Exception {
