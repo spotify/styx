@@ -121,6 +121,9 @@ public class QueuedStateManager implements StateManager {
       } catch (TransactionException e) {
         if (e.isAlreadyExists()) {
           throw new IllegalStateException("Workflow instance is already triggered: " + workflowInstance.toKey());
+        } else if (e.isConflict()) {
+          LOG.debug("Transactional conflict, abort triggering Workflow instance: " + workflowInstance.toKey());
+          throw new RuntimeException(e);
         } else {
           throw new RuntimeException(e);
         }
@@ -230,8 +233,7 @@ public class QueuedStateManager implements StateManager {
   public Map<WorkflowInstance, RunState> activeStates() {
     final Map<WorkflowInstance, PersistentWorkflowInstanceState> states;
     try {
-      states = storage
-          .readActiveWorkflowInstances();
+      states = storage.readActiveWorkflowInstances();
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

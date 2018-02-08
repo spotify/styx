@@ -24,6 +24,7 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doNothing;
@@ -189,6 +190,29 @@ public class QueuedStateManagerTest {
       fail();
     } catch (ExecutionException e) {
       assertThat(Throwables.getRootCause(e), is(instanceOf(IllegalStateException.class)));
+    }
+  }
+
+  @Test
+  public void shouldFailTriggerWFIfOnConflict() throws Exception {
+    reset(storage);
+    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
+    final TransactionException transactionException = spy(new TransactionException(true, null));
+    when(storage.runInTransaction(any())).thenAnswer(a -> {
+      a.getArgumentAt(0, TransactionFunction.class)
+          .apply(transaction);
+      throw transactionException;
+    });
+
+    try {
+      stateManager.trigger(INSTANCE, TRIGGER1)
+          .toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(Throwables.getRootCause(e), is(instanceOf(TransactionException.class)));
+      TransactionException cause = (TransactionException) Throwables.getRootCause(e);
+      assertTrue(cause.isConflict());
     }
   }
 
@@ -367,7 +391,7 @@ public class QueuedStateManagerTest {
   }
 
   @Test
-  public void shouldNotStoreEventOnIllegalStateTransition() throws Exception {
+  public void shouldPreventIllegalStateTransition() throws Exception {
     when(transaction.activeState(INSTANCE)).thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
         .counter(17)
         .timestamp(NOW.minusMillis(1))
