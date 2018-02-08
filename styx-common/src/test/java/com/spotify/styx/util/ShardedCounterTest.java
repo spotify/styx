@@ -29,6 +29,7 @@ import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_INDEX;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_VALUE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -56,6 +57,7 @@ public class ShardedCounterTest {
   private static Instant now = Instant.now();
   private static final Time TIME = () -> now;
   private static final String COUNTER_ID1 = "resource_counter_1";
+  private static final String COUNTER_ID2 = "resource_counter_2";
 
 
   private static LocalDatastoreHelper helper;
@@ -84,12 +86,7 @@ public class ShardedCounterTest {
   public void shouldCreateCounterEmpty() {
     assertEquals(shardedCounter.getCounter(COUNTER_ID1), 0L);
 
-    QueryResults<Entity> results = datastore.run(EntityQuery.newEntityQueryBuilder()
-                                                     .setKind(KIND_COUNTER_SHARD)
-                                                     .setFilter(PropertyFilter
-                                                                    .eq(PROPERTY_COUNTER_ID,
-                                                                        COUNTER_ID1))
-                                                     .build());
+    QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
     // assert all shards exist
     IntStream.range(0, ShardedCounter.NUM_SHARDS).forEach(i -> {
       assertTrue(results.hasNext());
@@ -100,16 +97,14 @@ public class ShardedCounterTest {
 
   @Test
   public void shouldCreateLimit() {
-    final Key
-        limitKey =
-        datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(COUNTER_ID1);
-    assertNull(datastore.get(limitKey));
+    assertNull(getLimitForCounter(COUNTER_ID1));
 
     datastore.runInTransaction(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 500);
       return null;
     });
-    assertEquals(500L, datastore.get(limitKey).getLong(PROPERTY_LIMIT));
+
+    assertEquals(500L, getLimitForCounter(COUNTER_ID1).getLong(PROPERTY_LIMIT));
   }
 
   @Test
@@ -137,13 +132,6 @@ public class ShardedCounterTest {
     // assert the correct value is fetched after cache expiry
     now = afterCacheExpiryDuration(now);
     assertEquals(1L, shardedCounter.getCounter(COUNTER_ID1));
-  }
-
-  private void updateCounterInTransaction(String counterId1, long delta) {
-    datastore.runInTransaction(rw -> {
-      shardedCounter.updateCounter(rw, counterId1, delta);
-      return null;
-    });
   }
 
   @Test
@@ -220,15 +208,12 @@ public class ShardedCounterTest {
     assertEquals(10L, shardedCounter.getCounter(COUNTER_ID1));
   }
 
-
   @Test
   public void shouldDeleteCounterAndLimit() {
     now = Instant.parse("2018-01-01T00:00:00.000Z");
     //init counter
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
     // create limit
-    final Key limitKey =
-        datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(COUNTER_ID1);
     datastore.runInTransaction(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 10);
       return null;
@@ -236,14 +221,36 @@ public class ShardedCounterTest {
 
     shardedCounter.deleteCounter(datastore, COUNTER_ID1);
 
-    QueryResults<Entity> results = datastore.run(EntityQuery.newEntityQueryBuilder()
-                                                     .setKind(KIND_COUNTER_SHARD)
-                                                     .setFilter(PropertyFilter
-                                                                    .eq(PROPERTY_COUNTER_ID,
-                                                                        COUNTER_ID1)).build());
+    QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
 
     assertFalse(results.hasNext());
-    assertNull(datastore.get(limitKey));
+    assertNull(getLimitForCounter(COUNTER_ID1));
+  }
+
+  @Test
+  public void shouldDeleteOnlySpecifiedCounterAndLimit() {
+    now = Instant.parse("2018-01-01T00:00:00.000Z");
+    //init counter
+    assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
+    assertEquals(0L, shardedCounter.getCounter(COUNTER_ID2));
+
+    // create limit
+    datastore.runInTransaction(transaction -> {
+      shardedCounter.updateLimit(transaction, COUNTER_ID1, 10);
+      shardedCounter.updateLimit(transaction, COUNTER_ID2, 10);
+      return null;
+    });
+
+    shardedCounter.deleteCounter(datastore, COUNTER_ID1);
+
+    QueryResults<Entity> shardsCounter1 = getShardsForCounter(COUNTER_ID1);
+    QueryResults<Entity> shardsCounter2 = getShardsForCounter(COUNTER_ID2);
+
+    assertFalse(shardsCounter1.hasNext());
+    assertNull(getLimitForCounter(COUNTER_ID1));
+
+    assertTrue(shardsCounter2.hasNext());
+    assertNotNull(getLimitForCounter(COUNTER_ID2));
   }
 
   @Test
@@ -252,14 +259,9 @@ public class ShardedCounterTest {
 
     shardedCounter.deleteCounter(datastore, COUNTER_ID1);
 
-    QueryResults<Entity> results = datastore.run(EntityQuery.newEntityQueryBuilder()
-                                                     .setKind(KIND_COUNTER_SHARD)
-                                                     .setFilter(PropertyFilter
-                                                                    .eq(PROPERTY_COUNTER_ID,
-                                                                        COUNTER_ID1)).build());
+    QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
     assertFalse(results.hasNext());
-    assertNull(datastore.get(
-        datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(COUNTER_ID1)));
+    assertNull(getLimitForCounter(COUNTER_ID1));
   }
 
 
@@ -278,6 +280,12 @@ public class ShardedCounterTest {
     //3. fail further increases, but allow for decreases of the counter
   }
 
+  private void updateCounterInTransaction(String counterId, long delta) {
+    datastore.runInTransaction(rw -> {
+      shardedCounter.updateCounter(rw, counterId, delta);
+      return null;
+    });
+  }
 
   private Instant afterCacheExpiryDuration(Instant now) {
     return now.plus(CACHE_EXPIRY_DURATION.toEpochMilli(), ChronoUnit.MILLIS);
@@ -296,6 +304,18 @@ public class ShardedCounterTest {
     while (results.hasNext()) {
       datastore.delete(results.next().getKey());
     }
+  }
+
+  private Entity getLimitForCounter(String counterId) {
+    return datastore.get(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId));
+  }
+
+  private QueryResults<Entity> getShardsForCounter(String counterId) {
+    return datastore.run(EntityQuery.newEntityQueryBuilder()
+                             .setKind(KIND_COUNTER_SHARD)
+                             .setFilter(PropertyFilter
+                                            .eq(PROPERTY_COUNTER_ID,
+                                                counterId)).build());
   }
 
 }

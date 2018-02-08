@@ -82,11 +82,11 @@ public class ShardedCounter {
 
   private static class CounterSnapshot {
 
-    final private String counterId;
-    final private Instant updatedAt;
-    final private Long limit;
-    final private Map<Integer, Long> shards;
-    final private Time time;
+    private final String counterId;
+    private final Instant updatedAt;
+    private final Long limit;
+    private final Map<Integer, Long> shards;
+    private final Time time;
 
     public CounterSnapshot(Datastore datastore, String counterId, Time time) {
       limit = getLimit(datastore, counterId);
