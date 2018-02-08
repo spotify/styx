@@ -523,9 +523,6 @@ public class KubernetesDockerRunnerTest {
     when(serviceAccountSecretManager.ensureServiceAccountKeySecret(
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT)).thenReturn(SERVICE_ACCOUNT_SECRET);
 
-    StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
-//    stateManager.trigger(RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTED, stateData), trigger);
-
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
 
     verify(serviceAccountSecretManager).ensureServiceAccountKeySecret(
@@ -616,16 +613,7 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldIgnoreDeletedEvents() throws Exception {
-    reset(stateManager);
-
-    StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
-    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.RUNNING, stateData);
-
-    when(stateManager.activeStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
-    when(stateManager.get(WORKFLOW_INSTANCE)).thenReturn(runState);
-
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
-
+    createdPod.setStatus(podStatusNoContainer("Succeeded"));
     podWatcher.eventReceived(Watcher.Action.DELETED, createdPod);
 
     verify(stateManager, never()).receive(any());
