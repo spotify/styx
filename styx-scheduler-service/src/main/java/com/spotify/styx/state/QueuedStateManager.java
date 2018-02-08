@@ -96,7 +96,9 @@ public class QueuedStateManager implements StateManager {
   }
 
   @Override
-  public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger) {
+  public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger)
+      throws IsClosedException {
+    ensureRunning();
     final long counter;
     try {
       counter = storage.getLatestStoredCounter(workflowInstance).orElse(NO_EVENTS_PROCESSED);
