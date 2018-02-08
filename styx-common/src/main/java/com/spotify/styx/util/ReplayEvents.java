@@ -25,7 +25,6 @@ import static java.lang.String.format;
 import com.google.common.base.Throwables;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.storage.Storage;
@@ -34,9 +33,6 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.SortedSet;
-import java.util.stream.Collectors;
-import javaslang.Tuple;
-import javaslang.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,77 +44,9 @@ public final class ReplayEvents {
   }
 
   // TODO: fix NPath complexity
-  public static Map<RunState, Long> replayActiveStates(
-      Map<WorkflowInstance, PersistentWorkflowInstanceState> instances,
-      Storage storage,
-      boolean printLogs) throws IOException {
-    LOG.info("Replaying active states");
-
-    final OutputHandler replayLogger = printLogs ? transitionLogger("  ") : OutputHandler.NOOP;
-
-    return instances.entrySet().parallelStream().map(entry -> {
-      final WorkflowInstance workflowInstance = entry.getKey();
-      final PersistentWorkflowInstanceState persistentState = entry.getValue();
-      final long lastConsumedEvent = persistentState.counter();
-
-      // TODO: always use the persistent state from datastore when it has been migrated
-      if (persistentState.state() != null) {
-        if (printLogs) {
-          LOG.debug("Using persistent state instead of replaying events: {}", workflowInstance.toKey());
-        }
-        final RunState runState = RunState.create(workflowInstance, persistentState.state(),
-            persistentState.data(), persistentState.timestamp());
-        return Tuple.of(runState, lastConsumedEvent);
-      }
-
-      final SettableTime time = new SettableTime();
-      if (printLogs) {
-        LOG.debug("Replaying {} up to #{}", workflowInstance.toKey(), lastConsumedEvent);
-      }
-
-      final SortedSet<SequenceEvent> sequenceEvents;
-      try {
-        sequenceEvents = storage.readEvents(workflowInstance);
-      } catch (IOException e) {
-        throw Throwables.propagate(e);
-      }
-      RunState restoredState = RunState.fresh(workflowInstance, time);
-
-      for (SequenceEvent sequenceEvent : sequenceEvents) {
-        // At the time of writing, we don't expect to get events while Styx is not running.
-        // That is because the only event producers are going to be in the same process.
-        // Thus, we don't expect any event in the sequence to be later than the last consumed
-        // event. We will treat this as an error for now and skip the rest of the events.
-        if (sequenceEvent.counter() > lastConsumedEvent) {
-          if (printLogs) {
-            LOG.error("Got unexpected newer event than the last consumed event {} > {} for {}",
-                sequenceEvent.counter(), lastConsumedEvent, workflowInstance.toKey());
-          }
-          break;
-        }
-
-        time.set(Instant.ofEpochMilli(sequenceEvent.timestamp()));
-
-        if ("triggerExecution".equals(EventUtil.name(sequenceEvent.event()))) {
-          restoredState = RunState.fresh(workflowInstance, time);
-        }
-
-        if (printLogs) {
-          LOG.debug("  replaying #{} {}", sequenceEvent.counter(), sequenceEvent.event());
-        }
-        restoredState = restoredState.transition(sequenceEvent.event());
-        replayLogger.transitionInto(restoredState);
-      }
-
-      return Tuple.of(restoredState, lastConsumedEvent);
-    })
-    .collect(Collectors.toMap(Tuple2::_1, Tuple2::_2));
-  }
-
-  // TODO: fix NPath complexity
   public static Optional<RunState> getBackfillRunState(
       WorkflowInstance workflowInstance,
-      Map<WorkflowInstance, PersistentWorkflowInstanceState> activeWorkflowInstances,
+      Map<WorkflowInstance, RunState> activeWorkflowInstances,
       Storage storage,
       String backfillId) {
     final SettableTime time = new SettableTime();
@@ -139,7 +67,7 @@ public final class ReplayEvents {
 
     final long lastConsumedEvent =
         Optional.ofNullable(activeWorkflowInstances.get(workflowInstance))
-            .map(PersistentWorkflowInstanceState::counter)
+            .map(RunState::counter)
             .orElse(sequenceEvents.last().counter());
 
     for (SequenceEvent sequenceEvent : sequenceEvents) {

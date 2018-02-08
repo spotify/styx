@@ -47,7 +47,7 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Duration;
@@ -260,10 +260,10 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void shouldReturnAllActiveStateForWFI() throws Exception {
-    storage.writeActiveState(WORKFLOW_INSTANCE, PERSISTENT_STATE);
+    storage.writeActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE);
     DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    Optional<PersistentWorkflowInstanceState> activeStates =
-        tx.activeState(WORKFLOW_INSTANCE);
+    Optional<RunState> activeStates =
+        tx.activeState(WORKFLOW_INSTANCE1);
     tx.commit();
 
     assertThat(activeStates, is(Optional.of(PERSISTENT_STATE)));
@@ -272,24 +272,23 @@ public class DatastoreStorageTransactionTest {
   @Test
   public void shouldInsertActiveState() throws Exception {
     DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.insertActiveState(WORKFLOW_INSTANCE, PERSISTENT_STATE);
+    tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE);
     tx.commit();
 
-    assertThat(storage.activeState(WORKFLOW_INSTANCE), is(Optional.of(PERSISTENT_STATE)));
+    assertThat(storage.activeState(WORKFLOW_INSTANCE1), is(Optional.of(PERSISTENT_STATE)));
   }
 
   @Test
   public void shouldUpdateActiveState() throws Exception {
     DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.insertActiveState(WORKFLOW_INSTANCE, PERSISTENT_STATE);
+    tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE);
     tx.commit();
     tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    PersistentWorkflowInstanceState newPersistedState =
-        PERSISTENT_STATE.toBuilder().counter(PERSISTENT_STATE.counter() + 1).build();
-    tx.updateActiveState(WORKFLOW_INSTANCE, newPersistedState);
+    RunState newPersistedState = PERSISTENT_STATE.increaseCounter();
+    tx.updateActiveState(WORKFLOW_INSTANCE1, newPersistedState);
     tx.commit();
 
-    assertThat(storage.activeState(WORKFLOW_INSTANCE), is(Optional.of(newPersistedState)));
+    assertThat(storage.activeState(WORKFLOW_INSTANCE1), is(Optional.of(newPersistedState)));
   }
 
   @Test

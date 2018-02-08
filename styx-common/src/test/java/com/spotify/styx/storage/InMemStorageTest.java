@@ -23,7 +23,7 @@ package com.spotify.styx.storage;
 import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
-import static com.spotify.styx.storage.DatastoreStorageTest.FULL_PERSISTENT_STATE;
+import static com.spotify.styx.storage.DatastoreStorageTest.FULLY_POPULATED_RUNSTATE;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
@@ -41,7 +41,7 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
+import com.spotify.styx.state.RunState;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -137,12 +137,12 @@ public class InMemStorageTest {
 
   @Test
   public void shouldReturnAllActiveStatesForATriggerId() throws IOException {
-    storage.writeActiveState(WORKFLOW_INSTANCE, FULL_PERSISTENT_STATE);
+    storage.writeActiveState(WORKFLOW_INSTANCE, FULLY_POPULATED_RUNSTATE);
 
-    final Map<WorkflowInstance, PersistentWorkflowInstanceState> activeStates =
+    final Map<WorkflowInstance, RunState> activeStates =
         storage.readActiveWorkflowInstancesByTriggerId("foobar");
 
-    assertThat(activeStates, is(ImmutableMap.of(WORKFLOW_INSTANCE, FULL_PERSISTENT_STATE)));
+    assertThat(activeStates, is(ImmutableMap.of(WORKFLOW_INSTANCE, FULLY_POPULATED_RUNSTATE)));
   }
 
   @Test
