@@ -44,6 +44,7 @@ class FanOutputHandler implements OutputHandler {
         handler.transitionInto(state);
       } catch (Throwable e) {
         LOG.warn("Output handler {} threw", handler, e);
+        throw e;
       }
     }
   }
