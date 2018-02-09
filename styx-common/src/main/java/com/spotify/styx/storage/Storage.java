@@ -145,7 +145,7 @@ public interface Storage {
    *
    * @return The map of workflow instances to sequence counts
    */
-  Map<WorkflowInstance, RunState> readActiveWorkflowInstances() throws IOException;
+  Map<WorkflowInstance, RunState> readActiveStates() throws IOException;
 
   /**
    * Return a map of all active {@link WorkflowInstance}s to their last consumed sequence count,
@@ -157,13 +157,13 @@ public interface Storage {
    *
    * @return The map of workflow instances to sequence counts
    */
-  Map<WorkflowInstance, RunState> readActiveWorkflowInstances(String componentId)
+  Map<WorkflowInstance, RunState> readActiveStates(String componentId)
       throws IOException;
 
   /**
    * Read an active workflow instance.
    */
-  Optional<RunState> readActiveWorkflowInstance(WorkflowInstance workflowInstance)
+  Optional<RunState> readActiveState(WorkflowInstance workflowInstance)
       throws IOException;
 
   /**

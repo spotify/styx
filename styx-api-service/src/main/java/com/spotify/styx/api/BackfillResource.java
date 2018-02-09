@@ -256,7 +256,7 @@ public final class BackfillResource {
     final Workflow workflow;
     final Set<WorkflowInstance> activeWorkflowInstances;
     try {
-      activeWorkflowInstances = storage.readActiveWorkflowInstances(input.component()).keySet();
+      activeWorkflowInstances = storage.readActiveStates(input.component()).keySet();
       final Optional<Workflow> workflowOpt = storage.workflow(workflowId);
       if (!workflowOpt.isPresent()) {
         return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("workflow not found"));
@@ -346,7 +346,7 @@ public final class BackfillResource {
 
     Map<WorkflowInstance, RunState> activeWorkflowInstances;
     try {
-      activeWorkflowInstances = storage.readActiveWorkflowInstances();
+      activeWorkflowInstances = storage.readActiveStates();
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

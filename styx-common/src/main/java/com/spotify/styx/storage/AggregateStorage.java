@@ -81,20 +81,20 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public Map<WorkflowInstance, RunState> readActiveWorkflowInstances() throws IOException {
-    return datastoreStorage.allActiveStates();
+  public Map<WorkflowInstance, RunState> readActiveStates() throws IOException {
+    return datastoreStorage.readActiveStates();
   }
 
   @Override
-  public Map<WorkflowInstance, RunState> readActiveWorkflowInstances(String componentId)
+  public Map<WorkflowInstance, RunState> readActiveStates(String componentId)
       throws IOException {
-    return datastoreStorage.activeStates(componentId);
+    return datastoreStorage.readActiveStates(componentId);
   }
 
   @Override
-  public Optional<RunState> readActiveWorkflowInstance(WorkflowInstance workflowInstance)
+  public Optional<RunState> readActiveState(WorkflowInstance workflowInstance)
       throws IOException {
-    return datastoreStorage.activeState(workflowInstance);
+    return datastoreStorage.readActiveState(workflowInstance);
   }
 
   @Override

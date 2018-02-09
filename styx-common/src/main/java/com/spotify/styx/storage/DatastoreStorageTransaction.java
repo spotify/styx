@@ -146,26 +146,26 @@ class DatastoreStorageTransaction implements StorageTransaction {
   }
 
   @Override
-  public Optional<RunState> activeState(WorkflowInstance instance) throws IOException {
+  public Optional<RunState> readActiveState(WorkflowInstance instance) throws IOException {
     final Entity entity = tx.get(activeWorkflowInstanceKey(tx.getDatastore().newKeyFactory(), instance));
     if (entity == null) {
       return Optional.empty();
     } else {
-      return Optional.of(DatastoreStorage.readRunState(entity, instance));
+      return Optional.of(DatastoreStorage.entityToRunState(entity, instance));
     }
   }
 
   @Override
-  public WorkflowInstance insertActiveState(WorkflowInstance instance, RunState state)
+  public WorkflowInstance writeActiveState(WorkflowInstance instance, RunState state)
       throws IOException {
-    tx.add(DatastoreStorage.activeStateToEntity(tx.getDatastore().newKeyFactory(), instance, state));
+    tx.add(DatastoreStorage.runStateToEntity(tx.getDatastore().newKeyFactory(), instance, state));
     return instance;
   }
 
   @Override
   public WorkflowInstance updateActiveState(WorkflowInstance instance, RunState state)
       throws IOException {
-    tx.update(DatastoreStorage.activeStateToEntity(tx.getDatastore().newKeyFactory(), instance, state));
+    tx.update(DatastoreStorage.runStateToEntity(tx.getDatastore().newKeyFactory(), instance, state));
     return instance;
   }
 

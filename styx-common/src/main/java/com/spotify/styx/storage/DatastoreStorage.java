@@ -322,14 +322,14 @@ class DatastoreStorage {
     return workflows;
   }
 
-  Map<WorkflowInstance, RunState> allActiveStates() throws IOException {
+  Map<WorkflowInstance, RunState> readActiveStates() throws IOException {
     final EntityQuery query =
         Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE).build();
 
     return queryActiveStates(query);
   }
 
-  Map<WorkflowInstance, RunState> activeStates(String componentId) throws IOException {
+  Map<WorkflowInstance, RunState> readActiveStates(String componentId) throws IOException {
     final EntityQuery query =
         Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE)
             .setFilter(PropertyFilter.eq(PROPERTY_COMPONENT, componentId))
@@ -346,28 +346,26 @@ class DatastoreStorage {
     while (results.hasNext()) {
       final Entity entity = results.next();
       final WorkflowInstance instance = parseWorkflowInstance(entity);
-      mapBuilder.put(instance, readRunState(entity, instance));
+      mapBuilder.put(instance, entityToRunState(entity, instance));
     }
 
     return mapBuilder.build();
   }
 
-  Optional<RunState> activeState(WorkflowInstance instance) throws IOException {
+  Optional<RunState> readActiveState(WorkflowInstance instance) throws IOException {
     final Entity entity = datastore.get(activeWorkflowInstanceKey(instance));
     if (entity == null) {
       return Optional.empty();
     } else {
-      return Optional.of(readRunState(entity, instance));
+      return Optional.of(entityToRunState(entity, instance));
     }
   }
 
-  static RunState readRunState(Entity entity, WorkflowInstance instance)
+  static RunState entityToRunState(Entity entity, WorkflowInstance instance)
       throws IOException {
     final long counter = entity.getLong(PROPERTY_COUNTER);
-
     final State state = State.valueOf(entity.getString(PROPERTY_STATE));
     final long timestamp = entity.getLong(PROPERTY_STATE_TIMESTAMP);
-
     final StateData data = StateData.newBuilder()
         .tries((int) entity.getLong(PROPERTY_STATE_TRIES))
         .consecutiveFailures((int) entity.getLong(PROPERTY_STATE_CONSECUTIVE_FAILURES))
@@ -387,17 +385,17 @@ class DatastoreStorage {
 
   void writeActiveState(WorkflowInstance workflowInstance, RunState state)
       throws IOException {
-    storeWithRetries(() -> datastore.put(activeStateToEntity(datastore.newKeyFactory(), workflowInstance, state)));
+    storeWithRetries(() -> datastore.put(
+        runStateToEntity(datastore.newKeyFactory(), workflowInstance, state)));
   }
 
-  static Entity activeStateToEntity(KeyFactory keyFactory, WorkflowInstance workflowInstance,
-                                    RunState state)
+  static Entity runStateToEntity(KeyFactory keyFactory, WorkflowInstance wfi, RunState state)
       throws JsonProcessingException {
-    final Key key = activeWorkflowInstanceKey(keyFactory, workflowInstance);
+    final Key key = activeWorkflowInstanceKey(keyFactory, wfi);
     final Entity.Builder entity = Entity.newBuilder(key)
-        .set(PROPERTY_COMPONENT, workflowInstance.workflowId().componentId())
-        .set(PROPERTY_WORKFLOW, workflowInstance.workflowId().id())
-        .set(PROPERTY_PARAMETER, workflowInstance.parameter())
+        .set(PROPERTY_COMPONENT, wfi.workflowId().componentId())
+        .set(PROPERTY_WORKFLOW, wfi.workflowId().id())
+        .set(PROPERTY_PARAMETER, wfi.parameter())
         .set(PROPERTY_COUNTER, state.counter());
 
     entity

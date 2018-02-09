@@ -75,12 +75,12 @@ public interface StorageTransaction {
   /**
    * Read an active workflow instance state.
    */
-  Optional<RunState> activeState(WorkflowInstance instance) throws IOException;
+  Optional<RunState> readActiveState(WorkflowInstance instance) throws IOException;
 
   /**
    * Insert a new active workflow instance state. Fails if the state already exists.
    */
-  WorkflowInstance insertActiveState(WorkflowInstance instance, RunState state)
+  WorkflowInstance writeActiveState(WorkflowInstance instance, RunState state)
       throws IOException;
 
   /**
