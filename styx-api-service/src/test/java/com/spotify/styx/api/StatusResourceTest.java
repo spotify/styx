@@ -105,7 +105,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
     storage.writeActiveState(WFI, PERSISTENT_STATE);
     storage.writeActiveState(OTHER_WFI, OTHER_PERSISTENT_STATE);
-    assertThat(storage.readActiveWorkflowInstances().entrySet(), hasSize(2));
+    assertThat(storage.readActiveStates().entrySet(), hasSize(2));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/activeStates")));
@@ -128,7 +128,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
     storage.writeActiveState(WFI, PERSISTENT_STATE);
     storage.writeActiveState(OTHER_WFI, OTHER_PERSISTENT_STATE);
-    assertThat(storage.readActiveWorkflowInstances().entrySet(), hasSize(2));
+    assertThat(storage.readActiveStates().entrySet(), hasSize(2));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/activeStates?component=" + COMPONENT_ID)));

@@ -44,8 +44,7 @@ public class AggregateStorageTest {
   @Mock BigtableStorage bigtable;
   @Mock DatastoreStorage datastore;
   @Mock WorkflowInstance workflowInstance;
-  @Mock
-  RunState persistentState;
+  @Mock RunState runState;
 
   private AggregateStorage sut;
 
@@ -57,31 +56,31 @@ public class AggregateStorageTest {
   @Test
   public void readActiveWorkflowInstances() throws Exception {
     final Map<WorkflowInstance, RunState> activeStates =
-        ImmutableMap.of(workflowInstance, persistentState);
-    when(datastore.allActiveStates()).thenReturn(activeStates);
-    assertThat(sut.readActiveWorkflowInstances(), is(activeStates));
-    verify(datastore).allActiveStates();
+        ImmutableMap.of(workflowInstance, runState);
+    when(datastore.readActiveStates()).thenReturn(activeStates);
+    assertThat(sut.readActiveStates(), is(activeStates));
+    verify(datastore).readActiveStates();
   }
 
   @Test
   public void readActiveWorkflowInstance() throws Exception {
-    when(datastore.activeState(workflowInstance)).thenReturn(Optional.of(persistentState));
-    assertThat(sut.readActiveWorkflowInstance(workflowInstance), is(Optional.of(persistentState)));
-    verify(datastore).activeState(workflowInstance);
+    when(datastore.readActiveState(workflowInstance)).thenReturn(Optional.of(runState));
+    assertThat(sut.readActiveState(workflowInstance), is(Optional.of(runState)));
+    verify(datastore).readActiveState(workflowInstance);
   }
 
   @Test
   public void readActiveWorkflowInstancesForComponent() throws Exception {
     final Map<WorkflowInstance, RunState> activeStates =
-        ImmutableMap.of(workflowInstance, persistentState);
-    when(datastore.activeStates(COMPONENT)).thenReturn(activeStates);
-    assertThat(sut.readActiveWorkflowInstances(COMPONENT), is(activeStates));
-    verify(datastore).activeStates(COMPONENT);
+        ImmutableMap.of(workflowInstance, runState);
+    when(datastore.readActiveStates(COMPONENT)).thenReturn(activeStates);
+    assertThat(sut.readActiveStates(COMPONENT), is(activeStates));
+    verify(datastore).readActiveStates(COMPONENT);
   }
 
   @Test
   public void writeActiveState() throws Exception {
-    sut.writeActiveState(workflowInstance, persistentState);
-    verify(datastore).writeActiveState(workflowInstance, persistentState);
+    sut.writeActiveState(workflowInstance, runState);
+    verify(datastore).writeActiveState(workflowInstance, runState);
   }
 }

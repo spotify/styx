@@ -21,8 +21,9 @@
 package com.spotify.styx.storage;
 
 import static com.spotify.styx.model.Schedule.DAYS;
-import static com.spotify.styx.storage.DatastoreStorageTest.PERSISTENT_STATE;
-import static com.spotify.styx.storage.DatastoreStorageTest.PERSISTENT_STATE1;
+import static com.spotify.styx.storage.DatastoreStorageTest.RUN_STATE;
+import static com.spotify.styx.storage.DatastoreStorageTest.RUN_STATE1;
+import static com.spotify.styx.storage.DatastoreStorageTest.TIMESTAMP;
 import static com.spotify.styx.storage.DatastoreStorageTest.WORKFLOW;
 import static com.spotify.styx.storage.DatastoreStorageTest.WORKFLOW_INSTANCE1;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
@@ -48,6 +49,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Duration;
@@ -180,10 +182,10 @@ public class DatastoreStorageTransactionTest {
   @Test
   public void insertActiveStateShouldFailIfAlreadyExists() throws Exception {
     DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1);
+    tx.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
     tx.commit();
     tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1);
+    tx.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
     try {
       tx.commit();
       fail("Expected exception!");
@@ -195,7 +197,7 @@ public class DatastoreStorageTransactionTest {
   @Test
   public void updateActiveStateShouldFailIfNotFound() throws Exception {
     DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.updateActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1);
+    tx.updateActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
     try {
       tx.commit();
       fail("Expected exception!");
@@ -260,47 +262,50 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void shouldReturnAllActiveStateForWFI() throws Exception {
-    storage.writeActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE);
+    storage.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
     DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
     Optional<RunState> activeStates =
-        tx.activeState(WORKFLOW_INSTANCE1);
+        tx.readActiveState(WORKFLOW_INSTANCE1);
     tx.commit();
 
-    assertThat(activeStates, is(Optional.of(PERSISTENT_STATE)));
+    assertThat(activeStates, is(Optional.of(RUN_STATE)));
   }
 
   @Test
   public void shouldInsertActiveState() throws Exception {
     DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE);
+    tx.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
     tx.commit();
 
-    assertThat(storage.activeState(WORKFLOW_INSTANCE1), is(Optional.of(PERSISTENT_STATE)));
+    assertThat(storage.readActiveState(WORKFLOW_INSTANCE1), is(Optional.of(RUN_STATE)));
   }
 
   @Test
   public void shouldUpdateActiveState() throws Exception {
+    RunState runState = RunState.create(WORKFLOW_INSTANCE1, RunState.State.NEW,
+        StateData.zero(), TIMESTAMP, 42L);
     DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE);
+    tx.writeActiveState(WORKFLOW_INSTANCE1, runState);
     tx.commit();
     tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    RunState newPersistedState = PERSISTENT_STATE.increaseCounter();
-    tx.updateActiveState(WORKFLOW_INSTANCE1, newPersistedState);
+    RunState newRunState = RunState.create(WORKFLOW_INSTANCE1, RunState.State.NEW,
+        StateData.zero(), TIMESTAMP, 43L);
+    tx.updateActiveState(WORKFLOW_INSTANCE1, newRunState);
     tx.commit();
 
-    assertThat(storage.activeState(WORKFLOW_INSTANCE1), is(Optional.of(newPersistedState)));
+    assertThat(storage.readActiveState(WORKFLOW_INSTANCE1), is(Optional.of(newRunState)));
   }
 
   @Test
   public void shouldDeleteActiveState() throws Exception {
     DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.insertActiveState(WORKFLOW_INSTANCE, PERSISTENT_STATE);
+    tx.writeActiveState(WORKFLOW_INSTANCE, RUN_STATE1);
     tx.commit();
     tx = new DatastoreStorageTransaction(datastore.newTransaction());
     tx.deleteActiveState(WORKFLOW_INSTANCE);
     tx.commit();
 
-    assertThat(storage.activeState(WORKFLOW_INSTANCE), is(Optional.empty()));
+    assertThat(storage.readActiveState(WORKFLOW_INSTANCE), is(Optional.empty()));
   }
 
   @Test

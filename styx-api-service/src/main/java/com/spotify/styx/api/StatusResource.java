@@ -91,8 +91,8 @@ public class StatusResource {
     try {
 
       final Map<WorkflowInstance, RunState> activeStates = componentOpt.isPresent()
-          ? storage.readActiveWorkflowInstances(componentOpt.get())
-          : storage.readActiveWorkflowInstances();
+          ? storage.readActiveStates(componentOpt.get())
+          : storage.readActiveStates();
 
       runStates.addAll(
           activeStates.values().stream().map(this::runStateToRunStateData).collect(toList()));
