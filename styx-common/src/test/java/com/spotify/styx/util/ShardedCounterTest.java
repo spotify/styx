@@ -186,13 +186,11 @@ public class ShardedCounterTest {
     now = afterCacheExpiryDuration(now);
 
     //increment counter by 1 until counter value gets to 10
-    while (shardedCounter.getCounter(COUNTER_ID1) < 10) {
-      try {
-        IntStream.range(0, 10).forEach(i -> updateCounterInTransaction(COUNTER_ID1, 1L));
-      } catch (DatastoreException ignored) {
-      }
+
+    IntStream.range(0, 10).forEach(i -> {
+      updateCounterInTransaction(COUNTER_ID1, 1L);
       now = afterCacheExpiryDuration(now);
-    }
+    });
 
     // try another 10 times to update the counter
     IntStream.range(0, 10).forEach(i -> {
