@@ -408,6 +408,18 @@ public class DatastoreStorageTest {
   }
 
   @Test
+  public void shouldReturnActiveStateForWFI() throws Exception {
+    storage.writeActiveState(WORKFLOW_INSTANCE2, PERSISTENT_STATE2);
+
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(1));
+
+    final Optional<PersistentWorkflowInstanceState> activeStates =
+        storage.activeState(WORKFLOW_INSTANCE2);
+
+    assertThat(activeStates, is(Optional.of(PERSISTENT_STATE2)));
+  }
+
+  @Test
   public void shouldWriteActiveStatesWithSamePartitionAsSeparateEntities() throws Exception {
     storage.writeActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1);
     storage.writeActiveState(WORKFLOW_INSTANCE2, PERSISTENT_STATE2);
