@@ -176,10 +176,13 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void insertActiveStateShouldFailIfAlreadyExists() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO);
-    storage.runInTransaction(tx -> tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1));
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1);
+    tx.commit();
+    tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1);
     try {
-      storage.runInTransaction(tx -> tx.insertActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1));
+      tx.commit();
       fail("Expected exception!");
     } catch (TransactionException e) {
       assertThat(e.isAlreadyExists(), is(true));
@@ -188,9 +191,10 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void updateActiveStateShouldFailIfNotFound() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO);
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx.updateActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1);
     try {
-      storage.runInTransaction(tx -> tx.updateActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1));
+      tx.commit();
       fail("Expected exception!");
     } catch (TransactionException e) {
       assertThat(e.isNotFound(), is(true));
@@ -234,12 +238,11 @@ public class DatastoreStorageTransactionTest {
   }
 
   @Test
-  public void shouldSetAndRetrieveWorkflowState() throws Exception {
+  public void shouldPatchState() throws Exception {
     storage.store(WORKFLOW);
     Instant instant = Instant.parse("2016-03-14T14:00:00Z");
     Instant offset = instant.plus(1, ChronoUnit.DAYS);
     TriggerInstantSpec spec = TriggerInstantSpec.create(instant, offset);
-    storage.updateNextNaturalTrigger(WORKFLOW.id(), spec);
     WorkflowState state = WorkflowState.builder()
         .enabled(true)
         .nextNaturalTrigger(instant)
