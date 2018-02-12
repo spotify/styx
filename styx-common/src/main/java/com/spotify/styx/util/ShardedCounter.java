@@ -184,7 +184,7 @@ public class ShardedCounter {
           LOG.info(
               "Trying to operate with a potentially uninitialized counter {}. Cache needs to be updated first.",
               counterId);
-          return new Random().nextInt(NUM_SHARDS);
+          return new Random().nextInt((int) Math.min(NUM_SHARDS, limit));
         } else {
           throw new CounterCapacityException("No shard for counter %s has capacity for delta %s",
                                              counterId, delta);
