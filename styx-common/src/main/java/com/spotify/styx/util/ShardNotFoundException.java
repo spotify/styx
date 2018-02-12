@@ -25,4 +25,7 @@ public class ShardNotFoundException extends RuntimeException {
   public ShardNotFoundException(String name) {
     super(name);
   }
+  public ShardNotFoundException(String message, Object... args) {
+    super(String.format(message, args));
+  }
 }
