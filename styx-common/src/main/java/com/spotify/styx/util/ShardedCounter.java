@@ -33,7 +33,6 @@ import com.google.common.collect.Range;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -275,12 +274,15 @@ public class ShardedCounter {
                                  shard.getLong(PROPERTY_SHARD_VALUE) + delta)
                             .build());
       } else {
-        // TODO fail (rollback) the transaction
-        throw new ConcurrentModificationException(
-            "Chosen shard has no spare capacity anymoar, pls rollback kths");
+        throw new CounterCapacityException("Chosen shard %s has no more capacity.",
+                                           shardKey.getName());
       }
     } else {
-      throw new ShardNotFoundException(shardKey.getName());
+      throw new ShardNotFoundException(
+          "Could not find shard %s. Unexpected Datastore corruption or our bug - the code should've "
+          + "called initialize() before reaching this point, and any particular shard should "
+          + "strongly be get()-able thereafter",
+          shardKey.getName());
     }
   }
 
