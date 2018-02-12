@@ -20,8 +20,13 @@
 
 package com.spotify.styx.storage;
 
+import static com.spotify.styx.storage.DatastoreStorageTest.PERSISTENT_STATE;
 import static com.spotify.styx.storage.DatastoreStorageTest.PERSISTENT_STATE1;
+import static com.spotify.styx.storage.DatastoreStorageTest.WORKFLOW;
 import static com.spotify.styx.storage.DatastoreStorageTest.WORKFLOW_INSTANCE1;
+import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
+import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
+import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
@@ -32,10 +37,23 @@ import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.KeyFactory;
+import com.google.cloud.datastore.KeyQuery;
+import com.google.cloud.datastore.Query;
+import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
+import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Map;
+import java.util.Optional;
+import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -47,6 +65,7 @@ public class DatastoreStorageTransactionTest {
 
   private static LocalDatastoreHelper helper;
   private static Datastore datastore;
+  private DatastoreStorage storage;
 
   @BeforeClass
   public static void setUpClass() throws Exception {
@@ -55,9 +74,31 @@ public class DatastoreStorageTransactionTest {
     helper.start();
   }
 
+  @AfterClass
+  public static void tearDownClass() throws Exception {
+    if (helper != null) {
+      try {
+        helper.stop(org.threeten.bp.Duration.ofSeconds(30));
+      } catch (Throwable e) {
+        e.printStackTrace();
+      }
+    }
+  }
+
   @Before
-  public void setUp() {
+  public void setUp() throws Exception {
     datastore = helper.getOptions().getService();
+    storage = new DatastoreStorage(datastore, Duration.ZERO);
+  }
+
+  @After
+  public void tearDown() throws Exception {
+    // clear datastore after each test
+    KeyQuery query = Query.newKeyQueryBuilder().build();
+    final QueryResults<Key> keys = datastore.run(query);
+    while (keys.hasNext()) {
+      datastore.delete(keys.next());
+    }
   }
 
   @Test
@@ -98,9 +139,9 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void shouldThrowIfTransactionFailed() throws IOException, InterruptedException {
-    Transaction transaction1 = datastore.newTransaction();
-    Transaction transaction2 = datastore.newTransaction();
-    Transaction transaction3 = datastore.newTransaction();
+    final Transaction transaction1 = datastore.newTransaction();
+    final Transaction transaction2 = datastore.newTransaction();
+    final Transaction transaction3 = datastore.newTransaction();
     DatastoreStorageTransaction storageTransaction1 = new DatastoreStorageTransaction(transaction1);
     DatastoreStorageTransaction storageTransaction2 = new DatastoreStorageTransaction(transaction2);
     DatastoreStorageTransaction storageTransaction3 = new DatastoreStorageTransaction(transaction3);
@@ -129,10 +170,8 @@ public class DatastoreStorageTransactionTest {
       fail("Expected exception!");
     } catch (TransactionException e) {
       assertTrue(e.isConflict());
+      transaction3.rollback();
     }
-
-    // To remove lingering transactions from the Datastore emulator
-    resetDatastore();
   }
 
   @Test
@@ -148,7 +187,7 @@ public class DatastoreStorageTransactionTest {
   }
 
   @Test
-  public void updateActiveStateShouldFailIfNotAlreadyExists() throws Exception {
+  public void updateActiveStateShouldFailIfNotFound() throws Exception {
     final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO);
     try {
       storage.runInTransaction(tx -> tx.updateActiveState(WORKFLOW_INSTANCE1, PERSISTENT_STATE1));
@@ -158,15 +197,105 @@ public class DatastoreStorageTransactionTest {
     }
   }
 
-  private void resetDatastore() throws IOException, InterruptedException {
-    if (helper != null) {
-      try {
-        helper.stop(org.threeten.bp.Duration.ofSeconds(30));
-      } catch (Throwable e) {
-        e.printStackTrace();
-      }
-    }
-    helper = LocalDatastoreHelper.create(1.0); // 100% global consistency
-    helper.start();
+  @Test
+  public void shouldStoreWorkflow() throws IOException {
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    Workflow workflow = Workflow.create("test", FULL_WORKFLOW_CONFIGURATION);
+    tx.store(workflow);
+    tx.commit();
+    assertThat(storage.workflow(workflow.id()), is(Optional.of(workflow)));
+  }
+
+  @Test
+  public void shouldGetWorkflow() throws IOException {
+    Workflow workflow = Workflow.create("test", FULL_WORKFLOW_CONFIGURATION);
+    storage.store(workflow);
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    Optional<Workflow> workflowOptional = tx.workflow(workflow.id());
+    tx.commit();
+    assertThat(workflowOptional, is(Optional.of(workflow)));
+  }
+
+  @Test
+  public void shouldPersistNextScheduledRun() throws Exception {
+    Instant instant = Instant.parse("2016-03-14T14:00:00Z");
+    Instant offset = instant.plus(1, ChronoUnit.DAYS);
+    TriggerInstantSpec spec = TriggerInstantSpec.create(instant, offset);
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx.store(WORKFLOW);
+    tx.commit();
+    tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx.updateNextNaturalTrigger(WORKFLOW.id(), spec);
+    tx.commit();
+
+    Map<Workflow, TriggerInstantSpec> result = storage.workflowsWithNextNaturalTrigger();
+    assertThat(result.values().size(), is(1));
+    assertThat(result, hasEntry(WORKFLOW, spec));
+  }
+
+  @Test
+  public void shouldSetAndRetrieveWorkflowState() throws Exception {
+    storage.store(WORKFLOW);
+    Instant instant = Instant.parse("2016-03-14T14:00:00Z");
+    Instant offset = instant.plus(1, ChronoUnit.DAYS);
+    TriggerInstantSpec spec = TriggerInstantSpec.create(instant, offset);
+    storage.updateNextNaturalTrigger(WORKFLOW.id(), spec);
+    WorkflowState state = WorkflowState.builder()
+        .enabled(true)
+        .nextNaturalTrigger(instant)
+        .nextNaturalOffsetTrigger(offset)
+        .build();
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx.patchState(WORKFLOW.id(), state);
+    tx.commit();
+    WorkflowState retrieved = storage.workflowState(WORKFLOW.id());
+
+    assertThat(retrieved, is(state));
+  }
+
+  @Test
+  public void shouldReturnAllActiveStateForWFI() throws Exception {
+    storage.writeActiveState(WORKFLOW_INSTANCE, PERSISTENT_STATE);
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    Optional<PersistentWorkflowInstanceState> activeStates =
+        tx.activeState(WORKFLOW_INSTANCE);
+    tx.commit();
+
+    assertThat(activeStates, is(Optional.of(PERSISTENT_STATE)));
+  }
+
+  @Test
+  public void shouldInsertActiveState() throws Exception {
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx.insertActiveState(WORKFLOW_INSTANCE, PERSISTENT_STATE);
+    tx.commit();
+
+    assertThat(storage.activeState(WORKFLOW_INSTANCE), is(Optional.of(PERSISTENT_STATE)));
+  }
+
+  @Test
+  public void shouldUpdateActiveState() throws Exception {
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx.insertActiveState(WORKFLOW_INSTANCE, PERSISTENT_STATE);
+    tx.commit();
+    tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    PersistentWorkflowInstanceState newPersistedState =
+        PERSISTENT_STATE.toBuilder().counter(PERSISTENT_STATE.counter() + 1).build();
+    tx.updateActiveState(WORKFLOW_INSTANCE, newPersistedState);
+    tx.commit();
+
+    assertThat(storage.activeState(WORKFLOW_INSTANCE), is(Optional.of(newPersistedState)));
+  }
+
+  @Test
+  public void shouldDeleteActiveState() throws Exception {
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx.insertActiveState(WORKFLOW_INSTANCE, PERSISTENT_STATE);
+    tx.commit();
+    tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx.deleteActiveState(WORKFLOW_INSTANCE);
+    tx.commit();
+
+    assertThat(storage.activeState(WORKFLOW_INSTANCE), is(Optional.empty()));
   }
 }

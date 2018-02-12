@@ -220,7 +220,7 @@ public class QueuedStateManagerTest {
   }
 
   @Test
-  public void shouldFailTriggerWFIfOnConflict9() throws Exception {
+  public void shouldFailTriggerWFIfOnFooException() throws Exception {
     reset(storage);
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
