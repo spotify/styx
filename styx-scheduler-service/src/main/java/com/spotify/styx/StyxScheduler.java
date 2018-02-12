@@ -543,14 +543,14 @@ public class StyxScheduler implements AppInit {
           stats.registerActiveStatesMetric(
               state,
               triggerType,
-              () -> stateManager.activeStates().values().stream()
+              () -> activeStates.values().stream()
                   .filter(runState -> runState.state().equals(state))
                   .filter(runState -> runState.data().trigger().isPresent() && triggerType
                       .equals(TriggerUtil.triggerType(runState.data().trigger().get())))
                   .count()));
       stats.registerActiveStatesMetric(
           state,
-          "none", () -> stateManager.activeStates().values().stream()
+          "none", () -> activeStates.values().stream()
               .filter(runState -> runState.state().equals(state))
               .filter(runState -> !runState.data().trigger().isPresent())
               .count());
