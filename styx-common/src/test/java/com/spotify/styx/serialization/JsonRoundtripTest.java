@@ -40,13 +40,6 @@ public class JsonRoundtripTest {
 
   private static final Logger LOG = LoggerFactory.getLogger(JsonRoundtripTest.class);
 
-  @Test
-  public void testRoundtripSchedule() throws Exception {
-    WorkflowConfiguration before = TestData.FULL_WORKFLOW_CONFIGURATION;
-    WorkflowConfiguration after = roundtrip(before, WorkflowConfiguration.class);
-    assertThat(after, is(before));
-  }
-
   private static final Map<String, Schedule> LEGACY_SCHEDULE_TESTS =
       ImmutableMap.<String, Schedule>builder()
           .put("hourly", Schedule.HOURS)
@@ -59,6 +52,13 @@ public class JsonRoundtripTest {
           .put("DAILY", Schedule.DAYS)
           .put("dAiLy", Schedule.DAYS)
           .build();
+
+  @Test
+  public void testRoundtripSchedule() throws Exception {
+    WorkflowConfiguration before = TestData.FULL_WORKFLOW_CONFIGURATION;
+    WorkflowConfiguration after = roundtrip(before, WorkflowConfiguration.class);
+    assertThat(after, is(before));
+  }
 
   @Test
   public void testLegacyScheduleSupport() throws Exception {

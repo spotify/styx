@@ -67,6 +67,8 @@ public class StyxApi implements AppInit {
 
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
 
+  private final StorageFactory storageFactory;
+
   public static class Builder {
 
     private StorageFactory storageFactory = StyxApi::storage;
@@ -88,8 +90,6 @@ public class StyxApi implements AppInit {
   public static StyxApi createDefault() {
     return newBuilder().build();
   }
-
-  private final StorageFactory storageFactory;
 
   private StyxApi(StorageFactory storageFactory) {
     this.storageFactory = requireNonNull(storageFactory);

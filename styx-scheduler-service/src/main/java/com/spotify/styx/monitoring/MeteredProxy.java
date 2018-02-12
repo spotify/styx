@@ -112,11 +112,12 @@ public class MeteredProxy implements InvocationHandler {
   }
 
   private static <T> T findCause(Throwable throwable, Class<T> needle) {
-    while (throwable != null) {
-      if (needle.isInstance(throwable)) {
-        return needle.cast(throwable);
+    Throwable target = throwable;
+    while (target != null) {
+      if (needle.isInstance(target)) {
+        return needle.cast(target);
       }
-      throwable = throwable.getCause();
+      target = target.getCause();
     }
     return null;
   }

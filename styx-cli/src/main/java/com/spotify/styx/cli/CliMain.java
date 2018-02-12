@@ -331,7 +331,7 @@ public final class CliMain {
           "Sure you want to delete the workflow" + (workflows.size() > 1 ? "s" : "") + " "
               + workflows.stream().collect(joining(", "))
               + " in component " + component + "? [y/N] ").trim();
-      if (!reply.equals("y")) {
+      if (!"y".equals(reply)) {
         throw CliExitException.of(ExitStatus.UnknownError);
       }
     }
