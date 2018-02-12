@@ -30,6 +30,7 @@ import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Range;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -59,7 +60,7 @@ public class ShardedCounter {
 
   // Ought to be enough (parallelism) for everyone. We could make it dynamic with extra effort.
   public static final int NUM_SHARDS = 128;
-  public static final Instant CACHE_EXPIRY_DURATION = Instant.ofEpochMilli(1000);
+  public static final Duration CACHE_EXPIRY_DURATION = Duration.ofMillis(1000);
 
   public static final String KIND_COUNTER_LIMIT = "CounterLimit";
   public static final String PROPERTY_LIMIT = "limit";
@@ -145,7 +146,7 @@ public class ShardedCounter {
     }
 
     private boolean isRecent() {
-      return updatedAt.plus(CACHE_EXPIRY_DURATION.toEpochMilli(), ChronoUnit.MILLIS)
+      return updatedAt.plus(CACHE_EXPIRY_DURATION.toMillis(), ChronoUnit.MILLIS)
           .isAfter(time.get());
     }
 

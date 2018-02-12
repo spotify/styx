@@ -288,7 +288,7 @@ public class ShardedCounterTest {
   }
 
   private Instant afterCacheExpiryDuration(Instant now) {
-    return now.plus(CACHE_EXPIRY_DURATION.toEpochMilli(), ChronoUnit.MILLIS);
+    return now.plus(CACHE_EXPIRY_DURATION.toMillis(), ChronoUnit.MILLIS);
   }
 
 
