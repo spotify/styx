@@ -242,7 +242,6 @@ public class DatastoreStorageTransactionTest {
     storage.store(WORKFLOW);
     Instant instant = Instant.parse("2016-03-14T14:00:00Z");
     Instant offset = instant.plus(1, ChronoUnit.DAYS);
-    TriggerInstantSpec spec = TriggerInstantSpec.create(instant, offset);
     WorkflowState state = WorkflowState.builder()
         .enabled(true)
         .nextNaturalTrigger(instant)

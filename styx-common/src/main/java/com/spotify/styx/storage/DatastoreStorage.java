@@ -779,10 +779,9 @@ class DatastoreStorage {
       final T value = f.apply(tx);
       tx.commit();
       return value;
-    } catch (DatastoreException ex) {
+    } catch (DatastoreException e) {
       tx.rollback();
-      final boolean conflict = ex.getCode() == 10;
-      throw new TransactionException(ex.getMessage(), conflict, ex);
+      throw new TransactionException(e);
     } finally {
       if (tx.isActive()) {
         tx.rollback();
@@ -795,7 +794,7 @@ class DatastoreStorage {
     try {
       transaction = datastore.newTransaction();
     } catch (DatastoreException e) {
-      throw new TransactionException(e.getMessage(), false, e);
+      throw new TransactionException(e);
     }
     return storageTransactionFactory.apply(transaction);
   }
