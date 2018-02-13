@@ -664,7 +664,8 @@ public class DatastoreStorageTest {
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
 
-    final TransactionException expectedException = new TransactionException(true, null);
+    final DatastoreException datastoreException = new DatastoreException(1, "", "");
+    final TransactionException expectedException = new TransactionException(datastoreException);
     when(transactionFunction.apply(any())).thenReturn("");
     doThrow(expectedException).when(storageTransaction).commit();
 
@@ -687,9 +688,9 @@ public class DatastoreStorageTest {
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
 
     when(transactionFunction.apply(any())).thenReturn("");
-
-    doThrow(new TransactionException(true, null)).when(storageTransaction).commit();
-    final TransactionException expectedException = new TransactionException(false, null);
+    final DatastoreException datastoreException = new DatastoreException(1, "", "");
+    doThrow(new TransactionException(datastoreException)).when(storageTransaction).commit();
+    final TransactionException expectedException = new TransactionException(datastoreException);
     doThrow(expectedException).when(storageTransaction).rollback();
 
     try {

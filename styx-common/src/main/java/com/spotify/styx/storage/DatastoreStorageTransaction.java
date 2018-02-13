@@ -57,8 +57,7 @@ class DatastoreStorageTransaction implements StorageTransaction {
     try {
       tx.commit();
     } catch (DatastoreException e) {
-      final boolean conflict = e.getCode() == 10;
-      throw new TransactionException(e.getMessage(), conflict, e);
+      throw new TransactionException(e);
     }
   }
 
@@ -67,7 +66,7 @@ class DatastoreStorageTransaction implements StorageTransaction {
     try {
       tx.rollback();
     } catch (DatastoreException e) {
-      throw new TransactionException(e.getMessage(), false, e);
+      throw new TransactionException(e);
     }
   }
 
