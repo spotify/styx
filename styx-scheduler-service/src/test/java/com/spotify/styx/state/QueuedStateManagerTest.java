@@ -394,6 +394,29 @@ public class QueuedStateManagerTest {
     verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
   }
 
+  @Test
+  public void shouldHaveZeroQueuedEvent() throws Exception {
+    when(transaction.activeState(INSTANCE)).thenReturn(
+        Optional.of(PersistentWorkflowInstanceState
+                        .builder()
+                        .counter(17)
+                        .timestamp(NOW.minusMillis(1))
+                        .state(State.TERMINATED)
+                        .data(StateData.zero())
+                        .build()));
+
+    assertThat(stateManager.queuedEvents(), is(0L));
+
+    Event event = Event.success(INSTANCE);
+    stateManager.receive(event)
+        .toCompletableFuture().get(1, MINUTES);
+
+    assertThat(stateManager.queuedEvents(), is(0L));
+
+    verify(transaction).deleteActiveState(INSTANCE);
+
+    verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
+  }
 
   @Test
   public void shouldWriteActiveStateOnEvent() throws Exception {
@@ -523,6 +546,17 @@ public class QueuedStateManagerTest {
     }
   }
 
-  class FooException extends Exception {
+  @Test
+  public void shouldXXX() throws Exception {
+    final IOException exception = new IOException();
+    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    doThrow(exception).when(storage).runInTransaction(any());
+    CompletableFuture<Void> f = stateManager.trigger(INSTANCE, TRIGGER1).toCompletableFuture();
+    try {
+      f.get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(Throwables.getRootCause(e), is(exception));
+    }
   }
 }
