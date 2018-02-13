@@ -547,11 +547,11 @@ public class QueuedStateManagerTest {
   }
 
   @Test
-  public void shouldXXX() throws Exception {
+  public void shouldThrowRuntimeException() throws Exception {
     final IOException exception = new IOException();
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     doThrow(exception).when(storage).runInTransaction(any());
-    CompletableFuture<Void> f = stateManager.trigger(INSTANCE, TRIGGER1).toCompletableFuture();
+    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE)).toCompletableFuture();
     try {
       f.get(1, MINUTES);
       fail();
