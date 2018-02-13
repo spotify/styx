@@ -22,6 +22,7 @@ package com.spotify.styx.docker;
 
 import static com.spotify.styx.docker.DockerRunner.LOG;
 import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_TERMINATION_LOGGING_ANNOTATION;
+import static com.spotify.styx.docker.KubernetesDockerRunner.getStyxContainer;
 import static java.util.Collections.emptyList;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -44,13 +45,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Predicate;
 import okio.ByteString;
 
 final class KubernetesPodEventTranslator {
-
-  private static final Predicate<ContainerStatus> IS_STYX_CONTAINER =
-      (cs) -> KubernetesDockerRunner.STYX_RUN.equals(cs.getName());
 
   private KubernetesPodEventTranslator() {
     throw new UnsupportedOperationException();
@@ -175,22 +172,19 @@ final class KubernetesPodEventTranslator {
     switch (phase) {
       case "Running":
         // check that the styx container is ready
-        started = status.getContainerStatuses().stream()
-            .anyMatch(IS_STYX_CONTAINER.and(ContainerStatus::getReady));
+        started = getStyxContainer(pod)
+            .map(ContainerStatus::getReady)
+            .orElse(false);
         break;
 
       case "Succeeded":
       case "Failed":
         exited = true;
-        exitCode = pod.getStatus().getContainerStatuses().stream()
-            .filter(IS_STYX_CONTAINER)
-            .map(cs -> getExitCodeIfValid(
+        exitCode = getStyxContainer(pod)
+            .flatMap(cs -> getExitCodeIfValid(
                 workflowInstance.toKey(),
                 pod,
-                cs, stats))
-            .filter(Optional::isPresent)
-            .map(Optional::get)
-            .findFirst();
+                cs, stats));
         break;
 
       default:
@@ -238,18 +232,13 @@ final class KubernetesPodEventTranslator {
     switch (phase) {
       case "Pending":
         // check if one or more docker contains failed to pull their image, a possible silent error
-        return status.getContainerStatuses().stream()
-            .filter(IS_STYX_CONTAINER.and(KubernetesPodEventTranslator::hasPullImageError))
-            .findAny()
-            .map((x) -> Event.runError(workflowInstance, "One or more containers failed to pull their image"));
+        return getStyxContainer(pod)
+            .filter(KubernetesPodEventTranslator::hasPullImageError)
+            .map(x -> Event.runError(workflowInstance, "One or more containers failed to pull their image"));
 
       case "Succeeded":
       case "Failed":
-        final Optional<ContainerStatus> containerStatusOpt =
-            pod.getStatus().getContainerStatuses().stream()
-                .filter(IS_STYX_CONTAINER)
-                .findFirst();
-
+        final Optional<ContainerStatus> containerStatusOpt = getStyxContainer(pod);
         if (!containerStatusOpt.isPresent()) {
           return Optional.of(Event.runError(workflowInstance, "Could not find our container in pod"));
         }

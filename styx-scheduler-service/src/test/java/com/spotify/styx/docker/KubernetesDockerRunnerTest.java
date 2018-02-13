@@ -79,6 +79,7 @@ import io.fabric8.kubernetes.client.dsl.Resource;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -100,6 +101,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 public class KubernetesDockerRunnerTest {
 
   private static final String POD_NAME = "test-pod-1";
+  private static final String CONTAINER_NAME = "test-container-1";
   private static final String SERVICE_ACCOUNT = "sa@example.com";
   private static final String SERVICE_ACCOUNT_SECRET = "sa-secret";
   private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(TestData.WORKFLOW_ID, "foo");
@@ -215,6 +217,15 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
+  public void shouldCreateSingleContainerNamedByExecutionId() throws IOException, IsClosedException {
+    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    verify(pods).create(podCaptor.capture());
+    Pod submittedPod = podCaptor.getValue();
+    assertThat(submittedPod.getSpec().getContainers().size(), is(1));
+    assertThat(submittedPod.getSpec().getContainers().get(0).getName(), is(RUN_SPEC.executionId()));
+  }
+
+  @Test
   public void shouldNotDeletePodIfDebugEnabled() throws Exception {
     when(debug.get()).thenReturn(true);
     final String name = createdPod.getMetadata().getName();
@@ -224,7 +235,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
-    when(containerStatus.getName()).thenReturn(KubernetesDockerRunner.STYX_RUN);
+    when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
     when(containerStateTerminated.getFinishedAt())
@@ -247,7 +258,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
-    when(containerStatus.getName()).thenReturn(KubernetesDockerRunner.STYX_RUN);
+    when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
     when(containerStateTerminated.getFinishedAt())
@@ -266,7 +277,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
-    when(containerStatus.getName()).thenReturn(KubernetesDockerRunner.STYX_RUN);
+    when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
 
@@ -309,7 +320,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
-    when(containerStatus.getName()).thenReturn(KubernetesDockerRunner.STYX_RUN);
+    when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
     when(containerStateTerminated.getFinishedAt())
@@ -328,7 +339,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
-    when(containerStatus.getName()).thenReturn(KubernetesDockerRunner.STYX_RUN);
+    when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
 
     kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
@@ -336,30 +347,32 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldNotCleanupPodIfNotStyxContainer() {
+  public void shouldNotCleanupNonStyxPod() {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
     when(namedPod.get()).thenReturn(createdPod);
 
+    createdPod.getMetadata().setAnnotations(Collections.emptyMap());
+
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
-    when(containerStatus.getName()).thenReturn("foo");
 
     kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
     verify(namedPod, never()).delete();
   }
 
   @Test
-  public void shouldNotCleanupPodWithoutRunStateIfNotStyxContainer() {
+  public void shouldNotCleanupNonStyxPodWithoutRunState() {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
     when(namedPod.get()).thenReturn(createdPod);
 
+    createdPod.getMetadata().setAnnotations(Collections.emptyMap());
+
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
-    when(containerStatus.getName()).thenReturn("foo");
 
     kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name);
     verify(namedPod, never()).delete();
@@ -374,7 +387,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
-    when(containerStatus.getName()).thenReturn(KubernetesDockerRunner.STYX_RUN);
+    when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
 
     kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name);
@@ -390,7 +403,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
-    when(containerStatus.getName()).thenReturn(KubernetesDockerRunner.STYX_RUN);
+    when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
     when(containerStateTerminated.getFinishedAt())
@@ -409,7 +422,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
-    when(containerStatus.getName()).thenReturn(KubernetesDockerRunner.STYX_RUN);
+    when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
     when(containerStateTerminated.getFinishedAt())
