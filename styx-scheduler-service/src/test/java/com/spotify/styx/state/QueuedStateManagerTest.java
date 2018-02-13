@@ -272,7 +272,7 @@ public class QueuedStateManagerTest {
         eventConsumerExecutor, outputHandler));
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
-    when(stateManager.receive(any())).thenThrow(new IsClosedException());
+    doThrow(new IsClosedException()).when(stateManager).receive(any());
 
     try {
       stateManager.trigger(INSTANCE, TRIGGER1)
@@ -292,7 +292,7 @@ public class QueuedStateManagerTest {
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     doThrow(new IOException()).when(storage).deleteActiveState(any());
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
-    when(stateManager.receive(any())).thenThrow(new IsClosedException());
+    doThrow(new IsClosedException()).when(stateManager).receive(any());
 
     try {
       stateManager.trigger(INSTANCE, TRIGGER1)
