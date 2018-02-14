@@ -354,7 +354,7 @@ public class StyxScheduler implements AppInit {
         new StateInitializingTrigger(stateFactory, stateManager);
     final TriggerManager triggerManager = new TriggerManager(trigger, time, storage, stats);
     final BackfillTriggerManager backfillTriggerManager =
-        new BackfillTriggerManager(stateManager, workflowCache, storage, trigger);
+        new BackfillTriggerManager(stateManager, workflowCache, storage, trigger, stats, time);
 
     final WorkflowInitializer workflowInitializer = new WorkflowInitializer(storage, time);
     final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer =

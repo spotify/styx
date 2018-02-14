@@ -44,11 +44,13 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.SyncStateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.ParameterUtil;
+import com.spotify.styx.util.Time;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -110,6 +112,8 @@ public class BackfillTriggerManagerTest {
 
   private ExecutorService executor = Executors.newCachedThreadPool();
 
+  private static final Time TIME =  () -> Instant.parse("2016-12-02T22:00:00Z");
+
   @Before
   public void setUp() throws Exception {
     when(triggerListener.event(any(Workflow.class), any(Trigger.class), any(Instant.class)))
@@ -121,7 +125,7 @@ public class BackfillTriggerManagerTest {
     stateManager = new SyncStateManager();
     workflowCache = new InMemWorkflowCache();
     backfillTriggerManager = new BackfillTriggerManager(stateManager, workflowCache, storage,
-                                                        triggerListener);
+                                                        triggerListener, Stats.NOOP, TIME);
   }
 
   @After

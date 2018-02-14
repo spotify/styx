@@ -137,4 +137,9 @@ final class NoopStats implements Stats {
   public void recordWorkflowConsumerError() {
     // nop
   }
+
+  @Override
+  public void recordTickDuration(String type, long duration) {
+    // nop
+  }
 }

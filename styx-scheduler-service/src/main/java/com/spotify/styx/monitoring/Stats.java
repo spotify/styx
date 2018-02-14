@@ -75,4 +75,6 @@ public interface Stats {
   void recordWorkflowConsumer(String action);
 
   void recordWorkflowConsumerError();
+
+  void recordTickDuration(String type, long duration);
 }
