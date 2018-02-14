@@ -20,22 +20,20 @@
 package com.spotify.styx;
 
 import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.sameInstance;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.only;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
-import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
@@ -282,28 +280,53 @@ public class BackfillTriggerManagerTest {
   }
 
   @Test
-  public void shouldNotContinueTriggeringBackfillsIfTriggerFails() throws Exception {
+  public void shouldContinueTriggeringNextBackfillWhenExecutionException() throws Exception {
     final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
     initWorkflow(workflow);
-    when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(BACKFILL_1));
+    final int concurrency = BACKFILL_1.concurrency();
 
-    RuntimeException rootCause = new RuntimeException("trigger listener failure!");
-
+    when(storage.backfills(anyBoolean())).thenReturn(ImmutableList.of(BACKFILL_1, BACKFILL_2));
     when(triggerListener.event(
-        any(Workflow.class), any(Trigger.class), any(Instant.class)))
-        .thenThrow(rootCause);
+        any(Workflow.class), any(Trigger.class), eq(Instant.parse("2016-12-02T22:00:00Z"))))
+        .thenReturn(CompletableFutures.exceptionallyCompletedFuture(new RuntimeException()));
 
-    try {
-      backfillTriggerManager.tick();
-      fail();
-    } catch (Exception e) {
-      assertThat(Throwables.getRootCause(e), is(sameInstance(rootCause)));
-    }
+    backfillTriggerManager.tick();
 
-    verify(triggerListener, timeout(60_000))
-        .event(any(Workflow.class), any(Trigger.class), any(Instant.class));
+    final List<Instant> instants =
+        ParameterUtil.rangeOfInstants(BACKFILL_2.start(), BACKFILL_2.end(),
+                                      workflow.configuration().schedule());
 
-    verifyNoMoreInteractions(triggerListener);
+    instants.stream().limit(concurrency).forEach(
+        instant ->
+            verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_2.id()), instant));
+
+    verify(storage)
+        .storeBackfill(BACKFILL_2.builder().nextTrigger(instants.get(concurrency)).build());
+  }
+
+  @Test
+  public void shouldContinueTriggeringNextBackfillIfTriggerFails() throws Exception {
+    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+    initWorkflow(workflow);
+    final int concurrency = BACKFILL_1.concurrency();
+
+    when(storage.backfills(anyBoolean())).thenReturn(ImmutableList.of(BACKFILL_1, BACKFILL_2));
+    when(triggerListener.event(
+        any(Workflow.class), any(Trigger.class), eq(Instant.parse("2016-12-02T22:00:00Z"))))
+        .thenThrow(new RuntimeException());
+
+    backfillTriggerManager.tick();
+
+    final List<Instant> instants =
+        ParameterUtil.rangeOfInstants(BACKFILL_2.start(), BACKFILL_2.end(),
+                                      workflow.configuration().schedule());
+
+    instants.stream().limit(concurrency).forEach(
+        instant ->
+            verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_2.id()), instant));
+
+    verify(storage)
+        .storeBackfill(BACKFILL_2.builder().nextTrigger(instants.get(concurrency)).build());
   }
 
   private void initWorkflow(Workflow workflow) {
