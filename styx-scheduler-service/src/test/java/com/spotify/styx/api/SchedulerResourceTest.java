@@ -513,7 +513,7 @@ public class SchedulerResourceTest {
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
     assertThat(response.status(),
-               is(Status.BAD_REQUEST.withReasonPhrase(cause.getMessage())));
+               is(Status.CONFLICT.withReasonPhrase(cause.getMessage())));
   }
 
   @Test

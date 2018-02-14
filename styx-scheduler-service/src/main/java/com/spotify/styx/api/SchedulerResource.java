@@ -21,6 +21,7 @@
 package com.spotify.styx.api;
 
 import static com.spotify.apollo.Status.BAD_REQUEST;
+import static com.spotify.apollo.Status.CONFLICT;
 import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
 import static com.spotify.apollo.Status.OK;
 import static com.spotify.styx.util.ParameterUtil.parseAlignedInstant;
@@ -273,7 +274,7 @@ public class SchedulerResource {
       if (cause instanceof IllegalStateException
           || cause instanceof IllegalArgumentException) {
         // TODO: propagate error information using a more specific exception type
-        return Response.forStatus(BAD_REQUEST.withReasonPhrase(cause.getMessage()));
+        return Response.forStatus(CONFLICT.withReasonPhrase(cause.getMessage()));
       } else {
         return Response.forStatus(INTERNAL_SERVER_ERROR);
       }
