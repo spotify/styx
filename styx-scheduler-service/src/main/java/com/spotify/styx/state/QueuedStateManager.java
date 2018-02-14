@@ -24,7 +24,6 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toMap;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
@@ -99,41 +98,11 @@ public class QueuedStateManager implements StateManager {
   public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger)
       throws IsClosedException {
     ensureRunning();
-    final long counter;
-    try {
-      counter = storage.getLatestStoredCounter(workflowInstance).orElse(NO_EVENTS_PROCESSED);
-    } catch (IOException e) {
-      return CompletableFutures.exceptionallyCompletedFuture(e);
-    }
+    LOG.debug("Trigger {}", workflowInstance);
 
     // TODO: optional retry on transaction conflict
 
-    return CompletableFuture.supplyAsync(() -> {
-
-      // Write active state to datastore
-      final RunState runState = RunState.create(workflowInstance, State.NEW, time.get());
-      try {
-        storage.runInTransaction(tx -> {
-          final Optional<Workflow> workflow = tx.workflow(workflowInstance.workflowId());
-          if (!workflow.isPresent()) {
-            throw new IllegalArgumentException("Workflow not found: " + workflowInstance.workflowId().toKey());
-          }
-          return tx.insertActiveState(workflowInstance, PersistentWorkflowInstanceState.of(runState, counter));
-        });
-      } catch (TransactionException e) {
-        if (e.isAlreadyExists()) {
-          throw new IllegalStateException("Workflow instance is already triggered: " + workflowInstance.toKey());
-        } else if (e.isConflict()) {
-          LOG.debug("Transactional conflict, abort triggering Workflow instance: " + workflowInstance.toKey());
-          throw new RuntimeException(e);
-        } else {
-          throw new RuntimeException(e);
-        }
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-      return null;
-    }).thenCompose((nil) -> {
+    return CompletableFuture.runAsync(() -> initialize(workflowInstance)).thenCompose((ignore) -> {
       final Event event = Event.triggerExecution(workflowInstance, trigger);
       try {
         return receive(event);
@@ -151,7 +120,7 @@ public class QueuedStateManager implements StateManager {
   }
 
   @Override
-  public CompletionStage<Void> receive(Event event) throws IsClosedException {
+  public CompletableFuture<Void> receive(Event event) throws IsClosedException {
     ensureRunning();
     LOG.debug("Event {}", event);
 
@@ -159,61 +128,95 @@ public class QueuedStateManager implements StateManager {
 
     // TODO: run on striped executor to get event execution in order.
 
-    final CompletableFuture<Tuple2<SequenceEvent, RunState>> processedTransition =
-        CompletableFuture.supplyAsync(() -> {
-          // Perform transactional state transition
-          try {
-            return storage.runInTransaction(tx -> {
-
-              // Read active state from datastore
-              final Optional<PersistentWorkflowInstanceState> persistentState =
-                  tx.activeState(event.workflowInstance());
-              if (!persistentState.isPresent()) {
-                String message = "Received event for unknown workflow instance: " + event;
-                LOG.warn(message);
-                throw new IllegalArgumentException(message);
-              }
-
-              // Transition to next state
-              final RunState runState =
-                  RunState.create(event.workflowInstance(), persistentState.get().state(),
-                      persistentState.get().data(), time.get());
-              final RunState nextRunState;
-              try {
-                nextRunState = runState.transition(event);
-              } catch (IllegalStateException e) {
-                // TODO: illegal state transitions might become common as multiple scheduler
-                //       instances concurrently consume events from k8s.
-                LOG.warn("Illegal state transition", e);
-                throw e;
-              }
-
-              // Write new state to datastore (or remove it if terminal)
-              final long nextCounter = persistentState.get().counter() + 1;
-              if (nextRunState.state().isTerminal()) {
-                tx.deleteActiveState(event.workflowInstance());
-              } else {
-                final PersistentWorkflowInstanceState nextPersistentState =
-                    PersistentWorkflowInstanceState.of(nextRunState, nextCounter);
-                tx.updateActiveState(event.workflowInstance(), nextPersistentState);
-              }
-
-              final SequenceEvent sequenceEvent =
-                  SequenceEvent.create(event, nextCounter, nextRunState.timestamp());
-
-              return Tuple.of(sequenceEvent, nextRunState);
-            });
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-        }, eventTransitionExecutor);
-    return processedTransition.thenComposeAsync((emitEventInfoTuple) -> {
-      emitEvent(emitEventInfoTuple._1, emitEventInfoTuple._2);
-      return CompletableFuture.completedFuture(null);
-    });
+    return CompletableFuture.supplyAsync(() -> transition(event), eventTransitionExecutor)
+        .thenAccept((tuple) -> postTransition(tuple._1, tuple._2));
   }
 
-  private void emitEvent(SequenceEvent sequenceEvent, RunState runState) {
+  private void initialize(WorkflowInstance workflowInstance) {
+    // Write active state to datastore
+    final RunState runState = RunState.create(workflowInstance, State.NEW, time.get());
+
+    final long counter;
+    try {
+      counter = storage.getLatestStoredCounter(workflowInstance).orElse(NO_EVENTS_PROCESSED);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    try {
+      storage.runInTransaction(tx -> {
+        final Optional<Workflow> workflow = tx.workflow(workflowInstance.workflowId());
+        if (!workflow.isPresent()) {
+          throw new IllegalArgumentException(
+              "Workflow not found: " + workflowInstance.workflowId().toKey());
+        }
+        return tx.insertActiveState(workflowInstance,
+            PersistentWorkflowInstanceState.of(runState, counter));
+      });
+    } catch (TransactionException e) {
+      if (e.isAlreadyExists()) {
+        throw new IllegalStateException(
+            "Workflow instance is already triggered: " + workflowInstance.toKey());
+      } else if (e.isConflict()) {
+        LOG.debug(
+            "Transactional conflict, abort triggering Workflow instance: " + workflowInstance
+                .toKey());
+        throw new RuntimeException(e);
+      } else {
+        throw new RuntimeException(e);
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private Tuple2<SequenceEvent, RunState> transition(Event event) {
+    try {
+      return storage.runInTransaction(tx -> {
+
+        // Read active state from datastore
+        final Optional<PersistentWorkflowInstanceState> persistentState =
+            tx.activeState(event.workflowInstance());
+        if (!persistentState.isPresent()) {
+          String message = "Received event for unknown workflow instance: " + event;
+          LOG.warn(message);
+          throw new IllegalArgumentException(message);
+        }
+
+        // Transition to next state
+        final RunState runState =
+            RunState.create(event.workflowInstance(), persistentState.get().state(),
+                persistentState.get().data(), time.get());
+        final RunState nextRunState;
+        try {
+          nextRunState = runState.transition(event);
+        } catch (IllegalStateException e) {
+          // TODO: illegal state transitions might become common as multiple scheduler
+          //       instances concurrently consume events from k8s.
+          LOG.warn("Illegal state transition", e);
+          throw e;
+        }
+
+        // Write new state to datastore (or remove it if terminal)
+        final long nextCounter = persistentState.get().counter() + 1;
+        if (nextRunState.state().isTerminal()) {
+          tx.deleteActiveState(event.workflowInstance());
+        } else {
+          final PersistentWorkflowInstanceState nextPersistentState =
+              PersistentWorkflowInstanceState.of(nextRunState, nextCounter);
+          tx.updateActiveState(event.workflowInstance(), nextPersistentState);
+        }
+
+        final SequenceEvent sequenceEvent =
+            SequenceEvent.create(event, nextCounter, nextRunState.timestamp());
+
+        return Tuple.of(sequenceEvent, nextRunState);
+      });
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void postTransition(SequenceEvent sequenceEvent, RunState runState) {
     // Write event to bigtable
     try {
       storage.writeEvent(sequenceEvent);
