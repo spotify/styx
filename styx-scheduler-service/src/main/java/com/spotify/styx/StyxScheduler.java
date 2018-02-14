@@ -544,10 +544,7 @@ public class StyxScheduler implements AppInit {
     });
 
     workflowCache.all().forEach(workflow -> stats.registerActiveStatesMetric(
-        workflow.id(),
-        () -> activeStates.keySet().stream()
-            .filter(wfi -> workflow.id().equals(wfi.workflowId()))
-            .count()));
+        workflow.id(), workflowActiveStates(activeStates, workflow)));
 
     stats.registerSubmissionRateLimitMetric(submissionRateLimiter::getRate);
   }
@@ -560,10 +557,7 @@ public class StyxScheduler implements AppInit {
       BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
     return (workflow) -> {
       stats.registerActiveStatesMetric(
-          workflow.id(),
-          () -> stateManager.activeStates().keySet().stream()
-              .filter(wfi -> workflow.id().equals(wfi.workflowId()))
-              .count());
+          workflow.id(), workflowActiveStates(stateManager.activeStates(), workflow));
 
       final Optional<Workflow> oldWorkflowOptional = cache.workflow(workflow.id());
 
@@ -594,6 +588,13 @@ public class StyxScheduler implements AppInit {
       workflowConsumer.accept(Optional.of(workflow), Optional.empty());
       LOG.info("Workflow removed: {}", workflow);
     });
+  }
+
+  private static Gauge<Long> workflowActiveStates(Map<WorkflowInstance, RunState> activeStates,
+                                                  Workflow workflow) {
+    return () -> activeStates.keySet().stream()
+        .filter(wfi -> workflow.id().equals(wfi.workflowId()))
+        .count();
   }
 
   private static Stats stats(Environment environment) {
