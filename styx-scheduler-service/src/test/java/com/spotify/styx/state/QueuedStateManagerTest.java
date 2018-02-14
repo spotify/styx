@@ -170,7 +170,6 @@ public class QueuedStateManagerTest {
         .toCompletableFuture().get(1, MINUTES);
 
     verify(transaction).deleteActiveState(INSTANCE);
-
     verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
   }
 
