@@ -179,21 +179,20 @@ public class QueuedStateManagerTest {
     reset(storage);
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
-    final DatastoreException datastoreException = new DatastoreException(1, "", "");
-    final TransactionException transactionException = spy(new TransactionException(datastoreException));
+    DatastoreException datastoreException = new DatastoreException(1, "", "");
+    TransactionException transactionException = spy(new TransactionException(datastoreException));
+
     when(transactionException.isAlreadyExists()).thenReturn(true);
-    when(storage.runInTransaction(any())).thenAnswer(a -> {
-      a.getArgumentAt(0, TransactionFunction.class)
-          .apply(transaction);
-      throw transactionException;
-    });
+    doThrow(transactionException).when(transaction).insertActiveState(any(), any());
+    when(storage.runInTransaction(any())).thenAnswer(a ->
+        a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
 
     try {
       stateManager.trigger(INSTANCE, TRIGGER1)
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
-      assertThat(Throwables.getRootCause(e), is(instanceOf(IllegalStateException.class)));
+      assertThat(e.getCause(), is(instanceOf(IllegalStateException.class)));
     }
   }
 
