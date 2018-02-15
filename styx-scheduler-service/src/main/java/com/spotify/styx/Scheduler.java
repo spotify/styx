@@ -20,6 +20,8 @@
 
 package com.spotify.styx;
 
+import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
+import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.spotify.styx.WorkflowExecutionGate.NOOP;
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
@@ -53,6 +55,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -89,6 +92,9 @@ public class Scheduler {
   @VisibleForTesting
   static final String GLOBAL_RESOURCE_ID = "GLOBAL_STYX_CLUSTER";
 
+  private static final String TICK_TYPE = UPPER_CAMEL.to(LOWER_UNDERSCORE,
+                                                         Scheduler.class.getSimpleName());
+
   private static final int SCHEDULING_BATCH_SIZE = 16;
 
   private final Time time;
@@ -117,6 +123,8 @@ public class Scheduler {
   }
 
   void tick() {
+    final Instant t0 = time.get();
+
     final Map<String, Resource> resources;
     final Optional<Long> globalConcurrency;
     final StyxConfig config;
@@ -175,7 +183,10 @@ public class Scheduler {
     limitAndDequeue(config, resources, workflowResourceReferences, currentResourceUsage,
         eligibleInstances);
 
-    updateStats(resources, currentResourceUsage);
+    updateResourceStats(resources, currentResourceUsage);
+
+    final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
+    stats.recordTickDuration(TICK_TYPE, durationMillis);
   }
 
   private void limitAndDequeue(
@@ -221,8 +232,8 @@ public class Scheduler {
     return state != State.NEW && state != State.QUEUED;
   }
 
-  private void updateStats(Map<String, Resource> resources,
-                           Map<String, Long> currentResourceUsage) {
+  private void updateResourceStats(Map<String, Resource> resources,
+                                   Map<String, Long> currentResourceUsage) {
     resources.values().forEach(r -> stats.recordResourceConfigured(r.id(), r.concurrency()));
     currentResourceUsage.forEach(stats::recordResourceUsed);
     Sets.difference(resources.keySet(), currentResourceUsage.keySet())

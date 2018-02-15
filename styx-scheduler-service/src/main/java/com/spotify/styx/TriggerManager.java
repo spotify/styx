@@ -20,6 +20,8 @@
 
 package com.spotify.styx;
 
+import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
+import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.spotify.styx.util.GuardedRunnable.guard;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.Objects.requireNonNull;
@@ -36,6 +38,7 @@ import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
@@ -45,19 +48,22 @@ import org.slf4j.LoggerFactory;
 /**
  * Triggers natural executions for {@link Workflow}s.
  */
-public class TriggerManager {
+class TriggerManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(TriggerManager.class);
+
+  private static final String TICK_TYPE = UPPER_CAMEL.to(LOWER_UNDERSCORE,
+                                                         TriggerManager.class.getSimpleName());
 
   private final TriggerListener triggerListener;
   private final Time time;
   private final Storage storage;
   private final Stats stats;
 
-  public TriggerManager(TriggerListener triggerListener,
-                        Time time,
-                        Storage storage,
-                        Stats stats) {
+  TriggerManager(TriggerListener triggerListener,
+                 Time time,
+                 Storage storage,
+                 Stats stats) {
     this.triggerListener = requireNonNull(triggerListener);
     this.time = requireNonNull(time);
     this.storage = requireNonNull(storage);
@@ -65,6 +71,8 @@ public class TriggerManager {
   }
 
   void tick() {
+    final Instant t0 = time.get();
+
     try {
       if (!storage.config().globalEnabled()) {
         LOG.info("Triggering has been disabled globally.");
@@ -89,6 +97,9 @@ public class TriggerManager {
     canBeTriggeredWorkflows.entrySet().stream()
         .filter(entry -> now.isAfter(entry.getValue().offsetInstant()))
         .forEach(entry -> tryTriggering(entry.getKey(), entry.getValue(), enabledWorkflows));
+
+    final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
+    stats.recordTickDuration(TICK_TYPE, durationMillis);
   }
 
   private void tryTriggering(Workflow workflow,

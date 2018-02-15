@@ -20,6 +20,8 @@
 
 package com.spotify.styx;
 
+import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
+import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingBy;
@@ -28,13 +30,16 @@ import static java.util.stream.Collectors.toList;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
+import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,24 +53,36 @@ import org.slf4j.LoggerFactory;
 /**
  * Triggers backfill executions for {@link Workflow}s.
  */
-public class BackfillTriggerManager {
+class BackfillTriggerManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(BackfillTriggerManager.class);
+
+  private static final String TICK_TYPE = UPPER_CAMEL.to(
+      LOWER_UNDERSCORE, BackfillTriggerManager.class.getSimpleName());
 
   private final TriggerListener triggerListener;
   private final Storage storage;
   private final StateManager stateManager;
   private final WorkflowCache workflowCache;
+  private final Stats stats;
+  private final Time time;
 
-  public BackfillTriggerManager(StateManager stateManager,
-                   WorkflowCache workflowCache, Storage storage, TriggerListener triggerListener) {
+  BackfillTriggerManager(StateManager stateManager,
+                         WorkflowCache workflowCache, Storage storage,
+                         TriggerListener triggerListener,
+                         Stats stats,
+                         Time time) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.workflowCache = Objects.requireNonNull(workflowCache);
     this.storage = Objects.requireNonNull(storage);
     this.triggerListener = Objects.requireNonNull(triggerListener);
+    this.stats = Objects.requireNonNull(stats);
+    this.time = Objects.requireNonNull(time);
   }
 
   void tick() {
+    final Instant t0 = time.get();
+
     final List<Backfill> backfills;
     try {
       backfills = storage.backfills(false);
@@ -76,6 +93,9 @@ public class BackfillTriggerManager {
 
     final Map<String, Long> backfillStates = getBackfillStates();
     backfills.forEach(backfill -> triggerBackfill(backfill, backfillStates));
+
+    final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
+    stats.recordTickDuration(TICK_TYPE, durationMillis);
   }
 
   private void triggerBackfill(Backfill backfill, Map<String, Long> backfillStates) {

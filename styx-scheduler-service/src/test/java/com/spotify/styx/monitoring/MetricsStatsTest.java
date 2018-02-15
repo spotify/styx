@@ -39,6 +39,7 @@ import static com.spotify.styx.monitoring.MetricsStats.STORAGE_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.SUBMISSION_RATE_LIMIT;
 import static com.spotify.styx.monitoring.MetricsStats.TERMINATION_LOG_INVALID;
 import static com.spotify.styx.monitoring.MetricsStats.TERMINATION_LOG_MISSING;
+import static com.spotify.styx.monitoring.MetricsStats.TICK_DURATION;
 import static com.spotify.styx.monitoring.MetricsStats.TRANSITIONING_DURATION;
 import static com.spotify.styx.monitoring.MetricsStats.WORKFLOW_CONSUMER_ERROR_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.WORKFLOW_CONSUMER_RATE;
@@ -86,7 +87,7 @@ public class MetricsStatsTest {
   @Mock Time time;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     when(time.nanoTime()).then(a -> System.nanoTime());
     when(time.get()).then(a -> Instant.now());
     when(registry.histogram(TRANSITIONING_DURATION)).thenReturn(histogram);
@@ -96,11 +97,12 @@ public class MetricsStatsTest {
     when(registry.meter(TERMINATION_LOG_INVALID)).thenReturn(meter);
     when(registry.meter(EXIT_CODE_MISMATCH)).thenReturn(meter);
     when(registry.meter(WORKFLOW_CONSUMER_ERROR_RATE)).thenReturn(meter);
+    when(registry.histogram(TICK_DURATION)).thenReturn(histogram);
     stats = new MetricsStats(registry, time);
   }
 
   @Test
-  public void shouldRecordStorageOperation() throws Exception {
+  public void shouldRecordStorageOperation() {
     String operation = "write";
     String status = "success";
     when(registry.histogram(STORAGE_DURATION.tagged("operation", operation, "status", status))).thenReturn(histogram);
@@ -111,7 +113,7 @@ public class MetricsStatsTest {
   }
 
   @Test
-  public void shouldRecordDockerOperation() throws Exception {
+  public void shouldRecordDockerOperation() {
     String operation = "start";
     String status = "success";
     when(registry.histogram(DOCKER_DURATION.tagged("operation", operation, "status", status))).thenReturn(histogram);
@@ -122,7 +124,7 @@ public class MetricsStatsTest {
   }
 
   @Test
-  public void shouldRecordDockerOperationError() throws Exception {
+  public void shouldRecordDockerOperationError() {
     String operation = "start";
     String type = "kubernetes-client";
     int code = 429;
@@ -132,7 +134,7 @@ public class MetricsStatsTest {
   }
 
   @Test
-  public void shouldRecordSubmitToRunningTime() throws Exception {
+  public void shouldRecordSubmitToRunningTime() {
     when(time.nanoTime()).thenReturn(SECONDS.toNanos(17L));
     stats.recordSubmission("foo");
     when(time.nanoTime()).thenReturn(SECONDS.toNanos(4711L));
@@ -141,13 +143,13 @@ public class MetricsStatsTest {
   }
 
   @Test
-  public void shouldRegisterQueuedEventsMetric() throws Exception {
+  public void shouldRegisterQueuedEventsMetric() {
     stats.registerQueuedEventsMetric(gauge);
     verify(registry).register(QUEUED_EVENTS, gauge);
   }
 
   @Test
-  public void shouldRegisterActiveStatesPerTriggerMetric() throws Exception {
+  public void shouldRegisterActiveStatesPerTriggerMetric() {
     RunState.State state = RunState.State.NEW;
     stats.registerActiveStatesMetric(state, "triggerName", gauge);
     verify(registry).register(ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER.tagged(
@@ -155,7 +157,7 @@ public class MetricsStatsTest {
   }
 
   @Test
-  public void shouldRegisterActiveStatesMetric() throws Exception {
+  public void shouldRegisterActiveStatesMetric() {
     WorkflowId workflowId = WorkflowId.create("component", "workflow");
     stats.registerActiveStatesMetric(workflowId, gauge);
     verify(registry).register(ACTIVE_STATES_PER_WORKFLOW.tagged(
@@ -163,14 +165,14 @@ public class MetricsStatsTest {
   }
 
   @Test
-  public void shouldRegisterWorkflowCountMetric() throws Exception {
+  public void shouldRegisterWorkflowCountMetric() {
     String status = "status";
     stats.registerWorkflowCountMetric(status, gauge);
     verify(registry).register(WORKFLOW_COUNT.tagged("status", status), gauge);
   }
 
   @Test
-  public void shouldRecordExitCode() throws Exception {
+  public void shouldRecordExitCode() {
     WorkflowId workflowId = WorkflowId.create("component", "workflow");
     when(registry.meter(EXIT_CODE_RATE.tagged(
         "component-id", workflowId.componentId(),
@@ -182,44 +184,44 @@ public class MetricsStatsTest {
 
   @Test
   @SuppressWarnings("unchecked")
-  public void shouldRegisterSubmissionRateLimitMetric() throws Exception {
+  public void shouldRegisterSubmissionRateLimitMetric() {
     Gauge<Double> gauge = mock(Gauge.class);
     stats.registerSubmissionRateLimitMetric(gauge);
     verify(registry).register(SUBMISSION_RATE_LIMIT, gauge);
   }
 
   @Test
-  public void shouldRecordTerminationLogMissing() throws Exception {
+  public void shouldRecordTerminationLogMissing() {
     stats.recordTerminationLogMissing();
     verify(meter).mark();
   }
 
   @Test
-  public void shouldRecordTerminationLogInvalid() throws Exception {
+  public void shouldRecordTerminationLogInvalid() {
     stats.recordTerminationLogInvalid();
     verify(meter).mark();
   }
 
   @Test
-  public void shouldRecordExitCodeMismatch() throws Exception {
+  public void shouldRecordExitCodeMismatch() {
     stats.recordExitCodeMismatch();
     verify(meter).mark();
   }
 
   @Test
-  public void shouldRecordNaturalTrigger() throws Exception {
+  public void shouldRecordNaturalTrigger() {
     stats.recordNaturalTrigger();
     verify(meter).mark();
   }
 
   @Test
-  public void shouldRecordPullImageError() throws Exception {
+  public void shouldRecordPullImageError() {
     stats.recordPullImageError();
     verify(meter).mark();
   }
 
   @Test
-  public void shouldRecordResourceConfigured() throws Exception {
+  public void shouldRecordResourceConfigured() {
     String resource = "resource";
     when(registry.histogram(RESOURCE_CONFIGURED.tagged("resource", resource))).thenReturn(histogram);
     stats.recordResourceConfigured(resource, 100L);
@@ -227,7 +229,7 @@ public class MetricsStatsTest {
   }
 
   @Test
-  public void shouldRecordResourceUsed() throws Exception {
+  public void shouldRecordResourceUsed() {
     String resource = "resource";
     when(registry.histogram(RESOURCE_USED.tagged("resource", resource))).thenReturn(histogram);
     stats.recordResourceUsed(resource, 100L);
@@ -235,7 +237,7 @@ public class MetricsStatsTest {
   }
 
   @Test
-  public void shouldRecordEventConsumer() throws Exception {
+  public void shouldRecordEventConsumer() {
     final SequenceEvent event = SequenceEvent
         .create(Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural()), 0L, 0L);
     when(registry.meter(EVENT_CONSUMER_RATE.tagged("event-type", "triggerExecution"))).thenReturn(meter);
@@ -244,7 +246,7 @@ public class MetricsStatsTest {
   }
 
   @Test
-  public void shouldRecordEventConsumerError() throws Exception {
+  public void shouldRecordEventConsumerError() {
     final SequenceEvent event = SequenceEvent
         .create(Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural()), 0L, 0L);
     when(registry.meter(EVENT_CONSUMER_ERROR_RATE.tagged("event-type", "triggerExecution"))).thenReturn(meter);
@@ -253,15 +255,23 @@ public class MetricsStatsTest {
   }
 
   @Test
-  public void shouldRecordWorkflowConsumer() throws Exception {
+  public void shouldRecordWorkflowConsumer() {
     when(registry.meter(WORKFLOW_CONSUMER_RATE.tagged("action", "updated"))).thenReturn(meter);
     stats.recordWorkflowConsumer("updated");
     verify(meter).mark();
   }
 
   @Test
-  public void shouldRecordWorkflowConsumerError() throws Exception {
+  public void shouldRecordWorkflowConsumerError() {
     stats.recordWorkflowConsumerError();
     verify(meter).mark();
+  }
+
+  @Test
+  public void shouldRecordTickDuration() {
+    String type = "dummy-tick";
+    when(registry.histogram(TICK_DURATION.tagged("type", type))).thenReturn(histogram);
+    stats.recordTickDuration(type, 100L);
+    verify(histogram).update(100L);
   }
 }

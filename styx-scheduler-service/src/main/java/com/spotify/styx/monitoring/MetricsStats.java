@@ -132,6 +132,10 @@ public final class MetricsStats implements Stats {
       .tagged("what", "workflow-consumer-error-rate")
       .tagged("unit", "error");
 
+  static final MetricId TICK_DURATION = BASE
+      .tagged("what", "tick-duration")
+      .tagged("unit", UNIT_MILLISECOND);
+
   private static final String STATUS = "status";
 
   private final SemanticMetricRegistry registry;
@@ -156,6 +160,7 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Meter> eventConsumerErrorMeters;
   private final ConcurrentMap<String, Meter> eventConsumerMeters;
   private final ConcurrentMap<String, Meter> workflowConsumerMeters;
+  private final ConcurrentMap<String, Histogram> tickHistograms;
 
   /**
    * Submission timestamps (nanotime) keyed on execution id.
@@ -187,6 +192,7 @@ public final class MetricsStats implements Stats {
     this.eventConsumerErrorMeters = new ConcurrentHashMap<>();
     this.eventConsumerMeters = new ConcurrentHashMap<>();
     this.workflowConsumerMeters = new ConcurrentHashMap<>();
+    this.tickHistograms = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -312,6 +318,11 @@ public final class MetricsStats implements Stats {
     workflowConsumerErrorMeter.mark();
   }
 
+  @Override
+  public void recordTickDuration(String type, long duration) {
+    tickHistogram(type).update(duration);
+  }
+
   private Meter exitCodeMeter(WorkflowId workflowId, int exitCode) {
     return exitCodePerWorkflowMeters
         .computeIfAbsent(Tuple.of(workflowId, exitCode), (tuple) ->
@@ -375,5 +386,10 @@ public final class MetricsStats implements Stats {
   private Meter workflowConsumerMeter(String action) {
     return workflowConsumerMeters.computeIfAbsent(
         action, (op) -> registry.meter(WORKFLOW_CONSUMER_RATE.tagged("action", action)));
+  }
+
+  private Histogram tickHistogram(String type) {
+    return tickHistograms.computeIfAbsent(
+        type, (op) -> registry.histogram(TICK_DURATION.tagged("type", type)));
   }
 }
