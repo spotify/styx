@@ -209,11 +209,12 @@ public final class MetricsStats implements Stats {
 
   @Override
   public void registerActiveStatesMetric(WorkflowId workflowId, Gauge<Long> activeStatesCount) {
-    activeStatesPerWorkflowGauges.computeIfAbsent(
-        workflowId, (ignoreKey) -> registry.register(
-            ACTIVE_STATES_PER_WORKFLOW.tagged(
-                "component-id", workflowId.componentId(), "workflow-id", workflowId.id()),
-            activeStatesCount));
+    // fixme temporarily disabled due to heavy load in presence of high volume of registered workflows
+    //activeStatesPerWorkflowGauges.computeIfAbsent(
+    //    workflowId, (ignoreKey) -> registry.register(
+    //        ACTIVE_STATES_PER_WORKFLOW.tagged(
+    //           "component-id", workflowId.componentId(), "workflow-id", workflowId.id()),
+    //        activeStatesCount));
   }
 
   @Override
