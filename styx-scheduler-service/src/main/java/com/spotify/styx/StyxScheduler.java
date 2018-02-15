@@ -100,7 +100,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
@@ -524,27 +523,27 @@ public class StyxScheduler implements AppInit {
             .filter(workflow -> workflow.configuration().dockerTerminationLogging())
             .count());
 
-    final Map<WorkflowInstance, RunState> activeStates = stateManager.activeStates();
     Arrays.stream(RunState.State.values()).forEach(state -> {
       TriggerUtil.triggerTypesList().forEach(triggerType ->
           stats.registerActiveStatesMetric(
               state,
               triggerType,
-              () -> activeStates.values().stream()
+              () -> stateManager.activeStates().values().stream()
                   .filter(runState -> runState.state().equals(state))
                   .filter(runState -> runState.data().trigger().isPresent() && triggerType
                       .equals(TriggerUtil.triggerType(runState.data().trigger().get())))
                   .count()));
       stats.registerActiveStatesMetric(
           state,
-          "none", () -> activeStates.values().stream()
+          "none",
+          () -> stateManager.activeStates().values().stream()
               .filter(runState -> runState.state().equals(state))
               .filter(runState -> !runState.data().trigger().isPresent())
               .count());
     });
 
     workflowCache.all().forEach(workflow -> stats.registerActiveStatesMetric(
-        workflow.id(), workflowActiveStates(activeStates, workflow)));
+        workflow.id(), workflowActiveStates(stateManager, workflow)));
 
     stats.registerSubmissionRateLimitMetric(submissionRateLimiter::getRate);
   }
@@ -557,7 +556,7 @@ public class StyxScheduler implements AppInit {
       BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
     return (workflow) -> {
       stats.registerActiveStatesMetric(
-          workflow.id(), workflowActiveStates(stateManager.activeStates(), workflow));
+          workflow.id(), workflowActiveStates(stateManager, workflow));
 
       final Optional<Workflow> oldWorkflowOptional = cache.workflow(workflow.id());
 
@@ -590,9 +589,8 @@ public class StyxScheduler implements AppInit {
     });
   }
 
-  private static Gauge<Long> workflowActiveStates(Map<WorkflowInstance, RunState> activeStates,
-                                                  Workflow workflow) {
-    return () -> activeStates.keySet().stream()
+  private static Gauge<Long> workflowActiveStates(StateManager stateManager, Workflow workflow) {
+    return () -> stateManager.activeStates().keySet().stream()
         .filter(wfi -> workflow.id().equals(wfi.workflowId()))
         .count();
   }
