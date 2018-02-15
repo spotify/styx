@@ -46,6 +46,7 @@ import static com.spotify.styx.monitoring.MetricsStats.WORKFLOW_CONSUMER_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.WORKFLOW_COUNT;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -160,7 +161,8 @@ public class MetricsStatsTest {
   public void shouldRegisterActiveStatesMetric() {
     WorkflowId workflowId = WorkflowId.create("component", "workflow");
     stats.registerActiveStatesMetric(workflowId, gauge);
-    verify(registry).register(ACTIVE_STATES_PER_WORKFLOW.tagged(
+    // fixme this should be called when registerActiveStatesMetric is re-enabled
+    verify(registry, never()).register(ACTIVE_STATES_PER_WORKFLOW.tagged(
         "component-id", workflowId.componentId(), "workflow-id", workflowId.id()), gauge);
   }
 
