@@ -71,6 +71,8 @@ class TriggerManager {
   }
 
   void tick() {
+    final Instant t0 = time.get();
+
     try {
       if (!storage.config().globalEnabled()) {
         LOG.info("Triggering has been disabled globally.");
@@ -80,8 +82,6 @@ class TriggerManager {
       LOG.warn("Couldn't fetch global enabled status, skipping this run.");
       return;
     }
-
-    final Instant t0 = time.get();
 
     final Map<Workflow, TriggerInstantSpec> canBeTriggeredWorkflows;
     final Set<WorkflowId> enabledWorkflows;

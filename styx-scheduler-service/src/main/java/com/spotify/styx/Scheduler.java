@@ -123,6 +123,8 @@ public class Scheduler {
   }
 
   void tick() {
+    final Instant t0 = time.get();
+
     final Map<String, Resource> resources;
     final Optional<Long> globalConcurrency;
     final StyxConfig config;
@@ -134,8 +136,6 @@ public class Scheduler {
       LOG.warn("Failed to get resource limits", e);
       return;
     }
-
-    final Instant t0 = time.get();
 
     globalConcurrency.ifPresent(
         concurrency ->

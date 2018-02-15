@@ -81,6 +81,8 @@ class BackfillTriggerManager {
   }
 
   void tick() {
+    final Instant t0 = time.get();
+
     final List<Backfill> backfills;
     try {
       backfills = storage.backfills(false);
@@ -88,8 +90,6 @@ class BackfillTriggerManager {
       LOG.warn("Failed to get backfills", e);
       return;
     }
-
-    final Instant t0 = time.get();
 
     final Map<String, Long> backfillStates = getBackfillStates();
     backfills.forEach(backfill -> triggerBackfill(backfill, backfillStates));
