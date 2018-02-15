@@ -408,8 +408,8 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @Override
   public void restore() {
-    // Failing here means restarting the styx scheduler and replaying all events again. This is quite time consuming
-    // and distressing when deploying, so try hard.
+    // Failing here means restarting the styx scheduler and replaying all events again. This is
+    // quite time consuming and distressing when deploying, so try hard.
     final Retryer<Object> retryer = RetryerBuilder.newBuilder()
         .retryIfException()
         .withWaitStrategy(WaitStrategies.exponentialWait(10, TimeUnit.SECONDS))

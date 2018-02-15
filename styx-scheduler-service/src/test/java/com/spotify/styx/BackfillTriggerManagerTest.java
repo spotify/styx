@@ -34,9 +34,9 @@ import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.StyxConfig;
@@ -46,7 +46,9 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.state.SyncStateManager;
+import com.spotify.styx.state.RunState.State;
+import com.spotify.styx.state.StateData;
+import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.ParameterUtil;
@@ -96,19 +98,14 @@ public class BackfillTriggerManagerTest {
 
   private List<Resource> resourceLimits = Lists.newArrayList();
 
-  @Mock
-  private TriggerListener triggerListener;
-
-  @Mock
-  private Storage storage;
-
+  @Mock TriggerListener triggerListener;
+  @Mock Storage storage;
   @Mock StyxConfig config;
+  @Mock StateManager stateManager;
 
   private WorkflowCache workflowCache;
 
   private BackfillTriggerManager backfillTriggerManager;
-
-  private SyncStateManager stateManager;
 
   private ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -122,7 +119,6 @@ public class BackfillTriggerManagerTest {
     when(config.globalConcurrency()).thenReturn(Optional.empty());
     when(storage.config()).thenReturn(config);
 
-    stateManager = new SyncStateManager();
     workflowCache = new InMemWorkflowCache();
     backfillTriggerManager = new BackfillTriggerManager(stateManager, workflowCache, storage,
                                                         triggerListener, Stats.NOOP, TIME);
@@ -163,13 +159,13 @@ public class BackfillTriggerManagerTest {
                                       .nextTrigger(Instant.parse("2016-12-03T00:00:00Z"))
                                       .build()));
 
-    stateManager.initialize
-        (RunState.fresh(
-            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23")));
-    stateManager.receive(
-        Event.triggerExecution(
-            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23"),
-            Trigger.backfill("backfill-1")));
+
+    final WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23");
+
+    when(stateManager.activeStates()).thenReturn(ImmutableMap.of(
+        wfi1, RunState.create(wfi1, State.RUNNING, StateData.newBuilder()
+            .trigger(Trigger.backfill("backfill-1"))
+            .build())));
 
     backfillTriggerManager.tick();
 
@@ -217,20 +213,16 @@ public class BackfillTriggerManagerTest {
     initWorkflow(workflow);
     when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(BACKFILL_1));
 
-    stateManager.initialize(
-        RunState.fresh(
-            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T22")));
-    stateManager.receive(
-        Event.triggerExecution(
-            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T22"),
-            Trigger.backfill("backfill-1")));
-    stateManager.initialize
-        (RunState.fresh(
-            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23")));
-    stateManager.receive(
-        Event.triggerExecution(
-            WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23"),
-            Trigger.backfill("backfill-1")));
+    final WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T22");
+    final WorkflowInstance wfi2 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23");
+
+    when(stateManager.activeStates()).thenReturn(ImmutableMap.of(
+        wfi1, RunState.create(wfi1, State.RUNNING, StateData.newBuilder()
+            .trigger(Trigger.backfill("backfill-1"))
+            .build()),
+        wfi2, RunState.create(wfi2, State.RUNNING, StateData.newBuilder()
+            .trigger(Trigger.backfill("backfill-1"))
+            .build())));
 
     backfillTriggerManager.tick();
 

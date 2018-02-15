@@ -22,17 +22,9 @@ package com.spotify.styx.storage;
 
 import java.io.IOException;
 
-public class StorageException extends IOException {
+class StorageException extends IOException {
 
-  public StorageException(String message) {
-    super(message);
-  }
-
-  public StorageException(String message, Throwable cause) {
+  StorageException(String message, Throwable cause) {
     super(message, cause);
-  }
-
-  public StorageException(Throwable cause) {
-    super(cause);
   }
 }

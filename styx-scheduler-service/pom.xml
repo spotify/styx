@@ -49,6 +49,10 @@
       <groupId>com.javaslang</groupId>
       <artifactId>javaslang</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.github.kabutz</groupId>
+      <artifactId>javaspecialists</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>com.spotify</groupId>

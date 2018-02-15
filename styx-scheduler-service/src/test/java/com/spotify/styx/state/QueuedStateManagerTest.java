@@ -20,80 +20,102 @@
 
 package com.spotify.styx.state;
 
-import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
-import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
-import static java.util.concurrent.ForkJoinPool.commonPool;
 import static java.util.concurrent.TimeUnit.MINUTES;
-import static org.hamcrest.Matchers.empty;
-import static org.hamcrest.Matchers.hasKey;
-import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import com.google.cloud.datastore.DatastoreException;
+import com.google.common.base.Throwables;
+import com.google.common.collect.Maps;
 import com.spotify.styx.RepeatRule;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.storage.InMemStorage;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
+import com.spotify.styx.state.RunState.State;
+import com.spotify.styx.storage.Storage;
+import com.spotify.styx.storage.StorageTransaction;
+import com.spotify.styx.storage.TransactionException;
+import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.IsClosedException;
+import com.spotify.styx.util.Time;
+import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
+import java.io.IOException;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
-import java.util.SortedSet;
-import java.util.Stack;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-import java.util.function.IntFunction;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.Mock;
+import org.mockito.runners.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.class)
 public class QueuedStateManagerTest {
 
+  private static final Instant NOW = Instant.parse("2017-01-02T01:02:03Z");
   private static final WorkflowInstance INSTANCE = WorkflowInstance.create(
       TestData.WORKFLOW_ID, "2016-05-01");
-
-  private final static String TEST_EXECUTION_ID_1 = "execution_1";
-  private final static String DOCKER_IMAGE = "busybox:1.1";
-
+  private static final PersistentWorkflowInstanceState INSTANCE_NEW_STATE =
+      PersistentWorkflowInstanceState.builder()
+          .counter(18)
+          .state(State.NEW)
+          .data(StateData.zero())
+          .timestamp(NOW)
+          .build();
+  private static final Workflow WORKFLOW =
+      Workflow.create("foo", TestData.FULL_WORKFLOW_CONFIGURATION);
   private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
-  private static final Trigger TRIGGER2 = Trigger.unknown("trig2");
-  private static final Trigger TRIGGER3 = Trigger.unknown("trig3");
   private static final BiConsumer<SequenceEvent, RunState> eventConsumer = (e, s) -> {};
 
-  private static final ExecutorService POOL1 = Executors.newFixedThreadPool(16);
-  private static final Executor POOL2 = Executors.newSingleThreadExecutor();
+  private final StripedExecutorService eventTransitionExecutor = new StripedExecutorService(16);
+  private final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
 
-  QueuedStateManager stateManager;
-  InMemStorage storage = new InMemStorage();
 
-  Stack<RunState> transitions = new Stack<>();
+  private QueuedStateManager stateManager;
 
-  @Rule
-  public RepeatRule repeatRule = new RepeatRule();
+  @Captor ArgumentCaptor<RunState> runStateCaptor;
 
-  private void setUp() throws Exception {
-    setUp(RunState.fresh(INSTANCE, transitions::push));
-  }
+  @Rule public RepeatRule repeatRule = new RepeatRule();
 
-  private void setUp(RunState initial) throws Exception {
-    if (stateManager != null) {
-      stateManager.close();
-    }
+  @Mock Storage storage;
+  @Mock StorageTransaction transaction;
+  @Mock OutputHandler outputHandler;
+  @Mock Time time;
 
-    storage = new InMemStorage();
-    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2);
-
-    stateManager.initialize(initial);
-    assertTrue(stateManager.awaitIdle(1000));
+  @Before
+  public void setUp() throws Exception {
+    when(time.get()).thenReturn(NOW);
+    when(storage.runInTransaction(any())).thenAnswer(
+        a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
+    doNothing().when(outputHandler).transitionInto(runStateCaptor.capture());
+    stateManager = new QueuedStateManager(
+        time, eventTransitionExecutor, storage, eventConsumer,
+        eventConsumerExecutor, OutputHandler.fanOutput(outputHandler));
   }
 
   @After
@@ -104,286 +126,437 @@ public class QueuedStateManagerTest {
   }
 
   @Test
-  public void shouldNotBeActiveAfterHalt() throws Exception {
-    setUp();
+  public void shouldInitializeAndTriggerWFInstance() throws Exception {
+    final PersistentWorkflowInstanceState instanceStateFresh =
+        INSTANCE_NEW_STATE.toBuilder().counter(-1).build();
+    when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
+    when(transaction.activeState(INSTANCE)).thenReturn(Optional.of(instanceStateFresh));
 
-    stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER1));
-    stateManager.receive(Event.halt(INSTANCE));
+    stateManager.trigger(INSTANCE, TRIGGER1)
+        .toCompletableFuture().get(1, MINUTES);
 
-    assertTrue(stateManager.awaitIdle(1000));
-
-    SortedSet<SequenceEvent> storedEvents = storage.readEvents(INSTANCE);
-    SequenceEvent lastStoredEvent = storedEvents.last();
-    assertThat(lastStoredEvent.event(), is(Event.halt(INSTANCE)));
-    assertThat(storage.getLatestStoredCounter(INSTANCE), hasValue(1L));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE).isPresent(), is(false));
+    verify(transaction).insertActiveState(INSTANCE, instanceStateFresh);
+    verify(storage).writeEvent(SequenceEvent.create(
+        Event.triggerExecution(INSTANCE, TRIGGER1), 0, NOW.toEpochMilli()));
   }
 
   @Test
-  public void shouldInitializeWFInstanceFromNextCounter() throws Exception {
-    setUp();
+  public void shouldReInitializeWFInstanceFromNextCounter() throws Exception {
+    when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.of(INSTANCE_NEW_STATE.counter()));
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
+    when(transaction.activeState(INSTANCE)).thenReturn(Optional.of(INSTANCE_NEW_STATE));
 
-    stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER1));
-    stateManager.receive(Event.dequeue(INSTANCE));
-    stateManager.receive(Event.halt(INSTANCE));
-    assertTrue(stateManager.awaitIdle(1000));
+    stateManager.trigger(INSTANCE, TRIGGER1)
+        .toCompletableFuture().get(1, MINUTES);
 
-    stateManager.initialize(RunState.fresh(INSTANCE));
-    stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER2));
-    stateManager.receive(Event.dequeue(INSTANCE));
-    stateManager.receive(Event.created(INSTANCE, TEST_EXECUTION_ID_1, DOCKER_IMAGE));
-    stateManager.receive(Event.started(INSTANCE));
-    stateManager.receive(Event.halt(INSTANCE));
-    assertTrue(stateManager.awaitIdle(1000));
-
-    stateManager.initialize(RunState.fresh(INSTANCE));
-    stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER3));
-    assertTrue(stateManager.awaitIdle(1000));
-
-    SortedSet<SequenceEvent> storedEvents = storage.readEvents(INSTANCE);
-    SequenceEvent lastStoredEvent = storedEvents.last();
-    assertThat(lastStoredEvent.event(), is(Event.triggerExecution(INSTANCE, TRIGGER3)));
-    assertThat(storage.getLatestStoredCounter(INSTANCE), hasValue(8L));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(8L));
+    verify(transaction).insertActiveState(INSTANCE, INSTANCE_NEW_STATE);
+    verify(storage).writeEvent(SequenceEvent.create(
+        Event.triggerExecution(INSTANCE, TRIGGER1), INSTANCE_NEW_STATE.counter() + 1, NOW.toEpochMilli()));
   }
 
-  @Test(expected = RuntimeException.class)
-  public void shouldFailInitializeWFIfAlreadyActive() throws Exception {
-    setUp();
+  @Test
+  public void shouldNotBeActiveAfterHalt() throws Exception {
+    when(transaction.activeState(INSTANCE)).thenReturn(
+        Optional.of(PersistentWorkflowInstanceState
+            .builder()
+            .counter(17)
+            .timestamp(NOW.minusMillis(1))
+            .state(State.PREPARE)
+            .data(StateData.zero())
+            .build()));
 
-    stateManager.initialize(RunState.fresh(INSTANCE));
+    Event event = Event.halt(INSTANCE);
+    stateManager.receive(event)
+        .toCompletableFuture().get(1, MINUTES);
+
+    verify(transaction).deleteActiveState(INSTANCE);
+    verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
+  }
+
+  @Test
+  public void shouldFailTriggerWFIfAlreadyActive() throws Exception {
+    reset(storage);
+    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
+    DatastoreException datastoreException = new DatastoreException(1, "", "");
+    TransactionException transactionException = spy(new TransactionException(datastoreException));
+
+    when(transactionException.isAlreadyExists()).thenReturn(true);
+    doThrow(transactionException).when(transaction).insertActiveState(any(), any());
+    when(storage.runInTransaction(any())).thenAnswer(a ->
+        a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
+
+    try {
+      stateManager.trigger(INSTANCE, TRIGGER1)
+          .toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(e.getCause(), is(instanceOf(IllegalStateException.class)));
+    }
+  }
+
+  @Test
+  public void shouldFailTriggerWFIfOnConflict() throws Exception {
+    reset(storage);
+    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
+    final DatastoreException datastoreException = new DatastoreException(1, "", "");
+    final TransactionException transactionException = spy(new TransactionException(datastoreException));
+    when(transactionException.isConflict()).thenReturn(true);
+    when(storage.runInTransaction(any())).thenAnswer(a -> {
+      a.getArgumentAt(0, TransactionFunction.class)
+          .apply(transaction);
+      throw transactionException;
+    });
+
+    try {
+      stateManager.trigger(INSTANCE, TRIGGER1)
+          .toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(e.getCause().getCause(), is(instanceOf(TransactionException.class)));
+      TransactionException cause = (TransactionException) e.getCause().getCause();
+      assertTrue(cause.isConflict());
+    }
+  }
+
+  @Test
+  public void shouldFailTriggerIfGetLatestCounterFails() throws Exception {
+    when(storage.getLatestStoredCounter(any())).thenThrow(new IOException());
+
+    try {
+      stateManager.trigger(INSTANCE, TRIGGER1)
+          .toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(Throwables.getRootCause(e), is(instanceOf(IOException.class)));
+    }
+  }
+
+  @Test
+  public void shouldFailTriggerIfWorkflowNotFound() throws Exception {
+    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
+
+    try {
+      stateManager.trigger(INSTANCE, TRIGGER1)
+          .toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(Throwables.getRootCause(e), is(instanceOf(IllegalArgumentException.class)));
+    }
+  }
+
+  @Test
+  public void shouldFailTriggerIfIOExceptionFromTransaction() throws Exception {
+    reset(storage);
+    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
+    when(storage.runInTransaction(any())).thenThrow(new IOException());
+
+    try {
+      stateManager.trigger(INSTANCE, TRIGGER1)
+          .toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(Throwables.getRootCause(e), is(instanceOf(IOException.class)));
+    }
+  }
+
+  @Test
+  public void shouldFailTriggerIfIsClosedOnReceive() throws Exception {
+    reset(storage);
+    stateManager = spy(new QueuedStateManager(
+        time, eventTransitionExecutor, storage, eventConsumer,
+        eventConsumerExecutor, outputHandler));
+    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
+    doThrow(new IsClosedException()).when(stateManager).receive(any());
+
+    try {
+      stateManager.trigger(INSTANCE, TRIGGER1)
+          .toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(Throwables.getRootCause(e), is(instanceOf(IsClosedException.class)));
+    }
+  }
+
+  @Test
+  public void shouldFailTriggerIfIsClosedOnReceiveAndFailDeleteActiveState() throws Exception {
+    reset(storage);
+    stateManager = spy(new QueuedStateManager(
+        time, eventTransitionExecutor, storage, eventConsumer,
+        eventConsumerExecutor, outputHandler));
+    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    doThrow(new IOException()).when(storage).deleteActiveState(any());
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
+    doThrow(new IsClosedException()).when(stateManager).receive(any());
+
+    try {
+      stateManager.trigger(INSTANCE, TRIGGER1)
+          .toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(Throwables.getRootCause(e), is(instanceOf(IsClosedException.class)));
+    }
   }
 
   @Test(expected = IsClosedException.class)
-  public void shouldRejectInitializeIfClosed() throws Exception {
-    setUp();
-
+  public void shouldRejectTriggertIfClosed() throws Exception {
     stateManager.close();
-    stateManager.initialize(RunState.fresh(INSTANCE));
+    stateManager.trigger(INSTANCE, TRIGGER1);
   }
 
   @Test(expected = IsClosedException.class)
   public void shouldRejectEventIfClosed() throws Exception {
-    setUp();
-
     stateManager.close();
     stateManager.receive(Event.timeTrigger(INSTANCE));
   }
 
   @Test
   public void shouldCloseGracefully() throws Exception {
-    setUp();
+    when(transaction.activeState(INSTANCE)).thenReturn(
+        Optional.of(PersistentWorkflowInstanceState
+            .builder()
+            .counter(17)
+            .timestamp(NOW.minusMillis(1))
+            .state(State.QUEUED)
+            .data(StateData.zero())
+            .build()));
 
-    stateManager.receive(Event.timeTrigger(INSTANCE));
-    stateManager.close();
+    CompletableFuture<Void> barrier = new CompletableFuture<>();
 
-    assertTrue(stateManager.awaitIdle(1000));
-    assertThat(transitions, hasSize(1));
-    assertThat(transitions.pop().state(), is(RunState.State.SUBMITTED));
+    reset(storage);
+
+    when(storage.runInTransaction(any())).thenAnswer(a -> {
+      barrier.get();
+      return a.getArgumentAt(0, TransactionFunction.class).apply(transaction);
+    });
+
+    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE))
+        .toCompletableFuture();
+
+    CompletableFuture.runAsync(() -> {
+      try {
+        stateManager.close();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+
+    verify(storage, timeout(30_000)).runInTransaction(any());
+
+    barrier.complete(null);
+
+    f.get(1, MINUTES);
+
+    verify(outputHandler).transitionInto(any());
+    assertThat(runStateCaptor.getValue().state(), is(State.PREPARE));
   }
 
   @Test
   public void shouldWriteEvents() throws Exception {
-    setUp();
+    Event event = Event.started(INSTANCE);
 
-    stateManager.receive(Event.timeTrigger(INSTANCE));
-    assertTrue(stateManager.awaitIdle(1000));
+    when(transaction.activeState(INSTANCE))
+        .then(a -> Optional.of(PersistentWorkflowInstanceState.builder()
+            .timestamp(NOW.minusMillis(1))
+            .counter(17)
+            .state(State.SUBMITTED)
+            .data(StateData.zero())
+            .build()));
 
-    stateManager.receive(Event.started(INSTANCE));
-    assertTrue(stateManager.awaitIdle(1000));
+    stateManager.receive(event)
+        .toCompletableFuture().get(1, MINUTES);
 
-    stateManager.receive(Event.timeout(INSTANCE));
-    assertTrue(stateManager.awaitIdle(1000));
-
-    stateManager.receive(Event.retryAfter(INSTANCE, 10));
-    assertTrue(stateManager.awaitIdle(1000));
-    assertThat(storage.writtenEvents, hasSize(4));
-
-    assertThat(storage.writtenEvents.get(0).counter(), is(0L));
-    assertThat(storage.writtenEvents.get(0).event(), is(Event.timeTrigger(INSTANCE)));
-    assertThat(storage.writtenEvents.get(1).counter(), is(1L));
-    assertThat(storage.writtenEvents.get(1).event(), is(Event.started(INSTANCE)));
-    assertThat(storage.writtenEvents.get(2).counter(), is(2L));
-    assertThat(storage.writtenEvents.get(2).event(), is(Event.timeout(INSTANCE)));
-    assertThat(storage.writtenEvents.get(3).counter(), is(3L));
-    assertThat(storage.writtenEvents.get(3).event(), is(Event.retryAfter(INSTANCE, 10)));
+    verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
   }
 
   @Test
   public void shouldRemoveStateIfTerminal() throws Exception {
-    setUp();
+    when(transaction.activeState(INSTANCE)).thenReturn(
+        Optional.of(PersistentWorkflowInstanceState
+            .builder()
+            .counter(17)
+            .timestamp(NOW.minusMillis(1))
+            .state(State.TERMINATED)
+            .data(StateData.zero())
+            .build()));
 
-    stateManager.receive(Event.timeTrigger(INSTANCE));
-    stateManager.receive(Event.started(INSTANCE));
-    stateManager.receive(Event.terminate(INSTANCE, Optional.of(0)));
-    stateManager.receive(Event.success(INSTANCE));
+    Event event = Event.success(INSTANCE);
+    stateManager.receive(event)
+        .toCompletableFuture().get(1, MINUTES);
 
-    assertTrue(stateManager.awaitIdle(1000));
-    assertThat(stateManager.get(INSTANCE), is(nullValue()));
+    verify(transaction).deleteActiveState(INSTANCE);
+
+    verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
+  }
+
+  @Test
+  public void shouldHaveZeroQueuedEvent() throws Exception {
+    when(transaction.activeState(INSTANCE)).thenReturn(
+        Optional.of(PersistentWorkflowInstanceState
+                        .builder()
+                        .counter(17)
+                        .timestamp(NOW.minusMillis(1))
+                        .state(State.TERMINATED)
+                        .data(StateData.zero())
+                        .build()));
+
+    assertThat(stateManager.queuedEvents(), is(0L));
+
+    Event event = Event.success(INSTANCE);
+    stateManager.receive(event)
+        .toCompletableFuture().get(1, MINUTES);
+
+    assertThat(stateManager.queuedEvents(), is(0L));
+
+    verify(transaction).deleteActiveState(INSTANCE);
+
+    verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
   }
 
   @Test
   public void shouldWriteActiveStateOnEvent() throws Exception {
-    setUp();
+    when(transaction.activeState(INSTANCE)).thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
+        .counter(17)
+        .timestamp(NOW.minusMillis(1))
+        .state(State.QUEUED)
+        .data(StateData.zero())
+        .build()));
 
-    assertThat(storage.activeStatesMap.isEmpty(), is(true));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE), isEmpty());
-
-    stateManager.receive(Event.timeTrigger(INSTANCE))   // 0
+    stateManager.receive(Event.dequeue(INSTANCE))
         .toCompletableFuture().get(1, MINUTES);
 
-    assertThat(storage.activeStatesMap, hasKey(INSTANCE));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(0L));
-
-    stateManager.receive(Event.started(INSTANCE))       // 1
-        .toCompletableFuture().get(1, MINUTES);
-
-    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(1L));
-
-    stateManager.receive(Event.terminate(INSTANCE, Optional.of(0)))  // 2
-        .toCompletableFuture().get(1, MINUTES);
-
-    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(2L));
-
-    assertTrue(stateManager.awaitIdle(1000));
-    assertThat(storage.getLatestStoredCounter(INSTANCE), hasValue(2L));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(2L));
-
-    stateManager.receive(Event.success(INSTANCE));
-
-    assertTrue(stateManager.awaitIdle(1000));
-    assertThat(storage.activeStatesMap.values(), is(empty()));
+    verify(transaction).updateActiveState(INSTANCE, PersistentWorkflowInstanceState.builder()
+        .counter(18)
+        .timestamp(NOW)
+        .state(State.PREPARE)
+        .data(StateData.zero())
+        .build());
   }
 
   @Test
-  public void shouldNotStoreEventOnIllegalStateTransition() throws Exception {
-    setUp();
+  public void shouldPreventIllegalStateTransition() throws Exception {
+    when(transaction.activeState(INSTANCE)).thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
+        .counter(17)
+        .timestamp(NOW.minusMillis(1))
+        .state(State.QUEUED)
+        .data(StateData.zero())
+        .build()));
 
-    stateManager.receive(Event.timeTrigger(INSTANCE));
-    assertTrue(stateManager.awaitIdle(1000));
+    CompletableFuture<Void> f = stateManager.receive(Event.terminate(INSTANCE, Optional.empty()))
+        .toCompletableFuture();
 
-    stateManager.receive(Event.started(INSTANCE));
-    assertTrue(stateManager.awaitIdle(1000));
-
-    stateManager.receive(Event.started(INSTANCE)); // causes illegal transition
-
-    assertTrue(stateManager.awaitIdle(1000));
-    assertThat(storage.getLatestStoredCounter(INSTANCE), hasValue(1L));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(1L));
-    assertThat(storage.writtenEvents, hasSize(2));
-
-    assertThat(storage.writtenEvents.get(0).counter(), is(0L));
-    assertThat(storage.writtenEvents.get(0).event(), is(Event.timeTrigger(INSTANCE)));
-    assertThat(storage.writtenEvents.get(1).counter(), is(1L));
-    assertThat(storage.writtenEvents.get(1).event(), is(Event.started(INSTANCE)));
-  }
-
-  @Test
-  public void shouldRestoreStateAtCount() throws Exception {
-    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2);
-
-    stateManager.restore(RunState.fresh(INSTANCE), 7L);
-    stateManager.receive(Event.timeTrigger(INSTANCE));  // 8
-
-    assertTrue(stateManager.awaitIdle(1000));
-    assertThat(storage.activeStatesMap, hasKey(INSTANCE));
-    assertThat(storage.getLatestStoredCounter(INSTANCE), hasValue(8L));
-    assertThat(storage.getCounterFromActiveStates(INSTANCE), hasValue(8L));
-  }
-
-  @Test
-  public void shouldHandleThrowingOutputHandler() throws Exception {
-    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2);
-
-    OutputHandler throwing = (state) -> {
-      throw new RuntimeException();
-    };
-
-    stateManager.initialize(RunState.fresh(INSTANCE, throwing));
-    stateManager.receive(Event.triggerExecution(INSTANCE, TRIGGER1));
-
-    assertTrue(stateManager.awaitIdle(5000));
-  }
-
-  @Test
-  public void testGetActiveWorkflowInstance() throws Exception {
-    stateManager = new QueuedStateManager(Instant::now, POOL1, storage, eventConsumer, POOL2);
-
-    assertThat(stateManager.isActiveWorkflowInstance(INSTANCE), is(false));
-
-    stateManager.initialize(RunState.fresh(INSTANCE, transitions::push));
-
-    assertTrue(stateManager.awaitIdle(1000));
-    assertThat(stateManager.isActiveWorkflowInstance(INSTANCE), is(true));
-  }
-
-  /**
-   * Repeated many times as we're doing some sort of concurrency test. It's hard to guarantee
-   * correctness, but repetition should increase our confidence.
-   */
-  @Test
-  @RepeatRule.Repeat(times = 50)
-  public void testConcurrentEvents() throws Exception {
-    setUp();
-
-    IntFunction<WorkflowInstance > wfi =
-        j -> WorkflowInstance.create(TestData.WORKFLOW_ID, "id-" + j);
-
-    Consumer<WorkflowInstance> sendEvents = instance -> {
-      try {
-        stateManager.receive(Event.submit(instance, ExecutionDescription.forImage(""), "id"));
-        stateManager.receive(Event.submitted(instance, "id"));
-        stateManager.receive(Event.started(instance));
-        stateManager.receive(Event.terminate(instance, Optional.of(20)));
-        stateManager.receive(Event.retryAfter(instance, 300));
-        stateManager.receive(Event.dequeue(instance));
-      } catch (IsClosedException ignored) {
-      }
-    };
-
-    int states = 50;
-    CountDownLatch initLatch = new CountDownLatch(states);
-    CountDownLatch eventsLatch = new CountDownLatch(states);
-
-    for (int j = 0; j < states; j++) {
-      int jj = j;
-      commonPool().execute(() -> {
-        WorkflowInstance instance = wfi.apply(jj);
-
-        try {
-          stateManager.initialize(RunState.fresh(instance));
-          stateManager.receive(Event.triggerExecution(instance, TRIGGER1));
-          stateManager.receive(Event.dequeue(instance));
-        } catch (IsClosedException ignored) {
-        }
-
-        initLatch.countDown();
-      });
+    try {
+      f.get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(e.getCause(), instanceOf(IllegalStateException.class));
     }
 
-    assertTrue(initLatch.await(1000, TimeUnit.SECONDS));
+    verify(transaction, never()).updateActiveState(any(), any());
+  }
 
-    for (int j = 0; j < states; j++) {
-      WorkflowInstance instance = wfi.apply(j);
+  @Test
+  public void shouldFailReceiveForUnknownActiveWFInstance() throws Exception {
+    when(transaction.activeState(INSTANCE)).thenReturn(Optional.empty());
 
-      commonPool().execute(() -> {
-        for (int k = 0; k < 100; k++) {
-          sendEvents.accept(instance);
-        }
-        eventsLatch.countDown();
-      });
+    CompletableFuture<Void> f = stateManager.receive(Event.terminate(INSTANCE, Optional.empty()))
+        .toCompletableFuture();
+
+    try {
+      f.get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(e.getCause(), instanceOf(IllegalArgumentException.class));
     }
 
-    assertTrue(eventsLatch.await(1000, TimeUnit.SECONDS));
-    assertTrue(stateManager.awaitIdle(5000));
+    verify(transaction, never()).updateActiveState(any(), any());
+  }
 
-    for (int j = 0; j < states; j++) {
-      assertThat(stateManager.getQueuedEventsCount(), is(0L));
+  @Test
+  public void shouldGetRunState() throws Exception {
+    when(storage.readActiveWorkflowInstance(INSTANCE)).thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
+        .counter(17)
+        .timestamp(NOW.minusMillis(1))
+        .state(State.QUEUED)
+        .data(StateData.zero())
+        .build()));
+    RunState expectedRunState = RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW.minusMillis(1));
+    RunState returnedRunState = stateManager.get(INSTANCE);
 
-      WorkflowInstance instance = wfi.apply(j);
-      RunState runState = stateManager.get(instance);
-      assertThat(instance.toKey(), runState.state(), is(RunState.State.PREPARE));
-      assertThat(instance.toKey(), runState.data().tries(), is(100));
+    assertThat(expectedRunState, equalTo(returnedRunState));
+  }
+
+  @Test
+  public void shouldGetRunStates() throws Exception {
+    Map<WorkflowInstance, PersistentWorkflowInstanceState> states = Maps.newConcurrentMap();
+    PersistentWorkflowInstanceState persistentState = PersistentWorkflowInstanceState.builder()
+        .counter(17)
+        .timestamp(NOW.minusMillis(1))
+        .state(State.QUEUED)
+        .data(StateData.zero())
+        .build();
+    states.put(INSTANCE, persistentState);
+    when(storage.readActiveWorkflowInstances()).thenReturn(states);
+    RunState expectedRunState = RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW.minusMillis(1));
+    Map<WorkflowInstance, RunState> returnedRunStates = stateManager.activeStates();
+
+    assertThat(returnedRunStates.get(INSTANCE), is(expectedRunState));
+    assertThat(returnedRunStates.size(), is(1));
+  }
+
+
+  @Test
+  public void triggerShouldHandleThrowingOutputHandler() throws Exception {
+    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
+    when(transaction.activeState(INSTANCE)).thenReturn(Optional.of(INSTANCE_NEW_STATE));
+    final RuntimeException rootCause = new RuntimeException("foo!");
+    doThrow(rootCause).when(outputHandler).transitionInto(any());
+    CompletableFuture<Void> f = stateManager.trigger(INSTANCE, TRIGGER1).toCompletableFuture();
+    try {
+      f.get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(Throwables.getRootCause(e), is(rootCause));
+    }
+  }
+
+  @Test
+  public void receiveShouldHandleThrowingOutputHandler() throws Exception {
+    when(transaction.activeState(INSTANCE)).thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
+        .counter(17)
+        .timestamp(NOW.minusMillis(1))
+        .state(State.QUEUED)
+        .data(StateData.zero())
+        .build()));
+
+    final RuntimeException rootCause = new RuntimeException("foo!");
+    doThrow(rootCause).when(outputHandler).transitionInto(any());
+    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE)).toCompletableFuture();
+    try {
+      f.get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(Throwables.getRootCause(e), is(rootCause));
+    }
+  }
+
+  @Test
+  public void shouldThrowRuntimeException() throws Exception {
+    final IOException exception = new IOException();
+    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
+    doThrow(exception).when(storage).runInTransaction(any());
+    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE)).toCompletableFuture();
+    try {
+      f.get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(Throwables.getRootCause(e), is(exception));
     }
   }
 }

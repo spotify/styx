@@ -21,6 +21,13 @@
     <semantic-metrics.version>0.11.2</semantic-metrics.version>
   </properties>
 
+  <repositories>
+    <repository>
+      <id>jitpack.io</id>
+      <url>https://jitpack.io</url>
+    </repository>
+  </repositories>
+
   <modules>
     <module>styx-api-service</module>
     <module>styx-scheduler-service</module>
@@ -190,6 +197,11 @@
         <groupId>com.spotify.metrics</groupId>
         <artifactId>semantic-metrics-ffwd-reporter</artifactId>
         <version>${semantic-metrics.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.kabutz</groupId>
+        <artifactId>javaspecialists</artifactId>
+        <version>055ddfd5d6d9</version>
       </dependency>
 
       <!-- cli -->

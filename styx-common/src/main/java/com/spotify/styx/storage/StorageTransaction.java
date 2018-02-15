@@ -22,9 +22,12 @@ package com.spotify.styx.storage;
 
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
+import java.util.Optional;
 
 /**
  * The interface to the persistence layer where the same transaction is used across storage
@@ -41,6 +44,14 @@ public interface StorageTransaction {
    * @param workflow the workflow to store
    */
   WorkflowId store(Workflow workflow) throws IOException;
+
+  /**
+   * Get a {@link Workflow} definition.
+   *
+   * @param workflowId  The workflow to get
+   * @return Optionally a workflow, if one was found for the given id
+   */
+  Optional<Workflow> workflow(WorkflowId workflowId) throws IOException;
 
   /**
    * Updates the next natural trigger for a {@link Workflow}.
@@ -60,6 +71,28 @@ public interface StorageTransaction {
    * @param state       The state object with optional fields to patch
    */
   WorkflowId patchState(WorkflowId workflowId, WorkflowState state) throws IOException;
+
+  /**
+   * Read an active workflow instance state.
+   */
+  Optional<PersistentWorkflowInstanceState> activeState(WorkflowInstance instance) throws IOException;
+
+  /**
+   * Insert a new active workflow instance state. Fails if the state already exists.
+   */
+  WorkflowInstance insertActiveState(WorkflowInstance instance, PersistentWorkflowInstanceState state)
+      throws IOException;
+
+  /**
+   * Update an existing active workflow instance state. Fails if the state does not exist.
+   */
+  WorkflowInstance updateActiveState(WorkflowInstance instance, PersistentWorkflowInstanceState state)
+      throws IOException;
+
+  /**
+   * Remove an active workflow instance state.
+   */
+  WorkflowInstance deleteActiveState(WorkflowInstance instance);
 
   /**
    * Commit all the storage operations previously called.

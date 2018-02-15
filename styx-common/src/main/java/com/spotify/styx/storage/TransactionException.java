@@ -20,21 +20,49 @@
 
 package com.spotify.styx.storage;
 
+import com.google.cloud.datastore.DatastoreException;
+
 public class TransactionException extends StorageException {
 
-  private final boolean conflict;
-
-  public TransactionException(String message, boolean conflict, Throwable cause) {
-    super(message, cause);
-    this.conflict = conflict;
+  public TransactionException(DatastoreException cause) {
+    super(cause.getMessage(), cause);
   }
 
-  public TransactionException(boolean conflict, Throwable cause) {
-    super(cause);
-    this.conflict = conflict;
-  }
+  // TODO: represent the failure cause using an enum instead
 
   public boolean isConflict() {
-    return conflict;
+    if (getCause() != null && getCause() instanceof DatastoreException) {
+      DatastoreException datastoreException = (DatastoreException) getCause();
+      return datastoreException.getCode() == 10;
+    } else {
+      return false;
+    }
+  }
+
+  public boolean isAlreadyExists() {
+    if (getCause() != null && getCause() instanceof DatastoreException) {
+      DatastoreException datastoreException = (DatastoreException) getCause();
+      // TODO remove check on message when Google fixes the Datastore emulator
+      return "ALREADY_EXISTS".equals(datastoreException.getReason())
+             || messageStartsWith("entity already exists");
+    } else {
+      return false;
+    }
+  }
+
+  public boolean isNotFound() {
+    if (getCause() != null && getCause() instanceof DatastoreException) {
+      DatastoreException datastoreException = (DatastoreException) getCause();
+      // TODO remove check on message when Google fixes the Datastore emulator
+      return "NOT_FOUND".equals(datastoreException.getReason())
+             || messageStartsWith("no entity to update");
+    } else {
+      return false;
+    }
+  }
+
+  private boolean messageStartsWith(String prefix) {
+    final String message = getMessage();
+    return message != null && message.startsWith(prefix);
   }
 }

@@ -24,13 +24,19 @@ import com.google.common.collect.Maps;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Testing utility for transitioning states.
  */
 public class StateTransitioner {
 
+  private final OutputHandler outputHandler;
   private final Map<WorkflowInstance, RunState> states = Maps.newHashMap();
+
+  StateTransitioner(OutputHandler outputHandler) {
+    this.outputHandler = Objects.requireNonNull(outputHandler);
+  }
 
   public void initialize(RunState runState) {
     states.put(runState.workflowInstance(), runState);
@@ -43,7 +49,7 @@ public class StateTransitioner {
     RunState nextState = currentState.transition(event);
     states.put(key, nextState);
 
-    nextState.outputHandler().transitionInto(nextState);
+    outputHandler.transitionInto(nextState);
   }
 
   public RunState get(WorkflowInstance workflowInstance) {

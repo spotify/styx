@@ -161,6 +161,12 @@ public interface Storage {
       throws IOException;
 
   /**
+   * Read an active workflow instance.
+   */
+  Optional<PersistentWorkflowInstanceState> readActiveWorkflowInstance(WorkflowInstance workflowInstance)
+      throws IOException;
+
+  /**
    * Get execution information for a {@link WorkflowInstance}.
    *
    * @param workflowInstance The workflow to get execution information for

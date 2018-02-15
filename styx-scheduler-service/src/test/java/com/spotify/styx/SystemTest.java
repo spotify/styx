@@ -53,7 +53,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import junitparams.JUnitParamsRunner;
-import junitparams.Parameters;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -576,11 +575,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @Test
-  @Parameters({
-      "true, true",
-      "true, false",
-      "false, true",})
-  public void restoredStatesUseOriginalTimestamps(boolean withEvents, boolean withPersistentState) throws Exception {
+  public void restoredStatesUseOriginalTimestamps() throws Exception {
     WorkflowInstance workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T10");
 
     givenTheTimeIs("2016-03-14T15:17:45Z");
@@ -588,23 +583,12 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    if (withEvents) {
-      givenStoredEventAtTime(Event.timeTrigger(workflowInstance),                0L, timeOffsetSeconds(1));
-      givenStoredEventAtTime(Event.started(workflowInstance),                    1L, timeOffsetSeconds(2));
-      givenStoredEventAtTime(Event.terminate(workflowInstance, Optional.of(20)), 2L, timeOffsetSeconds(3));
-      givenStoredEventAtTime(Event.retryAfter(workflowInstance, 30000),          3L, timeOffsetSeconds(4));
-    }
-
-    if (withPersistentState) {
-      givenActiveStateAtSequenceCount(workflowInstance, PersistentWorkflowInstanceState.builder()
-          .state(RunState.State.QUEUED)
-          .data(StateData.zero())
-          .timestamp(Instant.ofEpochMilli(timeOffsetSeconds(4)))
-          .counter(3L)
-          .build());
-    } else {
-      givenActiveStateAtSequenceCount(workflowInstance, 3L);
-    }
+    givenActiveStateAtSequenceCount(workflowInstance, PersistentWorkflowInstanceState.builder()
+        .state(RunState.State.QUEUED)
+        .data(StateData.zero())
+        .timestamp(Instant.ofEpochMilli(timeOffsetSeconds(4)))
+        .counter(3L)
+        .build());
 
     givenTheTimeIs("2016-03-14T16:01:00Z");
     styxStarts();
@@ -616,11 +600,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @Test
-  @Parameters({
-      "true, true",
-      "true, false",
-      "false, true",})
-  public void restoresActiveStates(boolean withEvents, boolean withPersistentState) throws Exception {
+  public void restoresActiveStates() throws Exception {
     WorkflowInstance workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
 
     givenTheTimeIs("2016-03-14T15:17:45Z");
@@ -628,27 +608,12 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    if (withEvents) {
-      givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER1),                       0L);
-      givenStoredEvent(Event.created(workflowInstance, TEST_EXECUTION_ID_1, TEST_DOCKER_IMAGE),  1L);
-      givenStoredEvent(Event.started(workflowInstance),                                          2L);
-      givenStoredEvent(Event.terminate(workflowInstance, Optional.of(20)),                       3L);
-      givenStoredEvent(Event.retry(workflowInstance),                                            4L);
-      givenStoredEvent(Event.started(workflowInstance),                                          5L);
-      givenStoredEvent(Event.terminate(workflowInstance, Optional.of(20)),                       6L);
-      givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                                7L);
-    }
-
-    if (withPersistentState) {
-      givenActiveStateAtSequenceCount(workflowInstance, PersistentWorkflowInstanceState.builder()
-          .state(RunState.State.QUEUED)
-          .data(StateData.newBuilder().trigger(TRIGGER1).build())
-          .timestamp(Instant.parse("2016-03-14T15:17:45Z"))
-          .counter(13L)
-          .build());
-    } else {
-      givenActiveStateAtSequenceCount(workflowInstance, 7L);
-    }
+    givenActiveStateAtSequenceCount(workflowInstance, PersistentWorkflowInstanceState.builder()
+        .state(RunState.State.QUEUED)
+        .data(StateData.newBuilder().trigger(TRIGGER1).build())
+        .timestamp(Instant.parse("2016-03-14T15:17:45Z"))
+        .counter(13L)
+        .build());
 
     styxStarts();
 
@@ -663,7 +628,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @Test
-  public void restoresActiveStatesFromBigtableRetriggered() throws Exception {
+  public void restoresContainerStateWhenStarting() throws Exception {
     WorkflowInstance workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
 
     givenTheTimeIs("2016-03-14T15:17:45Z");
@@ -671,108 +636,12 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER1),                       0L);
-    givenStoredEvent(Event.created(workflowInstance, TEST_EXECUTION_ID_1, TEST_DOCKER_IMAGE),  1L);
-    givenStoredEvent(Event.started(workflowInstance),                                          2L);
-    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),                       3L);
-    givenStoredEvent(Event.retry(workflowInstance),                                            4L);
-    givenStoredEvent(Event.started(workflowInstance),                                          5L);
-    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),                       6L);
-    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                                7L);
-    givenStoredEvent(Event.halt(workflowInstance),                                             8L);
-    givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER2),                       9L);
-    givenStoredEvent(Event.created(workflowInstance, TEST_EXECUTION_ID_1, TEST_DOCKER_IMAGE), 10L);
-    givenStoredEvent(Event.started(workflowInstance),                                         11L);
-    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),                      12L);
-    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                               13L);
-    givenActiveStateAtSequenceCount(workflowInstance,                                         13L);
-
-    styxStarts();
-
-    timePasses(1, MINUTES);
-    awaitNumberOfDockerRuns(1);
-
-    WorkflowInstance workflowInstance2 = dockerRuns.get(0)._1;
-    RunSpec runSpec = dockerRuns.get(0)._2;
-    assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
-    assertThat(runSpec, is(
-        unknownRunSpec(runSpec.executionId(), "busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig2")));
-  }
-
-  @Test
-  public void restoresActiveStatesFromBigtableRetriggered2() throws Exception {
-    WorkflowInstance workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
-
-    givenTheTimeIs("2016-03-14T15:17:45Z");
-    givenWorkflow(HOURLY_WORKFLOW);
-    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
-
-    givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER1),                   0L);
-    givenStoredEvent(Event.dequeue(workflowInstance),                                      1L);
-    givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION, "exec1"),  2L);
-    givenStoredEvent(Event.submitted(workflowInstance, "exec1"),                           3L);
-    givenStoredEvent(Event.started(workflowInstance),                                      4L);
-    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),                   5L);
-    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                            6L);
-    givenStoredEvent(Event.dequeue(workflowInstance),                                      7L);
-    givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION, "exec2"),  8L);
-    givenStoredEvent(Event.submitted(workflowInstance, "exec2"),                           9L);
-    givenStoredEvent(Event.started(workflowInstance),                                     10L);
-    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),                  11L);
-    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                           12L);
-    givenStoredEvent(Event.halt(workflowInstance),                                        13L);
-    givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER2),                  14L);
-    givenStoredEvent(Event.dequeue(workflowInstance),                                     15L);
-    givenStoredEvent(Event.submit(workflowInstance, TEST_EXECUTION_DESCRIPTION, "exec3"), 16L);
-    givenStoredEvent(Event.submitted(workflowInstance, "exec3"),                          17L);
-    givenStoredEvent(Event.started(workflowInstance),                                     18L);
-    givenStoredEvent(Event.terminate(workflowInstance, Optional.of(30)),                  19L);
-    givenStoredEvent(Event.retryAfter(workflowInstance, 30000),                           20L);
-    givenActiveStateAtSequenceCount(workflowInstance,                                     20L);
-
-    styxStarts();
-
-    timePasses(1, MINUTES);
-    awaitNumberOfDockerRuns(1);
-
-    WorkflowInstance workflowInstance2 = dockerRuns.get(0)._1;
-    RunSpec runSpec = dockerRuns.get(0)._2;
-    assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
-    assertThat(runSpec, is(
-        unknownRunSpec(runSpec.executionId(), "busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig2")));
-  }
-
-
-  @Test
-  @Parameters({
-      "true, true",
-      "true, false",
-      "false, true",})
-  public void restoresContainerStateWhenStarting(boolean withEvents, boolean withPersistentState) throws Exception {
-    WorkflowInstance workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
-
-    givenTheTimeIs("2016-03-14T15:17:45Z");
-    givenWorkflow(HOURLY_WORKFLOW);
-    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
-
-    if (withEvents) {
-      givenStoredEvent(Event.triggerExecution(workflowInstance, TRIGGER1),                       0L);
-      givenStoredEvent(Event.created(workflowInstance, TEST_EXECUTION_ID_1, TEST_DOCKER_IMAGE),  1L);
-      givenStoredEvent(Event.started(workflowInstance),                                          2L);
-    }
-
-    if (withPersistentState) {
-      givenActiveStateAtSequenceCount(workflowInstance, PersistentWorkflowInstanceState.builder()
-          .state(RunState.State.RUNNING)
-          .data(StateData.newBuilder().trigger(TRIGGER1).build())
-          .timestamp(Instant.parse("2016-03-14T15:17:45Z"))
-          .counter(2L)
-          .build());
-    } else {
-      givenActiveStateAtSequenceCount(workflowInstance, 2L);
-    }
+    givenActiveStateAtSequenceCount(workflowInstance, PersistentWorkflowInstanceState.builder()
+        .state(RunState.State.RUNNING)
+        .data(StateData.newBuilder().trigger(TRIGGER1).build())
+        .timestamp(Instant.parse("2016-03-14T15:17:45Z"))
+        .counter(2L)
+        .build());
 
     styxStarts();
 

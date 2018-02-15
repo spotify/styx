@@ -21,6 +21,7 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
@@ -57,7 +58,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import javaslang.Tuple;
 import javaslang.Tuple2;
@@ -101,6 +104,7 @@ public class StyxSchedulerServiceFixture {
 
   @BeforeClass
   public static void setUpClass() throws Exception {
+    // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
     localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
     localDatastore.start();
   }
@@ -159,8 +163,8 @@ public class StyxSchedulerServiceFixture {
     }
   }
 
-  void injectEvent(Event event) throws IsClosedException {
-    styxScheduler.receive(event);
+  void injectEvent(Event event) throws IsClosedException, InterruptedException, ExecutionException, TimeoutException {
+    styxScheduler.receive(event).toCompletableFuture().get(1, MINUTES);
   }
 
   RunState getState(WorkflowInstance workflowInstance) {

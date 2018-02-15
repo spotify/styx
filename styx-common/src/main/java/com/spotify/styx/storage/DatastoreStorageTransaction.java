@@ -25,6 +25,8 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_NATURAL_OF
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_NATURAL_TRIGGER;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_ENABLED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_JSON;
+import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceKey;
+import static com.spotify.styx.storage.DatastoreStorage.readPersistentWorkflowInstanceState;
 
 import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.Entity;
@@ -33,7 +35,9 @@ import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.Transaction;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
@@ -53,8 +57,7 @@ class DatastoreStorageTransaction implements StorageTransaction {
     try {
       tx.commit();
     } catch (DatastoreException e) {
-      final boolean conflict = e.getCode() == 10;
-      throw new TransactionException(conflict, e);
+      throw new TransactionException(e);
     }
   }
 
@@ -63,7 +66,7 @@ class DatastoreStorageTransaction implements StorageTransaction {
     try {
       tx.rollback();
     } catch (DatastoreException e) {
-      throw new TransactionException(false, e);
+      throw new TransactionException(e);
     }
   }
 
@@ -90,6 +93,17 @@ class DatastoreStorageTransaction implements StorageTransaction {
     tx.put(workflowEntity);
 
     return workflow.id();
+  }
+
+  @Override
+  public Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
+    final Optional<Entity> entityOptional =
+        DatastoreStorage.getOpt(tx, DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflowId));
+    if (entityOptional.isPresent()) {
+      return Optional.of(DatastoreStorage.parseWorkflowJson(entityOptional.get(), workflowId));
+    } else {
+      return Optional.empty();
+    }
   }
 
   @Override
@@ -130,5 +144,35 @@ class DatastoreStorageTransaction implements StorageTransaction {
     tx.put(builder.build());
 
     return workflowId;
+  }
+
+  @Override
+  public Optional<PersistentWorkflowInstanceState> activeState(WorkflowInstance instance) throws IOException {
+    final Entity entity = tx.get(activeWorkflowInstanceKey(tx.getDatastore().newKeyFactory(), instance));
+    if (entity == null) {
+      return Optional.empty();
+    } else {
+      return Optional.of(readPersistentWorkflowInstanceState(entity));
+    }
+  }
+
+  @Override
+  public WorkflowInstance insertActiveState(WorkflowInstance instance, PersistentWorkflowInstanceState state)
+      throws IOException {
+    tx.add(DatastoreStorage.activeStateToEntity(tx.getDatastore().newKeyFactory(), instance, state));
+    return instance;
+  }
+
+  @Override
+  public WorkflowInstance updateActiveState(WorkflowInstance instance, PersistentWorkflowInstanceState state)
+      throws IOException {
+    tx.update(DatastoreStorage.activeStateToEntity(tx.getDatastore().newKeyFactory(), instance, state));
+    return instance;
+  }
+
+  @Override
+  public WorkflowInstance deleteActiveState(WorkflowInstance instance) {
+    tx.delete(activeWorkflowInstanceKey(tx.getDatastore().newKeyFactory(), instance));
+    return instance;
   }
 }
