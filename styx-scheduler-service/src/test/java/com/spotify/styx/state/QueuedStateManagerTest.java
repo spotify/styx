@@ -442,7 +442,7 @@ public class QueuedStateManagerTest {
         INSTANCE, State.QUEUED, StateData.zero(), NOW.minusMillis(1), 17);
     when(storage.readActiveState(INSTANCE)).thenReturn(Optional.of(runState));
 
-    RunState returnedRunState = stateManager.get(INSTANCE);
+    RunState returnedRunState = stateManager.getActiveState(INSTANCE).get();
 
     assertThat(runState, equalTo(returnedRunState));
   }
@@ -455,7 +455,7 @@ public class QueuedStateManagerTest {
     states.put(INSTANCE, runState);
     when(storage.readActiveStates()).thenReturn(states);
 
-    Map<WorkflowInstance, RunState> returnedRunStates = stateManager.activeStates();
+    Map<WorkflowInstance, RunState> returnedRunStates = stateManager.getActiveStates();
 
     assertThat(returnedRunStates.get(INSTANCE), is(runState));
     assertThat(returnedRunStates.size(), is(1));
