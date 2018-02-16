@@ -27,18 +27,18 @@ import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Range;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,25 +70,23 @@ public class ShardedCounter {
   public static final String PROPERTY_SHARD_INDEX = "index";
   public static final String PROPERTY_COUNTER_ID = "counterId";
 
-  private final Time time;
   private final Datastore datastore;
 
   /**
    * A weakly consistent view of the state in Datastore, refreshed by ShardedCounter on demand.
    */
-  private final Cache<String, CounterSnapshot> cache = CacheBuilder.newBuilder()
+  @VisibleForTesting final Cache<String, CounterSnapshot> inMemSnapshot = CacheBuilder.newBuilder()
       .maximumSize(100_000)
+      .expireAfterWrite(CACHE_EXPIRY_DURATION.toMillis(), TimeUnit.MILLISECONDS)
       .build();
 
   private static class CounterSnapshot {
 
     private final String counterId;
-    private final Instant updatedAt;
     private final Long limit;
     private final Map<Integer, Long> shards;
-    private final Time time;
 
-    public CounterSnapshot(Datastore datastore, String counterId, Time time) {
+    public CounterSnapshot(Datastore datastore, String counterId) {
       limit = getLimit(datastore, counterId);
 
       Map<Integer, Long> fetchedShards = fetchShards(datastore, counterId);
@@ -101,9 +99,7 @@ public class ShardedCounter {
         fetchedShards = fetchShards(datastore, counterId);
       }
       this.counterId = counterId;
-      this.time = time;
       shards = fetchedShards;
-      updatedAt = time.get();
     }
 
     /**
@@ -143,11 +139,6 @@ public class ShardedCounter {
             .put((int) shard.getLong(PROPERTY_SHARD_INDEX), shard.getLong(PROPERTY_SHARD_VALUE));
       }
       return fetchedShards;
-    }
-
-    private boolean isRecent() {
-      return updatedAt.plus(CACHE_EXPIRY_DURATION.toMillis(), ChronoUnit.MILLIS)
-          .isAfter(time.get());
     }
 
     /**
@@ -196,17 +187,16 @@ public class ShardedCounter {
     }
   }
 
-  public ShardedCounter(Datastore datastore, Time time) {
+  public ShardedCounter(Datastore datastore) {
     this.datastore = Objects.requireNonNull(datastore);
-    this.time = time;
   }
 
   /**
-   * Returns a recent snapshot, possibly read from cache.
+   * Returns a recent snapshot, possibly read from inMemSnapshot.
    */
   private CounterSnapshot getCounterSnapshot(String counterId) {
-    final CounterSnapshot snapshot = cache.getIfPresent(counterId);
-    if (snapshot != null && snapshot.isRecent()) {
+    final CounterSnapshot snapshot = inMemSnapshot.getIfPresent(counterId);
+    if (snapshot != null) {
       return snapshot;
     }
     return refreshCounterSnapshot(counterId);
@@ -216,8 +206,8 @@ public class ShardedCounter {
    * Update cached snapshot with most recent state of counter in Datastore.
    */
   private CounterSnapshot refreshCounterSnapshot(String counterId) {
-    final CounterSnapshot newSnapshot = new CounterSnapshot(datastore, counterId, time);
-    cache.put(counterId, newSnapshot);
+    final CounterSnapshot newSnapshot = new CounterSnapshot(datastore, counterId);
+    inMemSnapshot.put(counterId, newSnapshot);
     return newSnapshot;
   }
 

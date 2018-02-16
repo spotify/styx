@@ -20,7 +20,6 @@
 
 package com.spotify.styx.util;
 
-import static com.spotify.styx.util.ShardedCounter.CACHE_EXPIRY_DURATION;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_SHARD;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_COUNTER_ID;
@@ -44,8 +43,6 @@ import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import java.io.IOException;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.stream.IntStream;
 import org.junit.After;
 import org.junit.Before;
@@ -54,8 +51,6 @@ import org.junit.Test;
 
 public class ShardedCounterTest {
 
-  private static Instant now = Instant.now();
-  private static final Time TIME = () -> now;
   private static final String COUNTER_ID1 = "resource_counter_1";
   private static final String COUNTER_ID2 = "resource_counter_2";
 
@@ -73,7 +68,7 @@ public class ShardedCounterTest {
 
   @Before
   public void setUp() throws IOException, InterruptedException {
-    shardedCounter = new ShardedCounter(datastore, TIME);
+    shardedCounter = new ShardedCounter(datastore);
   }
 
   @After
@@ -109,7 +104,6 @@ public class ShardedCounterTest {
 
   @Test
   public void shoudIncrementCounter() {
-    now = Instant.parse("2018-01-01T00:00:00.000Z");
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
     //increment counter by 1
@@ -130,13 +124,12 @@ public class ShardedCounterTest {
     assertFalse(results.hasNext());
 
     // assert the correct value is fetched after cache expiry
-    now = afterCacheExpiryDuration(now);
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
     assertEquals(1L, shardedCounter.getCounter(COUNTER_ID1));
   }
 
   @Test
   public void shoudDecrementCounter() {
-    now = Instant.parse("2018-01-01T00:00:00.000Z");
     // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
@@ -150,7 +143,7 @@ public class ShardedCounterTest {
                       .set(PROPERTY_SHARD_VALUE, 1)
                       .build());
 
-    now = afterCacheExpiryDuration(now);
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
     // assert cache is updated with the new value
     assertEquals(1L, shardedCounter.getCounter(COUNTER_ID1));
 
@@ -161,35 +154,32 @@ public class ShardedCounterTest {
     assertEquals(0L, datastore.get(shardKey).getLong(PROPERTY_SHARD_VALUE));
 
     // assert cache is updated with the new value
-    now = afterCacheExpiryDuration(now);
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
   }
 
 
   @Test(expected = DatastoreException.class)
   public void shoudFailDecrementingEmptyCounter() {
-    now = Instant.parse("2018-01-01T00:00:00.000Z");
     //increment counter by 1
     updateCounterInTransaction(COUNTER_ID1, -1L);
   }
 
   @Test
   public void shoudFailIncrementingFullCounter() {
-    now = Instant.parse("2018-01-01T00:00:00.000Z");
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
     datastore.runInTransaction(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 10);
       return null;
     });
 
-    //expire cache so that the new limit value gets picked up
-    now = afterCacheExpiryDuration(now);
+    //invalidate cache so that the new limit value gets picked up
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
 
     //increment counter by 1 until counter value gets to 10
-
     IntStream.range(0, 10).forEach(i -> {
       updateCounterInTransaction(COUNTER_ID1, 1L);
-      now = afterCacheExpiryDuration(now);
+      shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
     });
 
     // try another 10 times to update the counter
@@ -201,14 +191,12 @@ public class ShardedCounterTest {
       } catch (DatastoreException ignored) {
       }
     });
-    now = afterCacheExpiryDuration(now);
-
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
     assertEquals(10L, shardedCounter.getCounter(COUNTER_ID1));
   }
 
   @Test
   public void shouldDeleteCounterAndLimit() {
-    now = Instant.parse("2018-01-01T00:00:00.000Z");
     //init counter
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
     // create limit
@@ -227,7 +215,6 @@ public class ShardedCounterTest {
 
   @Test
   public void shouldDeleteOnlySpecifiedCounterAndLimit() {
-    now = Instant.parse("2018-01-01T00:00:00.000Z");
     //init counter
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID2));
@@ -253,8 +240,6 @@ public class ShardedCounterTest {
 
   @Test
   public void shouldPassDeletingNonExistingCounterAndLimit() {
-    now = Instant.parse("2018-01-01T00:00:00.000Z");
-
     shardedCounter.deleteCounter(datastore, COUNTER_ID1);
 
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
@@ -284,11 +269,6 @@ public class ShardedCounterTest {
       return null;
     });
   }
-
-  private Instant afterCacheExpiryDuration(Instant now) {
-    return now.plus(CACHE_EXPIRY_DURATION.toMillis(), ChronoUnit.MILLIS);
-  }
-
 
   private static void clearDatastore() {
     deleteAllOfKind(KIND_COUNTER_SHARD);
