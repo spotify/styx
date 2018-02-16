@@ -640,7 +640,7 @@ public class StyxScheduler implements AppInit {
 
     final Connection bigTable = closer.register(createBigTableConnection(config));
     final Datastore datastore = createDatastore(config);
-    final ShardedCounter shardedCounter = new ShardedCounter(datastore, Instant::now);
+    final ShardedCounter shardedCounter = new ShardedCounter(datastore);
     return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT, shardedCounter);
   }
 
