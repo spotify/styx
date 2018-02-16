@@ -167,7 +167,7 @@ public class StyxSchedulerServiceFixture {
     styxScheduler.receive(event).toCompletableFuture().get(1, MINUTES);
   }
 
-  RunState getState(WorkflowInstance workflowInstance) {
+  Optional<RunState> getState(WorkflowInstance workflowInstance) {
     return styxScheduler.getState(workflowInstance);
   }
 
@@ -299,13 +299,13 @@ public class StyxSchedulerServiceFixture {
 
   void awaitWorkflowInstanceState(WorkflowInstance instance, RunState.State state) {
     await().atMost(30, SECONDS).until(() -> {
-      final RunState runState = getState(instance);
-      return runState != null && runState.state() == state;
+      final Optional<RunState> runState = getState(instance);
+      return runState.isPresent() && runState.get().state() == state;
     });
   }
 
   void awaitWorkflowInstanceCompletion(WorkflowInstance workflowInstance) {
-    await().atMost(30, SECONDS).until(() -> getState(workflowInstance) == null);
+    await().atMost(30, SECONDS).until(() -> !getState(workflowInstance).isPresent());
   }
 
   void awaitUntilConsumedEvent(SequenceEvent sequenceEvent, RunState.State state) {

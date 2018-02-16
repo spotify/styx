@@ -230,7 +230,7 @@ public class QueuedStateManager implements StateManager {
   }
 
   @Override
-  public Map<WorkflowInstance, RunState> activeStates() {
+  public Map<WorkflowInstance, RunState> getActiveStates() {
     try {
       return storage.readActiveStates();
     } catch (IOException e) {
@@ -248,14 +248,12 @@ public class QueuedStateManager implements StateManager {
   }
 
   @Override
-  public RunState get(WorkflowInstance workflowInstance) {
-    final Optional<RunState> runStateOptional;
+  public Optional<RunState> getActiveState(WorkflowInstance workflowInstance) {
     try {
-      runStateOptional = storage.readActiveState(workflowInstance);
+      return storage.readActiveState(workflowInstance);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    return runStateOptional.orElse(null);
   }
 
   @Override

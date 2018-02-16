@@ -25,6 +25,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.util.IsClosedException;
 import java.io.Closeable;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,11 +54,6 @@ public interface StateManager extends Closeable {
   CompletionStage<Void> receive(Event event) throws IsClosedException;
 
   /**
-   * Get a map of all active {@link WorkflowInstance} states.
-   */
-  Map<WorkflowInstance, RunState> activeStates();
-
-  /**
    * Get a map of all active {@link WorkflowInstance} states filtered by triggerId.
    */
   Map<WorkflowInstance, RunState> activeStatesByTriggerId(String triggerId);
@@ -76,10 +72,15 @@ public interface StateManager extends Closeable {
   }
 
   /**
+   * Get a map of all active {@link WorkflowInstance} states.
+   */
+  Map<WorkflowInstance, RunState> getActiveStates();
+
+  /**
    * Get the current {@link RunState} of a {@link WorkflowInstance}.
    *
    * @param workflowInstance Workflow instance
    * @return The RunState associated with the workflow instance
    */
-  RunState get(WorkflowInstance workflowInstance);
+  Optional<RunState> getActiveState(WorkflowInstance workflowInstance);
 }

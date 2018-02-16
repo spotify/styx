@@ -51,6 +51,7 @@ import io.fabric8.kubernetes.client.dsl.PodResource;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -173,6 +174,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(k8sClient.pods().withName(RUN_SPEC_2.executionId())).thenReturn(namedPod2);
     when(namedPod1.get()).thenReturn(createdPod1);
     when(namedPod2.get()).thenReturn(createdPod2);
+    when(stateManager.getActiveState(any())).thenReturn(Optional.empty());
 
     setStatusAndState(createdPod1, RUN_SPEC.executionId());
     setStatusAndState(createdPod2, RUN_SPEC_2.executionId());
@@ -264,8 +266,8 @@ public class KubernetesDockerRunnerPodPollerTest {
     RunState runState2 = RunState.create(WORKFLOW_INSTANCE_2, state, stateData2);
     map.put(WORKFLOW_INSTANCE, runState);
     map.put(WORKFLOW_INSTANCE_2, runState2);
-    when(stateManager.get(WORKFLOW_INSTANCE)).thenReturn(runState);
-    when(stateManager.get(WORKFLOW_INSTANCE_2)).thenReturn(runState2);
-    when(stateManager.activeStates()).thenReturn(map);
+    when(stateManager.getActiveState(WORKFLOW_INSTANCE)).thenReturn(Optional.of(runState));
+    when(stateManager.getActiveState(WORKFLOW_INSTANCE_2)).thenReturn(Optional.of(runState2));
+    when(stateManager.getActiveStates()).thenReturn(map);
   }
 }

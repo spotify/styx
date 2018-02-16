@@ -28,7 +28,6 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableList;
@@ -318,7 +317,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     awaitWorkflowInstanceCompletion(workflowInstance);
     awaitBackfillCompleted(singleHourBackfill.id());
     tickScheduler();
-    assertThat(getState(workflowInstance), is(nullValue()));
+    assertThat(getState(workflowInstance), is(Optional.empty()));
   }
 
   @Test
@@ -342,7 +341,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     workflowDeleted(HOURLY_WORKFLOW);
     tickTriggerManager();
 
-    assertThat(getState(instance2), is(nullValue()));
+    assertThat(getState(instance2), is(Optional.empty()));
   }
 
   @Test
@@ -589,7 +588,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheTimeIs("2016-03-14T16:01:00Z");
     styxStarts();
 
-    RunState state = getState(workflowInstance);
+    RunState state = getState(workflowInstance).get();
     Instant stateTime = Instant.ofEpochMilli(state.timestamp());
 
     assertThat(stateTime, is(Instant.parse("2016-03-14T15:17:49Z")));
@@ -643,6 +642,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     awaitWorkflowInstanceCompletion(workflowInstance);
     tickScheduler();
-    assertThat(getState(workflowInstance), is(nullValue()));
+    assertThat(getState(workflowInstance), is(Optional.empty()));
   }
 }
