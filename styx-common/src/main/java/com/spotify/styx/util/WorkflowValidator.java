@@ -33,7 +33,7 @@ import java.util.Optional;
 public class WorkflowValidator {
 
   static final int MAX_ID_LENGTH = 256;
-  static final int MAX_DOCKER_ARGS_TOTAL = 1024;
+  static final int MAX_DOCKER_ARGS_TOTAL = 1000000;
   static final int MAX_RESOURCES = 5;
   static final int MAX_RESOURCE_LENGTH = 256;
   static final int MAX_COMMIT_SHA_LENGTH = 256;
