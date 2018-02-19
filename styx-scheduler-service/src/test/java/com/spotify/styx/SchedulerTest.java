@@ -156,14 +156,14 @@ public class SchedulerTest {
     for (RunState runState : runStates) {
       activeStates.put(runState.workflowInstance(), runState);
     }
-    when(stateManager.activeStates()).thenReturn(activeStates);
+    when(stateManager.getActiveStates()).thenReturn(activeStates);
   }
 
   private void removeActiveStates(Set<WorkflowInstance> workflowInstances) throws IsClosedException {
     for (WorkflowInstance workflowInstance : workflowInstances) {
       activeStates.remove(workflowInstance);
     }
-    when(stateManager.activeStates()).thenReturn(activeStates);
+    when(stateManager.getActiveStates()).thenReturn(activeStates);
   }
 
   private Workflow workflowUsingResources(WorkflowId id, String... resources) {

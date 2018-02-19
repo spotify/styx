@@ -52,11 +52,12 @@ import java.util.Optional;
 @AutoValue
 public abstract class RunState {
 
-  public static final int SUCCESS_EXIT_CODE = 0;
+  private static final int SUCCESS_EXIT_CODE = 0;
   public static final int MISSING_DEPS_EXIT_CODE = 20;
 
-  public static final double FAILURE_COST = 1.0;
-  public static final double MISSING_DEPS_COST = 0.1;
+  private static final double FAILURE_COST = 1.0;
+  private static final double MISSING_DEPS_COST = 0.1;
+  private static final long NO_EVENTS_PROCESSED = -1L;
 
   private final EventVisitor<RunState> visitor = new TransitionVisitor();
 
@@ -87,6 +88,7 @@ public abstract class RunState {
   public abstract State state();
   public abstract long timestamp();
   public abstract StateData data();
+  public abstract long counter();
 
   public static RunState fresh(
       WorkflowInstance workflowInstance,
@@ -99,17 +101,22 @@ public abstract class RunState {
   }
 
   public RunState transition(Event event) {
-    return event.accept(visitor);
+    return event.accept(visitor).increaseCounter();
   }
 
   private RunState state(State state, StateData newStateData) {
     return new AutoValue_RunState(
-        workflowInstance(), state, timestamp(), newStateData);
+        workflowInstance(), state, timestamp(), newStateData, counter());
   }
 
   private RunState state(State state) {
     return new AutoValue_RunState(
-        workflowInstance(), state, timestamp(), data());
+        workflowInstance(), state, timestamp(), data(), counter());
+  }
+
+  private RunState increaseCounter() {
+    return new AutoValue_RunState(
+        workflowInstance(), state(), timestamp(), data(), counter() + 1);
   }
 
   private class TransitionVisitor implements EventVisitor<RunState> {
@@ -407,9 +414,17 @@ public abstract class RunState {
   public static RunState create(
       WorkflowInstance workflowInstance,
       State state,
+      Instant timestamp,
+      long counter) {
+    return create(workflowInstance, state, StateData.zero(), timestamp, counter);
+  }
+
+  public static RunState create(
+      WorkflowInstance workflowInstance,
+      State state,
       StateData stateData) {
     return new AutoValue_RunState(
-        workflowInstance, state, currentTimeMillis(), stateData);
+        workflowInstance, state, currentTimeMillis(), stateData, NO_EVENTS_PROCESSED);
   }
 
   public static RunState create(
@@ -418,6 +433,16 @@ public abstract class RunState {
       StateData stateData,
       Instant timestamp) {
     return new AutoValue_RunState(
-        workflowInstance, state, timestamp.toEpochMilli(), stateData);
+        workflowInstance, state, timestamp.toEpochMilli(), stateData, NO_EVENTS_PROCESSED);
+  }
+
+  public static RunState create(
+      WorkflowInstance workflowInstance,
+      State state,
+      StateData stateData,
+      Instant timestamp,
+      long counter) {
+    return new AutoValue_RunState(
+        workflowInstance, state, timestamp.toEpochMilli(), stateData, counter);
   }
 }

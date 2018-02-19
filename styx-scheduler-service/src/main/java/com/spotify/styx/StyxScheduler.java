@@ -397,8 +397,8 @@ public class StyxScheduler implements AppInit {
   }
 
   @VisibleForTesting
-  RunState getState(WorkflowInstance workflowInstance) {
-    return stateManager.get(workflowInstance);
+  Optional<RunState> getState(WorkflowInstance workflowInstance) {
+    return stateManager.getActiveState(workflowInstance);
   }
 
   @VisibleForTesting
@@ -528,7 +528,7 @@ public class StyxScheduler implements AppInit {
           stats.registerActiveStatesMetric(
               state,
               triggerType,
-              () -> stateManager.activeStates().values().stream()
+              () -> stateManager.getActiveStates().values().stream()
                   .filter(runState -> runState.state().equals(state))
                   .filter(runState -> runState.data().trigger().isPresent() && triggerType
                       .equals(TriggerUtil.triggerType(runState.data().trigger().get())))
@@ -536,7 +536,7 @@ public class StyxScheduler implements AppInit {
       stats.registerActiveStatesMetric(
           state,
           "none",
-          () -> stateManager.activeStates().values().stream()
+          () -> stateManager.getActiveStates().values().stream()
               .filter(runState -> runState.state().equals(state))
               .filter(runState -> !runState.data().trigger().isPresent())
               .count());
@@ -590,7 +590,7 @@ public class StyxScheduler implements AppInit {
   }
 
   private static Gauge<Long> workflowActiveStates(StateManager stateManager, Workflow workflow) {
-    return () -> stateManager.activeStates().keySet().stream()
+    return () -> stateManager.getActiveStates().keySet().stream()
         .filter(wfi -> workflow.id().equals(wfi.workflowId()))
         .count();
   }

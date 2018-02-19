@@ -36,7 +36,7 @@ import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
-import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
@@ -58,19 +58,11 @@ public class StatusResourceTest extends VersionedApiTest {
   private static final WorkflowInstance OTHER_WFI =
       WorkflowInstance.create(WorkflowId.create(OTHER_COMPONENT_ID, ID), PARAMETER);
 
-  public static final PersistentWorkflowInstanceState PERSISTENT_STATE = PersistentWorkflowInstanceState.builder()
-      .timestamp(Instant.now())
-      .state(State.RUNNING)
-      .data(StateData.zero())
-      .counter(42L)
-      .build();
+  public static final RunState PERSISTENT_STATE = RunState.create(WFI, State.RUNNING,
+      StateData.zero(), Instant.now(), 42L);
 
-  public static final PersistentWorkflowInstanceState OTHER_PERSISTENT_STATE = PersistentWorkflowInstanceState.builder()
-      .timestamp(Instant.now())
-      .state(State.RUNNING)
-      .data(StateData.zero())
-      .counter(84L)
-      .build();
+  public static final RunState OTHER_PERSISTENT_STATE = RunState.create(WFI, State.RUNNING,
+      StateData.zero(), Instant.now(), 84L);
 
   private Storage storage = new InMemStorage();
 
@@ -113,7 +105,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
     storage.writeActiveState(WFI, PERSISTENT_STATE);
     storage.writeActiveState(OTHER_WFI, OTHER_PERSISTENT_STATE);
-    assertThat(storage.readActiveWorkflowInstances().entrySet(), hasSize(2));
+    assertThat(storage.readActiveStates().entrySet(), hasSize(2));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/activeStates")));
@@ -136,7 +128,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
     storage.writeActiveState(WFI, PERSISTENT_STATE);
     storage.writeActiveState(OTHER_WFI, OTHER_PERSISTENT_STATE);
-    assertThat(storage.readActiveWorkflowInstances().entrySet(), hasSize(2));
+    assertThat(storage.readActiveStates().entrySet(), hasSize(2));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/activeStates?component=" + COMPONENT_ID)));
