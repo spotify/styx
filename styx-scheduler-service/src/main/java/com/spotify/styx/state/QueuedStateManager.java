@@ -193,7 +193,6 @@ public class QueuedStateManager implements StateManager {
         }
 
         // Write new state to datastore (or remove it if terminal)
-        final long nextCounter = currentRunState.get().counter() + 1;
         if (nextRunState.state().isTerminal()) {
           tx.deleteActiveState(event.workflowInstance());
         } else {
@@ -201,7 +200,7 @@ public class QueuedStateManager implements StateManager {
         }
 
         final SequenceEvent sequenceEvent =
-            SequenceEvent.create(event, nextCounter, nextRunState.timestamp());
+            SequenceEvent.create(event, nextRunState.counter(), nextRunState.timestamp());
 
         return Tuple.of(sequenceEvent, nextRunState);
       });
