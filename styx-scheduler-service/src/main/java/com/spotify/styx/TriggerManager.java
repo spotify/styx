@@ -94,7 +94,7 @@ class TriggerManager {
     }
 
     final Instant now = time.get();
-    canBeTriggeredWorkflows.entrySet().stream()
+    canBeTriggeredWorkflows.entrySet().parallelStream()
         .filter(entry -> now.isAfter(entry.getValue().offsetInstant()))
         .forEach(entry -> tryTriggering(entry.getKey(), entry.getValue(), enabledWorkflows));
 
