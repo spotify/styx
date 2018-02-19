@@ -179,8 +179,7 @@ public class Scheduler {
             .collect(toCollection(Lists::newArrayList));
     Collections.shuffle(eligibleInstances);
 
-    timedOutInstances.stream().map(wfi -> InstanceState.create(wfi, activeStatesMap.get(wfi)))
-        .collect(toList()).forEach(this::sendTimeout);
+    timedOutInstances.forEach(wfi -> this.sendTimeout(wfi, activeStatesMap.get(wfi)));
 
     limitAndDequeue(config, resources, workflowResourceReferences, currentResourceUsage,
         eligibleInstances);
@@ -380,10 +379,10 @@ public class Scheduler {
     return !deadline.isAfter(now);
   }
 
-  private void sendTimeout(InstanceState instanceState) {
-    LOG.info("Found stale {} state, issuing timeout for {}",
-             instanceState.runState().state().name(), instanceState.workflowInstance());
-    stateManager.receiveIgnoreClosed(Event.timeout(instanceState.workflowInstance()));
+  private void sendTimeout(WorkflowInstance workflowInstance, RunState runState) {
+    LOG.info("Found stale state {} since {} for workflow {}; Issuing a timeout",
+             runState.state(), Instant.ofEpochMilli(runState.timestamp()), workflowInstance);
+    stateManager.receiveIgnoreClosed(Event.timeout(workflowInstance));
   }
 
   @AutoValue
