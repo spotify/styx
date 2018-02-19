@@ -142,7 +142,8 @@ public class Scheduler {
             resources.put(GLOBAL_RESOURCE_ID,
                           Resource.create(GLOBAL_RESOURCE_ID, concurrency)));
 
-    final List<InstanceState> activeStates = stateManager.activeStates().entrySet().stream()
+    final Map<WorkflowInstance, RunState> activeStatesMap = stateManager.activeStates();
+    final List<InstanceState> activeStates = activeStatesMap.entrySet().stream()
         .map(entry -> InstanceState.create(entry.getKey(), entry.getValue()))
         .collect(toList());
 
@@ -178,7 +179,7 @@ public class Scheduler {
             .collect(toCollection(Lists::newArrayList));
     Collections.shuffle(eligibleInstances);
 
-    timedOutInstances.forEach(this::sendTimeout);
+    timedOutInstances.forEach(wfi -> this.sendTimeout(wfi, activeStatesMap.get(wfi)));
 
     limitAndDequeue(config, resources, workflowResourceReferences, currentResourceUsage,
         eligibleInstances);
@@ -378,8 +379,9 @@ public class Scheduler {
     return !deadline.isAfter(now);
   }
 
-  private void sendTimeout(WorkflowInstance workflowInstance) {
-    LOG.info("Found stale state, issuing timeout for {}", workflowInstance);
+  private void sendTimeout(WorkflowInstance workflowInstance, RunState runState) {
+    LOG.info("Found stale state {} since {} for workflow {}; Issuing a timeout",
+             runState.state(), Instant.ofEpochMilli(runState.timestamp()), workflowInstance);
     stateManager.receiveIgnoreClosed(Event.timeout(workflowInstance));
   }
 
