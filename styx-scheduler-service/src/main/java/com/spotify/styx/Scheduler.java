@@ -142,7 +142,8 @@ public class Scheduler {
             resources.put(GLOBAL_RESOURCE_ID,
                           Resource.create(GLOBAL_RESOURCE_ID, concurrency)));
 
-    final List<InstanceState> activeStates = stateManager.activeStates().entrySet().stream()
+    final Map<WorkflowInstance, RunState> activeStatesMap = stateManager.activeStates();
+    final List<InstanceState> activeStates = activeStatesMap.entrySet().stream()
         .map(entry -> InstanceState.create(entry.getKey(), entry.getValue()))
         .collect(toList());
 
@@ -178,7 +179,8 @@ public class Scheduler {
             .collect(toCollection(Lists::newArrayList));
     Collections.shuffle(eligibleInstances);
 
-    timedOutInstances.forEach(this::sendTimeout);
+    timedOutInstances.stream().map(wfi -> InstanceState.create(wfi, activeStatesMap.get(wfi)))
+        .collect(toList()).forEach(this::sendTimeout);
 
     limitAndDequeue(config, resources, workflowResourceReferences, currentResourceUsage,
         eligibleInstances);
@@ -378,9 +380,10 @@ public class Scheduler {
     return !deadline.isAfter(now);
   }
 
-  private void sendTimeout(WorkflowInstance workflowInstance) {
-    LOG.info("Found stale state, issuing timeout for {}", workflowInstance);
-    stateManager.receiveIgnoreClosed(Event.timeout(workflowInstance));
+  private void sendTimeout(InstanceState instanceState) {
+    LOG.info("Found stale {} state, issuing timeout for {}",
+             instanceState.runState().state().name(), instanceState.workflowInstance());
+    stateManager.receiveIgnoreClosed(Event.timeout(instanceState.workflowInstance()));
   }
 
   @AutoValue
