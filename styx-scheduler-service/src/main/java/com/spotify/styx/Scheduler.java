@@ -254,7 +254,7 @@ public class Scheduler {
     if (blocker.isPresent()) {
       stateManager.receiveIgnoreClosed(Event.retryAfter(
           instance.workflowInstance(),
-          blocker.get().delay().toMillis()));
+          blocker.get().delay().toMillis()), instance.runState().counter());
       LOG.debug("Dequeue rescheduled: {}: {}", instance.workflowInstance(), blocker.get());
       return;
     }
@@ -287,7 +287,8 @@ public class Scheduler {
     if (!unknownResources.isEmpty()) {
       stateManager.receiveIgnoreClosed(Event.runError(
           instance.workflowInstance(),
-          String.format("Referenced resources not found: %s", unknownResources)));
+          String.format("Referenced resources not found: %s", unknownResources)),
+          instance.runState().counter());
     } else if (!depletedResources.isEmpty()) {
       final Message message = Message.info(
           String.format("Resource limit reached for: %s",
@@ -298,7 +299,8 @@ public class Scheduler {
                   .sorted()
                   .collect(toList())));
       if (!instance.runState().data().message().map(message::equals).orElse(false)) {
-        stateManager.receiveIgnoreClosed(Event.info(instance.workflowInstance(), message));
+        stateManager.receiveIgnoreClosed(Event.info(instance.workflowInstance(), message),
+            instance.runState().counter());
       }
     } else {
       double sleepingTime = dequeueRateLimiter.acquire();
@@ -347,16 +349,17 @@ public class Scheduler {
     return !deadline.isAfter(now);
   }
 
-  private void sendDequeue(InstanceState instanceState, Set<String> resourceIds) {
-    final WorkflowInstance workflowInstance = instanceState.workflowInstance();
-    final RunState state = instanceState.runState();
+  private void sendDequeue(InstanceState instance, Set<String> resourceIds) {
+    final WorkflowInstance workflowInstance = instance.workflowInstance();
+    final RunState state = instance.runState();
 
     if (state.data().tries() == 0) {
       LOG.info("Triggering {}", workflowInstance.toKey());
     } else {
       LOG.info("{} executing retry #{}", workflowInstance.toKey(), state.data().tries());
     }
-    stateManager.receiveIgnoreClosed(Event.dequeue(workflowInstance, resourceIds));
+    stateManager.receiveIgnoreClosed(
+        Event.dequeue(workflowInstance, resourceIds), instance.runState().counter());
   }
 
   private boolean hasTimedOut(RunState runState) {
@@ -375,7 +378,7 @@ public class Scheduler {
   private void sendTimeout(WorkflowInstance workflowInstance, RunState runState) {
     LOG.info("Found stale state {} since {} for workflow {}; Issuing a timeout",
              runState.state(), Instant.ofEpochMilli(runState.timestamp()), workflowInstance);
-    stateManager.receiveIgnoreClosed(Event.timeout(workflowInstance));
+    stateManager.receiveIgnoreClosed(Event.timeout(workflowInstance), runState.counter());
   }
 
   @AutoValue
