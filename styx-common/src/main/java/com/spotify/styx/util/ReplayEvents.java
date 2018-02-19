@@ -37,6 +37,7 @@ public final class ReplayEvents {
     throw new UnsupportedOperationException();
   }
 
+  // TODO: fix NPath complexity
   public static Optional<RunState> getBackfillRunState(
       WorkflowInstance workflowInstance,
       Map<WorkflowInstance, RunState> activeWorkflowInstances,
