@@ -21,6 +21,7 @@
 package com.spotify.styx.util;
 
 import com.google.cloud.datastore.Datastore;
+import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.DatastoreReaderWriter;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
@@ -437,22 +438,42 @@ public class ShardedCounter {
                                                                     .eq(PROPERTY_COUNTER_ID,
                                                                         counterId))
                                                      .build());
+
+    boolean exceptional = false;
+
     while (results.hasNext()) {
-      // remove max 25 entities per transaction
-      datastore.runInTransaction(transaction -> {
-        IntStream.range(0, 25).forEach(i -> {
-          if (results.hasNext()) {
-            transaction.delete(results.next().getKey());
-          }
+      try {
+        // remove max 25 entities per transaction
+        datastore.runInTransaction(transaction -> {
+          IntStream.range(0, 25).forEach(i -> {
+            if (results.hasNext()) {
+              transaction.delete(results.next().getKey());
+            }
+          });
+          return null;
         });
-        return null;
-      });
+      } catch (DatastoreException e) {
+        LOG.debug("Transaction failed when trying to delete shards for counter {}: {}", counterId,
+                  e);
+        exceptional = true;
+      }
     }
 
-    // delete limit entry too
-    datastore.runInTransaction(transaction -> {
-      transaction.delete(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId));
-      return null;
-    });
+    try {
+      // delete limit entry too
+      datastore.runInTransaction(transaction -> {
+        transaction.delete(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId));
+        return null;
+      });
+    } catch (DatastoreException e) {
+      LOG.debug("Transaction failed when trying to delete limit for counter {}: {}", counterId, e);
+      exceptional = true;
+    }
+
+    if (exceptional) {
+      LOG.info("Deleted counter {} with some issues", counterId);
+    } else {
+      LOG.info("Deleted counter {}", counterId);
+    }
   }
 }
