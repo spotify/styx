@@ -28,6 +28,7 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableList;
@@ -41,6 +42,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
@@ -317,7 +319,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     awaitWorkflowInstanceCompletion(workflowInstance);
     awaitBackfillCompleted(singleHourBackfill.id());
     tickScheduler();
-    assertThat(getState(workflowInstance), is(Optional.empty()));
+    assertThat(getState(workflowInstance), is(nullValue()));
   }
 
   @Test
@@ -341,7 +343,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     workflowDeleted(HOURLY_WORKFLOW);
     tickTriggerManager();
 
-    assertThat(getState(instance2), is(Optional.empty()));
+    assertThat(getState(instance2), is(nullValue()));
   }
 
   @Test
@@ -581,14 +583,17 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    givenActiveStateAtSequenceCount(workflowInstance, RunState.create(workflowInstance,
-        RunState.State.QUEUED, StateData.zero(),
-        Instant.ofEpochMilli(timeOffsetSeconds(4)), 3L));
+    givenActiveStateAtSequenceCount(workflowInstance, PersistentWorkflowInstanceState.builder()
+        .state(RunState.State.QUEUED)
+        .data(StateData.zero())
+        .timestamp(Instant.ofEpochMilli(timeOffsetSeconds(4)))
+        .counter(3L)
+        .build());
 
     givenTheTimeIs("2016-03-14T16:01:00Z");
     styxStarts();
 
-    RunState state = getState(workflowInstance).get();
+    RunState state = getState(workflowInstance);
     Instant stateTime = Instant.ofEpochMilli(state.timestamp());
 
     assertThat(stateTime, is(Instant.parse("2016-03-14T15:17:49Z")));
@@ -603,9 +608,12 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    givenActiveStateAtSequenceCount(workflowInstance, RunState.create(workflowInstance,
-        RunState.State.QUEUED, StateData.newBuilder().trigger(TRIGGER1).build(),
-        Instant.parse("2016-03-14T15:17:45Z"), 13L));
+    givenActiveStateAtSequenceCount(workflowInstance, PersistentWorkflowInstanceState.builder()
+        .state(RunState.State.QUEUED)
+        .data(StateData.newBuilder().trigger(TRIGGER1).build())
+        .timestamp(Instant.parse("2016-03-14T15:17:45Z"))
+        .counter(13L)
+        .build());
 
     styxStarts();
 
@@ -628,9 +636,12 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    givenActiveStateAtSequenceCount(workflowInstance, RunState.create(workflowInstance,
-        RunState.State.RUNNING, StateData.newBuilder().trigger(TRIGGER1).build(),
-        Instant.parse("2016-03-14T15:17:45Z"), 2L));
+    givenActiveStateAtSequenceCount(workflowInstance, PersistentWorkflowInstanceState.builder()
+        .state(RunState.State.RUNNING)
+        .data(StateData.newBuilder().trigger(TRIGGER1).build())
+        .timestamp(Instant.parse("2016-03-14T15:17:45Z"))
+        .counter(2L)
+        .build());
 
     styxStarts();
 
@@ -642,6 +653,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     awaitWorkflowInstanceCompletion(workflowInstance);
     tickScheduler();
-    assertThat(getState(workflowInstance), is(Optional.empty()));
+    assertThat(getState(workflowInstance), is(nullValue()));
   }
 }

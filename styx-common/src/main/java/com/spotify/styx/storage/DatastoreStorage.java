@@ -58,8 +58,9 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceStateBuilder;
 import com.spotify.styx.state.Message;
-import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.FnWithException;
@@ -322,14 +323,14 @@ class DatastoreStorage {
     return workflows;
   }
 
-  Map<WorkflowInstance, RunState> readActiveStates() throws IOException {
+  Map<WorkflowInstance, PersistentWorkflowInstanceState> allActiveStates() throws IOException {
     final EntityQuery query =
         Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE).build();
 
     return queryActiveStates(query);
   }
 
-  Map<WorkflowInstance, RunState> readActiveStates(String componentId) throws IOException {
+  Map<WorkflowInstance, PersistentWorkflowInstanceState> activeStates(String componentId) throws IOException {
     final EntityQuery query =
         Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE)
             .setFilter(PropertyFilter.eq(PROPERTY_COMPONENT, componentId))
@@ -338,86 +339,104 @@ class DatastoreStorage {
     return queryActiveStates(query);
   }
 
-  private Map<WorkflowInstance, RunState> queryActiveStates(EntityQuery activeStatesQuery)
+  private Map<WorkflowInstance, PersistentWorkflowInstanceState> queryActiveStates(EntityQuery activeStatesQuery)
       throws IOException {
-    final ImmutableMap.Builder<WorkflowInstance, RunState> mapBuilder = ImmutableMap.builder();
+    final ImmutableMap.Builder<WorkflowInstance, PersistentWorkflowInstanceState> mapBuilder = ImmutableMap.builder();
     final QueryResults<Entity> results = datastore.run(activeStatesQuery);
 
     while (results.hasNext()) {
       final Entity entity = results.next();
       final WorkflowInstance instance = parseWorkflowInstance(entity);
-      mapBuilder.put(instance, entityToRunState(entity, instance));
+      mapBuilder.put(instance, readPersistentWorkflowInstanceState(entity));
     }
 
     return mapBuilder.build();
   }
 
-  Optional<RunState> readActiveState(WorkflowInstance instance) throws IOException {
+  Optional<PersistentWorkflowInstanceState> activeState(WorkflowInstance instance) throws IOException {
     final Entity entity = datastore.get(activeWorkflowInstanceKey(instance));
     if (entity == null) {
       return Optional.empty();
     } else {
-      return Optional.of(entityToRunState(entity, instance));
+      return Optional.of(readPersistentWorkflowInstanceState(entity));
     }
   }
 
-  static RunState entityToRunState(Entity entity, WorkflowInstance instance)
+  static PersistentWorkflowInstanceState readPersistentWorkflowInstanceState(Entity entity)
       throws IOException {
     final long counter = entity.getLong(PROPERTY_COUNTER);
-    final State state = State.valueOf(entity.getString(PROPERTY_STATE));
-    final long timestamp = entity.getLong(PROPERTY_STATE_TIMESTAMP);
-    final StateData data = StateData.newBuilder()
-        .tries((int) entity.getLong(PROPERTY_STATE_TRIES))
-        .consecutiveFailures((int) entity.getLong(PROPERTY_STATE_CONSECUTIVE_FAILURES))
-        .retryCost(entity.getDouble(PROPERTY_STATE_RETRY_COST))
-        .trigger(DatastoreStorage.<String>readOpt(entity, PROPERTY_STATE_TRIGGER_TYPE).map(type ->
-            TriggerUtil.trigger(type, entity.getString(PROPERTY_STATE_TRIGGER_ID))))
-        .messages(OBJECT_MAPPER.<List<Message>>readValue(entity.getString(PROPERTY_STATE_MESSAGES),
-            new TypeReference<List<Message>>() { }))
-        .retryDelayMillis(readOpt(entity, PROPERTY_STATE_RETRY_DELAY_MILLIS))
-        .lastExit(DatastoreStorage.<Long>readOpt(entity, PROPERTY_STATE_LAST_EXIT).map(Long::intValue))
-        .executionId(readOpt(entity, PROPERTY_STATE_EXECUTION_ID))
-        .executionDescription(readOptJson(entity, PROPERTY_STATE_EXECUTION_DESCRIPTION,
-            ExecutionDescription.class))
-        .build();
-    return RunState.create(instance, state, data, Instant.ofEpochMilli(timestamp), counter);
+    final PersistentWorkflowInstanceStateBuilder persistentState =
+        PersistentWorkflowInstanceState.builder()
+            .counter(counter);
+
+    // TODO: always read these state fields when all active state entities have been migrated
+    if (entity.contains(PROPERTY_STATE)) {
+      final State state = State.valueOf(entity.getString(PROPERTY_STATE));
+      final long timestamp = entity.getLong(PROPERTY_STATE_TIMESTAMP);
+
+      final StateData data = StateData.newBuilder()
+          .tries((int) entity.getLong(PROPERTY_STATE_TRIES))
+          .consecutiveFailures((int) entity.getLong(PROPERTY_STATE_CONSECUTIVE_FAILURES))
+          .retryCost(entity.getDouble(PROPERTY_STATE_RETRY_COST))
+          .trigger(DatastoreStorage.<String>readOpt(entity, PROPERTY_STATE_TRIGGER_TYPE).map(type ->
+              TriggerUtil.trigger(type, entity.getString(PROPERTY_STATE_TRIGGER_ID))))
+          .messages(OBJECT_MAPPER.<List<Message>>readValue(entity.getString(PROPERTY_STATE_MESSAGES),
+              new TypeReference<List<Message>>() { }))
+          .retryDelayMillis(readOpt(entity, PROPERTY_STATE_RETRY_DELAY_MILLIS))
+          .lastExit(DatastoreStorage.<Long>readOpt(entity, PROPERTY_STATE_LAST_EXIT).map(Long::intValue))
+          .executionId(readOpt(entity, PROPERTY_STATE_EXECUTION_ID))
+          .executionDescription(readOptJson(entity, PROPERTY_STATE_EXECUTION_DESCRIPTION,
+              ExecutionDescription.class))
+          .build();
+
+      persistentState
+          .state(state)
+          .data(data)
+          .timestamp(Instant.ofEpochMilli(timestamp));
+    }
+
+    return persistentState.build();
   }
 
-  void writeActiveState(WorkflowInstance workflowInstance, RunState state)
+  void writeActiveState(WorkflowInstance workflowInstance, PersistentWorkflowInstanceState state)
       throws IOException {
-    storeWithRetries(() -> datastore.put(
-        runStateToEntity(datastore.newKeyFactory(), workflowInstance, state)));
+    storeWithRetries(() -> datastore.put(activeStateToEntity(datastore.newKeyFactory(), workflowInstance, state)));
   }
 
-  static Entity runStateToEntity(KeyFactory keyFactory, WorkflowInstance wfi, RunState state)
+  static Entity activeStateToEntity(KeyFactory keyFactory, WorkflowInstance workflowInstance,
+      PersistentWorkflowInstanceState state)
       throws JsonProcessingException {
-    final Key key = activeWorkflowInstanceKey(keyFactory, wfi);
+    final Key key = activeWorkflowInstanceKey(keyFactory, workflowInstance);
     final Entity.Builder entity = Entity.newBuilder(key)
-        .set(PROPERTY_COMPONENT, wfi.workflowId().componentId())
-        .set(PROPERTY_WORKFLOW, wfi.workflowId().id())
-        .set(PROPERTY_PARAMETER, wfi.parameter())
+        .set(PROPERTY_COMPONENT, workflowInstance.workflowId().componentId())
+        .set(PROPERTY_WORKFLOW, workflowInstance.workflowId().id())
+        .set(PROPERTY_PARAMETER, workflowInstance.parameter())
         .set(PROPERTY_COUNTER, state.counter());
 
-    entity
-        .set(PROPERTY_STATE, state.state().toString())
-        .set(PROPERTY_STATE_TIMESTAMP, state.timestamp())
-        .set(PROPERTY_STATE_TRIES, state.data().tries())
-        .set(PROPERTY_STATE_CONSECUTIVE_FAILURES, state.data().consecutiveFailures())
-        .set(PROPERTY_STATE_RETRY_COST, state.data().retryCost())
-        // TODO: consider making this list bounded or not storing it here to avoid exceeding entity size limit
-        .set(PROPERTY_STATE_MESSAGES, jsonValue(state.data().messages()));
+    // TODO: always write these fields when event-only replay tests have been removed
+    if (state.state() != null) {
+      entity
+          .set(PROPERTY_STATE, state.state().toString())
+          .set(PROPERTY_STATE_TIMESTAMP, state.timestamp().toEpochMilli())
+          .set(PROPERTY_STATE_TRIES, state.data().tries())
+          .set(PROPERTY_STATE_CONSECUTIVE_FAILURES, state.data().consecutiveFailures())
+          .set(PROPERTY_STATE_RETRY_COST, state.data().retryCost())
+          // TODO: consider making this list bounded or not storing it here to avoid exceeding entity size limit
+          .set(PROPERTY_STATE_MESSAGES, jsonValue(state.data().messages()));
 
-    state.data().retryDelayMillis().ifPresent(v -> entity.set(PROPERTY_STATE_RETRY_DELAY_MILLIS, v));
-    state.data().lastExit().ifPresent(v -> entity.set(PROPERTY_STATE_LAST_EXIT, v));
-    state.data().trigger().ifPresent(trigger -> {
-      entity.set(PROPERTY_STATE_TRIGGER_TYPE, TriggerUtil.triggerType(trigger));
-      entity.set(PROPERTY_STATE_TRIGGER_ID, TriggerUtil.triggerId(trigger));
-    });
-    state.data().executionId().ifPresent(v -> entity.set(PROPERTY_STATE_EXECUTION_ID, v));
+      state.data().retryDelayMillis().ifPresent(v -> entity.set(PROPERTY_STATE_RETRY_DELAY_MILLIS, v));
+      state.data().lastExit().ifPresent(v -> entity.set(PROPERTY_STATE_LAST_EXIT, v));
+      state.data().trigger().ifPresent(trigger -> {
+        entity.set(PROPERTY_STATE_TRIGGER_TYPE, TriggerUtil.triggerType(trigger));
+        entity.set(PROPERTY_STATE_TRIGGER_ID, TriggerUtil.triggerId(trigger));
+      });
+      state.data().executionId().ifPresent(v -> entity.set(PROPERTY_STATE_EXECUTION_ID, v));
 
-    if (state.data().executionDescription().isPresent()) {
-      entity.set(PROPERTY_STATE_EXECUTION_DESCRIPTION, jsonValue(state.data().executionDescription().get()));
+      if (state.data().executionDescription().isPresent()) {
+        entity.set(PROPERTY_STATE_EXECUTION_DESCRIPTION, jsonValue(state.data().executionDescription().get()));
+      }
     }
+
     return entity.build();
   }
 

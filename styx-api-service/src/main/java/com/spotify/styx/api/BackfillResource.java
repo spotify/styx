@@ -50,6 +50,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.storage.Storage;
@@ -256,7 +257,7 @@ public final class BackfillResource {
     final Workflow workflow;
     final Set<WorkflowInstance> activeWorkflowInstances;
     try {
-      activeWorkflowInstances = storage.readActiveStates(input.component()).keySet();
+      activeWorkflowInstances = storage.readActiveWorkflowInstances(input.component()).keySet();
       final Optional<Workflow> workflowOpt = storage.workflow(workflowId);
       if (!workflowOpt.isPresent()) {
         return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("workflow not found"));
@@ -344,9 +345,9 @@ public final class BackfillResource {
     final List<RunStateData> processedStates;
     final List<RunStateData> waitingStates;
 
-    Map<WorkflowInstance, RunState> activeWorkflowInstances;
+    Map<WorkflowInstance, PersistentWorkflowInstanceState> activeWorkflowInstances;
     try {
-      activeWorkflowInstances = storage.readActiveStates();
+      activeWorkflowInstances = storage.readActiveWorkflowInstances();
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

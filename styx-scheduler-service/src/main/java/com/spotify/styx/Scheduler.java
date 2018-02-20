@@ -142,7 +142,7 @@ public class Scheduler {
             resources.put(GLOBAL_RESOURCE_ID,
                           Resource.create(GLOBAL_RESOURCE_ID, concurrency)));
 
-    final Map<WorkflowInstance, RunState> activeStatesMap = stateManager.getActiveStates();
+    final Map<WorkflowInstance, RunState> activeStatesMap = stateManager.activeStates();
     final List<InstanceState> activeStates = activeStatesMap.entrySet().stream()
         .map(entry -> InstanceState.create(entry.getKey(), entry.getValue()))
         .collect(toList());
