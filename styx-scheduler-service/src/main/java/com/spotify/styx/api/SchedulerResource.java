@@ -195,6 +195,8 @@ public class SchedulerResource {
     } else if ("halt".equals(EventUtil.name(event))) {
       // For backwards compatibility
       return Response.forStatus(eventInjectorHelper(event));
+    } else if ("timeout".equals(EventUtil.name(event))) {
+      return Response.forStatus(eventInjectorHelper(event));
     } else {
       return Response.forStatus(BAD_REQUEST.withReasonPhrase(
           "This API for injecting generic events is deprecated, refer to the specific API for the "
