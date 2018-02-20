@@ -277,12 +277,23 @@ public class ShardedCounter {
     final CounterSnapshot snapshot = refreshCounterSnapshot(counterId);
 
     if (newLimit < oldLimit && newLimit >= getCounter(counterId)) {
-      // iterate through all shards and run single (1/-1) unit swaps between shards with excess usage
+      // iterate through all shards and run single (-1/+1) unit swaps between shards with excess usage
       // and shards with spare capacity, until each shard is at/below capacity.
       for (Integer fromShardIndex : snapshot.shards.keySet()) {
         while (snapshot.shards.get(fromShardIndex) > snapshot
             .shardCapacity(fromShardIndex, newLimit)) {
-          final int toShardIndex = snapshot.pickShardWithSpareCapacity(1, newLimit);
+
+          final int toShardIndex;
+          try {
+            toShardIndex = snapshot.pickShardWithSpareCapacity(1, newLimit);
+          } catch (CounterCapacityException e) {
+            LOG.warn(
+                "Redistribution for counter {} could not finalize because no shard "
+                + "with spare capacity was found. Only decrement operations will be applicable "
+                + "to the counter until the counter usage drops below the new proposed limit of {}",
+                counterId, newLimit);
+            return;
+          }
 
           swapUnits(snapshot.counterId, fromShardIndex, toShardIndex);
 
@@ -342,8 +353,16 @@ public class ShardedCounter {
       // when counter usage is at/over its limit, only allow negative deltas
       if (delta < 0) {
         int shardIndex = snapshot.pickShardWithExcessUsage(delta);
-        updateCounterShard(transaction, snapshot, shardIndex, delta);
-        return;
+        if (shardIndex != -1) {
+          updateCounterShard(transaction, snapshot, shardIndex, delta);
+          return;
+        }
+        throw new CounterCapacityException(
+            "Current usage of counter %s is %d and is larger than of equal to its limit of %d, "
+            + "but cannot find a shard with capacity of %d. "
+            + "Are you trying to decrement a counter with limit=0?",
+            counterId, getCounter(counterId), snapshot.limit, delta);
+        // OR is there a new limit set for the counter that hasn't propagated to the cache yet?
       }
       throw new CounterCapacityException("Counter %s has no more capacity.", counterId);
     }
