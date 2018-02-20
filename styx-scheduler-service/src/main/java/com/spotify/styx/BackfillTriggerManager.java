@@ -22,6 +22,7 @@ package com.spotify.styx;
 
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
+import static com.spotify.styx.util.GuardedRunnable.guard;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingBy;
@@ -46,7 +47,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,7 +92,7 @@ class BackfillTriggerManager {
     }
 
     final Map<String, Long> backfillStates = getBackfillStates();
-    backfills.forEach(backfill -> triggerBackfill(backfill, backfillStates));
+    backfills.forEach(backfill -> guard(() -> triggerBackfill(backfill, backfillStates)).run());
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
     stats.recordTickDuration(TICK_TYPE, durationMillis);
@@ -122,16 +122,11 @@ class BackfillTriggerManager {
             .toCompletableFuture();
         // Wait for the trigger execution to complete before proceeding to the next partition
         processed.get();
-      } catch (AlreadyInitializedException e) {
-        LOG.warn("tried to trigger backfill for already active state [{}]: {}",
-                 partition, backfill);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new RuntimeException(e);
-      } catch (ExecutionException e) {
-        LOG.error("failed to trigger backfill for state [{}]: {}",
-                  partition, backfill);
-        throw new RuntimeException(e);
+      } catch (AlreadyInitializedException ignored) {
+        // nop
+      } catch (Throwable e) {
+        LOG.warn("failed to trigger backfill for state [{}]: {}", partition, backfill, e);
+        return;
       }
 
       partition = nextInstant(partition, backfill.schedule());

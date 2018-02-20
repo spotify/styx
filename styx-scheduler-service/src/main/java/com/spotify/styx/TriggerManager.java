@@ -114,8 +114,8 @@ class TriggerManager {
               instantSpec.instant());
           // Wait for the event to be processed before proceeding to the next trigger
           processed.toCompletableFuture().get();
-        } catch (AlreadyInitializedException e) {
-          LOG.warn("{}", e.getMessage());
+        } catch (AlreadyInitializedException ignored) {
+          // nop
         } catch (Throwable e) {
           LOG.warn("Triggering {} threw exception", workflow.id(), e);
           return; // so we don't update the trigger time
