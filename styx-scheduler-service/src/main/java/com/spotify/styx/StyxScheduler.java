@@ -25,7 +25,6 @@ import static com.spotify.styx.state.OutputHandler.fanOutput;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.GuardedRunnable.guard;
-import static com.spotify.styx.util.ReplayEvents.transitionLogger;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -84,6 +83,7 @@ import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
+import com.spotify.styx.util.TransitionLogger;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import com.spotify.styx.workflow.WorkflowInitializer;
@@ -338,7 +338,7 @@ public class StyxScheduler implements AppInit {
     final RateLimiter dequeueRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
 
     outputHandlers.addAll(ImmutableList.of(
-        transitionLogger(""),
+        new TransitionLogger(""),
         new DockerRunnerHandler(
             dockerRunner, stateManager),
         new TerminationHandler(retryUtil, stateManager),
