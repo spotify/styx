@@ -44,8 +44,8 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.state.StateData;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
@@ -167,7 +167,7 @@ public class StyxSchedulerServiceFixture {
     styxScheduler.receive(event).toCompletableFuture().get(1, MINUTES);
   }
 
-  Optional<RunState> getState(WorkflowInstance workflowInstance) {
+  RunState getState(WorkflowInstance workflowInstance) {
     return styxScheduler.getState(workflowInstance);
   }
 
@@ -246,14 +246,13 @@ public class StyxSchedulerServiceFixture {
 
   void givenActiveStateAtSequenceCount(WorkflowInstance workflowInstance, long count) {
     try {
-      storage.writeActiveState(workflowInstance, RunState.create(workflowInstance,
-          RunState.State.QUEUED, StateData.zero(), Instant.now(), count));
+      storage.writeActiveState(workflowInstance, PersistentWorkflowInstanceState.of(count));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
   }
 
-  void givenActiveStateAtSequenceCount(WorkflowInstance workflowInstance, RunState state) {
+  void givenActiveStateAtSequenceCount(WorkflowInstance workflowInstance, PersistentWorkflowInstanceState state) {
     try {
       storage.writeActiveState(workflowInstance, state);
     } catch (IOException e) {
@@ -299,13 +298,13 @@ public class StyxSchedulerServiceFixture {
 
   void awaitWorkflowInstanceState(WorkflowInstance instance, RunState.State state) {
     await().atMost(30, SECONDS).until(() -> {
-      final Optional<RunState> runState = getState(instance);
-      return runState.isPresent() && runState.get().state() == state;
+      final RunState runState = getState(instance);
+      return runState != null && runState.state() == state;
     });
   }
 
   void awaitWorkflowInstanceCompletion(WorkflowInstance workflowInstance) {
-    await().atMost(30, SECONDS).until(() -> !getState(workflowInstance).isPresent());
+    await().atMost(30, SECONDS).until(() -> getState(workflowInstance) == null);
   }
 
   void awaitUntilConsumedEvent(SequenceEvent sequenceEvent, RunState.State state) {

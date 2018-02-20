@@ -442,7 +442,7 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private Set<WorkflowInstance> getRunningWorkflowInstances() {
-    return stateManager.getActiveStates()
+    return stateManager.activeStates()
         .values()
         .stream()
         .filter(runState -> runState.state().equals(RUNNING))
@@ -511,13 +511,13 @@ class KubernetesDockerRunner implements DockerRunner {
   private Optional<RunState> lookupPodRunState(Pod pod, WorkflowInstance workflowInstance) {
     final String podName = pod.getMetadata().getName();
 
-    final Optional<RunState> runState = stateManager.getActiveState(workflowInstance);
-    if (!runState.isPresent()) {
+    final RunState runState = stateManager.get(workflowInstance);
+    if (runState == null) {
       LOG.debug("Pod event for unknown or inactive workflow instance {}", workflowInstance);
       return Optional.empty();
     }
 
-    final Optional<String> executionIdOpt = runState.get().data().executionId();
+    final Optional<String> executionIdOpt = runState.data().executionId();
     if (!executionIdOpt.isPresent()) {
       LOG.debug("Pod event for state with no current executionId: {}", podName);
       return Optional.empty();
@@ -529,7 +529,8 @@ class KubernetesDockerRunner implements DockerRunner {
           executionId, podName);
       return Optional.empty();
     }
-    return runState;
+
+    return Optional.of(runState);
   }
 
   private void emitPodEvents(Watcher.Action action, Pod pod, RunState runState) {

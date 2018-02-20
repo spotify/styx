@@ -144,7 +144,7 @@ class BackfillTriggerManager {
   }
 
   private Map<String, Long> getBackfillStates() {
-    final List<InstanceState> activeStates = stateManager.getActiveStates().entrySet().stream()
+    final List<InstanceState> activeStates = stateManager.activeStates().entrySet().stream()
         .map(entry -> InstanceState.create(entry.getKey(), entry.getValue()))
         .collect(toList());
 

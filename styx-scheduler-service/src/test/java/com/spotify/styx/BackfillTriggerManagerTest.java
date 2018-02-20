@@ -160,7 +160,7 @@ public class BackfillTriggerManagerTest {
 
     final WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23");
 
-    when(stateManager.getActiveStates()).thenReturn(ImmutableMap.of(
+    when(stateManager.activeStates()).thenReturn(ImmutableMap.of(
         wfi1, RunState.create(wfi1, State.RUNNING, StateData.newBuilder()
             .trigger(Trigger.backfill("backfill-1"))
             .build())));
@@ -214,7 +214,7 @@ public class BackfillTriggerManagerTest {
     final WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T22");
     final WorkflowInstance wfi2 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23");
 
-    when(stateManager.getActiveStates()).thenReturn(ImmutableMap.of(
+    when(stateManager.activeStates()).thenReturn(ImmutableMap.of(
         wfi1, RunState.create(wfi1, State.RUNNING, StateData.newBuilder()
             .trigger(Trigger.backfill("backfill-1"))
             .build()),
