@@ -123,13 +123,10 @@ class BackfillTriggerManager {
             .toCompletableFuture();
         // Wait for the trigger execution to complete before proceeding to the next partition
         processed.get();
-      } catch (AlreadyInitializedException e) {
-        LOG.warn("tried to trigger backfill for already active state [{}]: {}", partition, backfill);
-      } catch (ExecutionException e) {
-        LOG.warn("failed to trigger backfill for state [{}]: {}", partition, backfill, e);
-        return;
+      } catch (AlreadyInitializedException ignored) {
+        // nop
       } catch (Throwable e) {
-        LOG.warn("backfill triggering threw exception for state [{}]: {}", partition, backfill, e);
+        LOG.warn("failed to trigger backfill for state [{}]: {}", partition, backfill, e);
         return;
       }
 
