@@ -247,20 +247,73 @@ public class ShardedCounterTest {
     assertNull(getLimitForCounter(COUNTER_ID1));
   }
 
-
-  /**
-   * TODO: We should be able to decrease a counter limit and keep a valid state for the counter shards.
-   *
-   * <p>Ex. Counter is at 75% usage. Decrease the limit for 50%.
-   * That leaves the counter at 25% extra usage (now 50% relative to the new limit).
-   * This state is still valid, but we should not allow further increases, only decreases.
-   * When the counter usage goes below the new limit, then we should allow increase operations again.
-   */
   @Test
-  public void decreaseLimitBelowCurrentCounterValue() {
-    //1. increase counter to an X value
-    //2. lower the limit to a L < X value
-    //3. fail further increases, but allow for decreases of the counter
+  public void testRedistribution() {
+    //1. increment counter by 1 until counter value gets to 10
+    IntStream.range(0, 20).forEach(i -> {
+      updateCounterInTransaction(COUNTER_ID1, 1L);
+      shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    });
+
+    //2. set limit to 10
+    datastore.runInTransaction(transaction -> {
+      shardedCounter.updateLimit(transaction, COUNTER_ID1, 20);
+      return null;
+    });
+
+    IntStream.range(0, 20).forEach(i -> assertEquals(1L, getShardForCounter(COUNTER_ID1, i)));
+
+    IntStream.range(20, 128).forEach(i -> assertEquals(0L, getShardForCounter(COUNTER_ID1, i)));
+  }
+
+  private long getShardForCounter(String counterId, int i) {
+    return datastore.get(getKey(counterId, i)).getLong(PROPERTY_SHARD_VALUE);
+  }
+
+  private Key getKey(String counterId, int i) {
+    return datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD).newKey(counterId + "-" + i);
+  }
+
+  @Test
+  public void shouldOnlyAllowNegativeDeltasWhenLimitIsBelowCurrentCounterValue() {
+    //1. increment counter by 1 until counter value gets to 10
+    IntStream.range(0, 20).forEach(i -> {
+      updateCounterInTransaction(COUNTER_ID1, 1L);
+      shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    });
+
+    //2. set limit to 10
+    datastore.runInTransaction(transaction -> {
+      shardedCounter.updateLimit(transaction, COUNTER_ID1, 10);
+      return null;
+    });
+
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    // try another 10 times to update the counter
+    IntStream.range(0, 10).forEach(i -> {
+      try {
+        updateCounterInTransaction(COUNTER_ID1, 1L);
+        // if the update goes through, fail the test
+        fail();
+      } catch (DatastoreException ignored) {
+      }
+    });
+
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertEquals(20L, shardedCounter.getCounter(COUNTER_ID1));
+
+    // try another 10 times to update the counter
+    IntStream.range(0, 10).forEach(i -> {
+      try {
+        updateCounterInTransaction(COUNTER_ID1, -1L);
+        shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+        // if the update goes through, fail the test
+      } catch (DatastoreException ignored) {
+        fail();
+      }
+    });
+
+    assertEquals(10L, shardedCounter.getCounter(COUNTER_ID1));
   }
 
   private void updateCounterInTransaction(String counterId, long delta) {

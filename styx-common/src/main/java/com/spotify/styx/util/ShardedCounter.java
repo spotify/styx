@@ -21,6 +21,7 @@
 package com.spotify.styx.util;
 
 import com.google.cloud.datastore.Datastore;
+import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.DatastoreReaderWriter;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
@@ -69,6 +70,7 @@ public class ShardedCounter {
   public static final String PROPERTY_SHARD_VALUE = "value";
   public static final String PROPERTY_SHARD_INDEX = "index";
   public static final String PROPERTY_COUNTER_ID = "counterId";
+  private static final long DEFAULT_MAX_COUNTER_LIMIT = Long.MAX_VALUE;
 
   private final Datastore datastore;
 
@@ -151,6 +153,10 @@ public class ShardedCounter {
      * then the distribution of capacity between the 3 shards will be [2, 2, 1]
      */
     private long shardCapacity(int shardIndex) {
+      return shardCapacity(shardIndex, limit);
+    }
+
+    private long shardCapacity(int shardIndex, long limit) {
       return limit / NUM_SHARDS + (shardIndex < limit % NUM_SHARDS ? 1 : 0);
     }
 
@@ -158,12 +164,12 @@ public class ShardedCounter {
      * Returns shard index which _likely_ could be successfully updated by delta, according to our
      * cached view of the state in Datastore.
      */
-    private int pickShardWithSpareCapacity(long delta) {
+    private int pickShardWithSpareCapacity(long delta, long limit) {
       List<Integer> candidates = new ArrayList<>();
 
       for (int i : shards.keySet()) {
         if (shards.containsKey(i) && Range
-            .closed(0L, shardCapacity(i)).contains(shards.get(i) + delta)) {
+            .closed(0L, shardCapacity(i, limit)).contains(shards.get(i) + delta)) {
           candidates.add(i);
         } else if (!shards.containsKey(i)) {
           LOG.warn("Shard {} for counter {} is not present in local cache", i, counterId);
@@ -181,6 +187,35 @@ public class ShardedCounter {
                                              counterId, delta);
         }
         // Or return -1 (and use that to abort the transaction early)?
+      } else {
+        return candidates.get(new Random().nextInt(candidates.size()));
+      }
+    }
+
+    /**
+     * Returns shard index which _likely_ could be successfully updated by delta, according to our
+     * cached view of the state in Datastore.
+     */
+    private int pickShardWithSpareCapacity(long delta) {
+      return pickShardWithSpareCapacity(delta, limit);
+    }
+
+    /**
+     * Returns shard index which _likely_ has excess usage, as per our cached view of the state in Datastore.
+     */
+    private int pickShardWithExcessUsage(long delta) {
+      List<Integer> candidates = new ArrayList<>();
+
+      for (int i : shards.keySet()) {
+        if (shards.containsKey(i) && shardCapacity(i, limit) <= shards.get(i) + delta) {
+          candidates.add(i);
+        } else if (!shards.containsKey(i)) {
+          LOG.warn("Shard {} for counter {} is not present in local cache", i, counterId);
+        }
+      }
+
+      if (candidates.isEmpty()) {
+        return -1;
       } else {
         return candidates.get(new Random().nextInt(candidates.size()));
       }
@@ -217,11 +252,76 @@ public class ShardedCounter {
    * <p>Augments the transaction with operations to persist the given limit in Datastore. So long as
    * there has been no preceding successful updateLimit operation, no limit is applied in
    * updateCounter operations on this counter.
+   *
+   * <p>It spawns other transactions if needed to do redistribution of shards in a specific case:
+   * if newLimit < oldLimit and newLimit >= currentCounterUsage
+   *
+   * <p>Redistribution will be done before the limit is updated within the transaction as parameter, but
+   * that will still be a valid distribution for the old limit, even if the new limit update fails.
    */
-  public void updateLimit(DatastoreReaderWriter transaction, String counterId, long limit) {
+  public void updateLimit(DatastoreReaderWriter transaction, String counterId, long newLimit) {
     final Key limitKey = datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId);
 
-    transaction.put(Entity.newBuilder(limitKey).set(PROPERTY_LIMIT, limit).build());
+    final Entity limitEntity = transaction.get(limitKey);
+    final Long oldLimit =
+        limitEntity == null ? DEFAULT_MAX_COUNTER_LIMIT : limitEntity.getLong(PROPERTY_LIMIT);
+    transaction.put(Entity.newBuilder(limitKey).set(PROPERTY_LIMIT, newLimit).build());
+    redistributeShardsIfNeeded(counterId, newLimit, oldLimit);
+  }
+
+  /**
+   * Redistribution of shard values for the given counter and limits.
+   * Redistribution should be done before the limit update happens.
+   */
+  private void redistributeShardsIfNeeded(String counterId, long newLimit, long oldLimit) {
+    // get fresh snapshot that will include the new limit
+    final CounterSnapshot snapshot = refreshCounterSnapshot(counterId);
+
+    if (newLimit < oldLimit && newLimit >= getCounter(counterId)) {
+      // iterate through all shards and run single (-1/+1) unit swaps between shards with excess usage
+      // and shards with spare capacity, until each shard is at/below capacity.
+      for (Integer fromShardIndex : snapshot.shards.keySet()) {
+        while (snapshot.shards.get(fromShardIndex) > snapshot
+            .shardCapacity(fromShardIndex, newLimit)) {
+
+          final int toShardIndex;
+          try {
+            toShardIndex = snapshot.pickShardWithSpareCapacity(1, newLimit);
+          } catch (CounterCapacityException e) {
+            LOG.warn(
+                "Redistribution for counter {} could not finalize because no shard "
+                + "with spare capacity was found. Only decrement operations will be applicable "
+                + "to the counter until the counter usage drops below the new proposed limit of {}",
+                counterId, newLimit);
+            return;
+          }
+
+          swapUnits(snapshot.counterId, fromShardIndex, toShardIndex);
+
+          //update snapshot
+          snapshot.shards.put(fromShardIndex, snapshot.shards.get(fromShardIndex) - 1);
+          snapshot.shards.put(toShardIndex, snapshot.shards.get(toShardIndex) + 1);
+        }
+      }
+    }
+    // no redistribution otherwise, the counter should stabilize by only allowing decrease operations.
+  }
+
+  private void swapUnits(String counterId, int fromShardIndex, int toShardIndex) {
+    datastore.runInTransaction(transaction -> {
+      final Key fromShardKey = datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD)
+          .newKey(counterId + "-" + fromShardIndex);
+      final Entity fromShard = transaction.get(fromShardKey);
+
+      updateShard(transaction, fromShard, -1);
+
+      final Key toShardKey = datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD)
+          .newKey(counterId + "-" + toShardIndex);
+      final Entity toShard = transaction.get(toShardKey);
+
+      updateShard(transaction, toShard, 1);
+      return null;
+    });
   }
 
   /**
@@ -231,7 +331,7 @@ public class ShardedCounter {
     final Key limitKey = datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId);
     final Entity limitEntity = datastore.get(limitKey);
     if (limitEntity == null) {
-      return Long.MAX_VALUE;
+      return DEFAULT_MAX_COUNTER_LIMIT;
       // Or IllegalStateException("No limit found in Datastore for " + counterId);?
     } else {
       return limitEntity.getLong(PROPERTY_LIMIT);
@@ -250,20 +350,40 @@ public class ShardedCounter {
    */
   public void updateCounter(DatastoreReaderWriter transaction, String counterId, long delta) {
     CounterSnapshot snapshot = getCounterSnapshot(counterId);
-    int shardIndex = snapshot.pickShardWithSpareCapacity(delta);
+    if (getCounter(counterId) >= snapshot.limit) {
+      // when counter usage is at/over its limit, only allow negative deltas
+      if (delta < 0) {
+        int shardIndex = snapshot.pickShardWithExcessUsage(delta);
+        if (shardIndex != -1) {
+          updateCounterShard(transaction, snapshot, shardIndex, delta);
+          return;
+        }
+        throw new CounterCapacityException(
+            "Current usage of counter %s is %d and is larger than of equal to its limit of %d, "
+            + "but cannot find a shard with capacity of %d. "
+            + "Are you trying to decrement a counter with limit=0?",
+            counterId, getCounter(counterId), snapshot.limit, delta);
+        // OR is there a new limit set for the counter that hasn't propagated to the cache yet?
+      }
+      throw new CounterCapacityException("Counter %s has no more capacity.", counterId);
+    }
 
+    int shardIndex = snapshot.pickShardWithSpareCapacity(delta);
+    updateCounterShard(transaction, snapshot, shardIndex, delta);
+  }
+
+  private void updateCounterShard(DatastoreReaderWriter transaction, CounterSnapshot snapshot,
+                                  int shardIndex, long delta) {
     final Key shardKey = datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD)
-        .newKey(counterId + "-" + shardIndex);
+        .newKey(snapshot.counterId + "-" + shardIndex);
     final Entity shard = transaction.get(shardKey);
 
     if (shard != null) {
       final long newShardValue = shard.getLong(PROPERTY_SHARD_VALUE) + delta;
-      if (Range.closed(0L, snapshot.shardCapacity(shardIndex))
-          .contains(newShardValue)) {
-        transaction.put(Entity.newBuilder(shard)
-                            .set(PROPERTY_SHARD_VALUE,
-                                 shard.getLong(PROPERTY_SHARD_VALUE) + delta)
-                            .build());
+      if (delta < 0 && newShardValue > 0) {
+        updateShard(transaction, shard, delta);
+      } else if (Range.closed(0L, snapshot.shardCapacity(shardIndex)).contains(newShardValue)) {
+        updateShard(transaction, shard, delta);
       } else {
         throw new CounterCapacityException("Chosen shard %s has no more capacity.",
                                            shardKey.getName());
@@ -276,6 +396,13 @@ public class ShardedCounter {
           shardKey.getName());
     }
   }
+
+  private void updateShard(DatastoreReaderWriter transaction, Entity shard, long delta) {
+    transaction.put(Entity.newBuilder(shard)
+                        .set(PROPERTY_SHARD_VALUE, shard.getLong(PROPERTY_SHARD_VALUE) + delta)
+                        .build());
+  }
+
 
   /**
    * Returns the current value of the counter referred to by counterId, a weakly consistent
@@ -311,22 +438,42 @@ public class ShardedCounter {
                                                                     .eq(PROPERTY_COUNTER_ID,
                                                                         counterId))
                                                      .build());
+
+    boolean exceptional = false;
+
     while (results.hasNext()) {
-      // remove max 25 entities per transaction
-      datastore.runInTransaction(transaction -> {
-        IntStream.range(0, 25).forEach(i -> {
-          if (results.hasNext()) {
-            transaction.delete(results.next().getKey());
-          }
+      try {
+        // remove max 25 entities per transaction
+        datastore.runInTransaction(transaction -> {
+          IntStream.range(0, 25).forEach(i -> {
+            if (results.hasNext()) {
+              transaction.delete(results.next().getKey());
+            }
+          });
+          return null;
         });
-        return null;
-      });
+      } catch (DatastoreException e) {
+        LOG.debug("Transaction failed when trying to delete shards for counter {}: {}", counterId,
+                  e);
+        exceptional = true;
+      }
     }
 
-    // delete limit entry too
-    datastore.runInTransaction(transaction -> {
-      transaction.delete(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId));
-      return null;
-    });
+    try {
+      // delete limit entry too
+      datastore.runInTransaction(transaction -> {
+        transaction.delete(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId));
+        return null;
+      });
+    } catch (DatastoreException e) {
+      LOG.debug("Transaction failed when trying to delete limit for counter {}: {}", counterId, e);
+      exceptional = true;
+    }
+
+    if (exceptional) {
+      LOG.info("Deleted counter {} with some issues", counterId);
+    } else {
+      LOG.info("Deleted counter {}", counterId);
+    }
   }
 }
