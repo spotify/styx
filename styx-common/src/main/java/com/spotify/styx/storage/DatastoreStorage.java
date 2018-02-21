@@ -339,6 +339,16 @@ class DatastoreStorage {
     return queryActiveStates(query);
   }
 
+  public Map<WorkflowInstance, PersistentWorkflowInstanceState> activeStatesByTriggerId(
+      String triggerId) throws IOException {
+    final EntityQuery query =
+        Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE)
+            .setFilter(PropertyFilter.eq(PROPERTY_STATE_TRIGGER_ID, triggerId))
+            .build();
+
+    return queryActiveStates(query);
+  }
+
   private Map<WorkflowInstance, PersistentWorkflowInstanceState> queryActiveStates(EntityQuery activeStatesQuery)
       throws IOException {
     final ImmutableMap.Builder<WorkflowInstance, PersistentWorkflowInstanceState> mapBuilder = ImmutableMap.builder();

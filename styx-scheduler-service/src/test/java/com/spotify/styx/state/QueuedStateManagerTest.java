@@ -509,6 +509,26 @@ public class QueuedStateManagerTest {
     assertThat(returnedRunStates.size(), is(1));
   }
 
+  @Test
+  public void shouldGetRunStatesByTriggerId() throws Exception {
+    Map<WorkflowInstance, PersistentWorkflowInstanceState> states = Maps.newConcurrentMap();
+    StateData stateData = StateData.newBuilder()
+        .trigger(Trigger.adhoc("foobar"))
+        .build();
+    PersistentWorkflowInstanceState persistentState = PersistentWorkflowInstanceState.builder()
+        .counter(17)
+        .timestamp(NOW.minusMillis(1))
+        .state(State.QUEUED)
+        .data(stateData)
+        .build();
+    states.put(INSTANCE, persistentState);
+    when(storage.readActiveWorkflowInstancesByTriggerId("foobar")).thenReturn(states);
+    RunState expectedRunState = RunState.create(INSTANCE, State.QUEUED, stateData, NOW.minusMillis(1));
+    Map<WorkflowInstance, RunState> returnedRunStates = stateManager.activeStates("foobar");
+
+    assertThat(returnedRunStates.get(INSTANCE), is(expectedRunState));
+    assertThat(returnedRunStates.size(), is(1));
+  }
 
   @Test
   public void triggerShouldHandleThrowingOutputHandler() throws Exception {

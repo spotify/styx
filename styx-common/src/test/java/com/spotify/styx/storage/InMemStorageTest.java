@@ -20,22 +20,34 @@
 
 package com.spotify.styx.storage;
 
+import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
+import static com.spotify.styx.storage.DatastoreStorageTest.FULL_PERSISTENT_STATE;
+import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 
+import com.google.common.collect.ImmutableMap;
+import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -47,10 +59,15 @@ public class InMemStorageTest {
   private static final WorkflowId WORKFLOW_ID2 = WorkflowId.create("component", "endpoint2");
   private static final WorkflowId WORKFLOW_ID3 = WorkflowId.create("component2", "pointless");
 
+  private Storage storage;
+
+  @Before
+  public void setUp() {
+    storage = new InMemStorage();
+  }
+
   @Test
   public void testEnableWorkflow() throws IOException {
-    Storage storage = new InMemStorage();
-
     WorkflowId id1 = WorkflowId.create("someComponent1", "someEndpoint1");
     WorkflowId id2 = WorkflowId.create("someComponent2", "someEndpoint2");
 
@@ -71,8 +88,6 @@ public class InMemStorageTest {
 
   @Test
   public void testConfig() throws IOException {
-    Storage storage = new InMemStorage();
-
     final StyxConfig expectedConfig = StyxConfig.newBuilder()
         .globalEnabled(true)
         .globalDockerRunnerId("default")
@@ -83,8 +98,6 @@ public class InMemStorageTest {
 
   @Test
   public void shouldReturnAllWorkflowsInComponent() throws Exception {
-    Storage storage = new InMemStorage();
-
     String componentId = "component";
 
     Workflow workflow1 = workflow(WORKFLOW_ID1);
@@ -108,7 +121,6 @@ public class InMemStorageTest {
 
   @Test
   public void shouldReturnEmptyListIfComponentDoesNotExist() throws Exception {
-    Storage storage = new InMemStorage();
     String componentId = "component";
     List<Workflow> l = storage.workflows(componentId);
     assertThat(l, hasSize(0));
@@ -121,5 +133,31 @@ public class InMemStorageTest {
             .id(workflowId.id())
             .schedule(HOURS)
             .build());
+  }
+
+  @Test
+  public void shouldReturnAllActiveStatesForATriggerId() throws IOException {
+    storage.writeActiveState(WORKFLOW_INSTANCE, FULL_PERSISTENT_STATE);
+
+    final Map<WorkflowInstance, PersistentWorkflowInstanceState> activeStates =
+        storage.readActiveWorkflowInstancesByTriggerId("foobar");
+
+    assertThat(activeStates, is(ImmutableMap.of(WORKFLOW_INSTANCE, FULL_PERSISTENT_STATE)));
+  }
+
+  @Test
+  public void shouldStoreAndReadBackfill() throws Exception {
+    final Backfill backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(Instant.parse("2017-01-01T00:00:00Z"))
+        .end(Instant.parse("2017-01-02T00:00:00Z"))
+        .workflowId(WorkflowId.create("component", "workflow2"))
+        .concurrency(2)
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(DAYS)
+        .build();
+
+    storage.storeBackfill(backfill);
+    assertThat(storage.backfill(backfill.id()), equalTo(Optional.of(backfill)));
   }
 }

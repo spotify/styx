@@ -254,6 +254,21 @@ public class QueuedStateManager implements StateManager {
   }
 
   @Override
+  public Map<WorkflowInstance, RunState> activeStates(String triggerId) {
+    final Map<WorkflowInstance, PersistentWorkflowInstanceState> states;
+    try {
+      states = storage.readActiveWorkflowInstancesByTriggerId(triggerId);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return states.entrySet().stream()
+        .collect(toMap(
+            Entry::getKey,
+            e -> RunState.create(
+                e.getKey(), e.getValue().state(), e.getValue().data(), e.getValue().timestamp())));
+  }
+
+  @Override
   public RunState get(WorkflowInstance workflowInstance) {
     try {
       return storage.readActiveWorkflowInstance(workflowInstance)

@@ -100,7 +100,7 @@ public interface StorageTransaction {
    *
    * @param backfill the backfill to store
    */
-  Backfill store(Backfill backfill) throws IOException;
+  Backfill store(Backfill backfill);
 
   /**
    * Commit all the storage operations previously called.

@@ -36,6 +36,7 @@ import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TriggerInstantSpec;
+import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowStateUtil;
 import java.io.IOException;
 import java.util.List;
@@ -257,7 +258,7 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public Optional<Backfill> backfill(String id) throws IOException {
+  public Optional<Backfill> backfill(String id) {
     return Optional.ofNullable(backfillStore.get(id));
   }
 
@@ -322,6 +323,14 @@ public class InMemStorage implements Storage {
       throws IOException {
     return activeStatesMap.entrySet().stream()
         .filter((entry) -> componentId.equals(entry.getKey().workflowId().componentId()))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  @Override
+  public Map<WorkflowInstance, PersistentWorkflowInstanceState> readActiveWorkflowInstancesByTriggerId(String triggerId)
+      throws IOException {
+    return activeStatesMap.entrySet().stream()
+        .filter((entry) -> triggerId.equals(TriggerUtil.triggerId(entry.getValue().data().trigger().get())))
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
