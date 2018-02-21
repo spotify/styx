@@ -202,7 +202,7 @@ public class DatastoreStorageTest {
 
   @Before
   public void setUp() throws Exception {
-    Datastore datastore = helper.getOptions().getService();
+    datastore = helper.getOptions().getService();
     storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter);
   }
 

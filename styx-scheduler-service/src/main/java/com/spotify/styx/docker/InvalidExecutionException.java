@@ -26,7 +26,7 @@ package com.spotify.styx.docker;
  */
 public class InvalidExecutionException extends RuntimeException {
 
-  InvalidExecutionException(String message) {
+  public InvalidExecutionException(String message) {
     super(message);
   }
 }
