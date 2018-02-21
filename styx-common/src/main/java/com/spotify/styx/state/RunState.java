@@ -42,6 +42,7 @@ import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * State machine for run states.
@@ -182,13 +183,14 @@ public abstract class RunState {
     }
 
     @Override
-    public RunState dequeue(WorkflowInstance workflowInstance) {
+    public RunState dequeue(WorkflowInstance workflowInstance, Set<String> resourceRefs) {
       switch (state()) {
         case QUEUED:
           return state(
               PREPARE,
               data().builder()
                   .retryDelayMillis(empty())
+                  .resourceRefs(resourceRefs)
                   .build());
 
         default:

@@ -26,6 +26,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
 import java.util.Optional;
+import java.util.Set;
 
 public class WorkflowInstanceEventFactory {
 
@@ -51,8 +52,8 @@ public class WorkflowInstanceEventFactory {
     return Event.created(workflowInstance, executionId, dockerImage);
   }
 
-  public Event dequeue() {
-    return Event.dequeue(workflowInstance);
+  public Event dequeue(Set<String> resourceRefs) {
+    return Event.dequeue(workflowInstance, resourceRefs);
   }
 
   public Event submit(ExecutionDescription executionDescription, String executionId) {

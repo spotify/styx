@@ -28,6 +28,7 @@ import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.INVALID_SHA;
+import static com.spotify.styx.testdata.TestData.RESOURCE_REFS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.startsWith;
@@ -200,7 +201,7 @@ public class SchedulerResourceTest {
 
   @Test
   public void testInjectDequeueEvent() throws Exception {
-    Event injectedEvent = Event.dequeue(WFI);
+    Event injectedEvent = Event.dequeue(WFI, RESOURCE_REFS);
     ByteString eventPayload = serialize(injectedEvent);
     CompletionStage<Response<ByteString>> post =
         serviceHelper.request("POST", BASE + "/events", eventPayload);

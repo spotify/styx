@@ -39,6 +39,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.cloud.datastore.DatastoreException;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.spotify.styx.RepeatRule;
 import com.spotify.styx.model.Event;
@@ -335,7 +336,7 @@ public class QueuedStateManagerTest {
       return a.getArgumentAt(0, TransactionFunction.class).apply(transaction);
     });
 
-    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE))
+    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()))
         .toCompletableFuture();
 
     CompletableFuture.runAsync(() -> {
@@ -427,7 +428,7 @@ public class QueuedStateManagerTest {
         .data(StateData.zero())
         .build()));
 
-    stateManager.receive(Event.dequeue(INSTANCE))
+    stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()))
         .toCompletableFuture().get(1, MINUTES);
 
     verify(transaction).updateActiveState(INSTANCE, PersistentWorkflowInstanceState.builder()
@@ -537,7 +538,7 @@ public class QueuedStateManagerTest {
 
     final RuntimeException rootCause = new RuntimeException("foo!");
     doThrow(rootCause).when(outputHandler).transitionInto(any());
-    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE)).toCompletableFuture();
+    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of())).toCompletableFuture();
     try {
       f.get(1, MINUTES);
       fail();
@@ -551,7 +552,7 @@ public class QueuedStateManagerTest {
     final IOException exception = new IOException();
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     doThrow(exception).when(storage).runInTransaction(any());
-    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE)).toCompletableFuture();
+    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of())).toCompletableFuture();
     try {
       f.get(1, MINUTES);
       fail();

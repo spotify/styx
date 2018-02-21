@@ -358,7 +358,7 @@ class KubernetesDockerRunner implements DockerRunner {
     }
   }
 
-  private void cleanup(WorkflowInstance workflowInstance, String executionId, 
+  private void cleanup(WorkflowInstance workflowInstance, String executionId,
                        Consumer<Pod> cleaner) {
     Optional.ofNullable(client.pods().withName(executionId).get()).ifPresent(pod -> {
       final List<ContainerStatus> containerStatuses = pod.getStatus().getContainerStatuses();
@@ -370,12 +370,12 @@ class KubernetesDockerRunner implements DockerRunner {
       }
     });
   }
-  
+
   static Optional<ContainerStatus> getStyxContainer(Pod pod) {
     return readPodWorkflowInstance(pod)
         .flatMap(wfi -> pod.getStatus().getContainerStatuses().stream().findFirst());
   }
-  
+
   private boolean isNonDeletePeriodExpired(ContainerStatus containerStatus) {
     return Optional.ofNullable(containerStatus.getState().getTerminated().getFinishedAt())
         .map(finishedAt -> Instant.parse(finishedAt)
@@ -383,7 +383,7 @@ class KubernetesDockerRunner implements DockerRunner {
                 Duration.ofSeconds(podDeletionDelaySeconds))))
         .orElse(true);
   }
-  
+
   private void deletePod(WorkflowInstance workflowInstance, String executionId) {
     if (!debug.get()) {
       client.pods().withName(executionId).delete();
@@ -632,7 +632,7 @@ class KubernetesDockerRunner implements DockerRunner {
     }
 
     @Override
-    public Boolean dequeue(WorkflowInstance workflowInstance) {
+    public Boolean dequeue(WorkflowInstance workflowInstance, Set<String> resourceRefs) {
       return false;
     }
 

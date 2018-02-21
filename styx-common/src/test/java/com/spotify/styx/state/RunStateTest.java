@@ -41,6 +41,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message.MessageLevel;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.TriggerUtil;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -95,7 +96,7 @@ public class RunStateTest {
   public void testTimeTriggerAndRetry2() throws Exception {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
-    transitioner.receive(eventFactory.dequeue());
+    transitioner.receive(eventFactory.dequeue(Collections.emptySet()));
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1"));
     transitioner.receive(eventFactory.submitted("exec1"));
     transitioner.receive(eventFactory.started());
@@ -105,7 +106,7 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), hasValue(777L));
 
-    transitioner.receive(eventFactory.dequeue());
+    transitioner.receive(eventFactory.dequeue(Collections.emptySet()));
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec2"));
     transitioner.receive(eventFactory.submitted("exec2"));
     transitioner.receive(eventFactory.started());
@@ -177,7 +178,7 @@ public class RunStateTest {
   public void testSubmitSetsExecutionId() throws Exception {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
-    transitioner.receive(eventFactory.dequeue());
+    transitioner.receive(eventFactory.dequeue(Collections.emptySet()));
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_1));
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(SUBMITTING));
@@ -193,7 +194,7 @@ public class RunStateTest {
 
     transitioner.receive(eventFactory.terminate(1));
     transitioner.receive(eventFactory.retryAfter(999));
-    transitioner.receive(eventFactory.dequeue());
+    transitioner.receive(eventFactory.dequeue(Collections.emptySet()));
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_2));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().get(), equalTo(TEST_EXECUTION_ID_2));
   }
@@ -225,7 +226,7 @@ public class RunStateTest {
   public void testRetryDelayFromQueued() throws Exception {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
-    transitioner.receive(eventFactory.dequeue());
+    transitioner.receive(eventFactory.dequeue(Collections.emptySet()));
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
     transitioner.receive(eventFactory.retryAfter(777));
 
@@ -237,7 +238,7 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), hasValue(0L));
 
-    transitioner.receive(eventFactory.dequeue());
+    transitioner.receive(eventFactory.dequeue(Collections.emptySet()));
 
     assertThat(outputs, contains(QUEUED, PREPARE, FAILED, QUEUED, QUEUED, PREPARE));
   }
@@ -486,13 +487,13 @@ public class RunStateTest {
   public void testRunErrorEmitsMessage() throws Exception {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
-    transitioner.receive(eventFactory.dequeue());
+    transitioner.receive(eventFactory.dequeue(Collections.emptySet()));
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_1));
     transitioner.receive(eventFactory.submitted(TEST_EXECUTION_ID_1));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(20));
     transitioner.receive(eventFactory.retryAfter(0));
-    transitioner.receive(eventFactory.dequeue());
+    transitioner.receive(eventFactory.dequeue(Collections.emptySet()));
     transitioner.receive(eventFactory.runError("Error"));
 
     final Message expectedMessage = Message.create(MessageLevel.ERROR, "Error");
