@@ -20,6 +20,7 @@
 
 package com.spotify.styx.storage;
 
+import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.storage.DatastoreStorageTest.PERSISTENT_STATE;
 import static com.spotify.styx.storage.DatastoreStorageTest.PERSISTENT_STATE1;
 import static com.spotify.styx.storage.DatastoreStorageTest.WORKFLOW;
@@ -42,7 +43,9 @@ import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.util.TriggerInstantSpec;
@@ -299,5 +302,23 @@ public class DatastoreStorageTransactionTest {
     tx.commit();
 
     assertThat(storage.activeState(WORKFLOW_INSTANCE), is(Optional.empty()));
+  }
+
+  @Test
+  public void shouldStoreBackfill() throws IOException {
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    final Backfill backfill = Backfill.newBuilder()
+        .id("backfill-1")
+        .start(Instant.parse("2017-01-01T00:00:00Z"))
+        .end(Instant.parse("2017-01-02T00:00:00Z"))
+        .workflowId(WorkflowId.create("component", "workflow1"))
+        .concurrency(2)
+        .description("Description")
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(DAYS)
+        .build();
+    tx.store(backfill);
+    tx.commit();
+    assertThat(storage.getBackfill(backfill.id()), is(Optional.of(backfill)));
   }
 }

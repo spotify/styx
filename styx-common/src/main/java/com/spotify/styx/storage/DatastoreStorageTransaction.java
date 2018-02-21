@@ -21,11 +21,22 @@
 package com.spotify.styx.storage;
 
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_ALL_TRIGGERED;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_COMPONENT;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONCURRENCY;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_DESCRIPTION;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_END;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_HALTED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_NATURAL_TRIGGER;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_TRIGGER;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_SCHEDULE;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_START;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_ENABLED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_JSON;
 import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceKey;
+import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
 import static com.spotify.styx.storage.DatastoreStorage.readPersistentWorkflowInstanceState;
 
 import com.google.cloud.datastore.DatastoreException;
@@ -119,8 +130,8 @@ class DatastoreStorageTransaction implements StorageTransaction {
 
     final Entity.Builder builder = Entity
         .newBuilder(workflowOpt.get())
-        .set(PROPERTY_NEXT_NATURAL_TRIGGER, DatastoreStorage.instantToTimestamp(triggerSpec.instant()))
-        .set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, DatastoreStorage.instantToTimestamp(triggerSpec.offsetInstant()));
+        .set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToTimestamp(triggerSpec.instant()))
+        .set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, instantToTimestamp(triggerSpec.offsetInstant()));
     tx.put(builder.build());
 
     return workflowId;
@@ -139,9 +150,9 @@ class DatastoreStorageTransaction implements StorageTransaction {
     final Entity.Builder builder = Entity.newBuilder(workflowOpt.get());
     state.enabled().ifPresent(x -> builder.set(PROPERTY_WORKFLOW_ENABLED, x));
     state.nextNaturalTrigger()
-        .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_TRIGGER, DatastoreStorage.instantToTimestamp(x)));
+        .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToTimestamp(x)));
     state.nextNaturalOffsetTrigger()
-        .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, DatastoreStorage.instantToTimestamp(x)));
+        .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, instantToTimestamp(x)));
     tx.put(builder.build());
 
     return workflowId;
@@ -176,13 +187,25 @@ class DatastoreStorageTransaction implements StorageTransaction {
     tx.delete(activeWorkflowInstanceKey(tx.getDatastore().newKeyFactory(), instance));
     return instance;
   }
-  
-  @Override
-  public Backfill storeBackfill(Backfill backfill) {
-    final Key key = DatastoreStorage.componentKey(tx.getDatastore().newKeyFactory(), backfill.id());
-    final Entity workflowEntity = DatastoreStorage.backfillToEntity(key, backfill);
 
-    tx.put(workflowEntity);
+  @Override
+  public Backfill store(Backfill backfill) {
+    final Key key = DatastoreStorage.backfillKey(tx.getDatastore().newKeyFactory(), backfill.id());
+    Entity.Builder builder = Entity.newBuilder(key)
+        .set(PROPERTY_CONCURRENCY, backfill.concurrency())
+        .set(PROPERTY_START, instantToTimestamp(backfill.start()))
+        .set(PROPERTY_END, instantToTimestamp(backfill.end()))
+        .set(PROPERTY_COMPONENT, backfill.workflowId().componentId())
+        .set(PROPERTY_WORKFLOW, backfill.workflowId().id())
+        .set(PROPERTY_SCHEDULE, backfill.schedule().toString())
+        .set(PROPERTY_NEXT_TRIGGER, instantToTimestamp(backfill.nextTrigger()))
+        .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())
+        .set(PROPERTY_HALTED, backfill.halted());
+
+    backfill.description().ifPresent(x -> builder.set(PROPERTY_DESCRIPTION, StringValue
+        .newBuilder(x).setExcludeFromIndexes(true).build()));
+
+    tx.put(builder.build());
 
     return backfill;
   }

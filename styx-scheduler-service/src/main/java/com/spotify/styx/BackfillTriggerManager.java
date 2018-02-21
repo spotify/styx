@@ -147,12 +147,12 @@ class BackfillTriggerManager {
     }
 
     final Instant nextPartition = nextInstant(partition, momentBackfill.schedule());
-    tx.storeBackfill(momentBackfill.builder()
+    tx.store(momentBackfill.builder()
                       .nextTrigger(nextPartition)
                       .build());
 
     if (nextPartition.equals(momentBackfill.end())) {
-      tx.storeBackfill(momentBackfill.builder()
+      tx.store(momentBackfill.builder()
                            .nextTrigger(momentBackfill.end())
                            .allTriggered(true)
                            .build());

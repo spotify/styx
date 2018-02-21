@@ -724,27 +724,8 @@ class DatastoreStorage {
   }
 
   void storeBackfill(Backfill backfill) throws IOException {
-    storeWithRetries(() -> runInTransaction(tx -> tx.storeBackfill(backfill)));
+    storeWithRetries(() -> runInTransaction(tx -> tx.store(backfill)));
   }
-
-  static Entity backfillToEntity(Key key, Backfill backfill) {
-    Entity.Builder builder = Entity.newBuilder(key)
-        .set(PROPERTY_CONCURRENCY, backfill.concurrency())
-        .set(PROPERTY_START, instantToTimestamp(backfill.start()))
-        .set(PROPERTY_END, instantToTimestamp(backfill.end()))
-        .set(PROPERTY_COMPONENT, backfill.workflowId().componentId())
-        .set(PROPERTY_WORKFLOW, backfill.workflowId().id())
-        .set(PROPERTY_SCHEDULE, backfill.schedule().toString())
-        .set(PROPERTY_NEXT_TRIGGER, instantToTimestamp(backfill.nextTrigger()))
-        .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())
-        .set(PROPERTY_HALTED, backfill.halted());
-
-    backfill.description().ifPresent(x -> builder.set(PROPERTY_DESCRIPTION, StringValue
-        .newBuilder(x).setExcludeFromIndexes(true).build()));
-
-    return builder.build();
-  }
-
 
   private <T> Stream<T> readStream(Entity entity, String property) {
     return read(entity, property, Collections.<Value<T>>emptyList()).stream()
