@@ -165,8 +165,6 @@ public class ShardedCounter {
         if (shards.containsKey(i) && Range
             .closed(0L, shardCapacity(i)).contains(shards.get(i) + delta)) {
           candidates.add(i);
-        } else if (!shards.containsKey(i)) {
-          LOG.warn("Shard {} for counter {} is not present in local cache", i, counterId);
         }
       }
 
