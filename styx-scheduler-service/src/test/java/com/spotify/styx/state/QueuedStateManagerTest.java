@@ -52,6 +52,7 @@ import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.storage.TransactionException;
 import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.Time;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
@@ -192,7 +193,7 @@ public class QueuedStateManagerTest {
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
-      assertThat(e.getCause(), is(instanceOf(IllegalStateException.class)));
+      assertThat(e.getCause(), is(instanceOf(AlreadyInitializedException.class)));
     }
   }
 

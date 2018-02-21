@@ -165,21 +165,17 @@ public final class BackfillResource {
 
   public Response<BackfillPayload> getBackfill(RequestContext rc, String id) {
     final boolean includeStatuses = rc.request().parameter("status").orElse("true").equals("true");
-    try {
-      final Optional<Backfill> backfillOpt = storage.backfill(id);
-      if (!backfillOpt.isPresent()) {
-        return Response.forStatus(Status.NOT_FOUND);
-      }
-      final Backfill backfill = backfillOpt.get();
-      if (includeStatuses) {
-        final List<RunStateData> statuses = retrieveBackfillStatuses(backfill);
-        return Response.forPayload(BackfillPayload.create(
-            backfill, Optional.of(RunStateDataPayload.create(statuses))));
-      } else {
-        return Response.forPayload(BackfillPayload.create(backfill, Optional.empty()));
-      }
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+    final Optional<Backfill> backfillOpt = storage.backfill(id);
+    if (!backfillOpt.isPresent()) {
+      return Response.forStatus(Status.NOT_FOUND);
+    }
+    final Backfill backfill = backfillOpt.get();
+    if (includeStatuses) {
+      final List<RunStateData> statuses = retrieveBackfillStatuses(backfill);
+      return Response.forPayload(BackfillPayload.create(
+          backfill, Optional.of(RunStateDataPayload.create(statuses))));
+    } else {
+      return Response.forPayload(BackfillPayload.create(backfill, Optional.empty()));
     }
   }
 

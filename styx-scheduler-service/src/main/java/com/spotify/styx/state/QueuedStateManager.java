@@ -32,6 +32,7 @@ import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.TransactionException;
+import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.Time;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
@@ -156,7 +157,7 @@ public class QueuedStateManager implements StateManager {
       });
     } catch (TransactionException e) {
       if (e.isAlreadyExists()) {
-        throw new IllegalStateException(
+        throw new AlreadyInitializedException(
             "Workflow instance is already triggered: " + workflowInstance.toKey());
       } else if (e.isConflict()) {
         LOG.debug(

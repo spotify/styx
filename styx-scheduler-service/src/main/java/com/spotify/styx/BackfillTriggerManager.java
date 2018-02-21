@@ -25,6 +25,7 @@ import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.spotify.styx.util.GuardedRunnable.guard;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.Workflow;
@@ -35,7 +36,6 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
-import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -44,6 +44,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,24 +59,38 @@ class BackfillTriggerManager {
   private static final String TICK_TYPE = UPPER_CAMEL.to(
       LOWER_UNDERSCORE, BackfillTriggerManager.class.getSimpleName());
 
+  private static Consumer<List<Backfill>> DEFAULT_SHUFFLER = Collections::shuffle;
+
   private final TriggerListener triggerListener;
   private final Storage storage;
   private final StateManager stateManager;
   private final WorkflowCache workflowCache;
   private final Stats stats;
   private final Time time;
+  private final Consumer<List<Backfill>> shuffler;
 
   BackfillTriggerManager(StateManager stateManager,
                          WorkflowCache workflowCache, Storage storage,
                          TriggerListener triggerListener,
                          Stats stats,
                          Time time) {
+    this(stateManager, workflowCache, storage, triggerListener, stats, time, DEFAULT_SHUFFLER);
+  }
+
+  @VisibleForTesting
+  BackfillTriggerManager(StateManager stateManager,
+                         WorkflowCache workflowCache, Storage storage,
+                         TriggerListener triggerListener,
+                         Stats stats,
+                         Time time,
+                         Consumer<List<Backfill>> shuffler) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.workflowCache = Objects.requireNonNull(workflowCache);
     this.storage = Objects.requireNonNull(storage);
     this.triggerListener = Objects.requireNonNull(triggerListener);
     this.stats = Objects.requireNonNull(stats);
     this.time = Objects.requireNonNull(time);
+    this.shuffler = Objects.requireNonNull(shuffler);
   }
 
   void tick() {
@@ -88,7 +104,7 @@ class BackfillTriggerManager {
       return;
     }
 
-    Collections.shuffle(backfills);
+    shuffler.accept(backfills);
 
     backfills.forEach(backfill -> guard(() -> triggerBackfill(backfill)).run());
 
@@ -128,7 +144,7 @@ class BackfillTriggerManager {
 
     final Instant partition = momentBackfill.nextTrigger();
     final int remainingCapacity =
-        momentBackfill.concurrency() - getNumberOfBackfillStates(momentBackfill.id());
+        momentBackfill.concurrency() - stateManager.activeStates(id).size();
 
     if (remainingCapacity < 1) {
       LOG.debug("no capacity left for backfill {}, stop triggering", momentBackfill);
@@ -146,14 +162,19 @@ class BackfillTriggerManager {
           .toCompletableFuture();
       // Wait for the trigger execution to complete before proceeding to the next partition
       processed.get();
-    } catch (AlreadyInitializedException ignored) {
-      // just encountered an ad-hoc trigger or it has been triggered by another scheduler instance
-      // do not propagate the exception but instead letting transaction decide
-      LOG.debug("{} already triggered for backfill {}", partition, momentBackfill);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof AlreadyInitializedException) {
+        // just encountered an ad-hoc trigger or it has been triggered by another scheduler instance
+        // do not propagate the exception but instead letting transaction decide what to do
+        LOG.debug("{} already triggered for backfill {}", partition, momentBackfill, e);
+      } else {
+        LOG.debug("failed to trigger {} for backfill {}", partition, momentBackfill, e);
+        throw new RuntimeException(e);
+      }
     } catch (Exception e) {
-      // whatever, can be failed to trigger, can be transaction conflict
-      // either case we give up on the backfill and retry on next tick
-      LOG.debug("failed to trigger {} for backfill {}", partition, momentBackfill);
+      // whatever, can be interrupted
+      // we give up this backfill and retry in next tick
+      LOG.debug("failed to trigger {} for backfill {}", partition, momentBackfill, e);
       throw new RuntimeException(e);
     }
 
@@ -173,17 +194,6 @@ class BackfillTriggerManager {
     }
 
     return true;
-  }
-
-  // TODO: push down the filter to datastore
-  private int getNumberOfBackfillStates(String id) {
-    return stateManager.activeStates().entrySet().stream()
-        .map(entry -> entry.getValue().data().trigger())
-        .filter(Optional::isPresent)
-        .map(Optional::get)
-        .filter(trigger -> id.equals(TriggerUtil.triggerId(trigger)))
-        .mapToInt(x -> 1)
-        .sum();
   }
 
   private void storeBackfill(Backfill backfill) {
