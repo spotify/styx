@@ -33,6 +33,7 @@ import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.Transaction;
+import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -174,5 +175,15 @@ class DatastoreStorageTransaction implements StorageTransaction {
   public WorkflowInstance deleteActiveState(WorkflowInstance instance) {
     tx.delete(activeWorkflowInstanceKey(tx.getDatastore().newKeyFactory(), instance));
     return instance;
+  }
+  
+  @Override
+  public Backfill storeBackfill(Backfill backfill) {
+    final Key key = DatastoreStorage.componentKey(tx.getDatastore().newKeyFactory(), backfill.id());
+    final Entity workflowEntity = DatastoreStorage.backfillToEntity(key, backfill);
+
+    tx.put(workflowEntity);
+
+    return backfill;
   }
 }

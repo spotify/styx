@@ -20,6 +20,7 @@
 
 package com.spotify.styx.storage;
 
+import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -93,6 +94,13 @@ public interface StorageTransaction {
    * Remove an active workflow instance state.
    */
   WorkflowInstance deleteActiveState(WorkflowInstance instance);
+
+  /**
+   * Stores a backfill
+   *
+   * @param backfill the backfill to store
+   */
+  Backfill storeBackfill(Backfill backfill) throws IOException;
 
   /**
    * Commit all the storage operations previously called.

@@ -575,6 +575,10 @@ class DatastoreStorage {
   static Key componentKey(KeyFactory keyFactory, String componentId) {
     return keyFactory.setKind(KIND_COMPONENT).newKey(componentId);
   }
+  
+  static Key backfillKey(KeyFactory keyFactory, String backfillId) {
+    return keyFactory.setKind(KIND_BACKFILL).newKey(backfillId);
+  }
 
   static Key globalConfigKey(KeyFactory keyFactory) {
     return keyFactory.setKind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
@@ -720,12 +724,10 @@ class DatastoreStorage {
   }
 
   void storeBackfill(Backfill backfill) throws IOException {
-    storeWithRetries(() -> datastore.put(backfillToEntity(backfill)));
+    storeWithRetries(() -> runInTransaction(tx -> tx.storeBackfill(backfill)));
   }
 
-  private Entity backfillToEntity(Backfill backfill) {
-    final Key key = datastore.newKeyFactory().setKind(KIND_BACKFILL).newKey(backfill.id());
-
+  static Entity backfillToEntity(Key key, Backfill backfill) {
     Entity.Builder builder = Entity.newBuilder(key)
         .set(PROPERTY_CONCURRENCY, backfill.concurrency())
         .set(PROPERTY_START, instantToTimestamp(backfill.start()))

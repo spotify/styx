@@ -24,9 +24,6 @@ import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.spotify.styx.util.GuardedRunnable.guard;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
-import static java.util.stream.Collectors.counting;
-import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.toList;
 
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
@@ -35,15 +32,15 @@ import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -91,14 +88,15 @@ class BackfillTriggerManager {
       return;
     }
 
-    final Map<String, Long> backfillStates = getBackfillStates();
-    backfills.forEach(backfill -> guard(() -> triggerBackfill(backfill, backfillStates)).run());
+    Collections.shuffle(backfills);
+
+    backfills.forEach(backfill -> guard(() -> triggerBackfill(backfill)).run());
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
     stats.recordTickDuration(TICK_TYPE, durationMillis);
   }
 
-  private void triggerBackfill(Backfill backfill, Map<String, Long> backfillStates) {
+  private void triggerBackfill(Backfill backfill) {
     final Optional<Workflow> workflowOpt = workflowCache.workflow(backfill.workflowId());
     if (!workflowOpt.isPresent()) {
       LOG.warn("workflow not found for backfill, skipping rest of triggers: {}", backfill);
@@ -110,53 +108,69 @@ class BackfillTriggerManager {
 
     final Workflow workflow = workflowOpt.get();
 
-    final int remainingCapacity =
-        backfill.concurrency() - backfillStates.getOrDefault(backfill.id(), 0L).intValue();
-
-    Instant partition = backfill.nextTrigger();
-
-    for (int i = 0; i < remainingCapacity && partition.isBefore(backfill.end()); i++) {
+    while (true) {
       try {
-        final CompletableFuture<Void> processed = triggerListener
-            .event(workflow, Trigger.backfill(backfill.id()), partition)
-            .toCompletableFuture();
-        // Wait for the trigger execution to complete before proceeding to the next partition
-        processed.get();
-      } catch (AlreadyInitializedException ignored) {
-        // nop
-      } catch (Throwable e) {
-        LOG.warn("failed to trigger backfill for state [{}]: {}", partition, backfill, e);
-        return;
+        if (!storage.runInTransaction(tx -> tryTriggerAndProgress(tx, backfill.id(), workflow))) {
+          break;
+        }
+      } catch (IOException e) {
+        // transaction failed, yield
+        break;
       }
-
-      partition = nextInstant(partition, backfill.schedule());
-      storeBackfill(backfill.builder()
-                        .nextTrigger(partition)
-                        .build());
-    }
-
-    if (partition.equals(backfill.end())) {
-      storeBackfill(backfill.builder()
-                        .nextTrigger(backfill.end())
-                        .allTriggered(true)
-                        .build());
     }
   }
 
-  private Map<String, Long> getBackfillStates() {
-    final List<InstanceState> activeStates = stateManager.activeStates().entrySet().stream()
-        .map(entry -> InstanceState.create(entry.getKey(), entry.getValue()))
-        .collect(toList());
+  private Boolean tryTriggerAndProgress(StorageTransaction tx,
+                                        String id, Workflow workflow) throws IOException {
+    final Backfill momentBackfill =
+        storage.backfill(id).orElseThrow(RuntimeException::new);
 
-    return activeStates.stream()
-        .map(state -> state.runState().data().trigger())
+    final Instant partition = momentBackfill.nextTrigger();
+    final int remainingCapacity =
+        momentBackfill.concurrency() - getNumberOfBackfillStates(momentBackfill.id());
+
+    if (remainingCapacity < 1 || !partition.isBefore(momentBackfill.end())) {
+      return false;
+    }
+
+    try {
+      final CompletableFuture<Void> processed = triggerListener
+          .event(workflow, Trigger.backfill(momentBackfill.id()), partition)
+          .toCompletableFuture();
+      // Wait for the trigger execution to complete before proceeding to the next partition
+      processed.get();
+    } catch (AlreadyInitializedException ignored) {
+      // just encountered an ad-hoc trigger or it is handled by another scheduler instance
+    } catch (Exception e) {
+      // whatever, can be failed to trigger, can be transaction conflict
+      throw new RuntimeException(e);
+    }
+
+    final Instant nextPartition = nextInstant(partition, momentBackfill.schedule());
+    tx.storeBackfill(momentBackfill.builder()
+                      .nextTrigger(nextPartition)
+                      .build());
+
+    if (nextPartition.equals(momentBackfill.end())) {
+      tx.storeBackfill(momentBackfill.builder()
+                           .nextTrigger(momentBackfill.end())
+                           .allTriggered(true)
+                           .build());
+      return false;
+    }
+
+    return true;
+  }
+
+  // TODO: push down the filter to datastore
+  private int getNumberOfBackfillStates(String id) {
+    return stateManager.activeStates().entrySet().stream()
+        .map(entry -> entry.getValue().data().trigger())
         .filter(Optional::isPresent)
         .map(Optional::get)
-        .filter(TriggerUtil::isBackfill)
-        .collect(groupingBy(
-            TriggerUtil::triggerId,
-            HashMap::new,
-            counting()));
+        .filter(trigger -> id.equals(TriggerUtil.triggerId(trigger)))
+        .mapToInt(x -> 1)
+        .sum();
   }
 
   private void storeBackfill(Backfill backfill) {
