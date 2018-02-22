@@ -196,6 +196,7 @@ public class SchedulerResource {
       // For backwards compatibility
       return Response.forStatus(eventInjectorHelper(event));
     } else if ("timeout".equals(EventUtil.name(event))) {
+      // This is for manually getting out of a stale state
       return Response.forStatus(eventInjectorHelper(event));
     } else {
       return Response.forStatus(BAD_REQUEST.withReasonPhrase(

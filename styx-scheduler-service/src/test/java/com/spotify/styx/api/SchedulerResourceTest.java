@@ -223,6 +223,18 @@ public class SchedulerResourceTest {
   }
 
   @Test
+  public void testInjectTimeoutEvent() throws Exception {
+    Event injectedEvent = Event.timeout(WFI);
+    ByteString eventPayload = serialize(injectedEvent);
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", BASE + "/events", eventPayload);
+
+    post.toCompletableFuture().get(1, MINUTES); // block until done
+
+    verify(stateManager).receive(Event.timeout(WFI));
+  }
+
+  @Test
   public void shouldFailOnInjectRetryEvent() throws Exception {
     Event injectedEvent = Event.retry(WFI);
     ByteString eventPayload = serialize(injectedEvent);
