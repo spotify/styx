@@ -90,8 +90,8 @@ class PersistentEvent {
     }
 
     @Override
-    public PersistentEvent dequeue(WorkflowInstance workflowInstance, Set<String> resourceRefs) {
-      return new Dequeue(workflowInstance.toKey(), resourceRefs);
+    public PersistentEvent dequeue(WorkflowInstance workflowInstance, Set<String> resourceIds) {
+      return new Dequeue(workflowInstance.toKey(), resourceIds);
     }
 
     @Override
@@ -323,19 +323,19 @@ class PersistentEvent {
 
   public static class Dequeue extends PersistentEvent {
 
-    public final Set<String> resourceRefs;
+    public final Set<String> resourceIds;
 
     @JsonCreator
     public Dequeue(
         @JsonProperty("workflow_instance") String workflowInstance,
-        @JsonProperty("resource_refs") Set<String> resourceRefs) {
+        @JsonProperty("resource_ids") Set<String> resourceIds) {
       super("dequeue", workflowInstance);
-      this.resourceRefs = resourceRefs;
+      this.resourceIds = resourceIds;
     }
 
     @Override
     public Event toEvent() {
-      return Event.dequeue(WorkflowInstance.parseKey(workflowInstance), resourceRefs);
+      return Event.dequeue(WorkflowInstance.parseKey(workflowInstance), resourceIds);
     }
   }
 

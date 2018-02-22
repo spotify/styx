@@ -38,7 +38,7 @@ public final class TestData {
 
   public static final String VALID_SHA = "00000ef508c1cb905e360590ce3e7e9193f6b370";
   public static final String INVALID_SHA = "XXXXXef508c1cb905e360590ce3e7e9193f6b370";
-  public static final Set<String> RESOURCE_REFS = ImmutableSet.of("foo-resource", "bar-resource");
+  public static final Set<String> RESOURCE_IDS = ImmutableSet.of("foo-resource", "bar-resource");
 
   public static final WorkflowId WORKFLOW_ID =
       WorkflowId.create("styx", "styx.TestEndpoint");

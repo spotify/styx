@@ -74,7 +74,7 @@ public final class EventUtil {
     }
 
     @Override
-    public String dequeue(WorkflowInstance workflowInstance, Set<String> resourceRefs) {
+    public String dequeue(WorkflowInstance workflowInstance, Set<String> resourceIds) {
       return "";
     }
 
@@ -157,7 +157,7 @@ public final class EventUtil {
     }
 
     @Override
-    public String dequeue(WorkflowInstance workflowInstance, Set<String> resourceRefs) {
+    public String dequeue(WorkflowInstance workflowInstance, Set<String> resourceIds) {
       return "dequeue";
     }
 

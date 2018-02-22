@@ -183,14 +183,14 @@ public abstract class RunState {
     }
 
     @Override
-    public RunState dequeue(WorkflowInstance workflowInstance, Set<String> resourceRefs) {
+    public RunState dequeue(WorkflowInstance workflowInstance, Set<String> resourceIds) {
       switch (state()) {
         case QUEUED:
           return state(
               PREPARE,
               data().builder()
                   .retryDelayMillis(empty())
-                  .resourceRefs(resourceRefs)
+                  .resourceIds(resourceIds)
                   .build());
 
         default:
@@ -344,7 +344,7 @@ public abstract class RunState {
                   .retryDelayMillis(delayMillis)
                   .executionId(empty())
                   .executionDescription(empty())
-                  .resourceRefs(empty())
+                  .resourceIds(empty())
                   .build());
 
         default:

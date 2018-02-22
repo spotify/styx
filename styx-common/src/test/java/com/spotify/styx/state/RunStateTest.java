@@ -568,7 +568,7 @@ public class RunStateTest {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
 
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), isEmpty());
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), isEmpty());
 
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of("r1")));
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1"));
@@ -577,15 +577,15 @@ public class RunStateTest {
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(FAILED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), hasValue(contains("r1")));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), hasValue(contains("r1")));
 
     transitioner.receive(eventFactory.retryAfter(12));
 
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), isEmpty());
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), isEmpty());
 
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of("r2")));
 
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), hasValue(contains("r2")));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), hasValue(contains("r2")));
   }
 
   @Test
@@ -593,7 +593,7 @@ public class RunStateTest {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
 
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), isEmpty());
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), isEmpty());
 
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of("r1")));
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1"));
@@ -602,7 +602,7 @@ public class RunStateTest {
     transitioner.receive(eventFactory.terminate(RunState.MISSING_DEPS_EXIT_CODE));
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(TERMINATED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), hasValue(contains("r1")));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), hasValue(contains("r1")));
   }
 
   @Test
@@ -610,14 +610,14 @@ public class RunStateTest {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
 
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), isEmpty());
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), isEmpty());
 
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of("r1")));
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1"));
     transitioner.receive(eventFactory.timeout());
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(FAILED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), hasValue(contains("r1")));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), hasValue(contains("r1")));
   }
 
   @Test
@@ -625,11 +625,11 @@ public class RunStateTest {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
 
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), isEmpty());
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), isEmpty());
 
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(FAILED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), isEmpty());
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), isEmpty());
   }
 }

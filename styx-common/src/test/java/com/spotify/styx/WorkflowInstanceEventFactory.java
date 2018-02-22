@@ -52,8 +52,8 @@ public class WorkflowInstanceEventFactory {
     return Event.created(workflowInstance, executionId, dockerImage);
   }
 
-  public Event dequeue(Set<String> resourceRefs) {
-    return Event.dequeue(workflowInstance, resourceRefs);
+  public Event dequeue(Set<String> resourceIds) {
+    return Event.dequeue(workflowInstance, resourceIds);
   }
 
   public Event submit(ExecutionDescription executionDescription, String executionId) {

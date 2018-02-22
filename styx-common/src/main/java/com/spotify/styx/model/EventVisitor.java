@@ -38,7 +38,7 @@ public interface EventVisitor<R> {
 
   R triggerExecution(@Getter WorkflowInstance workflowInstance, Trigger trigger);
   R info(@Getter WorkflowInstance workflowInstance, Message message);
-  R dequeue(@Getter WorkflowInstance workflowInstance, @Nullable Set<String> resourceRefs);
+  R dequeue(@Getter WorkflowInstance workflowInstance, @Nullable Set<String> resourceIds);
   R submit(@Getter WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
       @Nullable String executionId);
   R submitted(@Getter WorkflowInstance workflowInstance, @Nullable String executionId);

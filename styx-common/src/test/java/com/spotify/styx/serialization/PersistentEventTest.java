@@ -82,7 +82,7 @@ public class PersistentEventTest {
   @Test
   public void testDeserializeFromJson() throws Exception {
     assertThat(deserializeEvent(json("timeTrigger")), is(Event.timeTrigger(INSTANCE1)));
-    assertThat(deserializeEvent(json("dequeue", "\"resource_refs\":[\"quux\"]")),
+    assertThat(deserializeEvent(json("dequeue", "\"resource_ids\":[\"quux\"]")),
         is(Event.dequeue(INSTANCE1, ImmutableSet.of("quux"))));
     assertThat(deserializeEvent(json("dequeue")),
         is(Event.dequeue(INSTANCE1, null)));

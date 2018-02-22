@@ -93,7 +93,6 @@ public class SchedulerTest {
       WorkflowId.create("styx2", "example2");
   private static final WorkflowInstance INSTANCE_1 =
       WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T01");
-  private static final Set<String> RESOURCE_REFS = ImmutableSet.of("foo-resource", "bar-resource");
 
   private WorkflowCache workflowCache;
   private Scheduler scheduler;

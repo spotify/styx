@@ -47,7 +47,7 @@ public interface StateData {
   Optional<String> triggerId(); //for backwards compatibility
   Optional<String> executionId();
   Optional<ExecutionDescription> executionDescription();
-  Optional<Set<String>> resourceRefs(); // resources configured at the time of dequeue
+  Optional<Set<String>> resourceIds(); // resources referenced in the workflow configuration at the time of dequeue
 
   /**
    * This field is deprecated and kept only for backwards compatibility.

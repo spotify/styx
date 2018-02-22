@@ -632,7 +632,7 @@ class KubernetesDockerRunner implements DockerRunner {
     }
 
     @Override
-    public Boolean dequeue(WorkflowInstance workflowInstance, Set<String> resourceRefs) {
+    public Boolean dequeue(WorkflowInstance workflowInstance, Set<String> resourceIds) {
       return false;
     }
 
