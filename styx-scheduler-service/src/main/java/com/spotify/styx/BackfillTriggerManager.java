@@ -27,7 +27,6 @@ import static com.spotify.styx.util.TimeUtil.nextInstant;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.StateManager;
@@ -106,27 +105,39 @@ class BackfillTriggerManager {
 
     shuffler.accept(backfills);
 
-    backfills.forEach(backfill -> guard(() -> triggerBackfill(backfill)).run());
+    backfills.forEach(backfill -> guard(() -> triggerAndProgress(backfill)).run());
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
     stats.recordTickDuration(TICK_TYPE, durationMillis);
   }
 
-  private void triggerBackfill(Backfill backfill) {
+  private void triggerAndProgress(Backfill backfill) {
     final Optional<Workflow> workflowOpt = workflowCache.workflow(backfill.workflowId());
     if (!workflowOpt.isPresent()) {
       LOG.debug("workflow not found for backfill {}, halt it.", backfill);
-      final BackfillBuilder builder = backfill.builder();
-      builder.halted(true);
-      storeBackfill(builder.build());
+      storeBackfill(backfill.builder().halted(true).build());
       return;
     }
 
     final Workflow workflow = workflowOpt.get();
 
-    while (true) {
+    // this is best effort because querying active states is not strongly consistent so the
+    // initial remaining capacity may already be wrong
+    //
+    // we keep the remaining capacity in memory with a great hope that only one scheduler instance
+    // would win the transaction. there exists extreme cases that one scheduler instance becomes
+    // super slow after reading the capacity that it doesn't start its transaction until the other
+    // scheduler instance finishes its transaction, or the workflow instance triggered by the other
+    // scheduler instance finishes even before the transaction finishes (this case doesn't really
+    // violate concurrency limit, but would trigger the same workflow instance twice -- by both
+    // scheduler instances), however both of them have very very low probability to actually happen
+    int currentRemainingCapacity =
+        backfill.concurrency() - stateManager.activeStates(backfill.id()).size();
+
+    for (int i = 0; i < currentRemainingCapacity; i++) {
       try {
-        if (!storage.runInTransaction(tx -> tryTriggerAndProgress(tx, backfill.id(), workflow))) {
+        if (!storage.runInTransaction(
+            tx -> triggerNextPartitionAndProgress(tx, backfill.id(), workflow))) {
           break;
         }
       } catch (IOException e) {
@@ -137,20 +148,15 @@ class BackfillTriggerManager {
     }
   }
 
-  private Boolean tryTriggerAndProgress(StorageTransaction tx,
-                                        String id, Workflow workflow) {
-    final Backfill momentBackfill =
-        storage.backfill(id).orElseThrow(RuntimeException::new);
+  private Boolean triggerNextPartitionAndProgress(StorageTransaction tx,
+                                                  String id,
+                                                  Workflow workflow) {
+    // FIXME: read the backfill via transaction
+    final Backfill momentBackfill = storage.backfill(id).orElseThrow(RuntimeException::new);
 
     final Instant partition = momentBackfill.nextTrigger();
-    final int remainingCapacity =
-        momentBackfill.concurrency() - stateManager.activeStates(id).size();
 
-    if (remainingCapacity < 1) {
-      LOG.debug("no capacity left for backfill {}, stop triggering", momentBackfill);
-      return false;
-    }
-
+    // this is to prevent the other scheduler instance re-entering
     if (partition.equals(momentBackfill.end())) {
       LOG.debug("backfill {} all triggered", momentBackfill);
       return false;
