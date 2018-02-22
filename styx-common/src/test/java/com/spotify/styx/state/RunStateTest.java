@@ -21,6 +21,7 @@
 package com.spotify.styx.state;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
+import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
 import static com.spotify.styx.state.RunState.State.DONE;
 import static com.spotify.styx.state.RunState.State.ERROR;
 import static com.spotify.styx.state.RunState.State.FAILED;
@@ -35,6 +36,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.WorkflowInstanceEventFactory;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
@@ -559,5 +561,75 @@ public class RunStateTest {
     assertThat(
         transitioner.get(WORKFLOW_INSTANCE).data().executionDescription().get().dockerImage(),
         equalTo(DOCKER_IMAGE + "2"));
+  }
+
+  @Test
+  public void testStoresResourcesFromDequeueThroughRunError() throws Exception {
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
+    transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), isEmpty());
+
+    transitioner.receive(eventFactory.dequeue(ImmutableSet.of("r1")));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1"));
+    transitioner.receive(eventFactory.submitted("exec1"));
+    transitioner.receive(eventFactory.started());
+    transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(FAILED));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), hasValue(contains("r1")));
+
+    transitioner.receive(eventFactory.retryAfter(12));
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), isEmpty());
+
+    transitioner.receive(eventFactory.dequeue(ImmutableSet.of("r2")));
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), hasValue(contains("r2")));
+  }
+
+  @Test
+  public void testStoresResourcesFromDequeueThroughTerminate() throws Exception {
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
+    transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), isEmpty());
+
+    transitioner.receive(eventFactory.dequeue(ImmutableSet.of("r1")));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1"));
+    transitioner.receive(eventFactory.submitted("exec1"));
+    transitioner.receive(eventFactory.started());
+    transitioner.receive(eventFactory.terminate(RunState.MISSING_DEPS_EXIT_CODE));
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(TERMINATED));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), hasValue(contains("r1")));
+  }
+
+  @Test
+  public void testStoresResourcesFromDequeueThroughTimeout() throws Exception {
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
+    transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), isEmpty());
+
+    transitioner.receive(eventFactory.dequeue(ImmutableSet.of("r1")));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1"));
+    transitioner.receive(eventFactory.timeout());
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(FAILED));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), hasValue(contains("r1")));
+  }
+
+  @Test
+  public void testStoresNoResourcesWhenNotDequeued() throws Exception {
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
+    transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), isEmpty());
+
+    transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
+
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(FAILED));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceRefs(), isEmpty());
   }
 }

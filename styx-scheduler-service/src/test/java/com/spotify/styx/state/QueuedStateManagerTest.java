@@ -428,7 +428,7 @@ public class QueuedStateManagerTest {
         .data(StateData.zero())
         .build()));
 
-    stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()))
+    stateManager.receive(Event.dequeue(INSTANCE, null))
         .toCompletableFuture().get(1, MINUTES);
 
     verify(transaction).updateActiveState(INSTANCE, PersistentWorkflowInstanceState.builder()

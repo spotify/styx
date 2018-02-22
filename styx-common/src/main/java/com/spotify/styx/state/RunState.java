@@ -344,6 +344,7 @@ public abstract class RunState {
                   .retryDelayMillis(delayMillis)
                   .executionId(empty())
                   .executionDescription(empty())
+                  .resourceRefs(empty())
                   .build());
 
         default:
