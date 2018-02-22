@@ -126,7 +126,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
-    storage = new AggregateStorage(bigtable, datastore, Duration.ZERO, shardedCounter);
+    storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
     WorkflowResource workflowResource = new WorkflowResource(storage, SCHEDULER_BASE, workflowValidator,

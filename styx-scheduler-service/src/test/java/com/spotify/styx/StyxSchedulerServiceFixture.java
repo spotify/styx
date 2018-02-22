@@ -85,10 +85,8 @@ public class StyxSchedulerServiceFixture {
   private static LocalDatastoreHelper localDatastore;
 
   private Datastore datastore = localDatastore.getOptions().getService();
-  private ShardedCounter shardedCounter = new ShardedCounter(datastore);
   private Connection bigtable = setupBigTableMockTable(0);
-  protected AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO,
-                                                            shardedCounter);
+  protected AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
   private DeterministicScheduler executor = new QuietDeterministicScheduler();
 
   // circumstantial fields, set by test cases

@@ -269,10 +269,17 @@ public interface Storage {
 
   void storeBackfill(Backfill backfill) throws IOException;
 
+  Map<Integer, Long> shardsForCounter(String counterId);
+
+  void deleteShardsForCounter(String counterId);
+
+  long getLimitForCounter(String counterId);
+
   /**
    * Run a function in a transaction that is committed if successful. Any exception thrown by the
    * passed in function will cause the transaction to be rolled back.
    */
   <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
       throws IOException, E;
+
 }

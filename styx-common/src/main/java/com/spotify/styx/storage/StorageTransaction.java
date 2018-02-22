@@ -21,11 +21,14 @@
 package com.spotify.styx.storage;
 
 import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
+import com.spotify.styx.util.Shard;
+import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.util.Optional;
@@ -127,4 +130,29 @@ public interface StorageTransaction {
    * Check if this transaction is still active (not yet committed or rolled back).
    */
   boolean isActive();
+
+  /**
+   * Update counter by delta for the specified resource.
+   */
+  void updateCounter(ShardedCounter shardedCounter, String resource, int delta);
+
+  /**
+   * Reads a counter shard
+   */
+  Optional<Shard> shard(String counterId, int shardIndex);
+
+  /**
+   * Stores a shard
+   */
+  void store(Shard shard);
+
+  /**
+   * Updates the limit for the given counter
+   */
+  void updateLimitForCounter(String counterId, long limit);
+
+  /**
+   * Stores a resource
+   */
+  void store(Resource resource);
 }

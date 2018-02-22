@@ -321,9 +321,11 @@ public class StyxScheduler implements AppInit {
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
     //       take StateManager as argument instead?
     final List<OutputHandler> outputHandlers = new ArrayList<>();
+    final ShardedCounter shardedCounter = new ShardedCounter(storage);
     final QueuedStateManager stateManager = closer.register(
         new QueuedStateManager(time, eventTransitionExecutor, storage,
-            eventConsumerFactory.apply(environment, stats), eventConsumerExecutor, fanOutput(outputHandlers)));
+            eventConsumerFactory.apply(environment, stats), eventConsumerExecutor,
+            fanOutput(outputHandlers), shardedCounter));
 
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
@@ -617,8 +619,7 @@ public class StyxScheduler implements AppInit {
 
     final Connection bigTable = closer.register(createBigTableConnection(config));
     final Datastore datastore = createDatastore(config);
-    final ShardedCounter shardedCounter = new ShardedCounter(datastore);
-    return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT, shardedCounter);
+    return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
   }
 
   private static DockerRunner createDockerRunner(

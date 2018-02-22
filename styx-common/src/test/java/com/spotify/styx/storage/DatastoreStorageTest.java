@@ -203,7 +203,7 @@ public class DatastoreStorageTest {
   @Before
   public void setUp() throws Exception {
     datastore = helper.getOptions().getService();
-    storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter);
+    storage = new DatastoreStorage(datastore, Duration.ZERO);
   }
 
   @After
@@ -611,7 +611,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndCommit() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
     final Transaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
@@ -628,7 +628,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnFailure() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
     final Transaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
@@ -652,7 +652,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnPreCommitConflict() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
     final Transaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
@@ -674,7 +674,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnCommitConflict() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
     final Transaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
@@ -697,7 +697,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldThrowIfRollbackFailsAfterConflict() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
     final Transaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
@@ -723,7 +723,7 @@ public class DatastoreStorageTest {
   @Test
   public void runInTransactionShouldThrowIfDatastoreNewTransactionFails() throws Exception {
     Datastore datastore = mock(Datastore.class);
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
     when(datastore.newTransaction()).thenThrow(new DatastoreException(1, "", ""));
 
     when(transactionFunction.apply(any())).thenReturn("");

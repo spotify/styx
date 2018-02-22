@@ -42,13 +42,17 @@ import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.util.stream.IntStream;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.runners.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.class)
 public class ShardedCounterTest {
 
   private static final String COUNTER_ID1 = "resource_counter_1";
@@ -58,17 +62,19 @@ public class ShardedCounterTest {
   private static LocalDatastoreHelper helper;
   private static ShardedCounter shardedCounter;
   private static Datastore datastore;
+  private static Storage storage;
 
   @BeforeClass
   public static void setUpClass() throws IOException, InterruptedException {
     helper = LocalDatastoreHelper.create(1.0);
     helper.start();
     datastore = helper.getOptions().getService();
+    //storage = new AggregateStorage(mock, mock)
   }
 
   @Before
   public void setUp() throws IOException, InterruptedException {
-    shardedCounter = new ShardedCounter(datastore);
+    shardedCounter = new ShardedCounter(storage);
   }
 
   @After
@@ -91,10 +97,10 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shouldCreateLimit() {
+  public void shouldCreateLimit() throws IOException {
     assertNull(getLimitForCounter(COUNTER_ID1));
 
-    datastore.runInTransaction(transaction -> {
+    storage.runInTransaction(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 500);
       return null;
     });
@@ -166,9 +172,9 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shoudFailIncrementingFullCounter() {
+  public void shoudFailIncrementingFullCounter() throws IOException {
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
-    datastore.runInTransaction(transaction -> {
+    storage.runInTransaction(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 10);
       return null;
     });
@@ -196,16 +202,17 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shouldDeleteCounterAndLimit() {
+  public void shouldDeleteCounterAndLimit() throws IOException {
     //init counter
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
     // create limit
-    datastore.runInTransaction(transaction -> {
+    storage.runInTransaction(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 10);
       return null;
     });
 
-    shardedCounter.deleteCounter(datastore, COUNTER_ID1);
+    storage.deleteShardsForCounter(COUNTER_ID1);
+    //shardedCounter.deleteCounter(datastore, COUNTER_ID1);
 
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
 
@@ -214,19 +221,20 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shouldDeleteOnlySpecifiedCounterAndLimit() {
+  public void shouldDeleteOnlySpecifiedCounterAndLimit() throws IOException {
     //init counter
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID2));
 
     // create limit
-    datastore.runInTransaction(transaction -> {
+    storage.runInTransaction(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 10);
       shardedCounter.updateLimit(transaction, COUNTER_ID2, 10);
       return null;
     });
 
-    shardedCounter.deleteCounter(datastore, COUNTER_ID1);
+    storage.deleteShardsForCounter(COUNTER_ID1);
+//    shardedCounter.deleteCounter(datastore, COUNTER_ID1);
 
     QueryResults<Entity> shardsCounter1 = getShardsForCounter(COUNTER_ID1);
     QueryResults<Entity> shardsCounter2 = getShardsForCounter(COUNTER_ID2);
@@ -240,7 +248,7 @@ public class ShardedCounterTest {
 
   @Test
   public void shouldPassDeletingNonExistingCounterAndLimit() {
-    shardedCounter.deleteCounter(datastore, COUNTER_ID1);
+    shardedCounter.deleteCounter(storage, datastore, COUNTER_ID1);
 
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
     assertFalse(results.hasNext());
@@ -264,10 +272,14 @@ public class ShardedCounterTest {
   }
 
   private void updateCounterInTransaction(String counterId, long delta) {
-    datastore.runInTransaction(rw -> {
-      shardedCounter.updateCounter(rw, counterId, delta);
-      return null;
-    });
+    try {
+      storage.runInTransaction(rw -> {
+        shardedCounter.updateCounter(rw, counterId, delta);
+        return null;
+      });
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private static void clearDatastore() {

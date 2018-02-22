@@ -7,9 +7,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -34,6 +34,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.TransactionException;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.IsClosedException;
+import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
@@ -79,6 +80,7 @@ public class QueuedStateManager implements StateManager {
   private final BiConsumer<SequenceEvent, RunState> eventConsumer;
   private final Executor eventConsumerExecutor;
   private final OutputHandler outputHandler;
+  private final ShardedCounter shardedCounter;
 
   private volatile boolean running = true;
 
@@ -88,13 +90,15 @@ public class QueuedStateManager implements StateManager {
       Storage storage,
       BiConsumer<SequenceEvent, RunState> eventConsumer,
       Executor eventConsumerExecutor,
-      OutputHandler outputHandler) {
+      OutputHandler outputHandler,
+      ShardedCounter shardedCounter) {
     this.time = Objects.requireNonNull(time);
     this.storage = Objects.requireNonNull(storage);
     this.eventConsumer = Objects.requireNonNull(eventConsumer);
     this.eventConsumerExecutor = Objects.requireNonNull(eventConsumerExecutor);
     this.eventTransitionExecutor = Objects.requireNonNull(eventTransitionExecutor);
     this.outputHandler = Objects.requireNonNull(outputHandler);
+    this.shardedCounter = shardedCounter;
   }
 
   @Override
@@ -208,6 +212,10 @@ public class QueuedStateManager implements StateManager {
           final PersistentWorkflowInstanceState nextPersistentState =
               PersistentWorkflowInstanceState.of(nextRunState, nextCounter);
           tx.updateActiveState(event.workflowInstance(), nextPersistentState);
+          // FIXME if event == dequeue and resourceIds is present
+          for (String resource : nextRunState.data().resourceIds().get()) {
+            tx.updateCounter(shardedCounter, resource, 1);
+          }
         }
 
         final SequenceEvent sequenceEvent =

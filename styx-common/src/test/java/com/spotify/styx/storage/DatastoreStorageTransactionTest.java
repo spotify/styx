@@ -95,7 +95,7 @@ public class DatastoreStorageTransactionTest {
   @Before
   public void setUp() throws Exception {
     datastore = helper.getOptions().getService();
-    storage = new DatastoreStorage(datastore, Duration.ZERO, shardedCounter);
+    storage = new DatastoreStorage(datastore, Duration.ZERO);
   }
 
   @After

@@ -48,6 +48,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 /**
  * A Storage implementation with state stored in memory. For testing.
@@ -265,6 +266,21 @@ public class InMemStorage implements Storage {
   @Override
   public void storeBackfill(Backfill backfill) throws IOException {
     backfillStore.put(backfill.id(), backfill);
+  }
+
+  @Override
+  public Map<Integer, Long> shardsForCounter(String counterId) {
+    throw new NotImplementedException();
+  }
+
+  @Override
+  public void deleteShardsForCounter(String counterId) {
+    throw new NotImplementedException();
+  }
+
+  @Override
+  public long getLimitForCounter(String counterId) {
+    throw new NotImplementedException();
   }
 
   @Override
