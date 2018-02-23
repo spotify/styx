@@ -151,8 +151,7 @@ class BackfillTriggerManager {
   private Boolean triggerNextPartitionAndProgress(StorageTransaction tx,
                                                   String id,
                                                   Workflow workflow) {
-    // FIXME: read the backfill via transaction
-    final Backfill momentBackfill = storage.backfill(id).orElseThrow(RuntimeException::new);
+    final Backfill momentBackfill = tx.backfill(id).orElseThrow(RuntimeException::new);
 
     final Instant partition = momentBackfill.nextTrigger();
 

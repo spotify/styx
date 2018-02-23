@@ -154,7 +154,7 @@ public class BackfillTriggerManagerTest {
       return backfillArgumentCaptor.getValue();
     });
     ArgumentCaptor<String> stringCaptor = ArgumentCaptor.forClass(String.class);
-    when(storage.backfill(stringCaptor.capture()))
+    when(transaction.backfill(stringCaptor.capture()))
         .then(answer -> Optional.of(backfills.get(stringCaptor.getValue())));
 
     when(storage.backfills(anyBoolean())).then(a -> new ArrayList<>(backfills.values()));

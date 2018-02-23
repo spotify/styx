@@ -305,7 +305,7 @@ public class DatastoreStorageTransactionTest {
   }
 
   @Test
-  public void shouldStoreBackfill() throws IOException {
+  public void shouldStoreAndGetBackfill() throws IOException {
     DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
     final Backfill backfill = Backfill.newBuilder()
         .id("backfill-1")
@@ -319,6 +319,9 @@ public class DatastoreStorageTransactionTest {
         .build();
     tx.store(backfill);
     tx.commit();
-    assertThat(storage.getBackfill(backfill.id()), is(Optional.of(backfill)));
+
+    DatastoreStorageTransaction newTx = new DatastoreStorageTransaction(datastore.newTransaction());
+    assertThat(newTx.backfill(backfill.id()), is(Optional.of(backfill)));
+    newTx.commit();
   }
 }

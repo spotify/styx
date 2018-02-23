@@ -36,6 +36,7 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_ENABLED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_JSON;
 import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceKey;
+import static com.spotify.styx.storage.DatastoreStorage.entityToBackfill;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
 import static com.spotify.styx.storage.DatastoreStorage.readPersistentWorkflowInstanceState;
 
@@ -208,5 +209,15 @@ class DatastoreStorageTransaction implements StorageTransaction {
     tx.put(builder.build());
 
     return backfill;
+  }
+
+  @Override
+  public Optional<Backfill> backfill(String id) {
+    final Key key = DatastoreStorage.backfillKey(tx.getDatastore().newKeyFactory(), id);
+    final Entity entity = tx.get(key);
+    if (entity == null) {
+      return Optional.empty();
+    }
+    return Optional.of(entityToBackfill(entity));
   }
 }

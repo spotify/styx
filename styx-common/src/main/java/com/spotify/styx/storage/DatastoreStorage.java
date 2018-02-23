@@ -711,7 +711,7 @@ class DatastoreStorage {
     return backfillsForQuery(query);
   }
 
-  private Backfill entityToBackfill(Entity entity) {
+  static Backfill entityToBackfill(Entity entity) {
     final WorkflowId workflowId = WorkflowId.create(entity.getString(PROPERTY_COMPONENT),
                                                     entity.getString(PROPERTY_WORKFLOW));
 

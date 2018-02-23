@@ -55,6 +55,13 @@ public interface StorageTransaction {
   Optional<Workflow> workflow(WorkflowId workflowId) throws IOException;
 
   /**
+   * Get a {@link Backfill}.
+   * @param id Id of the backfill
+   * @return Optionally a backfill, if one was found for the given id
+   */
+  Optional<Backfill> backfill(String id);
+
+  /**
    * Updates the next natural trigger for a {@link Workflow}.
    *
    * @param workflowId  The {@link WorkflowId} to update the next natural trigger for.
