@@ -104,6 +104,29 @@ public class TimeUtil {
   }
 
   /**
+   * Gets the number of instants between lastInstant (inclusive) and firstInstant (inclusive)
+   * according to schedule.
+   *
+   * @param lastInstant The last instant
+   * @param firstInstant The first instant
+   * @param schedule The schedule of executions
+   * @return the number of instants in between
+   */
+  public static int numberOfInstants(Instant lastInstant, Instant firstInstant, Schedule schedule) {
+    if (lastInstant.isBefore(firstInstant)) {
+      throw new IllegalArgumentException();
+    }
+
+    Instant currentInstant = lastInstant;
+    int number = 0;
+    while (!currentInstant.equals(firstInstant)) {
+      currentInstant = previousInstant(currentInstant, schedule);
+      number++;
+    }
+    return number;
+  }
+
+  /**
    * Tests if a given instant is aligned with the execution times of a {@link Schedule}.
    *
    * @param instant  The instant to test

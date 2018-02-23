@@ -24,6 +24,7 @@ import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.spotify.styx.util.GuardedRunnable.guard;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
+import static com.spotify.styx.util.TimeUtil.numberOfInstants;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.Backfill;
@@ -123,32 +124,35 @@ class BackfillTriggerManager {
 
     // this is best effort because querying active states is not strongly consistent so the
     // initial remaining capacity may already be wrong
-    //
-    // we keep the remaining capacity in memory with a great hope that only one scheduler instance
-    // would win the transaction. there exists extreme cases that one scheduler instance becomes
-    // super slow after reading the capacity that it doesn't start its transaction until the other
-    // scheduler instance finishes its transaction, or the workflow instance triggered by the other
-    // scheduler instance finishes even before the transaction finishes (this case doesn't really
-    // violate concurrency limit, but would trigger the same workflow instance twice -- by both
-    // scheduler instances), however both of them have very very low probability to actually happen
-    int currentRemainingCapacity =
+    int remainingCapacity =
         backfill.concurrency() - stateManager.activeStates(backfill.id()).size();
 
-    for (int i = 0; i < currentRemainingCapacity; i++) {
+    if (remainingCapacity < 1) {
+      LOG.debug("No capacity left for backfill {}", backfill);
+      return;
+    }
+
+    final Instant initialNextTrigger = backfill.nextTrigger();
+
+    Instant nextTrigger;
+    do {
       try {
-        if (!storage.runInTransaction(
-            tx -> triggerNextPartitionAndProgress(tx, backfill.id(), workflow))) {
-          break;
-        }
+        // racy if one scheduler instant is super slow and doesn't start it's transaction
+        // until the other one has finished; in this case we exceed concurrency limit by 1,
+        // but this is rare case and we don't expect it to happen in practice
+        nextTrigger = storage.runInTransaction(
+            tx -> triggerNextPartitionAndProgress(tx, backfill.id(), workflow));
       } catch (IOException e) {
         // transaction failure, yield
         LOG.debug("transaction failure when working on backfill {}", backfill, e);
         break;
       }
-    }
+    } while (nextTrigger != null &&
+             numberOfInstants(nextTrigger, initialNextTrigger,
+                              backfill.schedule()) < remainingCapacity);
   }
 
-  private Boolean triggerNextPartitionAndProgress(StorageTransaction tx,
+  private Instant triggerNextPartitionAndProgress(StorageTransaction tx,
                                                   String id,
                                                   Workflow workflow) {
     final Backfill momentBackfill = tx.backfill(id).orElseThrow(RuntimeException::new);
@@ -158,8 +162,10 @@ class BackfillTriggerManager {
     // this is to prevent the other scheduler instance re-entering
     if (partition.equals(momentBackfill.end())) {
       LOG.debug("backfill {} all triggered", momentBackfill);
-      return false;
+      return null;
     }
+
+    final Instant nextPartition;
 
     try {
       final CompletableFuture<Void> processed = triggerListener
@@ -183,7 +189,7 @@ class BackfillTriggerManager {
       throw new RuntimeException(e);
     }
 
-    final Instant nextPartition = nextInstant(partition, momentBackfill.schedule());
+    nextPartition = nextInstant(partition, momentBackfill.schedule());
 
     tx.store(momentBackfill.builder()
                       .nextTrigger(nextPartition)
@@ -195,10 +201,10 @@ class BackfillTriggerManager {
                            .allTriggered(true)
                            .build());
       LOG.debug("backfill {} all triggered", momentBackfill);
-      return false;
+      return null;
     }
 
-    return true;
+    return nextPartition;
   }
 
   private void storeBackfill(Backfill backfill) {
