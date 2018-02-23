@@ -147,9 +147,9 @@ class BackfillTriggerManager {
         LOG.debug("transaction failure when working on backfill {}", backfill, e);
         break;
       }
-    } while (nextTrigger != null &&
-             numberOfInstants(nextTrigger, initialNextTrigger,
-                              backfill.schedule()) < remainingCapacity);
+    } while (nextTrigger != null
+             && numberOfInstants(nextTrigger, initialNextTrigger,
+                                 backfill.schedule()) < remainingCapacity);
   }
 
   private Instant triggerNextPartitionAndProgress(StorageTransaction tx,
