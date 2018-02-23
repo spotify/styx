@@ -216,7 +216,7 @@ public class AggregateStorage implements Storage {
 
   @Override
   public void deleteShardsForCounter(String counterId) {
-
+    datastoreStorage.deleteShardsForCounter(counterId);
   }
 
   @Override
@@ -257,5 +257,10 @@ public class AggregateStorage implements Storage {
   @Override
   public <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f) throws IOException, E {
     return datastoreStorage.runInTransaction(f);
+  }
+
+  @Override
+  public void deleteLimitForCounter(String counterId) throws IOException {
+    datastoreStorage.deleteLimitForCounter(counterId);
   }
 }

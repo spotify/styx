@@ -42,14 +42,18 @@ import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.stream.IntStream;
+import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mockito;
 import org.mockito.runners.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -63,13 +67,15 @@ public class ShardedCounterTest {
   private static ShardedCounter shardedCounter;
   private static Datastore datastore;
   private static Storage storage;
+  private static Connection connection;
 
   @BeforeClass
   public static void setUpClass() throws IOException, InterruptedException {
     helper = LocalDatastoreHelper.create(1.0);
     helper.start();
     datastore = helper.getOptions().getService();
-    //storage = new AggregateStorage(mock, mock)
+    connection = Mockito.mock(Connection.class);
+    storage = new AggregateStorage(connection, datastore, Duration.ZERO);
   }
 
   @Before
@@ -165,7 +171,7 @@ public class ShardedCounterTest {
   }
 
 
-  @Test(expected = DatastoreException.class)
+  @Test(expected = CounterCapacityException.class)
   public void shoudFailDecrementingEmptyCounter() {
     //increment counter by 1
     updateCounterInTransaction(COUNTER_ID1, -1L);
@@ -194,7 +200,7 @@ public class ShardedCounterTest {
         updateCounterInTransaction(COUNTER_ID1, 1L);
         // if the update goes through, fail the test
         fail();
-      } catch (DatastoreException ignored) {
+      } catch (DatastoreException | CounterCapacityException ignored) {
       }
     });
     shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
@@ -211,8 +217,7 @@ public class ShardedCounterTest {
       return null;
     });
 
-    storage.deleteShardsForCounter(COUNTER_ID1);
-    //shardedCounter.deleteCounter(datastore, COUNTER_ID1);
+    shardedCounter.deleteCounter(storage, COUNTER_ID1);
 
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
 
@@ -233,8 +238,7 @@ public class ShardedCounterTest {
       return null;
     });
 
-    storage.deleteShardsForCounter(COUNTER_ID1);
-//    shardedCounter.deleteCounter(datastore, COUNTER_ID1);
+    shardedCounter.deleteCounter(storage, COUNTER_ID1);
 
     QueryResults<Entity> shardsCounter1 = getShardsForCounter(COUNTER_ID1);
     QueryResults<Entity> shardsCounter2 = getShardsForCounter(COUNTER_ID2);
@@ -248,13 +252,12 @@ public class ShardedCounterTest {
 
   @Test
   public void shouldPassDeletingNonExistingCounterAndLimit() {
-    shardedCounter.deleteCounter(storage, datastore, COUNTER_ID1);
+    shardedCounter.deleteCounter(storage, COUNTER_ID1);
 
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
     assertFalse(results.hasNext());
     assertNull(getLimitForCounter(COUNTER_ID1));
   }
-
 
   /**
    * TODO: We should be able to decrease a counter limit and keep a valid state for the counter shards.
@@ -273,8 +276,8 @@ public class ShardedCounterTest {
 
   private void updateCounterInTransaction(String counterId, long delta) {
     try {
-      storage.runInTransaction(rw -> {
-        shardedCounter.updateCounter(rw, counterId, delta);
+      storage.runInTransaction(tx -> {
+        shardedCounter.updateCounter(tx, counterId, delta);
         return null;
       });
     } catch (IOException e) {

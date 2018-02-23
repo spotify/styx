@@ -282,4 +282,5 @@ public interface Storage {
   <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
       throws IOException, E;
 
+  void deleteLimitForCounter(String counterId) throws IOException;
 }

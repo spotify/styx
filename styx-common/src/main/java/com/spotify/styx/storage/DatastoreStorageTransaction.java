@@ -101,7 +101,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
 
   @Override
   public void updateCounter(ShardedCounter shardedCounter, String resource, int delta) {
-    //shardedCounter.updateCounter(this, resource, delta);
+    shardedCounter.updateCounter(this, resource, delta);
   }
 
   @Override
@@ -123,7 +123,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
                                  .newKey(shard.counterId() + "-" + shard.index()))
                         .set(PROPERTY_COUNTER_ID, shard.counterId())
                         .set(PROPERTY_SHARD_INDEX, shard.index())
-                        .set(PROPERTY_SHARD_VALUE, 0)
+                        .set(PROPERTY_SHARD_VALUE, shard.value())
                         .build());
   }
 
@@ -136,6 +136,11 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   @Override
   public void store(Resource resource) {
     tx.put(resourceToEntity(tx.getDatastore(), resource));
+  }
+
+  @Override
+  public void deleteCounterLimit(String counterId) {
+    tx.delete(tx.getDatastore().newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId));
   }
 
   private Entity resourceToEntity(Datastore datastore, Resource resource) {

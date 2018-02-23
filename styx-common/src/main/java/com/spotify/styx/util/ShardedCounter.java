@@ -20,11 +20,6 @@
 
 package com.spotify.styx.util;
 
-import com.google.cloud.datastore.Datastore;
-import com.google.cloud.datastore.Entity;
-import com.google.cloud.datastore.EntityQuery;
-import com.google.cloud.datastore.QueryResults;
-import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -39,7 +34,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -264,37 +258,18 @@ public class ShardedCounter {
    * <p>Due to Datastore limitations (modify max 25 entity groups per transaction),
    * deletion of shards is done in batches of 25 shards.
    *
-   * <p>Behaviour is non-determined if other instances try to access the same counter in the meantime.
+   * <p>Behaviour is best-effort and non-determined if other instances try to access the same counter in the meantime.
    * Best results are achieved if all usages of the given resource - which the counter is associated with -
    * are removed before calling deleteCounter. This is so, in order to avoid a scenario where one instance
    * is trying to delete all shards, while another is creating/updating shards in between the
    * multiple transactions made by this method.
    */
-  public void deleteCounter(Storage storage, Datastore datastore, String counterId) {
+  public void deleteCounter(Storage storage, String counterId) {
     storage.deleteShardsForCounter(counterId);
-
-    QueryResults<Entity> results = datastore.run(EntityQuery.newEntityQueryBuilder()
-                                                     .setKind(KIND_COUNTER_SHARD)
-                                                     .setFilter(PropertyFilter
-                                                                    .eq(PROPERTY_COUNTER_ID,
-                                                                        counterId))
-                                                     .build());
-    while (results.hasNext()) {
-      // remove max 25 entities per transaction
-      datastore.runInTransaction(transaction -> {
-        IntStream.range(0, 25).forEach(i -> {
-          if (results.hasNext()) {
-            transaction.delete(results.next().getKey());
-          }
-        });
-        return null;
-      });
+    try {
+      storage.deleteLimitForCounter(counterId);
+    } catch (IOException e) {
+      LOG.debug("Error when trying to delete limit for counter {}: {}", counterId, e);
     }
-
-    // delete limit entry too
-    datastore.runInTransaction(transaction -> {
-      transaction.delete(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId));
-      return null;
-    });
   }
 }
