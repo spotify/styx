@@ -125,7 +125,7 @@ class BackfillTriggerManager {
     // this is best effort because querying active states is not strongly consistent so the
     // initial remaining capacity may already be wrong
     int remainingCapacity =
-        backfill.concurrency() - stateManager.activeStates(backfill.id()).size();
+        backfill.concurrency() - stateManager.activeStatesByTriggerId(backfill.id()).size();
 
     if (remainingCapacity < 1) {
       LOG.debug("No capacity left for backfill {}", backfill);

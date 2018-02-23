@@ -142,7 +142,7 @@ public class BackfillTriggerManagerTest {
           return CompletableFuture.completedFuture(null);
         });
 
-    when(stateManager.activeStates(anyString())).thenReturn(activeStates);
+    when(stateManager.activeStatesByTriggerId(anyString())).thenReturn(activeStates);
 
     when(storage.resources()).thenReturn(resourceLimits);
     when(config.globalConcurrency()).thenReturn(Optional.empty());

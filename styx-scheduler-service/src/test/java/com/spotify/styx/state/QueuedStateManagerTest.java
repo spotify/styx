@@ -525,7 +525,7 @@ public class QueuedStateManagerTest {
     states.put(INSTANCE, persistentState);
     when(storage.readActiveWorkflowInstancesByTriggerId("foobar")).thenReturn(states);
     RunState expectedRunState = RunState.create(INSTANCE, State.QUEUED, stateData, NOW.minusMillis(1));
-    Map<WorkflowInstance, RunState> returnedRunStates = stateManager.activeStates("foobar");
+    Map<WorkflowInstance, RunState> returnedRunStates = stateManager.activeStatesByTriggerId("foobar");
 
     assertThat(returnedRunStates.get(INSTANCE), is(expectedRunState));
     assertThat(returnedRunStates.size(), is(1));

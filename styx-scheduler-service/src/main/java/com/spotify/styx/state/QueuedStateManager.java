@@ -255,7 +255,7 @@ public class QueuedStateManager implements StateManager {
   }
 
   @Override
-  public Map<WorkflowInstance, RunState> activeStates(String triggerId) {
+  public Map<WorkflowInstance, RunState> activeStatesByTriggerId(String triggerId) {
     final Map<WorkflowInstance, PersistentWorkflowInstanceState> states;
     try {
       states = storage.readActiveWorkflowInstancesByTriggerId(triggerId);
