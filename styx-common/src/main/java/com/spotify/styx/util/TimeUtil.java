@@ -125,7 +125,7 @@ public class TimeUtil {
 
     Instant currentInstant = lastInstant;
     int number = 0;
-    while (!currentInstant.equals(firstInstant)) {
+    while (currentInstant.isAfter(firstInstant)) {
       final ZonedDateTime utcDateTime = currentInstant.atZone(UTC);
       currentInstant = executionTime.lastExecution(utcDateTime)
           .orElseThrow(IllegalArgumentException::new) // with unix cron, this should not happen
