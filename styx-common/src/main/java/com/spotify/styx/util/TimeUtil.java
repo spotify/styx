@@ -117,10 +117,15 @@ public class TimeUtil {
       throw new IllegalArgumentException();
     }
 
+    final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
+
     Instant currentInstant = lastInstant;
     int number = 0;
     while (!currentInstant.equals(firstInstant)) {
-      currentInstant = previousInstant(currentInstant, schedule);
+      final ZonedDateTime utcDateTime = currentInstant.atZone(UTC);
+      currentInstant = executionTime.lastExecution(utcDateTime)
+          .orElseThrow(IllegalArgumentException::new) // with unix cron, this should not happen
+          .toInstant();
       number++;
     }
     return number;
