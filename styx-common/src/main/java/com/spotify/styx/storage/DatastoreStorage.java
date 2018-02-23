@@ -134,6 +134,7 @@ class DatastoreStorage {
   public static final String PROPERTY_STATE_LAST_EXIT = "lastExit";
   public static final String PROPERTY_STATE_EXECUTION_ID = "executionId";
   public static final String PROPERTY_STATE_EXECUTION_DESCRIPTION = "executionDescription";
+  public static final String PROPERTY_STATE_RESOURCE_IDS = "resourceIds";
 
   public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
 
@@ -387,6 +388,7 @@ class DatastoreStorage {
           .executionId(readOpt(entity, PROPERTY_STATE_EXECUTION_ID))
           .executionDescription(readOptJson(entity, PROPERTY_STATE_EXECUTION_DESCRIPTION,
               ExecutionDescription.class))
+          .resourceIds(readOpt(entity, PROPERTY_STATE_RESOURCE_IDS))
           .build();
 
       persistentState
