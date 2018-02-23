@@ -113,8 +113,12 @@ public class TimeUtil {
    * @return the number of instants in between
    */
   public static int numberOfInstants(Instant lastInstant, Instant firstInstant, Schedule schedule) {
+    if (!isAligned(lastInstant, schedule) || !isAligned(firstInstant, schedule)) {
+      throw new IllegalArgumentException("unaligned instant");
+    }
+
     if (lastInstant.isBefore(firstInstant)) {
-      throw new IllegalArgumentException();
+      throw new IllegalArgumentException("last instant should not be before first instant");
     }
 
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));

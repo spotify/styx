@@ -222,4 +222,18 @@ public class TimeUtilTest {
     final Instant firstTimeHours = Instant.parse("2016-01-19T10:00:00.00Z");
     numberOfInstants(lastTimeHours, firstTimeHours, Schedule.HOURS);
   }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void shouldGetExceptionIfLastInstantIsNotAlignedWithSchedule() {
+    final Instant lastTimeHours = Instant.parse("2016-01-19T09:10:00.00Z");
+    final Instant firstTimeHours = Instant.parse("2016-01-19T08:00:00.00Z");
+    numberOfInstants(lastTimeHours, firstTimeHours, Schedule.HOURS);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void shouldGetExceptionIfFirstInstantIsNotAlignedWithSchedule() {
+    final Instant lastTimeHours = Instant.parse("2016-01-19T09:00:00.00Z");
+    final Instant firstTimeHours = Instant.parse("2016-01-19T08:10:00.00Z");
+    numberOfInstants(lastTimeHours, firstTimeHours, Schedule.HOURS);
+  }
 }
