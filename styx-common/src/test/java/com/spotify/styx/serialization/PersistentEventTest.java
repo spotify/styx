@@ -65,7 +65,7 @@ public class PersistentEventTest {
     assertRoundtrip(Event.info(INSTANCE1, Message.info("InfoMessage")));
     assertRoundtrip(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE));
     assertRoundtrip(Event.dequeue(INSTANCE1, ImmutableSet.of("some-resource")));
-    assertRoundtrip(Event.dequeue(INSTANCE1, null));
+    assertRoundtrip(Event.dequeue(INSTANCE1, ImmutableSet.of()));
     assertRoundtrip(Event.started(INSTANCE1));
     assertRoundtrip(Event.terminate(INSTANCE1, Optional.of(20)));
     assertRoundtrip(Event.runError(INSTANCE1, "ErrorMessage"));
@@ -85,7 +85,7 @@ public class PersistentEventTest {
     assertThat(deserializeEvent(json("dequeue", "\"resource_ids\":[\"quux\"]")),
         is(Event.dequeue(INSTANCE1, ImmutableSet.of("quux"))));
     assertThat(deserializeEvent(json("dequeue")),
-        is(Event.dequeue(INSTANCE1, null)));
+        is(Event.dequeue(INSTANCE1, ImmutableSet.of())));
     assertThat(deserializeEvent(json("started")), is(Event.started(INSTANCE1)));
     assertThat(deserializeEvent(json("success")), is(Event.success(INSTANCE1)));
     assertThat(deserializeEvent(json("retry")), is(Event.retry(INSTANCE1)));

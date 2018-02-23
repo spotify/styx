@@ -28,6 +28,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeId;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
@@ -91,7 +92,7 @@ class PersistentEvent {
 
     @Override
     public PersistentEvent dequeue(WorkflowInstance workflowInstance, Set<String> resourceIds) {
-      return new Dequeue(workflowInstance.toKey(), resourceIds);
+      return new Dequeue(workflowInstance.toKey(), Optional.of(resourceIds));
     }
 
     @Override
@@ -328,9 +329,9 @@ class PersistentEvent {
     @JsonCreator
     public Dequeue(
         @JsonProperty("workflow_instance") String workflowInstance,
-        @JsonProperty("resource_ids") Set<String> resourceIds) {
+        @JsonProperty("resource_ids") Optional<Set<String>> resourceIds) {
       super("dequeue", workflowInstance);
-      this.resourceIds = resourceIds;
+      this.resourceIds = resourceIds.orElse(ImmutableSet.of());
     }
 
     @Override
