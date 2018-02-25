@@ -124,7 +124,7 @@ class BackfillTriggerManager {
 
     // this is best effort because querying active states is not strongly consistent so the
     // initial remaining capacity may already be wrong
-    int remainingCapacity =
+    final int remainingCapacity =
         backfill.concurrency() - stateManager.activeStatesByTriggerId(backfill.id()).size();
 
     if (remainingCapacity < 1) {
@@ -137,11 +137,9 @@ class BackfillTriggerManager {
     Instant nextTrigger;
     do {
       try {
-        // racy if one scheduler instant is super slow and doesn't start it's transaction
-        // until the other one has finished; in this case we exceed concurrency limit by 1,
-        // but this is rare case and we don't expect it to happen in practice
         nextTrigger = storage.runInTransaction(
-            tx -> triggerNextPartitionAndProgress(tx, backfill.id(), workflow));
+            tx -> triggerNextPartitionAndProgress(tx, backfill.id(), workflow,
+                                                  initialNextTrigger, remainingCapacity));
       } catch (IOException e) {
         // transaction failure, yield
         LOG.debug("transaction failure when working on backfill {}", backfill, e);
@@ -154,10 +152,19 @@ class BackfillTriggerManager {
 
   private Instant triggerNextPartitionAndProgress(StorageTransaction tx,
                                                   String id,
-                                                  Workflow workflow) {
+                                                  Workflow workflow,
+                                                  Instant initialNextTrigger,
+                                                  int remainingCapacity) {
     final Backfill momentBackfill = tx.backfill(id).orElseThrow(RuntimeException::new);
 
     final Instant partition = momentBackfill.nextTrigger();
+
+    // best effort to prevent the case that after this scheduler instance reading
+    // initialNextTrigger, the other scheduler instance managed to progress nextTrigger
+    if (numberOfInstants(partition, initialNextTrigger,
+                     momentBackfill.schedule()) >= remainingCapacity) {
+      return null;
+    }
 
     // this is to prevent the other scheduler instance re-entering
     if (partition.equals(momentBackfill.end())) {
@@ -168,6 +175,12 @@ class BackfillTriggerManager {
     final Instant nextPartition;
 
     try {
+      // worse case:
+      //   - the other scheduler instance has triggered partition, but hasn't committed the
+      //     transaction, and the workflow instance has finished very quickly
+      //   - this scheduler reads initialNextTrigger before the other scheduler commits the
+      //     transaction, so it will move on to trigger the same partition again, but we still
+      //     don't violate concurrency limit in this case
       final CompletableFuture<Void> processed = triggerListener
           .event(workflow, Trigger.backfill(momentBackfill.id()), partition)
           .toCompletableFuture();
