@@ -43,7 +43,6 @@ import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.Value;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -621,11 +620,11 @@ class DatastoreStorage {
   List<Resource> getResources() {
     final EntityQuery query = Query.newEntityQueryBuilder().setKind(KIND_RESOURCE).build();
     final QueryResults<Entity> results = datastore.run(query);
-    final ImmutableList.Builder<Resource> resources = ImmutableList.builder();
+    final List<Resource> resources = Lists.newArrayList();
     while (results.hasNext()) {
       resources.add(entityToResource(results.next()));
     }
-    return resources.build();
+    return resources;
   }
 
   private Resource entityToResource(Entity entity) {
@@ -676,9 +675,9 @@ class DatastoreStorage {
 
   private List<Backfill> backfillsForQuery(Query<Entity> query) {
     final QueryResults<Entity> results = datastore.run(query);
-    final ImmutableList.Builder<Backfill> resources = ImmutableList.builder();
-    results.forEachRemaining(entity -> resources.add(entityToBackfill(entity)));
-    return resources.build();
+    final List<Backfill> backfills = Lists.newArrayList();
+    results.forEachRemaining(entity -> backfills.add(entityToBackfill(entity)));
+    return backfills;
   }
 
   List<Backfill> getBackfills(boolean showAll) {
