@@ -106,7 +106,6 @@ class WFIExecutionBuilder {
     @Override
     public Void dequeue(WorkflowInstance workflowInstance, Set<String> resourceIds) {
       currWorkflowInstance = workflowInstance;
-      // TODO use resourceIds somehow?
       return null;
     }
 

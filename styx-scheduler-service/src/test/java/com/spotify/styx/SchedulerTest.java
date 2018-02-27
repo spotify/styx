@@ -582,7 +582,8 @@ public class SchedulerTest {
     verify(stateManager).receiveIgnoreClosed(Event.info(INSTANCE_1,
         Message.info("Resource limit reached for: [Resource{id=baz, concurrency=0}]")));
 
-    verify(stateManager, never()).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of("foo", "bar", "baz", "GLOBAL_STYX_CLUSTER")));
+    verify(stateManager, never()).receiveIgnoreClosed(Event.dequeue(INSTANCE_1,
+        ImmutableSet.of("foo", "bar", "baz", "GLOBAL_STYX_CLUSTER")));
   }
 
   @Test
