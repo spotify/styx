@@ -23,30 +23,29 @@ package com.spotify.styx;
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.spotify.styx.util.GuardedRunnable.guard;
+import static com.spotify.styx.util.TimeUtil.instancesInRange;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
-import static java.util.stream.Collectors.counting;
-import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.toList;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
-import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,24 +59,38 @@ class BackfillTriggerManager {
   private static final String TICK_TYPE = UPPER_CAMEL.to(
       LOWER_UNDERSCORE, BackfillTriggerManager.class.getSimpleName());
 
+  private static Consumer<List<Backfill>> DEFAULT_SHUFFLER = Collections::shuffle;
+
   private final TriggerListener triggerListener;
   private final Storage storage;
   private final StateManager stateManager;
   private final WorkflowCache workflowCache;
   private final Stats stats;
   private final Time time;
+  private final Consumer<List<Backfill>> shuffler;
 
   BackfillTriggerManager(StateManager stateManager,
                          WorkflowCache workflowCache, Storage storage,
                          TriggerListener triggerListener,
                          Stats stats,
                          Time time) {
+    this(stateManager, workflowCache, storage, triggerListener, stats, time, DEFAULT_SHUFFLER);
+  }
+
+  @VisibleForTesting
+  BackfillTriggerManager(StateManager stateManager,
+                         WorkflowCache workflowCache, Storage storage,
+                         TriggerListener triggerListener,
+                         Stats stats,
+                         Time time,
+                         Consumer<List<Backfill>> shuffler) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.workflowCache = Objects.requireNonNull(workflowCache);
     this.storage = Objects.requireNonNull(storage);
     this.triggerListener = Objects.requireNonNull(triggerListener);
     this.stats = Objects.requireNonNull(stats);
     this.time = Objects.requireNonNull(time);
+    this.shuffler = Objects.requireNonNull(shuffler);
   }
 
   void tick() {
@@ -91,72 +104,111 @@ class BackfillTriggerManager {
       return;
     }
 
-    final Map<String, Long> backfillStates = getBackfillStates();
-    backfills.forEach(backfill -> guard(() -> triggerBackfill(backfill, backfillStates)).run());
+    shuffler.accept(backfills);
+
+    backfills.forEach(backfill -> guard(() -> triggerAndProgress(backfill)).run());
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
     stats.recordTickDuration(TICK_TYPE, durationMillis);
   }
 
-  private void triggerBackfill(Backfill backfill, Map<String, Long> backfillStates) {
+  private void triggerAndProgress(Backfill backfill) {
     final Optional<Workflow> workflowOpt = workflowCache.workflow(backfill.workflowId());
     if (!workflowOpt.isPresent()) {
-      LOG.warn("workflow not found for backfill, skipping rest of triggers: {}", backfill);
-      final BackfillBuilder builder = backfill.builder();
-      builder.halted(true);
-      storeBackfill(builder.build());
+      LOG.debug("workflow not found for backfill {}, halt it.", backfill);
+      storeBackfill(backfill.builder().halted(true).build());
       return;
     }
 
     final Workflow workflow = workflowOpt.get();
 
+    // this is best effort because querying active states is not strongly consistent so the
+    // initial remaining capacity may already be wrong
     final int remainingCapacity =
-        backfill.concurrency() - backfillStates.getOrDefault(backfill.id(), 0L).intValue();
+        backfill.concurrency() - stateManager.activeStatesByTriggerId(backfill.id()).size();
 
-    Instant partition = backfill.nextTrigger();
-
-    for (int i = 0; i < remainingCapacity && partition.isBefore(backfill.end()); i++) {
-      try {
-        final CompletableFuture<Void> processed = triggerListener
-            .event(workflow, Trigger.backfill(backfill.id()), partition)
-            .toCompletableFuture();
-        // Wait for the trigger execution to complete before proceeding to the next partition
-        processed.get();
-      } catch (AlreadyInitializedException ignored) {
-        // nop
-      } catch (Throwable e) {
-        LOG.warn("failed to trigger backfill for state [{}]: {}", partition, backfill, e);
-        return;
-      }
-
-      partition = nextInstant(partition, backfill.schedule());
-      storeBackfill(backfill.builder()
-                        .nextTrigger(partition)
-                        .build());
+    if (remainingCapacity < 1) {
+      LOG.debug("No capacity left for backfill {}", backfill);
+      return;
     }
 
-    if (partition.equals(backfill.end())) {
-      storeBackfill(backfill.builder()
-                        .nextTrigger(backfill.end())
-                        .allTriggered(true)
-                        .build());
+    final Instant initialNextTrigger = backfill.nextTrigger();
+    while (true) {
+      try {
+        if (!storage.runInTransaction(tx ->
+            triggerNextPartitionAndProgress(tx, backfill.id(), workflow,
+                initialNextTrigger, remainingCapacity))) {
+          break;
+        }
+      } catch (IOException e) {
+        // if progressing the backfill fails, yield
+        LOG.debug("Failure while trying to progress backfill {}", backfill, e);
+        break;
+      }
     }
   }
 
-  private Map<String, Long> getBackfillStates() {
-    final List<InstanceState> activeStates = stateManager.activeStates().entrySet().stream()
-        .map(entry -> InstanceState.create(entry.getKey(), entry.getValue()))
-        .collect(toList());
+  private boolean triggerNextPartitionAndProgress(StorageTransaction tx,
+                                                  String id,
+                                                  Workflow workflow,
+                                                  Instant initialNextTrigger,
+                                                  int remainingCapacity) {
+    final Backfill momentBackfill = tx.backfill(id).orElseThrow(() ->
+        new RuntimeException("Error while fetching backfill " + id));
+    final Instant momentNextTrigger = momentBackfill.nextTrigger();
 
-    return activeStates.stream()
-        .map(state -> state.runState().data().trigger())
-        .filter(Optional::isPresent)
-        .map(Optional::get)
-        .filter(TriggerUtil::isBackfill)
-        .collect(groupingBy(
-            TriggerUtil::triggerId,
-            HashMap::new,
-            counting()));
+    if (instancesInRange(initialNextTrigger, momentNextTrigger,
+        momentBackfill.schedule()) >= remainingCapacity) {
+      LOG.debug("Capacity reached for backfill {}", momentBackfill);
+      return false;
+    }
+
+    if (momentNextTrigger.equals(momentBackfill.end())) {
+      LOG.debug("Backfill {} all triggered", momentBackfill);
+      return false;
+    }
+
+    try {
+      // race conditions:
+      //   - the other scheduler instance has triggered partition, but hasn't committed the
+      //     transaction, and the workflow instance has finished very quickly
+      //   - this scheduler reads initialNextTrigger before the other scheduler commits the
+      //     transaction, so it will move on to trigger the same partition again, but we still
+      //     don't violate concurrency limit in this case
+      final CompletableFuture<Void> processed = triggerListener
+          .event(workflow, Trigger.backfill(momentBackfill.id()), momentNextTrigger)
+          .toCompletableFuture();
+      // Wait for the trigger execution to complete before proceeding to the next partition
+      processed.get();
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof AlreadyInitializedException) {
+        // just encountered an ad-hoc trigger or it has been triggered by another scheduler instance
+        // do not propagate the exception but instead letting transaction decide what to do
+        LOG.debug("{} already triggered for backfill {}", momentNextTrigger, momentBackfill, e);
+      } else {
+        LOG.debug("Failed to trigger {} for backfill {}", momentNextTrigger, momentBackfill, e);
+        throw new RuntimeException(e);
+      }
+    } catch (Exception e) {
+      // can be interrupted, we give up this backfill and retry in next tick
+      LOG.debug("Failed to trigger {} for backfill {}", momentNextTrigger, momentBackfill, e);
+      throw new RuntimeException(e);
+    }
+
+    final Instant nextPartition = nextInstant(momentNextTrigger, momentBackfill.schedule());
+    tx.store(momentBackfill.builder()
+                      .nextTrigger(nextPartition)
+                      .build());
+
+    if (nextPartition.equals(momentBackfill.end())) {
+      tx.store(momentBackfill.builder()
+                           .nextTrigger(momentBackfill.end())
+                           .allTriggered(true)
+                           .build());
+      LOG.debug("Backfill {} all triggered", momentBackfill);
+      return false;
+    }
+    return true;
   }
 
   private void storeBackfill(Backfill backfill) {

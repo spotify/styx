@@ -19,19 +19,22 @@
  */
 package com.spotify.styx;
 
+import static com.spotify.styx.util.ParameterUtil.toParameter;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyBoolean;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.only;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.model.Backfill;
@@ -44,16 +47,21 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.state.RunState.State;
-import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.storage.StorageTransaction;
+import com.spotify.styx.storage.TransactionFunction;
+import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.Time;
+import java.io.IOException;
 import java.time.Instant;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
@@ -65,6 +73,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
@@ -94,10 +103,13 @@ public class BackfillTriggerManagerTest {
       .nextTrigger(Instant.parse("2016-12-02T00:00:00Z"))
       .build();
 
+  private static final Time TIME =  () -> Instant.parse("2016-12-02T22:00:00Z");
+
   private List<Resource> resourceLimits = Lists.newArrayList();
 
   @Mock TriggerListener triggerListener;
   @Mock Storage storage;
+  @Mock StorageTransaction transaction;
   @Mock StyxConfig config;
   @Mock StateManager stateManager;
 
@@ -107,32 +119,68 @@ public class BackfillTriggerManagerTest {
 
   private ExecutorService executor = Executors.newCachedThreadPool();
 
-  private static final Time TIME =  () -> Instant.parse("2016-12-02T22:00:00Z");
+  private Map<String, Backfill> backfills;
+
+  private Map<WorkflowInstance, RunState> activeStates;
 
   @Before
   public void setUp() throws Exception {
+    backfills = new LinkedHashMap<>(); // we need to keep entry order
+    activeStates = new HashMap<>();
+
     when(triggerListener.event(any(Workflow.class), any(Trigger.class), any(Instant.class)))
-        .then(a -> CompletableFuture.completedFuture(null));
+        .then(a -> {
+          Workflow workflow = a.getArgumentAt(0, Workflow.class);
+          Instant instant = a.getArgumentAt(2, Instant.class);
+
+          final String parameter = toParameter(workflow.configuration().schedule(), instant);
+          final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(),
+                                                                            parameter);
+          RunState runState = RunState.fresh(workflowInstance);
+          activeStates.put(workflowInstance, runState);
+
+          return CompletableFuture.completedFuture(null);
+        });
+
+    when(stateManager.activeStatesByTriggerId(anyString())).thenReturn(activeStates);
+
     when(storage.resources()).thenReturn(resourceLimits);
     when(config.globalConcurrency()).thenReturn(Optional.empty());
     when(storage.config()).thenReturn(config);
 
+    ArgumentCaptor<Backfill> backfillArgumentCaptor = ArgumentCaptor.forClass(Backfill.class);
+    when(transaction.store(backfillArgumentCaptor.capture())).then(answer -> {
+      backfills.put(backfillArgumentCaptor.getValue().id(), backfillArgumentCaptor.getValue());
+      return backfillArgumentCaptor.getValue();
+    });
+    ArgumentCaptor<String> stringCaptor = ArgumentCaptor.forClass(String.class);
+    when(transaction.backfill(stringCaptor.capture()))
+        .then(answer -> Optional.of(backfills.get(stringCaptor.getValue())));
+
+    when(storage.backfills(anyBoolean())).then(a -> new ArrayList<>(backfills.values()));
+
+    when(storage.runInTransaction(any())).then(
+        a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
+
     workflowCache = new InMemWorkflowCache();
     backfillTriggerManager = new BackfillTriggerManager(stateManager, workflowCache, storage,
-                                                        triggerListener, Stats.NOOP, TIME);
+                                                        triggerListener, Stats.NOOP, TIME,
+                                                        (x) -> {});
   }
 
   @After
-  public void tearDown() throws Exception {
+  public void tearDown() {
     executor.shutdownNow();
   }
 
   @Test
-  public void shouldTriggerBackfillsNew() throws Exception {
-    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+  public void shouldTriggerBackfillsNew() {
+    final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
+
     final int concurrency = BACKFILL_1.concurrency();
-    when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(BACKFILL_1));
+
+    backfills.put(BACKFILL_1.id(), BACKFILL_1);
 
     backfillTriggerManager.tick();
 
@@ -140,30 +188,23 @@ public class BackfillTriggerManagerTest {
         ParameterUtil.rangeOfInstants(BACKFILL_1.start(), BACKFILL_1.end(),
                                       workflow.configuration().schedule());
 
-    instants.stream().limit(concurrency).forEach(
-        instant ->
+    instants.stream().limit(concurrency).forEach(instant ->
             verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_1.id()), instant));
 
-    verify(storage)
-        .storeBackfill(BACKFILL_1.builder().nextTrigger(instants.get(concurrency)).build());
+    verify(transaction)
+        .store(BACKFILL_1.builder().nextTrigger(instants.get(concurrency)).build());
   }
 
   @Test
-  public void shouldTriggerBackfillsInProgress() throws Exception {
-    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+  public void shouldTriggerBackfillsInProgress() {
+    final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
-    when(storage.backfills(anyBoolean())).thenReturn(
-        Collections.singletonList(BACKFILL_1.builder()
-                                      .nextTrigger(Instant.parse("2016-12-03T00:00:00Z"))
-                                      .build()));
-
+    backfills.put(BACKFILL_1.id(), BACKFILL_1.builder()
+        .nextTrigger(Instant.parse("2016-12-03T00:00:00Z"))
+        .build());
 
     final WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23");
-
-    when(stateManager.activeStates()).thenReturn(ImmutableMap.of(
-        wfi1, RunState.create(wfi1, State.RUNNING, StateData.newBuilder()
-            .trigger(Trigger.backfill("backfill-1"))
-            .build())));
+    activeStates.put(wfi1, RunState.fresh(wfi1));
 
     backfillTriggerManager.tick();
 
@@ -173,54 +214,62 @@ public class BackfillTriggerManagerTest {
   }
 
   @Test
-  public void shouldTriggerBackfillsToCompletion() throws Exception {
-    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+  public void shouldTriggerBackfillsToCompletion() {
+    final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
-    when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(BACKFILL_2));
+
+    backfills.put(BACKFILL_2.id(), BACKFILL_2);
 
     backfillTriggerManager.tick();
 
     List<Instant> instants =
         ParameterUtil.rangeOfInstants(BACKFILL_2.start(), BACKFILL_2.end(), BACKFILL_2.schedule());
-    instants.forEach(
-        instant ->
+    instants.forEach(instant ->
             verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_2.id()), instant));
 
     final Backfill completedBackfill =
         BACKFILL_2.builder().nextTrigger(BACKFILL_2.end()).allTriggered(true).build();
-    verify(storage).storeBackfill(completedBackfill);
+    verify(transaction).store(completedBackfill);
   }
 
   @Test
-  public void shouldNotTriggerCompletedBackfillsAndUpdateCompleted() throws Exception {
-    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+  public void shouldNotTriggerBackfillsIfNoCapacity() {
+    final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
-    Backfill backfillWithNoPartitionsLeft = BACKFILL_2.builder().nextTrigger(BACKFILL_2.end()).build();
-    when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(backfillWithNoPartitionsLeft));
+
+    backfills.put(BACKFILL_1.id(), BACKFILL_1);
+
+    final WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T22");
+    final WorkflowInstance wfi2 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23");
+    activeStates.put(wfi1, RunState.fresh(wfi1));
+    activeStates.put(wfi2, RunState.fresh(wfi2));
 
     backfillTriggerManager.tick();
 
     verifyZeroInteractions(triggerListener);
-    final Backfill completedBackfill = backfillWithNoPartitionsLeft.builder().allTriggered(true).build();
-    verify(storage).storeBackfill(completedBackfill);
   }
 
   @Test
-  public void shouldNotTriggerBackfillsIfResourceLimit() throws Exception {
-    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+  public void shouldNotTriggerIfAllTriggered() {
+    final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
-    when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(BACKFILL_1));
 
-    final WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T22");
-    final WorkflowInstance wfi2 = WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T23");
+    final Backfill completedBackfill =
+        BACKFILL_2.builder().nextTrigger(BACKFILL_2.end()).allTriggered(true).build();
 
-    when(stateManager.activeStates()).thenReturn(ImmutableMap.of(
-        wfi1, RunState.create(wfi1, State.RUNNING, StateData.newBuilder()
-            .trigger(Trigger.backfill("backfill-1"))
-            .build()),
-        wfi2, RunState.create(wfi2, State.RUNNING, StateData.newBuilder()
-            .trigger(Trigger.backfill("backfill-1"))
-            .build())));
+    backfills.put(completedBackfill.id(), completedBackfill);
+
+    backfillTriggerManager.tick();
+
+    verifyZeroInteractions(triggerListener);
+  }
+
+  @Test
+  public void shouldNotTriggerIfFailedToGetBackfills() throws Exception {
+    final Workflow workflow = createWorkflow(WORKFLOW_ID1);
+    initWorkflow(workflow);
+
+    doThrow(new IOException()).when(storage).backfills(anyBoolean());
 
     backfillTriggerManager.tick();
 
@@ -229,7 +278,22 @@ public class BackfillTriggerManagerTest {
 
   @Test
   public void shouldNotTriggerBackfillsWithMissingWorkflows() throws Exception {
-    when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(BACKFILL_1));
+    backfills.put(BACKFILL_1.id(), BACKFILL_1);
+
+    backfillTriggerManager.tick();
+
+    verifyZeroInteractions(triggerListener);
+    verify(storage).storeBackfill(BACKFILL_1.builder().halted(true).build());
+  }
+
+  @Test
+  public void shouldNotTriggerBackfillsIfRunInTransactionFails() throws Exception {
+    final Workflow workflow = createWorkflow(WORKFLOW_ID1);
+    initWorkflow(workflow);
+
+    doThrow(new IOException()).when(storage).runInTransaction(any());
+
+    backfills.put(BACKFILL_1.id(), BACKFILL_1);
 
     backfillTriggerManager.tick();
 
@@ -238,21 +302,30 @@ public class BackfillTriggerManagerTest {
 
   @Test
   public void shouldTriggerAndUpdateBackfillsSynchronously() throws Exception {
-    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+    final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
-    when(storage.backfills(anyBoolean())).thenReturn(Collections.singletonList(BACKFILL_1));
+
+    backfills.put(BACKFILL_1.id(), BACKFILL_1);
 
     // Collect unfinished triggering futures as the trigger listener is called
     final BlockingQueue<CompletableFuture<Void>> triggerProcessingFutures =
         new LinkedBlockingQueue<>();
 
-    when(triggerListener.event(
-        any(Workflow.class), any(Trigger.class), any(Instant.class)))
-        .then(a -> {
-          CompletableFuture<Void> processed = new CompletableFuture<>();
-          triggerProcessingFutures.add(processed);
-          return processed;
-        });
+    doAnswer(a -> {
+      CompletableFuture<Void> processed = new CompletableFuture<>();
+      Workflow workflow1 = a.getArgumentAt(0, Workflow.class);
+      Instant instant = a.getArgumentAt(2, Instant.class);
+
+      final String parameter = toParameter(workflow1.configuration().schedule(), instant);
+      final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow1.id(),
+                                                                        parameter);
+      RunState runState = RunState.fresh(workflowInstance);
+      activeStates.put(workflowInstance, runState);
+
+      triggerProcessingFutures.add(processed);
+      return processed;
+    }).when(triggerListener)
+        .event(any(Workflow.class), any(Trigger.class), any(Instant.class));
 
     // Run a single tick of the backfillTriggerManager
     executor.execute(backfillTriggerManager::tick);
@@ -274,21 +347,24 @@ public class BackfillTriggerManagerTest {
           .event(any(Workflow.class), any(Trigger.class), eq(instant));
 
       triggerProcessed.complete(null);
-      verify(storage, timeout(60_000))
-          .storeBackfill(BACKFILL_1.builder().nextTrigger(instants.get(i + 1)).build());
+      verify(transaction, timeout(60_000))
+          .store(BACKFILL_1.builder().nextTrigger(instants.get(i + 1)).build());
     }
   }
 
   @Test
-  public void shouldContinueTriggeringNextBackfillWhenExecutionException() throws Exception {
-    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+  public void shouldContinueTriggeringNextBackfillWhenUnknownExecutionException() {
+    final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
+
     final int concurrency = BACKFILL_1.concurrency();
 
-    when(storage.backfills(anyBoolean())).thenReturn(ImmutableList.of(BACKFILL_1, BACKFILL_2));
-    when(triggerListener.event(
-        any(Workflow.class), any(Trigger.class), eq(Instant.parse("2016-12-02T22:00:00Z"))))
-        .thenReturn(CompletableFutures.exceptionallyCompletedFuture(new RuntimeException()));
+    backfills.put(BACKFILL_1.id(), BACKFILL_1);
+    backfills.put(BACKFILL_2.id(), BACKFILL_2);
+
+    doReturn(CompletableFutures.exceptionallyCompletedFuture(new RuntimeException()))
+        .when(triggerListener)
+        .event(any(Workflow.class), any(Trigger.class), eq(Instant.parse("2016-12-02T22:00:00Z")));
 
     backfillTriggerManager.tick();
 
@@ -296,24 +372,27 @@ public class BackfillTriggerManagerTest {
         ParameterUtil.rangeOfInstants(BACKFILL_2.start(), BACKFILL_2.end(),
                                       workflow.configuration().schedule());
 
-    instants.stream().limit(concurrency).forEach(
-        instant ->
+    instants.stream().limit(concurrency).forEach(instant ->
             verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_2.id()), instant));
 
-    verify(storage)
-        .storeBackfill(BACKFILL_2.builder().nextTrigger(instants.get(concurrency)).build());
+    final Backfill completedBackfill =
+        BACKFILL_2.builder().nextTrigger(BACKFILL_2.end()).allTriggered(true).build();
+    verify(transaction).store(completedBackfill);
   }
 
   @Test
-  public void shouldContinueTriggeringNextBackfillIfTriggerFails() throws Exception {
-    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
+  public void shouldContinueTriggeringNextBackfillWhenOtherException() {
+    final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
+
     final int concurrency = BACKFILL_1.concurrency();
 
-    when(storage.backfills(anyBoolean())).thenReturn(ImmutableList.of(BACKFILL_1, BACKFILL_2));
-    when(triggerListener.event(
-        any(Workflow.class), any(Trigger.class), eq(Instant.parse("2016-12-02T22:00:00Z"))))
-        .thenThrow(new RuntimeException());
+    backfills.put(BACKFILL_1.id(), BACKFILL_1);
+    backfills.put(BACKFILL_2.id(), BACKFILL_2);
+
+    doThrow(new RuntimeException())
+        .when(triggerListener)
+        .event(any(Workflow.class), any(Trigger.class), eq(Instant.parse("2016-12-02T22:00:00Z")));
 
     backfillTriggerManager.tick();
 
@@ -321,25 +400,51 @@ public class BackfillTriggerManagerTest {
         ParameterUtil.rangeOfInstants(BACKFILL_2.start(), BACKFILL_2.end(),
                                       workflow.configuration().schedule());
 
-    instants.stream().limit(concurrency).forEach(
-        instant ->
-            verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_2.id()), instant));
+    instants.stream().limit(concurrency).forEach(instant ->
+                                                     verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_2.id()), instant));
 
-    verify(storage)
-        .storeBackfill(BACKFILL_2.builder().nextTrigger(instants.get(concurrency)).build());
+    final Backfill completedBackfill =
+        BACKFILL_2.builder().nextTrigger(BACKFILL_2.end()).allTriggered(true).build();
+    verify(transaction).store(completedBackfill);
+  }
+
+  @Test
+  public void shouldIgnoreIfAlreadyInitialized() {
+    final Workflow workflow = createWorkflow(WORKFLOW_ID1);
+    initWorkflow(workflow);
+
+    final int concurrency = BACKFILL_1.concurrency();
+
+    backfills.put(BACKFILL_1.id(), BACKFILL_1);
+
+    doReturn(CompletableFutures
+                 .exceptionallyCompletedFuture(new AlreadyInitializedException("")))
+        .when(triggerListener)
+        .event(any(Workflow.class), any(Trigger.class), eq(Instant.parse("2016-12-02T22:00:00Z")));
+
+    backfillTriggerManager.tick();
+
+    final List<Instant> instants =
+        ParameterUtil.rangeOfInstants(BACKFILL_1.start(), BACKFILL_1.end(),
+                                      workflow.configuration().schedule());
+
+    instants.stream().limit(concurrency).forEach(instant ->
+            verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_1.id()), instant));
+
+    verify(transaction)
+        .store(BACKFILL_1.builder().nextTrigger(instants.get(concurrency)).build());
   }
 
   private void initWorkflow(Workflow workflow) {
     workflowCache.store(workflow);
   }
 
-  private Workflow workflowUsingResources(WorkflowId id, String... resources) {
+  private static Workflow createWorkflow(WorkflowId id) {
     return Workflow.create(
         id.componentId(),
         WorkflowConfiguration.builder()
             .id(id.id())
             .schedule(Schedule.HOURS)
-            .resources(resources)
             .build());
   }
 }

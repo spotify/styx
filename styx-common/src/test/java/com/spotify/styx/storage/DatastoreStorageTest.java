@@ -161,7 +161,6 @@ public class DatastoreStorageTest {
           .build())
       .build();
 
-
   static final WorkflowId WORKFLOW_ID = WorkflowId.create("dockerComp", "dockerEndpoint");
 
   static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
@@ -405,6 +404,18 @@ public class DatastoreStorageTest {
         storage.activeStates(WORKFLOW_ID1.componentId());
 
     assertThat(activeStates, is(ImmutableMap.of(WORKFLOW_INSTANCE2, PERSISTENT_STATE2)));
+  }
+
+  @Test
+  public void shouldReturnAllActiveStatesForATriggerId() throws Exception {
+    storage.writeActiveState(WORKFLOW_INSTANCE, FULL_PERSISTENT_STATE);
+
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(1));
+
+    final Map<WorkflowInstance, PersistentWorkflowInstanceState> activeStates =
+        storage.activeStatesByTriggerId("foobar");
+
+    assertThat(activeStates, is(ImmutableMap.of(WORKFLOW_INSTANCE, FULL_PERSISTENT_STATE)));
   }
 
   @Test

@@ -98,6 +98,12 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
+  public Map<WorkflowInstance, PersistentWorkflowInstanceState> readActiveWorkflowInstancesByTriggerId(
+      String triggerId) throws IOException {
+    return datastoreStorage.activeStatesByTriggerId(triggerId);
+  }
+
+  @Override
   public void writeActiveState(WorkflowInstance workflowInstance,
                                PersistentWorkflowInstanceState state) throws IOException {
     datastoreStorage.writeActiveState(workflowInstance, state);
@@ -228,7 +234,7 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public Optional<Backfill> backfill(String id) throws IOException {
+  public Optional<Backfill> backfill(String id) {
     return datastoreStorage.getBackfill(id);
   }
 

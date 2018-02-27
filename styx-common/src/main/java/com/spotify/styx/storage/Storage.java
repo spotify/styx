@@ -148,14 +148,14 @@ public interface Storage {
   Map<WorkflowInstance, PersistentWorkflowInstanceState> readActiveWorkflowInstances() throws IOException;
 
   /**
-   * Return a map of all active {@link WorkflowInstance}s to their last consumed sequence count,
+   * Return a map of all active {@link WorkflowInstance}s to their {@link PersistentWorkflowInstanceState},
    * for workflows that belong to a given component id.
    *
    * <p>A {@link WorkflowInstance} is active if there has been at least one call to
    * {@link #writeActiveState(WorkflowInstance, PersistentWorkflowInstanceState)} and no calls to
    * {@link #deleteActiveState(WorkflowInstance)}.
    *
-   * @return The map of workflow instances to sequence counts
+   * @return The map of workflow instances to {@link PersistentWorkflowInstanceState}
    */
   Map<WorkflowInstance, PersistentWorkflowInstanceState> readActiveWorkflowInstances(String componentId)
       throws IOException;
@@ -164,6 +164,19 @@ public interface Storage {
    * Read an active workflow instance.
    */
   Optional<PersistentWorkflowInstanceState> readActiveWorkflowInstance(WorkflowInstance workflowInstance)
+      throws IOException;
+
+  /**
+   * Return a map of all active {@link WorkflowInstance}s to their {@link PersistentWorkflowInstanceState},
+   * for a given triggerId.
+   *
+   * <p>A {@link WorkflowInstance} is active if there has been at least one call to
+   * {@link #writeActiveState(WorkflowInstance, PersistentWorkflowInstanceState)} and no calls to
+   * {@link #deleteActiveState(WorkflowInstance)}.
+   *
+   * @return The map of workflow instances to {@link PersistentWorkflowInstanceState}
+   */
+  Map<WorkflowInstance, PersistentWorkflowInstanceState> readActiveWorkflowInstancesByTriggerId(String triggerId)
       throws IOException;
 
   /**
@@ -252,7 +265,7 @@ public interface Storage {
 
   List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId) throws IOException;
 
-  Optional<Backfill> backfill(String id) throws IOException;
+  Optional<Backfill> backfill(String id);
 
   void storeBackfill(Backfill backfill) throws IOException;
 

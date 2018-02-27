@@ -43,7 +43,6 @@ import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.Value;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -339,6 +338,16 @@ class DatastoreStorage {
     return queryActiveStates(query);
   }
 
+  public Map<WorkflowInstance, PersistentWorkflowInstanceState> activeStatesByTriggerId(
+      String triggerId) throws IOException {
+    final EntityQuery query =
+        Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE)
+            .setFilter(PropertyFilter.eq(PROPERTY_STATE_TRIGGER_ID, triggerId))
+            .build();
+
+    return queryActiveStates(query);
+  }
+
   private Map<WorkflowInstance, PersistentWorkflowInstanceState> queryActiveStates(EntityQuery activeStatesQuery)
       throws IOException {
     final ImmutableMap.Builder<WorkflowInstance, PersistentWorkflowInstanceState> mapBuilder = ImmutableMap.builder();
@@ -575,6 +584,10 @@ class DatastoreStorage {
   static Key componentKey(KeyFactory keyFactory, String componentId) {
     return keyFactory.setKind(KIND_COMPONENT).newKey(componentId);
   }
+  
+  static Key backfillKey(KeyFactory keyFactory, String backfillId) {
+    return keyFactory.setKind(KIND_BACKFILL).newKey(backfillId);
+  }
 
   static Key globalConfigKey(KeyFactory keyFactory) {
     return keyFactory.setKind(KIND_STYX_CONFIG).newKey(KEY_GLOBAL_CONFIG);
@@ -607,11 +620,11 @@ class DatastoreStorage {
   List<Resource> getResources() {
     final EntityQuery query = Query.newEntityQueryBuilder().setKind(KIND_RESOURCE).build();
     final QueryResults<Entity> results = datastore.run(query);
-    final ImmutableList.Builder<Resource> resources = ImmutableList.builder();
+    final List<Resource> resources = Lists.newArrayList();
     while (results.hasNext()) {
       resources.add(entityToResource(results.next()));
     }
-    return resources.build();
+    return resources;
   }
 
   private Resource entityToResource(Entity entity) {
@@ -662,9 +675,9 @@ class DatastoreStorage {
 
   private List<Backfill> backfillsForQuery(Query<Entity> query) {
     final QueryResults<Entity> results = datastore.run(query);
-    final ImmutableList.Builder<Backfill> resources = ImmutableList.builder();
-    results.forEachRemaining(entity -> resources.add(entityToBackfill(entity)));
-    return resources.build();
+    final List<Backfill> backfills = Lists.newArrayList();
+    results.forEachRemaining(entity -> backfills.add(entityToBackfill(entity)));
+    return backfills;
   }
 
   List<Backfill> getBackfills(boolean showAll) {
@@ -697,7 +710,7 @@ class DatastoreStorage {
     return backfillsForQuery(query);
   }
 
-  private Backfill entityToBackfill(Entity entity) {
+  static Backfill entityToBackfill(Entity entity) {
     final WorkflowId workflowId = WorkflowId.create(entity.getString(PROPERTY_COMPONENT),
                                                     entity.getString(PROPERTY_WORKFLOW));
 
@@ -720,29 +733,8 @@ class DatastoreStorage {
   }
 
   void storeBackfill(Backfill backfill) throws IOException {
-    storeWithRetries(() -> datastore.put(backfillToEntity(backfill)));
+    storeWithRetries(() -> runInTransaction(tx -> tx.store(backfill)));
   }
-
-  private Entity backfillToEntity(Backfill backfill) {
-    final Key key = datastore.newKeyFactory().setKind(KIND_BACKFILL).newKey(backfill.id());
-
-    Entity.Builder builder = Entity.newBuilder(key)
-        .set(PROPERTY_CONCURRENCY, backfill.concurrency())
-        .set(PROPERTY_START, instantToTimestamp(backfill.start()))
-        .set(PROPERTY_END, instantToTimestamp(backfill.end()))
-        .set(PROPERTY_COMPONENT, backfill.workflowId().componentId())
-        .set(PROPERTY_WORKFLOW, backfill.workflowId().id())
-        .set(PROPERTY_SCHEDULE, backfill.schedule().toString())
-        .set(PROPERTY_NEXT_TRIGGER, instantToTimestamp(backfill.nextTrigger()))
-        .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())
-        .set(PROPERTY_HALTED, backfill.halted());
-
-    backfill.description().ifPresent(x -> builder.set(PROPERTY_DESCRIPTION, StringValue
-        .newBuilder(x).setExcludeFromIndexes(true).build()));
-
-    return builder.build();
-  }
-
 
   private <T> Stream<T> readStream(Entity entity, String property) {
     return read(entity, property, Collections.<Value<T>>emptyList()).stream()

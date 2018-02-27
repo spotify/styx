@@ -32,6 +32,7 @@ import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.TransactionException;
+import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.Time;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
@@ -156,7 +157,7 @@ public class QueuedStateManager implements StateManager {
       });
     } catch (TransactionException e) {
       if (e.isAlreadyExists()) {
-        throw new IllegalStateException(
+        throw new AlreadyInitializedException(
             "Workflow instance is already triggered: " + workflowInstance.toKey());
       } else if (e.isConflict()) {
         LOG.debug(
@@ -243,6 +244,21 @@ public class QueuedStateManager implements StateManager {
     final Map<WorkflowInstance, PersistentWorkflowInstanceState> states;
     try {
       states = storage.readActiveWorkflowInstances();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return states.entrySet().stream()
+        .collect(toMap(
+            Entry::getKey,
+            e -> RunState.create(
+                e.getKey(), e.getValue().state(), e.getValue().data(), e.getValue().timestamp())));
+  }
+
+  @Override
+  public Map<WorkflowInstance, RunState> activeStatesByTriggerId(String triggerId) {
+    final Map<WorkflowInstance, PersistentWorkflowInstanceState> states;
+    try {
+      states = storage.readActiveWorkflowInstancesByTriggerId(triggerId);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

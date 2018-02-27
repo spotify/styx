@@ -104,6 +104,38 @@ public class TimeUtil {
   }
 
   /**
+   * Gets the number of workflow instances between firstInstant (inclusive) and lastInstant (exclusive)
+   * according to the workflow's schedule.
+   *
+   * @param firstInstant The first instant
+   * @param lastInstant  The last instant
+   * @param schedule     The schedule of the workflow
+   * @return the number of instances within the range
+   */
+  public static int instancesInRange(Instant firstInstant, Instant lastInstant, Schedule schedule) {
+    if (!isAligned(firstInstant, schedule) || !isAligned(lastInstant, schedule)) {
+      throw new IllegalArgumentException("unaligned instant");
+    }
+
+    if (lastInstant.isBefore(firstInstant)) {
+      throw new IllegalArgumentException("last instant should not be before first instant");
+    }
+
+    final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
+
+    Instant currentInstant = firstInstant;
+    int number = 0;
+    while (currentInstant.isBefore(lastInstant)) {
+      final ZonedDateTime utcDateTime = currentInstant.atZone(UTC);
+      currentInstant = executionTime.nextExecution(utcDateTime)
+          .orElseThrow(IllegalArgumentException::new) // with unix cron, this should not happen
+          .toInstant();
+      number++;
+    }
+    return number;
+  }
+
+  /**
    * Tests if a given instant is aligned with the execution times of a {@link Schedule}.
    *
    * @param instant  The instant to test
