@@ -4,7 +4,7 @@
   <parent>
     <artifactId>styx</artifactId>
     <groupId>com.spotify</groupId>
-    <version>1.0.105-SNAPSHOT</version>
+    <version>1.0.105</version>
   </parent>
 
   <name>Spotify Styx API Client</name>
