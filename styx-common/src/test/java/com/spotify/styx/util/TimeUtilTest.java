@@ -21,10 +21,10 @@
 package com.spotify.styx.util;
 
 import static com.spotify.styx.util.TimeUtil.addOffset;
+import static com.spotify.styx.util.TimeUtil.instancesInRange;
 import static com.spotify.styx.util.TimeUtil.isAligned;
 import static com.spotify.styx.util.TimeUtil.lastInstant;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
-import static com.spotify.styx.util.TimeUtil.numberOfInstants;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
@@ -192,48 +192,48 @@ public class TimeUtilTest {
 
   @Test
   public void shouldGetCorrectNumberOfInstants() {
-    final Instant lastTimeHours = Instant.parse("2016-01-19T09:00:00.00Z");
     final Instant firstTimeHours = Instant.parse("2016-01-19T00:00:00.00Z");
-    final Instant lastTimeDays = Instant.parse("2016-01-19T00:00:00.00Z");
+    final Instant lastTimeHours = Instant.parse("2016-01-19T09:00:00.00Z");
     final Instant firstTimeDays = Instant.parse("2016-01-10T00:00:00.00Z");
-    final Instant lastTimeWeeks = Instant.parse("2016-01-18T00:00:00.00Z");
+    final Instant lastTimeDays = Instant.parse("2016-01-19T00:00:00.00Z");
     final Instant firstTimeWeeks = Instant.parse("2016-01-11T00:00:00.00Z");
-    final Instant lastTimeMonths = Instant.parse("2016-01-01T00:00:00.00Z");
+    final Instant lastTimeWeeks = Instant.parse("2016-01-18T00:00:00.00Z");
     final Instant firstTimeMonths = Instant.parse("2010-01-01T00:00:00.00Z");
+    final Instant lastTimeMonths = Instant.parse("2016-01-01T00:00:00.00Z");
 
-    assertThat(numberOfInstants(lastTimeHours, firstTimeHours, Schedule.HOURS), is(9));
-    assertThat(numberOfInstants(lastTimeDays, firstTimeDays, Schedule.DAYS), is(9));
-    assertThat(numberOfInstants(lastTimeWeeks, firstTimeWeeks, Schedule.WEEKS), is(1));
-    assertThat(numberOfInstants(lastTimeMonths, firstTimeMonths, Schedule.YEARS), is(6));
+    assertThat(instancesInRange(firstTimeHours, lastTimeHours, Schedule.HOURS), is(9));
+    assertThat(instancesInRange(firstTimeDays, lastTimeDays, Schedule.DAYS), is(9));
+    assertThat(instancesInRange(firstTimeWeeks, lastTimeWeeks, Schedule.WEEKS), is(1));
+    assertThat(instancesInRange(firstTimeMonths, lastTimeMonths, Schedule.YEARS), is(6));
   }
 
   @Test
   public void shouldGetCorrectNumberOfInstantsForCron() {
-    final Instant lastTimeHours = Instant.parse("2016-01-19T09:00:00.00Z");
     final Instant firstTimeHours = Instant.parse("2016-01-19T00:00:00.00Z");
+    final Instant lastTimeHours = Instant.parse("2016-01-19T09:00:00.00Z");
 
-    assertThat(numberOfInstants(lastTimeHours, firstTimeHours, Schedule.parse("0 * * * *")),
+    assertThat(instancesInRange(firstTimeHours, lastTimeHours, Schedule.parse("0 * * * *")),
                is(9));
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void shouldGetExceptionIfLastInstantIsBeforeFirstInstant() {
-    final Instant lastTimeHours = Instant.parse("2016-01-19T09:00:00.00Z");
     final Instant firstTimeHours = Instant.parse("2016-01-19T10:00:00.00Z");
-    numberOfInstants(lastTimeHours, firstTimeHours, Schedule.HOURS);
+    final Instant lastTimeHours = Instant.parse("2016-01-19T09:00:00.00Z");
+    instancesInRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void shouldGetExceptionIfLastInstantIsNotAlignedWithSchedule() {
-    final Instant lastTimeHours = Instant.parse("2016-01-19T09:10:00.00Z");
     final Instant firstTimeHours = Instant.parse("2016-01-19T08:00:00.00Z");
-    numberOfInstants(lastTimeHours, firstTimeHours, Schedule.HOURS);
+    final Instant lastTimeHours = Instant.parse("2016-01-19T09:10:00.00Z");
+    instancesInRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void shouldGetExceptionIfFirstInstantIsNotAlignedWithSchedule() {
-    final Instant lastTimeHours = Instant.parse("2016-01-19T09:00:00.00Z");
     final Instant firstTimeHours = Instant.parse("2016-01-19T08:10:00.00Z");
-    numberOfInstants(lastTimeHours, firstTimeHours, Schedule.HOURS);
+    final Instant lastTimeHours = Instant.parse("2016-01-19T09:00:00.00Z");
+    instancesInRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
   }
 }

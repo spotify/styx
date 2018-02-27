@@ -104,16 +104,16 @@ public class TimeUtil {
   }
 
   /**
-   * Gets the number of instants between lastInstant (inclusive) and firstInstant (inclusive)
-   * according to schedule.
+   * Gets the number of workflow instances between firstInstant (inclusive) and lastInstant (exclusive)
+   * according to the workflow's schedule.
    *
-   * @param lastInstant The last instant
    * @param firstInstant The first instant
-   * @param schedule The schedule of executions
-   * @return the number of instants in between
+   * @param lastInstant  The last instant
+   * @param schedule     The schedule of the workflow
+   * @return the number of instances within the range
    */
-  public static int numberOfInstants(Instant lastInstant, Instant firstInstant, Schedule schedule) {
-    if (!isAligned(lastInstant, schedule) || !isAligned(firstInstant, schedule)) {
+  public static int instancesInRange(Instant firstInstant, Instant lastInstant, Schedule schedule) {
+    if (!isAligned(firstInstant, schedule) || !isAligned(lastInstant, schedule)) {
       throw new IllegalArgumentException("unaligned instant");
     }
 
@@ -123,11 +123,11 @@ public class TimeUtil {
 
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
 
-    Instant currentInstant = lastInstant;
+    Instant currentInstant = firstInstant;
     int number = 0;
-    while (currentInstant.isAfter(firstInstant)) {
+    while (currentInstant.isBefore(lastInstant)) {
       final ZonedDateTime utcDateTime = currentInstant.atZone(UTC);
-      currentInstant = executionTime.lastExecution(utcDateTime)
+      currentInstant = executionTime.nextExecution(utcDateTime)
           .orElseThrow(IllegalArgumentException::new) // with unix cron, this should not happen
           .toInstant();
       number++;

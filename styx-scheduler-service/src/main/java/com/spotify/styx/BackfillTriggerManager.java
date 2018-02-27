@@ -23,8 +23,8 @@ package com.spotify.styx;
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.spotify.styx.util.GuardedRunnable.guard;
+import static com.spotify.styx.util.TimeUtil.instancesInRange;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
-import static com.spotify.styx.util.TimeUtil.numberOfInstants;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.Backfill;
@@ -156,7 +156,7 @@ class BackfillTriggerManager {
     final Backfill momentBackfill = tx.backfill(id).orElseThrow(RuntimeException::new);
     final Instant momentNextTrigger = momentBackfill.nextTrigger();
 
-    if (numberOfInstants(momentNextTrigger, initialNextTrigger,
+    if (instancesInRange(initialNextTrigger, momentNextTrigger,
         momentBackfill.schedule()) >= remainingCapacity) {
       LOG.debug("Capacity reached for backfill {}", momentBackfill);
       return false;
