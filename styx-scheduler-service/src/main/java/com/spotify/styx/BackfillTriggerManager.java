@@ -153,7 +153,8 @@ class BackfillTriggerManager {
                                                   Workflow workflow,
                                                   Instant initialNextTrigger,
                                                   int remainingCapacity) {
-    final Backfill momentBackfill = tx.backfill(id).orElseThrow(RuntimeException::new);
+    final Backfill momentBackfill = tx.backfill(id).orElseThrow(() ->
+        new RuntimeException("Error while fetching backfill " + id));
     final Instant momentNextTrigger = momentBackfill.nextTrigger();
 
     if (instancesInRange(initialNextTrigger, momentNextTrigger,
