@@ -133,56 +133,49 @@ class BackfillTriggerManager {
     }
 
     final Instant initialNextTrigger = backfill.nextTrigger();
-
-    Instant nextTrigger;
-    do {
+    while (true) {
       try {
-        nextTrigger = storage.runInTransaction(
-            tx -> triggerNextPartitionAndProgress(tx, backfill.id(), workflow,
-                                                  initialNextTrigger, remainingCapacity));
+        if (!storage.runInTransaction(tx ->
+            triggerNextPartitionAndProgress(tx, backfill.id(), workflow,
+                initialNextTrigger, remainingCapacity))) {
+          break;
+        }
       } catch (IOException e) {
         // transaction failure, yield
-        LOG.debug("transaction failure when working on backfill {}", backfill, e);
+        LOG.debug("Transaction failure when working on backfill {}", backfill, e);
         break;
       }
-    } while (nextTrigger != null
-             && numberOfInstants(nextTrigger, initialNextTrigger,
-                                 backfill.schedule()) < remainingCapacity);
+    }
   }
 
-  private Instant triggerNextPartitionAndProgress(StorageTransaction tx,
+  private boolean triggerNextPartitionAndProgress(StorageTransaction tx,
                                                   String id,
                                                   Workflow workflow,
                                                   Instant initialNextTrigger,
                                                   int remainingCapacity) {
     final Backfill momentBackfill = tx.backfill(id).orElseThrow(RuntimeException::new);
+    final Instant momentNextTrigger = momentBackfill.nextTrigger();
 
-    final Instant partition = momentBackfill.nextTrigger();
-
-    // best effort to prevent the case that after this scheduler instance reading
-    // initialNextTrigger, the other scheduler instance managed to progress nextTrigger
-    if (numberOfInstants(partition, initialNextTrigger,
-                     momentBackfill.schedule()) >= remainingCapacity) {
-      return null;
+    if (numberOfInstants(momentNextTrigger, initialNextTrigger,
+        momentBackfill.schedule()) >= remainingCapacity) {
+      LOG.debug("Capacity reached for backfill {}", momentBackfill);
+      return false;
     }
 
-    // this is to prevent the other scheduler instance re-entering
-    if (partition.equals(momentBackfill.end())) {
-      LOG.debug("backfill {} all triggered", momentBackfill);
-      return null;
+    if (momentNextTrigger.equals(momentBackfill.end())) {
+      LOG.debug("Backfill {} all triggered", momentBackfill);
+      return false;
     }
-
-    final Instant nextPartition;
 
     try {
-      // worse case:
+      // race conditions:
       //   - the other scheduler instance has triggered partition, but hasn't committed the
       //     transaction, and the workflow instance has finished very quickly
       //   - this scheduler reads initialNextTrigger before the other scheduler commits the
       //     transaction, so it will move on to trigger the same partition again, but we still
       //     don't violate concurrency limit in this case
       final CompletableFuture<Void> processed = triggerListener
-          .event(workflow, Trigger.backfill(momentBackfill.id()), partition)
+          .event(workflow, Trigger.backfill(momentBackfill.id()), momentNextTrigger)
           .toCompletableFuture();
       // Wait for the trigger execution to complete before proceeding to the next partition
       processed.get();
@@ -190,20 +183,18 @@ class BackfillTriggerManager {
       if (e.getCause() instanceof AlreadyInitializedException) {
         // just encountered an ad-hoc trigger or it has been triggered by another scheduler instance
         // do not propagate the exception but instead letting transaction decide what to do
-        LOG.debug("{} already triggered for backfill {}", partition, momentBackfill, e);
+        LOG.debug("{} already triggered for backfill {}", momentNextTrigger, momentBackfill, e);
       } else {
-        LOG.debug("failed to trigger {} for backfill {}", partition, momentBackfill, e);
+        LOG.debug("Failed to trigger {} for backfill {}", momentNextTrigger, momentBackfill, e);
         throw new RuntimeException(e);
       }
     } catch (Exception e) {
-      // whatever, can be interrupted
-      // we give up this backfill and retry in next tick
-      LOG.debug("failed to trigger {} for backfill {}", partition, momentBackfill, e);
+      // can be interrupted, we give up this backfill and retry in next tick
+      LOG.debug("Failed to trigger {} for backfill {}", momentNextTrigger, momentBackfill, e);
       throw new RuntimeException(e);
     }
 
-    nextPartition = nextInstant(partition, momentBackfill.schedule());
-
+    final Instant nextPartition = nextInstant(momentNextTrigger, momentBackfill.schedule());
     tx.store(momentBackfill.builder()
                       .nextTrigger(nextPartition)
                       .build());
@@ -213,11 +204,10 @@ class BackfillTriggerManager {
                            .nextTrigger(momentBackfill.end())
                            .allTriggered(true)
                            .build());
-      LOG.debug("backfill {} all triggered", momentBackfill);
-      return null;
+      LOG.debug("Backfill {} all triggered", momentBackfill);
+      return false;
     }
-
-    return nextPartition;
+    return true;
   }
 
   private void storeBackfill(Backfill backfill) {
