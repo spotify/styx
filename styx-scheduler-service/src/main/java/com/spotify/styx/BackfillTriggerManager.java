@@ -141,8 +141,8 @@ class BackfillTriggerManager {
           break;
         }
       } catch (IOException e) {
-        // transaction failure, yield
-        LOG.debug("Transaction failure when working on backfill {}", backfill, e);
+        // if progressing the backfill fails, yield
+        LOG.debug("Failure while trying to progress backfill {}", backfill, e);
         break;
       }
     }
