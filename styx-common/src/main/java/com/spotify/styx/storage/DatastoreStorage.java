@@ -388,7 +388,8 @@ class DatastoreStorage {
           .executionId(readOpt(entity, PROPERTY_STATE_EXECUTION_ID))
           .executionDescription(readOptJson(entity, PROPERTY_STATE_EXECUTION_DESCRIPTION,
               ExecutionDescription.class))
-          .resourceIds(readOpt(entity, PROPERTY_STATE_RESOURCE_IDS))
+          .resourceIds(readOptJson(entity, PROPERTY_STATE_RESOURCE_IDS,
+              new TypeReference<Set<String>>() { }))
           .build();
 
       persistentState
@@ -436,6 +437,9 @@ class DatastoreStorage {
 
       if (state.data().executionDescription().isPresent()) {
         entity.set(PROPERTY_STATE_EXECUTION_DESCRIPTION, jsonValue(state.data().executionDescription().get()));
+      }
+      if (state.data().resourceIds().isPresent()) {
+        entity.set(PROPERTY_STATE_RESOURCE_IDS, jsonValue(state.data().resourceIds().get()));
       }
     }
 
@@ -760,6 +764,13 @@ class DatastoreStorage {
   static <T> Optional<T> readOptJson(Entity entity, String property, Class<T> cls) throws IOException {
     return entity.contains(property)
         ? Optional.of(OBJECT_MAPPER.readValue(entity.getString(property), cls))
+        : Optional.empty();
+  }
+
+  static <T> Optional<T> readOptJson(Entity entity, String property, TypeReference valueTypeRef)
+      throws IOException {
+    return entity.contains(property)
+        ? Optional.of(OBJECT_MAPPER.readValue(entity.getString(property), valueTypeRef))
         : Optional.empty();
   }
 
