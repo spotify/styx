@@ -31,6 +31,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import javax.annotation.Nullable;
 
 class WFIExecutionBuilder {
@@ -103,7 +104,7 @@ class WFIExecutionBuilder {
     }
 
     @Override
-    public Void dequeue(WorkflowInstance workflowInstance) {
+    public Void dequeue(WorkflowInstance workflowInstance, Set<String> resourceIds) {
       currWorkflowInstance = workflowInstance;
       return null;
     }

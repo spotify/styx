@@ -26,16 +26,19 @@ import static com.spotify.styx.model.Schedule.MONTHS;
 import static com.spotify.styx.model.Schedule.WEEKS;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import java.util.Set;
 
 public final class TestData {
 
   public static final String VALID_SHA = "00000ef508c1cb905e360590ce3e7e9193f6b370";
   public static final String INVALID_SHA = "XXXXXef508c1cb905e360590ce3e7e9193f6b370";
+  public static final Set<String> RESOURCE_IDS = ImmutableSet.of("foo-resource", "bar-resource");
 
   public static final WorkflowId WORKFLOW_ID =
       WorkflowId.create("styx", "styx.TestEndpoint");

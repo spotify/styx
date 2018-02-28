@@ -26,6 +26,7 @@ import com.github.sviperll.adt4j.Visitor;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
 import java.util.Optional;
+import java.util.Set;
 import javax.annotation.Nullable;
 
 /**
@@ -37,7 +38,7 @@ public interface EventVisitor<R> {
 
   R triggerExecution(@Getter WorkflowInstance workflowInstance, Trigger trigger);
   R info(@Getter WorkflowInstance workflowInstance, Message message);
-  R dequeue(@Getter WorkflowInstance workflowInstance);
+  R dequeue(@Getter WorkflowInstance workflowInstance, Set<String> resourceIds);
   R submit(@Getter WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
       @Nullable String executionId);
   R submitted(@Getter WorkflowInstance workflowInstance, @Nullable String executionId);

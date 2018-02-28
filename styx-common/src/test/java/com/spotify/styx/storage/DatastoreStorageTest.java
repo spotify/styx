@@ -58,6 +58,7 @@ import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.StyxConfig;
@@ -154,6 +155,7 @@ public class DatastoreStorageTest {
               .serviceAccount("foo@bar.baz")
               .commitSha("2d2bfa926b94508de5aab47b5f305659ead2274a")
               .build())
+          .resourceIds(ImmutableSet.of("GLOBAL_STYX_CLUSTER", "foo-resource", "bar-resource"))
           .addMessage(Message.info("foo"))
           .addMessage(Message.warning("bar"))
           .addMessage(Message.error("baz"))

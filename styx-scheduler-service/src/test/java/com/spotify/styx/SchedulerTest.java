@@ -196,7 +196,7 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1));
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of("r1")));
     verify(rateLimiter, times(2)).tryAcquire();
     verify(stats).recordResourceUsed("r1", 1L);
   }
@@ -247,7 +247,7 @@ public class SchedulerTest {
     now = now.plus(15, ChronoUnit.SECONDS);
     scheduler.tick();
 
-    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1));
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of()));
   }
 
   @Test
@@ -268,7 +268,7 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1));
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of()));
   }
 
   @Test
@@ -281,7 +281,7 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1));
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of()));
   }
 
   @Test
@@ -362,12 +362,12 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    verify(stateManager, never()).receiveIgnoreClosed(Event.dequeue(INSTANCE_1));
+    verify(stateManager, never()).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of("r1")));
 
     setResourceLimit("r1", 1);
     scheduler.tick();
 
-    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1));
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of("r1")));
   }
 
   @Test
@@ -430,12 +430,12 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    verify(stateManager, never()).receiveIgnoreClosed(Event.dequeue(INSTANCE_1));
+    verify(stateManager, never()).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of("r1")));
     verify(stats).recordResourceUsed("r1", 3L);
 
     scheduler.tick();
 
-    verify(stateManager, never()).receiveIgnoreClosed(Event.dequeue(INSTANCE_1));
+    verify(stateManager, never()).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of("r1")));
     verify(stats, times(2)).recordResourceUsed("r1", 3L);
   }
 
@@ -555,7 +555,8 @@ public class SchedulerTest {
     verify(resourceDecorator).decorateResources(any(RunState.class), eq(workflow.configuration()),
         eq(ImmutableSet.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
 
-    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1));
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1,
+        ImmutableSet.of("baz", "quux", "GLOBAL_STYX_CLUSTER")));
   }
 
   @Test
@@ -581,7 +582,8 @@ public class SchedulerTest {
     verify(stateManager).receiveIgnoreClosed(Event.info(INSTANCE_1,
         Message.info("Resource limit reached for: [Resource{id=baz, concurrency=0}]")));
 
-    verify(stateManager, never()).receiveIgnoreClosed(Event.dequeue(INSTANCE_1));
+    verify(stateManager, never()).receiveIgnoreClosed(Event.dequeue(INSTANCE_1,
+        ImmutableSet.of("foo", "bar", "baz", "GLOBAL_STYX_CLUSTER")));
   }
 
   @Test
@@ -618,8 +620,8 @@ public class SchedulerTest {
         eq(ImmutableSet.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
 
     verify(stateManager).receiveIgnoreClosed(Matchers.argThat(
-        either(is(Event.dequeue(i0)))
-            .or(is(Event.dequeue(i4)))));
+        either(is(Event.dequeue(i0, ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"))))
+            .or(is(Event.dequeue(i4, ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"))))));
   }
 
   @Test
@@ -644,7 +646,7 @@ public class SchedulerTest {
 
     verify(gate).executionBlocker(INSTANCE_1);
     verify(stateManager).receiveIgnoreClosed(Event.retryAfter(INSTANCE_1, blocker.delay().toMillis()));
-    verify(stateManager, never()).receiveIgnoreClosed(Event.dequeue(INSTANCE_1));
+    verify(stateManager, never()).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of()));
 
     now = now.plus(blocker.delay());
     when(gate.executionBlocker(any())).thenReturn(WorkflowExecutionGate.NO_BLOCKER);
@@ -653,7 +655,7 @@ public class SchedulerTest {
 
     verify(gate, times(2)).executionBlocker(INSTANCE_1);
 
-    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1));
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of()));
   }
 
   @Test
@@ -672,7 +674,7 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1));
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of()));
     verifyZeroInteractions(gate);
   }
 
@@ -697,7 +699,7 @@ public class SchedulerTest {
 
     verify(gate).executionBlocker(INSTANCE_1);
 
-    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1));
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of()));
     verifyZeroInteractions(gate);
   }
 

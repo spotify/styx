@@ -269,6 +269,7 @@ public class Scheduler {
     final Set<String> workflowResourceRefs =
         workflowResourceReferences.getOrDefault(instance.workflowInstance().workflowId(), emptySet());
 
+    // TODO move to ShardedCounter being authoritative for resource accounting
     final Set<String> instanceResourceRefs = workflowCache.workflow(instance.workflowInstance().workflowId())
         .map(workflow -> resourceDecorator.decorateResources(
             instance.runState(), workflow.configuration(), workflowResourceRefs))
@@ -313,7 +314,7 @@ public class Scheduler {
       }
       instanceResourceRefs.forEach(id -> currentResourceUsage.computeIfAbsent(id, id_ -> 0L));
       instanceResourceRefs.forEach(id -> currentResourceUsage.compute(id, (id_, l) -> l + 1));
-      sendDequeue(instance);
+      sendDequeue(instance, instanceResourceRefs);
     }
 
     return true;
@@ -354,7 +355,7 @@ public class Scheduler {
     return !deadline.isAfter(now);
   }
 
-  private void sendDequeue(InstanceState instanceState) {
+  private void sendDequeue(InstanceState instanceState, Set<String> resourceIds) {
     final WorkflowInstance workflowInstance = instanceState.workflowInstance();
     final RunState state = instanceState.runState();
 
@@ -363,7 +364,7 @@ public class Scheduler {
     } else {
       LOG.info("{} executing retry #{}", workflowInstance.toKey(), state.data().tries());
     }
-    stateManager.receiveIgnoreClosed(Event.dequeue(workflowInstance));
+    stateManager.receiveIgnoreClosed(Event.dequeue(workflowInstance, resourceIds));
   }
 
   private boolean hasTimedOut(RunState runState) {
