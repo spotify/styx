@@ -55,6 +55,7 @@ import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.IsClosedException;
+import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
@@ -108,6 +109,7 @@ public class QueuedStateManagerTest {
   @Mock StorageTransaction transaction;
   @Mock OutputHandler outputHandler;
   @Mock Time time;
+  @Mock ShardedCounter shardedCounter;
 
   @Before
   public void setUp() throws Exception {
@@ -117,7 +119,7 @@ public class QueuedStateManagerTest {
     doNothing().when(outputHandler).transitionInto(runStateCaptor.capture());
     stateManager = new QueuedStateManager(
         time, eventTransitionExecutor, storage, eventConsumer,
-        eventConsumerExecutor, OutputHandler.fanOutput(outputHandler));
+        eventConsumerExecutor, OutputHandler.fanOutput(outputHandler), shardedCounter);
   }
 
   @After
@@ -271,7 +273,7 @@ public class QueuedStateManagerTest {
     reset(storage);
     stateManager = spy(new QueuedStateManager(
         time, eventTransitionExecutor, storage, eventConsumer,
-        eventConsumerExecutor, outputHandler));
+        eventConsumerExecutor, outputHandler, shardedCounter));
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
     doThrow(new IsClosedException()).when(stateManager).receive(any());
@@ -290,7 +292,7 @@ public class QueuedStateManagerTest {
     reset(storage);
     stateManager = spy(new QueuedStateManager(
         time, eventTransitionExecutor, storage, eventConsumer,
-        eventConsumerExecutor, outputHandler));
+        eventConsumerExecutor, outputHandler, shardedCounter));
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     doThrow(new IOException()).when(storage).deleteActiveState(any());
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());

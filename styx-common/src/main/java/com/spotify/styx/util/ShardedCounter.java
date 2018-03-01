@@ -20,26 +20,20 @@
 
 package com.spotify.styx.util;
 
-import com.google.cloud.datastore.Datastore;
-import com.google.cloud.datastore.DatastoreReaderWriter;
-import com.google.cloud.datastore.Entity;
-import com.google.cloud.datastore.EntityQuery;
-import com.google.cloud.datastore.Key;
-import com.google.cloud.datastore.QueryResults;
-import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Range;
+import com.spotify.styx.storage.Storage;
+import com.spotify.styx.storage.StorageTransaction;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +64,7 @@ public class ShardedCounter {
   public static final String PROPERTY_SHARD_INDEX = "index";
   public static final String PROPERTY_COUNTER_ID = "counterId";
 
-  private final Datastore datastore;
+  private final Storage storage;
 
   /**
    * A weakly consistent view of the state in Datastore, refreshed by ShardedCounter on demand.
@@ -86,59 +80,41 @@ public class ShardedCounter {
     private final Long limit;
     private final Map<Integer, Long> shards;
 
-    public CounterSnapshot(Datastore datastore, String counterId) {
-      limit = getLimit(datastore, counterId);
+    public CounterSnapshot(Storage storage, String counterId) {
+      limit = getLimit(storage, counterId);
 
-      Map<Integer, Long> fetchedShards = fetchShards(datastore, counterId);
+      Map<Integer, Long> fetchedShards = storage.shardsForCounter(counterId);
       if (fetchedShards.size() < NUM_SHARDS) {
         // The counter probably has not been initialized (so we have empty QueryResults). Also
         // possible that a prior initialize() crashed halfway, or we got a partial list of shards in
         // QueryResults due to eventual consistency. In any case, repeated initialization eventually
         // creates all NUM_SHARDS shards.
-        initialize(datastore, counterId);
-        fetchedShards = fetchShards(datastore, counterId);
+        initialize(storage, counterId);
+        fetchedShards = storage.shardsForCounter(counterId);
       }
       this.counterId = counterId;
-      shards = fetchedShards;
+      this.shards = fetchedShards;
     }
 
     /**
      * Idempotent initialization, so that we don't reset an existing shard to zero - counterId may
      * have already been initialized and incremented by another process.
      */
-    private static void initialize(Datastore datastore, String counterId) {
+    private static void initialize(Storage storage, String counterId) {
       for (int i = 0; i < NUM_SHARDS; i++) {
         final int shardIndex = i;
-        final Key shardKey = datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD)
-            .newKey(counterId + "-" + shardIndex);
-        datastore.runInTransaction(transaction -> {
-          final Entity shard = transaction.get(shardKey);
-          if (shard == null) {
-            transaction.put(Entity.newBuilder(shardKey)
-                                .set(PROPERTY_COUNTER_ID, counterId)
-                                .set(PROPERTY_SHARD_INDEX, shardIndex)
-                                .set(PROPERTY_SHARD_VALUE, 0)
-                                .build());
-          }
-          return null;
-        });
+        try {
+          storage.runInTransaction(tx -> {
+            final Optional<Shard> shard = tx.shard(counterId, shardIndex);
+            if (!shard.isPresent()) {
+              tx.store(Shard.create(counterId, shardIndex, 0));
+            }
+            return null;
+          });
+        } catch (IOException e) {
+          LOG.warn("Error when trying to create a shard entry in Datastore: ", e);
+        }
       }
-    }
-
-    private static Map<Integer, Long> fetchShards(Datastore datastore, String counterId) {
-      final EntityQuery queryShards = EntityQuery.newEntityQueryBuilder()
-          .setKind(KIND_COUNTER_SHARD)
-          .setFilter(PropertyFilter.eq(PROPERTY_COUNTER_ID, counterId))
-          .setLimit(NUM_SHARDS)
-          .build();
-      final QueryResults<Entity> shards = datastore.run(queryShards);
-      final Map<Integer, Long> fetchedShards = new HashMap<>();
-      while (shards.hasNext()) {
-        Entity shard = shards.next();
-        fetchedShards
-            .put((int) shard.getLong(PROPERTY_SHARD_INDEX), shard.getLong(PROPERTY_SHARD_VALUE));
-      }
-      return fetchedShards;
     }
 
     /**
@@ -185,8 +161,8 @@ public class ShardedCounter {
     }
   }
 
-  public ShardedCounter(Datastore datastore) {
-    this.datastore = Objects.requireNonNull(datastore);
+  public ShardedCounter(Storage storage) {
+    this.storage = storage;
   }
 
   /**
@@ -204,7 +180,7 @@ public class ShardedCounter {
    * Update cached snapshot with most recent state of counter in Datastore.
    */
   private CounterSnapshot refreshCounterSnapshot(String counterId) {
-    final CounterSnapshot newSnapshot = new CounterSnapshot(datastore, counterId);
+    final CounterSnapshot newSnapshot = new CounterSnapshot(storage, counterId);
     inMemSnapshot.put(counterId, newSnapshot);
     return newSnapshot;
   }
@@ -216,24 +192,15 @@ public class ShardedCounter {
    * there has been no preceding successful updateLimit operation, no limit is applied in
    * updateCounter operations on this counter.
    */
-  public void updateLimit(DatastoreReaderWriter transaction, String counterId, long limit) {
-    final Key limitKey = datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId);
-
-    transaction.put(Entity.newBuilder(limitKey).set(PROPERTY_LIMIT, limit).build());
+  public void updateLimit(StorageTransaction tx, String counterId, long limit) {
+    tx.updateLimitForCounter(counterId, limit);
   }
 
   /**
    * Reads the latest limit value from Datastore, for the specified {@param counterId}
    */
-  public static long getLimit(Datastore datastore, String counterId) {
-    final Key limitKey = datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId);
-    final Entity limitEntity = datastore.get(limitKey);
-    if (limitEntity == null) {
-      return Long.MAX_VALUE;
-      // Or IllegalStateException("No limit found in Datastore for " + counterId);?
-    } else {
-      return limitEntity.getLong(PROPERTY_LIMIT);
-    }
+  public static long getLimit(Storage storage, String counterId) {
+    return storage.getLimitForCounter(counterId);
   }
 
   /**
@@ -246,32 +213,27 @@ public class ShardedCounter {
    * Updates with a larger delta are prone to spuriously fail even when the counter is not near to
    * exceeding its limit. Failures are certain when delta >= limit / NUM_SHARDS + 1.
    */
-  public void updateCounter(DatastoreReaderWriter transaction, String counterId, long delta) {
+  public void updateCounter(StorageTransaction transaction, String counterId, long delta) {
     CounterSnapshot snapshot = getCounterSnapshot(counterId);
     int shardIndex = snapshot.pickShardWithSpareCapacity(delta);
 
-    final Key shardKey = datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD)
-        .newKey(counterId + "-" + shardIndex);
-    final Entity shard = transaction.get(shardKey);
+    final Optional<Shard> shard = transaction.shard(counterId, shardIndex);
 
-    if (shard != null) {
-      final long newShardValue = shard.getLong(PROPERTY_SHARD_VALUE) + delta;
+    if (shard.isPresent()) {
+      final long newShardValue = shard.get().value() + delta;
       if (Range.closed(0L, snapshot.shardCapacity(shardIndex))
           .contains(newShardValue)) {
-        transaction.put(Entity.newBuilder(shard)
-                            .set(PROPERTY_SHARD_VALUE,
-                                 shard.getLong(PROPERTY_SHARD_VALUE) + delta)
-                            .build());
+        transaction.store(Shard.create(counterId, shardIndex, (int) (shard.get().value() + delta)));
       } else {
-        throw new CounterCapacityException("Chosen shard %s has no more capacity.",
-                                           shardKey.getName());
+        throw new CounterCapacityException("Chosen shard %s-%s has no more capacity.",
+                                           counterId, shardIndex);
       }
     } else {
       throw new ShardNotFoundException(
-          "Could not find shard %s. Unexpected Datastore corruption or our bug - the code should've "
+          "Could not find shard %s-%s. Unexpected Datastore corruption or our bug - the code should've "
           + "called initialize() before reaching this point, and any particular shard should "
           + "strongly be get()-able thereafter",
-          shardKey.getName());
+          counterId, shardIndex);
     }
   }
 
@@ -296,35 +258,14 @@ public class ShardedCounter {
    * <p>Due to Datastore limitations (modify max 25 entity groups per transaction),
    * deletion of shards is done in batches of 25 shards.
    *
-   * <p>Behaviour is non-determined if other instances try to access the same counter in the meantime.
+   * <p>Behaviour is best-effort and non-determined if other instances try to access the same counter in the meantime.
    * Best results are achieved if all usages of the given resource - which the counter is associated with -
    * are removed before calling deleteCounter. This is so, in order to avoid a scenario where one instance
    * is trying to delete all shards, while another is creating/updating shards in between the
    * multiple transactions made by this method.
    */
-  public void deleteCounter(Datastore datastore, String counterId) {
-    QueryResults<Entity> results = datastore.run(EntityQuery.newEntityQueryBuilder()
-                                                     .setKind(KIND_COUNTER_SHARD)
-                                                     .setFilter(PropertyFilter
-                                                                    .eq(PROPERTY_COUNTER_ID,
-                                                                        counterId))
-                                                     .build());
-    while (results.hasNext()) {
-      // remove max 25 entities per transaction
-      datastore.runInTransaction(transaction -> {
-        IntStream.range(0, 25).forEach(i -> {
-          if (results.hasNext()) {
-            transaction.delete(results.next().getKey());
-          }
-        });
-        return null;
-      });
-    }
-
-    // delete limit entry too
-    datastore.runInTransaction(transaction -> {
-      transaction.delete(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId));
-      return null;
-    });
+  public void deleteCounter(Storage storage, String counterId) throws IOException {
+    storage.deleteShardsForCounter(counterId);
+    storage.deleteLimitForCounter(counterId);
   }
 }

@@ -21,6 +21,13 @@
 package com.spotify.styx.storage;
 
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
+import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
+import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_SHARD;
+import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
+import static com.spotify.styx.util.ShardedCounter.PROPERTY_COUNTER_ID;
+import static com.spotify.styx.util.ShardedCounter.PROPERTY_LIMIT;
+import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_INDEX;
+import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_VALUE;
 import static java.util.stream.Collectors.toList;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -64,7 +71,6 @@ import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.FnWithException;
 import com.spotify.styx.util.ResourceNotFoundException;
-import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.TriggerInstantSpec;
 import com.spotify.styx.util.TriggerUtil;
@@ -73,12 +79,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,7 +94,7 @@ import org.slf4j.LoggerFactory;
 /**
  * A backend for {@link AggregateStorage} backed by Google Datastore
  */
-class DatastoreStorage {
+public class DatastoreStorage {
 
   private static final Logger LOG = LoggerFactory.getLogger(DatastoreStorage.class);
 
@@ -148,18 +156,16 @@ class DatastoreStorage {
 
   private final Datastore datastore;
   private final Duration retryBaseDelay;
-  private final ShardedCounter shardedCounter;
   private final Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory;
 
-  DatastoreStorage(Datastore datastore, Duration retryBaseDelay, ShardedCounter shardedCounter) {
-    this(datastore, retryBaseDelay, shardedCounter, DatastoreStorageTransaction::new);
+  DatastoreStorage(Datastore datastore, Duration retryBaseDelay) {
+    this(datastore, retryBaseDelay, DatastoreStorageTransaction::new);
   }
 
-  DatastoreStorage(Datastore datastore, Duration retryBaseDelay, ShardedCounter shardedCounter,
+  DatastoreStorage(Datastore datastore, Duration retryBaseDelay,
       Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory) {
     this.datastore = Objects.requireNonNull(datastore);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
-    this.shardedCounter = Objects.requireNonNull(shardedCounter);
     this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
   }
 
@@ -623,9 +629,9 @@ class DatastoreStorage {
   }
 
   void postResource(Resource resource) throws IOException {
-    storeWithRetries(() -> datastore.runInTransaction(transaction -> {
-      shardedCounter.updateLimit(transaction, resource.id(), resource.concurrency());
-      return transaction.put(resourceToEntity(resource));
+    storeWithRetries(() -> runInTransaction(transaction -> {
+      transaction.store(resource);
+      return null;
       // TODO store just in one place, eliminate one of the two calls ^?
     }));
   }
@@ -642,13 +648,6 @@ class DatastoreStorage {
 
   private Resource entityToResource(Entity entity) {
     return Resource.create(entity.getKey().getName(), entity.getLong(PROPERTY_CONCURRENCY));
-  }
-
-  private Entity resourceToEntity(Resource resource) {
-    final Key key = datastore.newKeyFactory().setKind(KIND_RESOURCE).newKey(resource.id());
-    return Entity.newBuilder(key)
-        .set(PROPERTY_CONCURRENCY, resource.concurrency())
-        .build();
   }
 
   void deleteResource(String id) throws IOException {
@@ -809,5 +808,59 @@ class DatastoreStorage {
       throw new TransactionException(e);
     }
     return storageTransactionFactory.apply(transaction);
+  }
+
+  Map<Integer,Long> shardsForCounter(String counterId) {
+    final EntityQuery queryShards = EntityQuery.newEntityQueryBuilder()
+        .setKind(KIND_COUNTER_SHARD)
+        .setFilter(PropertyFilter.eq(PROPERTY_COUNTER_ID, counterId))
+        .setLimit(NUM_SHARDS)
+        .build();
+    final QueryResults<Entity> shards = datastore.run(queryShards);
+    final Map<Integer, Long> fetchedShards = new HashMap<>();
+    while (shards.hasNext()) {
+      Entity shard = shards.next();
+      fetchedShards
+          .put((int) shard.getLong(PROPERTY_SHARD_INDEX), shard.getLong(PROPERTY_SHARD_VALUE));
+    }
+    return fetchedShards;
+  }
+
+  long getLimitForCounter(String counterId) {
+    final Key limitKey = datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId);
+    final Entity limitEntity = datastore.get(limitKey);
+    if (limitEntity == null) {
+      return Long.MAX_VALUE;
+      // Or IllegalStateException("No limit found in Datastore for " + counterId);?
+    } else {
+      return limitEntity.getLong(PROPERTY_LIMIT);
+    }
+  }
+
+  void deleteShardsForCounter(String counterId) {
+    QueryResults<Entity> results = datastore.run(EntityQuery.newEntityQueryBuilder()
+                                                     .setKind(KIND_COUNTER_SHARD)
+                                                     .setFilter(PropertyFilter
+                                                                    .eq(PROPERTY_COUNTER_ID,
+                                                                        counterId))
+                                                     .build());
+    while (results.hasNext()) {
+      // remove max 25 entities per transaction
+      datastore.runInTransaction(transaction -> {
+        IntStream.range(0, 25).forEach(i -> {
+          if (results.hasNext()) {
+            transaction.delete(results.next().getKey());
+          }
+        });
+        return null;
+      });
+    }
+  }
+
+  void deleteLimitForCounter(String counterId) throws IOException {
+    storeWithRetries(() -> runInTransaction(tx -> {
+      tx.deleteCounterLimit(counterId);
+      return null;
+    }));
   }
 }

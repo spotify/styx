@@ -34,6 +34,7 @@ import com.spotify.apollo.route.Route;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.ShardedCounter;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
@@ -45,9 +46,11 @@ public final class ResourceResource {
   static final String BASE = "/resources";
 
   private final Storage storage;
+  private ShardedCounter shardedCounter;
 
-  public ResourceResource(Storage storage) {
+  public ResourceResource(Storage storage, ShardedCounter shardedCounter) {
     this.storage = Objects.requireNonNull(storage);
+    this.shardedCounter = shardedCounter;
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -111,6 +114,10 @@ public final class ResourceResource {
   private Resource postResource(Resource resource) {
     try {
       storage.storeResource(resource);
+      storage.runInTransaction(tx -> {
+        shardedCounter.updateLimit(tx, resource.id(), resource.concurrency());
+        return null;
+      });
       return resource;
     } catch (IOException e) {
       throw Throwables.propagate(e);
@@ -125,6 +132,10 @@ public final class ResourceResource {
 
     try {
       storage.storeResource(resource);
+      storage.runInTransaction(tx -> {
+        shardedCounter.updateLimit(tx, resource.id(), resource.concurrency());
+        return null;
+      });
     } catch (IOException e) {
       return Response
           .forStatus(

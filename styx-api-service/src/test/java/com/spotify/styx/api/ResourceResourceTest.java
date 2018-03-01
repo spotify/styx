@@ -76,9 +76,9 @@ public class ResourceResourceTest extends VersionedApiTest {
     storage = new AggregateStorage(
         mock(Connection.class),
         localDatastore.getOptions().getService(),
-        Duration.ZERO, shardedCounter);
+        Duration.ZERO);
 
-    ResourceResource resourceResource = new ResourceResource(storage);
+    ResourceResource resourceResource = new ResourceResource(storage, shardedCounter);
 
     environment.routingEngine()
         .registerRoutes(Api.withCommonMiddleware(

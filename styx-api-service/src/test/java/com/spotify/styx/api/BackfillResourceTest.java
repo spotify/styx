@@ -137,7 +137,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   @Override
   protected void init(Environment environment) {
     storage = new AggregateStorage(bigtable, localDatastore.getOptions().getService(),
-                                   Duration.ZERO, shardedCounter);
+                                   Duration.ZERO);
 
     environment.routingEngine()
         .registerRoutes(Api.withCommonMiddleware(
