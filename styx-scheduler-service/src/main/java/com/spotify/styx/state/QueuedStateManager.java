@@ -213,9 +213,9 @@ public class QueuedStateManager implements StateManager {
               PersistentWorkflowInstanceState.of(nextRunState, nextCounter);
           tx.updateActiveState(event.workflowInstance(), nextPersistentState);
           // FIXME if event == dequeue and resourceIds is present
-          for (String resource : nextRunState.data().resourceIds().get()) {
-            tx.updateCounter(shardedCounter, resource, 1);
-          }
+          //for (String resource : nextRunState.data().resourceIds().get()) {
+          //  tx.updateCounter(shardedCounter, resource, 1);
+          //}
         }
 
         final SequenceEvent sequenceEvent =
