@@ -117,7 +117,8 @@ public class StyxApi implements AppInit {
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
                                                                    storage,
                                                                    new WorkflowValidator(new DockerImageValidator()));
-    final ResourceResource resourceResource = new ResourceResource(storage);
+    final ShardedCounter shardedCounter = new ShardedCounter(storage);
+    final ResourceResource resourceResource = new ResourceResource(storage, shardedCounter);
     final StatusResource statusResource = new StatusResource(storage);
     final SchedulerProxyResource schedulerProxyResource = new SchedulerProxyResource(
         schedulerServiceBaseUrl, environment.client());
@@ -146,7 +147,6 @@ public class StyxApi implements AppInit {
 
     final Connection bigTable = closer.register(createBigTableConnection(config));
     final Datastore datastore = createDatastore(config);
-    final ShardedCounter shardedCounter = new ShardedCounter(datastore);
-    return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT, shardedCounter);
+    return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
   }
 }
