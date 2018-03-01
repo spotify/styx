@@ -251,7 +251,7 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shouldPassDeletingNonExistingCounterAndLimit() {
+  public void shouldPassDeletingNonExistingCounterAndLimit() throws IOException {
     shardedCounter.deleteCounter(storage, COUNTER_ID1);
 
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);

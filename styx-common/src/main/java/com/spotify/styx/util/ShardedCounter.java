@@ -264,12 +264,8 @@ public class ShardedCounter {
    * is trying to delete all shards, while another is creating/updating shards in between the
    * multiple transactions made by this method.
    */
-  public void deleteCounter(Storage storage, String counterId) {
+  public void deleteCounter(Storage storage, String counterId) throws IOException {
     storage.deleteShardsForCounter(counterId);
-    try {
-      storage.deleteLimitForCounter(counterId);
-    } catch (IOException e) {
-      LOG.debug("Error when trying to delete limit for counter {}: {}", counterId, e);
-    }
+    storage.deleteLimitForCounter(counterId);
   }
 }
