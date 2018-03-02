@@ -20,10 +20,12 @@
 
 package com.spotify.styx.state;
 
+import static com.spotify.styx.Scheduler.isConsumingResources;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toMap;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
@@ -31,6 +33,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.storage.TransactionException;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.IsClosedException;
@@ -50,6 +53,7 @@ import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
 import javaslang.Tuple;
 import javaslang.Tuple2;
+import javaslang.collection.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -212,11 +216,8 @@ public class QueuedStateManager implements StateManager {
           final PersistentWorkflowInstanceState nextPersistentState =
               PersistentWorkflowInstanceState.of(nextRunState, nextCounter);
           tx.updateActiveState(event.workflowInstance(), nextPersistentState);
-          // FIXME if event == dequeue and resourceIds is present
-          //for (String resource : nextRunState.data().resourceIds().get()) {
-          //  tx.updateCounter(shardedCounter, resource, 1);
-          //}
         }
+        updateResourceCounters(tx, event, runState, nextRunState);
 
         final SequenceEvent sequenceEvent =
             SequenceEvent.create(event, nextCounter, nextRunState.timestamp());
@@ -226,6 +227,36 @@ public class QueuedStateManager implements StateManager {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private void updateResourceCounters(StorageTransaction tx, Event event,
+                                      RunState currentRunState, RunState nextRunState) {
+    // increment counters if event is dequeue
+    if (isDequeue(event, nextRunState) && nextRunState.data().resourceIds().isPresent()) {
+      for (String resource : nextRunState.data().resourceIds().get()) {
+        tx.updateCounter(shardedCounter, resource, 1);
+      }
+    }
+
+    if (isConsumingResources(currentRunState.state())
+        && isReleasingResources(nextRunState.state())
+        && nextRunState.data().resourceIds().isPresent()) {
+      // decrement counters if transitioning from a state that consumes resources
+      // to a state that releases the same resources
+      for (String resource : nextRunState.data().resourceIds().get()) {
+        tx.updateCounter(shardedCounter, resource, -1);
+      }
+    }
+  }
+
+  private static boolean isReleasingResources(State state) {
+    return List.of(State.TERMINATED, State.FAILED, State.ERROR, State.DONE).contains(state);
+  }
+
+  private boolean isDequeue(Event event, RunState runState) {
+    return event
+        .equals(Event.dequeue(event.workflowInstance(),
+                              runState.data().resourceIds().orElse(ImmutableSet.of())));
   }
 
   private void postTransition(SequenceEvent sequenceEvent, RunState runState) {
