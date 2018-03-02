@@ -863,4 +863,11 @@ public class DatastoreStorage {
       return null;
     }));
   }
+
+  void updateLimitForCounter(String counterId, long limit) throws IOException {
+    storeWithRetries(() -> runInTransaction(tx -> {
+      tx.updateLimitForCounter(counterId, limit);
+      return null;
+    }));
+  }
 }

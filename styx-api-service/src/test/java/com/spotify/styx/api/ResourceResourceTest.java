@@ -31,6 +31,8 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Key;
@@ -73,10 +75,10 @@ public class ResourceResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
-    storage = new AggregateStorage(
+    storage = spy(new AggregateStorage(
         mock(Connection.class),
         localDatastore.getOptions().getService(),
-        Duration.ZERO);
+        Duration.ZERO));
 
     ResourceResource resourceResource = new ResourceResource(storage, shardedCounter);
 
@@ -105,6 +107,7 @@ public class ResourceResourceTest extends VersionedApiTest {
   @Before
   public void setUp() throws Exception {
     storage.storeResource(RESOURCE_1);
+    storage.updateLimitForCounter(RESOURCE_1.id(), RESOURCE_1.concurrency());
   }
 
   @After
@@ -170,7 +173,9 @@ public class ResourceResourceTest extends VersionedApiTest {
     assertJson(response, "id", equalTo("resource2"));
     assertJson(response, "concurrency", equalTo(2));
 
-    assertThat(storage.resource("resource2"), hasValue(RESOURCE_2));
+    assertThat(storage.resource(RESOURCE_2.id()), hasValue(RESOURCE_2));
+    verify(storage).updateLimitForCounter(RESOURCE_2.id(), RESOURCE_2.concurrency());
+    assertThat(storage.getLimitForCounter(RESOURCE_2.id()), is(RESOURCE_2.concurrency()));
   }
 
   @Test
@@ -186,6 +191,8 @@ public class ResourceResourceTest extends VersionedApiTest {
     assertJson(response, "concurrency", equalTo(21));
 
     assertThat(storage.resource(RESOURCE_1.id()), hasValue(Resource.create(RESOURCE_1.id(), 21)));
+    verify(storage).updateLimitForCounter(RESOURCE_1.id(), 21L);
+    assertThat(storage.getLimitForCounter(RESOURCE_1.id()), is(21L));
   }
 
   @Test
@@ -198,6 +205,7 @@ public class ResourceResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
 
     assertThat(storage.resource(RESOURCE_1.id()).isPresent(), is(false));
+    assertThat(storage.getLimitForCounter(RESOURCE_1.id()), is(Long.MAX_VALUE));
   }
 
   @Test
@@ -235,6 +243,8 @@ public class ResourceResourceTest extends VersionedApiTest {
     ));
     assertThat(storage.resource(RESOURCE_1.id()), hasValue(RESOURCE_1));
     assertThat(storage.resource("resource2"), hasValue(Resource.create("resource2", 3)));
+    assertThat(storage.getLimitForCounter(RESOURCE_1.id()), is(RESOURCE_1.concurrency()));
+    assertThat(storage.getLimitForCounter(RESOURCE_2.id()), is(3L));
 
     // delete resource2
     Response<ByteString> deleteResponse =
@@ -251,5 +261,7 @@ public class ResourceResourceTest extends VersionedApiTest {
     ));
     assertThat(storage.resource(RESOURCE_1.id()), hasValue(RESOURCE_1));
     assertThat(storage.resource("resource2"), isEmpty());
+    assertThat(storage.getLimitForCounter(RESOURCE_1.id()), is(RESOURCE_1.concurrency()));
+    assertThat(storage.getLimitForCounter(RESOURCE_2.id()), is(Long.MAX_VALUE));
   }
 }

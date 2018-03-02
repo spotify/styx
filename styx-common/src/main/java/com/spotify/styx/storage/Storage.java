@@ -283,4 +283,6 @@ public interface Storage {
       throws IOException, E;
 
   void deleteLimitForCounter(String counterId) throws IOException;
+
+  void updateLimitForCounter(String counterId, long limit) throws IOException;
 }
