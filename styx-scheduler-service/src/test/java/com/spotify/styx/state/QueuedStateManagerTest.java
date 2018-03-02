@@ -619,7 +619,7 @@ public class QueuedStateManagerTest {
   }
 
   @Test
-  public void shouldNotUpdateResourceCountersOnTerminate() throws Exception {
+  public void shouldUpdateResourceCountersOnTerminate() throws Exception {
     givenState(INSTANCE, State.RUNNING);
     receiveEvent(Event.terminate(INSTANCE, Optional.of(1)));
     verify(transaction).updateCounter(shardedCounter, "resource1", -1);

@@ -245,10 +245,10 @@ public class QueuedStateManager implements StateManager {
         tx.updateCounter(shardedCounter, resource, -1);
       }
     } else if (!nextRunState.data().resourceIds().isPresent()) {
-      LOG.error("Resource ids are missing for {}.", nextRunState.workflowInstance());
+      LOG.error("Resource ids are missing for {} when transitioning from {} to {}.",
+                nextRunState.workflowInstance(), currentRunState, nextRunState);
     }
   }
-
 
   private static boolean isConsumingResources(State state) {
     return javaslang.collection.List.of(State.PREPARE,
