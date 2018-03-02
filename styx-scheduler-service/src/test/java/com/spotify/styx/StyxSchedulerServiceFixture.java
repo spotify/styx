@@ -80,6 +80,7 @@ public class StyxSchedulerServiceFixture {
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxSchedulerServiceFixture.class);
 
+  private Instant now = Instant.parse("1970-01-01T00:00:00Z");
   private static LocalDatastoreHelper localDatastore;
 
   private Datastore datastore = localDatastore.getOptions().getService();
@@ -88,7 +89,6 @@ public class StyxSchedulerServiceFixture {
   private DeterministicScheduler executor = new QuietDeterministicScheduler();
 
   // circumstantial fields, set by test cases
-  private Instant now = Instant.parse("1970-01-01T00:00:00Z");
 
   private List<Tuple2<SequenceEvent, RunState.State>> transitionedEvents = Lists.newArrayList();
   private List<Tuple2<Optional<Workflow>, Optional<Workflow>>> workflowChanges = Lists.newArrayList();
