@@ -263,4 +263,9 @@ public class AggregateStorage implements Storage {
   public void deleteLimitForCounter(String counterId) throws IOException {
     datastoreStorage.deleteLimitForCounter(counterId);
   }
+
+  @Override
+  public void updateLimitForCounter(String counterId, long limit) throws IOException {
+    datastoreStorage.updateLimitForCounter(counterId, limit);
+  }
 }

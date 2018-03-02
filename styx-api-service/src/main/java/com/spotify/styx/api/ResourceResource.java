@@ -105,6 +105,7 @@ public final class ResourceResource {
   private Response<Void> deleteResource(String id) {
     try {
       storage.deleteResource(id);
+      storage.deleteLimitForCounter(id);
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
@@ -114,10 +115,7 @@ public final class ResourceResource {
   private Resource postResource(Resource resource) {
     try {
       storage.storeResource(resource);
-      storage.runInTransaction(tx -> {
-        shardedCounter.updateLimit(tx, resource.id(), resource.concurrency());
-        return null;
-      });
+      storage.updateLimitForCounter(resource.id(), resource.concurrency());
       return resource;
     } catch (IOException e) {
       throw Throwables.propagate(e);
@@ -132,10 +130,7 @@ public final class ResourceResource {
 
     try {
       storage.storeResource(resource);
-      storage.runInTransaction(tx -> {
-        shardedCounter.updateLimit(tx, resource.id(), resource.concurrency());
-        return null;
-      });
+      storage.updateLimitForCounter(resource.id(), resource.concurrency());
     } catch (IOException e) {
       return Response
           .forStatus(

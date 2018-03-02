@@ -295,6 +295,11 @@ public class InMemStorage implements Storage {
   }
 
   @Override
+  public void updateLimitForCounter(String counterId, long limit) throws IOException {
+    throw new NotImplementedException();
+  }
+
+  @Override
   public SortedSet<SequenceEvent> readEvents(WorkflowInstance workflowInstance) {
     final SortedSet<SequenceEvent> events = Sets.newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
     writtenEvents.stream()
