@@ -101,15 +101,15 @@ public class QueuedStateManagerTest {
 
   private QueuedStateManager stateManager;
 
-  @Captor ArgumentCaptor<RunState> runStateCaptor;
+  @Captor private ArgumentCaptor<RunState> runStateCaptor;
 
   @Rule public RepeatRule repeatRule = new RepeatRule();
 
-  @Mock Storage storage;
-  @Mock StorageTransaction transaction;
-  @Mock OutputHandler outputHandler;
-  @Mock Time time;
-  @Mock ShardedCounter shardedCounter;
+  @Mock private Storage storage;
+  @Mock private StorageTransaction transaction;
+  @Mock private OutputHandler outputHandler;
+  @Mock private Time time;
+  @Mock private ShardedCounter shardedCounter;
 
   @Before
   public void setUp() throws Exception {
@@ -440,6 +440,39 @@ public class QueuedStateManagerTest {
         .state(State.PREPARE)
         .data(StateData.newBuilder().resourceIds(ImmutableSet.of()).build())
         .build());
+  }
+
+  @Test
+  public void shouldUpdateResourceCountersOnDequeue() throws Exception {
+    when(transaction.activeState(INSTANCE)).thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
+                                                                       .counter(17)
+                                                                       .timestamp(NOW.minusMillis(1))
+                                                                       .state(State.QUEUED)
+                                                                       .data(StateData.zero())
+                                                                       .build()));
+
+    stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of("resource1")))
+        .toCompletableFuture().get(1, MINUTES);
+    verify(transaction).updateCounter(shardedCounter, "resource1", 1);
+  }
+
+  @Test
+  public void shouldUpdateResourceCountersOnTerminalState() throws Exception {
+    when(transaction.activeState(INSTANCE))
+        .thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
+                                    .counter(17)
+                                    .timestamp(NOW.minusMillis(1))
+                                    .state(State.RUNNING)
+                                    .data(StateData.newBuilder()
+                                              .resourceIds(
+                                                  ImmutableSet
+                                                      .of("resource1"))
+                                              .build())
+                                    .build()));
+
+    stateManager.receive(Event.timeout(INSTANCE))
+        .toCompletableFuture().get(1, MINUTES);
+    verify(transaction).updateCounter(shardedCounter, "resource1", -1);
   }
 
   @Test
