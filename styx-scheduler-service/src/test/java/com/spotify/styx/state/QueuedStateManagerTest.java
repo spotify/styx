@@ -28,6 +28,9 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -43,6 +46,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.spotify.styx.RepeatRule;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
@@ -93,6 +97,8 @@ public class QueuedStateManagerTest {
   private static final Workflow WORKFLOW =
       Workflow.create("foo", TestData.FULL_WORKFLOW_CONFIGURATION);
   private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
+  private static final StateData STATE_DATA_1 =
+      StateData.newBuilder().resourceIds(ImmutableSet.of("resource1")).build();
   private static final BiConsumer<SequenceEvent, RunState> eventConsumer = (e, s) -> {};
 
   private final StripedExecutorService eventTransitionExecutor = new StripedExecutorService(16);
@@ -443,39 +449,6 @@ public class QueuedStateManagerTest {
   }
 
   @Test
-  public void shouldUpdateResourceCountersOnDequeue() throws Exception {
-    when(transaction.activeState(INSTANCE)).thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
-                                                                       .counter(17)
-                                                                       .timestamp(NOW.minusMillis(1))
-                                                                       .state(State.QUEUED)
-                                                                       .data(StateData.zero())
-                                                                       .build()));
-
-    stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of("resource1")))
-        .toCompletableFuture().get(1, MINUTES);
-    verify(transaction).updateCounter(shardedCounter, "resource1", 1);
-  }
-
-  @Test
-  public void shouldUpdateResourceCountersOnTerminalState() throws Exception {
-    when(transaction.activeState(INSTANCE))
-        .thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
-                                    .counter(17)
-                                    .timestamp(NOW.minusMillis(1))
-                                    .state(State.RUNNING)
-                                    .data(StateData.newBuilder()
-                                              .resourceIds(
-                                                  ImmutableSet
-                                                      .of("resource1"))
-                                              .build())
-                                    .build()));
-
-    stateManager.receive(Event.timeout(INSTANCE))
-        .toCompletableFuture().get(1, MINUTES);
-    verify(transaction).updateCounter(shardedCounter, "resource1", -1);
-  }
-
-  @Test
   public void shouldPreventIllegalStateTransition() throws Exception {
     when(transaction.activeState(INSTANCE)).thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
         .counter(17)
@@ -616,4 +589,125 @@ public class QueuedStateManagerTest {
       assertThat(Throwables.getRootCause(e), is(exception));
     }
   }
+
+  @Test
+  public void shouldUpdateResourceCountersOnDequeue() throws Exception {
+    givenState(INSTANCE, State.QUEUED);
+    receiveEvent(Event.dequeue(INSTANCE, ImmutableSet.of("resource1")));
+    verify(transaction).updateCounter(shardedCounter, "resource1", 1);
+  }
+
+  @Test
+  public void shouldNotUpdateResourceCountersOnSubmit() throws Exception {
+    givenState(INSTANCE, State.PREPARE);
+    receiveEvent(Event.submit(INSTANCE, ExecutionDescription.forImage("docker-image"),"styx-run-1"));
+    verify(transaction, never()).updateCounter(eq(shardedCounter), anyString(), anyInt());
+  }
+
+  @Test
+  public void shouldNotUpdateResourceCountersOnSubmitted() throws Exception {
+    givenState(INSTANCE, State.SUBMITTING);
+    receiveEvent(Event.submitted(INSTANCE,"styx-run-1"));
+    verify(transaction, never()).updateCounter(eq(shardedCounter), anyString(), anyInt());
+  }
+
+  @Test
+  public void shouldNotUpdateResourceCountersOnStarted() throws Exception {
+    givenState(INSTANCE, State.SUBMITTED);
+    receiveEvent(Event.started(INSTANCE));
+    verify(transaction, never()).updateCounter(eq(shardedCounter), anyString(), anyInt());
+  }
+
+  @Test
+  public void shouldNotUpdateResourceCountersOnTerminate() throws Exception {
+    givenState(INSTANCE, State.RUNNING);
+    receiveEvent(Event.terminate(INSTANCE, Optional.of(1)));
+    verify(transaction).updateCounter(shardedCounter, "resource1", -1);
+  }
+
+  @Test
+  public void shouldNotUpdateResourceCountersOnStopAfterTerminated() throws Exception {
+    givenState(INSTANCE, State.TERMINATED);
+    receiveEvent(Event.stop(INSTANCE));
+    verify(transaction, never()).updateCounter(eq(shardedCounter), anyString(), anyInt());
+  }
+
+  @Test
+  public void shouldNotUpdateResourceCountersOnSuccess() throws Exception {
+    givenState(INSTANCE, State.TERMINATED);
+    receiveEvent(Event.success(INSTANCE));
+    verify(transaction, never()).updateCounter(eq(shardedCounter), anyString(), anyInt());
+  }
+
+  @Test
+  public void shouldUpdateResourceCountersOnHaltWhileRunning() throws Exception {
+    givenState(INSTANCE, State.RUNNING);
+    receiveEvent(Event.halt(INSTANCE));
+    verify(transaction).updateCounter(shardedCounter, "resource1", -1);
+  }
+
+  @Test
+  public void shouldUpdateResourceCountersOnTimeoutWhileRunning() throws Exception {
+    givenState(INSTANCE, State.RUNNING);
+    receiveEvent(Event.timeout(INSTANCE));
+    verify(transaction).updateCounter(shardedCounter, "resource1", -1);
+  }
+
+  @Test
+  public void shouldNotUpdateResourceCountersOnTimeoutWhileQueued() throws Exception {
+    givenState(INSTANCE, State.QUEUED);
+    receiveEvent(Event.timeout(INSTANCE));
+    verify(transaction, never()).updateCounter(eq(shardedCounter), anyString(), anyInt());
+  }
+
+  @Test
+  public void shouldNotUpdateResourceCountersOnStopAfterFailed() throws Exception {
+    givenState(INSTANCE, State.FAILED);
+    receiveEvent(Event.stop(INSTANCE));
+    verify(transaction, never()).updateCounter(eq(shardedCounter), anyString(), anyInt());
+  }
+
+  @Test
+  public void shouldNotUpdateResourceCountersOnRunErrorWhileQueued() throws Exception {
+    givenState(INSTANCE, State.QUEUED);
+    receiveEvent(Event.runError(INSTANCE, "random error"));
+    verify(transaction, never()).updateCounter(eq(shardedCounter), anyString(), anyInt());
+  }
+
+  @Test
+  public void shouldUpdateResourceCountersOnRunErrorWhileRunning() throws Exception {
+    givenState(INSTANCE, State.RUNNING);
+    receiveEvent(Event.runError(INSTANCE, "random error"));
+    verify(transaction).updateCounter(shardedCounter, "resource1", -1);
+  }
+
+  @Test
+  public void shouldNotUpdateResourceCountersOnRetryAfterFailed() throws Exception {
+    givenState(INSTANCE, State.FAILED);
+    receiveEvent(Event.retryAfter(INSTANCE,10));
+    verify(transaction, never()).updateCounter(eq(shardedCounter), anyString(), anyInt());
+  }
+
+  @Test
+  public void shouldNotUpdateResourceCountersOnRetryAfterTerminated() throws Exception {
+    givenState(INSTANCE, State.TERMINATED);
+    receiveEvent(Event.retryAfter(INSTANCE, 10));
+    verify(transaction, never()).updateCounter(eq(shardedCounter), anyString(), anyInt());
+  }
+
+
+  public void givenState(WorkflowInstance instance, State state) throws IOException {
+    when(transaction.activeState(instance))
+        .thenReturn(Optional.of(PersistentWorkflowInstanceState.builder()
+                                    .counter(17)
+                                    .timestamp(NOW.minusMillis(1))
+                                    .state(state)
+                                    .data(STATE_DATA_1)
+                                    .build()));
+  }
+
+  public void receiveEvent(Event event) throws Exception {
+    stateManager.receive(event).toCompletableFuture().get(1, MINUTES);
+  }
+
 }
