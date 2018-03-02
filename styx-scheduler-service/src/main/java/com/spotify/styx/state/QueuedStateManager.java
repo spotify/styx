@@ -244,6 +244,8 @@ public class QueuedStateManager implements StateManager {
       for (String resource : nextRunState.data().resourceIds().get()) {
         tx.updateCounter(shardedCounter, resource, -1);
       }
+    } else if (!nextRunState.data().resourceIds().isPresent()) {
+      LOG.error("Resource ids are missing for {}.", nextRunState.workflowInstance());
     }
   }
 
