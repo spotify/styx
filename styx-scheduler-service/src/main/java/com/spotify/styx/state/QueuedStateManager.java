@@ -20,7 +20,6 @@
 
 package com.spotify.styx.state;
 
-import static com.spotify.styx.Scheduler.isConsumingResources;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toMap;
 
@@ -53,7 +52,6 @@ import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
 import javaslang.Tuple;
 import javaslang.Tuple2;
-import javaslang.collection.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -239,24 +237,27 @@ public class QueuedStateManager implements StateManager {
     }
 
     if (isConsumingResources(currentRunState.state())
-        && isReleasingResources(nextRunState.state())
+        && !isConsumingResources(nextRunState.state())
         && nextRunState.data().resourceIds().isPresent()) {
       // decrement counters if transitioning from a state that consumes resources
-      // to a state that releases the same resources
+      // to a state that doesn't consume any resources
       for (String resource : nextRunState.data().resourceIds().get()) {
         tx.updateCounter(shardedCounter, resource, -1);
       }
     }
   }
 
-  private static boolean isReleasingResources(State state) {
-    return List.of(State.TERMINATED, State.FAILED, State.ERROR, State.DONE).contains(state);
+
+  private static boolean isConsumingResources(State state) {
+    return javaslang.collection.List.of(State.PREPARE,
+                                        State.SUBMITTING,
+                                        State.SUBMITTED,
+                                        State.RUNNING).contains(state);
   }
 
   private boolean isDequeue(Event event, RunState runState) {
-    return event
-        .equals(Event.dequeue(event.workflowInstance(),
-                              runState.data().resourceIds().orElse(ImmutableSet.of())));
+    return event.equals(Event.dequeue(event.workflowInstance(),
+                                      runState.data().resourceIds().orElse(ImmutableSet.of())));
   }
 
   private void postTransition(SequenceEvent sequenceEvent, RunState runState) {
