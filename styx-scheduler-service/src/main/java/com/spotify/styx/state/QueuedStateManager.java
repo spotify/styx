@@ -125,7 +125,7 @@ public class QueuedStateManager implements StateManager {
   @Override
   public CompletableFuture<Void> receive(Event event) throws IsClosedException {
     ensureRunning();
-    LOG.debug("Event {}", event);
+    LOG.info("Received event {}", event);
 
     // TODO: optional retry on transaction conflict
 
