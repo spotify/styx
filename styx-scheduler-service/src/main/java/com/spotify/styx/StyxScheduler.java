@@ -82,7 +82,6 @@ import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RetryUtil;
-import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
@@ -321,11 +320,9 @@ public class StyxScheduler implements AppInit {
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
     //       take StateManager as argument instead?
     final List<OutputHandler> outputHandlers = new ArrayList<>();
-    final ShardedCounter shardedCounter = new ShardedCounter(storage);
     final QueuedStateManager stateManager = closer.register(
         new QueuedStateManager(time, eventTransitionExecutor, storage,
-            eventConsumerFactory.apply(environment, stats), eventConsumerExecutor,
-            fanOutput(outputHandlers), shardedCounter));
+            eventConsumerFactory.apply(environment, stats), eventConsumerExecutor, fanOutput(outputHandlers)));
 
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);

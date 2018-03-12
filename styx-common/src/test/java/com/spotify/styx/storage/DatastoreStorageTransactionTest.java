@@ -48,7 +48,6 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
-import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Duration;
@@ -62,13 +61,10 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class DatastoreStorageTransactionTest {
-
-  @Mock private ShardedCounter shardedCounter;
 
   private static LocalDatastoreHelper helper;
   private static Datastore datastore;
