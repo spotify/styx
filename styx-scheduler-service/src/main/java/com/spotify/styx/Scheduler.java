@@ -214,7 +214,7 @@ public class Scheduler {
         final boolean proceed = limitAndDequeue(resources, workflowResourceReferences,
             currentResourceUsage, batch.get(i), blockers.get(i));
 
-        // Stop processing if rate limit was hit or thread was interrupted
+        // Stop processing if thread was interrupted
         if (!proceed) {
           return;
         }
@@ -310,7 +310,10 @@ public class Scheduler {
     } else {
       if (!dequeueRateLimiter.tryAcquire()) {
         LOG.debug("Dequeue rate limited");
-        return false;
+        // give up on current workflow instance but continue with the rest and after
+        // rate limiter cools down, hopefully we can dequeue the rest of candidates;
+        // otherwise we leave them to the next tick
+        return true;
       }
       instanceResourceRefs.forEach(id -> currentResourceUsage.computeIfAbsent(id, id_ -> 0L));
       instanceResourceRefs.forEach(id -> currentResourceUsage.compute(id, (id_, l) -> l + 1));
