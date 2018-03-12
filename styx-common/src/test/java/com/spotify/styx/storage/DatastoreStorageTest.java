@@ -74,7 +74,6 @@ import com.spotify.styx.state.Message.MessageLevel;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
-import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.time.Duration;
 import java.time.Instant;
@@ -178,7 +177,6 @@ public class DatastoreStorageTest {
   private DatastoreStorage storage;
   private Datastore datastore;
 
-  @Mock private ShardedCounter shardedCounter;
   @Mock TransactionFunction<String, FooException> transactionFunction;
   @Mock Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory;
 

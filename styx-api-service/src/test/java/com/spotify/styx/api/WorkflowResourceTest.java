@@ -61,7 +61,6 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
-import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
@@ -83,13 +82,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private static final String SCHEDULER_BASE = "http://localhost:12345";
 
   private static LocalDatastoreHelper localDatastore;
-
-  private Datastore datastore = localDatastore.getOptions().getService();
-  private Connection bigtable = setupBigTableMockTable();
-  private AggregateStorage storage;
-
-  @Mock private ShardedCounter shardedCounter;
-  @Mock private WorkflowValidator workflowValidator;
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
@@ -119,6 +111,12 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private static final ByteString BAD_JSON =
       ByteString.encodeUtf8("{\"The BAD\"}");
 
+  @Mock WorkflowValidator workflowValidator;
+
+  private Datastore datastore = localDatastore.getOptions().getService();
+  private Connection bigtable = setupBigTableMockTable();
+  private AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
+
   public WorkflowResourceTest(Api.Version version) {
     super("/workflows", version, "workflow-test");
     MockitoAnnotations.initMocks(this);
@@ -126,7 +124,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
-    storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
     WorkflowResource workflowResource = new WorkflowResource(storage, SCHEDULER_BASE, workflowValidator,
