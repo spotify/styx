@@ -31,7 +31,6 @@ import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.EventUtil;
-import com.spotify.styx.util.Time;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -59,7 +58,7 @@ public class WFIExecutionBuilderTest {
   }
 
   @Test
-  public void testHaltEventAfterTriggerEvent() throws Exception {
+  public void testHaltEventAfterTriggerEvent() {
     long c = 0L;
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
@@ -93,7 +92,7 @@ public class WFIExecutionBuilderTest {
   }
 
   @Test
-  public void testRunErrorEventAfterTriggerEvent() throws Exception {
+  public void testRunErrorEventAfterTriggerEvent() {
     long c = 0L;
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
@@ -127,7 +126,7 @@ public class WFIExecutionBuilderTest {
   }
 
   @Test
-  public void testGeneralExample() throws Exception {
+  public void testGeneralExample() {
     long c = 0L;
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
@@ -222,7 +221,7 @@ public class WFIExecutionBuilderTest {
   }
 
   @Test
-  public void testFailureNoExitCode() throws Exception {
+  public void testFailureNoExitCode() {
     long c = 0L;
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
@@ -263,7 +262,7 @@ public class WFIExecutionBuilderTest {
   }
 
   @Test
-  public void testTimeout() throws Exception {
+  public void testTimeout() {
     long c = 0L;
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
@@ -318,7 +317,52 @@ public class WFIExecutionBuilderTest {
   }
 
   @Test
-  public void testRunError() throws Exception {
+  public void testReceiveTimeoutWithMissingTriggerExecution() {
+    long c = 0L;
+    List<SequenceEvent> events = Arrays.asList(
+        SequenceEvent.create(E.timeout(), c++, ts("07:54")),
+        SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(desc("img1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
+        SequenceEvent.create(E.started(), c++, ts("07:57"))
+    );
+
+    WorkflowInstanceExecutionData workflowInstanceExecutionData =
+        new WFIExecutionBuilder().executionInfo(events);
+    WorkflowInstanceExecutionData expected =
+        WorkflowInstanceExecutionData.create(
+            WORKFLOW_INSTANCE,
+            Collections.singletonList(
+                Trigger.create(
+                    "UNKNOWN",
+                    time("07:54"),
+                    false,
+                    Arrays.asList(
+                        Execution.create(
+                            Optional.empty(),
+                            Optional.empty(),
+                            Collections.singletonList(
+                                ExecStatus.create(time("07:54"), "TIMEOUT", Optional.empty())
+                            )
+                        ),
+                        Execution.create(
+                            Optional.of("exec-id-00"),
+                            Optional.of("img1"),
+                            Arrays.asList(
+                                ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
+                                ExecStatus.create(time("07:57"), "STARTED", Optional.empty())
+                            )
+                        )
+                    )
+                )
+            )
+        );
+
+    assertThat(workflowInstanceExecutionData, is(expected));
+  }
+
+  @Test
+  public void testRunError() {
     long c = 0L;
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
@@ -371,7 +415,7 @@ public class WFIExecutionBuilderTest {
   }
 
   @Test
-  public void testHaltAndReTrigger() throws Exception {
+  public void testHaltAndReTrigger() {
     long c = 0L;
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
@@ -431,7 +475,7 @@ public class WFIExecutionBuilderTest {
   }
 
   private void assertValidTransitionSequence(List<SequenceEvent> events) {
-    RunState runState = RunState.fresh(WORKFLOW_INSTANCE, (Time) Instant::now);
+    RunState runState = RunState.fresh(WORKFLOW_INSTANCE, Instant::now);
 
     if (!EventUtil.name(events.get(0).event()).equals("triggerExecution")) {
       fail("first event must be triggerExecution");
@@ -441,7 +485,7 @@ public class WFIExecutionBuilderTest {
       if ("triggerExecution".equals(EventUtil.name(event.event()))
           && runState.state() != RunState.State.NEW) {
         assertThat(runState.state().isTerminal(), is(true));
-        runState = RunState.fresh(WORKFLOW_INSTANCE, (Time) Instant::now);
+        runState = RunState.fresh(WORKFLOW_INSTANCE, Instant::now);
       }
 
       runState = runState.transition(event.event());
