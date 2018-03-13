@@ -24,10 +24,10 @@ import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.spotify.styx.WorkflowExecutionGate.NOOP;
 import static java.util.Collections.emptySet;
+import static java.util.Comparator.comparingLong;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingByConcurrent;
-import static java.util.stream.Collectors.toCollection;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
@@ -56,7 +56,6 @@ import com.spotify.styx.util.Time;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -176,8 +175,8 @@ public class Scheduler {
         activeStates.parallelStream()
             .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
             .filter(entry -> shouldExecute(entry.runState()))
-            .collect(toCollection(Lists::newArrayList));
-    Collections.shuffle(eligibleInstances);
+            .sorted(comparingLong(i -> i.runState().timestamp()))
+            .collect(toList());
 
     timedOutInstances.forEach(wfi -> this.sendTimeout(wfi, activeStatesMap.get(wfi)));
 

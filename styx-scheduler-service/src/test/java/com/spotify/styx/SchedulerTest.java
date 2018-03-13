@@ -31,6 +31,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anySetOf;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.longThat;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -67,6 +68,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -80,6 +82,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Matchers;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
@@ -277,11 +280,28 @@ public class SchedulerTest {
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
 
     StateData stateData = StateData.newBuilder().tries(0).build();
+
     populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get()));
+
+    List<WorkflowInstance> workflowInstances = new ArrayList<>();
+
+    for (int i = 1; i <= 10; i++) {
+      WorkflowId workflowId = WorkflowId.create("styx2", "example" + i);
+      initWorkflow(workflowUsingResources(workflowId));
+      WorkflowInstance instance = WorkflowInstance.create(workflowId, "2016-12-02T01");
+      populateActiveStates(RunState.create(instance, State.QUEUED, stateData,
+                                           time.get().minus(i, ChronoUnit.SECONDS)));
+      workflowInstances.add(instance);
+    }
 
     scheduler.tick();
 
-    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of()));
+    InOrder inOrder = inOrder(stateManager);
+
+    Lists.reverse(workflowInstances)
+        .forEach(x -> inOrder.verify(stateManager)
+            .receiveIgnoreClosed(Event.dequeue(x, ImmutableSet.of())));
+    inOrder.verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of()));
   }
 
   @Test
