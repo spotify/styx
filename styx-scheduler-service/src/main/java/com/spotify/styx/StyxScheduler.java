@@ -305,6 +305,8 @@ public class StyxScheduler implements AppInit {
     final Publisher publisher = publisherFactory.apply(environment);
     closer.register(publisher);
 
+    final ScheduledExecutorService shardedCounterExecutor = executorFactory.create(10, schedulerTf);
+    closer.register(executorCloser("sharded-counter", shardedCounterExecutor));
     final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
     closer.register(executorCloser("scheduler", executor));
     final StripedExecutorService eventTransitionExecutor = new StripedExecutorService(16);
@@ -321,7 +323,7 @@ public class StyxScheduler implements AppInit {
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
     //       take StateManager as argument instead?
     final List<OutputHandler> outputHandlers = new ArrayList<>();
-    final ShardedCounter shardedCounter = new ShardedCounter(storage);
+    final ShardedCounter shardedCounter = new ShardedCounter(storage, shardedCounterExecutor);
     final QueuedStateManager stateManager = closer.register(
         new QueuedStateManager(time, eventTransitionExecutor, storage,
             eventConsumerFactory.apply(environment, stats), eventConsumerExecutor,

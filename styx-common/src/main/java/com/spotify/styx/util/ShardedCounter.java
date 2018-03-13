@@ -29,15 +29,11 @@ import com.spotify.styx.storage.StorageTransaction;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +66,7 @@ public class ShardedCounter {
   public static final String PROPERTY_COUNTER_ID = "counterId";
 
   private final Storage storage;
+  private final ExecutorService executorService;
 
   /**
    * A weakly consistent view of the state in Datastore, refreshed by ShardedCounter on demand.
@@ -79,45 +76,45 @@ public class ShardedCounter {
       .expireAfterWrite(CACHE_EXPIRY_DURATION.toMillis(), TimeUnit.MILLISECONDS)
       .build();
 
-  private static class CounterSnapshot {
+  private static class CounterSnapshotFactory {
 
     private static final int TRANSACTION_GROUP_SIZE = 15;
-    private final String counterId;
-    private final Long limit;
-    private final Map<Integer, Long> shards;
 
-    public CounterSnapshot(Storage storage, String counterId) {
-      limit = getLimit(storage, counterId);
+    public static CounterSnapshot create(Storage storage, String counterId,
+                                         ExecutorService executorService) {
 
+      return new CounterSnapshot(storage, counterId,
+                                 getShards(storage, counterId, executorService));
+    }
+
+    private static Map<Integer, Long> getShards(Storage storage, String counterId,
+                                                ExecutorService executorService) {
       Map<Integer, Long> fetchedShards = storage.shardsForCounter(counterId);
       if (fetchedShards.size() < NUM_SHARDS) {
         // The counter probably has not been initialized (so we have empty QueryResults). Also
         // possible that a prior initialize() crashed halfway, or we got a partial list of shards in
         // QueryResults due to eventual consistency. In any case, repeated initialization eventually
         // creates all NUM_SHARDS shards.
-        initialize(storage, counterId);
+        initialize(storage, counterId, executorService);
         fetchedShards = storage.shardsForCounter(counterId);
       }
-      this.counterId = counterId;
-      this.shards = fetchedShards;
+      return fetchedShards;
     }
 
     /**
      * Idempotent initialization, so that we don't reset an existing shard to zero - counterId may
      * have already been initialized and incremented by another process.
      */
-    private static void initialize(Storage storage, String counterId) {
-      Set<CompletableFuture> results = new HashSet<>();
+    private static void initialize(Storage storage, String counterId,
+                                   ExecutorService executorService) {
       for (int i = 0; i < NUM_SHARDS; i += TRANSACTION_GROUP_SIZE) {
-        int index = i;
-        results.add(CompletableFuture.runAsync(() -> initShard(storage, counterId, index, TRANSACTION_GROUP_SIZE)));
+        final int index = i;
+        executorService.execute(() -> initShard(storage, counterId, index, TRANSACTION_GROUP_SIZE));
       }
-      for (CompletableFuture future : results) {
-        try {
-          future.get();
-        } catch (InterruptedException | ExecutionException e) {
-          LOG.warn("Error when initializing shards: ", e);
-        }
+      try {
+        executorService.awaitTermination(20, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        LOG.warn("Error when initializing shards: ", e);
       }
     }
 
@@ -135,6 +132,22 @@ public class ShardedCounter {
       } catch (IOException e) {
         LOG.warn("Error when trying to create a group of shards in Datastore: ", e);
       }
+    }
+  }
+
+  private static class CounterSnapshot {
+
+    private static final int TRANSACTION_GROUP_SIZE = 15;
+    private final String counterId;
+    private final Long limit;
+    private final Map<Integer, Long> shards;
+
+    public CounterSnapshot(Storage storage, String counterId,
+                           Map<Integer, Long> shards) {
+      limit = getLimit(storage, counterId);
+
+      this.shards = storage.shardsForCounter(counterId);
+      this.counterId = counterId;
     }
 
     /**
@@ -181,7 +194,8 @@ public class ShardedCounter {
     }
   }
 
-  public ShardedCounter(Storage storage) {
+  public ShardedCounter(Storage storage, ExecutorService executorService) {
+    this.executorService = executorService;
     this.storage = storage;
   }
 
@@ -200,7 +214,9 @@ public class ShardedCounter {
    * Update cached snapshot with most recent state of counter in Datastore.
    */
   private CounterSnapshot refreshCounterSnapshot(String counterId) {
-    final CounterSnapshot newSnapshot = new CounterSnapshot(storage, counterId);
+    final CounterSnapshot
+        newSnapshot =
+        CounterSnapshotFactory.create(storage, counterId, executorService);
     inMemSnapshot.put(counterId, newSnapshot);
     return newSnapshot;
   }

@@ -24,9 +24,11 @@ import static com.spotify.styx.api.Middlewares.authValidator;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.common.io.Closer;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.apollo.AppInit;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
@@ -48,18 +50,27 @@ import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.StreamUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import com.typesafe.config.Config;
+import java.io.Closeable;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Main entrypoint for Styx API Service
  */
 public class StyxApi implements AppInit {
+
+  private static final Logger LOG = LoggerFactory.getLogger(StyxApi.class);
 
   public static final String SERVICE_NAME = "styx-api";
 
@@ -69,18 +80,32 @@ public class StyxApi implements AppInit {
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
 
   private final StorageFactory storageFactory;
+  private final ExecutorFactory executorFactory;
+
+  @FunctionalInterface
+  interface ExecutorFactory {
+    ScheduledExecutorService create(
+        int threads,
+        ThreadFactory threadFactory);
+  }
 
   public static class Builder {
 
     private StorageFactory storageFactory = StyxApi::storage;
+    private ExecutorFactory executorFactory = Executors::newScheduledThreadPool;
 
     public Builder setStorageFactory(StorageFactory storageFactory) {
       this.storageFactory = storageFactory;
       return this;
     }
 
+    public Builder setExecutorFactory(ExecutorFactory executorFactory) {
+      this.executorFactory = executorFactory;
+      return this;
+    }
+
     public StyxApi build() {
-      return new StyxApi(storageFactory);
+      return new StyxApi(storageFactory, executorFactory);
     }
   }
 
@@ -92,13 +117,15 @@ public class StyxApi implements AppInit {
     return newBuilder().build();
   }
 
-  private StyxApi(StorageFactory storageFactory) {
+  private StyxApi(StorageFactory storageFactory, ExecutorFactory executorFactory) {
     this.storageFactory = requireNonNull(storageFactory);
+    this.executorFactory = requireNonNull(executorFactory);
   }
 
   @Override
   public void create(Environment environment) {
     final Config config = environment.config();
+    final Closer closer = environment.closer();
     final String schedulerServiceBaseUrl = config.hasPath(SCHEDULER_SERVICE_BASE_URL)
                                            ? config.getString(SCHEDULER_SERVICE_BASE_URL)
                                            : DEFAULT_SCHEDULER_SERVICE_BASE_URL;
@@ -117,7 +144,19 @@ public class StyxApi implements AppInit {
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
                                                                    storage,
                                                                    new WorkflowValidator(new DockerImageValidator()));
-    final ShardedCounter shardedCounter = new ShardedCounter(storage);
+    final Thread.UncaughtExceptionHandler uncaughtExceptionHandler =
+        (thread, throwable) -> LOG.error("Thread {} threw {}", thread, throwable);
+
+    final ThreadFactory schedulerTf = new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat("styx-scheduler-%d")
+        .setUncaughtExceptionHandler(uncaughtExceptionHandler)
+        .build();
+
+    final ScheduledExecutorService shardedCounterExecutor = executorFactory.create(10, schedulerTf);
+    closer.register(executorCloser("sharded-counter", shardedCounterExecutor));
+
+    final ShardedCounter shardedCounter = new ShardedCounter(storage, shardedCounterExecutor);
     final ResourceResource resourceResource = new ResourceResource(storage, shardedCounter);
     final StatusResource statusResource = new StatusResource(storage);
     final SchedulerProxyResource schedulerProxyResource = new SchedulerProxyResource(
@@ -148,5 +187,20 @@ public class StyxApi implements AppInit {
     final Connection bigTable = closer.register(createBigTableConnection(config));
     final Datastore datastore = createDatastore(config);
     return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
+  }
+
+  private static Closeable executorCloser(String name, ExecutorService executor) {
+    return () -> {
+      LOG.info("Shutting down executor: {}", name);
+      executor.shutdown();
+      try {
+        executor.awaitTermination(1, SECONDS);
+      } catch (InterruptedException ignored) {
+      }
+      final List<Runnable> runnables = executor.shutdownNow();
+      if (!runnables.isEmpty()) {
+        LOG.warn("{} task(s) in {} did not execute", runnables.size(), name);
+      }
+    };
   }
 }

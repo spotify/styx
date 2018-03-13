@@ -46,6 +46,8 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -62,12 +64,13 @@ public class ShardedCounterTest {
   private static final String COUNTER_ID1 = "resource_counter_1";
   private static final String COUNTER_ID2 = "resource_counter_2";
 
-
   private static LocalDatastoreHelper helper;
   private static ShardedCounter shardedCounter;
   private static Datastore datastore;
   private static Storage storage;
   private static Connection connection;
+
+  private final ExecutorService executor = Executors.newScheduledThreadPool(10);
 
   @BeforeClass
   public static void setUpClass() throws IOException, InterruptedException {
@@ -80,7 +83,7 @@ public class ShardedCounterTest {
 
   @Before
   public void setUp() throws IOException, InterruptedException {
-    shardedCounter = new ShardedCounter(storage);
+    shardedCounter = new ShardedCounter(storage, executor);
   }
 
   @After
@@ -91,8 +94,10 @@ public class ShardedCounterTest {
 
   @Test
   public void shouldCreateCounterEmpty() {
+    long before = System.currentTimeMillis();
     assertEquals(shardedCounter.getCounter(COUNTER_ID1), 0L);
-
+    long after = System.currentTimeMillis();
+    System.out.println(after - before);
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
     // assert all shards exist
     IntStream.range(0, ShardedCounter.NUM_SHARDS).forEach(i -> {
