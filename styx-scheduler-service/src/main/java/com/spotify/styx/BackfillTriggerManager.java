@@ -165,6 +165,9 @@ class BackfillTriggerManager {
 
     if (momentNextTrigger.equals(momentBackfill.end())) {
       LOG.debug("Backfill {} all triggered", momentBackfill);
+      tx.store(momentBackfill.builder()
+          .allTriggered(true)
+          .build());
       return false;
     }
 

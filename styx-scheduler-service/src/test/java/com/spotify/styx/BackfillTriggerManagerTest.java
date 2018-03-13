@@ -250,7 +250,7 @@ public class BackfillTriggerManagerTest {
   }
 
   @Test
-  public void shouldNotTriggerIfAllTriggered() {
+  public void shouldNotTriggerIfAllTriggered() throws IOException {
     final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
 
@@ -261,6 +261,22 @@ public class BackfillTriggerManagerTest {
 
     backfillTriggerManager.tick();
 
+    verifyZeroInteractions(triggerListener);
+  }
+
+  @Test
+  public void shouldMarkedAsAllTriggeredIfEndOfBackfillEncountered() throws IOException {
+    final Workflow workflow = createWorkflow(WORKFLOW_ID1);
+    initWorkflow(workflow);
+
+    final Backfill completedBackfill =
+        BACKFILL_2.builder().nextTrigger(BACKFILL_2.end()).allTriggered(false).build();
+
+    backfills.put(completedBackfill.id(), completedBackfill);
+
+    backfillTriggerManager.tick();
+
+    verify(transaction).store(completedBackfill.builder().allTriggered(true).build());
     verifyZeroInteractions(triggerListener);
   }
 
