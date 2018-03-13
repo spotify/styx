@@ -29,10 +29,15 @@ import com.spotify.styx.storage.StorageTransaction;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,6 +81,7 @@ public class ShardedCounter {
 
   private static class CounterSnapshot {
 
+    private static final int TRANSACTION_GROUP_SIZE = 15;
     private final String counterId;
     private final Long limit;
     private final Map<Integer, Long> shards;
@@ -101,19 +107,33 @@ public class ShardedCounter {
      * have already been initialized and incremented by another process.
      */
     private static void initialize(Storage storage, String counterId) {
-      for (int i = 0; i < NUM_SHARDS; i++) {
-        final int shardIndex = i;
+      Set<CompletableFuture> results = new HashSet<>();
+      for (int i = 0; i < NUM_SHARDS; i += TRANSACTION_GROUP_SIZE) {
+        int index = i;
+        results.add(CompletableFuture.runAsync(() -> initShard(storage, counterId, index, TRANSACTION_GROUP_SIZE)));
+      }
+      for (CompletableFuture future : results) {
         try {
-          storage.runInTransaction(tx -> {
-            final Optional<Shard> shard = tx.shard(counterId, shardIndex);
-            if (!shard.isPresent()) {
-              tx.store(Shard.create(counterId, shardIndex, 0));
-            }
-            return null;
-          });
-        } catch (IOException e) {
-          LOG.warn("Error when trying to create a shard entry in Datastore: ", e);
+          future.get();
+        } catch (InterruptedException | ExecutionException e) {
+          LOG.warn("Error when initializing shards: ", e);
         }
+      }
+    }
+
+    private static void initShard(Storage storage, String counterId, int index, int groupSize) {
+      try {
+        storage.runInTransaction(tx -> {
+          for (int i = 0; i < groupSize; i++) {
+            final Optional<Shard> shard = tx.shard(counterId, index + i);
+            if (!shard.isPresent()) {
+              tx.store(Shard.create(counterId, index + i, 0));
+            }
+          }
+          return null;
+        });
+      } catch (IOException e) {
+        LOG.warn("Error when trying to create a group of shards in Datastore: ", e);
       }
     }
 
