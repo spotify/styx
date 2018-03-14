@@ -147,13 +147,13 @@ public class StyxApi implements AppInit {
     final Thread.UncaughtExceptionHandler uncaughtExceptionHandler =
         (thread, throwable) -> LOG.error("Thread {} threw {}", thread, throwable);
 
-    final ThreadFactory schedulerTf = new ThreadFactoryBuilder()
+    final ThreadFactory shardedCounterTf = new ThreadFactoryBuilder()
         .setDaemon(true)
-        .setNameFormat("styx-scheduler-%d")
+        .setNameFormat("sharded-counter-%d")
         .setUncaughtExceptionHandler(uncaughtExceptionHandler)
         .build();
 
-    final ScheduledExecutorService shardedCounterExecutor = executorFactory.create(10, schedulerTf);
+    final ScheduledExecutorService shardedCounterExecutor = executorFactory.create(10, shardedCounterTf);
     closer.register(executorCloser("sharded-counter", shardedCounterExecutor));
 
     final ShardedCounter shardedCounter = new ShardedCounter(storage, shardedCounterExecutor);

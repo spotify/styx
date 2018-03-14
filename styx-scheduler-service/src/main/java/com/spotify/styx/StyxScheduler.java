@@ -296,20 +296,15 @@ public class StyxScheduler implements AppInit {
     final Config config = environment.config();
     final Closer closer = environment.closer();
 
-    final Thread.UncaughtExceptionHandler uncaughtExceptionHandler =
-        (thread, throwable) -> LOG.error("Thread {} threw {}", thread, throwable);
-    final ThreadFactory schedulerTf = new ThreadFactoryBuilder()
-        .setDaemon(true)
-        .setNameFormat("styx-scheduler-%d")
-        .setUncaughtExceptionHandler(uncaughtExceptionHandler)
-        .build();
+    final ThreadFactory schedulerTf = threadFactoryFor("styx-scheduler-%d");
+    final ThreadFactory shardedCounterTf = threadFactoryFor("sharded-counter-%d");
 
     final Publisher publisher = publisherFactory.apply(environment);
     closer.register(publisher);
 
     final ScheduledExecutorService shardedCounterExecutor = executorFactory.create(10, schedulerTf);
     closer.register(executorCloser("sharded-counter", shardedCounterExecutor));
-    final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
+    final ScheduledExecutorService executor = executorFactory.create(3, shardedCounterTf);
     closer.register(executorCloser("scheduler", executor));
     final StripedExecutorService eventTransitionExecutor = new StripedExecutorService(16);
     closer.register(executorCloser("event-transition", eventTransitionExecutor));
@@ -397,6 +392,17 @@ public class StyxScheduler implements AppInit {
     this.backfillTriggerManager = backfillTriggerManager;
     this.workflowRemoveListener = workflowRemoveListener;
     this.workflowChangeListener = workflowChangeListener;
+  }
+
+  private ThreadFactory threadFactoryFor(String name) {
+    final Thread.UncaughtExceptionHandler uncaughtExceptionHandler =
+        (thread, throwable) -> LOG.error("Thread {} threw {}", thread, throwable);
+
+    return new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat(name)
+        .setUncaughtExceptionHandler(uncaughtExceptionHandler)
+        .build();
   }
 
   @VisibleForTesting
