@@ -37,7 +37,7 @@ public class ShardedCounterSnapshotFactory implements CounterSnapshotFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShardedCounterSnapshotFactory.class);
 
-  private static final int TRANSACTION_GROUP_SIZE = 25;
+  public static final int TRANSACTION_GROUP_SIZE = 25;
   private final Storage storage;
 
   public ShardedCounterSnapshotFactory(Storage storage) {

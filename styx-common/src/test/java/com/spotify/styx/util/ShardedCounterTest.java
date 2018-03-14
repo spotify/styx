@@ -86,7 +86,7 @@ public class ShardedCounterTest {
 
   @After
   public void tearDown() throws IOException, InterruptedException {
-    clearDatastore();
+    clearDatastore(datastore);
   }
 
 
@@ -285,12 +285,12 @@ public class ShardedCounterTest {
     }
   }
 
-  private static void clearDatastore() {
-    deleteAllOfKind(KIND_COUNTER_SHARD);
-    deleteAllOfKind(KIND_COUNTER_LIMIT);
+  public static void clearDatastore(Datastore datastore) {
+    deleteAllOfKind(datastore, KIND_COUNTER_SHARD);
+    deleteAllOfKind(datastore, KIND_COUNTER_LIMIT);
   }
 
-  private static void deleteAllOfKind(String kind) {
+  private static void deleteAllOfKind(Datastore datastore, String kind) {
     QueryResults<Entity> results = datastore.run(EntityQuery.newEntityQueryBuilder()
                                                      .setKind(kind)
                                                      .build());
