@@ -63,6 +63,7 @@ public class ShardedCounterTest {
   private static final String COUNTER_ID2 = "resource_counter_2";
 
   private static LocalDatastoreHelper helper;
+  private static CounterSnapshotFactory counterSnapshotFactory;
   private static ShardedCounter shardedCounter;
   private static Datastore datastore;
   private static Storage storage;
@@ -75,11 +76,12 @@ public class ShardedCounterTest {
     datastore = helper.getOptions().getService();
     connection = Mockito.mock(Connection.class);
     storage = new AggregateStorage(connection, datastore, Duration.ZERO);
+    counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
   }
 
   @Before
   public void setUp() throws IOException, InterruptedException {
-    shardedCounter = new ShardedCounter(storage);
+    shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
   }
 
   @After

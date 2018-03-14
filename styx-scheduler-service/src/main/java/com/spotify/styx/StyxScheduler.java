@@ -84,6 +84,7 @@ import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.ShardedCounter;
+import com.spotify.styx.util.ShardedCounterSnapshotFactory;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
@@ -320,10 +321,12 @@ public class StyxScheduler implements AppInit {
 
     warmUpCache(workflowCache, storage);
 
+    final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
+    final ShardedCounter shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
+
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
     //       take StateManager as argument instead?
     final List<OutputHandler> outputHandlers = new ArrayList<>();
-    final ShardedCounter shardedCounter = new ShardedCounter(storage);
     final QueuedStateManager stateManager = closer.register(
         new QueuedStateManager(time, eventTransitionExecutor, storage,
             eventConsumerFactory.apply(environment, stats), eventConsumerExecutor,
@@ -372,8 +375,7 @@ public class StyxScheduler implements AppInit {
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
     dockerRunner.restore();
-
-    initializeResourceShards(storage, shardedCounter);
+    initializeResourceShards(storage, shardedCounter, counterSnapshotFactory);
     startTriggerManager(triggerManager, executor);
     startBackfillTriggerManager(backfillTriggerManager, executor);
     startScheduler(scheduler, executor);
@@ -441,11 +443,11 @@ public class StyxScheduler implements AppInit {
     }
   }
 
-  //TODO: test this bit
-  private void initializeResourceShards(Storage storage, ShardedCounter shardedCounter) {
+  private void initializeResourceShards(Storage storage, ShardedCounter shardedCounter,
+                                        CounterSnapshotFactory counterSnapshotFactory) {
     try {
       storage.resources().parallelStream().forEach(resource -> {
-        CounterSnapshotFactory.create(storage, resource.id());
+        counterSnapshotFactory.create(resource.id());
         try {
           storage.runInTransaction(tx -> {
             shardedCounter.updateLimit(tx, resource.id(), resource.concurrency());

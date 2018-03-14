@@ -74,13 +74,15 @@ public class ShardedCounter {
       .expireAfterWrite(CACHE_EXPIRY_DURATION.toMillis(), TimeUnit.MILLISECONDS)
       .build();
 
-  public static class CounterSnapshot {
+  private CounterSnapshotFactory counterSnapshotFactory;
+
+  public static class Snapshot implements CounterSnapshot {
 
     private final String counterId;
     private final Long limit;
     private final Map<Integer, Long> shards;
 
-    public CounterSnapshot(Storage storage, String counterId, Map<Integer, Long> shards) {
+    public Snapshot(Storage storage, String counterId, Map<Integer, Long> shards) {
       this.limit = getLimit(storage, counterId);
       this.shards = shards;
       this.counterId = counterId;
@@ -95,15 +97,20 @@ public class ShardedCounter {
      * </p>ex. If limit=5 for a given counter and NUM_SHARDS=3,
      * then the distribution of capacity between the 3 shards will be [2, 2, 1]
      */
-    private long shardCapacity(int shardIndex) {
+    public long shardCapacity(int shardIndex) {
       return limit / NUM_SHARDS + (shardIndex < limit % NUM_SHARDS ? 1 : 0);
+    }
+
+    @Override
+    public Map<Integer, Long> getShards() {
+      return shards;
     }
 
     /**
      * Returns shard index which _likely_ could be successfully updated by delta, according to our
      * cached view of the state in Datastore.
      */
-    private int pickShardWithSpareCapacity(long delta) {
+    public int pickShardWithSpareCapacity(long delta) {
       List<Integer> candidates = new ArrayList<>();
 
       shards.keySet().forEach(index -> {
@@ -130,8 +137,9 @@ public class ShardedCounter {
     }
   }
 
-  public ShardedCounter(Storage storage) {
+  public ShardedCounter(Storage storage, CounterSnapshotFactory counterSnapshotFactory) {
     this.storage = storage;
+    this.counterSnapshotFactory = counterSnapshotFactory;
   }
 
   /**
@@ -149,7 +157,7 @@ public class ShardedCounter {
    * Update cached snapshot with most recent state of counter in Datastore.
    */
   private CounterSnapshot refreshCounterSnapshot(String counterId) {
-    final CounterSnapshot newSnapshot = CounterSnapshotFactory.create(storage, counterId);
+    final CounterSnapshot newSnapshot = counterSnapshotFactory.create(counterId);
     inMemSnapshot.put(counterId, newSnapshot);
     return newSnapshot;
   }
@@ -215,8 +223,8 @@ public class ShardedCounter {
     final CounterSnapshot snapshot = getCounterSnapshot(counterId);
     long result = 0;
 
-    for (long shard : snapshot.shards.values()) {
-      result += shard;
+    for (long shardValue : snapshot.getShards().values()) {
+      result += shardValue;
     }
     return result;
   }
@@ -233,6 +241,7 @@ public class ShardedCounter {
    * is trying to delete all shards, while another is creating/updating shards in between the
    * multiple transactions made by this method.
    */
+  //TODO: remove storage parameter. use class field
   public void deleteCounter(Storage storage, String counterId) throws IOException {
     storage.deleteShardsForCounter(counterId);
     storage.deleteLimitForCounter(counterId);

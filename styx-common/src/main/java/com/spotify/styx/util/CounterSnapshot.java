@@ -20,10 +20,16 @@
 
 package com.spotify.styx.util;
 
-/**
- * Factory for creating counter snapshot instances
- */
-public interface CounterSnapshotFactory {
+import java.util.Map;
 
-  CounterSnapshot create(String counterId);
+/**
+ * An interface for counter snapshots
+ */
+public interface CounterSnapshot {
+
+  Map<Integer, Long> getShards();
+
+  int pickShardWithSpareCapacity(long delta);
+
+  long shardCapacity(int shardIndex);
 }
