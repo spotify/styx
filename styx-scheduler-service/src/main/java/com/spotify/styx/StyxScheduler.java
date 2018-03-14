@@ -45,6 +45,7 @@ import com.google.cloud.datastore.Datastore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -78,6 +79,7 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
+import com.spotify.styx.util.CounterSnapshotFactory;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.IsClosedException;
@@ -373,6 +375,7 @@ public class StyxScheduler implements AppInit {
 
     dockerRunner.restore();
 
+    initializeResourceShards(stateManager, storage, shardedCounterExecutor);
     startTriggerManager(triggerManager, executor);
     startBackfillTriggerManager(backfillTriggerManager, executor);
     startScheduler(scheduler, executor);
@@ -438,6 +441,15 @@ public class StyxScheduler implements AppInit {
       LOG.error("Failed to get workflows from storage while warming up the cache");
       throw new RuntimeException(e);
     }
+  }
+
+  //TODO: test this bit
+  private void initializeResourceShards(QueuedStateManager stateManager,
+                                        Storage storage, ExecutorService executorService) {
+    stateManager.activeStates().entrySet().parallelStream().forEach(activeState ->
+        activeState.getValue().data().resourceIds().orElse(ImmutableSet.of())
+           .forEach(resource -> CounterSnapshotFactory.create(storage, resource, executorService))
+    );
   }
 
   private static void startCleaner(Cleaner cleaner, ScheduledExecutorService exec) {
