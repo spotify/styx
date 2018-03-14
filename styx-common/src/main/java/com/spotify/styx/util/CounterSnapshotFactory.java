@@ -20,6 +20,8 @@
 
 package com.spotify.styx.util;
 
+import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
+
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.util.Map;
@@ -50,7 +52,7 @@ public class CounterSnapshotFactory {
   private static Map<Integer, Long> getShards(Storage storage, String counterId,
                                               ExecutorService executorService) {
     Map<Integer, Long> fetchedShards = storage.shardsForCounter(counterId);
-    if (fetchedShards.size() < ShardedCounter.NUM_SHARDS) {
+    if (fetchedShards.size() < NUM_SHARDS) {
       // The counter probably has not been initialized (so we have empty QueryResults). Also
       // possible that a prior initialize() crashed halfway, or we got a partial list of shards in
       // QueryResults due to eventual consistency. In any case, repeated initialization eventually
@@ -68,11 +70,11 @@ public class CounterSnapshotFactory {
   private static void initialize(Storage storage, String counterId,
                                  ExecutorService executorService) {
 
-    for (int i = 0; i < ShardedCounter.NUM_SHARDS; i += TRANSACTION_GROUP_SIZE) {
+    for (int i = 0; i < NUM_SHARDS; i += TRANSACTION_GROUP_SIZE) {
       final int startIndex = i;
       executorService.execute(
           () -> initShardRange(storage, counterId, startIndex,
-                               startIndex + TRANSACTION_GROUP_SIZE));
+                               Math.min(NUM_SHARDS, startIndex + TRANSACTION_GROUP_SIZE)));
     }
     try {
       executorService.awaitTermination(20, TimeUnit.SECONDS);
