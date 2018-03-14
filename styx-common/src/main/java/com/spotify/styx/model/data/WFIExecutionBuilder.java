@@ -218,13 +218,14 @@ class WFIExecutionBuilder {
     public Void timeout(WorkflowInstance workflowInstance) {
       currWorkflowInstance = workflowInstance;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "TIMEOUT", Optional.empty()));
-
       // we might get timeout before triggerExecution, and in that case we take best effort to
       // set trigger timestamp
       if (triggerTs == null) {
         triggerTs = eventTs;
+        return null;
       }
+
+      executionStatusList.add(ExecStatus.create(eventTs, "TIMEOUT", Optional.empty()));
 
       closeExecution();
       return null;

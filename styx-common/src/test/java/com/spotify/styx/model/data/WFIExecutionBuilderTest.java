@@ -337,14 +337,7 @@ public class WFIExecutionBuilderTest {
                     "UNKNOWN",
                     time("07:54"),
                     false,
-                    Arrays.asList(
-                        Execution.create(
-                            Optional.empty(),
-                            Optional.empty(),
-                            Collections.singletonList(
-                                ExecStatus.create(time("07:54"), "TIMEOUT", Optional.empty())
-                            )
-                        ),
+                    Collections.singletonList(
                         Execution.create(
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
