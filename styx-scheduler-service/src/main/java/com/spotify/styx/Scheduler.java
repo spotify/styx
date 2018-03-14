@@ -209,14 +209,8 @@ public class Scheduler {
 
       // Evaluate each instance in the batch for dequeuing
       for (int i = 0; i < batch.size(); i++) {
-
-        final boolean proceed = limitAndDequeue(resources, workflowResourceReferences,
-            currentResourceUsage, batch.get(i), blockers.get(i));
-
-        // Stop processing if rate limit was hit or thread was interrupted
-        if (!proceed) {
-          return;
-        }
+        limitAndDequeue(resources, workflowResourceReferences,
+                        currentResourceUsage, batch.get(i), blockers.get(i));
       }
     }
   }
@@ -240,7 +234,7 @@ public class Scheduler {
         .forEach(r -> stats.recordResourceUsed(r, 0));
   }
 
-  private boolean limitAndDequeue(Map<String, Resource> resources,
+  private void limitAndDequeue(Map<String, Resource> resources,
       Map<WorkflowId, Set<String>> workflowResourceReferences,
       Map<String, Long> currentResourceUsage, InstanceState instance,
       CompletionStage<Optional<ExecutionBlocker>> executionBlockerFuture) {
@@ -250,8 +244,8 @@ public class Scheduler {
     try {
       blocker = executionBlockerFuture.toCompletableFuture().get(10, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
-      LOG.debug("Interrupted");
-      return false;
+      LOG.debug("Thread interrupted");
+      throw new RuntimeException(e);
     } catch (ExecutionException | TimeoutException e) {
       LOG.warn("Failed to check execution blocker for {}, assuming there is no blocker",
           instance.workflowInstance(), e);
@@ -262,7 +256,7 @@ public class Scheduler {
           instance.workflowInstance(),
           blocker.get().delay().toMillis()));
       LOG.debug("Dequeue rescheduled: {}: {}", instance.workflowInstance(), blocker.get());
-      return true;
+      return;
     }
 
     final Set<String> workflowResourceRefs =
@@ -307,16 +301,15 @@ public class Scheduler {
         stateManager.receiveIgnoreClosed(Event.info(instance.workflowInstance(), message));
       }
     } else {
-      if (!dequeueRateLimiter.tryAcquire()) {
-        LOG.debug("Dequeue rate limited");
-        return false;
+      double sleepingTime = dequeueRateLimiter.acquire();
+      if (sleepingTime > 0.0001) {
+        LOG.debug("Dequeue rate limited and slept for {} ms", sleepingTime * 1000);
       }
+
       instanceResourceRefs.forEach(id -> currentResourceUsage.computeIfAbsent(id, id_ -> 0L));
       instanceResourceRefs.forEach(id -> currentResourceUsage.compute(id, (id_, l) -> l + 1));
       sendDequeue(instance, instanceResourceRefs);
     }
-
-    return true;
   }
 
   private Stream<ResourceWithInstance> pairWithResources(Optional<Long> globalConcurrency,
