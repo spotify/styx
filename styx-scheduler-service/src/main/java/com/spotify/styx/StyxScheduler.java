@@ -45,7 +45,6 @@ import com.google.cloud.datastore.Datastore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -374,7 +373,7 @@ public class StyxScheduler implements AppInit {
 
     dockerRunner.restore();
 
-    initializeResourceShards(stateManager, storage);
+    initializeResourceShards(storage, shardedCounter);
     startTriggerManager(triggerManager, executor);
     startBackfillTriggerManager(backfillTriggerManager, executor);
     startScheduler(scheduler, executor);
@@ -443,11 +442,24 @@ public class StyxScheduler implements AppInit {
   }
 
   //TODO: test this bit
-  private void initializeResourceShards(QueuedStateManager stateManager, Storage storage) {
-    stateManager.activeStates().entrySet().parallelStream().forEach(activeState ->
-        activeState.getValue().data().resourceIds().orElse(ImmutableSet.of())
-           .forEach(resource -> CounterSnapshotFactory.create(storage, resource))
-    );
+  private void initializeResourceShards(Storage storage, ShardedCounter shardedCounter) {
+    try {
+      storage.resources().parallelStream().forEach(resource -> {
+        CounterSnapshotFactory.create(storage, resource.id());
+        try {
+          storage.runInTransaction(tx -> {
+            shardedCounter.updateLimit(tx, resource.id(), resource.concurrency());
+            return null;
+          });
+        } catch (IOException e) {
+          LOG.error("Error creating a counter limit for {}: {}", resource, e);
+          // TODO: re-throw exception when moving to entirely depend on counter shards
+        }
+      });
+    } catch (IOException e) {
+      LOG.error("Error reading resources from datastore: {}", e);
+      // TODO: re-throw exception when moving to entirely depend on counter shards
+    }
   }
 
   private static void startCleaner(Cleaner cleaner, ScheduledExecutorService exec) {

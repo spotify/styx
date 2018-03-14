@@ -64,7 +64,6 @@ public class CounterSnapshotFactory {
    * have already been initialized and incremented by another process.
    */
   private static void initialize(Storage storage, String counterId) {
-
     for (int startIndex = 0; startIndex < NUM_SHARDS; startIndex += TRANSACTION_GROUP_SIZE) {
       initShardRange(storage, counterId, startIndex,
                      Math.min(NUM_SHARDS, startIndex + TRANSACTION_GROUP_SIZE));
