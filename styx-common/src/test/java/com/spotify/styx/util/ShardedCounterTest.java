@@ -94,10 +94,7 @@ public class ShardedCounterTest {
 
   @Test
   public void shouldCreateCounterEmpty() {
-    long before = System.currentTimeMillis();
     assertEquals(shardedCounter.getCounter(COUNTER_ID1), 0L);
-    long after = System.currentTimeMillis();
-    System.out.println(after - before);
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
     // assert all shards exist
     IntStream.range(0, ShardedCounter.NUM_SHARDS).forEach(i -> {
