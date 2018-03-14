@@ -46,8 +46,6 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -70,8 +68,6 @@ public class ShardedCounterTest {
   private static Storage storage;
   private static Connection connection;
 
-  private final ExecutorService executor = Executors.newScheduledThreadPool(10);
-
   @BeforeClass
   public static void setUpClass() throws IOException, InterruptedException {
     helper = LocalDatastoreHelper.create(1.0);
@@ -83,7 +79,7 @@ public class ShardedCounterTest {
 
   @Before
   public void setUp() throws IOException, InterruptedException {
-    shardedCounter = new ShardedCounter(storage, executor);
+    shardedCounter = new ShardedCounter(storage);
   }
 
   @After

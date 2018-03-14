@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +65,6 @@ public class ShardedCounter {
   public static final String PROPERTY_COUNTER_ID = "counterId";
 
   private final Storage storage;
-  private final ExecutorService executorService;
 
   /**
    * A weakly consistent view of the state in Datastore, refreshed by ShardedCounter on demand.
@@ -132,8 +130,7 @@ public class ShardedCounter {
     }
   }
 
-  public ShardedCounter(Storage storage, ExecutorService executorService) {
-    this.executorService = executorService;
+  public ShardedCounter(Storage storage) {
     this.storage = storage;
   }
 
@@ -152,8 +149,7 @@ public class ShardedCounter {
    * Update cached snapshot with most recent state of counter in Datastore.
    */
   private CounterSnapshot refreshCounterSnapshot(String counterId) {
-    final CounterSnapshot newSnapshot =
-        CounterSnapshotFactory.create(storage, counterId, executorService);
+    final CounterSnapshot newSnapshot = CounterSnapshotFactory.create(storage, counterId);
     inMemSnapshot.put(counterId, newSnapshot);
     return newSnapshot;
   }

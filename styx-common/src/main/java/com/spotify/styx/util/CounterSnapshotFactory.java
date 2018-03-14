@@ -26,8 +26,6 @@ import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,25 +37,23 @@ public class CounterSnapshotFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(CounterSnapshotFactory.class);
 
-  private static final int TRANSACTION_GROUP_SIZE = 15;
+  private static final int TRANSACTION_GROUP_SIZE = 25;
 
   private CounterSnapshotFactory() {
   }
-  public static ShardedCounter.CounterSnapshot create(Storage storage, String counterId,
-                                                      ExecutorService executorService) {
-    return new ShardedCounter.CounterSnapshot(storage, counterId,
-                                              getShards(storage, counterId, executorService));
+
+  public static ShardedCounter.CounterSnapshot create(Storage storage, String counterId) {
+    return new ShardedCounter.CounterSnapshot(storage, counterId, getShards(storage, counterId));
   }
 
-  private static Map<Integer, Long> getShards(Storage storage, String counterId,
-                                              ExecutorService executorService) {
+  private static Map<Integer, Long> getShards(Storage storage, String counterId) {
     Map<Integer, Long> fetchedShards = storage.shardsForCounter(counterId);
     if (fetchedShards.size() < NUM_SHARDS) {
       // The counter probably has not been initialized (so we have empty QueryResults). Also
       // possible that a prior initialize() crashed halfway, or we got a partial list of shards in
       // QueryResults due to eventual consistency. In any case, repeated initialization eventually
       // creates all NUM_SHARDS shards.
-      initialize(storage, counterId, executorService);
+      initialize(storage, counterId);
       fetchedShards = storage.shardsForCounter(counterId);
     }
     return fetchedShards;
@@ -67,19 +63,11 @@ public class CounterSnapshotFactory {
    * Idempotent initialization, so that we don't reset an existing shard to zero - counterId may
    * have already been initialized and incremented by another process.
    */
-  private static void initialize(Storage storage, String counterId,
-                                 ExecutorService executorService) {
+  private static void initialize(Storage storage, String counterId) {
 
-    for (int i = 0; i < NUM_SHARDS; i += TRANSACTION_GROUP_SIZE) {
-      final int startIndex = i;
-      executorService.execute(
-          () -> initShardRange(storage, counterId, startIndex,
-                               Math.min(NUM_SHARDS, startIndex + TRANSACTION_GROUP_SIZE)));
-    }
-    try {
-      executorService.awaitTermination(20, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      LOG.warn("Error when initializing shards: ", e);
+    for (int startIndex = 0; startIndex < NUM_SHARDS; startIndex += TRANSACTION_GROUP_SIZE) {
+      initShardRange(storage, counterId, startIndex,
+                     Math.min(NUM_SHARDS, startIndex + TRANSACTION_GROUP_SIZE));
     }
   }
 
