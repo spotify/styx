@@ -279,29 +279,13 @@ public class SchedulerTest {
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
 
     StateData stateData = StateData.newBuilder().tries(0).build();
-
     populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get()));
-
-    List<WorkflowInstance> workflowInstances = new ArrayList<>();
-
-    for (int i = 1; i <= 10; i++) {
-      WorkflowId workflowId = WorkflowId.create("styx2", "example" + i);
-      initWorkflow(workflowUsingResources(workflowId));
-      WorkflowInstance instance = WorkflowInstance.create(workflowId, "2016-12-02T01");
-      populateActiveStates(RunState.create(instance, State.QUEUED, stateData,
-          time.get().minus(i, ChronoUnit.SECONDS)));
-      workflowInstances.add(instance);
-    }
 
     scheduler.tick();
 
-    InOrder inOrder = inOrder(stateManager);
-
-    Lists.reverse(workflowInstances)
-        .forEach(x -> inOrder.verify(stateManager)
-            .receiveIgnoreClosed(eq(Event.dequeue(x, ImmutableSet.of())), anyLong()));
-    inOrder.verify(stateManager).receiveIgnoreClosed(eq(
-        Event.dequeue(INSTANCE_1, ImmutableSet.of())), anyLong());
+    verify(stateManager).receiveIgnoreClosed(
+        eq(Event.dequeue(INSTANCE_1, ImmutableSet.of())),
+        anyLong());
   }
 
   @Test
