@@ -232,8 +232,7 @@ public class ShardedCounter {
    * is trying to delete all shards, while another is creating/updating shards in between the
    * multiple transactions made by this method.
    */
-  //TODO: remove storage parameter. use class field
-  public void deleteCounter(Storage storage, String counterId) throws IOException {
+  public void deleteCounter(String counterId) throws IOException {
     storage.deleteShardsForCounter(counterId);
     storage.deleteLimitForCounter(counterId);
   }

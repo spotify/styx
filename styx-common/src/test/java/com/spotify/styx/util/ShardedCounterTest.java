@@ -230,7 +230,7 @@ public class ShardedCounterTest {
       return null;
     });
 
-    shardedCounter.deleteCounter(storage, COUNTER_ID1);
+    shardedCounter.deleteCounter(COUNTER_ID1);
 
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
 
@@ -251,7 +251,7 @@ public class ShardedCounterTest {
       return null;
     });
 
-    shardedCounter.deleteCounter(storage, COUNTER_ID1);
+    shardedCounter.deleteCounter(COUNTER_ID1);
 
     QueryResults<Entity> shardsCounter1 = getShardsForCounter(COUNTER_ID1);
     QueryResults<Entity> shardsCounter2 = getShardsForCounter(COUNTER_ID2);
@@ -265,7 +265,7 @@ public class ShardedCounterTest {
 
   @Test
   public void shouldPassDeletingNonExistingCounterAndLimit() throws IOException {
-    shardedCounter.deleteCounter(storage, COUNTER_ID1);
+    shardedCounter.deleteCounter(COUNTER_ID1);
 
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
     assertFalse(results.hasNext());
