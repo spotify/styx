@@ -37,6 +37,9 @@ public class ShardedCounterSnapshotFactory implements CounterSnapshotFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShardedCounterSnapshotFactory.class);
 
+  /**
+   * Maximum number of entity groups that can be accessed in a transaction in Datastore.
+   */
   public static final int TRANSACTION_GROUP_SIZE = 25;
   private final Storage storage;
 
@@ -66,6 +69,7 @@ public class ShardedCounterSnapshotFactory implements CounterSnapshotFactory {
    * have already been initialized and incremented by another process.
    */
   private static void initialize(Storage storage, String counterId) {
+    LOG.debug("Initializing counter shards for resource {}", counterId);
     for (int startIndex = 0; startIndex < NUM_SHARDS; startIndex += TRANSACTION_GROUP_SIZE) {
       initShardRange(storage, counterId, startIndex,
                      Math.min(NUM_SHARDS, startIndex + TRANSACTION_GROUP_SIZE));

@@ -56,6 +56,7 @@ import com.spotify.styx.api.Api;
 import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -319,10 +320,11 @@ public class StyxScheduler implements AppInit {
     final WorkflowCache workflowCache = new InMemWorkflowCache();
     final Storage storage = instrument(Storage.class, storageFactory.apply(environment), stats, time);
 
-    warmUpCache(workflowCache, storage);
-
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
     final ShardedCounter shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
+    initializeResources(storage, shardedCounter, counterSnapshotFactory);
+
+    warmUpCache(workflowCache, storage);
 
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
     //       take StateManager as argument instead?
@@ -375,7 +377,6 @@ public class StyxScheduler implements AppInit {
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
     dockerRunner.restore();
-    initializeResourceShards(storage, shardedCounter, counterSnapshotFactory);
     startTriggerManager(triggerManager, executor);
     startBackfillTriggerManager(backfillTriggerManager, executor);
     startScheduler(scheduler, executor);
@@ -443,23 +444,30 @@ public class StyxScheduler implements AppInit {
     }
   }
 
-  private void initializeResourceShards(Storage storage, ShardedCounter shardedCounter,
-                                        CounterSnapshotFactory counterSnapshotFactory) {
+  private void initializeResources(Storage storage, ShardedCounter shardedCounter,
+                                   CounterSnapshotFactory counterSnapshotFactory) {
     try {
-      storage.resources().parallelStream().forEach(resource -> {
-        counterSnapshotFactory.create(resource.id());
-        try {
-          storage.runInTransaction(tx -> {
-            shardedCounter.updateLimit(tx, resource.id(), resource.concurrency());
-            return null;
-          });
-        } catch (IOException e) {
-          LOG.error("Error creating a counter limit for {}: {}", resource, e);
-          // TODO: re-throw exception when moving to entirely depend on counter shards
-        }
-      });
+      storage.resources().parallelStream().forEach(
+          r -> initializeResourceShards_(counterSnapshotFactory, storage, shardedCounter, r));
+      LOG.info("Finished initializing resources");
     } catch (IOException e) {
       LOG.error("Error reading resources from datastore: {}", e);
+      // TODO: re-throw exception when moving to entirely depend on counter shards
+    }
+  }
+
+  private void initializeResourceShards_(CounterSnapshotFactory counterSnapshotFactory,
+                                         Storage storage,
+                                         ShardedCounter shardedCounter,
+                                         Resource resource) {
+    counterSnapshotFactory.create(resource.id());
+    try {
+      storage.runInTransaction(tx -> {
+        shardedCounter.updateLimit(tx, resource.id(), resource.concurrency());
+        return null;
+      });
+    } catch (IOException e) {
+      LOG.error("Error creating a counter limit for {}: {}", resource, e);
       // TODO: re-throw exception when moving to entirely depend on counter shards
     }
   }
