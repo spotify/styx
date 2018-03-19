@@ -28,12 +28,13 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +66,6 @@ public class ShardedCounter {
   public static final String PROPERTY_COUNTER_ID = "counterId";
 
   private final Storage storage;
-
   /**
    * A weakly consistent view of the state in Datastore, refreshed by ShardedCounter on demand.
    */
@@ -73,6 +73,11 @@ public class ShardedCounter {
       .maximumSize(100_000)
       .expireAfterWrite(CACHE_EXPIRY_DURATION.toMillis(), TimeUnit.MILLISECONDS)
       .build();
+
+  public ShardedCounter(Storage storage, CounterSnapshotFactory counterSnapshotFactory) {
+    this.storage = Objects.requireNonNull(storage);
+    this.counterSnapshotFactory = Objects.requireNonNull(counterSnapshotFactory);
+  }
 
   private CounterSnapshotFactory counterSnapshotFactory;
 
@@ -83,6 +88,7 @@ public class ShardedCounter {
     private final Map<Integer, Long> shards;
 
     public Snapshot(Storage storage, String counterId, Map<Integer, Long> shards) {
+      Objects.requireNonNull(storage);
       this.limit = getLimit(storage, counterId);
       this.shards = shards;
       this.counterId = counterId;
@@ -111,14 +117,10 @@ public class ShardedCounter {
      * cached view of the state in Datastore.
      */
     public int pickShardWithSpareCapacity(long delta) {
-      List<Integer> candidates = new ArrayList<>();
-
-      shards.keySet().forEach(index -> {
-        if (shards.containsKey(index) && Range
-            .closed(0L, shardCapacity(index)).contains(shards.get(index) + delta)) {
-          candidates.add(index);
-        }
-      });
+      List<Integer> candidates =
+          shards.keySet().stream().filter(index -> shards.containsKey(index) && Range
+              .closed(0L, shardCapacity(index)).contains(shards.get(index) + delta))
+              .collect(Collectors.toList());
 
       if (candidates.isEmpty()) {
         if (shards.size() == 0) {
@@ -135,11 +137,6 @@ public class ShardedCounter {
         return candidates.get(new Random().nextInt(candidates.size()));
       }
     }
-  }
-
-  public ShardedCounter(Storage storage, CounterSnapshotFactory counterSnapshotFactory) {
-    this.storage = storage;
-    this.counterSnapshotFactory = counterSnapshotFactory;
   }
 
   /**
@@ -220,13 +217,7 @@ public class ShardedCounter {
    * larger than the corresponding limit might be possible without error.)
    */
   public long getCounter(String counterId) {
-    final CounterSnapshot snapshot = getCounterSnapshot(counterId);
-    long result = 0;
-
-    for (long shardValue : snapshot.getShards().values()) {
-      result += shardValue;
-    }
-    return result;
+    return getCounterSnapshot(counterId).getShards().values().stream().mapToLong(i -> i).sum();
   }
 
   /**
