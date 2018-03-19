@@ -88,7 +88,7 @@ public final class ReplayEvents {
         restoredState = RunState.fresh(workflowInstance, time);
       }
 
-      restoredState = restoredState.transition(sequenceEvent.event());
+      restoredState = restoredState.transition(sequenceEvent.event(), time);
       if ("triggerExecution".equals(EventUtil.name(sequenceEvent.event()))
           && restoredState.data().trigger().isPresent()
           && backfillId.equals(TriggerUtil.triggerId(restoredState.data().trigger().get()))) {

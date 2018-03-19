@@ -101,8 +101,8 @@ public abstract class RunState {
     return fresh(workflowInstance, Instant::now);
   }
 
-  public RunState transition(Event event) {
-    return event.accept(visitor).increaseCounter();
+  public RunState transition(Event event, Time time) {
+    return event.accept(visitor).transitionUpdates(time.get());
   }
 
   private RunState state(State state, StateData newStateData) {
@@ -115,9 +115,9 @@ public abstract class RunState {
         workflowInstance(), state, timestamp(), data(), counter());
   }
 
-  private RunState increaseCounter() {
+  private RunState transitionUpdates(Instant instant) {
     return new AutoValue_RunState(
-        workflowInstance(), state(), timestamp(), data(), counter() + 1);
+        workflowInstance(), state(), instant.toEpochMilli(), data(), counter() + 1);
   }
 
   private class TransitionVisitor implements EventVisitor<RunState> {

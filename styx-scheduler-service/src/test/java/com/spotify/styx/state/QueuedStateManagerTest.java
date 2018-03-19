@@ -394,7 +394,7 @@ public class QueuedStateManagerTest {
   @Test
   public void shouldWriteActiveStateOnEvent() throws Exception {
     when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.of(RunState.create(INSTANCE,
-        State.QUEUED, StateData.zero(), NOW, 17)));
+        State.QUEUED, StateData.zero(), NOW.minusMillis(1), 17)));
 
     stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()))
         .toCompletableFuture().get(1, MINUTES);

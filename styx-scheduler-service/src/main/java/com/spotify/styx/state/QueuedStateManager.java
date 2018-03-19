@@ -184,7 +184,7 @@ public class QueuedStateManager implements StateManager {
 
         final RunState nextRunState;
         try {
-          nextRunState = currentRunState.get().transition(event);
+          nextRunState = currentRunState.get().transition(event, time);
         } catch (IllegalStateException e) {
           // TODO: illegal state transitions might become common as multiple scheduler
           //       instances concurrently consume events from k8s.
