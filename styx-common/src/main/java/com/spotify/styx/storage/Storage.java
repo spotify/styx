@@ -176,7 +176,7 @@ public interface Storage {
    *
    * @return The map of workflow instances to {@link RunState}
    */
-  Map<WorkflowInstance, RunState> readActiveWorkflowInstancesByTriggerId(String triggerId)
+  Map<WorkflowInstance, RunState> readActiveStatesByTriggerId(String triggerId)
       throws IOException;
 
   /**

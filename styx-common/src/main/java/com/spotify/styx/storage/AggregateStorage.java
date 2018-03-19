@@ -98,7 +98,7 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public Map<WorkflowInstance, RunState> readActiveWorkflowInstancesByTriggerId(
+  public Map<WorkflowInstance, RunState> readActiveStatesByTriggerId(
       String triggerId) throws IOException {
     return datastoreStorage.activeStatesByTriggerId(triggerId);
   }

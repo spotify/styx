@@ -56,7 +56,7 @@ public interface StateManager extends Closeable {
   /**
    * Get a map of all active {@link WorkflowInstance} states filtered by triggerId.
    */
-  Map<WorkflowInstance, RunState> activeStatesByTriggerId(String triggerId);
+  Map<WorkflowInstance, RunState> getActiveStatesByTriggerId(String triggerId);
 
   /**
    * Like {@link #receive(Event)} but ignoring the {@link IsClosedException} exception.

@@ -140,7 +140,7 @@ public class InMemStorageTest {
     storage.writeActiveState(WORKFLOW_INSTANCE, FULLY_POPULATED_RUNSTATE);
 
     final Map<WorkflowInstance, RunState> activeStates =
-        storage.readActiveWorkflowInstancesByTriggerId("foobar");
+        storage.readActiveStatesByTriggerId("foobar");
 
     assertThat(activeStates, is(ImmutableMap.of(WORKFLOW_INSTANCE, FULLY_POPULATED_RUNSTATE)));
   }

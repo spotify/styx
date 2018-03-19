@@ -238,9 +238,9 @@ public class QueuedStateManager implements StateManager {
   }
 
   @Override
-  public Map<WorkflowInstance, RunState> activeStatesByTriggerId(String triggerId) {
+  public Map<WorkflowInstance, RunState> getActiveStatesByTriggerId(String triggerId) {
     try {
-      return storage.readActiveWorkflowInstancesByTriggerId(triggerId);
+      return storage.readActiveStatesByTriggerId(triggerId);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

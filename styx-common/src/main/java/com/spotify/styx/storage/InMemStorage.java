@@ -324,7 +324,7 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public Map<WorkflowInstance, RunState> readActiveWorkflowInstancesByTriggerId(String triggerId)
+  public Map<WorkflowInstance, RunState> readActiveStatesByTriggerId(String triggerId)
       throws IOException {
     return activeStatesMap.entrySet().stream()
         .filter((entry) -> triggerId.equals(TriggerUtil.triggerId(entry.getValue().data().trigger().get())))
