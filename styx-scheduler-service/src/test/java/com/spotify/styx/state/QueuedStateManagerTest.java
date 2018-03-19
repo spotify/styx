@@ -82,7 +82,7 @@ public class QueuedStateManagerTest {
   private static final WorkflowInstance INSTANCE = WorkflowInstance.create(
       TestData.WORKFLOW_ID, "2016-05-01");
   private static final RunState INSTANCE_NEW_STATE =
-      RunState.create(INSTANCE, State.NEW, StateData.zero(), NOW);
+      RunState.create(INSTANCE, State.NEW, StateData.zero(), NOW, 18L);
   private static final Workflow WORKFLOW =
       Workflow.create("foo", TestData.FULL_WORKFLOW_CONFIGURATION);
   private static final Trigger TRIGGER1 = Trigger.unknown("trig1");

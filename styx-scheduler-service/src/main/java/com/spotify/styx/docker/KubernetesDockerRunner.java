@@ -529,6 +529,7 @@ class KubernetesDockerRunner implements DockerRunner {
           executionId, podName);
       return Optional.empty();
     }
+
     return runState;
   }
 

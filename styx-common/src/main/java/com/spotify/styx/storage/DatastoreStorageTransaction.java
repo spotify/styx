@@ -37,7 +37,9 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_ENABLE
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_JSON;
 import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceKey;
 import static com.spotify.styx.storage.DatastoreStorage.entityToBackfill;
+import static com.spotify.styx.storage.DatastoreStorage.entityToRunState;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
+import static com.spotify.styx.storage.DatastoreStorage.runStateToEntity;
 
 import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.Entity;
@@ -164,21 +166,21 @@ class DatastoreStorageTransaction implements StorageTransaction {
     if (entity == null) {
       return Optional.empty();
     } else {
-      return Optional.of(DatastoreStorage.entityToRunState(entity, instance));
+      return Optional.of(entityToRunState(entity, instance));
     }
   }
 
   @Override
   public WorkflowInstance writeActiveState(WorkflowInstance instance, RunState state)
       throws IOException {
-    tx.add(DatastoreStorage.runStateToEntity(tx.getDatastore().newKeyFactory(), instance, state));
+    tx.add(runStateToEntity(tx.getDatastore().newKeyFactory(), instance, state));
     return instance;
   }
 
   @Override
   public WorkflowInstance updateActiveState(WorkflowInstance instance, RunState state)
       throws IOException {
-    tx.update(DatastoreStorage.runStateToEntity(tx.getDatastore().newKeyFactory(), instance, state));
+    tx.update(runStateToEntity(tx.getDatastore().newKeyFactory(), instance, state));
     return instance;
   }
 
