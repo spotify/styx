@@ -37,8 +37,9 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_ENABLE
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_JSON;
 import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceKey;
 import static com.spotify.styx.storage.DatastoreStorage.entityToBackfill;
+import static com.spotify.styx.storage.DatastoreStorage.entityToRunState;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
-import static com.spotify.styx.storage.DatastoreStorage.readPersistentWorkflowInstanceState;
+import static com.spotify.styx.storage.DatastoreStorage.runStateToEntity;
 
 import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.Entity;
@@ -50,7 +51,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
@@ -160,26 +161,26 @@ class DatastoreStorageTransaction implements StorageTransaction {
   }
 
   @Override
-  public Optional<PersistentWorkflowInstanceState> activeState(WorkflowInstance instance) throws IOException {
+  public Optional<RunState> readActiveState(WorkflowInstance instance) throws IOException {
     final Entity entity = tx.get(activeWorkflowInstanceKey(tx.getDatastore().newKeyFactory(), instance));
     if (entity == null) {
       return Optional.empty();
     } else {
-      return Optional.of(readPersistentWorkflowInstanceState(entity));
+      return Optional.of(entityToRunState(entity, instance));
     }
   }
 
   @Override
-  public WorkflowInstance insertActiveState(WorkflowInstance instance, PersistentWorkflowInstanceState state)
+  public WorkflowInstance writeActiveState(WorkflowInstance instance, RunState state)
       throws IOException {
-    tx.add(DatastoreStorage.activeStateToEntity(tx.getDatastore().newKeyFactory(), instance, state));
+    tx.add(runStateToEntity(tx.getDatastore().newKeyFactory(), instance, state));
     return instance;
   }
 
   @Override
-  public WorkflowInstance updateActiveState(WorkflowInstance instance, PersistentWorkflowInstanceState state)
+  public WorkflowInstance updateActiveState(WorkflowInstance instance, RunState state)
       throws IOException {
-    tx.update(DatastoreStorage.activeStateToEntity(tx.getDatastore().newKeyFactory(), instance, state));
+    tx.update(runStateToEntity(tx.getDatastore().newKeyFactory(), instance, state));
     return instance;
   }
 

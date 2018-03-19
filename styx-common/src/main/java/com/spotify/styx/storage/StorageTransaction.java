@@ -25,7 +25,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.util.Optional;
@@ -83,18 +83,18 @@ public interface StorageTransaction {
   /**
    * Read an active workflow instance state.
    */
-  Optional<PersistentWorkflowInstanceState> activeState(WorkflowInstance instance) throws IOException;
+  Optional<RunState> readActiveState(WorkflowInstance instance) throws IOException;
 
   /**
    * Insert a new active workflow instance state. Fails if the state already exists.
    */
-  WorkflowInstance insertActiveState(WorkflowInstance instance, PersistentWorkflowInstanceState state)
+  WorkflowInstance writeActiveState(WorkflowInstance instance, RunState state)
       throws IOException;
 
   /**
    * Update an existing active workflow instance state. Fails if the state does not exist.
    */
-  WorkflowInstance updateActiveState(WorkflowInstance instance, PersistentWorkflowInstanceState state)
+  WorkflowInstance updateActiveState(WorkflowInstance instance, RunState state)
       throws IOException;
 
   /**

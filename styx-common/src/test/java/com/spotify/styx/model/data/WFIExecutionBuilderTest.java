@@ -481,7 +481,7 @@ public class WFIExecutionBuilderTest {
         runState = RunState.fresh(WORKFLOW_INSTANCE, Instant::now);
       }
 
-      runState = runState.transition(event.event());
+      runState = runState.transition(event.event(), Instant::now);
     }
   }
 

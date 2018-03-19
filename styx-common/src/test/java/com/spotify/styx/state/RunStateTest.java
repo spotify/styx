@@ -35,19 +35,32 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 import com.spotify.styx.WorkflowInstanceEventFactory;
+import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message.MessageLevel;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
+import java.time.Instant;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.runners.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.class)
 public class RunStateTest {
 
   private static final WorkflowInstance WORKFLOW_INSTANCE =
@@ -69,11 +82,59 @@ public class RunStateTest {
   private WorkflowInstanceEventFactory eventFactory =
       new WorkflowInstanceEventFactory(WORKFLOW_INSTANCE);
 
-  List<RunState.State> outputs = new LinkedList<>();
-  StateTransitioner transitioner = new StateTransitioner(this::record);
+  private List<RunState.State> outputs;
+  private StateTransitioner transitioner;
+  @Mock private Time time;
+
+  class StateTransitioner {
+
+    private final Time time;
+    private final OutputHandler outputHandler;
+    private final Map<WorkflowInstance, RunState> states = Maps.newHashMap();
+
+    StateTransitioner(Time time, OutputHandler outputHandler) {
+      this.time = Objects.requireNonNull(time);
+      this.outputHandler = Objects.requireNonNull(outputHandler);
+    }
+
+    void initialize(RunState runState) {
+      states.put(runState.workflowInstance(), runState);
+    }
+
+    void receive(Event event) {
+      WorkflowInstance key = event.workflowInstance();
+      RunState currentState = states.get(key);
+
+      RunState nextState = currentState.transition(event, time);
+      states.put(key, nextState);
+
+      outputHandler.transitionInto(nextState);
+    }
+
+    public RunState get(WorkflowInstance workflowInstance) {
+      return states.get(workflowInstance);
+    }
+  }
+
+  @Before
+  public void setUp() throws Exception {
+    outputs = new LinkedList<>();
+    transitioner = new StateTransitioner(time, this::record);
+    when(time.get()).thenReturn(Instant.now());
+  }
 
   private void record(RunState state) {
     outputs.add(state.state());
+  }
+
+  @Test
+  public void testTransitionUpdates() {
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
+    transitioner.receive(eventFactory.triggerExecution(Trigger.natural()));
+
+    verify(time).get();
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).counter(), is(0L));
   }
 
   @Test // for backwards compatibility
