@@ -49,6 +49,7 @@ import java.time.Duration;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -77,6 +78,18 @@ public class ShardedCounterTest {
     connection = Mockito.mock(Connection.class);
     storage = new AggregateStorage(connection, datastore, Duration.ZERO);
     counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
+  }
+
+  @AfterClass
+  public static void tearDownClass() throws Exception {
+    connection.close();
+    if (helper != null) {
+      try {
+        helper.stop(org.threeten.bp.Duration.ofSeconds(30));
+      } catch (Throwable e) {
+        e.printStackTrace();
+      }
+    }
   }
 
   @Before
