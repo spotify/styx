@@ -21,7 +21,6 @@
 package com.spotify.styx.state;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static java.util.stream.Collectors.toMap;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
@@ -29,7 +28,6 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.serialization.PersistentWorkflowInstanceState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
@@ -42,7 +40,6 @@ import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorServic
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -143,7 +140,6 @@ public class QueuedStateManager implements StateManager {
 
   private void initialize(WorkflowInstance workflowInstance) {
     // Write active state to datastore
-    final RunState runState = RunState.create(workflowInstance, State.NEW, time.get());
 
     final long counter;
     try {
@@ -151,6 +147,7 @@ public class QueuedStateManager implements StateManager {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+    final RunState runState = RunState.create(workflowInstance, State.NEW, time.get(), counter);
     try {
       storage.runInTransaction(tx -> {
         final Optional<Workflow> workflow = tx.workflow(workflowInstance.workflowId());
@@ -158,8 +155,7 @@ public class QueuedStateManager implements StateManager {
           throw new IllegalArgumentException(
               "Workflow not found: " + workflowInstance.workflowId().toKey());
         }
-        return tx.insertActiveState(workflowInstance,
-            PersistentWorkflowInstanceState.of(runState, counter));
+        return tx.writeActiveState(workflowInstance, runState);
       });
     } catch (TransactionException e) {
       if (e.isAlreadyExists()) {
@@ -184,21 +180,17 @@ public class QueuedStateManager implements StateManager {
       return storage.runInTransaction(tx -> {
 
         // Read active state from datastore
-        final Optional<PersistentWorkflowInstanceState> persistentState =
-            tx.activeState(event.workflowInstance());
-        if (!persistentState.isPresent()) {
+        final Optional<RunState> currentRunState =
+            tx.readActiveState(event.workflowInstance());
+        if (!currentRunState.isPresent()) {
           String message = "Received event for unknown workflow instance: " + event;
           LOG.warn(message);
           throw new IllegalArgumentException(message);
         }
 
-        // Transition to next state
-        final RunState runState =
-            RunState.create(event.workflowInstance(), persistentState.get().state(),
-                persistentState.get().data(), time.get());
         final RunState nextRunState;
         try {
-          nextRunState = runState.transition(event);
+          nextRunState = currentRunState.get().transition(event, time);
         } catch (IllegalStateException e) {
           // TODO: illegal state transitions might become common as multiple scheduler
           //       instances concurrently consume events from k8s.
@@ -207,18 +199,15 @@ public class QueuedStateManager implements StateManager {
         }
 
         // Write new state to datastore (or remove it if terminal)
-        final long nextCounter = persistentState.get().counter() + 1;
         if (nextRunState.state().isTerminal()) {
           tx.deleteActiveState(event.workflowInstance());
         } else {
-          final PersistentWorkflowInstanceState nextPersistentState =
-              PersistentWorkflowInstanceState.of(nextRunState, nextCounter);
-          tx.updateActiveState(event.workflowInstance(), nextPersistentState);
+          tx.updateActiveState(event.workflowInstance(), nextRunState);
         }
-        updateResourceCounters(tx, event, runState, nextRunState);
+        updateResourceCounters(tx, event, currentRunState.get(), nextRunState);
 
         final SequenceEvent sequenceEvent =
-            SequenceEvent.create(event, nextCounter, nextRunState.timestamp());
+            SequenceEvent.create(event, nextRunState.counter(), nextRunState.timestamp());
 
         return Tuple.of(sequenceEvent, nextRunState);
       });
@@ -282,41 +271,27 @@ public class QueuedStateManager implements StateManager {
   }
 
   @Override
-  public Map<WorkflowInstance, RunState> activeStates() {
-    final Map<WorkflowInstance, PersistentWorkflowInstanceState> states;
+  public Map<WorkflowInstance, RunState> getActiveStates() {
     try {
-      states = storage.readActiveWorkflowInstances();
+      return storage.readActiveStates();
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    return states.entrySet().stream()
-        .collect(toMap(
-            Entry::getKey,
-            e -> RunState.create(
-                e.getKey(), e.getValue().state(), e.getValue().data(), e.getValue().timestamp())));
   }
 
   @Override
-  public Map<WorkflowInstance, RunState> activeStatesByTriggerId(String triggerId) {
-    final Map<WorkflowInstance, PersistentWorkflowInstanceState> states;
+  public Map<WorkflowInstance, RunState> getActiveStatesByTriggerId(String triggerId) {
     try {
-      states = storage.readActiveWorkflowInstancesByTriggerId(triggerId);
+      return storage.readActiveStatesByTriggerId(triggerId);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    return states.entrySet().stream()
-        .collect(toMap(
-            Entry::getKey,
-            e -> RunState.create(
-                e.getKey(), e.getValue().state(), e.getValue().data(), e.getValue().timestamp())));
   }
 
   @Override
-  public RunState get(WorkflowInstance workflowInstance) {
+  public Optional<RunState> getActiveState(WorkflowInstance workflowInstance) {
     try {
-      return storage.readActiveWorkflowInstance(workflowInstance)
-          .map(state -> RunState.create(workflowInstance, state.state(), state.data(), state.timestamp()))
-          .orElse(null);
+      return storage.readActiveState(workflowInstance);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

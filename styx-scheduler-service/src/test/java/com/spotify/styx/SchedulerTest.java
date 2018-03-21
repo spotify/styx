@@ -62,7 +62,6 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.EventUtil;
-import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
 import java.time.Duration;
@@ -117,19 +116,17 @@ public class SchedulerTest {
   @Mock StateManager stateManager;
 
   @Before
-  public void setUp() throws Exception {
-    when(rateLimiter.tryAcquire()).thenReturn(true);
-
+  public void setUp() {
     when(gate.executionBlocker(any()))
         .thenReturn(WorkflowExecutionGate.NO_BLOCKER);
   }
 
   @After
-  public void tearDown() throws Exception {
+  public void tearDown() {
     executor.shutdownNow();
   }
 
-  private void setUp(long timeoutSeconds) throws IsClosedException, IOException {
+  private void setUp(long timeoutSeconds) throws IOException {
     workflowCache = new InMemWorkflowCache();
     TimeoutConfig timeoutConfig = createWithDefaultTtl(ofSeconds(timeoutSeconds));
 
@@ -155,18 +152,18 @@ public class SchedulerTest {
     workflowCache.store(workflow);
   }
 
-  private void populateActiveStates(RunState... runStates) throws IsClosedException {
+  private void populateActiveStates(RunState... runStates) {
     for (RunState runState : runStates) {
       activeStates.put(runState.workflowInstance(), runState);
     }
-    when(stateManager.activeStates()).thenReturn(activeStates);
+    when(stateManager.getActiveStates()).thenReturn(activeStates);
   }
 
-  private void removeActiveStates(Set<WorkflowInstance> workflowInstances) throws IsClosedException {
+  private void removeActiveStates(Set<WorkflowInstance> workflowInstances) {
     for (WorkflowInstance workflowInstance : workflowInstances) {
       activeStates.remove(workflowInstance);
     }
-    when(stateManager.activeStates()).thenReturn(activeStates);
+    when(stateManager.getActiveStates()).thenReturn(activeStates);
   }
 
   private Workflow workflowUsingResources(WorkflowId id, String... resources) {
@@ -181,8 +178,7 @@ public class SchedulerTest {
 
   @Test
   public void shouldBeRateLimiting() throws Exception {
-
-    when(rateLimiter.tryAcquire()).thenReturn(false);
+    when(rateLimiter.acquire()).thenReturn(1.0);
 
     setUp(20);
     setResourceLimit("r1", 2);
@@ -191,16 +187,8 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    verify(rateLimiter).tryAcquire();
-    verify(stats).recordResourceUsed("r1", 0L);
-    verify(stateManager, never()).receiveIgnoreClosed(any());
-
-    when(rateLimiter.tryAcquire()).thenReturn(true);
-
-    scheduler.tick();
-
     verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of("r1")));
-    verify(rateLimiter, times(2)).tryAcquire();
+    verify(rateLimiter).acquire();
     verify(stats).recordResourceUsed("r1", 1L);
   }
 

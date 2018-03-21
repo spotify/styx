@@ -41,6 +41,7 @@ import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodStatus;
 import io.fabric8.kubernetes.client.Watcher;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.Test;
@@ -283,7 +284,7 @@ public class KubernetesPodEventTranslatorTest {
 
     // ensure no exceptions are thrown when transitioning
     for (Event event : events) {
-      state = state.transition(event);
+      state = state.transition(event, Instant::now);
     }
   }
 

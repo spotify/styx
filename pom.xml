@@ -11,7 +11,7 @@
 
   <artifactId>styx</artifactId>
   <packaging>pom</packaging>
-  <version>1.0.110-SNAPSHOT</version>
+  <version>1.0.113-SNAPSHOT</version>
 
   <properties>
     <apollo.version>1.3.2</apollo.version>
