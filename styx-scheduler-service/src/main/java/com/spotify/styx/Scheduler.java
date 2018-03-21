@@ -223,7 +223,7 @@ public class Scheduler {
    * @return true if the state consumes resources, otherwise false.
    */
   private static boolean isConsumingResources(State state) {
-    return state != State.NEW && state != State.QUEUED;
+    return !javaslang.collection.List.of(State.NEW, State.QUEUED).contains(state);
   }
 
   private void updateResourceStats(Map<String, Resource> resources,

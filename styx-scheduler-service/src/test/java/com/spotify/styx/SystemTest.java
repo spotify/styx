@@ -28,6 +28,7 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableList;
@@ -35,6 +36,7 @@ import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
@@ -106,6 +108,12 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       .nextTrigger(Instant.parse("2015-01-01T00:00:00Z"))
       .schedule(Schedule.HOURS)
       .build();
+  private static final String RESOURCE_ID1 = "resource_1";
+  private static final String RESOURCE_ID2 = "resource_2";
+  private static final String RESOURCE_ID3 = "resource_3";
+  private static final Resource RESOURCE_1 = Resource.create(RESOURCE_ID1, 10);
+  private static final Resource RESOURCE_2 = Resource.create(RESOURCE_ID2, 128);
+  private static final Resource RESOURCE_3 = Resource.create(RESOURCE_ID3, 10000);
 
   private static RunSpec naturalRunSpec(String executionId, String imageName, List<String> args) {
     return RunSpec.builder()
@@ -643,5 +651,21 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     awaitWorkflowInstanceCompletion(workflowInstance);
     tickScheduler();
     assertThat(getState(workflowInstance), is(Optional.empty()));
+  }
+
+  @Test
+  public void createsCounterShardsForExistingResources() throws Exception {
+    givenResource(RESOURCE_1);
+    givenResource(RESOURCE_2);
+    givenResource(RESOURCE_3);
+
+    styxStarts();
+
+    assertEquals(RESOURCE_1.concurrency(), storage.getLimitForCounter(RESOURCE_1.id()));
+    assertEquals(RESOURCE_2.concurrency(), storage.getLimitForCounter(RESOURCE_2.id()));
+    assertEquals(RESOURCE_3.concurrency(), storage.getLimitForCounter(RESOURCE_3.id()));
+    assertEquals(128, storage.shardsForCounter(RESOURCE_1.id()).size());
+    assertEquals(128, storage.shardsForCounter(RESOURCE_2.id()).size());
+    assertEquals(128, storage.shardsForCounter(RESOURCE_3.id()).size());
   }
 }

@@ -30,6 +30,7 @@ import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -50,6 +51,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
+import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Duration;
@@ -213,6 +215,17 @@ public class DatastoreStorageTransactionTest {
     tx.store(workflow);
     tx.commit();
     assertThat(storage.workflow(workflow.id()), is(Optional.of(workflow)));
+  }
+
+  @Test
+  public void shouldStoreShards() throws IOException {
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    Shard shard1 = Shard.create("res1",0, 1);
+    Shard shard2 = Shard.create("res1",1, 1);
+    tx.store(shard1);
+    tx.store(shard2);
+    tx.commit();
+    assertEquals(storage.shardsForCounter("res1").size(), 2);
   }
 
   @Test

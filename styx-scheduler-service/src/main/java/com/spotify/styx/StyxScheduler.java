@@ -78,10 +78,13 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
+import com.spotify.styx.util.CounterSnapshotFactory;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RetryUtil;
+import com.spotify.styx.util.ShardedCounter;
+import com.spotify.styx.util.ShardedCounterSnapshotFactory;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
@@ -295,6 +298,7 @@ public class StyxScheduler implements AppInit {
 
     final Thread.UncaughtExceptionHandler uncaughtExceptionHandler =
         (thread, throwable) -> LOG.error("Thread {} threw {}", thread, throwable);
+
     final ThreadFactory schedulerTf = new ThreadFactoryBuilder()
         .setDaemon(true)
         .setNameFormat("styx-scheduler-%d")
@@ -315,6 +319,10 @@ public class StyxScheduler implements AppInit {
     final WorkflowCache workflowCache = new InMemWorkflowCache();
     final Storage storage = instrument(Storage.class, storageFactory.apply(environment), stats, time);
 
+    final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
+    final ShardedCounter shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
+    initializeResources(storage, shardedCounter, counterSnapshotFactory);
+
     warmUpCache(workflowCache, storage);
 
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
@@ -322,7 +330,8 @@ public class StyxScheduler implements AppInit {
     final List<OutputHandler> outputHandlers = new ArrayList<>();
     final QueuedStateManager stateManager = closer.register(
         new QueuedStateManager(time, eventTransitionExecutor, storage,
-            eventConsumerFactory.apply(environment, stats), eventConsumerExecutor, fanOutput(outputHandlers)));
+            eventConsumerFactory.apply(environment, stats), eventConsumerExecutor,
+            fanOutput(outputHandlers), shardedCounter));
 
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
@@ -367,7 +376,6 @@ public class StyxScheduler implements AppInit {
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
     dockerRunner.restore();
-
     startTriggerManager(triggerManager, executor);
     startBackfillTriggerManager(backfillTriggerManager, executor);
     startScheduler(scheduler, executor);
@@ -432,6 +440,29 @@ public class StyxScheduler implements AppInit {
     } catch (IOException e) {
       LOG.error("Failed to get workflows from storage while warming up the cache");
       throw new RuntimeException(e);
+    }
+  }
+
+  private void initializeResources(Storage storage, ShardedCounter shardedCounter,
+                                   CounterSnapshotFactory counterSnapshotFactory) {
+    try {
+      storage.resources().parallelStream().forEach(
+          resource -> {
+            counterSnapshotFactory.create(resource.id());
+            try {
+              storage.runInTransaction(tx -> {
+                shardedCounter.updateLimit(tx, resource.id(), resource.concurrency());
+                return null;
+              });
+            } catch (IOException e) {
+              LOG.error("Error creating a counter limit for {}: {}", resource, e);
+              // TODO: re-throw exception when moving to entirely depend on counter shards
+            }
+          });
+      LOG.info("Finished initializing resources");
+    } catch (IOException e) {
+      LOG.error("Error reading resources from datastore: {}", e);
+      // TODO: re-throw exception when moving to entirely depend on counter shards
     }
   }
 
