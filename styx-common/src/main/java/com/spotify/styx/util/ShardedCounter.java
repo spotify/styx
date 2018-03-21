@@ -117,10 +117,11 @@ public class ShardedCounter {
      * cached view of the state in Datastore.
      */
     public int pickShardWithSpareCapacity(long delta) {
-      List<Integer> candidates =
-          shards.keySet().stream().filter(index -> shards.containsKey(index) && Range
-              .closed(0L, shardCapacity(index)).contains(shards.get(index) + delta))
-              .collect(Collectors.toList());
+      List<Integer> candidates = shards.keySet().stream()
+          .filter(index -> shards.containsKey(index))
+          .filter(index -> Range.closed(0L, shardCapacity(index))
+                                .contains(shards.get(index) + delta))
+          .collect(Collectors.toList());
 
       if (candidates.isEmpty()) {
         if (shards.size() == 0) {

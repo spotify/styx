@@ -56,7 +56,6 @@ import com.spotify.styx.api.Api;
 import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -448,26 +447,21 @@ public class StyxScheduler implements AppInit {
                                    CounterSnapshotFactory counterSnapshotFactory) {
     try {
       storage.resources().parallelStream().forEach(
-          r -> initializeResourceShards_(counterSnapshotFactory, storage, shardedCounter, r));
+          resource -> {
+            counterSnapshotFactory.create(resource.id());
+            try {
+              storage.runInTransaction(tx -> {
+                shardedCounter.updateLimit(tx, resource.id(), resource.concurrency());
+                return null;
+              });
+            } catch (IOException e) {
+              LOG.error("Error creating a counter limit for {}: {}", resource, e);
+              // TODO: re-throw exception when moving to entirely depend on counter shards
+            }
+          });
       LOG.info("Finished initializing resources");
     } catch (IOException e) {
       LOG.error("Error reading resources from datastore: {}", e);
-      // TODO: re-throw exception when moving to entirely depend on counter shards
-    }
-  }
-
-  private void initializeResourceShards_(CounterSnapshotFactory counterSnapshotFactory,
-                                         Storage storage,
-                                         ShardedCounter shardedCounter,
-                                         Resource resource) {
-    counterSnapshotFactory.create(resource.id());
-    try {
-      storage.runInTransaction(tx -> {
-        shardedCounter.updateLimit(tx, resource.id(), resource.concurrency());
-        return null;
-      });
-    } catch (IOException e) {
-      LOG.error("Error creating a counter limit for {}: {}", resource, e);
       // TODO: re-throw exception when moving to entirely depend on counter shards
     }
   }
