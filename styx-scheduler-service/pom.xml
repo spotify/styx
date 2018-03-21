@@ -4,7 +4,7 @@
   <parent>
     <groupId>com.spotify</groupId>
     <artifactId>styx</artifactId>
-    <version>1.0.113-SNAPSHOT</version>
+    <version>1.0.113</version>
   </parent>
 
   <name>Spotify Styx Scheduler Service</name>
