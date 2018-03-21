@@ -49,6 +49,7 @@ import java.time.Duration;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -62,8 +63,8 @@ public class ShardedCounterTest {
   private static final String COUNTER_ID1 = "resource_counter_1";
   private static final String COUNTER_ID2 = "resource_counter_2";
 
-
   private static LocalDatastoreHelper helper;
+  private static CounterSnapshotFactory counterSnapshotFactory;
   private static ShardedCounter shardedCounter;
   private static Datastore datastore;
   private static Storage storage;
@@ -76,23 +77,35 @@ public class ShardedCounterTest {
     datastore = helper.getOptions().getService();
     connection = Mockito.mock(Connection.class);
     storage = new AggregateStorage(connection, datastore, Duration.ZERO);
+    counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
+  }
+
+  @AfterClass
+  public static void tearDownClass() throws Exception {
+    connection.close();
+    if (helper != null) {
+      try {
+        helper.stop(org.threeten.bp.Duration.ofSeconds(30));
+      } catch (Throwable e) {
+        e.printStackTrace();
+      }
+    }
   }
 
   @Before
   public void setUp() throws IOException, InterruptedException {
-    shardedCounter = new ShardedCounter(storage);
+    shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
   }
 
   @After
   public void tearDown() throws IOException, InterruptedException {
-    clearDatastore();
+    clearDatastore(datastore);
   }
 
 
   @Test
   public void shouldCreateCounterEmpty() {
     assertEquals(shardedCounter.getCounter(COUNTER_ID1), 0L);
-
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
     // assert all shards exist
     IntStream.range(0, ShardedCounter.NUM_SHARDS).forEach(i -> {
@@ -217,7 +230,7 @@ public class ShardedCounterTest {
       return null;
     });
 
-    shardedCounter.deleteCounter(storage, COUNTER_ID1);
+    shardedCounter.deleteCounter(COUNTER_ID1);
 
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
 
@@ -238,7 +251,7 @@ public class ShardedCounterTest {
       return null;
     });
 
-    shardedCounter.deleteCounter(storage, COUNTER_ID1);
+    shardedCounter.deleteCounter(COUNTER_ID1);
 
     QueryResults<Entity> shardsCounter1 = getShardsForCounter(COUNTER_ID1);
     QueryResults<Entity> shardsCounter2 = getShardsForCounter(COUNTER_ID2);
@@ -252,7 +265,7 @@ public class ShardedCounterTest {
 
   @Test
   public void shouldPassDeletingNonExistingCounterAndLimit() throws IOException {
-    shardedCounter.deleteCounter(storage, COUNTER_ID1);
+    shardedCounter.deleteCounter(COUNTER_ID1);
 
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
     assertFalse(results.hasNext());
@@ -285,12 +298,12 @@ public class ShardedCounterTest {
     }
   }
 
-  private static void clearDatastore() {
-    deleteAllOfKind(KIND_COUNTER_SHARD);
-    deleteAllOfKind(KIND_COUNTER_LIMIT);
+  public static void clearDatastore(Datastore datastore) {
+    deleteAllOfKind(datastore, KIND_COUNTER_SHARD);
+    deleteAllOfKind(datastore, KIND_COUNTER_LIMIT);
   }
 
-  private static void deleteAllOfKind(String kind) {
+  private static void deleteAllOfKind(Datastore datastore, String kind) {
     QueryResults<Entity> results = datastore.run(EntityQuery.newEntityQueryBuilder()
                                                      .setKind(kind)
                                                      .build());

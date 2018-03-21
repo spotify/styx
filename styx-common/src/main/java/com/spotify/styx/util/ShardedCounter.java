@@ -28,12 +28,13 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +66,6 @@ public class ShardedCounter {
   public static final String PROPERTY_COUNTER_ID = "counterId";
 
   private final Storage storage;
-
   /**
    * A weakly consistent view of the state in Datastore, refreshed by ShardedCounter on demand.
    */
@@ -74,47 +74,24 @@ public class ShardedCounter {
       .expireAfterWrite(CACHE_EXPIRY_DURATION.toMillis(), TimeUnit.MILLISECONDS)
       .build();
 
-  private static class CounterSnapshot {
+  public ShardedCounter(Storage storage, CounterSnapshotFactory counterSnapshotFactory) {
+    this.storage = Objects.requireNonNull(storage);
+    this.counterSnapshotFactory = Objects.requireNonNull(counterSnapshotFactory);
+  }
+
+  private CounterSnapshotFactory counterSnapshotFactory;
+
+  public static class Snapshot implements CounterSnapshot {
 
     private final String counterId;
     private final Long limit;
     private final Map<Integer, Long> shards;
 
-    public CounterSnapshot(Storage storage, String counterId) {
-      limit = getLimit(storage, counterId);
-
-      Map<Integer, Long> fetchedShards = storage.shardsForCounter(counterId);
-      if (fetchedShards.size() < NUM_SHARDS) {
-        // The counter probably has not been initialized (so we have empty QueryResults). Also
-        // possible that a prior initialize() crashed halfway, or we got a partial list of shards in
-        // QueryResults due to eventual consistency. In any case, repeated initialization eventually
-        // creates all NUM_SHARDS shards.
-        initialize(storage, counterId);
-        fetchedShards = storage.shardsForCounter(counterId);
-      }
+    public Snapshot(Storage storage, String counterId, Map<Integer, Long> shards) {
+      Objects.requireNonNull(storage);
+      this.limit = getLimit(storage, counterId);
+      this.shards = shards;
       this.counterId = counterId;
-      this.shards = fetchedShards;
-    }
-
-    /**
-     * Idempotent initialization, so that we don't reset an existing shard to zero - counterId may
-     * have already been initialized and incremented by another process.
-     */
-    private static void initialize(Storage storage, String counterId) {
-      for (int i = 0; i < NUM_SHARDS; i++) {
-        final int shardIndex = i;
-        try {
-          storage.runInTransaction(tx -> {
-            final Optional<Shard> shard = tx.shard(counterId, shardIndex);
-            if (!shard.isPresent()) {
-              tx.store(Shard.create(counterId, shardIndex, 0));
-            }
-            return null;
-          });
-        } catch (IOException e) {
-          LOG.warn("Error when trying to create a shard entry in Datastore: ", e);
-        }
-      }
     }
 
     /**
@@ -126,23 +103,25 @@ public class ShardedCounter {
      * </p>ex. If limit=5 for a given counter and NUM_SHARDS=3,
      * then the distribution of capacity between the 3 shards will be [2, 2, 1]
      */
-    private long shardCapacity(int shardIndex) {
+    public long shardCapacity(int shardIndex) {
       return limit / NUM_SHARDS + (shardIndex < limit % NUM_SHARDS ? 1 : 0);
+    }
+
+    @Override
+    public Map<Integer, Long> getShards() {
+      return shards;
     }
 
     /**
      * Returns shard index which _likely_ could be successfully updated by delta, according to our
      * cached view of the state in Datastore.
      */
-    private int pickShardWithSpareCapacity(long delta) {
-      List<Integer> candidates = new ArrayList<>();
-
-      for (int i : shards.keySet()) {
-        if (shards.containsKey(i) && Range
-            .closed(0L, shardCapacity(i)).contains(shards.get(i) + delta)) {
-          candidates.add(i);
-        }
-      }
+    public int pickShardWithSpareCapacity(long delta) {
+      List<Integer> candidates = shards.keySet().stream()
+          .filter(index -> shards.containsKey(index))
+          .filter(index -> Range.closed(0L, shardCapacity(index))
+                                .contains(shards.get(index) + delta))
+          .collect(Collectors.toList());
 
       if (candidates.isEmpty()) {
         if (shards.size() == 0) {
@@ -161,10 +140,6 @@ public class ShardedCounter {
     }
   }
 
-  public ShardedCounter(Storage storage) {
-    this.storage = storage;
-  }
-
   /**
    * Returns a recent snapshot, possibly read from inMemSnapshot.
    */
@@ -180,7 +155,7 @@ public class ShardedCounter {
    * Update cached snapshot with most recent state of counter in Datastore.
    */
   private CounterSnapshot refreshCounterSnapshot(String counterId) {
-    final CounterSnapshot newSnapshot = new CounterSnapshot(storage, counterId);
+    final CounterSnapshot newSnapshot = counterSnapshotFactory.create(counterId);
     inMemSnapshot.put(counterId, newSnapshot);
     return newSnapshot;
   }
@@ -243,13 +218,7 @@ public class ShardedCounter {
    * larger than the corresponding limit might be possible without error.)
    */
   public long getCounter(String counterId) {
-    final CounterSnapshot snapshot = getCounterSnapshot(counterId);
-    long result = 0;
-
-    for (long shard : snapshot.shards.values()) {
-      result += shard;
-    }
-    return result;
+    return getCounterSnapshot(counterId).getShards().values().stream().mapToLong(i -> i).sum();
   }
 
   /**
@@ -264,7 +233,7 @@ public class ShardedCounter {
    * is trying to delete all shards, while another is creating/updating shards in between the
    * multiple transactions made by this method.
    */
-  public void deleteCounter(Storage storage, String counterId) throws IOException {
+  public void deleteCounter(String counterId) throws IOException {
     storage.deleteShardsForCounter(counterId);
     storage.deleteLimitForCounter(counterId);
   }
