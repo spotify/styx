@@ -21,7 +21,6 @@
 package com.spotify.styx.storage;
 
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
-import static com.spotify.styx.storage.DatastoreStorage.KIND_RESOURCE;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_ALL_TRIGGERED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_COMPONENT;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONCURRENCY;
@@ -41,39 +40,29 @@ import static com.spotify.styx.storage.DatastoreStorage.entityToBackfill;
 import static com.spotify.styx.storage.DatastoreStorage.entityToRunState;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
 import static com.spotify.styx.storage.DatastoreStorage.runStateToEntity;
-import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
-import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_SHARD;
-import static com.spotify.styx.util.ShardedCounter.PROPERTY_COUNTER_ID;
-import static com.spotify.styx.util.ShardedCounter.PROPERTY_LIMIT;
-import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_INDEX;
-import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_VALUE;
 
-import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.Transaction;
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.ResourceNotFoundException;
-import com.spotify.styx.util.Shard;
-import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.Optional;
 
-public class DatastoreStorageTransaction implements StorageTransaction {
+class DatastoreStorageTransaction implements StorageTransaction {
 
   private final Transaction tx;
 
-  public DatastoreStorageTransaction(Transaction transaction) {
+  DatastoreStorageTransaction(Transaction transaction) {
     this.tx = Objects.requireNonNull(transaction);
   }
 
@@ -98,57 +87,6 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   @Override
   public boolean isActive() {
     return tx.isActive();
-  }
-
-  @Override
-  public void updateCounter(ShardedCounter shardedCounter, String resource, int delta) {
-    shardedCounter.updateCounter(this, resource, delta);
-  }
-
-  @Override
-  public Optional<Shard> shard(String counterId, int shardIndex) {
-    // TODO there's no need for this to be transactional
-    final Key shardKey = tx.getDatastore().newKeyFactory().setKind(KIND_COUNTER_SHARD)
-        .newKey(counterId + "-" + shardIndex);
-    Entity shardEntity = tx.get(shardKey);
-    if (shardEntity == null) {
-      return Optional.empty();
-    }
-    return Optional.of(Shard.create(counterId, shardIndex,
-                                    (int) tx.get(shardKey).getLong(PROPERTY_SHARD_VALUE)));
-  }
-
-  @Override
-  public void store(Shard shard) {
-    tx.put(Entity.newBuilder(tx.getDatastore().newKeyFactory().setKind(KIND_COUNTER_SHARD)
-                                 .newKey(shard.counterId() + "-" + shard.index()))
-                        .set(PROPERTY_COUNTER_ID, shard.counterId())
-                        .set(PROPERTY_SHARD_INDEX, shard.index())
-                        .set(PROPERTY_SHARD_VALUE, shard.value())
-                        .build());
-  }
-
-  @Override
-  public void updateLimitForCounter(String counterId, long limit) {
-    final Key limitKey = tx.getDatastore().newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId);
-    tx.put(Entity.newBuilder(limitKey).set(PROPERTY_LIMIT, limit).build());
-  }
-
-  @Override
-  public void store(Resource resource) {
-    tx.put(resourceToEntity(tx.getDatastore(), resource));
-  }
-
-  @Override
-  public void deleteCounterLimit(String counterId) {
-    tx.delete(tx.getDatastore().newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId));
-  }
-
-  private Entity resourceToEntity(Datastore datastore, Resource resource) {
-    final Key key = datastore.newKeyFactory().setKind(KIND_RESOURCE).newKey(resource.id());
-    return Entity.newBuilder(key)
-        .set(PROPERTY_CONCURRENCY, resource.concurrency())
-        .build();
   }
 
   @Override

@@ -70,7 +70,6 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
 import com.spotify.styx.util.WorkflowValidator;
-import com.spotify.styx.util.ShardedCounter;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -83,8 +82,6 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
 public class BackfillResourceTest extends VersionedApiTest {
 
@@ -92,9 +89,11 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   private static LocalDatastoreHelper localDatastore;
   private Connection bigtable = setupBigTableMockTable();
-  @Mock private ShardedCounter shardedCounter;
 
-  private AggregateStorage storage;
+  private AggregateStorage storage = new AggregateStorage(
+      bigtable,
+      localDatastore.getOptions().getService(),
+      Duration.ZERO);
 
   private static final Backfill BACKFILL_1 = Backfill.newBuilder()
       .id("backfill-1")
@@ -130,14 +129,10 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   public BackfillResourceTest(Api.Version version) {
     super(BackfillResource.BASE, version, "backfill-test", spy(StubClient.class));
-    MockitoAnnotations.initMocks(this);
   }
 
   @Override
   protected void init(Environment environment) {
-    storage = new AggregateStorage(bigtable, localDatastore.getOptions().getService(),
-                                   Duration.ZERO);
-
     environment.routingEngine()
         .registerRoutes(Api.withCommonMiddleware(
             new BackfillResource(SCHEDULER_BASE, storage, workflowValidator).routes()));
