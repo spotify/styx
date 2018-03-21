@@ -23,18 +23,15 @@ package com.spotify.styx.state;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.storage.TransactionException;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.IsClosedException;
-import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
@@ -79,7 +76,6 @@ public class QueuedStateManager implements StateManager {
   private final BiConsumer<SequenceEvent, RunState> eventConsumer;
   private final Executor eventConsumerExecutor;
   private final OutputHandler outputHandler;
-  private final ShardedCounter shardedCounter;
 
   private volatile boolean running = true;
 
@@ -89,15 +85,13 @@ public class QueuedStateManager implements StateManager {
       Storage storage,
       BiConsumer<SequenceEvent, RunState> eventConsumer,
       Executor eventConsumerExecutor,
-      OutputHandler outputHandler,
-      ShardedCounter shardedCounter) {
+      OutputHandler outputHandler) {
     this.time = Objects.requireNonNull(time);
     this.storage = Objects.requireNonNull(storage);
     this.eventConsumer = Objects.requireNonNull(eventConsumer);
     this.eventConsumerExecutor = Objects.requireNonNull(eventConsumerExecutor);
     this.eventTransitionExecutor = Objects.requireNonNull(eventTransitionExecutor);
     this.outputHandler = Objects.requireNonNull(outputHandler);
-    this.shardedCounter = shardedCounter;
   }
 
   @Override
@@ -204,7 +198,6 @@ public class QueuedStateManager implements StateManager {
         } else {
           tx.updateActiveState(event.workflowInstance(), nextRunState);
         }
-        updateResourceCounters(tx, event, currentRunState.get(), nextRunState);
 
         final SequenceEvent sequenceEvent =
             SequenceEvent.create(event, nextRunState.counter(), nextRunState.timestamp());
@@ -214,41 +207,6 @@ public class QueuedStateManager implements StateManager {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  private void updateResourceCounters(StorageTransaction tx, Event event,
-                                      RunState currentRunState, RunState nextRunState) {
-    // increment counters if event is dequeue
-    if (isDequeue(event, nextRunState) && nextRunState.data().resourceIds().isPresent()) {
-      for (String resource : nextRunState.data().resourceIds().get()) {
-        tx.updateCounter(shardedCounter, resource, 1);
-      }
-    }
-
-    if (isConsumingResources(currentRunState.state())
-        && !isConsumingResources(nextRunState.state())
-        && nextRunState.data().resourceIds().isPresent()) {
-      // decrement counters if transitioning from a state that consumes resources
-      // to a state that doesn't consume any resources
-      for (String resource : nextRunState.data().resourceIds().get()) {
-        tx.updateCounter(shardedCounter, resource, -1);
-      }
-    } else if (!nextRunState.data().resourceIds().isPresent()) {
-      LOG.error("Resource ids are missing for {} when transitioning from {} to {}.",
-                nextRunState.workflowInstance(), currentRunState, nextRunState);
-    }
-  }
-
-  private static boolean isConsumingResources(State state) {
-    return javaslang.collection.List.of(State.PREPARE,
-                                        State.SUBMITTING,
-                                        State.SUBMITTED,
-                                        State.RUNNING).contains(state);
-  }
-
-  private boolean isDequeue(Event event, RunState runState) {
-    return event.equals(Event.dequeue(event.workflowInstance(),
-                                      runState.data().resourceIds().orElse(ImmutableSet.of())));
   }
 
   private void postTransition(SequenceEvent sequenceEvent, RunState runState) {

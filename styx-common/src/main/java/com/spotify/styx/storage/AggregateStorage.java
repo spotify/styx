@@ -51,8 +51,7 @@ public class AggregateStorage implements Storage {
   private final DatastoreStorage datastoreStorage;
 
   public AggregateStorage(Connection connection, Datastore datastore, Duration retryBaseDelay) {
-    this(new BigtableStorage(connection, retryBaseDelay),
-         new DatastoreStorage(datastore, retryBaseDelay));
+    this(new BigtableStorage(connection, retryBaseDelay), new DatastoreStorage(datastore, retryBaseDelay));
   }
 
   AggregateStorage(BigtableStorage bigtableStorage, DatastoreStorage datastoreStorage) {
@@ -209,21 +208,6 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public Map<Integer, Long> shardsForCounter(String counterId) {
-    return datastoreStorage.shardsForCounter(counterId);
-  }
-
-  @Override
-  public void deleteShardsForCounter(String counterId) {
-    datastoreStorage.deleteShardsForCounter(counterId);
-  }
-
-  @Override
-  public long getLimitForCounter(String counterId) {
-    return datastoreStorage.getLimitForCounter(counterId);
-  }
-
-  @Override
   public void storeResource(Resource resource) throws IOException {
     datastoreStorage.postResource(resource);
   }
@@ -256,15 +240,5 @@ public class AggregateStorage implements Storage {
   @Override
   public <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f) throws IOException, E {
     return datastoreStorage.runInTransaction(f);
-  }
-
-  @Override
-  public void deleteLimitForCounter(String counterId) throws IOException {
-    datastoreStorage.deleteLimitForCounter(counterId);
-  }
-
-  @Override
-  public void updateLimitForCounter(String counterId, long limit) throws IOException {
-    datastoreStorage.updateLimitForCounter(counterId, limit);
   }
 }
