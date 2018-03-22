@@ -22,7 +22,10 @@ package com.spotify.styx;
 
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
-import static com.spotify.styx.Scheduler.SchedulerUtil.*;
+import static com.spotify.styx.Scheduler.SchedulerUtil.getActiveInstanceStates;
+import static com.spotify.styx.Scheduler.SchedulerUtil.getResourceUsage;
+import static com.spotify.styx.Scheduler.SchedulerUtil.getTimedOutInstances;
+import static com.spotify.styx.Scheduler.SchedulerUtil.workflowResources;
 import static com.spotify.styx.WorkflowExecutionGate.NOOP;
 import static java.util.Collections.emptySet;
 import static java.util.Comparator.comparingLong;
@@ -347,6 +350,11 @@ public class Scheduler {
   }
 
   public static class SchedulerUtil {
+
+    private SchedulerUtil() {
+      // no instantiation
+    }
+
     static List<InstanceState> getActiveInstanceStates(
         Map<WorkflowInstance, RunState> activeStatesMap) {
       return activeStatesMap.entrySet().stream()
@@ -371,18 +379,20 @@ public class Scheduler {
       return activeStates.parallelStream()
           .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
           .filter(entry -> isConsumingResources(entry.runState().state()))
-          .flatMap(instanceState -> pairWithResources(globalConcurrencyEnabled, instanceState, workflows, resourceDecorator))
+          .flatMap(instanceState -> pairWithResources(globalConcurrencyEnabled, instanceState,
+              workflows, resourceDecorator))
           .collect(groupingByConcurrent(
               ResourceWithInstance::resource,
               ConcurrentHashMap::new,
               counting()));
     }
 
-    static private Stream<ResourceWithInstance> pairWithResources(boolean globalConcurrencyEnabled,
+    private static Stream<ResourceWithInstance> pairWithResources(boolean globalConcurrencyEnabled,
                                                                   InstanceState instanceState,
                                                                   Set<Workflow> workflows,
                                                                   WorkflowResourceDecorator resourceDecorator) {
-      final Optional<Workflow> workflowOpt = workflows.stream().filter(wf -> wf.id().equals(instanceState.workflowInstance().workflowId())).findFirst();
+      final Optional<Workflow> workflowOpt = workflows.stream().filter(
+          wf -> wf.id().equals(instanceState.workflowInstance().workflowId())).findFirst();
       final Set<String> workflowResources = workflowResources(globalConcurrencyEnabled, workflowOpt);
       return workflowOpt
           .map(workflow -> resourceDecorator.decorateResources(
@@ -401,7 +411,7 @@ public class Scheduler {
       return builder.build();
     }
 
-    static private boolean hasTimedOut(RunState runState, Instant instant, Duration timeout) {
+    private static boolean hasTimedOut(RunState runState, Instant instant, Duration timeout) {
       if (runState.state().isTerminal()) {
         return false;
       }
