@@ -22,11 +22,7 @@ package com.spotify.styx.util;
 
 class CounterCapacityException extends RuntimeException {
 
-  CounterCapacityException() {
-    super();
-  }
-
-  CounterCapacityException(String s, Object... args) {
-    super(String.format(s, args));
+  CounterCapacityException(String message) {
+    super(message);
   }
 }

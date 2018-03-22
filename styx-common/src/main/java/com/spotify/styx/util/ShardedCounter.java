@@ -55,7 +55,7 @@ public class ShardedCounter {
 
   // Ought to be enough (parallelism) for everyone. We could make it dynamic with extra effort.
   public static final int NUM_SHARDS = 128;
-  public static final Duration CACHE_EXPIRY_DURATION = Duration.ofMillis(1000);
+  private static final Duration CACHE_EXPIRY_DURATION = Duration.ofMillis(1000);
 
   public static final String KIND_COUNTER_LIMIT = "CounterLimit";
   public static final String PROPERTY_LIMIT = "limit";
@@ -73,12 +73,6 @@ public class ShardedCounter {
       .maximumSize(100_000)
       .expireAfterWrite(CACHE_EXPIRY_DURATION.toMillis(), TimeUnit.MILLISECONDS)
       .build();
-
-  public ShardedCounter(Storage storage, CounterSnapshotFactory counterSnapshotFactory) {
-    this.storage = Objects.requireNonNull(storage);
-    this.counterSnapshotFactory = Objects.requireNonNull(counterSnapshotFactory);
-  }
-
   private CounterSnapshotFactory counterSnapshotFactory;
 
   public static class Snapshot implements CounterSnapshot {
@@ -87,11 +81,11 @@ public class ShardedCounter {
     private final Long limit;
     private final Map<Integer, Long> shards;
 
-    public Snapshot(Storage storage, String counterId, Map<Integer, Long> shards) {
+    Snapshot(Storage storage, String counterId, Map<Integer, Long> shards) {
       Objects.requireNonNull(storage);
+      this.counterId = Objects.requireNonNull(counterId);
       this.limit = getLimit(storage, counterId);
-      this.shards = shards;
-      this.counterId = counterId;
+      this.shards = Objects.requireNonNull(shards);
     }
 
     /**
@@ -118,7 +112,7 @@ public class ShardedCounter {
      */
     public int pickShardWithSpareCapacity(long delta) {
       List<Integer> candidates = shards.keySet().stream()
-          .filter(index -> shards.containsKey(index))
+          .filter(shards::containsKey)
           .filter(index -> Range.closed(0L, shardCapacity(index))
                                 .contains(shards.get(index) + delta))
           .collect(Collectors.toList());
@@ -130,14 +124,21 @@ public class ShardedCounter {
               counterId);
           return new Random().nextInt((int) Math.min(NUM_SHARDS, limit));
         } else {
-          throw new CounterCapacityException("No shard for counter %s has capacity for delta %s",
-                                             counterId, delta);
+          final String message = String.format("No shard for counter %s has capacity for delta %s",
+                                               counterId, delta);
+          LOG.debug(message);
+          throw new CounterCapacityException(message);
         }
         // Or return -1 (and use that to abort the transaction early)?
       } else {
         return candidates.get(new Random().nextInt(candidates.size()));
       }
     }
+  }
+
+  public ShardedCounter(Storage storage, CounterSnapshotFactory counterSnapshotFactory) {
+    this.storage = Objects.requireNonNull(storage);
+    this.counterSnapshotFactory = Objects.requireNonNull(counterSnapshotFactory);
   }
 
   /**
@@ -174,7 +175,7 @@ public class ShardedCounter {
   /**
    * Reads the latest limit value from Datastore, for the specified {@param counterId}
    */
-  public static long getLimit(Storage storage, String counterId) {
+  static long getLimit(Storage storage, String counterId) {
     return storage.getLimitForCounter(counterId);
   }
 
@@ -200,15 +201,20 @@ public class ShardedCounter {
           .contains(newShardValue)) {
         transaction.store(Shard.create(counterId, shardIndex, (int) (shard.get().value() + delta)));
       } else {
-        throw new CounterCapacityException("Chosen shard %s-%s has no more capacity.",
-                                           counterId, shardIndex);
+        final String message = String.format("Chosen shard %s-%s has no more capacity.",
+                                             counterId, shardIndex);
+        LOG.debug(message);
+        throw new CounterCapacityException(message);
       }
     } else {
-      throw new ShardNotFoundException(
-          "Could not find shard %s-%s. Unexpected Datastore corruption or our bug - the code should've "
-          + "called initialize() before reaching this point, and any particular shard should "
-          + "strongly be get()-able thereafter",
-          counterId, shardIndex);
+      final String message =
+          String.format("Could not find shard %s-%s. Unexpected Datastore corruption or our"
+                        + "bug - the code should've called initialize() before reaching this"
+                        + "point, and any particular shard should strongly be get()-able" 
+                        + "thereafter",
+                        counterId, shardIndex);
+      LOG.debug(message);
+      throw new ShardNotFoundException(message);
     }
   }
 

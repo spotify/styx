@@ -204,7 +204,13 @@ public class QueuedStateManager implements StateManager {
         } else {
           tx.updateActiveState(event.workflowInstance(), nextRunState);
         }
-        updateResourceCounters(tx, event, currentRunState.get(), nextRunState);
+
+        try {
+          updateResourceCounters(tx, event, currentRunState.get(), nextRunState);
+        } catch (Exception e) {
+          // FIXME: should we continue or fail the transition?
+          LOG.error("Failed to update resource counters", e);
+        }
 
         final SequenceEvent sequenceEvent =
             SequenceEvent.create(event, nextRunState.counter(), nextRunState.timestamp());
