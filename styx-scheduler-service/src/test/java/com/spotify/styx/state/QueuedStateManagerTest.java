@@ -691,6 +691,23 @@ public class QueuedStateManagerTest {
     verify(transaction, never()).updateCounter(eq(shardedCounter), anyString(), anyInt());
   }
 
+  @Test
+  public void shouldReceiveEventIgnoreClosed() throws IOException, IsClosedException {
+    final QueuedStateManager spied = spy(stateManager);
+    spied.close();
+    givenState(INSTANCE, State.SUBMITTED);
+    spied.receiveIgnoreClosed(Event.started(INSTANCE));
+    verify(spied).ensureRunning();
+  }
+
+  @Test
+  public void shouldReceiveEventIgnoreClosedWithCounter() throws IOException, IsClosedException {
+    final QueuedStateManager spied = spy(stateManager);
+    spied.close();
+    givenState(INSTANCE, State.SUBMITTED);
+    spied.receiveIgnoreClosed(Event.started(INSTANCE), 17);
+    verify(spied).ensureRunning();
+  }
 
   public void givenState(WorkflowInstance instance, State state) throws IOException {
     final RunState runState = RunState.create(instance, state, STATE_DATA_1, NOW.minusMillis(1), 17);
