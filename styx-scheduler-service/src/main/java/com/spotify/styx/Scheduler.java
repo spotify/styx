@@ -252,9 +252,9 @@ public class Scheduler {
     }
 
     if (blocker.isPresent()) {
-      stateManager.receiveIgnoreClosed(Event.retryAfter(
-          instance.workflowInstance(),
-          blocker.get().delay().toMillis()), instance.runState().counter());
+      stateManager.receiveIgnoreClosed(Event.retryAfter(instance.workflowInstance(),
+                                                        blocker.get().delay().toMillis()),
+                                       instance.runState().counter());
       LOG.debug("Dequeue rescheduled: {}: {}", instance.workflowInstance(), blocker.get());
       return;
     }
@@ -285,9 +285,9 @@ public class Scheduler {
         .collect(toSet());
 
     if (!unknownResources.isEmpty()) {
-      stateManager.receiveIgnoreClosed(Event.runError(
-          instance.workflowInstance(),
-          String.format("Referenced resources not found: %s", unknownResources)),
+      stateManager.receiveIgnoreClosed(
+          Event.runError(instance.workflowInstance(),
+                         String.format("Referenced resources not found: %s", unknownResources)),
           instance.runState().counter());
     } else if (!depletedResources.isEmpty()) {
       final Message message = Message.info(
@@ -300,7 +300,7 @@ public class Scheduler {
                   .collect(toList())));
       if (!instance.runState().data().message().map(message::equals).orElse(false)) {
         stateManager.receiveIgnoreClosed(Event.info(instance.workflowInstance(), message),
-            instance.runState().counter());
+                                         instance.runState().counter());
       }
     } else {
       double sleepingTime = dequeueRateLimiter.acquire();
@@ -358,8 +358,8 @@ public class Scheduler {
     } else {
       LOG.info("{} executing retry #{}", workflowInstance.toKey(), state.data().tries());
     }
-    stateManager.receiveIgnoreClosed(
-        Event.dequeue(workflowInstance, resourceIds), instance.runState().counter());
+    stateManager.receiveIgnoreClosed(Event.dequeue(workflowInstance, resourceIds),
+                                     instance.runState().counter());
   }
 
   private boolean hasTimedOut(RunState runState) {
