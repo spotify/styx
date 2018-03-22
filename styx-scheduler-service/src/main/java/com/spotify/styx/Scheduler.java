@@ -22,6 +22,7 @@ package com.spotify.styx;
 
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
+import static com.spotify.styx.Scheduler.SchedulerUtil.*;
 import static com.spotify.styx.WorkflowExecutionGate.NOOP;
 import static java.util.Collections.emptySet;
 import static java.util.Comparator.comparingLong;
@@ -54,6 +55,7 @@ import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -92,7 +94,7 @@ public class Scheduler {
   static final String GLOBAL_RESOURCE_ID = "GLOBAL_STYX_CLUSTER";
 
   private static final String TICK_TYPE = UPPER_CAMEL.to(LOWER_UNDERSCORE,
-                                                         Scheduler.class.getSimpleName());
+      Scheduler.class.getSimpleName());
 
   private static final int SCHEDULING_BATCH_SIZE = 16;
 
@@ -107,9 +109,9 @@ public class Scheduler {
   private final WorkflowExecutionGate gate;
 
   public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager,
-      WorkflowCache workflowCache, Storage storage,
-      WorkflowResourceDecorator resourceDecorator,
-      Stats stats, RateLimiter dequeueRateLimiter, WorkflowExecutionGate gate) {
+                   WorkflowCache workflowCache, Storage storage,
+                   WorkflowResourceDecorator resourceDecorator,
+                   Stats stats, RateLimiter dequeueRateLimiter, WorkflowExecutionGate gate) {
     this.time = Objects.requireNonNull(time);
     this.ttls = Objects.requireNonNull(ttls);
     this.stateManager = Objects.requireNonNull(stateManager);
@@ -139,18 +141,14 @@ public class Scheduler {
     globalConcurrency.ifPresent(
         concurrency ->
             resources.put(GLOBAL_RESOURCE_ID,
-                          Resource.create(GLOBAL_RESOURCE_ID, concurrency)));
+                Resource.create(GLOBAL_RESOURCE_ID, concurrency)));
 
     final Map<WorkflowInstance, RunState> activeStatesMap = stateManager.getActiveStates();
     final List<InstanceState> activeStates = activeStatesMap.entrySet().stream()
         .map(entry -> InstanceState.create(entry.getKey(), entry.getValue()))
         .collect(toList());
 
-    final Set<WorkflowInstance> timedOutInstances =
-        activeStates.parallelStream()
-            .filter(entry -> hasTimedOut(entry.runState()))
-            .map(InstanceState::workflowInstance)
-            .collect(toSet());
+    final Set<WorkflowInstance> timedOutInstances = getTimedOutInstances(activeStates, time.get(), ttls);
 
     final Map<WorkflowId, Set<String>> workflowResourceReferences =
         activeStates.parallelStream()
@@ -159,17 +157,11 @@ public class Scheduler {
             .distinct()
             .collect(toMap(
                 workflowId -> workflowId,
-                workflowId -> workflowResources(globalConcurrency, workflowId)));
+                workflowId -> workflowResources(globalConcurrency.isPresent(), workflowCache.workflow(workflowId))));
 
     final Map<String, Long> currentResourceUsage =
-        activeStates.parallelStream()
-            .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
-            .filter(entry -> isConsumingResources(entry.runState().state()))
-            .flatMap(instanceState -> pairWithResources(globalConcurrency, instanceState))
-            .collect(groupingByConcurrent(
-                ResourceWithInstance::resource,
-                ConcurrentHashMap::new,
-                counting()));
+        getResourceUsage(globalConcurrency.isPresent(), activeStates, timedOutInstances,
+            resourceDecorator, workflowCache.all());
 
     final List<InstanceState> eligibleInstances =
         activeStates.parallelStream()
@@ -210,7 +202,7 @@ public class Scheduler {
       // Evaluate each instance in the batch for dequeuing
       for (int i = 0; i < batch.size(); i++) {
         limitAndDequeue(resources, workflowResourceReferences,
-                        currentResourceUsage, batch.get(i), blockers.get(i));
+            currentResourceUsage, batch.get(i), blockers.get(i));
       }
     }
   }
@@ -235,9 +227,9 @@ public class Scheduler {
   }
 
   private void limitAndDequeue(Map<String, Resource> resources,
-      Map<WorkflowId, Set<String>> workflowResourceReferences,
-      Map<String, Long> currentResourceUsage, InstanceState instanceState,
-      CompletionStage<Optional<ExecutionBlocker>> executionBlockerFuture) {
+                               Map<WorkflowId, Set<String>> workflowResourceReferences,
+                               Map<String, Long> currentResourceUsage, InstanceState instanceState,
+                               CompletionStage<Optional<ExecutionBlocker>> executionBlockerFuture) {
 
     // Check for execution blocker
     Optional<ExecutionBlocker> blocker = Optional.empty();
@@ -287,7 +279,7 @@ public class Scheduler {
     if (!unknownResources.isEmpty()) {
       stateManager.receiveIgnoreClosed(
           Event.runError(instanceState.workflowInstance(),
-                         String.format("Referenced resources not found: %s", unknownResources)),
+              String.format("Referenced resources not found: %s", unknownResources)),
           instanceState.runState().counter());
     } else if (!depletedResources.isEmpty()) {
       final Message message = Message.info(
@@ -300,7 +292,7 @@ public class Scheduler {
                   .collect(toList())));
       if (!instanceState.runState().data().message().map(message::equals).orElse(false)) {
         stateManager.receiveIgnoreClosed(Event.info(instanceState.workflowInstance(), message),
-                                         instanceState.runState().counter());
+            instanceState.runState().counter());
       }
     } else {
       double sleepingTime = dequeueRateLimiter.acquire();
@@ -312,28 +304,6 @@ public class Scheduler {
       instanceResourceRefs.forEach(id -> currentResourceUsage.compute(id, (id_, l) -> l + 1));
       sendDequeue(instanceState, instanceResourceRefs);
     }
-  }
-
-  private Stream<ResourceWithInstance> pairWithResources(Optional<Long> globalConcurrency,
-                                                         InstanceState instanceState) {
-    final WorkflowId workflowId = instanceState.workflowInstance().workflowId();
-    final Set<String> workflowResources = workflowResources(globalConcurrency, workflowId);
-    return workflowCache.workflow(workflowId)
-        .map(workflow -> resourceDecorator.decorateResources(
-            instanceState.runState(), workflow.configuration(), workflowResources))
-        .orElse(workflowResources).stream()
-        .map(resource -> ResourceWithInstance.create(resource, instanceState));
-  }
-
-  private Set<String> workflowResources(Optional<Long> globalConcurrency, WorkflowId workflowId) {
-    final ImmutableSet.Builder<String> builder = ImmutableSet.builder();
-
-    globalConcurrency.ifPresent(concurrency -> builder.add(GLOBAL_RESOURCE_ID));
-
-    workflowCache.workflow(workflowId).ifPresent(workflow ->
-        builder.addAll(workflow.configuration().resources()));
-
-    return builder.build();
   }
 
   private boolean shouldExecute(RunState runState) {
@@ -359,25 +329,12 @@ public class Scheduler {
       LOG.info("{} executing retry #{}", workflowInstance.toKey(), state.data().tries());
     }
     stateManager.receiveIgnoreClosed(Event.dequeue(workflowInstance, resourceIds),
-                                     instanceState.runState().counter());
-  }
-
-  private boolean hasTimedOut(RunState runState) {
-    if (runState.state().isTerminal()) {
-      return false;
-    }
-
-    final Instant now = time.get();
-    final Instant deadline = Instant
-        .ofEpochMilli(runState.timestamp())
-        .plus(ttls.ttlOf(runState.state()));
-
-    return !deadline.isAfter(now);
+        instanceState.runState().counter());
   }
 
   private void sendTimeout(WorkflowInstance workflowInstance, RunState runState) {
     LOG.info("Found stale state {} since {} for workflow {}; Issuing a timeout",
-             runState.state(), Instant.ofEpochMilli(runState.timestamp()), workflowInstance);
+        runState.state(), Instant.ofEpochMilli(runState.timestamp()), workflowInstance);
     stateManager.receiveIgnoreClosed(Event.timeout(workflowInstance), runState.counter());
   }
 
@@ -388,6 +345,67 @@ public class Scheduler {
 
     static ResourceWithInstance create(String resource, InstanceState instanceState) {
       return new AutoValue_Scheduler_ResourceWithInstance(resource, instanceState);
+    }
+  }
+
+  public static class SchedulerUtil {
+    static Set<WorkflowInstance> getTimedOutInstances(List<InstanceState> activeStates,
+                                                      Instant instant,
+                                                      TimeoutConfig ttl) {
+      return activeStates.parallelStream()
+          .filter(entry -> hasTimedOut(entry.runState(), instant, ttl.ttlOf(entry.runState().state())))
+          .map(InstanceState::workflowInstance)
+          .collect(toSet());
+    }
+
+    static ConcurrentHashMap<String, Long> getResourceUsage(boolean globalConcurrencyEnabled,
+                                                            List<InstanceState> activeStates,
+                                                            Set<WorkflowInstance> timedOutInstances,
+                                                            WorkflowResourceDecorator resourceDecorator,
+                                                            Set<Workflow> workflows) {
+      return activeStates.parallelStream()
+          .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
+          .filter(entry -> isConsumingResources(entry.runState().state()))
+          .flatMap(instanceState -> pairWithResources(globalConcurrencyEnabled, instanceState, workflows, resourceDecorator))
+          .collect(groupingByConcurrent(
+              ResourceWithInstance::resource,
+              ConcurrentHashMap::new,
+              counting()));
+    }
+
+    static private Stream<ResourceWithInstance> pairWithResources(boolean globalConcurrencyEnabled,
+                                                                  InstanceState instanceState,
+                                                                  Set<Workflow> workflows,
+                                                                  WorkflowResourceDecorator resourceDecorator) {
+      final Optional<Workflow> workflowOpt = workflows.stream().filter(wf -> wf.id().equals(instanceState.workflowInstance().workflowId())).findFirst();
+      final Set<String> workflowResources = workflowResources(globalConcurrencyEnabled, workflowOpt);
+      return workflowOpt
+          .map(workflow -> resourceDecorator.decorateResources(
+              instanceState.runState(), workflow.configuration(), workflowResources))
+          .orElse(workflowResources).stream()
+          .map(resource -> ResourceWithInstance.create(resource, instanceState));
+    }
+
+    static Set<String> workflowResources(boolean globalConcurrenyEnabled,
+                                         Optional<Workflow> workflowOpt) {
+      final ImmutableSet.Builder<String> builder = ImmutableSet.builder();
+      if (globalConcurrenyEnabled) {
+        builder.add(GLOBAL_RESOURCE_ID);
+      }
+      workflowOpt.ifPresent(wf -> builder.addAll(wf.configuration().resources()));
+      return builder.build();
+    }
+
+    static private boolean hasTimedOut(RunState runState, Instant instant, Duration timeout) {
+      if (runState.state().isTerminal()) {
+        return false;
+      }
+
+      final Instant deadline = Instant
+          .ofEpochMilli(runState.timestamp())
+          .plus(timeout);
+
+      return !deadline.isAfter(instant);
     }
   }
 }
