@@ -93,15 +93,14 @@ public class ShardedCounterTest {
   }
 
   @Before
-  public void setUp() throws IOException, InterruptedException {
+  public void setUp() {
     shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
   }
 
   @After
-  public void tearDown() throws IOException, InterruptedException {
+  public void tearDown() {
     clearDatastore(datastore);
   }
-
 
   @Test
   public void shouldCreateCounterEmpty() {
@@ -182,7 +181,6 @@ public class ShardedCounterTest {
     shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
   }
-
 
   @Test(expected = CounterCapacityException.class)
   public void shoudFailDecrementingEmptyCounter() {
