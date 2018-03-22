@@ -30,6 +30,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -39,6 +40,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.datastore.DatastoreException;
@@ -696,8 +698,13 @@ public class QueuedStateManagerTest {
     final QueuedStateManager spied = spy(stateManager);
     spied.close();
     givenState(INSTANCE, State.SUBMITTED);
-    spied.receiveIgnoreClosed(Event.started(INSTANCE));
+
+    final Event event = Event.started(INSTANCE);
+    spied.receiveIgnoreClosed(event);
+    verify(storage).readActiveState(INSTANCE);
+    verify(spied).receive(eq(event), anyLong());
     verify(spied).ensureRunning();
+    verifyNoMoreInteractions(storage);
   }
 
   @Test
@@ -705,8 +712,10 @@ public class QueuedStateManagerTest {
     final QueuedStateManager spied = spy(stateManager);
     spied.close();
     givenState(INSTANCE, State.SUBMITTED);
+
     spied.receiveIgnoreClosed(Event.started(INSTANCE), 17);
     verify(spied).ensureRunning();
+    verifyNoMoreInteractions(storage);
   }
 
   public void givenState(WorkflowInstance instance, State state) throws IOException {
