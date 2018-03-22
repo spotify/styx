@@ -144,9 +144,7 @@ public class Scheduler {
                 Resource.create(GLOBAL_RESOURCE_ID, concurrency)));
 
     final Map<WorkflowInstance, RunState> activeStatesMap = stateManager.getActiveStates();
-    final List<InstanceState> activeStates = activeStatesMap.entrySet().stream()
-        .map(entry -> InstanceState.create(entry.getKey(), entry.getValue()))
-        .collect(toList());
+    final List<InstanceState> activeStates = getActiveInstanceStates(activeStatesMap);
 
     final Set<WorkflowInstance> timedOutInstances = getTimedOutInstances(activeStates, time.get(), ttls);
 
@@ -349,6 +347,13 @@ public class Scheduler {
   }
 
   public static class SchedulerUtil {
+    static List<InstanceState> getActiveInstanceStates(
+        Map<WorkflowInstance, RunState> activeStatesMap) {
+      return activeStatesMap.entrySet().stream()
+          .map(entry -> InstanceState.create(entry.getKey(), entry.getValue()))
+          .collect(toList());
+    }
+
     static Set<WorkflowInstance> getTimedOutInstances(List<InstanceState> activeStates,
                                                       Instant instant,
                                                       TimeoutConfig ttl) {

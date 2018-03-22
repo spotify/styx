@@ -103,9 +103,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -321,9 +323,12 @@ public class StyxScheduler implements AppInit {
 
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
     final ShardedCounter shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
-    initializeResources(storage, shardedCounter, counterSnapshotFactory);
+
+    final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
+    final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
 
     warmUpCache(workflowCache, storage);
+    initializeResources(storage, shardedCounter, counterSnapshotFactory, timeoutConfig, workflowCache);
 
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
     //       take StateManager as argument instead?
@@ -332,9 +337,6 @@ public class StyxScheduler implements AppInit {
         new QueuedStateManager(time, eventTransitionExecutor, storage,
             eventConsumerFactory.apply(environment, stats), eventConsumerExecutor,
             fanOutput(outputHandlers), shardedCounter));
-
-    final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
-    final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
 
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
     final Supplier<String> dockerId = () -> styxConfig.get().globalDockerRunnerId();
@@ -444,7 +446,9 @@ public class StyxScheduler implements AppInit {
   }
 
   private void initializeResources(Storage storage, ShardedCounter shardedCounter,
-                                   CounterSnapshotFactory counterSnapshotFactory) {
+                                   CounterSnapshotFactory counterSnapshotFactory,
+                                   TimeoutConfig timeoutConfig,
+                                   WorkflowCache workflowCache) {
     try {
       storage.resources().parallelStream().forEach(
           resource -> {
@@ -464,6 +468,39 @@ public class StyxScheduler implements AppInit {
       LOG.error("Error reading resources from datastore: {}", e);
       // TODO: re-throw exception when moving to entirely depend on counter shards
     }
+
+    try {
+      syncResources(storage, timeoutConfig, workflowCache, shardedCounter);
+    } catch (Exception e) {
+      LOG.error("Error syncing resources: {}", e);
+      // TODO: re-throw exception when moving to entirely depend on counter shards
+    }
+  }
+
+  private void syncResources(Storage storage, TimeoutConfig timeoutConfig,
+                             WorkflowCache workflowCache,
+                             ShardedCounter shardedCounter) throws IOException {
+    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
+    final List<InstanceState> activeInstanceStates =
+        Scheduler.SchedulerUtil.getActiveInstanceStates(activeStates);
+    boolean globalConcurrencyEnabled = storage.config().globalConcurrency().isPresent();
+    final Set<WorkflowInstance> timedOutInstances = Scheduler.SchedulerUtil
+        .getTimedOutInstances(activeInstanceStates, time.get(), timeoutConfig);
+    final ConcurrentHashMap<String, Long> resourceUsage = Scheduler.SchedulerUtil
+        .getResourceUsage(globalConcurrencyEnabled, activeInstanceStates, timedOutInstances,
+            resourceDecorator, workflowCache.all());
+
+    resourceUsage.forEach((key, value) -> {
+      try {
+        storage.runInTransaction(tx -> {
+          shardedCounter.updateCounter(tx, key, value);
+          return null;
+        });
+      } catch (IOException e) {
+        LOG.error("Error syncing resource: {}", key);
+        // TODO: re-throw exception when moving to entirely depend on counter shards
+      }
+    });
   }
 
   private static void startCleaner(Cleaner cleaner, ScheduledExecutorService exec) {
