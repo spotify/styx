@@ -693,12 +693,12 @@ public class QueuedStateManagerTest {
 
 
   public void givenState(WorkflowInstance instance, State state) throws IOException {
-    when(transaction.readActiveState(instance))
-        .thenReturn(Optional.of(RunState.create(instance, state, STATE_DATA_1, NOW.minusMillis(1), 17)));
+    final RunState runState = RunState.create(instance, state, STATE_DATA_1, NOW.minusMillis(1), 17);
+    when(transaction.readActiveState(instance)).thenReturn(Optional.of(runState));
+    when(storage.readActiveState(INSTANCE)).thenReturn(Optional.of(runState));
   }
 
   public void receiveEvent(Event event) throws Exception {
     stateManager.receive(event).toCompletableFuture().get(1, MINUTES);
   }
-
 }
