@@ -504,7 +504,9 @@ public class StyxScheduler implements AppInit {
   @VisibleForTesting
   void updateShards(final Storage storage,
                     final Map<String, Long> resourceUsage) {
-    resourceUsage.forEach((resource, usage) -> {
+    resourceUsage.entrySet().parallelStream().forEach(entity -> {
+      final String resource = entity.getKey();
+      final Long usage = entity.getValue();
       LOG.info("Syncing {} -> {}", resource, usage);
       try {
         int result = (int) (usage / NUM_SHARDS);
