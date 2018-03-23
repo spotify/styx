@@ -23,11 +23,6 @@ package com.spotify.styx.storage;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
-import static com.spotify.styx.storage.DatastoreStorage.DEFAULT_CONFIG_DEBUG_ENABLED;
-import static com.spotify.styx.storage.DatastoreStorage.DEFAULT_CONFIG_DOCKER_RUNNER_ID;
-import static com.spotify.styx.storage.DatastoreStorage.DEFAULT_CONFIG_ENABLED;
-import static com.spotify.styx.storage.DatastoreStorage.DEFAULT_CONFIG_EXECUTION_GATING_ENABLED;
-import static com.spotify.styx.storage.DatastoreStorage.DEFAULT_CONFIG_RESOURCES_SYNC_ENABLED;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -557,11 +552,12 @@ public class DatastoreStorageTest {
   @Test
   public void testDefaultConfig() {
     final StyxConfig expectedConfig = StyxConfig.newBuilder()
-        .globalDockerRunnerId(DEFAULT_CONFIG_DOCKER_RUNNER_ID)
-        .globalEnabled(DEFAULT_CONFIG_ENABLED)
-        .debugEnabled(DEFAULT_CONFIG_DEBUG_ENABLED)
-        .resourcesSyncEnabled(DEFAULT_CONFIG_RESOURCES_SYNC_ENABLED)
-        .executionGatingEnabled(DEFAULT_CONFIG_EXECUTION_GATING_ENABLED)
+        .globalDockerRunnerId("default")
+        .globalEnabled(true)
+        .debugEnabled(false)
+        .resourcesSyncEnabled(false)
+        .executionGatingEnabled(false
+        )
         .build();
 
     assertThat(storage.config(), is(expectedConfig));
