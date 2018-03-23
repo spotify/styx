@@ -24,6 +24,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
+import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
@@ -128,13 +129,26 @@ public class QueuedStateManager implements StateManager {
   @Override
   public CompletableFuture<Void> receive(Event event) throws IsClosedException {
     ensureRunning();
+    // Read state counter at enqueueing time
+    final Optional<RunState> currentRunState = getActiveState(event.workflowInstance());
+    if (!currentRunState.isPresent()) {
+      return CompletableFutures.exceptionallyCompletedFuture(
+          new IllegalArgumentException("Workflow not found: "
+                                       + event.workflowInstance().workflowId().toKey()));
+    }
+    return receive(event, currentRunState.get().counter());
+  }
+
+  @Override
+  public CompletableFuture<Void> receive(Event event, long expectedCounter) throws IsClosedException {
+    ensureRunning();
     LOG.info("Received event {}", event);
 
     // TODO: optional retry on transaction conflict
 
     queuedEvents.increment();
     return Striping.supplyAsyncStriped(() ->
-        transition(event), event.workflowInstance(), eventTransitionExecutor)
+        transition(event, expectedCounter), event.workflowInstance(), eventTransitionExecutor)
         .thenAccept((tuple) -> postTransition(tuple._1, tuple._2));
   }
 
@@ -174,7 +188,7 @@ public class QueuedStateManager implements StateManager {
     }
   }
 
-  private Tuple2<SequenceEvent, RunState> transition(Event event) {
+  private Tuple2<SequenceEvent, RunState> transition(Event event, long expectedCounter) {
     queuedEvents.decrement();
     try {
       return storage.runInTransaction(tx -> {
@@ -187,6 +201,9 @@ public class QueuedStateManager implements StateManager {
           LOG.warn(message);
           throw new IllegalArgumentException(message);
         }
+
+        // Verify counters for in-order event processing
+        verifyCounter(event, expectedCounter, currentRunState.get());
 
         final RunState nextRunState;
         try {
@@ -255,6 +272,23 @@ public class QueuedStateManager implements StateManager {
   private boolean isDequeue(Event event, RunState runState) {
     return event.equals(Event.dequeue(event.workflowInstance(),
                                       runState.data().resourceIds().orElse(ImmutableSet.of())));
+  }
+
+  private void verifyCounter(Event event, long expectedCounter, RunState currentRunState) {
+    final long currentCounter = currentRunState.counter();
+    if (currentCounter > expectedCounter) {
+      final String message = "Stale event encountered. Expected counter is "
+                             + expectedCounter  + " but current counter is "
+                             + currentCounter + ". Discarding event " + event;
+      LOG.debug(message);
+      throw new StaleEventException(message);
+    } else if (currentCounter < expectedCounter) {
+      // This should never happen
+      final String message = "Unexpected current counter is less than last observed one for "
+                             + currentRunState;
+      LOG.error(message);
+      throw new RuntimeException(message);
+    }
   }
 
   private void postTransition(SequenceEvent sequenceEvent, RunState runState) {

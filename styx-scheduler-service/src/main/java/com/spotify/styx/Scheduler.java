@@ -236,7 +236,7 @@ public class Scheduler {
 
   private void limitAndDequeue(Map<String, Resource> resources,
       Map<WorkflowId, Set<String>> workflowResourceReferences,
-      Map<String, Long> currentResourceUsage, InstanceState instance,
+      Map<String, Long> currentResourceUsage, InstanceState instanceState,
       CompletionStage<Optional<ExecutionBlocker>> executionBlockerFuture) {
 
     // Check for execution blocker
@@ -248,24 +248,24 @@ public class Scheduler {
       throw new RuntimeException(e);
     } catch (ExecutionException | TimeoutException e) {
       LOG.warn("Failed to check execution blocker for {}, assuming there is no blocker",
-          instance.workflowInstance(), e);
+          instanceState.workflowInstance(), e);
     }
 
     if (blocker.isPresent()) {
-      stateManager.receiveIgnoreClosed(Event.retryAfter(
-          instance.workflowInstance(),
-          blocker.get().delay().toMillis()));
-      LOG.debug("Dequeue rescheduled: {}: {}", instance.workflowInstance(), blocker.get());
+      stateManager.receiveIgnoreClosed(Event.retryAfter(instanceState.workflowInstance(),
+          blocker.get().delay().toMillis()),
+          instanceState.runState().counter());
+      LOG.debug("Dequeue rescheduled: {}: {}", instanceState.workflowInstance(), blocker.get());
       return;
     }
 
     final Set<String> workflowResourceRefs =
-        workflowResourceReferences.getOrDefault(instance.workflowInstance().workflowId(), emptySet());
+        workflowResourceReferences.getOrDefault(instanceState.workflowInstance().workflowId(), emptySet());
 
     // TODO move to ShardedCounter being authoritative for resource accounting
-    final Set<String> instanceResourceRefs = workflowCache.workflow(instance.workflowInstance().workflowId())
+    final Set<String> instanceResourceRefs = workflowCache.workflow(instanceState.workflowInstance().workflowId())
         .map(workflow -> resourceDecorator.decorateResources(
-            instance.runState(), workflow.configuration(), workflowResourceRefs))
+            instanceState.runState(), workflow.configuration(), workflowResourceRefs))
         .orElse(workflowResourceRefs);
 
     final Set<String> unknownResources = instanceResourceRefs.stream()
@@ -285,9 +285,10 @@ public class Scheduler {
         .collect(toSet());
 
     if (!unknownResources.isEmpty()) {
-      stateManager.receiveIgnoreClosed(Event.runError(
-          instance.workflowInstance(),
-          String.format("Referenced resources not found: %s", unknownResources)));
+      stateManager.receiveIgnoreClosed(
+          Event.runError(instanceState.workflowInstance(),
+                         String.format("Referenced resources not found: %s", unknownResources)),
+          instanceState.runState().counter());
     } else if (!depletedResources.isEmpty()) {
       final Message message = Message.info(
           String.format("Resource limit reached for: %s",
@@ -297,8 +298,9 @@ public class Scheduler {
                   .map(Resource::toString)
                   .sorted()
                   .collect(toList())));
-      if (!instance.runState().data().message().map(message::equals).orElse(false)) {
-        stateManager.receiveIgnoreClosed(Event.info(instance.workflowInstance(), message));
+      if (!instanceState.runState().data().message().map(message::equals).orElse(false)) {
+        stateManager.receiveIgnoreClosed(Event.info(instanceState.workflowInstance(), message),
+                                         instanceState.runState().counter());
       }
     } else {
       double sleepingTime = dequeueRateLimiter.acquire();
@@ -308,7 +310,7 @@ public class Scheduler {
 
       instanceResourceRefs.forEach(id -> currentResourceUsage.computeIfAbsent(id, id_ -> 0L));
       instanceResourceRefs.forEach(id -> currentResourceUsage.compute(id, (id_, l) -> l + 1));
-      sendDequeue(instance, instanceResourceRefs);
+      sendDequeue(instanceState, instanceResourceRefs);
     }
   }
 
@@ -356,7 +358,8 @@ public class Scheduler {
     } else {
       LOG.info("{} executing retry #{}", workflowInstance.toKey(), state.data().tries());
     }
-    stateManager.receiveIgnoreClosed(Event.dequeue(workflowInstance, resourceIds));
+    stateManager.receiveIgnoreClosed(Event.dequeue(workflowInstance, resourceIds),
+                                     instanceState.runState().counter());
   }
 
   private boolean hasTimedOut(RunState runState) {
@@ -375,7 +378,7 @@ public class Scheduler {
   private void sendTimeout(WorkflowInstance workflowInstance, RunState runState) {
     LOG.info("Found stale state {} since {} for workflow {}; Issuing a timeout",
              runState.state(), Instant.ofEpochMilli(runState.timestamp()), workflowInstance);
-    stateManager.receiveIgnoreClosed(Event.timeout(workflowInstance));
+    stateManager.receiveIgnoreClosed(Event.timeout(workflowInstance), runState.counter());
   }
 
   @AutoValue

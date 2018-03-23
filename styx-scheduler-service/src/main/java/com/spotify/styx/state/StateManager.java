@@ -54,6 +54,16 @@ public interface StateManager extends Closeable {
   CompletionStage<Void> receive(Event event) throws IsClosedException;
 
   /**
+   * Receive an {@link Event} and route it to the corresponding active {@link RunState} based on
+   * the {@link Event#workflowInstance()} key of the event.
+   *
+   * @param event   The event to receive
+   * @param counter The state counter upon which the event must act upon
+   * @throws IsClosedException if the state receiver is closed and can not handle events
+   */
+  CompletionStage<Void> receive(Event event, long counter) throws IsClosedException;
+
+  /**
    * Get a map of all active {@link WorkflowInstance} states filtered by triggerId.
    */
   Map<WorkflowInstance, RunState> getActiveStatesByTriggerId(String triggerId);
@@ -66,6 +76,20 @@ public interface StateManager extends Closeable {
   default void receiveIgnoreClosed(Event event) {
     try {
       receive(event);
+    } catch (IsClosedException isClosedException) {
+      LOG.info("Ignored event, state receiver closed", isClosedException);
+    }
+  }
+
+  /**
+   * Like {@link #receive(Event)} but ignoring the {@link IsClosedException} exception.
+   *
+   * @param event The event to receive
+   * @param counter The state counter upon which the event must act upon
+   */
+  default void receiveIgnoreClosed(Event event, long counter) {
+    try {
+      receive(event, counter);
     } catch (IsClosedException isClosedException) {
       LOG.info("Ignored event, state receiver closed", isClosedException);
     }
