@@ -26,6 +26,7 @@ import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.GuardedRunnable.guard;
 import static com.spotify.styx.util.ReplayEvents.transitionLogger;
+import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -83,6 +84,7 @@ import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RetryUtil;
+import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.ShardedCounterSnapshotFactory;
 import com.spotify.styx.util.StorageFactory;
@@ -472,7 +474,7 @@ public class StyxScheduler implements AppInit {
     try {
       if (storage.config().resourcesSyncEnabled()) {
         try {
-          syncResources(storage, timeoutConfig, workflowCache, shardedCounter);
+          syncResources(storage, timeoutConfig, workflowCache);
         } catch (Exception e) {
           LOG.error("Error syncing resources: {}", e);
           // TODO: re-throw exception when moving to entirely depend on counter shards
@@ -485,8 +487,7 @@ public class StyxScheduler implements AppInit {
   }
 
   private void syncResources(Storage storage, TimeoutConfig timeoutConfig,
-                             WorkflowCache workflowCache,
-                             ShardedCounter shardedCounter) throws IOException {
+                             WorkflowCache workflowCache) throws IOException {
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
     final List<InstanceState> activeInstanceStates =
         Scheduler.SchedulerUtil.getActiveInstanceStates(activeStates);
@@ -497,14 +498,27 @@ public class StyxScheduler implements AppInit {
         .getResourceUsage(globalConcurrencyEnabled, activeInstanceStates, timedOutInstances,
             resourceDecorator, workflowCache.all());
 
-    resourceUsage.forEach((key, value) -> {
+    updateShards(storage, resourceUsage);
+  }
+
+  @VisibleForTesting
+  void updateShards(final Storage storage,
+                    final Map<String, Long> resourceUsage) {
+    resourceUsage.forEach((resource, usage) -> {
       try {
-        storage.runInTransaction(tx -> {
-          shardedCounter.updateCounter(tx, key, value);
-          return null;
-        });
+        int result = (int) (usage / NUM_SHARDS);
+        int remainder = (int) (usage % NUM_SHARDS);
+        for (int i = 0; i < NUM_SHARDS; i++) {
+          final int index = i;
+          final int shardValue = remainder <= 0 ? result : result + 1;
+          storage.runInTransaction(tx -> {
+            tx.store(Shard.create(resource, index, shardValue));
+            return null;
+          });
+          remainder--;
+        }
       } catch (IOException e) {
-        LOG.error("Error syncing resource: {}", key);
+        LOG.error("Error syncing resource: {}", resource);
         // TODO: re-throw exception when moving to entirely depend on counter shards
       }
     });

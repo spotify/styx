@@ -25,6 +25,7 @@ import static org.hamcrest.Matchers.theInstance;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,9 +34,15 @@ import com.google.api.services.container.v1beta1.model.Cluster;
 import com.google.api.services.container.v1beta1.model.MasterAuth;
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.StyxScheduler.KubernetesClientFactory;
+import com.spotify.styx.storage.Storage;
+import com.spotify.styx.storage.StorageTransaction;
+import com.spotify.styx.storage.TransactionFunction;
+import com.spotify.styx.util.Shard;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
+import java.io.IOException;
+import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -47,12 +54,15 @@ import org.mockito.runners.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class StyxSchedulerTest {
 
-  @Captor ArgumentCaptor<io.fabric8.kubernetes.client.Config> k8sClientConfigCaptor;
+  @Captor private ArgumentCaptor<io.fabric8.kubernetes.client.Config> k8sClientConfigCaptor;
+  @Captor private ArgumentCaptor<Shard> shardArgumentCaptor;
 
-  @Mock KubernetesClientFactory kubernetesClientFactory;
-  @Mock NamespacedKubernetesClient kubernetesClient;
-  @Mock(answer = RETURNS_DEEP_STUBS) Container gkeClient;
-  @Mock Container.Projects.Locations.Clusters.Get gkeClusterGet;
+  @Mock private KubernetesClientFactory kubernetesClientFactory;
+  @Mock private NamespacedKubernetesClient kubernetesClient;
+  @Mock(answer = RETURNS_DEEP_STUBS) private Container gkeClient;
+  @Mock private Container.Projects.Locations.Clusters.Get gkeClusterGet;
+  @Mock private Storage storage;
+  @Mock private StorageTransaction transaction;
 
   @Before
   public void setUp() throws Exception {
@@ -103,5 +113,27 @@ public class StyxSchedulerTest {
     assertThat(k8sConfig.getClientCertData(), is(clientCertificate));
     assertThat(k8sConfig.getClientKeyData(), is(clientKey));
     assertThat(k8sConfig.getNamespace(), is(namespace));
+  }
+
+  @Test
+  public void syncResources() throws IOException {
+    final StyxScheduler styxScheduler = StyxScheduler.newBuilder().build();
+    when(storage.runInTransaction(any())).thenAnswer(
+        a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
+    final Map<String, Long> resourcesUsageMap = ImmutableMap.of("res1", 257L);
+
+    styxScheduler.updateShards(storage, resourcesUsageMap);
+
+    verify(transaction, times(128)).store(shardArgumentCaptor.capture());
+    shardsWithValue(shardArgumentCaptor, 3L, 1L);
+    shardsWithValue(shardArgumentCaptor, 2L, 127L);
+  }
+
+  private void shardsWithValue(ArgumentCaptor<Shard> shardArgumentCaptor, long value, long times) {
+    assertThat(shardArgumentCaptor.getAllValues()
+            .stream()
+            .filter(shard -> shard.value() == value)
+            .count(),
+        is(times));
   }
 }
