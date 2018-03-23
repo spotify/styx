@@ -109,6 +109,8 @@ public class DatastoreStorage {
   public static final String PROPERTY_CONFIG_CONCURRENCY = "concurrency";
   public static final String PROPERTY_CONFIG_CLIENT_BLACKLIST = "clientBlacklist";
   public static final String PROPERTY_CONFIG_EXECUTION_GATING_ENABLED = "executionGatingEnabled";
+  public static final String PROPERTY_CONFIG_DEBUG_ENABLED = "debug";
+  public static final String PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED = "resourcesSync";
 
   public static final String PROPERTY_WORKFLOW_JSON = "json";
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
@@ -126,7 +128,6 @@ public class DatastoreStorage {
   public static final String PROPERTY_ALL_TRIGGERED = "allTriggered";
   public static final String PROPERTY_HALTED = "halted";
   public static final String PROPERTY_DESCRIPTION = "description";
-  public static final String PROPERTY_CONFIG_DEBUG_ENABLED = "debug";
   public static final String PROPERTY_SUBMISSION_RATE_LIMIT = "submissionRateLimit";
 
   public static final String PROPERTY_STATE = "state";
@@ -150,6 +151,7 @@ public class DatastoreStorage {
   public static final boolean DEFAULT_WORKFLOW_ENABLED = false;
   public static final boolean DEFAULT_CONFIG_DEBUG_ENABLED = false;
   public static final boolean DEFAULT_CONFIG_EXECUTION_GATING_ENABLED = false;
+  public static final boolean DEFAULT_CONFIG_RESOURCES_SYNC_ENABLED = false;
 
   public static final int MAX_RETRIES = 100;
 
@@ -181,6 +183,8 @@ public class DatastoreStorage {
         .globalConcurrency(readOpt(entity, PROPERTY_CONFIG_CONCURRENCY))
         .globalEnabled(read(entity, PROPERTY_CONFIG_ENABLED, DEFAULT_CONFIG_ENABLED))
         .debugEnabled(read(entity, PROPERTY_CONFIG_DEBUG_ENABLED, DEFAULT_CONFIG_DEBUG_ENABLED))
+        .resourcesSyncEnabled(read(entity, PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED,
+            DEFAULT_CONFIG_RESOURCES_SYNC_ENABLED))
         .submissionRateLimit(readOpt(entity, PROPERTY_SUBMISSION_RATE_LIMIT))
         .globalDockerRunnerId(
             read(entity, PROPERTY_CONFIG_DOCKER_RUNNER_ID, DEFAULT_CONFIG_DOCKER_RUNNER_ID))

@@ -470,9 +470,16 @@ public class StyxScheduler implements AppInit {
     }
 
     try {
-      syncResources(storage, timeoutConfig, workflowCache, shardedCounter);
-    } catch (Exception e) {
-      LOG.error("Error syncing resources: {}", e);
+      if (storage.config().resourcesSyncEnabled()) {
+        try {
+          syncResources(storage, timeoutConfig, workflowCache, shardedCounter);
+        } catch (Exception e) {
+          LOG.error("Error syncing resources: {}", e);
+          // TODO: re-throw exception when moving to entirely depend on counter shards
+        }
+      }
+    } catch (IOException e) {
+      LOG.error("Couldn't retrieve configuration for resource syncing", e);
       // TODO: re-throw exception when moving to entirely depend on counter shards
     }
   }
