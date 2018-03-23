@@ -123,6 +123,7 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hbase.client.Connection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -492,8 +493,18 @@ public class StyxScheduler implements AppInit {
 
   private void syncResources(Storage storage, TimeoutConfig timeoutConfig,
                              WorkflowCache workflowCache) throws IOException {
-    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
-    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
+    // The only inconsistency left is to miss active workflow instances. Outdated instances or
+    // inactive instances will be correctly updated or removed via the strongly consistent lookups
+    final Map<WorkflowInstance, RunState> strictActiveStates = storage.readActiveStates().entrySet()
+        .parallelStream().filter(entry -> {
+          try {
+            return storage.readActiveState(entry.getKey()).isPresent();
+          } catch (IOException e) {
+            throw new RuntimeException("Error while fetching active states");
+          }
+        }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(strictActiveStates);
     boolean globalConcurrencyEnabled = storage.config().globalConcurrency().isPresent();
     final Set<WorkflowInstance> timedOutInstances =
         getTimedOutInstances(activeInstanceStates, time.get(), timeoutConfig);
