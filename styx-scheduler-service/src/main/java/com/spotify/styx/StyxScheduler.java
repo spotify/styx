@@ -501,6 +501,13 @@ public class StyxScheduler implements AppInit {
     updateShards(storage, resourceUsage);
   }
 
+  /**
+   * For each resource, distribute usage value evenly across shards.
+   * For example, with a usage value of 10 and 3 available shards, the latter will be set to:
+   * Shard 1 = 4
+   * Shard 2 = 3
+   * Shard 3 = 3
+   */
   @VisibleForTesting
   void updateShards(final Storage storage,
                     final Map<String, Long> resourceUsage) {
