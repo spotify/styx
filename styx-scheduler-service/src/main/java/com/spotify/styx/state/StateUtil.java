@@ -28,9 +28,12 @@ import static java.util.stream.Collectors.toSet;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.Scheduler;
+import com.spotify.styx.WorkflowCache;
 import com.spotify.styx.WorkflowResourceDecorator;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.storage.Storage;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -38,6 +41,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public final class StateUtil {
@@ -76,6 +80,29 @@ public final class StateUtil {
             ResourceWithInstance::resource,
             ConcurrentHashMap::new,
             counting()));
+  }
+
+  public static Map<String, Long> getResourcesUsageMap(Storage storage, TimeoutConfig timeoutConfig,
+                                                       WorkflowCache workflowCache, Instant instant,
+                                                       WorkflowResourceDecorator resourceDecorator)
+      throws IOException {
+    // The only inconsistency left is to miss active workflow instances. Outdated instances or
+    // inactive instances will be correctly updated or removed via the strongly consistent lookups
+    final Map<WorkflowInstance, RunState> strictActiveStates = storage.readActiveStates().entrySet()
+        .parallelStream().filter(entry -> {
+          try {
+            return storage.readActiveState(entry.getKey()).isPresent();
+          } catch (IOException e) {
+            throw new RuntimeException("Error while fetching active states");
+          }
+        }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(strictActiveStates);
+    boolean globalConcurrencyEnabled = storage.config().globalConcurrency().isPresent();
+    final Set<WorkflowInstance> timedOutInstances =
+        getTimedOutInstances(activeInstanceStates, instant, timeoutConfig);
+    return getResourceUsage(globalConcurrencyEnabled,
+        activeInstanceStates, timedOutInstances, resourceDecorator, workflowCache.all());
   }
 
   private static Stream<ResourceWithInstance> pairWithResources(boolean globalConcurrencyEnabled,
@@ -121,7 +148,7 @@ public final class StateUtil {
    *
    * @return true if the state consumes resources, otherwise false.
    */
-  static boolean isConsumingResources(RunState.State state) {
+  private static boolean isConsumingResources(RunState.State state) {
     return !javaslang.collection.List.of(RunState.State.NEW, RunState.State.QUEUED).contains(state);
   }
 

@@ -22,9 +22,7 @@ package com.spotify.styx;
 
 import static com.spotify.styx.monitoring.MeteredProxy.instrument;
 import static com.spotify.styx.state.OutputHandler.fanOutput;
-import static com.spotify.styx.state.StateUtil.getActiveInstanceStates;
-import static com.spotify.styx.state.StateUtil.getResourceUsage;
-import static com.spotify.styx.state.StateUtil.getTimedOutInstances;
+import static com.spotify.styx.state.StateUtil.getResourcesUsageMap;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.GuardedRunnable.guard;
@@ -69,7 +67,6 @@ import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.MonitoringHandler;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
-import com.spotify.styx.state.InstanceState;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.QueuedStateManager;
 import com.spotify.styx.state.RunState;
@@ -113,7 +110,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -123,7 +119,6 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hbase.client.Connection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -479,7 +474,9 @@ public class StyxScheduler implements AppInit {
     try {
       if (storage.config().resourcesSyncEnabled()) {
         try {
-          syncResources(storage, timeoutConfig, workflowCache);
+          final Map<String, Long> resourcesUsageMap = getResourcesUsageMap(storage, timeoutConfig,
+              workflowCache, time.get(), resourceDecorator);
+          updateShards(storage, resourcesUsageMap);
         } catch (Exception e) {
           LOG.error("Error syncing resources: {}", e);
           // TODO: re-throw exception when moving to entirely depend on counter shards
@@ -489,29 +486,6 @@ public class StyxScheduler implements AppInit {
       LOG.error("Couldn't retrieve configuration for resource syncing", e);
       // TODO: re-throw exception when moving to entirely depend on counter shards
     }
-  }
-
-  private void syncResources(Storage storage, TimeoutConfig timeoutConfig,
-                             WorkflowCache workflowCache) throws IOException {
-    // The only inconsistency left is to miss active workflow instances. Outdated instances or
-    // inactive instances will be correctly updated or removed via the strongly consistent lookups
-    final Map<WorkflowInstance, RunState> strictActiveStates = storage.readActiveStates().entrySet()
-        .parallelStream().filter(entry -> {
-          try {
-            return storage.readActiveState(entry.getKey()).isPresent();
-          } catch (IOException e) {
-            throw new RuntimeException("Error while fetching active states");
-          }
-        }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(strictActiveStates);
-    boolean globalConcurrencyEnabled = storage.config().globalConcurrency().isPresent();
-    final Set<WorkflowInstance> timedOutInstances =
-        getTimedOutInstances(activeInstanceStates, time.get(), timeoutConfig);
-    final ConcurrentHashMap<String, Long> resourceUsage = getResourceUsage(globalConcurrencyEnabled,
-        activeInstanceStates, timedOutInstances, resourceDecorator, workflowCache.all());
-
-    updateShards(storage, resourceUsage);
   }
 
   /**
