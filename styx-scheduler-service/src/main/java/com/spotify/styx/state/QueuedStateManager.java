@@ -128,6 +128,7 @@ public class QueuedStateManager implements StateManager {
 
   @Override
   public CompletableFuture<Void> receive(Event event) throws IsClosedException {
+    ensureRunning();
     // Read state counter at enqueueing time
     final Optional<RunState> currentRunState = getActiveState(event.workflowInstance());
     if (!currentRunState.isPresent()) {

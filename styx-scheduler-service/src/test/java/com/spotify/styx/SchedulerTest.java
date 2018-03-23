@@ -141,7 +141,7 @@ public class SchedulerTest {
         .thenAnswer(a -> a.getArgumentAt(2, Set.class));
 
     scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage, resourceDecorator,
-                              stats, rateLimiter, gate);
+        stats, rateLimiter, gate);
   }
 
   private void setResourceLimit(String resourceId, long limit) {
@@ -300,7 +300,7 @@ public class SchedulerTest {
       initWorkflow(workflowUsingResources(workflowId));
       WorkflowInstance instance = WorkflowInstance.create(workflowId, "2016-12-02T01");
       populateActiveStates(RunState.create(instance, State.QUEUED, stateData,
-                                           time.get().minus(i, ChronoUnit.SECONDS)));
+          time.get().minus(i, ChronoUnit.SECONDS)));
       workflowInstances.add(instance);
     }
 
@@ -338,8 +338,8 @@ public class SchedulerTest {
 
     verify(stateManager).receiveIgnoreClosed(
         eq(Event.info(INSTANCE_1,
-                      Message.info("Resource limit reached for: "
-                                   + "[Resource{id=GLOBAL_STYX_CLUSTER, concurrency=0}]"))),
+            Message.info("Resource limit reached for: "
+                         + "[Resource{id=GLOBAL_STYX_CLUSTER, concurrency=0}]"))),
         anyLong());
   }
 
@@ -354,7 +354,7 @@ public class SchedulerTest {
 
     verify(stateManager).receiveIgnoreClosed(
         eq(Event.info(INSTANCE_1,
-                      Message.info("Resource limit reached for: [Resource{id=r1, concurrency=0}]"))),
+            Message.info("Resource limit reached for: [Resource{id=r1, concurrency=0}]"))),
         anyLong());
   }
 
@@ -370,7 +370,7 @@ public class SchedulerTest {
 
     verify(stateManager).receiveIgnoreClosed(
         eq(Event.runError(INSTANCE_1,
-                          "Referenced resources not found: [r2, r3]")),
+            "Referenced resources not found: [r2, r3]")),
         anyLong());
   }
 
@@ -388,7 +388,7 @@ public class SchedulerTest {
 
     verify(stateManager, times(0)).receiveIgnoreClosed(
         eq(Event.info(INSTANCE_1,
-                      Message.info("Resource limit reached for: [Resource{id=r1, concurrency=0}]"))),
+            Message.info("Resource limit reached for: [Resource{id=r1, concurrency=0}]"))),
         anyLong());
   }
 
@@ -642,12 +642,12 @@ public class SchedulerTest {
 
     verify(stateManager).receiveIgnoreClosed(
         eq(Event.info(INSTANCE_1,
-                      Message.info("Resource limit reached for: [Resource{id=baz, concurrency=0}]"))),
+            Message.info("Resource limit reached for: [Resource{id=baz, concurrency=0}]"))),
         anyLong());
 
     verify(stateManager, never()).receiveIgnoreClosed(
         eq(Event.dequeue(INSTANCE_1,
-                         ImmutableSet.of("baz", "quux", "GLOBAL_STYX_CLUSTER"))),
+            ImmutableSet.of("baz", "quux", "GLOBAL_STYX_CLUSTER"))),
         anyLong());
   }
 
@@ -687,7 +687,7 @@ public class SchedulerTest {
     verify(stateManager).receiveIgnoreClosed(Matchers.argThat(
         either(is(Event.dequeue(i0, ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"))))
             .or(is(Event.dequeue(i4, ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"))))),
-                                             anyLong());
+        anyLong());
   }
 
   @Test
@@ -726,7 +726,7 @@ public class SchedulerTest {
     verify(gate, times(2)).executionBlocker(INSTANCE_1);
 
     verify(stateManager).receiveIgnoreClosed(eq(Event.dequeue(INSTANCE_1, ImmutableSet.of())),
-                                             anyLong());
+        anyLong());
   }
 
   @Test
@@ -746,7 +746,7 @@ public class SchedulerTest {
     scheduler.tick();
 
     verify(stateManager).receiveIgnoreClosed(eq(Event.dequeue(INSTANCE_1, ImmutableSet.of())),
-                                             anyLong());
+        anyLong());
     verifyZeroInteractions(gate);
   }
 
@@ -772,7 +772,7 @@ public class SchedulerTest {
     verify(gate).executionBlocker(INSTANCE_1);
 
     verify(stateManager).receiveIgnoreClosed(eq(Event.dequeue(INSTANCE_1, ImmutableSet.of())),
-                                             anyLong());
+        anyLong());
     verifyZeroInteractions(gate);
   }
 

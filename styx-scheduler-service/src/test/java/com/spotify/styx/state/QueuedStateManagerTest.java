@@ -30,7 +30,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -697,12 +696,8 @@ public class QueuedStateManagerTest {
   public void shouldReceiveEventIgnoreClosed() throws IOException, IsClosedException {
     final QueuedStateManager spied = spy(stateManager);
     spied.close();
-    givenState(INSTANCE, State.SUBMITTED);
 
-    final Event event = Event.started(INSTANCE);
-    spied.receiveIgnoreClosed(event);
-    verify(storage).readActiveState(INSTANCE);
-    verify(spied).receive(eq(event), anyLong());
+    spied.receiveIgnoreClosed(Event.started(INSTANCE));
     verify(spied).ensureRunning();
     verifyNoMoreInteractions(storage);
   }
@@ -711,7 +706,6 @@ public class QueuedStateManagerTest {
   public void shouldReceiveEventIgnoreClosedWithCounter() throws IOException, IsClosedException {
     final QueuedStateManager spied = spy(stateManager);
     spied.close();
-    givenState(INSTANCE, State.SUBMITTED);
 
     spied.receiveIgnoreClosed(Event.started(INSTANCE), 17);
     verify(spied).ensureRunning();

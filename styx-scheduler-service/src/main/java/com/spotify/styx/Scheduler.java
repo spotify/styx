@@ -253,8 +253,8 @@ public class Scheduler {
 
     if (blocker.isPresent()) {
       stateManager.receiveIgnoreClosed(Event.retryAfter(instanceState.workflowInstance(),
-                                                        blocker.get().delay().toMillis()),
-                                       instanceState.runState().counter());
+          blocker.get().delay().toMillis()),
+          instanceState.runState().counter());
       LOG.debug("Dequeue rescheduled: {}: {}", instanceState.workflowInstance(), blocker.get());
       return;
     }
