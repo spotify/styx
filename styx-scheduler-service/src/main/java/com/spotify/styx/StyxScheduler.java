@@ -505,6 +505,7 @@ public class StyxScheduler implements AppInit {
   void updateShards(final Storage storage,
                     final Map<String, Long> resourceUsage) {
     resourceUsage.forEach((resource, usage) -> {
+      LOG.info("Syncing {} -> {}", resource, usage);
       try {
         int result = (int) (usage / NUM_SHARDS);
         int remainder = (int) (usage % NUM_SHARDS);
@@ -516,6 +517,7 @@ public class StyxScheduler implements AppInit {
             return null;
           });
           remainder--;
+          LOG.info("Stored {}#shard-{} -> {}", resource, index, shardValue);
         }
       } catch (IOException e) {
         LOG.error("Error syncing resource: {}", resource);
