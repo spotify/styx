@@ -22,23 +22,19 @@ package com.spotify.styx;
 
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
-import static com.spotify.styx.Scheduler.SchedulerUtil.getActiveInstanceStates;
-import static com.spotify.styx.Scheduler.SchedulerUtil.getResourceUsage;
-import static com.spotify.styx.Scheduler.SchedulerUtil.getTimedOutInstances;
-import static com.spotify.styx.Scheduler.SchedulerUtil.workflowResources;
 import static com.spotify.styx.WorkflowExecutionGate.NOOP;
+import static com.spotify.styx.state.StateUtil.getActiveInstanceStates;
+import static com.spotify.styx.state.StateUtil.getResourceUsage;
+import static com.spotify.styx.state.StateUtil.getTimedOutInstances;
+import static com.spotify.styx.state.StateUtil.workflowResources;
 import static java.util.Collections.emptySet;
 import static java.util.Comparator.comparingLong;
 import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.counting;
-import static java.util.stream.Collectors.groupingByConcurrent;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
-import com.google.auto.value.AutoValue;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.RateLimiter;
@@ -50,6 +46,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
+import com.spotify.styx.state.InstanceState;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
@@ -58,7 +55,6 @@ import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -67,11 +63,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,7 +88,7 @@ public class Scheduler {
   private static final Logger LOG = LoggerFactory.getLogger(Scheduler.class);
 
   @VisibleForTesting
-  static final String GLOBAL_RESOURCE_ID = "GLOBAL_STYX_CLUSTER";
+  public static final String GLOBAL_RESOURCE_ID = "GLOBAL_STYX_CLUSTER";
 
   private static final String TICK_TYPE = UPPER_CAMEL.to(LOWER_UNDERSCORE,
       Scheduler.class.getSimpleName());
@@ -206,17 +200,6 @@ public class Scheduler {
             currentResourceUsage, batch.get(i), blockers.get(i));
       }
     }
-  }
-
-  /**
-   * We'll keep counting terminal states as if they consume resources. They are transient states and
-   * should go away fairly quickly. If they don't, then we might be having some trouble cleaning up
-   * the containers. In that case it's better to be conservative on resource usage.
-   *
-   * @return true if the state consumes resources, otherwise false.
-   */
-  private static boolean isConsumingResources(State state) {
-    return !javaslang.collection.List.of(State.NEW, State.QUEUED).contains(state);
   }
 
   private void updateResourceStats(Map<String, Resource> resources,
@@ -337,90 +320,5 @@ public class Scheduler {
     LOG.info("Found stale state {} since {} for workflow {}; Issuing a timeout",
         runState.state(), Instant.ofEpochMilli(runState.timestamp()), workflowInstance);
     stateManager.receiveIgnoreClosed(Event.timeout(workflowInstance), runState.counter());
-  }
-
-  @AutoValue
-  abstract static class ResourceWithInstance {
-    abstract String resource();
-    abstract InstanceState instanceState();
-
-    static ResourceWithInstance create(String resource, InstanceState instanceState) {
-      return new AutoValue_Scheduler_ResourceWithInstance(resource, instanceState);
-    }
-  }
-
-  public static class SchedulerUtil {
-
-    private SchedulerUtil() {
-      // no instantiation
-    }
-
-    static List<InstanceState> getActiveInstanceStates(
-        Map<WorkflowInstance, RunState> activeStatesMap) {
-      return activeStatesMap.entrySet().stream()
-          .map(entry -> InstanceState.create(entry.getKey(), entry.getValue()))
-          .collect(toList());
-    }
-
-    static Set<WorkflowInstance> getTimedOutInstances(List<InstanceState> activeStates,
-                                                      Instant instant,
-                                                      TimeoutConfig ttl) {
-      return activeStates.parallelStream()
-          .filter(entry -> hasTimedOut(entry.runState(), instant, ttl.ttlOf(entry.runState().state())))
-          .map(InstanceState::workflowInstance)
-          .collect(toSet());
-    }
-
-    static ConcurrentHashMap<String, Long> getResourceUsage(boolean globalConcurrencyEnabled,
-                                                            List<InstanceState> activeStates,
-                                                            Set<WorkflowInstance> timedOutInstances,
-                                                            WorkflowResourceDecorator resourceDecorator,
-                                                            Set<Workflow> workflows) {
-      return activeStates.parallelStream()
-          .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
-          .filter(entry -> isConsumingResources(entry.runState().state()))
-          .flatMap(instanceState -> pairWithResources(globalConcurrencyEnabled, instanceState,
-              workflows, resourceDecorator))
-          .collect(groupingByConcurrent(
-              ResourceWithInstance::resource,
-              ConcurrentHashMap::new,
-              counting()));
-    }
-
-    private static Stream<ResourceWithInstance> pairWithResources(boolean globalConcurrencyEnabled,
-                                                                  InstanceState instanceState,
-                                                                  Set<Workflow> workflows,
-                                                                  WorkflowResourceDecorator resourceDecorator) {
-      final Optional<Workflow> workflowOpt = workflows.stream().filter(
-          wf -> wf.id().equals(instanceState.workflowInstance().workflowId())).findFirst();
-      final Set<String> workflowResources = workflowResources(globalConcurrencyEnabled, workflowOpt);
-      return workflowOpt
-          .map(workflow -> resourceDecorator.decorateResources(
-              instanceState.runState(), workflow.configuration(), workflowResources))
-          .orElse(workflowResources).stream()
-          .map(resource -> ResourceWithInstance.create(resource, instanceState));
-    }
-
-    static Set<String> workflowResources(boolean globalConcurrenyEnabled,
-                                         Optional<Workflow> workflowOpt) {
-      final ImmutableSet.Builder<String> builder = ImmutableSet.builder();
-      if (globalConcurrenyEnabled) {
-        builder.add(GLOBAL_RESOURCE_ID);
-      }
-      workflowOpt.ifPresent(wf -> builder.addAll(wf.configuration().resources()));
-      return builder.build();
-    }
-
-    private static boolean hasTimedOut(RunState runState, Instant instant, Duration timeout) {
-      if (runState.state().isTerminal()) {
-        return false;
-      }
-
-      final Instant deadline = Instant
-          .ofEpochMilli(runState.timestamp())
-          .plus(timeout);
-
-      return !deadline.isAfter(instant);
-    }
   }
 }

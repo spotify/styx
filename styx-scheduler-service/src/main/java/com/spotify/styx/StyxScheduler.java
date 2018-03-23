@@ -22,6 +22,9 @@ package com.spotify.styx;
 
 import static com.spotify.styx.monitoring.MeteredProxy.instrument;
 import static com.spotify.styx.state.OutputHandler.fanOutput;
+import static com.spotify.styx.state.StateUtil.getActiveInstanceStates;
+import static com.spotify.styx.state.StateUtil.getResourceUsage;
+import static com.spotify.styx.state.StateUtil.getTimedOutInstances;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.GuardedRunnable.guard;
@@ -66,6 +69,7 @@ import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.MonitoringHandler;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
+import com.spotify.styx.state.InstanceState;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.QueuedStateManager;
 import com.spotify.styx.state.RunState;
@@ -489,14 +493,12 @@ public class StyxScheduler implements AppInit {
   private void syncResources(Storage storage, TimeoutConfig timeoutConfig,
                              WorkflowCache workflowCache) throws IOException {
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
-    final List<InstanceState> activeInstanceStates =
-        Scheduler.SchedulerUtil.getActiveInstanceStates(activeStates);
+    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
     boolean globalConcurrencyEnabled = storage.config().globalConcurrency().isPresent();
-    final Set<WorkflowInstance> timedOutInstances = Scheduler.SchedulerUtil
-        .getTimedOutInstances(activeInstanceStates, time.get(), timeoutConfig);
-    final ConcurrentHashMap<String, Long> resourceUsage = Scheduler.SchedulerUtil
-        .getResourceUsage(globalConcurrencyEnabled, activeInstanceStates, timedOutInstances,
-            resourceDecorator, workflowCache.all());
+    final Set<WorkflowInstance> timedOutInstances =
+        getTimedOutInstances(activeInstanceStates, time.get(), timeoutConfig);
+    final ConcurrentHashMap<String, Long> resourceUsage = getResourceUsage(globalConcurrencyEnabled,
+        activeInstanceStates, timedOutInstances, resourceDecorator, workflowCache.all());
 
     updateShards(storage, resourceUsage);
   }
