@@ -242,6 +242,20 @@ public class DatastoreStorage {
     });
   }
 
+  void delete(String componentId, boolean cascade) throws IOException {
+    final List<Workflow> workflows = workflows(componentId);
+    if (!cascade && !workflows.isEmpty()) {
+      throw new IOException(String.format("Component %s has workflows", componentId));
+    }
+
+    storeWithRetries(() -> runInTransaction(tx -> {
+      workflows.forEach(workflow -> 
+          datastore.delete(workflowKey(datastore.newKeyFactory(), workflow.id())));
+      datastore.delete(componentKey(datastore.newKeyFactory(), componentId));
+      return null;
+    }));
+  }
+
   public void updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec triggerSpec) throws IOException {
     storeWithRetries(() -> runInTransaction(tx -> tx.updateNextNaturalTrigger(workflowId, triggerSpec)));
   }

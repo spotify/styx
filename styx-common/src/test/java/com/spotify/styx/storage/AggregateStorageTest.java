@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
+import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.Before;
@@ -82,5 +83,11 @@ public class AggregateStorageTest {
   public void writeActiveState() throws Exception {
     sut.writeActiveState(workflowInstance, runState);
     verify(datastore).writeActiveState(workflowInstance, runState);
+  }
+
+  @Test
+  public void shouldDeleteComponent() throws IOException {
+    sut.delete(COMPONENT, true);
+    verify(datastore).delete(COMPONENT, true);
   }
 }

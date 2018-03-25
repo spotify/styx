@@ -20,6 +20,8 @@
 
 package com.spotify.styx.storage;
 
+import static java.util.stream.Collectors.toList;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -103,12 +105,26 @@ public class InMemStorage implements Storage {
   public List<Workflow> workflows(String componentId) throws IOException {
     return workflowStore.values().stream()
         .filter(w -> w.componentId().equals(componentId))
-        .collect(Collectors.toList());
+        .collect(toList());
   }
 
   @Override
   public void delete(WorkflowId workflowId) throws IOException {
     workflowStore.remove(workflowId);
+  }
+
+  @Override
+  public void delete(final String componentId, final boolean cascade) throws IOException {
+    final List<WorkflowId> workflowsToDelete = workflowStore.keySet().stream()
+        .filter(workflowId -> workflowId.componentId().equals(componentId))
+        .collect(toList());
+    if (!cascade && !workflowsToDelete.isEmpty()) {
+      throw new IOException(String.format("Component %s has workflows", componentId));
+    }
+
+    for (WorkflowId workflowId: workflowsToDelete) {
+      delete(workflowId);
+    }
   }
 
   @Override
@@ -213,7 +229,7 @@ public class InMemStorage implements Storage {
           .filter(backfill -> backfill.halted() && backfill.allTriggered());
     }
 
-    return ImmutableList.copyOf(backfillStream.collect(Collectors.toList())
+    return ImmutableList.copyOf(backfillStream.collect(toList())
     );
   }
 
@@ -228,7 +244,7 @@ public class InMemStorage implements Storage {
           .filter(backfill -> backfill.halted() && backfill.allTriggered());
     }
 
-    return ImmutableList.copyOf(backfillStream.collect(Collectors.toList()));
+    return ImmutableList.copyOf(backfillStream.collect(toList()));
   }
 
   @Override
@@ -241,7 +257,7 @@ public class InMemStorage implements Storage {
           .filter(backfill -> backfill.halted() && backfill.allTriggered());
     }
 
-    return ImmutableList.copyOf(backfillStream.collect(Collectors.toList()));
+    return ImmutableList.copyOf(backfillStream.collect(toList()));
   }
 
   @Override
@@ -255,7 +271,7 @@ public class InMemStorage implements Storage {
           .filter(backfill -> backfill.halted() && backfill.allTriggered());
     }
 
-    return ImmutableList.copyOf(backfillStream.collect(Collectors.toList()));
+    return ImmutableList.copyOf(backfillStream.collect(toList()));
   }
 
   @Override
