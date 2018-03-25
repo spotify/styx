@@ -35,6 +35,7 @@ import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.WaitStrategies;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.spotify.styx.cleaner.CleanupException;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
@@ -170,8 +171,12 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   @Override
-  public void cleanup() throws IOException {
-    serviceAccountSecretManager.cleanup();
+  public void cleanup() throws CleanupException {
+    try {
+      serviceAccountSecretManager.cleanup();
+    } catch (IOException e) {
+      throw new CleanupException("Failed to cleanup service account secret", e);
+    }
   }
 
   private KubernetesSecretSpec ensureSecrets(WorkflowInstance workflowInstance, RunSpec runSpec) {

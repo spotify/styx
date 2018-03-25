@@ -56,6 +56,8 @@ import com.spotify.apollo.route.Route;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.api.Api;
 import com.spotify.styx.api.SchedulerResource;
+import com.spotify.styx.cleaner.Cleaner;
+import com.spotify.styx.cleaner.CleanerOperation;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
@@ -163,6 +165,7 @@ public class StyxScheduler implements AppInit {
   private final EventConsumerFactory eventConsumerFactory;
   private final WorkflowConsumerFactory workflowConsumerFactory;
   private final WorkflowExecutionGateFactory executionGateFactory;
+  private final HousecleaningOperationFactory housecleaningOperationFactory;
 
   private StateManager stateManager;
   private Scheduler scheduler;
@@ -180,6 +183,7 @@ public class StyxScheduler implements AppInit {
   public interface WorkflowConsumerFactory
       extends BiFunction<Environment, Stats, BiConsumer<Optional<Workflow>, Optional<Workflow>>> { }
   public interface WorkflowExecutionGateFactory extends BiFunction<Environment, Storage, WorkflowExecutionGate> { }
+  public interface HousecleaningOperationFactory extends BiFunction<Environment, Storage, CleanerOperation> { }
 
   @FunctionalInterface
   interface DockerRunnerFactory {
@@ -212,6 +216,7 @@ public class StyxScheduler implements AppInit {
     private EventConsumerFactory eventConsumerFactory = (env, stats) -> (event, state) -> { };
     private WorkflowConsumerFactory workflowConsumerFactory = (env, stats) -> (oldWorkflow, newWorkflow) -> { };
     private WorkflowExecutionGateFactory executionGateFactory = (env, storage) -> WorkflowExecutionGate.NOOP;
+    private HousecleaningOperationFactory housecleaningOperationFactory = (env, storage) -> CleanerOperation.NOOP;
 
     public Builder setTime(Time time) {
       this.time = time;
@@ -268,6 +273,12 @@ public class StyxScheduler implements AppInit {
       return this;
     }
 
+    public Builder setHousecleaningOperationFactory(
+        HousecleaningOperationFactory housecleaningOperationFactory) {
+      this.housecleaningOperationFactory = housecleaningOperationFactory;
+      return this;
+    }
+
     public StyxScheduler build() {
       return new StyxScheduler(this);
     }
@@ -295,6 +306,7 @@ public class StyxScheduler implements AppInit {
     this.eventConsumerFactory = requireNonNull(builder.eventConsumerFactory);
     this.workflowConsumerFactory = requireNonNull(builder.workflowConsumerFactory);
     this.executionGateFactory = requireNonNull(builder.executionGateFactory);
+    this.housecleaningOperationFactory = requireNonNull(builder.housecleaningOperationFactory);
   }
 
   @Override
@@ -386,15 +398,19 @@ public class StyxScheduler implements AppInit {
                                               storage, resourceDecorator, stats, dequeueRateLimiter,
                                               executionGateFactory.apply(environment, storage));
 
-    final Cleaner cleaner = new Cleaner(dockerRunner);
+    final Cleaner dockerCleaner = new Cleaner(dockerRunner);
+    final Cleaner housecleaner = new Cleaner(
+        housecleaningOperationFactory.apply(environment, storage));
 
     dockerRunner.restore();
     startTriggerManager(triggerManager, executor);
     startBackfillTriggerManager(backfillTriggerManager, executor);
     startScheduler(scheduler, executor);
     startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
-    startCleaner(cleaner, executor);
+    startCleaner(dockerCleaner, executor);
+    startCleaner(housecleaner, executor);
     startConcurrentWorkflowInstanceIndexing(storage, executor);
+
     setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats);
 
     final SchedulerResource schedulerResource =

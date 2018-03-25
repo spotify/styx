@@ -21,6 +21,8 @@
 package com.spotify.styx.docker;
 
 import com.spotify.styx.ServiceAccountKeyManager;
+import com.spotify.styx.cleaner.CleanerOperation;
+import com.spotify.styx.cleaner.CleanupException;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
@@ -42,7 +44,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Defines an interface to the Docker execution environment
  */
-public interface DockerRunner extends Closeable {
+public interface DockerRunner extends Closeable, CleanerOperation {
 
   Logger LOG = LoggerFactory.getLogger(DockerRunner.class);
 
@@ -63,7 +65,7 @@ public interface DockerRunner extends Closeable {
    * Perform cleanup for resources such as secrets etc. Resources that are not in use by any currently live workflows
    * should be removed.
    */
-  void cleanup() throws IOException;
+  void cleanup() throws CleanupException;
 
   /**
    * Execute cleanup operations for when an execution finishes.

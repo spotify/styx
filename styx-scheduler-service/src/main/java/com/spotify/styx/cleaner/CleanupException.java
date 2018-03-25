@@ -1,8 +1,8 @@
-/*
+/*-
  * -\-\-
  * Spotify Styx Scheduler Service
  * --
- * Copyright (C) 2017 Spotify AB
+ * Copyright (C) 2018 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,29 +18,14 @@
  * -/-/-
  */
 
-package com.spotify.styx;
+package com.spotify.styx.cleaner;
 
-import com.spotify.styx.docker.DockerRunner;
-import java.io.IOException;
-import java.util.Objects;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-class Cleaner {
-
-  private static final Logger logger = LoggerFactory.getLogger(Cleaner.class);
-
-  private final DockerRunner dockerRunner;
-
-  Cleaner(DockerRunner dockerRunner) {
-    this.dockerRunner = Objects.requireNonNull(dockerRunner);
+public class CleanupException extends Exception {
+  public CleanupException(final String message) {
+    super(message);
   }
 
-  void tick() {
-    try {
-      dockerRunner.cleanup();
-    } catch (IOException e) {
-      logger.warn("Docker runner cleanup failed", e);
-    }
+  public CleanupException(final String message, final Throwable cause) {
+    super(message, cause);
   }
 }
