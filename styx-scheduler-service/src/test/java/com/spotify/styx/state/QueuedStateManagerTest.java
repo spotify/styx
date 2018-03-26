@@ -77,7 +77,6 @@ import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -599,7 +598,6 @@ public class QueuedStateManagerTest {
   }
 
   @Test
-  @Ignore
   public void shouldFailToUpdateResourceCountersOnDequeueDueToCapacity() throws Exception {
     givenState(INSTANCE, State.QUEUED);
     doThrow(new CounterCapacityException("foo"))
@@ -610,10 +608,14 @@ public class QueuedStateManagerTest {
     final Event infoEvent = Event.info(INSTANCE,
         Message.info(String.format("Resource limit reached for: %s", resources)));
     final QueuedStateManager spied = spy(stateManager);
-    spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
     doNothing().when(spied).receiveIgnoreClosed(eq(infoEvent), anyLong());
 
-    receiveEvent(dequeueEvent);
+    try {
+      spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (Exception e) {
+      // expected exception
+    }
 
     verify(spied).receiveIgnoreClosed(eq(infoEvent), anyLong());
   }
@@ -633,9 +635,13 @@ public class QueuedStateManagerTest {
 
     final Event dequeueEvent = Event.dequeue(INSTANCE, resources);
     final QueuedStateManager spied = spy(stateManager);
-    spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
 
-    receiveEvent(dequeueEvent);
+    try {
+      spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (Exception e) {
+      // expected exception
+    }
 
     verify(spied, never()).receiveIgnoreClosed(eq(Event.info(INSTANCE, message)), anyLong());
   }
@@ -651,9 +657,13 @@ public class QueuedStateManagerTest {
     final Event infoEvent = Event.info(INSTANCE,
         Message.info(String.format("Resource limit reached for: %s", resources)));
     final QueuedStateManager spied = spy(stateManager);
-    spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
 
-    receiveEvent(dequeueEvent);
+    try {
+      spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (Exception e) {
+      // expected exception
+    }
 
     verify(spied, never()).receiveIgnoreClosed(eq(infoEvent), anyLong());
   }
