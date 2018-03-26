@@ -610,13 +610,34 @@ public class QueuedStateManagerTest {
     final Event infoEvent = Event.info(INSTANCE,
         Message.info(String.format("Resource limit reached for: %s", resources)));
     final QueuedStateManager spied = spy(stateManager);
-    spied.receive(dequeueEvent)
-        .toCompletableFuture().get(1, MINUTES);
+    spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
     doNothing().when(spied).receiveIgnoreClosed(eq(infoEvent), anyLong());
 
     receiveEvent(dequeueEvent);
 
     verify(spied).receiveIgnoreClosed(eq(infoEvent), anyLong());
+  }
+
+  @Test
+  public void shouldFailToUpdateResourceCountersOnDequeueDueToCapacityAndNoInfoEventSent() throws Exception {
+    final Set<String> resources = ImmutableSet.of("resource1");
+    final Message message = Message.info(String.format("Resource limit reached for: %s", resources));
+    final RunState runState = RunState.create(INSTANCE, State.QUEUED,
+        STATE_DATA_1.builder().messages(message).build(),
+        NOW.minusMillis(1), 17);
+    when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.of(runState));
+    when(storage.readActiveState(INSTANCE)).thenReturn(Optional.of(runState));
+
+    doThrow(new CounterCapacityException("foo"))
+        .when(transaction).updateCounter(shardedCounter, "resource1", 1);
+
+    final Event dequeueEvent = Event.dequeue(INSTANCE, resources);
+    final QueuedStateManager spied = spy(stateManager);
+    spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
+
+    receiveEvent(dequeueEvent);
+
+    verify(spied, never()).receiveIgnoreClosed(eq(Event.info(INSTANCE, message)), anyLong());
   }
 
   @Test
@@ -630,8 +651,7 @@ public class QueuedStateManagerTest {
     final Event infoEvent = Event.info(INSTANCE,
         Message.info(String.format("Resource limit reached for: %s", resources)));
     final QueuedStateManager spied = spy(stateManager);
-    spied.receive(dequeueEvent)
-        .toCompletableFuture().get(1, MINUTES);
+    spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
 
     receiveEvent(dequeueEvent);
 
