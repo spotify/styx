@@ -122,15 +122,15 @@ public class StateUtilTest {
     assertTrue(StateUtil.isConsumingResources(RunState.State.SUBMITTING));
     assertTrue(StateUtil.isConsumingResources(RunState.State.SUBMITTED));
     assertTrue(StateUtil.isConsumingResources(RunState.State.RUNNING));
-    assertTrue(StateUtil.isConsumingResources(RunState.State.TERMINATED));
-    assertTrue(StateUtil.isConsumingResources(RunState.State.FAILED));
-    assertTrue(StateUtil.isConsumingResources(RunState.State.ERROR));
-    assertTrue(StateUtil.isConsumingResources(RunState.State.DONE));
   }
 
   @Test
   public void shouldNotConsumeResource() {
     assertFalse(StateUtil.isConsumingResources(RunState.State.NEW));
     assertFalse(StateUtil.isConsumingResources(RunState.State.QUEUED));
+    assertFalse(StateUtil.isConsumingResources(RunState.State.TERMINATED));
+    assertFalse(StateUtil.isConsumingResources(RunState.State.FAILED));
+    assertFalse(StateUtil.isConsumingResources(RunState.State.ERROR));
+    assertFalse(StateUtil.isConsumingResources(RunState.State.DONE));
   }
 }
