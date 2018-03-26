@@ -30,6 +30,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -59,6 +60,7 @@ import com.spotify.styx.storage.TransactionException;
 import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.AlreadyInitializedException;
+import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
@@ -67,6 +69,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -74,6 +77,7 @@ import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -592,6 +596,46 @@ public class QueuedStateManagerTest {
     givenState(INSTANCE, State.QUEUED);
     receiveEvent(Event.dequeue(INSTANCE, ImmutableSet.of("resource1")));
     verify(transaction).updateCounter(shardedCounter, "resource1", 1);
+  }
+
+  @Test
+  @Ignore
+  public void shouldFailToUpdateResourceCountersOnDequeueDueToCapacity() throws Exception {
+    givenState(INSTANCE, State.QUEUED);
+    doThrow(new CounterCapacityException("foo"))
+        .when(transaction).updateCounter(shardedCounter, "resource1", 1);
+
+    final Set<String> resources = ImmutableSet.of("resource1");
+    final Event dequeueEvent = Event.dequeue(INSTANCE, resources);
+    final Event infoEvent = Event.info(INSTANCE,
+        Message.info(String.format("Resource limit reached for: %s", resources)));
+    final QueuedStateManager spied = spy(stateManager);
+    spied.receive(dequeueEvent)
+        .toCompletableFuture().get(1, MINUTES);
+    doNothing().when(spied).receiveIgnoreClosed(eq(infoEvent), anyLong());
+
+    receiveEvent(dequeueEvent);
+
+    verify(spied).receiveIgnoreClosed(eq(infoEvent), anyLong());
+  }
+
+  @Test
+  public void shouldFailToUpdateResourceCountersOnDequeueDueToConflict() throws Exception {
+    givenState(INSTANCE, State.QUEUED);
+    doThrow(new RuntimeException())
+        .when(transaction).updateCounter(shardedCounter, "resource1", 1);
+
+    final Set<String> resources = ImmutableSet.of("resource1");
+    final Event dequeueEvent = Event.dequeue(INSTANCE, resources);
+    final Event infoEvent = Event.info(INSTANCE,
+        Message.info(String.format("Resource limit reached for: %s", resources)));
+    final QueuedStateManager spied = spy(stateManager);
+    spied.receive(dequeueEvent)
+        .toCompletableFuture().get(1, MINUTES);
+
+    receiveEvent(dequeueEvent);
+
+    verify(spied, never()).receiveIgnoreClosed(eq(infoEvent), anyLong());
   }
 
   @Test

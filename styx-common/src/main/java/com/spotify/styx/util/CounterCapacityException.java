@@ -20,9 +20,12 @@
 
 package com.spotify.styx.util;
 
-class CounterCapacityException extends RuntimeException {
+import com.google.common.annotations.VisibleForTesting;
 
-  CounterCapacityException(String message) {
+public class CounterCapacityException extends RuntimeException {
+
+  @VisibleForTesting
+  public CounterCapacityException(String message) {
     super(message);
   }
 }

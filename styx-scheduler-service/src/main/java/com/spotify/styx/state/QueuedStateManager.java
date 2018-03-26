@@ -22,6 +22,7 @@ package com.spotify.styx.state;
 
 import static com.spotify.styx.state.StateUtil.isConsumingResources;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.stream.Collectors.toSet;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
@@ -35,6 +36,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.storage.TransactionException;
 import com.spotify.styx.util.AlreadyInitializedException;
+import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
@@ -44,6 +46,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
@@ -51,6 +54,7 @@ import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
 import javaslang.Tuple;
 import javaslang.Tuple2;
+import javaslang.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -244,9 +248,7 @@ public class QueuedStateManager implements StateManager {
                                       RunState currentRunState, RunState nextRunState) {
     // increment counters if event is dequeue
     if (isDequeue(event, nextRunState) && nextRunState.data().resourceIds().isPresent()) {
-      for (String resource : nextRunState.data().resourceIds().get()) {
-        tx.updateCounter(shardedCounter, resource, 1);
-      }
+      tryUpdatingCounter(currentRunState, tx, nextRunState.data().resourceIds().get());
     }
 
     if (isConsumingResources(currentRunState.state())
@@ -260,6 +262,37 @@ public class QueuedStateManager implements StateManager {
     } else if (!nextRunState.data().resourceIds().isPresent()) {
       LOG.error("Resource ids are missing for {} when transitioning from {} to {}.",
                 nextRunState.workflowInstance(), currentRunState, nextRunState);
+    }
+  }
+
+  private void tryUpdatingCounter(RunState runState,
+                                  StorageTransaction tx,
+                                  Set<String> resourceIds) {
+    final Set<Tuple2<String, Try<Void>>> failedTries = resourceIds.stream()
+        .map(resource -> Tuple.of(resource, Try.run(() ->
+            tx.updateCounter(shardedCounter, resource, 1))))
+        .filter(x -> x._2.isFailure())
+        .collect(toSet());
+    final Set<String> depletedResources = failedTries.stream()
+        .filter(x -> x._2.getCause() instanceof CounterCapacityException)
+        .map(x -> x._1)
+        .sorted()
+        .collect(toSet());
+
+    if (!depletedResources.isEmpty()) {
+      final Message message = Message.info(
+          String.format("Resource limit reached for: %s", depletedResources));
+      if (!runState.data().message().map(message::equals).orElse(false)) {
+        // FIXME: uncomment the code to use new way of sending event and remove debug logging
+        LOG.debug(message.line());
+        // receiveIgnoreClosed(Event.info(runState.workflowInstance(), message), runState.counter());
+      }
+    }
+
+    if (!failedTries.isEmpty()) {
+      throw new RuntimeException(
+          String.format("Failed to update resource counter for workflow instance %s",
+          runState.workflowInstance()));
     }
   }
 
