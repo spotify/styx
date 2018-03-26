@@ -27,7 +27,6 @@ import static java.util.stream.Collectors.toSet;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
-import com.spotify.styx.Scheduler;
 import com.spotify.styx.WorkflowCache;
 import com.spotify.styx.WorkflowResourceDecorator;
 import com.spotify.styx.model.Workflow;
@@ -45,6 +44,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public final class StateUtil {
+
+  public static final String GLOBAL_RESOURCE_ID = "GLOBAL_STYX_CLUSTER";
 
   private StateUtil() {
     throw new UnsupportedOperationException();
@@ -123,7 +124,7 @@ public final class StateUtil {
                                               Optional<Workflow> workflowOpt) {
     final ImmutableSet.Builder<String> builder = ImmutableSet.builder();
     if (globalConcurrenyEnabled) {
-      builder.add(Scheduler.GLOBAL_RESOURCE_ID);
+      builder.add(GLOBAL_RESOURCE_ID);
     }
     workflowOpt.ifPresent(wf -> builder.addAll(wf.configuration().resources()));
     return builder.build();

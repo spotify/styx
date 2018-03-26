@@ -116,7 +116,7 @@ public class StyxSchedulerTest {
   }
 
   @Test
-  public void syncResources() throws IOException {
+  public void shouldUpdateShardsAccordingToUsedResources() throws IOException {
     final StyxScheduler styxScheduler = StyxScheduler.newBuilder().build();
     when(storage.runInTransaction(any())).thenAnswer(
         a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));

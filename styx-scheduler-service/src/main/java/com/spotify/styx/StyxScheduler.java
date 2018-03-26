@@ -452,6 +452,7 @@ public class StyxScheduler implements AppInit {
                                    TimeoutConfig timeoutConfig,
                                    WorkflowCache workflowCache) {
     try {
+      // Initialize resources
       storage.resources().parallelStream().forEach(
           resource -> {
             counterSnapshotFactory.create(resource.id());
@@ -461,30 +462,27 @@ public class StyxScheduler implements AppInit {
                 return null;
               });
             } catch (IOException e) {
-              LOG.error("Error creating a counter limit for {}: {}", resource, e);
-              // TODO: re-throw exception when moving to entirely depend on counter shards
+              LOG.error("Error creating a counter limit for {}", resource, e);
+              throw new RuntimeException(e);
             }
           });
       LOG.info("Finished initializing resources");
-    } catch (IOException e) {
-      LOG.error("Error reading resources from datastore: {}", e);
-      // TODO: re-throw exception when moving to entirely depend on counter shards
-    }
 
-    try {
+      // Sync resources usage
       if (storage.config().resourcesSyncEnabled()) {
         try {
           final Map<String, Long> resourcesUsageMap = getResourcesUsageMap(storage, timeoutConfig,
               workflowCache, time.get(), resourceDecorator);
           updateShards(storage, resourcesUsageMap);
         } catch (Exception e) {
-          LOG.error("Error syncing resources: {}", e);
-          // TODO: re-throw exception when moving to entirely depend on counter shards
+          LOG.error("Error syncing resources", e);
+          throw new RuntimeException(e);
         }
       }
+      LOG.info("Finished syncing resources");
     } catch (IOException e) {
-      LOG.error("Couldn't retrieve configuration for resource syncing", e);
-      // TODO: re-throw exception when moving to entirely depend on counter shards
+      LOG.error("Error while initializing/syncing resources", e);
+      throw new RuntimeException(e);
     }
   }
 
@@ -516,8 +514,8 @@ public class StyxScheduler implements AppInit {
           LOG.info("Stored {}#shard-{} -> {}", resource, index, shardValue);
         }
       } catch (IOException e) {
-        LOG.error("Error syncing resource: {}", resource);
-        // TODO: re-throw exception when moving to entirely depend on counter shards
+        LOG.error("Error syncing resource: {}", resource, e);
+        throw new RuntimeException(e);
       }
     });
   }

@@ -98,7 +98,7 @@ public class QueuedStateManager implements StateManager {
     this.eventConsumerExecutor = Objects.requireNonNull(eventConsumerExecutor);
     this.eventTransitionExecutor = Objects.requireNonNull(eventTransitionExecutor);
     this.outputHandler = Objects.requireNonNull(outputHandler);
-    this.shardedCounter = shardedCounter;
+    this.shardedCounter = Objects.requireNonNull(shardedCounter);
   }
 
   @Override

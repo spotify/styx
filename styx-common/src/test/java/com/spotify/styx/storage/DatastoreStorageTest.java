@@ -23,6 +23,7 @@ package com.spotify.styx.storage;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -467,7 +468,7 @@ public class DatastoreStorageTest {
   @Test
   public void getsResourcesSyncEnabled() {
     Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
-        .set(DatastoreStorage.PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED, true)
+        .set(PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED, true)
         .build();
     helper.getOptions().getService().put(config);
 
@@ -556,8 +557,7 @@ public class DatastoreStorageTest {
         .globalEnabled(true)
         .debugEnabled(false)
         .resourcesSyncEnabled(false)
-        .executionGatingEnabled(false
-        )
+        .executionGatingEnabled(false)
         .build();
 
     assertThat(storage.config(), is(expectedConfig));

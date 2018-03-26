@@ -23,6 +23,7 @@ package com.spotify.styx;
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.spotify.styx.WorkflowExecutionGate.NOOP;
+import static com.spotify.styx.state.StateUtil.GLOBAL_RESOURCE_ID;
 import static com.spotify.styx.state.StateUtil.getActiveInstanceStates;
 import static com.spotify.styx.state.StateUtil.getResourceUsage;
 import static com.spotify.styx.state.StateUtil.getTimedOutInstances;
@@ -34,7 +35,6 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.RateLimiter;
@@ -86,9 +86,6 @@ import org.slf4j.LoggerFactory;
 public class Scheduler {
 
   private static final Logger LOG = LoggerFactory.getLogger(Scheduler.class);
-
-  @VisibleForTesting
-  public static final String GLOBAL_RESOURCE_ID = "GLOBAL_STYX_CLUSTER";
 
   private static final String TICK_TYPE = UPPER_CAMEL.to(LOWER_UNDERSCORE,
       Scheduler.class.getSimpleName());
