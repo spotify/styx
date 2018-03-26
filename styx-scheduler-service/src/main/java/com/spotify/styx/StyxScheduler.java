@@ -478,8 +478,8 @@ public class StyxScheduler implements AppInit {
           LOG.error("Error syncing resources", e);
           throw new RuntimeException(e);
         }
+        LOG.info("Finished syncing resources");
       }
-      LOG.info("Finished syncing resources");
     } catch (IOException e) {
       LOG.error("Error while initializing/syncing resources", e);
       throw new RuntimeException(e);
