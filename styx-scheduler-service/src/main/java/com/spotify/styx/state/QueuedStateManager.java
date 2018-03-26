@@ -20,6 +20,7 @@
 
 package com.spotify.styx.state;
 
+import static com.spotify.styx.state.StateUtil.isConsumingResources;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -260,13 +261,6 @@ public class QueuedStateManager implements StateManager {
       LOG.error("Resource ids are missing for {} when transitioning from {} to {}.",
                 nextRunState.workflowInstance(), currentRunState, nextRunState);
     }
-  }
-
-  private static boolean isConsumingResources(State state) {
-    return javaslang.collection.List.of(State.PREPARE,
-                                        State.SUBMITTING,
-                                        State.SUBMITTED,
-                                        State.RUNNING).contains(state);
   }
 
   private boolean isDequeue(Event event, RunState runState) {
