@@ -26,6 +26,7 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
 import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.WorkflowCache;
 import com.spotify.styx.WorkflowResourceDecorator;
@@ -142,15 +143,12 @@ public final class StateUtil {
     return !deadline.isAfter(instant);
   }
 
-  /**
-   * We'll keep counting terminal states as if they consume resources. They are transient states and
-   * should go away fairly quickly. If they don't, then we might be having some trouble cleaning up
-   * the containers. In that case it's better to be conservative on resource usage.
-   *
-   * @return true if the state consumes resources, otherwise false.
-   */
-  private static boolean isConsumingResources(RunState.State state) {
-    return !javaslang.collection.List.of(RunState.State.NEW, RunState.State.QUEUED).contains(state);
+  static boolean isConsumingResources(RunState.State state) {
+    return ImmutableList.of(
+        RunState.State.PREPARE,
+        RunState.State.SUBMITTING,
+        RunState.State.SUBMITTED,
+        RunState.State.RUNNING).contains(state);
   }
 
   @AutoValue

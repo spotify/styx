@@ -437,7 +437,7 @@ public class SchedulerTest {
   @Test
   public void shouldCountResourcesOnStatesConsumingResources() throws Exception {
     setUp(20);
-    setResourceLimit("r1", 3);
+    setResourceLimit("r1", 2);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
 
     // do not consume resources
@@ -453,9 +453,9 @@ public class SchedulerTest {
 
     verify(stateManager, times(1)).receiveIgnoreClosed(
         eq(Event.info(instance(WORKFLOW_ID1, "i1"),
-            Message.info("Resource limit reached for: [Resource{id=r1, concurrency=3}]"))),
+            Message.info("Resource limit reached for: [Resource{id=r1, concurrency=2}]"))),
         anyLong());
-    verify(stats).recordResourceUsed("r1", 3L);
+    verify(stats).recordResourceUsed("r1", 2L);
   }
 
   @Test
@@ -662,7 +662,7 @@ public class SchedulerTest {
 
     when(config.globalConcurrency()).thenReturn(Optional.of(17L));
 
-    setResourceLimit("baz", 4);
+    setResourceLimit("baz", 3);
     initWorkflow(workflow);
 
     WorkflowInstance i0 = instance(WORKFLOW_ID1, "i0");
@@ -680,8 +680,8 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    // 3 invocations to count current resource usage + 2 invocations to calculate future usage for queued states
-    verify(resourceDecorator, times(3 + 2)).decorateResources(any(RunState.class), eq(workflow.configuration()),
+    // 2 invocations to count current resource usage + 2 invocations to calculate future usage for queued states
+    verify(resourceDecorator, times(2 + 2)).decorateResources(any(RunState.class), eq(workflow.configuration()),
         eq(ImmutableSet.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
 
     verify(stateManager).receiveIgnoreClosed(Matchers.argThat(

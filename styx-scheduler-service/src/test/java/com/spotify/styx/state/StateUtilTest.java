@@ -26,6 +26,8 @@ import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_WITH_RESOURCES;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
@@ -112,5 +114,23 @@ public class StateUtilTest {
 
     StateUtil.getResourcesUsageMap(storage, timeoutConfig, workflowCache,
         Instant.ofEpochMilli(11L), resourceDecorator);
+  }
+
+  @Test
+  public void shouldConsumeResource() {
+    assertTrue(StateUtil.isConsumingResources(RunState.State.PREPARE));
+    assertTrue(StateUtil.isConsumingResources(RunState.State.SUBMITTING));
+    assertTrue(StateUtil.isConsumingResources(RunState.State.SUBMITTED));
+    assertTrue(StateUtil.isConsumingResources(RunState.State.RUNNING));
+  }
+
+  @Test
+  public void shouldNotConsumeResource() {
+    assertFalse(StateUtil.isConsumingResources(RunState.State.NEW));
+    assertFalse(StateUtil.isConsumingResources(RunState.State.QUEUED));
+    assertFalse(StateUtil.isConsumingResources(RunState.State.TERMINATED));
+    assertFalse(StateUtil.isConsumingResources(RunState.State.FAILED));
+    assertFalse(StateUtil.isConsumingResources(RunState.State.ERROR));
+    assertFalse(StateUtil.isConsumingResources(RunState.State.DONE));
   }
 }
