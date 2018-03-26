@@ -132,9 +132,9 @@ public class QueuedStateManager implements StateManager {
     // Read state counter at enqueueing time
     final Optional<RunState> currentRunState = getActiveState(event.workflowInstance());
     if (!currentRunState.isPresent()) {
-      return CompletableFutures.exceptionallyCompletedFuture(
-          new IllegalArgumentException("Workflow not found: "
-                                       + event.workflowInstance().workflowId().toKey()));
+      String message = "Received event for unknown workflow instance: " + event;
+      LOG.warn(message);
+      return CompletableFutures.exceptionallyCompletedFuture(new IllegalArgumentException(message));
     }
     return receive(event, currentRunState.get().counter());
   }
