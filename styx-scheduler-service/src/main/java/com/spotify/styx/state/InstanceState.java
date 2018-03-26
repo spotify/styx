@@ -17,16 +17,15 @@
  * limitations under the License.
  * -/-/-
  */
-package com.spotify.styx;
+package com.spotify.styx.state;
 
 import com.google.auto.value.AutoValue;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.state.RunState;
 
 @AutoValue
-abstract class InstanceState {
-  abstract WorkflowInstance workflowInstance();
-  abstract RunState runState();
+public abstract class InstanceState {
+  public abstract WorkflowInstance workflowInstance();
+  public abstract RunState runState();
 
   static InstanceState create(WorkflowInstance workflowInstance, RunState runState) {
     return new AutoValue_InstanceState(workflowInstance, runState);

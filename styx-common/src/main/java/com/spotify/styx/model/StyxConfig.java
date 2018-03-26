@@ -36,10 +36,16 @@ public interface StyxConfig {
    * Get the global enabled flag for Styx.
    */
   boolean globalEnabled();
+
   /**
    * Get the debug flag for Styx.
    */
   boolean debugEnabled();
+
+  /**
+   * Get the flag for enabling resource sync at startup.
+   */
+  boolean resourcesSyncEnabled();
 
   /**
    * Controls whether workflow instance execution gating should be performed. If set to false,

@@ -22,10 +22,12 @@ package com.spotify.styx;
 
 import static com.spotify.styx.monitoring.MeteredProxy.instrument;
 import static com.spotify.styx.state.OutputHandler.fanOutput;
+import static com.spotify.styx.state.StateUtil.getResourcesUsageMap;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.GuardedRunnable.guard;
 import static com.spotify.styx.util.ReplayEvents.transitionLogger;
+import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -83,6 +85,7 @@ import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RetryUtil;
+import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.ShardedCounterSnapshotFactory;
 import com.spotify.styx.util.StorageFactory;
@@ -103,6 +106,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
@@ -321,9 +325,12 @@ public class StyxScheduler implements AppInit {
 
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
     final ShardedCounter shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
-    initializeResources(storage, shardedCounter, counterSnapshotFactory);
+
+    final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
+    final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
 
     warmUpCache(workflowCache, storage);
+    initializeResources(storage, shardedCounter, counterSnapshotFactory, timeoutConfig, workflowCache);
 
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
     //       take StateManager as argument instead?
@@ -332,9 +339,6 @@ public class StyxScheduler implements AppInit {
         new QueuedStateManager(time, eventTransitionExecutor, storage,
             eventConsumerFactory.apply(environment, stats), eventConsumerExecutor,
             fanOutput(outputHandlers), shardedCounter));
-
-    final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
-    final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
 
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
     final Supplier<String> dockerId = () -> styxConfig.get().globalDockerRunnerId();
@@ -444,8 +448,11 @@ public class StyxScheduler implements AppInit {
   }
 
   private void initializeResources(Storage storage, ShardedCounter shardedCounter,
-                                   CounterSnapshotFactory counterSnapshotFactory) {
+                                   CounterSnapshotFactory counterSnapshotFactory,
+                                   TimeoutConfig timeoutConfig,
+                                   WorkflowCache workflowCache) {
     try {
+      // Initialize resources
       storage.resources().parallelStream().forEach(
           resource -> {
             counterSnapshotFactory.create(resource.id());
@@ -455,15 +462,62 @@ public class StyxScheduler implements AppInit {
                 return null;
               });
             } catch (IOException e) {
-              LOG.error("Error creating a counter limit for {}: {}", resource, e);
-              // TODO: re-throw exception when moving to entirely depend on counter shards
+              LOG.error("Error creating a counter limit for {}", resource, e);
+              throw new RuntimeException(e);
             }
           });
       LOG.info("Finished initializing resources");
+
+      // Sync resources usage
+      if (storage.config().resourcesSyncEnabled()) {
+        try {
+          final Map<String, Long> resourcesUsageMap = getResourcesUsageMap(storage, timeoutConfig,
+              workflowCache, time.get(), resourceDecorator);
+          updateShards(storage, resourcesUsageMap);
+        } catch (Exception e) {
+          LOG.error("Error syncing resources", e);
+          throw new RuntimeException(e);
+        }
+      }
+      LOG.info("Finished syncing resources");
     } catch (IOException e) {
-      LOG.error("Error reading resources from datastore: {}", e);
-      // TODO: re-throw exception when moving to entirely depend on counter shards
+      LOG.error("Error while initializing/syncing resources", e);
+      throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * For each resource, distribute usage value evenly across shards.
+   * For example, with a usage value of 10 and 3 available shards, the latter will be set to:
+   * Shard 1 = 4
+   * Shard 2 = 3
+   * Shard 3 = 3
+   */
+  @VisibleForTesting
+  void updateShards(final Storage storage,
+                    final Map<String, Long> resourceUsage) {
+    resourceUsage.entrySet().parallelStream().forEach(entity -> {
+      final String resource = entity.getKey();
+      final Long usage = entity.getValue();
+      LOG.info("Syncing {} -> {}", resource, usage);
+      try {
+        int result = (int) (usage / NUM_SHARDS);
+        int remainder = (int) (usage % NUM_SHARDS);
+        for (int i = 0; i < NUM_SHARDS; i++) {
+          final int index = i;
+          final int shardValue = remainder <= 0 ? result : result + 1;
+          storage.runInTransaction(tx -> {
+            tx.store(Shard.create(resource, index, shardValue));
+            return null;
+          });
+          remainder--;
+          LOG.info("Stored {}#shard-{} -> {}", resource, index, shardValue);
+        }
+      } catch (IOException e) {
+        LOG.error("Error syncing resource: {}", resource, e);
+        throw new RuntimeException(e);
+      }
+    });
   }
 
   private static void startCleaner(Cleaner cleaner, ScheduledExecutorService exec) {

@@ -23,6 +23,7 @@ package com.spotify.styx.storage;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -465,6 +466,16 @@ public class DatastoreStorageTest {
   }
 
   @Test
+  public void getsResourcesSyncEnabled() {
+    Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
+        .set(PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED, true)
+        .build();
+    helper.getOptions().getService().put(config);
+
+    assertThat(storage.config().resourcesSyncEnabled(), is(true));
+  }
+
+  @Test
   public void shouldReturnEmptyClientBlacklist() {
     Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
@@ -540,10 +551,13 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void testDefaultConfig() throws Exception {
+  public void testDefaultConfig() {
     final StyxConfig expectedConfig = StyxConfig.newBuilder()
-        .globalEnabled(true)
         .globalDockerRunnerId("default")
+        .globalEnabled(true)
+        .debugEnabled(false)
+        .resourcesSyncEnabled(false)
+        .executionGatingEnabled(false)
         .build();
 
     assertThat(storage.config(), is(expectedConfig));
