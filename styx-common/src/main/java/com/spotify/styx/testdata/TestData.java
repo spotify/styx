@@ -28,6 +28,7 @@ import static com.spotify.styx.model.Schedule.WEEKS;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
@@ -55,6 +56,15 @@ public final class TestData {
           .commitSha(VALID_SHA)
           .dockerImage("busybox")
           .schedule(HOURS)
+          .build();
+
+  public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES =
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .dockerImage("busybox")
+          .schedule(HOURS)
+          .resources(RESOURCE_IDS)
           .build();
 
   public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_INVALID_OFFSET =
@@ -117,6 +127,9 @@ public final class TestData {
           .secret(WorkflowConfiguration.Secret.create("secret", "/dev/null"))
           .commitSha(VALID_SHA)
           .build();
+
+  public static final Workflow WORKFLOW_WITH_RESOURCES = Workflow.create(WORKFLOW_ID.componentId(),
+      HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES);
 
   private TestData() {
     throw new UnsupportedOperationException();

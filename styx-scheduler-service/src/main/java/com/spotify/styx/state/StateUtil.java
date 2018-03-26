@@ -94,7 +94,7 @@ public final class StateUtil {
           try {
             return storage.readActiveState(entry.getKey()).isPresent();
           } catch (IOException e) {
-            throw new RuntimeException("Error while fetching active states");
+            throw new RuntimeException("Error while fetching active states", e);
           }
         }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
