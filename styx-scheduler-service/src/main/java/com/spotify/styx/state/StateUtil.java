@@ -151,10 +151,7 @@ public final class StateUtil {
    * @return true if the state consumes resources, otherwise false.
    */
   static boolean isConsumingResources(RunState.State state) {
-    return ImmutableList.of(RunState.State.PREPARE,
-        RunState.State.SUBMITTING,
-        RunState.State.SUBMITTED,
-        RunState.State.RUNNING).contains(state);
+    return !ImmutableList.of(RunState.State.NEW, RunState.State.QUEUED).contains(state);
   }
 
   @AutoValue
