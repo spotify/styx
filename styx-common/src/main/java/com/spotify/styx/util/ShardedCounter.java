@@ -81,10 +81,9 @@ public class ShardedCounter {
     private final Long limit;
     private final Map<Integer, Long> shards;
 
-    Snapshot(Storage storage, String counterId, Map<Integer, Long> shards) {
-      Objects.requireNonNull(storage);
+    Snapshot(String counterId, Long limit, Map<Integer, Long> shards) {
       this.counterId = Objects.requireNonNull(counterId);
-      this.limit = getLimit(storage, counterId);
+      this.limit = Objects.requireNonNull(limit);
       this.shards = Objects.requireNonNull(shards);
     }
 
@@ -102,6 +101,11 @@ public class ShardedCounter {
     }
 
     @Override
+    public long getLimit() {
+      return limit;
+    }
+
+    @Override
     public Map<Integer, Long> getShards() {
       return shards;
     }
@@ -112,9 +116,7 @@ public class ShardedCounter {
      */
     public int pickShardWithSpareCapacity(long delta) {
       List<Integer> candidates = shards.keySet().stream()
-          .filter(shards::containsKey)
-          .filter(index -> Range.closed(0L, shardCapacity(index))
-                                .contains(shards.get(index) + delta))
+          .filter(index -> Range.closed(0L, shardCapacity(index)).contains(shards.get(index) + delta))
           .collect(Collectors.toList());
 
       if (candidates.isEmpty()) {

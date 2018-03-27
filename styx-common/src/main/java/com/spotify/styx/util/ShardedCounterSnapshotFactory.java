@@ -49,7 +49,8 @@ public class ShardedCounterSnapshotFactory implements CounterSnapshotFactory {
   }
 
   public ShardedCounter.Snapshot create(String counterId) {
-    return new ShardedCounter.Snapshot(storage, counterId, getShards(storage, counterId));
+    return new ShardedCounter.Snapshot(counterId, ShardedCounter.getLimit(storage, counterId),
+        getShards(storage, counterId));
   }
 
   private static Map<Integer, Long> getShards(Storage storage, String counterId) {

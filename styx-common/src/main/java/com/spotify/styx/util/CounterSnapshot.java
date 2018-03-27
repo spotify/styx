@@ -32,4 +32,6 @@ public interface CounterSnapshot {
   int pickShardWithSpareCapacity(long delta);
 
   long shardCapacity(int shardIndex);
+
+  long getLimit();
 }
