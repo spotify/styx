@@ -156,10 +156,10 @@ public class ShardedCounter {
 
       if (candidates.isEmpty()) {
         if (shards.size() == 0) {
-          LOG.info(
-              "Trying to operate with a potentially uninitialized counter {}. Cache needs to be updated first.",
-              counterId);
-          return new Random().nextInt((int) Math.min(NUM_SHARDS, limit));
+          final String message = "Trying to operate with a potentially uninitialized counter " +
+                                 counterId + ". Cache needs to be updated first.";
+          LOG.error(message);
+          throw new ShardNotFoundException(message);
         } else {
           final String message = String.format("No shard for counter %s has capacity for delta %s",
               counterId, delta);
@@ -243,18 +243,18 @@ public class ShardedCounter {
     updateCounterShard(transaction, counterId, delta, shardIndex, snapshot.shardCapacity(shardIndex));
   }
 
-  private void updateCounterShard(StorageTransaction transaction, String counterId, long delta,
-                                  int shardIndex, long shardCapacity) {
+  @VisibleForTesting
+  void updateCounterShard(StorageTransaction transaction, String counterId, long delta,
+                          int shardIndex, long shardCapacity) {
     final Optional<Shard> shard = transaction.shard(counterId, shardIndex);
 
     if (shard.isPresent()) {
       final long newShardValue = shard.get().value() + delta;
-      if (Range.closed(0L, shardCapacity)
-          .contains(newShardValue)) {
+      if (Range.closed(0L, shardCapacity).contains(newShardValue)) {
         transaction.store(Shard.create(counterId, shardIndex, (int) (shard.get().value() + delta)));
       } else {
         final String message = String.format("Chosen shard %s-%s has no more capacity.",
-                                             counterId, shardIndex);
+            counterId, shardIndex);
         LOG.debug(message);
         throw new CounterCapacityException(message);
       }
@@ -264,7 +264,7 @@ public class ShardedCounter {
                         + "bug - the code should've called initialize() before reaching this"
                         + "point, and any particular shard should strongly be get()-able"
                         + "thereafter",
-                        counterId, shardIndex);
+              counterId, shardIndex);
       LOG.debug(message);
       throw new ShardNotFoundException(message);
     }
