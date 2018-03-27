@@ -20,6 +20,8 @@
 
 package com.spotify.styx.util;
 
+import static java.util.stream.Collectors.toList;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -34,7 +36,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,10 +82,9 @@ public class ShardedCounter {
     private final Long limit;
     private final Map<Integer, Long> shards;
 
-    Snapshot(Storage storage, String counterId, Map<Integer, Long> shards) {
-      Objects.requireNonNull(storage);
+    Snapshot(String counterId, long limit, Map<Integer, Long> shards) {
       this.counterId = Objects.requireNonNull(counterId);
-      this.limit = getLimit(storage, counterId);
+      this.limit = limit;
       this.shards = Objects.requireNonNull(shards);
     }
 
@@ -102,6 +102,38 @@ public class ShardedCounter {
     }
 
     @Override
+    public long getLimit() {
+      return limit;
+    }
+
+    /**
+     * Returns the current value of the counter referred to by counterId, a weakly consistent
+     * estimate. (May have not truly been the counter value at any point in time. Even a return value
+     * larger than the corresponding limit might be possible without error.)
+     */
+    @Override
+    public long getTotalUsage() {
+      return shards.values().stream().mapToLong(i -> i).sum();
+    }
+
+    /**
+     * Returns shard index which _likely_ has excess usage, as per our cached view of the state in Datastore.
+     */
+    @Override
+    public Optional<Integer> pickShardWithExcessUsage(long delta) {
+      final List<Integer> candidates = shards.keySet().stream()
+          .filter(index -> shards.get(index) > shardCapacity(index))
+          .filter(index -> shards.get(index) + delta >= 0)
+          .collect(toList());
+
+      if (candidates.isEmpty()) {
+        return Optional.empty();
+      } else {
+        return Optional.of(candidates.get(new Random().nextInt(candidates.size())));
+      }
+    }
+
+    @Override
     public Map<Integer, Long> getShards() {
       return shards;
     }
@@ -111,22 +143,27 @@ public class ShardedCounter {
      * cached view of the state in Datastore.
      */
     public int pickShardWithSpareCapacity(long delta) {
+      if (delta > 0 && getTotalUsage() >= getLimit()) {
+        final String message = String.format("No shard for counter %s has capacity for delta %s",
+            counterId, delta);
+        LOG.info(message);
+        throw new CounterCapacityException(message);
+      }
+
       List<Integer> candidates = shards.keySet().stream()
-          .filter(shards::containsKey)
-          .filter(index -> Range.closed(0L, shardCapacity(index))
-                                .contains(shards.get(index) + delta))
-          .collect(Collectors.toList());
+          .filter(index -> Range.closed(0L, shardCapacity(index)).contains(shards.get(index) + delta))
+          .collect(toList());
 
       if (candidates.isEmpty()) {
         if (shards.size() == 0) {
-          LOG.info(
-              "Trying to operate with a potentially uninitialized counter {}. Cache needs to be updated first.",
-              counterId);
-          return new Random().nextInt((int) Math.min(NUM_SHARDS, limit));
+          final String message = "Trying to operate with a potentially uninitialized counter "
+                                 + counterId + ". Cache needs to be updated first.";
+          LOG.error(message);
+          throw new ShardNotFoundException(message);
         } else {
           final String message = String.format("No shard for counter %s has capacity for delta %s",
-                                               counterId, delta);
-          LOG.debug(message);
+              counterId, delta);
+          LOG.info(message);
           throw new CounterCapacityException(message);
         }
         // Or return -1 (and use that to abort the transaction early)?
@@ -191,29 +228,44 @@ public class ShardedCounter {
    */
   public void updateCounter(StorageTransaction transaction, String counterId, long delta) {
     CounterSnapshot snapshot = getCounterSnapshot(counterId);
-    int shardIndex = snapshot.pickShardWithSpareCapacity(delta);
 
+    // If delta is negative, try to update shards with excess usage first
+    if (delta < 0) {
+      Optional<Integer> shardIndex = snapshot.pickShardWithExcessUsage(delta);
+      if (shardIndex.isPresent()) {
+        updateCounterShard(transaction, counterId, delta, shardIndex.get(),
+            snapshot.shardCapacity(shardIndex.get()));
+        return;
+      }
+    }
+
+    int shardIndex = snapshot.pickShardWithSpareCapacity(delta);
+    updateCounterShard(transaction, counterId, delta, shardIndex, snapshot.shardCapacity(shardIndex));
+  }
+
+  @VisibleForTesting
+  void updateCounterShard(StorageTransaction transaction, String counterId, long delta,
+                          int shardIndex, long shardCapacity) {
     final Optional<Shard> shard = transaction.shard(counterId, shardIndex);
 
     if (shard.isPresent()) {
       final long newShardValue = shard.get().value() + delta;
-      if (Range.closed(0L, snapshot.shardCapacity(shardIndex))
-          .contains(newShardValue)) {
+      if (Range.closed(0L, shardCapacity).contains(newShardValue)) {
         transaction.store(Shard.create(counterId, shardIndex, (int) (shard.get().value() + delta)));
       } else {
         final String message = String.format("Chosen shard %s-%s has no more capacity.",
-                                             counterId, shardIndex);
-        LOG.debug(message);
+            counterId, shardIndex);
+        LOG.info(message);
         throw new CounterCapacityException(message);
       }
     } else {
       final String message =
           String.format("Could not find shard %s-%s. Unexpected Datastore corruption or our"
                         + "bug - the code should've called initialize() before reaching this"
-                        + "point, and any particular shard should strongly be get()-able" 
+                        + "point, and any particular shard should strongly be get()-able"
                         + "thereafter",
-                        counterId, shardIndex);
-      LOG.debug(message);
+              counterId, shardIndex);
+      LOG.error(message);
       throw new ShardNotFoundException(message);
     }
   }
@@ -224,7 +276,7 @@ public class ShardedCounter {
    * larger than the corresponding limit might be possible without error.)
    */
   public long getCounter(String counterId) {
-    return getCounterSnapshot(counterId).getShards().values().stream().mapToLong(i -> i).sum();
+    return getCounterSnapshot(counterId).getTotalUsage();
   }
 
   /**

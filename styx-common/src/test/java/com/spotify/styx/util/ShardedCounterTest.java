@@ -26,12 +26,21 @@ import static com.spotify.styx.util.ShardedCounter.PROPERTY_COUNTER_ID;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_LIMIT;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_INDEX;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_VALUE;
+import static org.hamcrest.CoreMatchers.either;
+import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
@@ -44,6 +53,7 @@ import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.storage.StorageTransaction;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.stream.IntStream;
@@ -111,38 +121,46 @@ public class ShardedCounterTest {
       assertTrue(results.hasNext());
       results.next();
     });
+  }
 
+  @Test
+  public void updateCounterShouldInitializeShardsIfAbsent() {
+    // Make sure shards are not initialized
+    QueryResults<Entity> shardsForCounter = getShardsForCounter(COUNTER_ID1);
+    assertThat(shardsForCounter.hasNext(), is(false));
+
+    updateCounterInTransaction(COUNTER_ID1, 1L);
+
+    // Make sure updating counter initializes shards if required
+    shardsForCounter = getShardsForCounter(COUNTER_ID1);
+    assertThat(shardsForCounter.hasNext(), is(true));
   }
 
   @Test
   public void shouldCreateLimit() throws IOException {
-    assertNull(getLimitForCounter(COUNTER_ID1));
+    assertNull(getLimitFromStorage(COUNTER_ID1));
 
     storage.runInTransaction(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 500);
       return null;
     });
 
-    assertEquals(500L, getLimitForCounter(COUNTER_ID1).getLong(PROPERTY_LIMIT));
+    assertEquals(500L, getLimitFromStorage(COUNTER_ID1).getLong(PROPERTY_LIMIT));
   }
 
   @Test
-  public void shoudIncrementCounter() {
+  public void shouldIncrementCounter() {
+    // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
     //increment counter by 1
     updateCounterInTransaction(COUNTER_ID1, 1L);
 
     QueryResults<Entity> results = datastore.run(EntityQuery.newEntityQueryBuilder()
-                                                     .setKind(KIND_COUNTER_SHARD)
-                                                     .setFilter(CompositeFilter.and(
-                                                         PropertyFilter
-                                                             .eq(PROPERTY_COUNTER_ID,
-                                                                 COUNTER_ID1),
-                                                         PropertyFilter
-                                                             .eq(PROPERTY_SHARD_VALUE,
-                                                                 1)))
-                                                     .build());
+        .setKind(KIND_COUNTER_SHARD)
+        .setFilter(CompositeFilter.and(PropertyFilter.eq(PROPERTY_COUNTER_ID, COUNTER_ID1),
+            PropertyFilter.eq(PROPERTY_SHARD_VALUE,1)))
+        .build());
     // assert there's one and only one shard with the value set to 1
     assertEquals(1L, results.next().getLong(PROPERTY_SHARD_VALUE));
     assertFalse(results.hasNext());
@@ -153,19 +171,12 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shoudDecrementCounter() {
+  public void shouldDecrementCounter() {
     // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
-    final int shardIndex = 3;
-    final Key shardKey = datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD)
-        .newKey(COUNTER_ID1 + "-" + shardIndex);
     //increment counter shard by 1
-    datastore.put(Entity.newBuilder(shardKey)
-                      .set(PROPERTY_COUNTER_ID, COUNTER_ID1)
-                      .set(PROPERTY_SHARD_INDEX, shardIndex)
-                      .set(PROPERTY_SHARD_VALUE, 1)
-                      .build());
+    updateShard(COUNTER_ID1,3, 1);
 
     shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
     // assert cache is updated with the new value
@@ -175,21 +186,134 @@ public class ShardedCounterTest {
     updateCounterInTransaction(COUNTER_ID1, -1L);
 
     // assert that the only eligible shard was chosen to be decremented
-    assertEquals(0L, datastore.get(shardKey).getLong(PROPERTY_SHARD_VALUE));
+    assertEquals(0L, datastore.get(getKey(COUNTER_ID1, 3)).getLong(PROPERTY_SHARD_VALUE));
 
     // assert cache is updated with the new value
     shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
   }
 
+  @Test
+  public void shouldDecrementShardWithExcessUsage() {
+    // init counter
+    assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
+
+    updateShard(COUNTER_ID1, 0, 1);
+    updateShard(COUNTER_ID1, 1, 1);
+    updateLimitInStorage(COUNTER_ID1, 1);
+
+    // Invalidate snapshot to force pull changes from Datastore emulator
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    // assert cache is updated with the new value
+    assertEquals(2L, shardedCounter.getCounter(COUNTER_ID1));
+
+    //decrement counter by 1
+    updateCounterInTransaction(COUNTER_ID1, -1L);
+
+    // assert that the only shard in excess was chosen to be decremented
+    assertEquals(1L, datastore.get(getKey(COUNTER_ID1, 0))
+        .getLong(PROPERTY_SHARD_VALUE));
+    assertEquals(0L, datastore.get(getKey(COUNTER_ID1, 1))
+        .getLong(PROPERTY_SHARD_VALUE));
+
+    // assert cache is updated with the new value
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertEquals(1L, shardedCounter.getCounter(COUNTER_ID1));
+  }
+
+  @Test
+  public void shouldDecrementShardWithNoExcessUsage() {
+    // init counter
+    assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
+
+    updateShard(COUNTER_ID1, 0, 1);
+    updateShard(COUNTER_ID1, 1, 1);
+    updateLimitInStorage(COUNTER_ID1, 2);
+
+    // Invalidate snapshot to force pull changes from Datastore emulator
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    // assert cache is updated with the new value
+    assertEquals(2L, shardedCounter.getCounter(COUNTER_ID1));
+
+    //decrement counter by 1
+    updateCounterInTransaction(COUNTER_ID1, -1L);
+
+    assertThat(1L,
+        either(is(datastore.get(getKey(COUNTER_ID1, 0)).getLong(PROPERTY_SHARD_VALUE)))
+            .or(is(datastore.get(getKey(COUNTER_ID1, 1)).getLong(PROPERTY_SHARD_VALUE))));
+
+    // assert cache is updated with the new value
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertEquals(1L, shardedCounter.getCounter(COUNTER_ID1));
+  }
+
   @Test(expected = CounterCapacityException.class)
-  public void shoudFailDecrementingEmptyCounter() {
+  public void shouldFailWhenIncreasingIfChosenShardIsFilledConcurrently() {
+    // init counter and limit
+    updateLimitInStorage(COUNTER_ID1, 1);
+    assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
+
+    shardedCounter = spy(shardedCounter);
+
+    doAnswer(invocation -> {
+      final Integer shardIndex = invocation.getArgumentAt(3, Integer.class);
+      final String counterId = invocation.getArgumentAt(1, String.class);
+      // Fill the chosen shard just before attempting to increment in storage
+      updateShard(counterId, shardIndex, 1L);
+      invocation.callRealMethod();
+      return null;
+    }).when(shardedCounter).updateCounterShard(any(StorageTransaction.class), anyString(),
+        anyLong(), anyInt(), anyLong());
+
+    //increment counter by 1
+    updateCounterInTransaction(COUNTER_ID1, 1L);
+  }
+
+  @Test(expected = ShardNotFoundException.class)
+  public void shouldFailWhenIncreasingIfChosenShardIsMissing() {
+    // init counter and limit
+    updateLimitInStorage(COUNTER_ID1, 1);
+    assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
+
+    shardedCounter = spy(shardedCounter);
+
+    doAnswer(invocation -> {
+      final Integer shardIndex = invocation.getArgumentAt(3, Integer.class);
+      datastore.delete(getKey(COUNTER_ID1, shardIndex));
+      invocation.callRealMethod();
+      return null;
+    }).when(shardedCounter).updateCounterShard(any(StorageTransaction.class), anyString(),
+        anyLong(), anyInt(), anyLong());
+
+    //increment counter by 1
+    updateCounterInTransaction(COUNTER_ID1, 1L);
+  }
+
+  @Test(expected = CounterCapacityException.class)
+  public void shouldNotIncrementIfUsageIsAboveLimitAndShardsHaveExcessUsage() {
+    // init counter
+    assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
+
+    updateLimitInStorage(COUNTER_ID1, 1);
+    // Update second shard despite limit being set to 1, possible if users decrease resource limit
+    updateShard(COUNTER_ID1, 1, 1);
+
+    // Invalidate snapshot to force pull changes from Datastore emulator
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    // assert cache is updated with the new value
+    assertEquals(1L, shardedCounter.getCounter(COUNTER_ID1));
+
+    updateCounterInTransaction(COUNTER_ID1, 1L);
+  }
+
+  @Test(expected = CounterCapacityException.class)
+  public void shouldFailDecrementingEmptyCounter() {
     //increment counter by 1
     updateCounterInTransaction(COUNTER_ID1, -1L);
   }
 
   @Test
-  public void shoudFailIncrementingFullCounter() throws IOException {
+  public void shouldFailIncrementingFullCounter() throws IOException {
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
     storage.runInTransaction(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 10);
@@ -233,7 +357,7 @@ public class ShardedCounterTest {
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
 
     assertFalse(results.hasNext());
-    assertNull(getLimitForCounter(COUNTER_ID1));
+    assertNull(getLimitFromStorage(COUNTER_ID1));
   }
 
   @Test
@@ -255,10 +379,10 @@ public class ShardedCounterTest {
     QueryResults<Entity> shardsCounter2 = getShardsForCounter(COUNTER_ID2);
 
     assertFalse(shardsCounter1.hasNext());
-    assertNull(getLimitForCounter(COUNTER_ID1));
+    assertNull(getLimitFromStorage(COUNTER_ID1));
 
     assertTrue(shardsCounter2.hasNext());
-    assertNotNull(getLimitForCounter(COUNTER_ID2));
+    assertNotNull(getLimitFromStorage(COUNTER_ID2));
   }
 
   @Test
@@ -267,7 +391,7 @@ public class ShardedCounterTest {
 
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
     assertFalse(results.hasNext());
-    assertNull(getLimitForCounter(COUNTER_ID1));
+    assertNull(getLimitFromStorage(COUNTER_ID1));
   }
 
   /**
@@ -296,6 +420,20 @@ public class ShardedCounterTest {
     }
   }
 
+  private void updateShard(String counterId, int shardIndex, long usage) {
+    final Key key = getKey(counterId, shardIndex);
+    datastore.put(Entity.newBuilder(key)
+        .set(PROPERTY_COUNTER_ID, counterId)
+        .set(PROPERTY_SHARD_INDEX, shardIndex)
+        .set(PROPERTY_SHARD_VALUE, usage)
+        .build());
+  }
+
+  private Key getKey(String counterId, int shardIndex) {
+    return datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD)
+        .newKey(counterId + "-" + shardIndex);
+  }
+
   public static void clearDatastore(Datastore datastore) {
     deleteAllOfKind(datastore, KIND_COUNTER_SHARD);
     deleteAllOfKind(datastore, KIND_COUNTER_LIMIT);
@@ -303,23 +441,27 @@ public class ShardedCounterTest {
 
   private static void deleteAllOfKind(Datastore datastore, String kind) {
     QueryResults<Entity> results = datastore.run(EntityQuery.newEntityQueryBuilder()
-                                                     .setKind(kind)
-                                                     .build());
+        .setKind(kind)
+        .build());
     while (results.hasNext()) {
       datastore.delete(results.next().getKey());
     }
   }
 
-  private Entity getLimitForCounter(String counterId) {
+  private Entity getLimitFromStorage(String counterId) {
     return datastore.get(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId));
+  }
+
+  private void updateLimitInStorage(String counterId, long limit) {
+    datastore.put(Entity.newBuilder((datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey
+        (counterId)))
+        .set(PROPERTY_LIMIT, limit)
+        .build());
   }
 
   private QueryResults<Entity> getShardsForCounter(String counterId) {
     return datastore.run(EntityQuery.newEntityQueryBuilder()
-                             .setKind(KIND_COUNTER_SHARD)
-                             .setFilter(PropertyFilter
-                                            .eq(PROPERTY_COUNTER_ID,
-                                                counterId)).build());
+        .setKind(KIND_COUNTER_SHARD)
+        .setFilter(PropertyFilter.eq(PROPERTY_COUNTER_ID, counterId)).build());
   }
-
 }
