@@ -27,6 +27,7 @@ import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -674,29 +675,46 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @Test
   public void shouldLimitConcurrencyForResource() throws Exception {
     givenResource(RESOURCE_4);
-    givenWorkflowAboutToTriggerWithResources("dummy", ImmutableList.of(RESOURCE_ID4));
-
-    styxStarts();
-    timePasses(1, SECONDS);
-    awaitNumberOfDockerRuns(3);
-
-
-//    setUp(20);
-    setResourceLimit("r1", 3);
-    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
-
     for (int i = 0; i < 4; i++) {
-      populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.QUEUED, time.get()));
+      givenWorkflowAboutToTriggerWithResources("foo_" + i, ImmutableList.of(RESOURCE_4.id()));
     }
 
-    scheduler.tick();
+    styxStarts();
+    tickTriggerManager();
+    tickScheduler();
+    timePasses(2, SECONDS);
+    tickTriggerManager();
+    tickScheduler();
 
-    ArgumentCaptor<Event> capturedEvents = ArgumentCaptor.forClass(Event.class);
-    ArgumentCaptor<Long> capturedCounters = ArgumentCaptor.forClass(Long.class);
-    verify(stateManager, times(4))
-        .receiveIgnoreClosed(capturedEvents.capture(), capturedCounters.capture());
-    issuedEvents(capturedEvents, "dequeue", 3);
-    issuedEvents(capturedEvents, "info", 1);
-    verify(stats).recordResourceUsed("r1", 3L);
+    // This is flaky: sometimes awaitNumberOfDockerRuns passes, sometimes it doesn't. I guess here
+    // we get a varying number of runs, depending on contention...
+    // TODO await for eventuality that will happen with repeated ticks
+    awaitNumberOfDockerRuns(3);
+//    awaitNumberOfConsumedEvents(13);
+    assertThat(consumedEventNames(), containsInAnyOrder(
+        "triggerExecution", "dequeue", "submit", "submitted",
+        "triggerExecution", "dequeue", "submit", "submitted",
+        "triggerExecution", "dequeue", "submit", "submitted",
+        "info"
+    ));
   }
+
+//    setUp(20);
+//    setResourceLimit("r1", 3);
+//    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
+//
+//    for (int i = 0; i < 4; i++) {
+//      populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.QUEUED, time.get()));
+//    }
+//
+//    scheduler.tick();
+//
+//    ArgumentCaptor<Event> capturedEvents = ArgumentCaptor.forClass(Event.class);
+//    ArgumentCaptor<Long> capturedCounters = ArgumentCaptor.forClass(Long.class);
+//    verify(stateManager, times(4))
+//        .receiveIgnoreClosed(capturedEvents.capture(), capturedCounters.capture());
+//    issuedEvents(capturedEvents, "dequeue", 3);
+//    issuedEvents(capturedEvents, "info", 1);
+//    verify(stats).recordResourceUsed("r1", 3L);
+//  }
 }

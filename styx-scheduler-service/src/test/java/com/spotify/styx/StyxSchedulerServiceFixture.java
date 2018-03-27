@@ -24,6 +24,7 @@ import static com.spotify.styx.model.WorkflowState.patchEnabled;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.Collectors.toList;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 
@@ -52,6 +53,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
+import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
@@ -198,7 +200,6 @@ public class StyxSchedulerServiceFixture {
 
   void givenWorkflowAboutToTriggerWithResources(String workflowId, List<String> resources) throws
                                                                                  IOException {
-    // storing before start causes the WorkflowInitializer not to do anything
     final WorkflowConfiguration configuration = WorkflowConfiguration.builder()
         .id(workflowId)
         .schedule(Schedule.HOURS)
@@ -209,8 +210,8 @@ public class StyxSchedulerServiceFixture {
     final Workflow workflow = Workflow.create("styx", configuration);
     givenWorkflow(workflow);
     givenWorkflowEnabledStateIs(workflow, true);
-    givenTheTimeIs("2018-03-27T15:59:59Z");
-    givenNextNaturalTrigger(workflow, "2018-03-27T16:00:00Z");
+    givenTheTimeIs("2018-03-27T16:00:00Z");
+    givenNextNaturalTrigger(workflow, "2018-03-27T15:00:00Z");
   }
 
   void givenNextNaturalTrigger(Workflow workflow, String nextNaturalTrigger) throws IOException {
@@ -332,6 +333,18 @@ public class StyxSchedulerServiceFixture {
   void awaitUntilConsumedEvent(SequenceEvent sequenceEvent, RunState.State state) {
     await().atMost(30, SECONDS).until(() ->
         transitionedEvents.contains(Tuple.of(sequenceEvent, state)));
+  }
+
+  void awaitNumberOfConsumedEvents(int n) {
+    await().atMost(30, SECONDS).until(() ->
+        transitionedEvents.size() == n);
+  }
+
+  List<String> consumedEventNames() {
+    return transitionedEvents.stream()
+        .map(item -> EventUtil.name(item._1.event()))
+        .sorted()
+        .collect(toList());
   }
 
   void awaitUntilConsumedWorkflow(Optional<Workflow> oldWorkflow, Optional<Workflow> newWorkflow) {
