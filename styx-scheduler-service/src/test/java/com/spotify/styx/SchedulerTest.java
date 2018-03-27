@@ -371,11 +371,11 @@ public class SchedulerTest {
     // do not consume resources
     populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i0"), State.NEW, time.get()));
     populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i1"), State.QUEUED, time.get()));
+    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i4"), State.TERMINATED, time.get()));
 
     // consume resources
     populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i2"), State.SUBMITTING, time.get()));
     populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i3"), State.PREPARE, time.get()));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i4"), State.TERMINATED, time.get()));
 
     scheduler.tick();
 
