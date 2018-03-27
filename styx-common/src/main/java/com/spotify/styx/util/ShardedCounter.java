@@ -20,6 +20,8 @@
 
 package com.spotify.styx.util;
 
+import static java.util.stream.Collectors.toList;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -34,7 +36,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,6 +106,23 @@ public class ShardedCounter {
       return limit;
     }
 
+    /**
+     * Returns shard index which _likely_ has excess usage, as per our cached view of the state in Datastore.
+     */
+    @Override
+    public Optional<Integer> pickShardWithExcessUsage(long delta) {
+      final List<Integer> candidates = shards.keySet().stream()
+          .filter(index -> shards.get(index) > shardCapacity(index))
+          .filter(index -> shards.get(index) + delta >= 0)
+          .collect(toList());
+
+      if (candidates.isEmpty()) {
+        return Optional.empty();
+      } else {
+        return Optional.of(candidates.get(new Random().nextInt(candidates.size())));
+      }
+    }
+
     @Override
     public Map<Integer, Long> getShards() {
       return shards;
@@ -117,7 +135,7 @@ public class ShardedCounter {
     public int pickShardWithSpareCapacity(long delta) {
       List<Integer> candidates = shards.keySet().stream()
           .filter(index -> Range.closed(0L, shardCapacity(index)).contains(shards.get(index) + delta))
-          .collect(Collectors.toList());
+          .collect(toList());
 
       if (candidates.isEmpty()) {
         if (shards.size() == 0) {
@@ -193,13 +211,28 @@ public class ShardedCounter {
    */
   public void updateCounter(StorageTransaction transaction, String counterId, long delta) {
     CounterSnapshot snapshot = getCounterSnapshot(counterId);
-    int shardIndex = snapshot.pickShardWithSpareCapacity(delta);
 
+    // If delta is negative, try to update shards with excess usage first
+    if (delta < 0) {
+      Optional<Integer> shardIndex = snapshot.pickShardWithExcessUsage(delta);
+      if (shardIndex.isPresent()) {
+        updateCounterShard(transaction, counterId, delta, shardIndex.get(), snapshot.shardCapacity
+            (shardIndex.get()));
+        return;
+      }
+    }
+
+    int shardIndex = snapshot.pickShardWithSpareCapacity(delta);
+    updateCounterShard(transaction, counterId, delta, shardIndex, snapshot.shardCapacity(shardIndex));
+  }
+
+  private void updateCounterShard(StorageTransaction transaction, String counterId, long delta,
+                                  int shardIndex, long shardCapacity) {
     final Optional<Shard> shard = transaction.shard(counterId, shardIndex);
 
     if (shard.isPresent()) {
       final long newShardValue = shard.get().value() + delta;
-      if (Range.closed(0L, snapshot.shardCapacity(shardIndex))
+      if (Range.closed(0L, shardCapacity)
           .contains(newShardValue)) {
         transaction.store(Shard.create(counterId, shardIndex, (int) (shard.get().value() + delta)));
       } else {
@@ -212,7 +245,7 @@ public class ShardedCounter {
       final String message =
           String.format("Could not find shard %s-%s. Unexpected Datastore corruption or our"
                         + "bug - the code should've called initialize() before reaching this"
-                        + "point, and any particular shard should strongly be get()-able" 
+                        + "point, and any particular shard should strongly be get()-able"
                         + "thereafter",
                         counterId, shardIndex);
       LOG.debug(message);

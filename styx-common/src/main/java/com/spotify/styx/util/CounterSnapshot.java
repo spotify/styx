@@ -21,6 +21,7 @@
 package com.spotify.styx.util;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * An interface for counter snapshots
@@ -34,4 +35,6 @@ public interface CounterSnapshot {
   long shardCapacity(int shardIndex);
 
   long getLimit();
+
+  Optional<Integer> pickShardWithExcessUsage(long delta);
 }
