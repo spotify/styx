@@ -156,8 +156,8 @@ public class ShardedCounter {
 
       if (candidates.isEmpty()) {
         if (shards.size() == 0) {
-          final String message = "Trying to operate with a potentially uninitialized counter " +
-                                 counterId + ". Cache needs to be updated first.";
+          final String message = "Trying to operate with a potentially uninitialized counter "
+                                 + counterId + ". Cache needs to be updated first.";
           LOG.error(message);
           throw new ShardNotFoundException(message);
         } else {
