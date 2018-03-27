@@ -111,9 +111,11 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   private static final String RESOURCE_ID1 = "resource_1";
   private static final String RESOURCE_ID2 = "resource_2";
   private static final String RESOURCE_ID3 = "resource_3";
+  private static final String RESOURCE_ID4 = "resource_4";
   private static final Resource RESOURCE_1 = Resource.create(RESOURCE_ID1, 10);
   private static final Resource RESOURCE_2 = Resource.create(RESOURCE_ID2, 128);
   private static final Resource RESOURCE_3 = Resource.create(RESOURCE_ID3, 10000);
+  private static final Resource RESOURCE_4 = Resource.create(RESOURCE_ID4, 3);
 
   private static RunSpec naturalRunSpec(String executionId, String imageName, List<String> args) {
     return RunSpec.builder()
@@ -667,5 +669,34 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertEquals(128, storage.shardsForCounter(RESOURCE_1.id()).size());
     assertEquals(128, storage.shardsForCounter(RESOURCE_2.id()).size());
     assertEquals(128, storage.shardsForCounter(RESOURCE_3.id()).size());
+  }
+
+  @Test
+  public void shouldLimitConcurrencyForResource() throws Exception {
+    givenResource(RESOURCE_4);
+    givenWorkflowAboutToTriggerWithResources("dummy", ImmutableList.of(RESOURCE_ID4));
+
+    styxStarts();
+    timePasses(1, SECONDS);
+    awaitNumberOfDockerRuns(3);
+
+
+//    setUp(20);
+    setResourceLimit("r1", 3);
+    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
+
+    for (int i = 0; i < 4; i++) {
+      populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.QUEUED, time.get()));
+    }
+
+    scheduler.tick();
+
+    ArgumentCaptor<Event> capturedEvents = ArgumentCaptor.forClass(Event.class);
+    ArgumentCaptor<Long> capturedCounters = ArgumentCaptor.forClass(Long.class);
+    verify(stateManager, times(4))
+        .receiveIgnoreClosed(capturedEvents.capture(), capturedCounters.capture());
+    issuedEvents(capturedEvents, "dequeue", 3);
+    issuedEvents(capturedEvents, "info", 1);
+    verify(stats).recordResourceUsed("r1", 3L);
   }
 }
