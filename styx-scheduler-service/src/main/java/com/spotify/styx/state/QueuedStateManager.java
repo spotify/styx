@@ -28,6 +28,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
@@ -270,14 +271,16 @@ public class QueuedStateManager implements StateManager {
             tx.updateCounter(shardedCounter, resource, 1))))
         .filter(x -> x._2.isFailure())
         .collect(toSet());
-    final Set<String> depletedResources = failedTries.stream()
+    final Set<String> depletedResourceIds = failedTries.stream()
         .filter(x -> x._2.getCause() instanceof CounterCapacityException)
         .map(x -> x._1)
         .sorted()
         .collect(toSet());
 
-    if (!depletedResources.isEmpty()) {
-      // FIXME: construct Resource object in order to bring back the same output as before
+    if (!depletedResourceIds.isEmpty()) {
+      final Set<Resource> depletedResources = depletedResourceIds.stream().map(x ->
+          Resource.create(x, shardedCounter.getCounterSnapshot(x).getLimit()))
+          .collect(toSet());
       final Message message = Message.info(
           String.format("Resource limit reached for: %s", depletedResources));
       if (!runState.data().message().map(message::equals).orElse(false)) {
