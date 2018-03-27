@@ -126,7 +126,7 @@ public class ShardedCounter {
         } else {
           final String message = String.format("No shard for counter %s has capacity for delta %s",
                                                counterId, delta);
-          LOG.debug(message);
+          LOG.info(message);
           throw new CounterCapacityException(message);
         }
         // Or return -1 (and use that to abort the transaction early)?
@@ -199,11 +199,11 @@ public class ShardedCounter {
       final long newShardValue = shard.get().value() + delta;
       if (Range.closed(0L, snapshot.shardCapacity(shardIndex))
           .contains(newShardValue)) {
-        transaction.store(Shard.create(counterId, shardIndex, (int) (shard.get().value() + delta)));
+        transaction.store(Shard.create(counterId, shardIndex, (int) newShardValue));
       } else {
-        final String message = String.format("Chosen shard %s-%s has no more capacity.",
-                                             counterId, shardIndex);
-        LOG.debug(message);
+        final String message = String.format("Chosen shard %s-%s has no more capacity for delta %s",
+                                             counterId, shardIndex, delta);
+        LOG.info(message);
         throw new CounterCapacityException(message);
       }
     } else {
@@ -213,7 +213,7 @@ public class ShardedCounter {
                         + "point, and any particular shard should strongly be get()-able" 
                         + "thereafter",
                         counterId, shardIndex);
-      LOG.debug(message);
+      LOG.error(message);
       throw new ShardNotFoundException(message);
     }
   }

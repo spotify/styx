@@ -228,13 +228,7 @@ public class QueuedStateManager implements StateManager {
         }
 
         // Resource limiting occurs by throwing here, or by failing the commit with a conflict.
-        try {
-          updateResourceCounters(tx, event, currentRunState.get(), nextRunState);
-        } catch (Exception e) {
-          LOG.info("Failed to update resource counters. Possibly because of a concurrent counter "
-                   + "update by another workflow instance", e);
-          throw e;
-        }
+        updateResourceCounters(tx, event, currentRunState.get(), nextRunState);
 
         final SequenceEvent sequenceEvent =
             SequenceEvent.create(event, nextRunState.counter(), nextRunState.timestamp());
