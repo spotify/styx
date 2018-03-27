@@ -170,6 +170,23 @@ public class QueuedStateManagerTest {
   @Test
   public void shouldNotBeActiveAfterHalt() throws Exception {
     Optional<RunState> runState = Optional.of(
+        RunState.create(INSTANCE, State.PREPARE,
+            StateData.newBuilder().resourceIds(ImmutableSet.of()).build(), NOW, 17));
+    when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
+    when(storage.readActiveState(INSTANCE)).thenReturn(runState);
+
+    Event event = Event.halt(INSTANCE);
+    stateManager.receive(event)
+        .toCompletableFuture().get(1, MINUTES);
+
+    verify(transaction).deleteActiveState(INSTANCE);
+    verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
+  }
+
+  @Test
+  public void shouldNotFailWhenMissingResourceIdsWhenTransitionFromPrepareToError()
+      throws Exception {
+    Optional<RunState> runState = Optional.of(
         RunState.create(INSTANCE, State.PREPARE, StateData.zero(), NOW, 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
     when(storage.readActiveState(INSTANCE)).thenReturn(runState);
