@@ -113,7 +113,7 @@ public class ShardedCounter {
      */
     @Override
     public long getTotalUsage() {
-      return getShards().values().stream().mapToLong(i -> i).sum();
+      return shards.values().stream().mapToLong(i -> i).sum();
     }
 
     /**
@@ -146,7 +146,7 @@ public class ShardedCounter {
       if (delta > 0 && getTotalUsage() >= getLimit()) {
         final String message = String.format("No shard for counter %s has capacity for delta %s",
             counterId, delta);
-        LOG.debug(message);
+        LOG.info(message);
         throw new CounterCapacityException(message);
       }
 
@@ -163,7 +163,7 @@ public class ShardedCounter {
         } else {
           final String message = String.format("No shard for counter %s has capacity for delta %s",
               counterId, delta);
-          LOG.debug(message);
+          LOG.info(message);
           throw new CounterCapacityException(message);
         }
         // Or return -1 (and use that to abort the transaction early)?
@@ -255,7 +255,7 @@ public class ShardedCounter {
       } else {
         final String message = String.format("Chosen shard %s-%s has no more capacity.",
             counterId, shardIndex);
-        LOG.debug(message);
+        LOG.info(message);
         throw new CounterCapacityException(message);
       }
     } else {
@@ -265,7 +265,7 @@ public class ShardedCounter {
                         + "point, and any particular shard should strongly be get()-able"
                         + "thereafter",
               counterId, shardIndex);
-      LOG.debug(message);
+      LOG.error(message);
       throw new ShardNotFoundException(message);
     }
   }
