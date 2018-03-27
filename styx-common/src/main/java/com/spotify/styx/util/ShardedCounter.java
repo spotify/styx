@@ -107,6 +107,16 @@ public class ShardedCounter {
     }
 
     /**
+     * Returns the current value of the counter referred to by counterId, a weakly consistent
+     * estimate. (May have not truly been the counter value at any point in time. Even a return value
+     * larger than the corresponding limit might be possible without error.)
+     */
+    @Override
+    public long getTotalUsage() {
+      return getShards().values().stream().mapToLong(i -> i).sum();
+    }
+
+    /**
      * Returns shard index which _likely_ has excess usage, as per our cached view of the state in Datastore.
      */
     @Override
@@ -133,6 +143,13 @@ public class ShardedCounter {
      * cached view of the state in Datastore.
      */
     public int pickShardWithSpareCapacity(long delta) {
+      if (delta > 0 && getTotalUsage() >= getLimit()) {
+        final String message = String.format("No shard for counter %s has capacity for delta %s",
+            counterId, delta);
+        LOG.debug(message);
+        throw new CounterCapacityException(message);
+      }
+
       List<Integer> candidates = shards.keySet().stream()
           .filter(index -> Range.closed(0L, shardCapacity(index)).contains(shards.get(index) + delta))
           .collect(toList());
@@ -145,7 +162,7 @@ public class ShardedCounter {
           return new Random().nextInt((int) Math.min(NUM_SHARDS, limit));
         } else {
           final String message = String.format("No shard for counter %s has capacity for delta %s",
-                                               counterId, delta);
+              counterId, delta);
           LOG.debug(message);
           throw new CounterCapacityException(message);
         }
@@ -216,8 +233,8 @@ public class ShardedCounter {
     if (delta < 0) {
       Optional<Integer> shardIndex = snapshot.pickShardWithExcessUsage(delta);
       if (shardIndex.isPresent()) {
-        updateCounterShard(transaction, counterId, delta, shardIndex.get(), snapshot.shardCapacity
-            (shardIndex.get()));
+        updateCounterShard(transaction, counterId, delta, shardIndex.get(),
+            snapshot.shardCapacity(shardIndex.get()));
         return;
       }
     }
@@ -259,7 +276,7 @@ public class ShardedCounter {
    * larger than the corresponding limit might be possible without error.)
    */
   public long getCounter(String counterId) {
-    return getCounterSnapshot(counterId).getShards().values().stream().mapToLong(i -> i).sum();
+    return getCounterSnapshot(counterId).getTotalUsage();
   }
 
   /**

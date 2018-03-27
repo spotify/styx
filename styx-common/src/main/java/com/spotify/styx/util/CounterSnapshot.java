@@ -36,5 +36,7 @@ public interface CounterSnapshot {
 
   long getLimit();
 
+  long getTotalUsage();
+
   Optional<Integer> pickShardWithExcessUsage(long delta);
 }
