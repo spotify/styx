@@ -127,22 +127,17 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shoudIncrementCounter() {
+  public void shouldIncrementCounter() {
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
     //increment counter by 1
     updateCounterInTransaction(COUNTER_ID1, 1L);
 
     QueryResults<Entity> results = datastore.run(EntityQuery.newEntityQueryBuilder()
-                                                     .setKind(KIND_COUNTER_SHARD)
-                                                     .setFilter(CompositeFilter.and(
-                                                         PropertyFilter
-                                                             .eq(PROPERTY_COUNTER_ID,
-                                                                 COUNTER_ID1),
-                                                         PropertyFilter
-                                                             .eq(PROPERTY_SHARD_VALUE,
-                                                                 1)))
-                                                     .build());
+        .setKind(KIND_COUNTER_SHARD)
+        .setFilter(CompositeFilter.and(PropertyFilter.eq(PROPERTY_COUNTER_ID, COUNTER_ID1),
+            PropertyFilter.eq(PROPERTY_SHARD_VALUE,1)))
+        .build());
     // assert there's one and only one shard with the value set to 1
     assertEquals(1L, results.next().getLong(PROPERTY_SHARD_VALUE));
     assertFalse(results.hasNext());
@@ -157,15 +152,8 @@ public class ShardedCounterTest {
     // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
-    final int shardIndex = 3;
-    final Key shardKey = datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD)
-        .newKey(COUNTER_ID1 + "-" + shardIndex);
     //increment counter shard by 1
-    datastore.put(Entity.newBuilder(shardKey)
-                      .set(PROPERTY_COUNTER_ID, COUNTER_ID1)
-                      .set(PROPERTY_SHARD_INDEX, shardIndex)
-                      .set(PROPERTY_SHARD_VALUE, 1)
-                      .build());
+    updateShard(COUNTER_ID1,3, 1);
 
     shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
     // assert cache is updated with the new value
@@ -175,7 +163,7 @@ public class ShardedCounterTest {
     updateCounterInTransaction(COUNTER_ID1, -1L);
 
     // assert that the only eligible shard was chosen to be decremented
-    assertEquals(0L, datastore.get(shardKey).getLong(PROPERTY_SHARD_VALUE));
+    assertEquals(0L, datastore.get(getKey(COUNTER_ID1, 3)).getLong(PROPERTY_SHARD_VALUE));
 
     // assert cache is updated with the new value
     shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
@@ -294,6 +282,20 @@ public class ShardedCounterTest {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private void updateShard(String counterId, int shardIndex, long usage) {
+    final Key key = getKey(counterId, shardIndex);
+    datastore.put(Entity.newBuilder(key)
+        .set(PROPERTY_COUNTER_ID, counterId)
+        .set(PROPERTY_SHARD_INDEX, shardIndex)
+        .set(PROPERTY_SHARD_VALUE, usage)
+        .build());
+  }
+
+  private Key getKey(String counterId, int shardIndex) {
+    return datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD)
+        .newKey(counterId + "-" + shardIndex);
   }
 
   public static void clearDatastore(Datastore datastore) {
