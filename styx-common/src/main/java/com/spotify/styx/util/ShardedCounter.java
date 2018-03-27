@@ -82,9 +82,9 @@ public class ShardedCounter {
     private final Long limit;
     private final Map<Integer, Long> shards;
 
-    Snapshot(String counterId, Long limit, Map<Integer, Long> shards) {
+    Snapshot(String counterId, long limit, Map<Integer, Long> shards) {
       this.counterId = Objects.requireNonNull(counterId);
-      this.limit = Objects.requireNonNull(limit);
+      this.limit = limit;
       this.shards = Objects.requireNonNull(shards);
     }
 
