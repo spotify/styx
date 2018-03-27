@@ -277,6 +277,7 @@ public class QueuedStateManager implements StateManager {
         .collect(toSet());
 
     if (!depletedResources.isEmpty()) {
+      // FIXME: construct Resource object in order to bring back the same output as before
       final Message message = Message.info(
           String.format("Resource limit reached for: %s", depletedResources));
       if (!runState.data().message().map(message::equals).orElse(false)) {
