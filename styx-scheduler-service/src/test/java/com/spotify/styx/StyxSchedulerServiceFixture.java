@@ -21,6 +21,7 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
+import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
@@ -39,8 +40,10 @@ import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
@@ -193,6 +196,23 @@ public class StyxSchedulerServiceFixture {
     storage.storeWorkflow(workflow);
   }
 
+  void givenWorkflowAboutToTriggerWithResources(String workflowId, List<String> resources) throws
+                                                                                 IOException {
+    // storing before start causes the WorkflowInitializer not to do anything
+    final WorkflowConfiguration configuration = WorkflowConfiguration.builder()
+        .id(workflowId)
+        .schedule(Schedule.HOURS)
+        .dockerImage("busybox")
+        .dockerArgs(asList("--hour", "{}"))
+        .resources(resources)
+        .build();
+    final Workflow workflow = Workflow.create("styx", configuration);
+    givenWorkflow(workflow);
+    givenWorkflowEnabledStateIs(workflow, true);
+    givenTheTimeIs("2018-03-27T15:59:59Z");
+    givenNextNaturalTrigger(workflow, "2018-03-27T16:00:00Z");
+  }
+
   void givenNextNaturalTrigger(Workflow workflow, String nextNaturalTrigger) throws IOException {
     Instant next = Instant.parse(nextNaturalTrigger);
     Instant offset = workflow.configuration().addOffset(next);
@@ -207,6 +227,7 @@ public class StyxSchedulerServiceFixture {
 
   void givenResource(Resource resource) throws IOException {
     storage.storeResource(resource);
+    storage.updateLimitForCounter(resource.id(), resource.concurrency());
   }
 
   void workflowChanges(Workflow workflow) {
@@ -321,7 +342,7 @@ public class StyxSchedulerServiceFixture {
   private void printTime() {
     LOG.info("The time is {}", now);
   }
-  
+
   private DockerRunner fakeDockerRunner() {
     return new DockerRunner() {
       @Override
