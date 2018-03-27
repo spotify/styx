@@ -156,6 +156,7 @@ public class Scheduler {
         getResourceUsage(globalConcurrency.isPresent(), activeStates, timedOutInstances,
             resourceDecorator, workflowCache.all());
 
+    // this reflects resource usage since last tick, so a couple of minutes delay
     updateResourceStats(resources, currentResourceUsage);
 
     final List<InstanceState> eligibleInstances =
@@ -171,6 +172,14 @@ public class Scheduler {
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
     stats.recordTickDuration(TICK_TYPE, durationMillis);
+  }
+
+  private void updateResourceStats(Map<String, Resource> resources,
+                                   Map<String, Long> currentResourceUsage) {
+    resources.values().forEach(r -> stats.recordResourceConfigured(r.id(), r.concurrency()));
+    currentResourceUsage.forEach(stats::recordResourceUsed);
+    Sets.difference(resources.keySet(), currentResourceUsage.keySet())
+        .forEach(r -> stats.recordResourceUsed(r, 0));
   }
 
   private void gateAndDequeueInstances(
@@ -196,14 +205,6 @@ public class Scheduler {
         dequeueInstance(resources, workflowResourceReferences, batch.get(i), blockers.get(i));
       }
     }
-  }
-
-  private void updateResourceStats(Map<String, Resource> resources,
-                                   Map<String, Long> currentResourceUsage) {
-    resources.values().forEach(r -> stats.recordResourceConfigured(r.id(), r.concurrency()));
-    currentResourceUsage.forEach(stats::recordResourceUsed);
-    Sets.difference(resources.keySet(), currentResourceUsage.keySet())
-        .forEach(r -> stats.recordResourceUsed(r, 0));
   }
 
   private void dequeueInstance(Map<String, Resource> resources,
