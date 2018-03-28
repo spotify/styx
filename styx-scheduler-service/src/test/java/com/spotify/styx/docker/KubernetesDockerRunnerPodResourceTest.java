@@ -32,6 +32,7 @@ import static com.spotify.styx.docker.KubernetesDockerRunner.TERMINATION_LOG;
 import static com.spotify.styx.docker.KubernetesDockerRunner.TRIGGER_ID;
 import static com.spotify.styx.docker.KubernetesDockerRunner.TRIGGER_TYPE;
 import static com.spotify.styx.docker.KubernetesDockerRunner.WORKFLOW_ID;
+import static com.spotify.styx.docker.KubernetesDockerRunner.createJob;
 import static com.spotify.styx.docker.KubernetesDockerRunner.envVar;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasEntry;
@@ -46,7 +47,7 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
 import io.fabric8.kubernetes.api.model.Container;
 import io.fabric8.kubernetes.api.model.EnvVar;
-import io.fabric8.kubernetes.api.model.Pod;
+import io.fabric8.kubernetes.api.model.Job;
 import io.fabric8.kubernetes.api.model.Volume;
 import io.fabric8.kubernetes.api.model.VolumeMount;
 import java.util.List;
@@ -64,12 +65,11 @@ public class KubernetesDockerRunnerPodResourceTest {
   private static final String TEST_EXECUTION_ID = "execution_1";
 
   @Test
-  public void shouldAddLatestTag() throws Exception {
-    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
-        WORKFLOW_INSTANCE,
+  public void shouldAddLatestTag() {
+    Job job = createJob(WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
-    List<Container> containers = pod.getSpec().getContainers();
+    List<Container> containers = job.getSpec().getTemplate().getSpec().getContainers();
     assertThat(containers.size(), is(1));
 
     Container container = containers.get(0);
@@ -77,12 +77,11 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldUseConfiguredTag() throws Exception {
-    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
-        WORKFLOW_INSTANCE,
+  public void shouldUseConfiguredTag() {
+    Job job = createJob(WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox:v7"), EMPTY_SECRET_SPEC);
 
-    List<Container> containers = pod.getSpec().getContainers();
+    List<Container> containers = job.getSpec().getTemplate().getSpec().getContainers();
     assertThat(containers.size(), is(1));
 
     Container container = containers.get(0);
@@ -90,12 +89,11 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldAddArgs() throws Exception {
-    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
-        WORKFLOW_INSTANCE,
+  public void shouldAddArgs() {
+    Job job = createJob(WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox", "echo", "foo", "bar"), EMPTY_SECRET_SPEC);
 
-    List<Container> containers = pod.getSpec().getContainers();
+    List<Container> containers = job.getSpec().getTemplate().getSpec().getContainers();
     assertThat(containers.size(), is(1));
 
     Container container = containers.get(0);
@@ -103,12 +101,11 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldAddWorkflowInstanceAnnotation() throws Exception {
-    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
-        WORKFLOW_INSTANCE,
+  public void shouldAddWorkflowInstanceAnnotation() {
+    Job job = createJob(WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
-    Map<String, String> annotations = pod.getMetadata().getAnnotations();
+    Map<String, String> annotations = job.getSpec().getTemplate().getMetadata().getAnnotations();
     assertThat(annotations, hasEntry(STYX_WORKFLOW_INSTANCE_ANNOTATION, WORKFLOW_INSTANCE.toKey()));
 
     WorkflowInstance workflowInstance =
@@ -117,24 +114,22 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldDisableTerminationLoggingWhenFalse() throws Exception {
-    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
-        WORKFLOW_INSTANCE,
+  public void shouldDisableTerminationLoggingWhenFalse() {
+    Job job = createJob(WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
-    Map<String, String> annotations = pod.getMetadata().getAnnotations();
+    Map<String, String> annotations = job.getSpec().getTemplate().getMetadata().getAnnotations();
     assertThat(annotations.get(DOCKER_TERMINATION_LOGGING_ANNOTATION), is("false"));
 
-    List<Container> containers = pod.getSpec().getContainers();
+    List<Container> containers = job.getSpec().getTemplate().getSpec().getContainers();
     Optional<EnvVar> terminationLogVar = containers.get(0).getEnv().stream()
         .filter(e -> TERMINATION_LOG.equals(e.getName())).findAny();
     assertThat(terminationLogVar.get().getValue(), is("/dev/termination-log"));
   }
 
   @Test
-  public void shouldEnableTerminationLoggingWhenTrue() throws Exception {
-    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
-        WORKFLOW_INSTANCE,
+  public void shouldEnableTerminationLoggingWhenTrue() {
+    Job job = createJob(WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.builder()
             .executionId("eid")
             .imageName("busybox")
@@ -142,32 +137,38 @@ public class KubernetesDockerRunnerPodResourceTest {
             .build(),
         EMPTY_SECRET_SPEC);
 
-    Map<String, String> annotations = pod.getMetadata().getAnnotations();
+    Map<String, String> annotations = job.getSpec().getTemplate().getMetadata().getAnnotations();
     assertThat(annotations.get(DOCKER_TERMINATION_LOGGING_ANNOTATION), is("true"));
 
-    List<Container> containers = pod.getSpec().getContainers();
+    List<Container> containers = job.getSpec().getTemplate().getSpec().getContainers();
     Optional<EnvVar> terminationLogVar = containers.get(0).getEnv().stream()
         .filter(e -> TERMINATION_LOG.equals(e.getName())).findAny();
     assertThat(terminationLogVar.get().getValue(), is("/dev/termination-log"));
   }
 
   @Test
-  public void shouldHaveRestartPolicyNever() throws Exception {
-    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
-        WORKFLOW_INSTANCE,
+  public void shouldHaveRestartPolicyNever() {
+    Job job = createJob(WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
-    assertThat(pod.getSpec().getRestartPolicy(), is("Never"));
+    assertThat(job.getSpec().getTemplate().getSpec().getRestartPolicy(), is("Never"));
   }
 
   @Test
-  public void shouldNotHaveSecretsMountIfNoSecret() throws Exception {
-    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
-        WORKFLOW_INSTANCE,
+  public void shouldHaveBackoffLimitZero() {
+    Job job = createJob(WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
-    List<Volume> volumes = pod.getSpec().getVolumes();
-    List<Container> containers = pod.getSpec().getContainers();
+    assertThat(job.getSpec().getAdditionalProperties().get("backoffLimit"), is(0));
+  }
+
+  @Test
+  public void shouldNotHaveSecretsMountIfNoSecret() {
+    Job job = createJob(WORKFLOW_INSTANCE,
+        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
+
+    List<Volume> volumes = job.getSpec().getTemplate().getSpec().getVolumes();
+    List<Container> containers = job.getSpec().getTemplate().getSpec().getContainers();
     assertThat(volumes.size(), is(0));
     assertThat(containers.size(), is(1));
 
@@ -177,13 +178,12 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldConfigureSecretsMount() throws Exception {
+  public void shouldConfigureSecretsMount() {
     WorkflowConfiguration.Secret secret = WorkflowConfiguration.Secret.create("my-secret", "/etc/secrets");
     KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
         .customSecret(secret)
         .build();
-    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
-        WORKFLOW_INSTANCE,
+    Job job = createJob(WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.builder()
             .executionId("eid")
             .imageName("busybox")
@@ -191,8 +191,8 @@ public class KubernetesDockerRunnerPodResourceTest {
             .build(),
         secretSpec);
 
-    List<Volume> volumes = pod.getSpec().getVolumes();
-    List<Container> containers = pod.getSpec().getContainers();
+    List<Volume> volumes = job.getSpec().getTemplate().getSpec().getVolumes();
+    List<Container> containers = job.getSpec().getTemplate().getSpec().getContainers();
     assertThat(volumes.size(), is(1));
     assertThat(containers.size(), is(1));
 
@@ -211,9 +211,8 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldConfigureEnvironmentVariables() throws Exception {
-    final Pod pod = KubernetesDockerRunnerTestUtil.createPod(
-        WORKFLOW_INSTANCE,
+  public void shouldConfigureEnvironmentVariables() {
+    final Job job = createJob(WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.builder()
             .executionId(TEST_EXECUTION_ID)
             .imageName("busybox")
@@ -222,7 +221,7 @@ public class KubernetesDockerRunnerPodResourceTest {
             .build(),
         EMPTY_SECRET_SPEC);
 
-    final List<EnvVar> envVars = pod.getSpec().getContainers().get(0).getEnv();
+    final List<EnvVar> envVars = job.getSpec().getTemplate().getSpec().getContainers().get(0).getEnv();
 
     assertThat(envVars, hasItem(envVar(COMPONENT_ID, WORKFLOW_INSTANCE.workflowId().componentId())));
     assertThat(envVars, hasItem(envVar(WORKFLOW_ID, WORKFLOW_INSTANCE.workflowId().id())));

@@ -550,7 +550,7 @@ class KubernetesDockerRunner implements DockerRunner {
       if (!workflowInstance.isPresent()) {
         continue;
       }
-      
+
       final String executionId = getExecutionId(pod);
       final Optional<RunState> runState = lookupPodRunState(executionId, workflowInstance.get());
       if (runState.isPresent()) {
