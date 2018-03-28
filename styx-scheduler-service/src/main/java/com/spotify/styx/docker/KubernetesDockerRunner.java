@@ -54,11 +54,16 @@ import io.fabric8.kubernetes.api.model.ContainerBuilder;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.EnvVarBuilder;
+import io.fabric8.kubernetes.api.model.Job;
+import io.fabric8.kubernetes.api.model.JobBuilder;
+import io.fabric8.kubernetes.api.model.JobSpec;
+import io.fabric8.kubernetes.api.model.JobSpecBuilder;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.PodSpec;
 import io.fabric8.kubernetes.api.model.PodSpecBuilder;
+import io.fabric8.kubernetes.api.model.PodTemplateSpecBuilder;
 import io.fabric8.kubernetes.api.model.Quantity;
 import io.fabric8.kubernetes.api.model.ResourceRequirementsBuilder;
 import io.fabric8.kubernetes.api.model.Secret;
@@ -164,7 +169,9 @@ class KubernetesDockerRunner implements DockerRunner {
     final KubernetesSecretSpec secretSpec = ensureSecrets(workflowInstance, runSpec);
     stats.recordSubmission(runSpec.executionId());
     try {
-      client.pods().create(createPod(workflowInstance, runSpec, secretSpec));
+      // TODO: stop using extensions when fabric8 starts supporting job in a standard way
+      // check https://github.com/fabric8io/kubernetes-model/issues/297
+      client.extensions().jobs().create(createJob(workflowInstance, runSpec, secretSpec));
     } catch (KubernetesClientException kce) {
       throw new IOException("Failed to create Kubernetes pod", kce);
     }
@@ -220,7 +227,34 @@ class KubernetesDockerRunner implements DockerRunner {
     });
   }
 
-  static PodSpec createPodSpec(WorkflowInstance workflowInstance, RunSpec runSpec, KubernetesSecretSpec secretSpec) {
+  @VisibleForTesting
+  static Job createJob(WorkflowInstance workflowInstance, RunSpec runSpec, KubernetesSecretSpec secretSpec) {
+    final JobSpec jobSpec = new JobSpecBuilder()
+        .withTemplate(new PodTemplateSpecBuilder()
+            .withNewMetadata()
+            .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
+            .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION,
+                String.valueOf(runSpec.terminationLogging()))
+            .endMetadata()
+            .withSpec(createPodSpec(workflowInstance, runSpec, secretSpec))
+            .build())
+        .build();
+    // TODO: use builder instead
+    // check https://github.com/fabric8io/kubernetes-model/issues/297
+    jobSpec.setAdditionalProperty("backoffLimit", 0);
+
+    final Job job = new JobBuilder()
+        .withNewMetadata()
+        .withName(runSpec.executionId())
+        .endMetadata()
+        .build();
+    job.setSpec(jobSpec); // cannot use builder because it does't copy additional property
+
+    return job;
+  }
+
+  private static PodSpec createPodSpec(WorkflowInstance workflowInstance, RunSpec runSpec,
+                                       KubernetesSecretSpec secretSpec) {
     final String imageWithTag = runSpec.imageName().contains(":")
                                 ? runSpec.imageName()
                                 : runSpec.imageName() + ":latest";
@@ -286,7 +320,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static Pod createPod(WorkflowInstance workflowInstance, RunSpec runSpec, KubernetesSecretSpec secretSpec) {
     final PodBuilder podBuilder = new PodBuilder()
         .withNewMetadata()
-        .withName(runSpec.executionId())
+        .withName(runSpec.executionId() + "-randomsuffix")
         .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
         .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION,
                           String.valueOf(runSpec.terminationLogging()))

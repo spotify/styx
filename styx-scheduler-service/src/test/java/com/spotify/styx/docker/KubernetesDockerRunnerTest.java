@@ -26,6 +26,7 @@ import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminate
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.waiting;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyListOf;
 import static org.mockito.Mockito.never;
@@ -49,13 +50,15 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Debug;
-import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.Time;
 import io.fabric8.kubernetes.api.model.ContainerState;
 import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
+import io.fabric8.kubernetes.api.model.DoneableJob;
 import io.fabric8.kubernetes.api.model.DoneablePod;
 import io.fabric8.kubernetes.api.model.DoneableSecret;
+import io.fabric8.kubernetes.api.model.Job;
+import io.fabric8.kubernetes.api.model.JobList;
 import io.fabric8.kubernetes.api.model.ListMeta;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
@@ -74,6 +77,7 @@ import io.fabric8.kubernetes.client.Watcher;
 import io.fabric8.kubernetes.client.dsl.MixedOperation;
 import io.fabric8.kubernetes.client.dsl.PodResource;
 import io.fabric8.kubernetes.client.dsl.Resource;
+import io.fabric8.kubernetes.client.dsl.ScalableResource;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -137,40 +141,43 @@ public class KubernetesDockerRunnerTest {
   private static final int POD_DELETION_DELAY_SECONDS = 120;
   private static final Instant FIXED_INSTANT = Instant.parse("2017-09-01T01:00:00Z");
 
-  @Mock NamespacedKubernetesClient k8sClient;
-  @Mock KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
-  @Mock MixedOperation<Pod, PodList, DoneablePod, PodResource<Pod, DoneablePod>> pods;
-  @Mock MixedOperation<Secret, SecretList, DoneableSecret, Resource<Secret, DoneableSecret>> secrets;
-  @Mock Resource<Secret, DoneableSecret> namedResource;
-  @Mock PodResource<Pod, DoneablePod> namedPod;
-  @Mock PodList podList;
-  @Mock PodStatus podStatus;
-  @Mock ContainerStatus containerStatus;
-  @Mock ContainerState containerState;
-  @Mock ContainerStateTerminated containerStateTerminated;
-  @Mock ListMeta listMeta;
-  @Mock Watch watch;
-  @Mock Debug debug;
-  @Mock Time time;
-  @Mock StateManager stateManager;
+  @Mock(answer = RETURNS_DEEP_STUBS) private NamespacedKubernetesClient k8sClient;
+  @Mock private KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
+  @Mock private MixedOperation<Pod, PodList, DoneablePod, PodResource<Pod, DoneablePod>> pods;
+  @Mock private MixedOperation<Job, JobList, DoneableJob, ScalableResource<Job, DoneableJob>> jobs;
+  @Mock private MixedOperation<Secret, SecretList, DoneableSecret, Resource<Secret, DoneableSecret>> secrets;
+  @Mock private Resource<Secret, DoneableSecret> namedResource;
+  @Mock private PodResource<Pod, DoneablePod> namedPod;
+  @Mock private PodList podList;
+  @Mock private PodStatus podStatus;
+  @Mock private ContainerStatus containerStatus;
+  @Mock private ContainerState containerState;
+  @Mock private ContainerStateTerminated containerStateTerminated;
+  @Mock private ListMeta listMeta;
+  @Mock private Watch watch;
+  @Mock private Debug debug;
+  @Mock private Time time;
+  @Mock private StateManager stateManager;
 
-  @Captor ArgumentCaptor<Watcher<Pod>> watchCaptor;
-  @Captor ArgumentCaptor<Pod> podCaptor;
+  @Captor private ArgumentCaptor<Watcher<Pod>> watchCaptor;
+  @Captor private ArgumentCaptor<Pod> podCaptor;
+  @Captor private ArgumentCaptor<Job> jobCaptor;
 
   @Rule public ExpectedException exception = ExpectedException.none();
 
-  Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, EMPTY_SECRET_SPEC);
-  Stats stats = Mockito.mock(Stats.class);
+  private Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, EMPTY_SECRET_SPEC);
+  private Stats stats = Mockito.mock(Stats.class);
 
-  KubernetesDockerRunner kdr;
-  Watcher<Pod> podWatcher;
+  private KubernetesDockerRunner kdr;
+  private Watcher<Pod> podWatcher;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     when(debug.get()).thenReturn(false);
 
     when(k8sClient.inNamespace(any(String.class))).thenReturn(k8sClient);
     when(k8sClient.pods()).thenReturn(pods);
+    when(k8sClient.extensions().jobs()).thenReturn(jobs);
 
     when(pods.list()).thenReturn(podList);
     when(podList.getItems()).thenReturn(ImmutableList.of(createdPod));
@@ -210,24 +217,25 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldUseExecutionIdForPodName() throws IOException, IsClosedException {
+  public void shouldUseExecutionIdForJobName() throws IOException {
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
-    verify(pods).create(podCaptor.capture());
-    Pod submittedPod = podCaptor.getValue();
-    assertThat(submittedPod.getMetadata().getName(), is(RUN_SPEC.executionId()));
+    verify(jobs).create(jobCaptor.capture());
+    Job submittedJob = jobCaptor.getValue();
+    assertThat(submittedJob.getMetadata().getName(), is(RUN_SPEC.executionId()));
   }
 
   @Test
-  public void shouldCreateSingleContainerNamedByExecutionId() throws IOException, IsClosedException {
+  public void shouldCreateSingleContainerNamedByExecutionId() throws IOException {
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
-    verify(pods).create(podCaptor.capture());
-    Pod submittedPod = podCaptor.getValue();
-    assertThat(submittedPod.getSpec().getContainers().size(), is(1));
-    assertThat(submittedPod.getSpec().getContainers().get(0).getName(), is(RUN_SPEC.executionId()));
+    verify(jobs).create(jobCaptor.capture());
+    Job submittedJob = jobCaptor.getValue();
+    assertThat(submittedJob.getSpec().getTemplate().getSpec().getContainers().size(), is(1));
+    assertThat(submittedJob.getSpec().getTemplate().getSpec().getContainers().get(0).getName(),
+        is(RUN_SPEC.executionId()));
   }
 
   @Test
-  public void shouldNotDeletePodIfDebugEnabled() throws Exception {
+  public void shouldNotDeletePodIfDebugEnabled() {
     when(debug.get()).thenReturn(true);
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
@@ -434,7 +442,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test(expected = InvalidExecutionException.class)
-  public void shouldThrowIfSecretNotExist() throws IOException, IsClosedException {
+  public void shouldThrowIfSecretNotExist() throws IOException {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(null);
     when(k8sClient.secrets()).thenReturn(secrets);
@@ -443,7 +451,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test(expected = InvalidExecutionException.class)
-  public void shouldThrowIfMountToReservedPath() throws IOException, IsClosedException {
+  public void shouldThrowIfMountToReservedPath() throws IOException {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(null);
     when(k8sClient.secrets()).thenReturn(secrets);
@@ -452,7 +460,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldMountSecret() throws IOException, IsClosedException {
+  public void shouldMountSecret() {
     final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET,
         SECRET_SPEC_WITH_CUSTOM_SECRET);
     assertThat(pod.getSpec().getVolumes().size(), is(1));
@@ -465,7 +473,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldMountServiceAccount() throws IOException, IsClosedException {
+  public void shouldMountServiceAccount() {
     final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, SECRET_SPEC_WITH_SA);
     assertThat(pod.getSpec().getVolumes().size(), is(1));
     assertThat(pod.getSpec().getVolumes().get(0).getName(),
@@ -479,7 +487,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldConfigureResourceRequirements() throws IOException, IsClosedException {
+  public void shouldConfigureResourceRequirements() {
     final String memRequest = "17Mi";
     final String memLimit = "4711Mi";
     final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RunSpec.builder()
@@ -497,14 +505,14 @@ public class KubernetesDockerRunnerTest {
 
 
   @Test
-  public void shouldRunIfSecretExists() throws IOException, IsClosedException {
+  public void shouldRunIfSecretExists() throws IOException {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(new SecretBuilder().build());
     when(k8sClient.secrets()).thenReturn(secrets);
 
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET);
 
-    verify(pods).create(podCaptor.capture());
+    verify(jobs).create(jobCaptor.capture());
   }
 
   @Test
@@ -514,7 +522,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldEnsureAndMountServiceAccountSecret() throws IsClosedException, IOException {
+  public void shouldEnsureAndMountServiceAccountSecret() throws IOException {
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(null);
     when(k8sClient.secrets()).thenReturn(secrets);
@@ -527,11 +535,12 @@ public class KubernetesDockerRunnerTest {
     verify(serviceAccountSecretManager).ensureServiceAccountKeySecret(
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT);
 
-    verify(pods).create(podCaptor.capture());
+    verify(jobs).create(jobCaptor.capture());
 
-    final Pod pod = podCaptor.getValue();
+    final Job job = jobCaptor.getValue();
 
-    final Optional<SecretVolumeSource> serviceAccountSecretVolume = pod.getSpec().getVolumes().stream()
+    final Optional<SecretVolumeSource> serviceAccountSecretVolume = job.getSpec()
+        .getTemplate().getSpec().getVolumes().stream()
         .map(Volume::getSecret)
         .filter(Objects::nonNull)
         .filter(v -> SERVICE_ACCOUNT_SECRET.equals(v.getSecretName()))
@@ -541,7 +550,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldNotRunIfServiceAccountSecretEnsureFails() throws IsClosedException, IOException {
+  public void shouldNotRunIfServiceAccountSecretEnsureFails() throws IOException {
     final InvalidExecutionException error = new InvalidExecutionException("SA not found");
     when(serviceAccountSecretManager.ensureServiceAccountKeySecret(
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT)).thenThrow(error);
@@ -552,8 +561,8 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldNotRunIfSecretHasManagedServiceAccountKeySecretNamePrefix() throws
-                                                                                IsClosedException, IOException {
+  public void shouldNotRunIfSecretHasManagedServiceAccountKeySecretNamePrefix()
+      throws IOException {
     final String secret = "styx-wf-sa-keys-foo";
 
     exception.expect(InvalidExecutionException.class);
@@ -595,7 +604,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldNotSendStatsOnOtherError() throws Exception {
+  public void shouldNotSendStatsOnOtherError() {
     createdPod.setStatus(podStatusNoContainer("Succeeded"));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
