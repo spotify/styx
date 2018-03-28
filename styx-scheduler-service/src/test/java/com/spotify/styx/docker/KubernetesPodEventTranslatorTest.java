@@ -20,6 +20,7 @@
 
 package com.spotify.styx.docker;
 
+import static com.google.common.collect.Lists.newArrayList;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
 import static java.util.Collections.emptyList;
 import static org.hamcrest.Matchers.contains;
@@ -334,7 +335,7 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   static PodStatus podStatusNoContainer(String phase) {
-    return new PodStatus(emptyList(), emptyList(), "",
+    return new PodStatus(emptyList(), newArrayList(), "",
         emptyList(), "", phase, "", "", "", "");
   }
 
