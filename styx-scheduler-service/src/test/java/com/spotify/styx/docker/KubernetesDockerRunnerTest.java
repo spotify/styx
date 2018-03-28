@@ -107,7 +107,8 @@ public class KubernetesDockerRunnerTest {
   private static final String SERVICE_ACCOUNT = "sa@example.com";
   private static final String SERVICE_ACCOUNT_SECRET = "sa-secret";
   private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(TestData.WORKFLOW_ID, "foo");
-  private static final RunSpec RUN_SPEC = RunSpec.simple("eid0", "busybox");
+  private static final String EXECUTION_ID = "eid0";
+  private static final RunSpec RUN_SPEC = RunSpec.simple(EXECUTION_ID, "busybox");
   private static final RunSpec RUN_SPEC_WITH_SECRET = RunSpec.builder()
       .executionId("eid1")
       .imageName("busybox")
@@ -148,6 +149,7 @@ public class KubernetesDockerRunnerTest {
   @Mock private MixedOperation<Secret, SecretList, DoneableSecret, Resource<Secret, DoneableSecret>> secrets;
   @Mock private Resource<Secret, DoneableSecret> namedResource;
   @Mock private PodResource<Pod, DoneablePod> namedPod;
+  @Mock private ScalableResource<Job, DoneableJob> namedJob;
   @Mock private PodList podList;
   @Mock private PodStatus podStatus;
   @Mock private ContainerStatus containerStatus;
@@ -160,7 +162,6 @@ public class KubernetesDockerRunnerTest {
   @Mock private StateManager stateManager;
 
   @Captor private ArgumentCaptor<Watcher<Pod>> watchCaptor;
-  @Captor private ArgumentCaptor<Pod> podCaptor;
   @Captor private ArgumentCaptor<Job> jobCaptor;
 
   @Rule public ExpectedException exception = ExpectedException.none();
@@ -205,7 +206,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.getMetadata().setName(POD_NAME);
     createdPod.getMetadata().setResourceVersion("1001");
 
-    StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
+    StateData stateData = StateData.newBuilder().executionId(EXECUTION_ID).build();
     RunState runState = RunState.create(WORKFLOW_INSTANCE, State.SUBMITTED, stateData);
 
     when(stateManager.getActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
@@ -213,7 +214,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @After
-  public void tearDown() throws Exception {
+  public void tearDown() {
     kdr.close();
   }
 
@@ -238,9 +239,6 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldNotDeletePodIfDebugEnabled() {
     when(debug.get()).thenReturn(true);
-    final String name = createdPod.getMetadata().getName();
-    when(k8sClient.pods().withName(name)).thenReturn(namedPod);
-    when(namedPod.get()).thenReturn(createdPod);
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
@@ -251,7 +249,7 @@ public class KubernetesDockerRunnerTest {
     when(containerStateTerminated.getFinishedAt())
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(5)).toString());
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod.getMetadata().getName(), createdPod);
     verify(k8sClient.pods(), never()).delete(any(Pod.class));
     verify(k8sClient.pods(), never()).delete(any(Pod[].class));
     verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
@@ -260,10 +258,8 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldCleanupPodAfterNonDeletePeriod() {
-    final String name = createdPod.getMetadata().getName();
-    when(k8sClient.pods().withName(name)).thenReturn(namedPod);
-    when(namedPod.get()).thenReturn(createdPod);
+  public void shouldNotDeleteJobfDebugEnabled() {
+    when(debug.get()).thenReturn(true);
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
@@ -274,15 +270,54 @@ public class KubernetesDockerRunnerTest {
     when(containerStateTerminated.getFinishedAt())
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(5)).toString());
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, getJobName(createdPod), createdPod);
+    verify(k8sClient.extensions().jobs(), never()).delete(any(Job.class));
+    verify(k8sClient.extensions().jobs(), never()).delete(any(Job[].class));
+    verify(k8sClient.extensions().jobs(), never()).delete(anyListOf(Job.class));
+    verify(k8sClient.extensions().jobs(), never()).delete();
+    verify(namedJob, never()).delete();
+  }
+
+  @Test
+  public void shouldCleanupPodAfterNonDeletePeriod() {
+    final String name = createdPod.getMetadata().getName();
+    when(k8sClient.pods().withName(name)).thenReturn(namedPod);
+
+    // inject mock status in real instance
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
+    when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
+    when(containerStatus.getState()).thenReturn(containerState);
+    when(containerState.getTerminated()).thenReturn(containerStateTerminated);
+    when(containerStateTerminated.getFinishedAt())
+        .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(5)).toString());
+
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name, createdPod);
     verify(namedPod).delete();
+  }
+
+  @Test
+  public void shouldCleanupJobAfterNonDeletePeriod() {
+    final String name = getJobName(createdPod);
+    when(k8sClient.extensions().jobs().withName(name)).thenReturn(namedJob);
+
+    // inject mock status in real instance
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
+    when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
+    when(containerStatus.getState()).thenReturn(containerState);
+    when(containerState.getTerminated()).thenReturn(containerStateTerminated);
+    when(containerStateTerminated.getFinishedAt())
+        .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(5)).toString());
+
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name, createdPod);
+    verify(namedJob).delete();
   }
 
   @Test
   public void shouldCleanupPodWhenMissingFinishedAt() {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
-    when(namedPod.get()).thenReturn(createdPod);
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
@@ -291,41 +326,79 @@ public class KubernetesDockerRunnerTest {
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name, createdPod);
     verify(namedPod).delete();
   }
+
+  @Test
+  public void shouldCleanupJobWhenMissingFinishedAt() {
+    final String name = getJobName(createdPod);
+    when(k8sClient.extensions().jobs().withName(name)).thenReturn(namedJob);
+
+    // inject mock status in real instance
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
+    when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
+    when(containerStatus.getState()).thenReturn(containerState);
+    when(containerState.getTerminated()).thenReturn(containerStateTerminated);
+
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name, createdPod);
+    verify(namedJob).delete();
+  }
+
 
   @Test
   public void shouldCleanupPodWhenMissingContainerStatus() {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
-    when(namedPod.get()).thenReturn(createdPod);
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name, createdPod);
     verify(namedPod).delete();
+  }
+
+  @Test
+  public void shouldCleanupJobWhenMissingContainerStatus() {
+    final String name = getJobName(createdPod);
+    when(k8sClient.extensions().jobs().withName(name)).thenReturn(namedJob);
+
+    // inject mock status in real instance
+    createdPod.setStatus(podStatus);
+
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name, createdPod);
+    verify(namedJob).delete();
   }
 
   @Test
   public void shouldCleanupPodWhenPullImageError() {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
-    when(namedPod.get()).thenReturn(createdPod);
 
     // inject mock status in real instance
     createdPod.setStatus(waiting("Pending", "ErrImagePull"));
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name, createdPod);
     verify(namedPod).delete();
+  }
+
+  @Test
+  public void shouldCleanupJobWhenPullImageError() {
+    final String name = getJobName(createdPod);
+    when(k8sClient.extensions().jobs().withName(name)).thenReturn(namedJob);
+
+    // inject mock status in real instance
+    createdPod.setStatus(waiting("Pending", "ErrImagePull"));
+
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name, createdPod);
+    verify(namedJob).delete();
   }
 
   @Test
   public void shouldNotCleanupPodBeforeNonDeletePeriod() {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
-    when(namedPod.get()).thenReturn(createdPod);
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
@@ -336,15 +409,32 @@ public class KubernetesDockerRunnerTest {
     when(containerStateTerminated.getFinishedAt())
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(1)).toString());
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name, createdPod);
     verify(namedPod, never()).delete();
+  }
+
+  @Test
+  public void shouldNotCleanupJobBeforeNonDeletePeriod() {
+    final String name = getJobName(createdPod);
+    when(k8sClient.extensions().jobs().withName(name)).thenReturn(namedJob);
+
+    // inject mock status in real instance
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
+    when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
+    when(containerStatus.getState()).thenReturn(containerState);
+    when(containerState.getTerminated()).thenReturn(containerStateTerminated);
+    when(containerStateTerminated.getFinishedAt())
+        .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(1)).toString());
+
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name, createdPod);
+    verify(namedJob, never()).delete();
   }
 
   @Test
   public void shouldNotCleanupPodIfNotTerminated() {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
-    when(namedPod.get()).thenReturn(createdPod);
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
@@ -352,15 +442,29 @@ public class KubernetesDockerRunnerTest {
     when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name, createdPod);
     verify(namedPod, never()).delete();
+  }
+
+  @Test
+  public void shouldNotCleanupJobIfNotTerminated() {
+    final String name = getJobName(createdPod);
+    when(k8sClient.extensions().jobs().withName(name)).thenReturn(namedJob);
+
+    // inject mock status in real instance
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
+    when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
+    when(containerStatus.getState()).thenReturn(containerState);
+
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name, createdPod);
+    verify(namedJob, never()).delete();
   }
 
   @Test
   public void shouldNotCleanupNonStyxPod() {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
-    when(namedPod.get()).thenReturn(createdPod);
 
     createdPod.getMetadata().setAnnotations(Collections.emptyMap());
 
@@ -368,15 +472,29 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name, createdPod);
     verify(namedPod, never()).delete();
+  }
+
+  @Test
+  public void shouldNotCleanupNonStyxJob() {
+    final String name = getJobName(createdPod);
+    when(k8sClient.extensions().jobs().withName(name)).thenReturn(namedJob);
+
+    createdPod.getMetadata().setAnnotations(Collections.emptyMap());
+
+    // inject mock status in real instance
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
+
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name, createdPod);
+    verify(namedJob, never()).delete();
   }
 
   @Test
   public void shouldNotCleanupNonStyxPodWithoutRunState() {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
-    when(namedPod.get()).thenReturn(createdPod);
 
     createdPod.getMetadata().setAnnotations(Collections.emptyMap());
 
@@ -384,15 +502,29 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
 
-    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name, createdPod);
     verify(namedPod, never()).delete();
+  }
+
+  @Test
+  public void shouldNotCleanupNonStyxJobWithoutRunState() {
+    final String name = getJobName(createdPod);
+    when(k8sClient.extensions().jobs().withName(name)).thenReturn(namedJob);
+
+    createdPod.getMetadata().setAnnotations(Collections.emptyMap());
+
+    // inject mock status in real instance
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
+
+    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name, createdPod);
+    verify(namedJob, never()).delete();
   }
 
   @Test
   public void shouldCleanupPodWithoutRunStateIfNotTerminated() {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
-    when(namedPod.get()).thenReturn(createdPod);
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
@@ -400,15 +532,29 @@ public class KubernetesDockerRunnerTest {
     when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
 
-    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name, createdPod);
     verify(namedPod).delete();
+  }
+
+  @Test
+  public void shouldCleanupJobWithoutRunStateIfNotTerminated() {
+    final String name = getJobName(createdPod);
+    when(k8sClient.extensions().jobs().withName(name)).thenReturn(namedJob);
+
+    // inject mock status in real instance
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
+    when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
+    when(containerStatus.getState()).thenReturn(containerState);
+
+    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name, createdPod);
+    verify(namedJob).delete();
   }
 
   @Test
   public void shouldNotCleanupPodWithoutRunStateBeforeNonDeletePeriod() {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
-    when(namedPod.get()).thenReturn(createdPod);
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
@@ -419,15 +565,32 @@ public class KubernetesDockerRunnerTest {
     when(containerStateTerminated.getFinishedAt())
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(1)).toString());
 
-    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name, createdPod);
     verify(namedPod, never()).delete();
+  }
+
+  @Test
+  public void shouldNotCleanupJobWithoutRunStateBeforeNonDeletePeriod() {
+    final String name = getJobName(createdPod);
+    when(k8sClient.extensions().jobs().withName(name)).thenReturn(namedJob);
+
+    // inject mock status in real instance
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
+    when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
+    when(containerStatus.getState()).thenReturn(containerState);
+    when(containerState.getTerminated()).thenReturn(containerStateTerminated);
+    when(containerStateTerminated.getFinishedAt())
+        .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(1)).toString());
+
+    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name, createdPod);
+    verify(namedJob, never()).delete();
   }
 
   @Test
   public void shouldCleanupPodWithoutRunStateAfterNonDeletePeriod() {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
-    when(namedPod.get()).thenReturn(createdPod);
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
@@ -438,8 +601,26 @@ public class KubernetesDockerRunnerTest {
     when(containerStateTerminated.getFinishedAt())
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(5)).toString());
 
-    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name, createdPod);
     verify(namedPod).delete();
+  }
+
+  @Test
+  public void shouldCleanupJobWithoutRunStateAfterNonDeletePeriod() {
+    final String name = getJobName(createdPod);
+    when(k8sClient.extensions().jobs().withName(name)).thenReturn(namedJob);
+
+    // inject mock status in real instance
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
+    when(containerStatus.getName()).thenReturn(CONTAINER_NAME);
+    when(containerStatus.getState()).thenReturn(containerState);
+    when(containerState.getTerminated()).thenReturn(containerStateTerminated);
+    when(containerStateTerminated.getFinishedAt())
+        .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(5)).toString());
+
+    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name, createdPod);
+    verify(namedJob).delete();
   }
 
   @Test(expected = InvalidExecutionException.class)
@@ -648,8 +829,8 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldGenerateStartedAndRecordSubmitToRunningTimeWhenContainerIsReady() throws Exception {
     when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(17));
-    kdr.start(WORKFLOW_INSTANCE, RunSpec.simple(POD_NAME, "busybox"));
-    verify(stats).recordSubmission(POD_NAME);
+    kdr.start(WORKFLOW_INSTANCE, RunSpec.simple(EXECUTION_ID, "busybox"));
+    verify(stats).recordSubmission(EXECUTION_ID);
 
     when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(18));
 
@@ -663,7 +844,7 @@ public class KubernetesDockerRunnerTest {
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
     verify(stateManager).receive(Event.started(WORKFLOW_INSTANCE));
 
-    verify(stats).recordRunning(POD_NAME);
+    verify(stats).recordRunning(EXECUTION_ID);
   }
 
   @Test
@@ -671,7 +852,7 @@ public class KubernetesDockerRunnerTest {
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
 
     // simulate event from different pod, but still with the same workflow instance annotation
-    createdPod.getMetadata().setName(POD_NAME + "-other");
+    createdPod.getMetadata().getLabels().put("job-name", "another-job");
     createdPod.setStatus(terminated("Succeeded", 20, null));
 
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
@@ -681,8 +862,6 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldPollPodStatusAndEmitEventsOnRestore() throws Exception {
-    when(k8sClient.pods().withName(createdPod.getMetadata().getName())).thenReturn(namedPod);
-
     // Stop the runner and change the pod status to terminated while styx is "down"
     kdr.close();
     createdPod.setStatus(terminated("Succeeded", 20, null));
@@ -701,8 +880,6 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldRegularlyPollPodStatusAndEmitEvents() throws Exception {
-    when(k8sClient.pods().withName(createdPod.getMetadata().getName())).thenReturn(namedPod);
-
     createdPod.setStatus(running(/* ready= */ true));
 
     // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
@@ -720,5 +897,9 @@ public class KubernetesDockerRunnerTest {
 
     // Verify that the runner eventually polls and finds out that the pod is terminated
     verify(stateManager, timeout(30_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)));
+  }
+
+  private static String getJobName(final Pod pod) {
+    return pod.getMetadata().getLabels().get("job-name");
   }
 }

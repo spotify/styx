@@ -92,7 +92,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
@@ -347,53 +346,64 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   @VisibleForTesting
-  void cleanupWithRunState(WorkflowInstance workflowInstance, String executionId) {
-    cleanup(workflowInstance, executionId, pod ->
+  void cleanupWithRunState(WorkflowInstance workflowInstance, String executionId, Pod pod) {
+    cleanup(workflowInstance, executionId, pod, () ->
         getStyxContainer(pod).ifPresent(containerStatus -> {
+          final String podName = pod.getMetadata().getName();
           if (hasPullImageError(containerStatus)) {
-            deletePod(workflowInstance, executionId);
+            if (!podName.equals(executionId)) {
+              deleteJob(workflowInstance, executionId);
+            } else { // TODO: delete after graceful rollout
+              deletePod(workflowInstance, podName);
+            }
           } else {
             if (containerStatus.getState().getTerminated() != null) {
-              deletePodIfNonDeletePeriodExpired(workflowInstance, executionId, containerStatus);
+              if (!podName.equals(executionId)) {
+                deleteJobIfNonDeletePeriodExpired(workflowInstance, executionId, containerStatus);
+              } else { // TODO: delete after graceful rollout
+                deletePodIfNonDeletePeriodExpired(workflowInstance, podName, containerStatus);
+              }
             }
           }
         }));
   }
 
   @VisibleForTesting
-  void cleanupWithoutRunState(WorkflowInstance workflowInstance, String executionId) {
-    cleanup(workflowInstance, executionId, pod ->
+  void cleanupWithoutRunState(WorkflowInstance workflowInstance, String executionId, Pod pod) {
+    cleanup(workflowInstance, executionId, pod, () ->
         getStyxContainer(pod).ifPresent(containerStatus -> {
+          final String podName = pod.getMetadata().getName();
           if (containerStatus.getState().getTerminated() != null) {
-            deletePodIfNonDeletePeriodExpired(workflowInstance, executionId, containerStatus);
+            if (!podName.equals(executionId)) {
+              deleteJobIfNonDeletePeriodExpired(workflowInstance, executionId, containerStatus);
+            } else { // TODO: delete after graceful rollout
+              deletePodIfNonDeletePeriodExpired(workflowInstance, podName, containerStatus);
+            }
           } else {
             // if not terminated, delete it directly
-            deletePod(workflowInstance, executionId);
+            if (!podName.equals(executionId)) {
+              deleteJob(workflowInstance, executionId);
+            } else { // TODO: delete after graceful rollout
+              deletePod(workflowInstance, podName);
+            }
           }
         }));
   }
 
-  private void deletePodIfNonDeletePeriodExpired(WorkflowInstance workflowInstance,
-                                                 String executionId,
-                                                 ContainerStatus containerStatus) {
-    if (isNonDeletePeriodExpired(containerStatus)) {
-      // if terminated and after graceful period, delete the pod
-      // otherwise wait until next polling happens
-      deletePod(workflowInstance, executionId);
-    }
-  }
-
   private void cleanup(WorkflowInstance workflowInstance, String executionId,
-                       Consumer<Pod> cleaner) {
-    Optional.ofNullable(client.pods().withName(executionId).get()).ifPresent(pod -> {
-      final List<ContainerStatus> containerStatuses = pod.getStatus().getContainerStatuses();
-      if (!containerStatuses.isEmpty()) {
-        cleaner.accept(pod);
+                       Pod pod, Runnable cleaner) {
+    final List<ContainerStatus> containerStatuses = pod.getStatus().getContainerStatuses();
+    if (!containerStatuses.isEmpty()) {
+      cleaner.run();
+    } else {
+      // for some cases such as evicted pod, there is no container status, so we delete directly
+      final String podName = pod.getMetadata().getName();
+      if (!podName.equals(executionId)) {
+        deleteJob(workflowInstance, executionId);
       } else {
-        // for some cases such as evicted pod, there is no container status, so we delete directly
-        deletePod(workflowInstance, executionId);
+        deletePod(workflowInstance, podName);
       }
-    });
+    }
   }
 
   static Optional<ContainerStatus> getStyxContainer(Pod pod) {
@@ -409,17 +419,48 @@ class KubernetesDockerRunner implements DockerRunner {
         .orElse(true);
   }
 
-  private void deletePod(WorkflowInstance workflowInstance, String executionId) {
+  private void deleteJobIfNonDeletePeriodExpired(WorkflowInstance workflowInstance,
+                                                 String jobName,
+                                                 ContainerStatus containerStatus) {
+    if (isNonDeletePeriodExpired(containerStatus)) {
+      // if terminated and after graceful period, delete the pod
+      // otherwise wait until next polling happens
+      deleteJob(workflowInstance, jobName);
+    }
+  }
+
+  private void deleteJob(WorkflowInstance workflowInstance, String jobName) {
     if (!debug.get()) {
-      client.pods().withName(executionId).delete();
-      LOG.info("Cleaned up {} pod: {}", workflowInstance.toKey(), executionId);
+      client.extensions().jobs().withName(jobName).delete();
+      LOG.info("Cleaned up {} job: {}", workflowInstance.toKey(), jobName);      
     } else {
-      LOG.info("Keeping {} pod: {}", workflowInstance.toKey(), executionId);
+      LOG.info("Keeping {} job: {}", workflowInstance.toKey(), jobName);
+    }
+  }
+
+  // TODO: delete after graceful rollout
+  private void deletePodIfNonDeletePeriodExpired(WorkflowInstance workflowInstance,
+                                                 String podName,
+                                                 ContainerStatus containerStatus) {
+    if (isNonDeletePeriodExpired(containerStatus)) {
+      // if terminated and after graceful period, delete the pod
+      // otherwise wait until next polling happens
+      deletePod(workflowInstance, podName);
+    }
+  }
+
+  // TODO: delete after graceful rollout
+  private void deletePod(WorkflowInstance workflowInstance, String podName) {
+    if (!debug.get()) {
+      client.pods().withName(podName).delete();
+      LOG.info("Cleaned up {} pod: {}", workflowInstance.toKey(), podName);
+    } else {
+      LOG.info("Keeping {} pod: {}", workflowInstance.toKey(), podName);
     }
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     if (watch != null) {
       watch.close();
     }
@@ -509,14 +550,22 @@ class KubernetesDockerRunner implements DockerRunner {
       if (!workflowInstance.isPresent()) {
         continue;
       }
-      final Optional<RunState> runState = lookupPodRunState(pod, workflowInstance.get());
+      
+      final String executionId = getExecutionId(pod);
+      final Optional<RunState> runState = lookupPodRunState(executionId, workflowInstance.get());
       if (runState.isPresent()) {
         emitPodEvents(Watcher.Action.MODIFIED, pod, runState.get());
-        cleanupWithRunState(workflowInstance.get(), pod.getMetadata().getName());
+        cleanupWithRunState(workflowInstance.get(), executionId, pod);
       } else {
-        cleanupWithoutRunState(workflowInstance.get(), pod.getMetadata().getName());
+        cleanupWithoutRunState(workflowInstance.get(), executionId, pod);
       }
     }
+  }
+  
+  private static String getExecutionId(Pod pod) {
+    return Optional.of(pod.getMetadata().getLabels())
+        .flatMap((x -> Optional.of(x.get("job-name"))))
+        .orElse(pod.getMetadata().getName());
   }
 
   private static Optional<WorkflowInstance> readPodWorkflowInstance(Pod pod) {
@@ -533,9 +582,8 @@ class KubernetesDockerRunner implements DockerRunner {
     return Optional.of(workflowInstance);
   }
 
-  private Optional<RunState> lookupPodRunState(Pod pod, WorkflowInstance workflowInstance) {
-    final String podName = pod.getMetadata().getName();
-
+  private Optional<RunState> lookupPodRunState(String executionIdFromPod,
+                                               WorkflowInstance workflowInstance) {
     final Optional<RunState> runState = stateManager.getActiveState(workflowInstance);
     if (!runState.isPresent()) {
       LOG.debug("Pod event for unknown or inactive workflow instance {}", workflowInstance);
@@ -544,14 +592,14 @@ class KubernetesDockerRunner implements DockerRunner {
 
     final Optional<String> executionIdOpt = runState.get().data().executionId();
     if (!executionIdOpt.isPresent()) {
-      LOG.debug("Pod event for state with no current executionId: {}", podName);
+      LOG.debug("Pod event for state with no current executionId: {}", executionIdFromPod);
       return Optional.empty();
     }
 
     final String executionId = executionIdOpt.get();
-    if (!podName.equals(executionId)) {
+    if (!executionIdFromPod.equals(executionId)) {
       LOG.debug("Pod event not matching current exec id, current:{} != pod:{}",
-          executionId, podName);
+          executionId, executionIdFromPod);
       return Optional.empty();
     }
 
@@ -611,7 +659,7 @@ class KubernetesDockerRunner implements DockerRunner {
       logEvent(action, pod, pod.getMetadata().getResourceVersion(), false);
 
       readPodWorkflowInstance(pod)
-          .flatMap(workflowInstance -> lookupPodRunState(pod, workflowInstance))
+          .flatMap(workflowInstance -> lookupPodRunState(getExecutionId(pod), workflowInstance))
           .ifPresent(runState -> emitPodEvents(action, pod, runState));
     }
 
