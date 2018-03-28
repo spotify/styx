@@ -163,6 +163,14 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
+  public void shouldHaveCorrectJobName() {
+    Job job = createJob(WORKFLOW_INSTANCE,
+        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
+
+    assertThat(job.getMetadata().getName(), is("eid"));
+  }
+
+  @Test
   public void shouldNotHaveSecretsMountIfNoSecret() {
     Job job = createJob(WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
