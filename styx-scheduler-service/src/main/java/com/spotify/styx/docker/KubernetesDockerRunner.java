@@ -563,8 +563,8 @@ class KubernetesDockerRunner implements DockerRunner {
   }
   
   private static String getExecutionId(Pod pod) {
-    return Optional.of(pod.getMetadata().getLabels())
-        .flatMap((x -> Optional.of(x.get("job-name"))))
+    return Optional.ofNullable(pod.getMetadata().getLabels())
+        .flatMap((x -> Optional.ofNullable(x.get("job-name"))))
         .orElse(pod.getMetadata().getName());
   }
 
