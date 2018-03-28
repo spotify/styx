@@ -171,7 +171,7 @@ class KubernetesDockerRunner implements DockerRunner {
       // check https://github.com/fabric8io/kubernetes-model/issues/297
       client.extensions().jobs().create(createJob(workflowInstance, runSpec, secretSpec));
     } catch (KubernetesClientException kce) {
-      throw new IOException("Failed to create Kubernetes pod", kce);
+      throw new IOException("Failed to create Kubernetes job", kce);
     }
   }
 
@@ -620,7 +620,7 @@ class KubernetesDockerRunner implements DockerRunner {
       try {
         stateManager.receive(event);
       } catch (IsClosedException isClosedException) {
-        LOG.warn("Could not receive kubernetes event", isClosedException);
+        LOG.warn("Could not receive Kubernetes event", isClosedException);
         throw new RuntimeException(isClosedException);
       }
     }
