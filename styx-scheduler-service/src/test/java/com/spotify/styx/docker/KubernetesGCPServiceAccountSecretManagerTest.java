@@ -307,7 +307,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     final KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
         .serviceAccountSecret(secret.getMetadata().getName())
         .build();
-    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
+    final Pod pod = KubernetesDockerRunnerTestUtil
+        .createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
 
     final PodStatus podStatus = podStatus(phase);
     pod.setStatus(podStatus);
@@ -364,7 +365,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     final KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
         .serviceAccountSecret(secret.getMetadata().getName())
         .build();
-    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
+    final Pod pod = KubernetesDockerRunnerTestUtil
+        .createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
     pod.setStatus(podStatus("Running"));
     when(podList.getItems()).thenReturn(ImmutableList.of(pod));
     sut.cleanup();

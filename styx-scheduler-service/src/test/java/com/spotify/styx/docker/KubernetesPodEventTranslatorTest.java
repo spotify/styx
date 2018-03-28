@@ -55,7 +55,7 @@ public class KubernetesPodEventTranslatorTest {
   private static final String MESSAGE_FORMAT = "{\"rfu\":{\"dum\":\"my\"},\"component_id\":\"dummy\",\"workflow_id\":\"dummy\",\"parameter\":\"dummy\",\"execution_id\":\"dummy\",\"event\":\"dummy\",\"exit_code\":%d}\n";
   private static final KubernetesSecretSpec SECRET_SPEC = KubernetesSecretSpec.builder().build();
 
-  Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC, SECRET_SPEC);
+  Pod pod = KubernetesDockerRunnerTestUtil.createPod(WFI, RUN_SPEC, SECRET_SPEC);
 
   @Test
   public void terminateOnSuccessfulTermination() throws Exception {
@@ -332,7 +332,7 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   private Pod podWithTerminationLogging() {
-    return KubernetesDockerRunner.createPod(
+    return KubernetesDockerRunnerTestUtil.createPod(
         WFI,
         DockerRunner.RunSpec.builder()
             .executionId("eid")

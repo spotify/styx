@@ -65,7 +65,7 @@ public class KubernetesDockerRunnerPodResourceTest {
 
   @Test
   public void shouldAddLatestTag() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
@@ -78,7 +78,7 @@ public class KubernetesDockerRunnerPodResourceTest {
 
   @Test
   public void shouldUseConfiguredTag() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox:v7"), EMPTY_SECRET_SPEC);
 
@@ -91,7 +91,7 @@ public class KubernetesDockerRunnerPodResourceTest {
 
   @Test
   public void shouldAddArgs() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox", "echo", "foo", "bar"), EMPTY_SECRET_SPEC);
 
@@ -104,7 +104,7 @@ public class KubernetesDockerRunnerPodResourceTest {
 
   @Test
   public void shouldAddWorkflowInstanceAnnotation() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
@@ -118,7 +118,7 @@ public class KubernetesDockerRunnerPodResourceTest {
 
   @Test
   public void shouldDisableTerminationLoggingWhenFalse() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
@@ -133,7 +133,7 @@ public class KubernetesDockerRunnerPodResourceTest {
 
   @Test
   public void shouldEnableTerminationLoggingWhenTrue() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.builder()
             .executionId("eid")
@@ -153,7 +153,7 @@ public class KubernetesDockerRunnerPodResourceTest {
 
   @Test
   public void shouldHaveRestartPolicyNever() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
@@ -162,7 +162,7 @@ public class KubernetesDockerRunnerPodResourceTest {
 
   @Test
   public void shouldNotHaveSecretsMountIfNoSecret() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
@@ -182,7 +182,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
         .customSecret(secret)
         .build();
-    Pod pod = KubernetesDockerRunner.createPod(
+    Pod pod = KubernetesDockerRunnerTestUtil.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.builder()
             .executionId("eid")
@@ -212,7 +212,7 @@ public class KubernetesDockerRunnerPodResourceTest {
 
   @Test
   public void shouldConfigureEnvironmentVariables() throws Exception {
-    final Pod pod = KubernetesDockerRunner.createPod(
+    final Pod pod = KubernetesDockerRunnerTestUtil.createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.builder()
             .executionId(TEST_EXECUTION_ID)

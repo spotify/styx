@@ -165,7 +165,8 @@ public class KubernetesDockerRunnerTest {
 
   @Rule public ExpectedException exception = ExpectedException.none();
 
-  private Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, EMPTY_SECRET_SPEC);
+  private Pod createdPod = KubernetesDockerRunnerTestUtil
+      .createPod(WORKFLOW_INSTANCE, RUN_SPEC, EMPTY_SECRET_SPEC);
   private Stats stats = Mockito.mock(Stats.class);
 
   private KubernetesDockerRunner kdr;
@@ -461,7 +462,7 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldMountSecret() {
-    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET,
+    final Pod pod = KubernetesDockerRunnerTestUtil.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET,
         SECRET_SPEC_WITH_CUSTOM_SECRET);
     assertThat(pod.getSpec().getVolumes().size(), is(1));
     assertThat(pod.getSpec().getVolumes().get(0).getName(),
@@ -474,7 +475,8 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldMountServiceAccount() {
-    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, SECRET_SPEC_WITH_SA);
+    final Pod pod = KubernetesDockerRunnerTestUtil
+        .createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, SECRET_SPEC_WITH_SA);
     assertThat(pod.getSpec().getVolumes().size(), is(1));
     assertThat(pod.getSpec().getVolumes().get(0).getName(),
                is(KubernetesDockerRunner.STYX_WORKFLOW_SA_SECRET_NAME));
@@ -490,7 +492,7 @@ public class KubernetesDockerRunnerTest {
   public void shouldConfigureResourceRequirements() {
     final String memRequest = "17Mi";
     final String memLimit = "4711Mi";
-    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RunSpec.builder()
+    final Pod pod = KubernetesDockerRunnerTestUtil.createPod(WORKFLOW_INSTANCE, RunSpec.builder()
         .executionId("eid1")
         .imageName("busybox")
         .memRequest(memRequest)

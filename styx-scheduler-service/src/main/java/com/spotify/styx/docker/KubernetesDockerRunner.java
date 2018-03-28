@@ -59,7 +59,6 @@ import io.fabric8.kubernetes.api.model.JobBuilder;
 import io.fabric8.kubernetes.api.model.JobSpec;
 import io.fabric8.kubernetes.api.model.JobSpecBuilder;
 import io.fabric8.kubernetes.api.model.Pod;
-import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.PodSpec;
 import io.fabric8.kubernetes.api.model.PodSpecBuilder;
@@ -253,7 +252,8 @@ class KubernetesDockerRunner implements DockerRunner {
     return job;
   }
 
-  private static PodSpec createPodSpec(WorkflowInstance workflowInstance, RunSpec runSpec,
+  @VisibleForTesting
+  static PodSpec createPodSpec(WorkflowInstance workflowInstance, RunSpec runSpec,
                                        KubernetesSecretSpec secretSpec) {
     final String imageWithTag = runSpec.imageName().contains(":")
                                 ? runSpec.imageName()
@@ -314,21 +314,6 @@ class KubernetesDockerRunner implements DockerRunner {
     specBuilder.addToContainers(containerBuilder.build());
 
     return specBuilder.build();
-  }
-
-  @VisibleForTesting
-  static Pod createPod(WorkflowInstance workflowInstance, RunSpec runSpec, KubernetesSecretSpec secretSpec) {
-    final PodBuilder podBuilder = new PodBuilder()
-        .withNewMetadata()
-        .withName(runSpec.executionId() + "-randomsuffix")
-        .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
-        .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION,
-                          String.valueOf(runSpec.terminationLogging()))
-        .endMetadata();
-
-    podBuilder.withSpec(createPodSpec(workflowInstance, runSpec, secretSpec));
-
-    return podBuilder.build();
   }
 
   @VisibleForTesting
