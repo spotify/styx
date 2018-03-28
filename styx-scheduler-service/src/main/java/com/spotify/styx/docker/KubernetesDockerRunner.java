@@ -57,6 +57,7 @@ import io.fabric8.kubernetes.api.model.EnvVarBuilder;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.PodList;
+import io.fabric8.kubernetes.api.model.PodSpec;
 import io.fabric8.kubernetes.api.model.PodSpecBuilder;
 import io.fabric8.kubernetes.api.model.Quantity;
 import io.fabric8.kubernetes.api.model.ResourceRequirementsBuilder;
@@ -219,19 +220,10 @@ class KubernetesDockerRunner implements DockerRunner {
     });
   }
 
-  @VisibleForTesting
-  static Pod createPod(WorkflowInstance workflowInstance, RunSpec runSpec, KubernetesSecretSpec secretSpec) {
+  static PodSpec createPodSpec(WorkflowInstance workflowInstance, RunSpec runSpec, KubernetesSecretSpec secretSpec) {
     final String imageWithTag = runSpec.imageName().contains(":")
-        ? runSpec.imageName()
-        : runSpec.imageName() + ":latest";
-
-    final PodBuilder podBuilder = new PodBuilder()
-        .withNewMetadata()
-        .withName(runSpec.executionId())
-        .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
-        .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION,
-                          String.valueOf(runSpec.terminationLogging()))
-        .endMetadata();
+                                ? runSpec.imageName()
+                                : runSpec.imageName() + ":latest";
 
     final PodSpecBuilder specBuilder = new PodSpecBuilder()
         .withRestartPolicy("Never");
@@ -264,7 +256,7 @@ class KubernetesDockerRunner implements DockerRunner {
           .build();
       containerBuilder.addToVolumeMounts(saMount);
       containerBuilder.addToEnv(envVar(STYX_WORKFLOW_SA_ENV_VARIABLE,
-                                       saMount.getMountPath() + STYX_WORKFLOW_SA_JSON_KEY));
+          saMount.getMountPath() + STYX_WORKFLOW_SA_JSON_KEY));
     });
 
     secretSpec.customSecret().ifPresent(secret -> {
@@ -286,7 +278,21 @@ class KubernetesDockerRunner implements DockerRunner {
     });
 
     specBuilder.addToContainers(containerBuilder.build());
-    podBuilder.withSpec(specBuilder.build());
+
+    return specBuilder.build();
+  }
+
+  @VisibleForTesting
+  static Pod createPod(WorkflowInstance workflowInstance, RunSpec runSpec, KubernetesSecretSpec secretSpec) {
+    final PodBuilder podBuilder = new PodBuilder()
+        .withNewMetadata()
+        .withName(runSpec.executionId())
+        .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
+        .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION,
+                          String.valueOf(runSpec.terminationLogging()))
+        .endMetadata();
+
+    podBuilder.withSpec(createPodSpec(workflowInstance, runSpec, secretSpec));
 
     return podBuilder.build();
   }
