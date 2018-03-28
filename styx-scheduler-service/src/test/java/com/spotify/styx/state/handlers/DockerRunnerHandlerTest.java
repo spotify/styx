@@ -72,9 +72,10 @@ public class DockerRunnerHandlerTest {
   @Captor ArgumentCaptor<WorkflowInstance> instanceCaptor;
   @Captor ArgumentCaptor<RunSpec> runSpecCaptor;
   @Captor ArgumentCaptor<Event> eventCaptor;
+  @Captor ArgumentCaptor<Long> counterCaptor;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     dockerRunnerHandler = new DockerRunnerHandler(dockerRunner, stateManager);
   }
 
@@ -124,7 +125,8 @@ public class DockerRunnerHandlerTest {
 
     dockerRunnerHandler.transitionInto(runState);
 
-    verify(stateManager, timeout(60_000)).receive(Event.submitted(workflowInstance, TEST_EXECUTION_ID));
+    verify(stateManager, timeout(60_000)).receive(Event.submitted(workflowInstance, TEST_EXECUTION_ID),
+        runState.counter());
   }
 
   @Test
@@ -155,20 +157,26 @@ public class DockerRunnerHandlerTest {
     // Verify that the state manager receives two events:
     // 1. submitted
     // 2. runError
-    verify(stateManager, timeout(60_000).times(2)).receive(eventCaptor.capture());
+    verify(stateManager, timeout(60_000).times(2))
+        .receive(eventCaptor.capture(), counterCaptor.capture());
 
     Event event1 = eventCaptor.getAllValues().get(0);
     Event event2 = eventCaptor.getAllValues().get(1);
+    
+    long counter1 = counterCaptor.getAllValues().get(0);
+    long counter2 = counterCaptor.getAllValues().get(1);
 
     event1.accept(eventVisitor);
     verify(eventVisitor).submitted(workflowInstance, TEST_EXECUTION_ID);
+    assertThat(counter1, is(runState.counter()));
 
     event2.accept(eventVisitor);
     verify(eventVisitor).runError(workflowInstance, throwable.getMessage());
+    assertThat(counter2, is(runState.counter() + 1));
   }
 
   @Test
-  public void shouldHaltIfMissingExecutionDescription() throws Exception {
+  public void shouldHaltIfMissingExecutionDescription() {
     Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING);
@@ -179,7 +187,7 @@ public class DockerRunnerHandlerTest {
   }
 
   @Test
-  public void shouldPerformCleanupOnFailed() throws Exception {
+  public void shouldPerformCleanupOnFailed() {
     WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
     Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
@@ -192,7 +200,7 @@ public class DockerRunnerHandlerTest {
   }
 
   @Test
-  public void shouldPerformCleanupOnFailedThroughTransitions() throws Exception {
+  public void shouldPerformCleanupOnFailedThroughTransitions() {
     WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
     Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
