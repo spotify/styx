@@ -24,7 +24,6 @@ import static com.spotify.styx.docker.KubernetesDockerRunnerTestUtil.getJobName;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyListOf;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -121,6 +120,8 @@ public class KubernetesDockerRunnerPodPollerTest {
   @Test
   @SuppressWarnings("MockitoCast")
   public void shouldSendRunErrorWhenPodForRunningWFIDoesntExist() {
+    when(jobs.withName(EXECUTION_ID_2)).thenReturn(namedJob2);
+
     Pod createdPod = KubernetesDockerRunnerTestUtil
         .createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
     podList.setItems(Collections.singletonList(createdPod));
@@ -128,7 +129,7 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.pollPods();
 
-    verify(stateManager, times(1)).receiveIgnoreClosed(
+    verify(stateManager).receiveIgnoreClosed(
         Event.runError(WORKFLOW_INSTANCE_2, "No pod associated with this instance"));
   }
 
