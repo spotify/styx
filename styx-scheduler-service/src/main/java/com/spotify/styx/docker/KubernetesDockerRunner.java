@@ -412,13 +412,14 @@ class KubernetesDockerRunner implements DockerRunner {
 
   private void deleteJob(WorkflowInstance workflowInstance, final String jobName, String podName) {
     if (!debug.get()) {
+      // delete job first to make sure if exception happens we won't zombify the job
+      client.extensions().jobs().withName(jobName).delete();
+      LOG.info("Cleaned up {} job: {}", workflowInstance.toKey(), jobName);
       client.pods().withName(podName).delete();
       LOG.info("Cleaned up {} pod: {}", workflowInstance.toKey(), podName);
-      client.extensions().jobs().withName(jobName).delete();
-      LOG.info("Cleaned up {} job: {}", workflowInstance.toKey(), jobName);      
     } else {
-      LOG.info("Keeping {} pod: {}", workflowInstance.toKey(), podName);
       LOG.info("Keeping {} job: {}", workflowInstance.toKey(), jobName);
+      LOG.info("Keeping {} pod: {}", workflowInstance.toKey(), podName);
     }
   }
 

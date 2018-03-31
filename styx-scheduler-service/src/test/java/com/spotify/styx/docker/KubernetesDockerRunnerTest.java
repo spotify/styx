@@ -259,16 +259,18 @@ public class KubernetesDockerRunnerTest {
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(5)).toString());
 
     kdr.cleanupWithRunState(WORKFLOW_INSTANCE, getJobName(createdPod), createdPod);
-    verify(pods, never()).delete(any(Pod.class));
-    verify(pods, never()).delete(any(Pod[].class));
-    verify(pods, never()).delete(anyListOf(Pod.class));
-    verify(pods, never()).delete();
-    verify(namedPod, never()).delete();
+
     verify(jobs, never()).delete(any(Job.class));
     verify(jobs, never()).delete(any(Job[].class));
     verify(jobs, never()).delete(anyListOf(Job.class));
     verify(jobs, never()).delete();
     verify(namedJob, never()).delete();
+
+    verify(pods, never()).delete(any(Pod.class));
+    verify(pods, never()).delete(any(Pod[].class));
+    verify(pods, never()).delete(anyListOf(Pod.class));
+    verify(pods, never()).delete();
+    verify(namedPod, never()).delete();
   }
 
   @Test
@@ -283,8 +285,8 @@ public class KubernetesDockerRunnerTest {
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(5)).toString());
 
     kdr.cleanupWithRunState(WORKFLOW_INSTANCE, getJobName(createdPod), createdPod);
-    verify(namedPod).delete();
     verify(namedJob).delete();
+    verify(namedPod).delete();
   }
 
   @Test
@@ -297,6 +299,7 @@ public class KubernetesDockerRunnerTest {
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
 
     kdr.cleanupWithRunState(WORKFLOW_INSTANCE, getJobName(createdPod), createdPod);
+
     verify(namedPod).delete();
     verify(namedJob).delete();
   }
@@ -307,8 +310,9 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatus);
 
     kdr.cleanupWithRunState(WORKFLOW_INSTANCE, getJobName(createdPod), createdPod);
-    verify(namedPod).delete();
+
     verify(namedJob).delete();
+    verify(namedPod).delete();
   }
 
   @Test
@@ -317,8 +321,9 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(waiting("Pending", "ErrImagePull"));
 
     kdr.cleanupWithRunState(WORKFLOW_INSTANCE, getJobName(createdPod), createdPod);
-    verify(namedPod).delete();
+
     verify(namedJob).delete();
+    verify(namedPod).delete();
   }
 
   @Test
@@ -333,8 +338,9 @@ public class KubernetesDockerRunnerTest {
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(1)).toString());
 
     kdr.cleanupWithRunState(WORKFLOW_INSTANCE, getJobName(createdPod), createdPod);
-    verify(namedPod, never()).delete();
+
     verify(namedJob, never()).delete();
+    verify(namedPod, never()).delete();
   }
 
   @Test
@@ -346,8 +352,9 @@ public class KubernetesDockerRunnerTest {
     when(containerStatus.getState()).thenReturn(containerState);
 
     kdr.cleanupWithRunState(WORKFLOW_INSTANCE, getJobName(createdPod), createdPod);
-    verify(namedPod, never()).delete();
+
     verify(namedJob, never()).delete();
+    verify(namedPod, never()).delete();
   }
 
   @Test
@@ -359,8 +366,9 @@ public class KubernetesDockerRunnerTest {
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
 
     kdr.cleanupWithRunState(WORKFLOW_INSTANCE, getJobName(createdPod), createdPod);
-    verify(namedPod, never()).delete();
+
     verify(namedJob, never()).delete();
+    verify(namedPod, never()).delete();
   }
 
   @Test
@@ -372,8 +380,9 @@ public class KubernetesDockerRunnerTest {
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
 
     kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, getJobName(createdPod), createdPod);
-    verify(namedPod, never()).delete();
+
     verify(namedJob, never()).delete();
+    verify(namedPod, never()).delete();
   }
 
   @Test
@@ -388,8 +397,9 @@ public class KubernetesDockerRunnerTest {
     when(containerStatus.getState()).thenReturn(containerState);
 
     kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, getJobName(createdPod), createdPod);
-    verify(namedPod).delete();
+
     verify(namedJob).delete();
+    verify(namedPod).delete();
   }
 
   @Test
@@ -404,8 +414,9 @@ public class KubernetesDockerRunnerTest {
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(1)).toString());
 
     kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, getJobName(createdPod), createdPod);
-    verify(namedPod, never()).delete();
+
     verify(namedJob, never()).delete();
+    verify(namedPod, never()).delete();
   }
 
   @Test
@@ -420,8 +431,9 @@ public class KubernetesDockerRunnerTest {
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(5)).toString());
 
     kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, getJobName(createdPod), createdPod);
-    verify(namedPod).delete();
+
     verify(namedJob).delete();
+    verify(namedPod).delete();
   }
 
   @Test(expected = InvalidExecutionException.class)

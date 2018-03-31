@@ -200,10 +200,10 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.pollPods();
 
-    verify(namedPod1).delete();
-    verify(namedPod2).delete();
     verify(namedJob1).delete();
     verify(namedJob2).delete();
+    verify(namedPod1).delete();
+    verify(namedPod2).delete();
   }
 
   @Test
@@ -228,19 +228,19 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.pollPods();
 
-    verify(k8sClient.pods(), never()).delete(any(Pod.class));
-    verify(k8sClient.pods(), never()).delete(any(Pod[].class));
-    verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
-    verify(k8sClient.pods(), never()).delete();
-    verify(namedPod1, never()).delete();
-    verify(namedPod2, never()).delete();
-
     verify(k8sClient.extensions().jobs(), never()).delete(any(Job.class));
     verify(k8sClient.extensions().jobs(), never()).delete(any(Job[].class));
     verify(k8sClient.extensions().jobs(), never()).delete(anyListOf(Job.class));
     verify(k8sClient.extensions().jobs(), never()).delete();
     verify(namedJob1, never()).delete();
     verify(namedJob2, never()).delete();
+
+    verify(k8sClient.pods(), never()).delete(any(Pod.class));
+    verify(k8sClient.pods(), never()).delete(any(Pod[].class));
+    verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
+    verify(k8sClient.pods(), never()).delete();
+    verify(namedPod1, never()).delete();
+    verify(namedPod2, never()).delete();
   }
 
   @Test
@@ -262,19 +262,19 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.pollPods();
 
-    verify(k8sClient.pods(), never()).delete(any(Pod.class));
-    verify(k8sClient.pods(), never()).delete(any(Pod[].class));
-    verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
-    verify(k8sClient.pods(), never()).delete();
-    verify(namedPod1, never()).delete();
-    verify(namedPod2, never()).delete();
-
     verify(k8sClient.extensions().jobs(), never()).delete(any(Job.class));
     verify(k8sClient.extensions().jobs(), never()).delete(any(Job[].class));
     verify(k8sClient.extensions().jobs(), never()).delete(anyListOf(Job.class));
     verify(k8sClient.extensions().jobs(), never()).delete();
     verify(namedJob1, never()).delete();
     verify(namedJob2, never()).delete();
+
+    verify(k8sClient.pods(), never()).delete(any(Pod.class));
+    verify(k8sClient.pods(), never()).delete(any(Pod[].class));
+    verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
+    verify(k8sClient.pods(), never()).delete();
+    verify(namedPod1, never()).delete();
+    verify(namedPod2, never()).delete();
   }
 
   @Test
@@ -295,19 +295,19 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.pollPods();
 
-    verify(k8sClient.pods(), never()).delete(any(Pod.class));
-    verify(k8sClient.pods(), never()).delete(any(Pod[].class));
-    verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
-    verify(k8sClient.pods(), never()).delete();
-    verify(namedPod1, never()).delete();
-    verify(namedPod2, never()).delete();
-
     verify(k8sClient.extensions().jobs(), never()).delete(any(Job.class));
     verify(k8sClient.extensions().jobs(), never()).delete(any(Job[].class));
     verify(k8sClient.extensions().jobs(), never()).delete(anyListOf(Job.class));
     verify(k8sClient.extensions().jobs(), never()).delete();
     verify(namedJob1, never()).delete();
     verify(namedJob2, never()).delete();
+
+    verify(k8sClient.pods(), never()).delete(any(Pod.class));
+    verify(k8sClient.pods(), never()).delete(any(Pod[].class));
+    verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
+    verify(k8sClient.pods(), never()).delete();
+    verify(namedPod1, never()).delete();
+    verify(namedPod2, never()).delete();
   }
 
   private void setupActiveInstances(RunState.State state, String executionId1, String executionId2) {
