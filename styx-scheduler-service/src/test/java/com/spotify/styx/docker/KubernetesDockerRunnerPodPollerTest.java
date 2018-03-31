@@ -151,15 +151,20 @@ public class KubernetesDockerRunnerPodPollerTest {
 
   @Test
   public void shouldHandleEmptyPodList() {
+    when(jobs.withName(EXECUTION_ID_1)).thenReturn(namedJob1);
+    when(jobs.withName(EXECUTION_ID_2)).thenReturn(namedJob2);
+
     when(k8sClient.pods().list()).thenReturn(podList);
     setupActiveInstances(RunState.State.RUNNING, EXECUTION_ID_1, EXECUTION_ID_2);
 
     kdr.pollPods();
 
-    verify(stateManager, times(1)).receiveIgnoreClosed(
+    verify(stateManager).receiveIgnoreClosed(
         Event.runError(WORKFLOW_INSTANCE, "No pod associated with this instance"));
-    verify(stateManager, times(1)).receiveIgnoreClosed(
+    verify(namedJob1).delete();
+    verify(stateManager).receiveIgnoreClosed(
         Event.runError(WORKFLOW_INSTANCE_2, "No pod associated with this instance"));
+    verify(namedJob2).delete();
   }
 
   @Test

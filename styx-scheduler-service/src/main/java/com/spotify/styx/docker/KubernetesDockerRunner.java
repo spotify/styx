@@ -470,16 +470,15 @@ class KubernetesDockerRunner implements DockerRunner {
         .watch(new PodWatcher());
   }
 
-  private Set<WorkflowInstance> getRunningWorkflowInstances() {
+  private Set<RunState> getRunningActiveStates() {
     return stateManager.getActiveStates()
         .values()
         .stream()
         .filter(runState -> runState.state().equals(RUNNING))
-        .map(RunState::workflowInstance)
         .collect(toSet());
   }
 
-  private void examineRunningWFISandAssociatedPods(Set<WorkflowInstance> runningWorkflowInstances,
+  private void examineRunningWFISandAssociatedPods(Set<RunState> runningActiveStates,
                                                    PodList podList) {
     final Set<WorkflowInstance> workflowInstancesForPods = podList.getItems().stream()
         .filter(pod -> pod.getMetadata().getAnnotations()
@@ -488,9 +487,15 @@ class KubernetesDockerRunner implements DockerRunner {
             .parseKey(pod.getMetadata().getAnnotations().get(STYX_WORKFLOW_INSTANCE_ANNOTATION)))
         .collect(toSet());
 
-    runningWorkflowInstances.removeAll(workflowInstancesForPods);
-    runningWorkflowInstances.forEach(workflowInstance -> stateManager.receiveIgnoreClosed(
-        Event.runError(workflowInstance, "No pod associated with this instance")));
+    runningActiveStates.stream()
+        .filter(runState -> !workflowInstancesForPods.contains(runState.workflowInstance()))
+        .forEach(runState -> {
+          stateManager.receiveIgnoreClosed(
+              Event.runError(runState.workflowInstance(), "No pod associated with this instance"));
+          // delete job if the pod is gone somehow
+          runState.data().executionId()
+              .ifPresent(executionId -> client.extensions().jobs().withName(executionId).delete());
+        });
   }
 
   @VisibleForTesting
@@ -503,9 +508,9 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private synchronized void tryPollPods() {
-    final Set<WorkflowInstance> runningWorkflowInstances = getRunningWorkflowInstances();
+    final Set<RunState> runningActiveStates = getRunningActiveStates();
     final PodList list = client.pods().list();
-    examineRunningWFISandAssociatedPods(runningWorkflowInstances, list);
+    examineRunningWFISandAssociatedPods(runningActiveStates, list);
 
     for (Pod pod : list.getItems()) {
       logEvent(Watcher.Action.MODIFIED, pod, list.getMetadata().getResourceVersion(), true);
