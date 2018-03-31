@@ -182,6 +182,8 @@ public class KubernetesDockerRunnerPodPollerTest {
     final Pod createdPod2 = KubernetesDockerRunnerTestUtil
         .createPod(WORKFLOW_INSTANCE_2, RUN_SPEC_2, SECRET_SPEC);
 
+    when(pods.withName(createdPod1.getMetadata().getName())).thenReturn(namedPod1);
+    when(pods.withName(createdPod2.getMetadata().getName())).thenReturn(namedPod2);
     when(jobs.withName(getJobName(createdPod1))).thenReturn(namedJob1);
     when(jobs.withName(getJobName(createdPod2))).thenReturn(namedJob2);
 
@@ -193,6 +195,8 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.pollPods();
 
+    verify(namedPod1).delete();
+    verify(namedPod2).delete();
     verify(namedJob1).delete();
     verify(namedJob2).delete();
   }
@@ -206,6 +210,8 @@ public class KubernetesDockerRunnerPodPollerTest {
     final Pod createdPod2 = KubernetesDockerRunnerTestUtil
         .createPod(WORKFLOW_INSTANCE_2, RUN_SPEC_2, SECRET_SPEC);
 
+    when(pods.withName(createdPod1.getMetadata().getName())).thenReturn(namedPod1);
+    when(pods.withName(createdPod2.getMetadata().getName())).thenReturn(namedPod2);
     when(jobs.withName(getJobName(createdPod1))).thenReturn(namedJob1);
     when(jobs.withName(getJobName(createdPod2))).thenReturn(namedJob2);
 
@@ -216,6 +222,13 @@ public class KubernetesDockerRunnerPodPollerTest {
     setStatusAndState(createdPod2, RUN_SPEC_2.executionId());
 
     kdr.pollPods();
+
+    verify(k8sClient.pods(), never()).delete(any(Pod.class));
+    verify(k8sClient.pods(), never()).delete(any(Pod[].class));
+    verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
+    verify(k8sClient.pods(), never()).delete();
+    verify(namedPod1, never()).delete();
+    verify(namedPod2, never()).delete();
 
     verify(k8sClient.extensions().jobs(), never()).delete(any(Job.class));
     verify(k8sClient.extensions().jobs(), never()).delete(any(Job[].class));
@@ -235,6 +248,8 @@ public class KubernetesDockerRunnerPodPollerTest {
     createdPod1.getMetadata().getAnnotations().remove("styx-workflow-instance");
     createdPod2.getMetadata().getAnnotations().remove("styx-workflow-instance");
 
+    when(pods.withName(createdPod1.getMetadata().getName())).thenReturn(namedPod1);
+    when(pods.withName(createdPod2.getMetadata().getName())).thenReturn(namedPod2);
     when(jobs.withName(getJobName(createdPod1))).thenReturn(namedJob1);
     when(jobs.withName(getJobName(createdPod2))).thenReturn(namedJob2);
 
@@ -242,19 +257,19 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.pollPods();
 
-    verify(k8sClient.extensions().jobs(), never()).delete(any(Job.class));
-    verify(k8sClient.extensions().jobs(), never()).delete(any(Job[].class));
-    verify(k8sClient.extensions().jobs(), never()).delete(anyListOf(Job.class));
-    verify(k8sClient.extensions().jobs(), never()).delete();
-    verify(namedJob1, never()).delete();
-    verify(namedJob2, never()).delete();
-
     verify(k8sClient.pods(), never()).delete(any(Pod.class));
     verify(k8sClient.pods(), never()).delete(any(Pod[].class));
     verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
     verify(k8sClient.pods(), never()).delete();
     verify(namedPod1, never()).delete();
     verify(namedPod2, never()).delete();
+
+    verify(k8sClient.extensions().jobs(), never()).delete(any(Job.class));
+    verify(k8sClient.extensions().jobs(), never()).delete(any(Job[].class));
+    verify(k8sClient.extensions().jobs(), never()).delete(anyListOf(Job.class));
+    verify(k8sClient.extensions().jobs(), never()).delete();
+    verify(namedJob1, never()).delete();
+    verify(namedJob2, never()).delete();
   }
 
   @Test
@@ -264,6 +279,8 @@ public class KubernetesDockerRunnerPodPollerTest {
     final Pod createdPod2 = KubernetesDockerRunnerTestUtil
         .createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
 
+    when(pods.withName(createdPod1.getMetadata().getName())).thenReturn(namedPod1);
+    when(pods.withName(createdPod2.getMetadata().getName())).thenReturn(namedPod2);
     when(jobs.withName(getJobName(createdPod1))).thenReturn(namedJob1);
     when(jobs.withName(getJobName(createdPod2))).thenReturn(namedJob2);
 
@@ -272,6 +289,13 @@ public class KubernetesDockerRunnerPodPollerTest {
     setupActiveInstances(RunState.State.RUNNING, RUN_SPEC.executionId(), RUN_SPEC_2.executionId());
 
     kdr.pollPods();
+
+    verify(k8sClient.pods(), never()).delete(any(Pod.class));
+    verify(k8sClient.pods(), never()).delete(any(Pod[].class));
+    verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
+    verify(k8sClient.pods(), never()).delete();
+    verify(namedPod1, never()).delete();
+    verify(namedPod2, never()).delete();
 
     verify(k8sClient.extensions().jobs(), never()).delete(any(Job.class));
     verify(k8sClient.extensions().jobs(), never()).delete(any(Job[].class));

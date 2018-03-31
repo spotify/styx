@@ -351,18 +351,11 @@ class KubernetesDockerRunner implements DockerRunner {
         getStyxContainer(pod).ifPresent(containerStatus -> {
           final String podName = pod.getMetadata().getName();
           if (hasPullImageError(containerStatus)) {
-            if (!podName.equals(executionId)) {
-              deleteJob(workflowInstance, executionId);
-            } else { // TODO: delete after graceful rollout
-              deletePod(workflowInstance, podName);
-            }
+            deleteJob(workflowInstance, executionId, podName);
           } else {
             if (containerStatus.getState().getTerminated() != null) {
-              if (!podName.equals(executionId)) {
-                deleteJobIfNonDeletePeriodExpired(workflowInstance, executionId, containerStatus);
-              } else { // TODO: delete after graceful rollout
-                deletePodIfNonDeletePeriodExpired(workflowInstance, podName, containerStatus);
-              }
+              deleteJobIfNonDeletePeriodExpired(workflowInstance, executionId,
+                  podName, containerStatus);
             }
           }
         }));
@@ -374,18 +367,11 @@ class KubernetesDockerRunner implements DockerRunner {
         getStyxContainer(pod).ifPresent(containerStatus -> {
           final String podName = pod.getMetadata().getName();
           if (containerStatus.getState().getTerminated() != null) {
-            if (!podName.equals(executionId)) {
-              deleteJobIfNonDeletePeriodExpired(workflowInstance, executionId, containerStatus);
-            } else { // TODO: delete after graceful rollout
-              deletePodIfNonDeletePeriodExpired(workflowInstance, podName, containerStatus);
-            }
+            deleteJobIfNonDeletePeriodExpired(workflowInstance, executionId,
+                podName, containerStatus);
           } else {
             // if not terminated, delete it directly
-            if (!podName.equals(executionId)) {
-              deleteJob(workflowInstance, executionId);
-            } else { // TODO: delete after graceful rollout
-              deletePod(workflowInstance, podName);
-            }
+            deleteJob(workflowInstance, executionId, podName);
           }
         }));
   }
@@ -397,12 +383,7 @@ class KubernetesDockerRunner implements DockerRunner {
       cleaner.run();
     } else {
       // for some cases such as evicted pod, there is no container status, so we delete directly
-      final String podName = pod.getMetadata().getName();
-      if (!podName.equals(executionId)) {
-        deleteJob(workflowInstance, executionId);
-      } else {
-        deletePod(workflowInstance, podName);
-      }
+      deleteJob(workflowInstance, executionId, pod.getMetadata().getName());
     }
   }
 
@@ -420,42 +401,24 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private void deleteJobIfNonDeletePeriodExpired(WorkflowInstance workflowInstance,
-                                                 String jobName,
+                                                 final String executionId, String podName,
                                                  ContainerStatus containerStatus) {
     if (isNonDeletePeriodExpired(containerStatus)) {
       // if terminated and after graceful period, delete the pod
       // otherwise wait until next polling happens
-      deleteJob(workflowInstance, jobName);
+      deleteJob(workflowInstance, executionId, podName);
     }
   }
 
-  private void deleteJob(WorkflowInstance workflowInstance, String jobName) {
-    if (!debug.get()) {
-      client.extensions().jobs().withName(jobName).delete();
-      LOG.info("Cleaned up {} job: {}", workflowInstance.toKey(), jobName);      
-    } else {
-      LOG.info("Keeping {} job: {}", workflowInstance.toKey(), jobName);
-    }
-  }
-
-  // TODO: delete after graceful rollout
-  private void deletePodIfNonDeletePeriodExpired(WorkflowInstance workflowInstance,
-                                                 String podName,
-                                                 ContainerStatus containerStatus) {
-    if (isNonDeletePeriodExpired(containerStatus)) {
-      // if terminated and after graceful period, delete the pod
-      // otherwise wait until next polling happens
-      deletePod(workflowInstance, podName);
-    }
-  }
-
-  // TODO: delete after graceful rollout
-  private void deletePod(WorkflowInstance workflowInstance, String podName) {
+  private void deleteJob(WorkflowInstance workflowInstance, final String jobName, String podName) {
     if (!debug.get()) {
       client.pods().withName(podName).delete();
       LOG.info("Cleaned up {} pod: {}", workflowInstance.toKey(), podName);
+      client.extensions().jobs().withName(jobName).delete();
+      LOG.info("Cleaned up {} job: {}", workflowInstance.toKey(), jobName);      
     } else {
       LOG.info("Keeping {} pod: {}", workflowInstance.toKey(), podName);
+      LOG.info("Keeping {} job: {}", workflowInstance.toKey(), jobName);
     }
   }
 
