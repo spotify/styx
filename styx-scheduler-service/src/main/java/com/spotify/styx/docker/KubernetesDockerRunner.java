@@ -491,11 +491,12 @@ class KubernetesDockerRunner implements DockerRunner {
     runningActiveStates.stream()
         .filter(runState -> !workflowInstancesForPods.contains(runState.workflowInstance()))
         .forEach(runState -> {
-          stateManager.receiveIgnoreClosed(
-              Event.runError(runState.workflowInstance(), "No pod associated with this instance"));
-          // delete job if the pod is gone somehow
+          // delete the job if its pod is gone somehow
+          // in case exception happens, retry during next polling
           runState.data().executionId()
               .ifPresent(executionId -> client.extensions().jobs().withName(executionId).delete());
+          stateManager.receiveIgnoreClosed(
+              Event.runError(runState.workflowInstance(), "No pod associated with this instance"));
         });
   }
 
