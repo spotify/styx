@@ -27,7 +27,6 @@ import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -680,23 +679,25 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     }
 
     styxStarts();
+//    tickTriggerManager();
+//    tickScheduler();
+//    timePasses(1, SECONDS);
     tickTriggerManager();
-    tickScheduler();
-    timePasses(2, SECONDS);
-    tickTriggerManager();
-    tickScheduler();
+//    tickScheduler();
 
     // This is flaky: sometimes awaitNumberOfDockerRuns passes, sometimes it doesn't. I guess here
     // we get a varying number of runs, depending on contention...
     // TODO await for eventuality that will happen with repeated ticks
-    awaitNumberOfDockerRuns(3);
+//    awaitNumberOfDockerRuns(3);
+    tickSchedulerUntilNumberOfDockerRuns(3);
+//    awaitNumberOfDockerRunsNot(4)?
 //    awaitNumberOfConsumedEvents(13);
-    assertThat(consumedEventNames(), containsInAnyOrder(
+    assertThat(consumedEventNames(), is(ImmutableList.of(
         "triggerExecution", "dequeue", "submit", "submitted",
         "triggerExecution", "dequeue", "submit", "submitted",
         "triggerExecution", "dequeue", "submit", "submitted",
         "info"
-    ));
+    )));
   }
 
 //    setUp(20);

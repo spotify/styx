@@ -135,7 +135,10 @@ public class StyxSchedulerServiceFixture {
     StyxScheduler.DockerRunnerFactory dockerRunnerFactory =
         (id, env, states, exec, stats, debug) -> fakeDockerRunner();
     StyxScheduler.EventConsumerFactory eventConsumerFactory =
-        (env, stats) -> (event, state) ->  transitionedEvents.add(Tuple.of(event, state.state()));
+        (env, stats) -> (event, state) -> {
+          System.out.println("Event: " + event.toString() + ", state: " + state.toString());
+          transitionedEvents.add(Tuple.of(event, state.state()));
+        };
     StyxScheduler.WorkflowConsumerFactory workflowConsumerFactory =
         (env, stats) -> (oldWorkflow, newWorkflow) ->
             workflowChanges.add(Tuple.of(oldWorkflow, newWorkflow));
@@ -180,6 +183,15 @@ public class StyxSchedulerServiceFixture {
     styxScheduler.tickScheduler();
   }
 
+  void tickSchedulerUntilNumberOfDockerRuns(int n) {
+    await().atMost(30, SECONDS).until(() -> {
+      System.out.println("Scheduler ticks");
+      tickScheduler();
+      return dockerRuns.size() == n;
+    });
+  }
+
+
   void tickTriggerManager() {
     styxScheduler.tickTriggerManager();
   }
@@ -210,7 +222,7 @@ public class StyxSchedulerServiceFixture {
     final Workflow workflow = Workflow.create("styx", configuration);
     givenWorkflow(workflow);
     givenWorkflowEnabledStateIs(workflow, true);
-    givenTheTimeIs("2018-03-27T16:00:00Z");
+    givenTheTimeIs("2018-03-27T16:00:01Z");
     givenNextNaturalTrigger(workflow, "2018-03-27T15:00:00Z");
   }
 
@@ -341,9 +353,13 @@ public class StyxSchedulerServiceFixture {
   }
 
   List<String> consumedEventNames() {
+//    System.out.println("transitionedEvents:");
+//    for (Tuple2<SequenceEvent, RunState.State> tuple2 : transitionedEvents) {
+//      System.out.println(tuple2.toString());
+//    };
     return transitionedEvents.stream()
         .map(item -> EventUtil.name(item._1.event()))
-        .sorted()
+//        .sorted()
         .collect(toList());
   }
 
