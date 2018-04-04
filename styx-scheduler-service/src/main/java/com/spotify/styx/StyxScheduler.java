@@ -492,6 +492,7 @@ public class StyxScheduler implements AppInit {
 
   @VisibleForTesting
   void resetShards(final Storage storage, final Resource resource) {
+    LOG.info("Resetting shards of resource {}", resource.id());
     for (int i = 0; i < NUM_SHARDS; i++) {
       final int index = i;
       try {
@@ -500,7 +501,7 @@ public class StyxScheduler implements AppInit {
           return null;
         });
       } catch (IOException e) {
-        LOG.error("Error resetting shards for resource {}", resource, e);
+        LOG.error("Error resetting shards of resource {}", resource, e);
         throw new RuntimeException(e);
       }
     }
