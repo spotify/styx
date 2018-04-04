@@ -41,7 +41,7 @@ public class ShardedCounterSnapshotFactory implements CounterSnapshotFactory {
   /**
    * Maximum number of entity groups that can be accessed in a transaction in Datastore.
    */
-  public static final int TRANSACTION_GROUP_SIZE = 25;
+  static final int TRANSACTION_GROUP_SIZE = 25;
   private final Storage storage;
 
   public ShardedCounterSnapshotFactory(Storage storage) {
@@ -49,7 +49,8 @@ public class ShardedCounterSnapshotFactory implements CounterSnapshotFactory {
   }
 
   public ShardedCounter.Snapshot create(String counterId) {
-    return new ShardedCounter.Snapshot(storage, counterId, getShards(storage, counterId));
+    return new ShardedCounter.Snapshot(counterId, ShardedCounter.getLimit(storage, counterId),
+        getShards(storage, counterId));
   }
 
   private static Map<Integer, Long> getShards(Storage storage, String counterId) {
