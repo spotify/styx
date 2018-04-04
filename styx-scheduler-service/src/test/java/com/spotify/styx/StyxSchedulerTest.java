@@ -23,6 +23,7 @@ package com.spotify.styx;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.theInstance;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.times;
@@ -34,6 +35,7 @@ import com.google.api.services.container.v1beta1.model.Cluster;
 import com.google.api.services.container.v1beta1.model.MasterAuth;
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.StyxScheduler.KubernetesClientFactory;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.storage.TransactionFunction;
@@ -127,6 +129,47 @@ public class StyxSchedulerTest {
     verify(transaction, times(128)).store(shardArgumentCaptor.capture());
     shardsWithValue(shardArgumentCaptor, 3L, 1L);
     shardsWithValue(shardArgumentCaptor, 2L, 127L);
+  }
+
+  @Test
+  public void shouldFailToUpdateShardsAccordingToUsedResources() throws IOException {
+    final StyxScheduler styxScheduler = StyxScheduler.newBuilder().build();
+    final IOException exception = new IOException();
+    when(storage.runInTransaction(any())).thenThrow(exception);
+    final Map<String, Long> resourcesUsageMap = ImmutableMap.of("res1", 257L);
+
+    try {
+      styxScheduler.updateShards(storage, resourcesUsageMap);
+      fail();
+    } catch (Exception e) {
+      assertThat(e.getCause(), is(exception));
+    }
+}
+
+  @Test
+  public void shouldResetShardsOfResource() throws IOException {
+    final StyxScheduler styxScheduler = StyxScheduler.newBuilder().build();
+    when(storage.runInTransaction(any())).thenAnswer(
+        a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
+
+    styxScheduler.resetShards(storage, Resource.create("res1", 300));
+
+    verify(transaction, times(128)).store(shardArgumentCaptor.capture());
+    shardsWithValue(shardArgumentCaptor, 0L, 128);
+  }
+
+  @Test
+  public void shouldFailToResetShardsOfResource() throws IOException {
+    final StyxScheduler styxScheduler = StyxScheduler.newBuilder().build();
+    final IOException exception = new IOException();
+    when(storage.runInTransaction(any())).thenThrow(exception);
+
+    try {
+      styxScheduler.resetShards(storage, Resource.create("res1", 300));
+      fail();
+    } catch (Exception e) {
+      assertThat(e.getCause(), is(exception));
+    }
   }
 
   private void shardsWithValue(ArgumentCaptor<Shard> shardArgumentCaptor, long value, long times) {

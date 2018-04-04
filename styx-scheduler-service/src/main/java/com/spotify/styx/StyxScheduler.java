@@ -58,6 +58,7 @@ import com.spotify.styx.api.Api;
 import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -470,6 +471,9 @@ public class StyxScheduler implements AppInit {
 
       // Sync resources usage
       if (storage.config().resourcesSyncEnabled()) {
+        // first we reset all shards for each resource
+        storage.resources().parallelStream().forEach(resource -> resetShards(storage, resource));
+        // then we update shards with actual usage
         try {
           final Map<String, Long> resourcesUsageMap = getResourcesUsageMap(storage, timeoutConfig,
               workflowCache, time.get(), resourceDecorator);
@@ -483,6 +487,22 @@ public class StyxScheduler implements AppInit {
     } catch (IOException e) {
       LOG.error("Error while initializing/syncing resources", e);
       throw new RuntimeException(e);
+    }
+  }
+
+  @VisibleForTesting
+  void resetShards(final Storage storage, final Resource resource) {
+    for (int i = 0; i < NUM_SHARDS; i++) {
+      final int index = i;
+      try {
+        storage.runInTransaction(tx -> {
+          tx.store(Shard.create(resource.id(), index, 0));
+          return null;
+        });
+      } catch (IOException e) {
+        LOG.error("Error resetting shards for resource {}", resource, e);
+        throw new RuntimeException(e);
+      }
     }
   }
 
