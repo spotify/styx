@@ -53,7 +53,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import junitparams.JUnitParamsRunner;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -673,8 +672,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @Test
-  @Ignore("WIP; transaction failures likely due to Datastore emulator, and random shard picking "
-          + "makes it hard to test")
   public void shouldLimitConcurrencyForResource() throws Exception {
     givenResource(RESOURCE_4);
     for (int i = 0; i < 4; i++) {
@@ -682,38 +679,12 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     }
 
     styxStarts();
-//    tickTriggerManager();
-//    tickScheduler();
-//    timePasses(1, SECONDS);
     tickTriggerManager();
-//    tickScheduler();
-
-    tickSchedulerUntilNumberOfDockerRuns(3);
-//    awaitNumberOfDockerRunsNot(4)?
-//    awaitNumberOfConsumedEvents(13);
-    assertThat(consumedEventNames(), is(ImmutableList.of(
-        "triggerExecution", "dequeue", "submit", "submitted",
-        "triggerExecution", "dequeue", "submit", "submitted",
-        "triggerExecution", "dequeue", "submit", "submitted",
-        "info"
-    )));
-
-//    setUp(20);
-//    setResourceLimit("r1", 3);
-//    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
-//
-//    for (int i = 0; i < 4; i++) {
-//      populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.QUEUED, time.get()));
-//    }
-//
-//    scheduler.tick();
-//
-//    ArgumentCaptor<Event> capturedEvents = ArgumentCaptor.forClass(Event.class);
-//    ArgumentCaptor<Long> capturedCounters = ArgumentCaptor.forClass(Long.class);
-//    verify(stateManager, times(4))
-//        .receiveIgnoreClosed(capturedEvents.capture(), capturedCounters.capture());
-//    issuedEvents(capturedEvents, "dequeue", 3);
-//    issuedEvents(capturedEvents, "info", 1);
-//    verify(stats).recordResourceUsed("r1", 3L);
+    // FIXME still flaky; I think sometimes we lose the info event because of transaction conflicts
+    tickSchedulerUntil(() -> getDockerRuns().size() == 3
+        && getTransitionedEventsByName("dequeue").size() == 3
+        && getTransitionedEventsByName("info").size() >= 1);
+    // TODO assert the message too?
+    // ("Resource limit reached for: [Resource{id=resource_4, concurrency=3}]")
   }
 }

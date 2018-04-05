@@ -64,6 +64,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -137,10 +138,7 @@ public class StyxSchedulerServiceFixture {
     StyxScheduler.DockerRunnerFactory dockerRunnerFactory =
         (id, env, states, exec, stats, debug) -> fakeDockerRunner();
     StyxScheduler.EventConsumerFactory eventConsumerFactory =
-        (env, stats) -> (event, state) -> {
-          System.out.println("Event: " + event.toString() + ", state: " + state.toString());
-          transitionedEvents.add(Tuple.of(event, state.state()));
-        };
+        (env, stats) -> (event, state) -> transitionedEvents.add(Tuple.of(event, state.state()));
     StyxScheduler.WorkflowConsumerFactory workflowConsumerFactory =
         (env, stats) -> (oldWorkflow, newWorkflow) ->
             workflowChanges.add(Tuple.of(oldWorkflow, newWorkflow));
@@ -185,18 +183,22 @@ public class StyxSchedulerServiceFixture {
     return dockerRuns.stream().collect(toList());
   }
 
+  List<Tuple2<SequenceEvent, RunState.State>> getTransitionedEventsByName(String name) {
+    return transitionedEvents.stream()
+        .filter(item -> name.equals(EventUtil.name(item._1.event())))
+        .collect(toList());
+  }
+
   void tickScheduler() {
     styxScheduler.tickScheduler();
   }
 
-  void tickSchedulerUntilNumberOfDockerRuns(int n) {
+  void tickSchedulerUntil(Callable<Boolean> conditionEvaluator) {
     await().atMost(30, SECONDS).until(() -> {
-      System.out.println("Scheduler ticks");
       tickScheduler();
-      return dockerRuns.size() == n;
+      return conditionEvaluator.call();
     });
   }
-
 
   void tickTriggerManager() {
     styxScheduler.tickTriggerManager();
@@ -351,22 +353,6 @@ public class StyxSchedulerServiceFixture {
   void awaitUntilConsumedEvent(SequenceEvent sequenceEvent, RunState.State state) {
     await().atMost(30, SECONDS).until(() ->
         transitionedEvents.contains(Tuple.of(sequenceEvent, state)));
-  }
-
-  void awaitNumberOfConsumedEvents(int n) {
-    await().atMost(30, SECONDS).until(() ->
-        transitionedEvents.size() == n);
-  }
-
-  List<String> consumedEventNames() {
-//    System.out.println("transitionedEvents:");
-//    for (Tuple2<SequenceEvent, RunState.State> tuple2 : transitionedEvents) {
-//      System.out.println(tuple2.toString());
-//    };
-    return transitionedEvents.stream()
-        .map(item -> EventUtil.name(item._1.event()))
-//        .sorted()
-        .collect(toList());
   }
 
   void awaitUntilConsumedWorkflow(Optional<Workflow> oldWorkflow, Optional<Workflow> newWorkflow) {

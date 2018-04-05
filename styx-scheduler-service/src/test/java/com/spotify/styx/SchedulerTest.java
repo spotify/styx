@@ -360,8 +360,6 @@ public class SchedulerTest {
 
   // TODO shouldDequeueIfResourceValueIsIncreased as an integration test?
 
-  // TODO shouldLimitConcurrencyForResource as an integration test?
-
   @Test
   public void shouldCountResourcesOnStatesConsumingResources() throws Exception {
     setUp(20);
