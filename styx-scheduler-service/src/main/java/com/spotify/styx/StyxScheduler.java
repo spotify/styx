@@ -330,7 +330,12 @@ public class StyxScheduler implements AppInit {
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
 
+    // DATAEX-1903: it is probably not needed or can be replaced with a timed cache and we do
+    // global query when evicting the cache (CachedSupplier)
     warmUpCache(workflowCache, storage);
+
+    // DATAEX-1903: this can be replaced with concurrent lookups when it is eventually used by
+    // getResourcesUsageMap
     initializeResources(storage, shardedCounter, counterSnapshotFactory, timeoutConfig, workflowCache);
 
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
@@ -363,17 +368,27 @@ public class StyxScheduler implements AppInit {
     final TriggerListener trigger =
         new StateInitializingTrigger(stateManager);
     final TriggerManager triggerManager = new TriggerManager(trigger, time, storage, stats);
+
+    // DATAEX-1903: this can be replaced with lookup and it will be one lookup per backfill,
+    // doesn't feel very heavy
     final BackfillTriggerManager backfillTriggerManager =
         new BackfillTriggerManager(stateManager, workflowCache, storage, trigger, stats, time);
 
     final WorkflowInitializer workflowInitializer = new WorkflowInitializer(storage, time);
     final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer =
         workflowConsumerFactory.apply(environment, stats);
+
+    // DATAEX-1903: this can be removed completely
     final Consumer<Workflow> workflowRemoveListener =
         workflowRemoved(workflowCache, storage, workflowConsumer);
+
+    // DATAEX-1903: this can be removed completely, or if you want to keep the log, we can do
+    // a lookup, but it is potentially heavy because workflow change/create requests are frequent
     final Consumer<Workflow> workflowChangeListener =
         workflowChanged(workflowCache, workflowInitializer, stats, stateManager, workflowConsumer);
 
+    // DATAEX-1903: this can be replaced with concurrent lookups which go with each tick
+    // we need to test how heavy it will be
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
                                               storage, resourceDecorator, stats, dequeueRateLimiter,
                                               executionGateFactory.apply(environment, storage));
@@ -386,6 +401,9 @@ public class StyxScheduler implements AppInit {
     startScheduler(scheduler, executor);
     startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
     startCleaner(cleaner, executor);
+
+    // DATAEX-1903: this can be metrics using this cache are not so important, but if we want to
+    // keep them we can use timed cache and we do global query when evicting the cache (CachedSupplier)
     setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats);
 
     final SchedulerResource schedulerResource =
