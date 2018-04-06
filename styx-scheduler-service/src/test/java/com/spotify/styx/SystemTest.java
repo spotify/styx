@@ -33,6 +33,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
@@ -676,7 +677,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   public void shouldLimitConcurrencyForResource() throws Exception {
     givenResource(RESOURCE_4);
     for (int i = 0; i < 4; i++) {
-      givenWorkflowAboutToTriggerWithResources("foo_" + i, ImmutableList.of(RESOURCE_4.id()));
+      givenWorkflowAboutToTriggerWithResources("foo_" + i, ImmutableSet.of(RESOURCE_4.id()));
     }
 
     styxStarts();
@@ -694,7 +695,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @Test
   public void shouldDequeueIfResourceValueIsIncreased() throws Exception {
     givenResource(RESOURCE_4);
-    givenWorkflowAboutToTriggerWithResources("foo", ImmutableList.of(RESOURCE_4.id()));
+    givenWorkflowAboutToTriggerWithResources("foo", ImmutableSet.of(RESOURCE_4.id()));
 
     styxStarts();
     tickTriggerManager();
@@ -708,5 +709,24 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickSchedulerUntil(() -> {
       assertThat(getTransitionedEventsByName("dequeue").size(), is(1));
     });
+  }
+
+  @Test
+  public void shouldLimitOnDecoratedWorkflowInstanceResourcesIfNotAvailable() throws Exception {
+    givenResource(RESOURCE_3);
+    givenResource(RESOURCE_4);
+    givenWorkflowAboutToTriggerWithResources("foo", ImmutableSet.of(RESOURCE_3.id()));
+    givenResourceIdsToDecorateWith(ImmutableSet.of(RESOURCE_4.id()));
+
+    styxStarts();
+    tickTriggerManager();
+    storage.updateLimitForCounter(RESOURCE_4.id(), 0);
+    tickSchedulerUntil(() -> {
+      assertThat(getTransitionedEventsByName("info").size(), greaterThanOrEqualTo(1));
+    });
+    // TODO assert the message too?
+    // ("Resource limit reached for: [Resource{id=resource_4, concurrency=0}]")
+    assertThat(getDockerRuns().size(), is(0));
+    assertThat(getTransitionedEventsByName("dequeue").size(), is(0));
   }
 }

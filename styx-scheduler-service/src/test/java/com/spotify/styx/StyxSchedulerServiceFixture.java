@@ -36,6 +36,7 @@ import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.spotify.apollo.test.ServiceHelper;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Backfill;
@@ -64,6 +65,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -95,6 +97,7 @@ public class StyxSchedulerServiceFixture {
   private Connection bigtable = setupBigTableMockTable(0);
   protected AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
   private DeterministicScheduler executor = new QuietDeterministicScheduler();
+  private Set<String> resourceIdsToDecorateWith = Sets.newHashSet();
 
   // circumstantial fields, set by test cases
 
@@ -137,6 +140,8 @@ public class StyxSchedulerServiceFixture {
     StyxScheduler.PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
     StyxScheduler.DockerRunnerFactory dockerRunnerFactory =
         (id, env, states, exec, stats, debug) -> fakeDockerRunner();
+    WorkflowResourceDecorator resourceDecorator = (rs, cfg, res) ->
+        Sets.union(res, resourceIdsToDecorateWith);
     StyxScheduler.EventConsumerFactory eventConsumerFactory =
         (env, stats) -> (event, state) -> transitionedEvents.add(Tuple.of(event, state.state()));
     StyxScheduler.WorkflowConsumerFactory workflowConsumerFactory =
@@ -151,6 +156,7 @@ public class StyxSchedulerServiceFixture {
         .setStatsFactory(statsFactory)
         .setExecutorFactory(executorFactory)
         .setPublisherFactory(publisherFactory)
+        .setResourceDecorator(resourceDecorator)
         .setEventConsumerFactory(eventConsumerFactory)
         .setWorkflowConsumerFactory(workflowConsumerFactory)
         .build();
@@ -238,14 +244,14 @@ public class StyxSchedulerServiceFixture {
     storage.storeWorkflow(workflow);
   }
 
-  void givenWorkflowAboutToTriggerWithResources(String workflowId, List<String> resources) throws
+  void givenWorkflowAboutToTriggerWithResources(String workflowId, Set<String> resourceIds) throws
                                                                                  IOException {
     final WorkflowConfiguration configuration = WorkflowConfiguration.builder()
         .id(workflowId)
         .schedule(Schedule.HOURS)
         .dockerImage("busybox")
         .dockerArgs(asList("--hour", "{}"))
-        .resources(resources)
+        .resources(resourceIds)
         .build();
     final Workflow workflow = Workflow.create("styx", configuration);
     givenWorkflow(workflow);
@@ -269,6 +275,10 @@ public class StyxSchedulerServiceFixture {
   void givenResource(Resource resource) throws IOException {
     storage.storeResource(resource);
     storage.updateLimitForCounter(resource.id(), resource.concurrency());
+  }
+
+  void givenResourceIdsToDecorateWith(Set<String> resourceIds) throws IOException {
+    resourceIdsToDecorateWith = resourceIds;
   }
 
   void workflowChanges(Workflow workflow) {
