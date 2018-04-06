@@ -64,7 +64,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -73,6 +72,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javaslang.Tuple;
 import javaslang.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
+import org.awaitility.core.ConditionTimeoutException;
 import org.jmock.lib.concurrent.DeterministicScheduler;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -179,12 +179,18 @@ public class StyxSchedulerServiceFixture {
     return styxScheduler.getState(workflowInstance);
   }
 
+  /**
+   * @return a best effort snapshot, without throwing ConcurrentModificationException.
+   */
   List<Tuple2<WorkflowInstance, DockerRunner.RunSpec>> getDockerRuns() {
-    return dockerRuns.stream().collect(toList());
+    return Lists.newArrayList(dockerRuns);
   }
 
+  /**
+   * @return a best effort snapshot, without throwing ConcurrentModificationException.
+   */
   List<Tuple2<SequenceEvent, RunState.State>> getTransitionedEventsByName(String name) {
-    return transitionedEvents.stream()
+    return Lists.newArrayList(transitionedEvents).stream()
         .filter(item -> name.equals(EventUtil.name(item._1.event())))
         .collect(toList());
   }
@@ -193,11 +199,25 @@ public class StyxSchedulerServiceFixture {
     styxScheduler.tickScheduler();
   }
 
-  void tickSchedulerUntil(Callable<Boolean> conditionEvaluator) {
-    await().atMost(30, SECONDS).until(() -> {
-      tickScheduler();
-      return conditionEvaluator.call();
-    });
+  void tickSchedulerUntil(Runnable asserter) {
+    List<AssertionError> errors = Lists.newArrayList();
+    try {
+      await().atMost(30, SECONDS).until(() -> {
+        tickScheduler();
+        try {
+          asserter.run();
+          return true;
+        } catch (AssertionError ae) {
+          errors.add(ae);
+          return false;
+        }
+      });
+    } catch (ConditionTimeoutException cte) {
+      if (errors.size() > 0) {
+        cte.addSuppressed(errors.get(errors.size() - 1));
+      }
+      throw cte;
+    }
   }
 
   void tickTriggerManager() {

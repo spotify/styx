@@ -27,6 +27,7 @@ import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -681,9 +682,11 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     styxStarts();
     tickTriggerManager();
     // FIXME still flaky; I think sometimes we lose the info event because of transaction conflicts
-    tickSchedulerUntil(() -> getDockerRuns().size() == 3
-        && getTransitionedEventsByName("dequeue").size() == 3
-        && getTransitionedEventsByName("info").size() >= 1);
+    tickSchedulerUntil(() -> {
+        assertThat(getDockerRuns().size(), is(3));
+        assertThat(getTransitionedEventsByName("dequeue").size(), is(3));
+        assertThat(getTransitionedEventsByName("info").size(), greaterThanOrEqualTo(1));
+    });
     // TODO assert the message too?
     // ("Resource limit reached for: [Resource{id=resource_4, concurrency=3}]")
   }
