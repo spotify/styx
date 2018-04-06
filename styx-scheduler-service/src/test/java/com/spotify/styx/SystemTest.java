@@ -679,16 +679,15 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   public void shouldLimitConcurrencyForResource() throws Exception {
     givenResource(RESOURCE_4);
     for (int i = 0; i < 4; i++) {
-      givenWorkflowAboutToTriggerWithResources("foo_" + i, ImmutableSet.of(RESOURCE_4.id()));
+      givenQueuedWfisWithResources("foo_" + i, 1, ImmutableSet.of(RESOURCE_4.id()));
     }
 
     styxStarts();
-    tickTriggerManager();
     // FIXME still flaky; I think sometimes we lose the info event because of transaction conflicts
     tickSchedulerUntil(() -> {
-        assertThat(getDockerRuns().size(), is(3));
-        assertThat(getTransitionedEventsByName("dequeue").size(), is(3));
-        assertThat(getTransitionedEventsByName("info").size(), greaterThanOrEqualTo(1));
+      assertThat(getDockerRuns().size(), is(3));
+      assertThat(getTransitionedEventsByName("dequeue").size(), is(3));
+      assertThat(getTransitionedEventsByName("info").size(), greaterThanOrEqualTo(1));
     });
     // TODO assert the message too?
     // ("Resource limit reached for: [Resource{id=resource_4, concurrency=3}]")
@@ -697,10 +696,9 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @Test
   public void shouldDequeueIfResourceValueIsIncreased() throws Exception {
     givenResource(RESOURCE_4);
-    givenWorkflowAboutToTriggerWithResources("foo", ImmutableSet.of(RESOURCE_4.id()));
+    givenQueuedWfisWithResources("foo", 1, ImmutableSet.of(RESOURCE_4.id()));
 
     styxStarts();
-    tickTriggerManager();
     storage.updateLimitForCounter(RESOURCE_4.id(), 0);
     tickSchedulerUntil(() -> {
       assertThat(getTransitionedEventsByName("info").size(), greaterThanOrEqualTo(1));
@@ -717,11 +715,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   public void shouldLimitOnDecoratedWorkflowInstanceResourcesIfNotAvailable() throws Exception {
     givenResource(RESOURCE_3);
     givenResource(RESOURCE_4);
-    givenWorkflowAboutToTriggerWithResources("foo", ImmutableSet.of(RESOURCE_3.id()));
+    givenQueuedWfisWithResources("foo", 1, ImmutableSet.of(RESOURCE_3.id()));
     givenResourceIdsToDecorateWith(ImmutableSet.of(RESOURCE_4.id()));
 
     styxStarts();
-    tickTriggerManager();
     storage.updateLimitForCounter(RESOURCE_4.id(), 0);
     tickSchedulerUntil(() -> {
       assertThat(getTransitionedEventsByName("info").size(), greaterThanOrEqualTo(1));
@@ -735,15 +732,13 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @Test
   public void shouldLimitConcurrencyAcrossWorkflows() throws Exception {
     givenResource(RESOURCE_5); // concurrency 1
-
-    givenWorkflowAboutToTriggerWithResources("foo", ImmutableSet.of(RESOURCE_5.id()));
-    givenWorkflowAboutToTriggerWithResources("bar", ImmutableSet.of(RESOURCE_5.id()));
+    givenQueuedWfisWithResources("foo", 1, ImmutableSet.of(RESOURCE_5.id()));
+    givenQueuedWfisWithResources("bar", 1, ImmutableSet.of(RESOURCE_5.id()));
 
     styxStarts();
-    tickTriggerManager();
     tickSchedulerUntil(() -> {
       assertThat(getTransitionedEventsByName("info").size(), is(1));
     });
-   assertThat(getTransitionedEventsByName("dequeue").size(), is(1));
+    assertThat(getTransitionedEventsByName("dequeue").size(), is(1));
   }
 }

@@ -21,6 +21,7 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
+import static java.time.temporal.ChronoUnit.HOURS;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -244,8 +245,8 @@ public class StyxSchedulerServiceFixture {
     storage.storeWorkflow(workflow);
   }
 
-  void givenWorkflowAboutToTriggerWithResources(String workflowId, Set<String> resourceIds) throws
-                                                                                 IOException {
+  void givenQueuedWfisWithResources(String workflowId, int numInstances, Set<String> resourceIds)
+      throws Exception {
     final WorkflowConfiguration configuration = WorkflowConfiguration.builder()
         .id(workflowId)
         .schedule(Schedule.HOURS)
@@ -254,10 +255,14 @@ public class StyxSchedulerServiceFixture {
         .resources(resourceIds)
         .build();
     final Workflow workflow = Workflow.create("styx", configuration);
+//    final Instant now = Instant.parse("2018-03-27T16:00:00Z");
+//    givenTheTimeIs(now.toString());
     givenWorkflow(workflow);
     givenWorkflowEnabledStateIs(workflow, true);
-    givenTheTimeIs("2018-03-27T16:00:01Z");
-    givenNextNaturalTrigger(workflow, "2018-03-27T15:00:00Z");
+    for (int i = 0; i < numInstances; i++) {
+      givenActiveState(WorkflowInstance.create(workflow.id(),
+          now.plus(i + 1, HOURS).toString().substring(0, 13)), 1);
+    }
   }
 
   void givenNextNaturalTrigger(Workflow workflow, String nextNaturalTrigger) throws IOException {
@@ -319,7 +324,7 @@ public class StyxSchedulerServiceFixture {
   void givenActiveState(WorkflowInstance workflowInstance, long count) {
     try {
       storage.writeActiveState(workflowInstance, RunState.create(workflowInstance,
-          RunState.State.QUEUED, StateData.zero(), Instant.now(), count));
+          RunState.State.QUEUED, StateData.newBuilder().retryDelayMillis(0L).build(), now, count));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
