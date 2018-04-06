@@ -408,8 +408,6 @@ public class SchedulerTest {
     verify(stats, times(2)).recordResourceUsed("r1", 3L);
   }
 
-  // TODO shouldLimitConcurrencyAcrossWorkflows as an integration test?
-
   // TODO shouldLimitConcurrencyUsingMultipleResources as an integration test?
 
   // TODO shouldLimitConcurrencyUsingMultipleResourcesAcrossWorkflows as an integration test?

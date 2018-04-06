@@ -114,10 +114,12 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   private static final String RESOURCE_ID2 = "resource_2";
   private static final String RESOURCE_ID3 = "resource_3";
   private static final String RESOURCE_ID4 = "resource_4";
+  private static final String RESOURCE_ID5 = "resource_5";
   private static final Resource RESOURCE_1 = Resource.create(RESOURCE_ID1, 10);
   private static final Resource RESOURCE_2 = Resource.create(RESOURCE_ID2, 128);
   private static final Resource RESOURCE_3 = Resource.create(RESOURCE_ID3, 10000);
   private static final Resource RESOURCE_4 = Resource.create(RESOURCE_ID4, 3);
+  private static final Resource RESOURCE_5 = Resource.create(RESOURCE_ID5, 1);
 
   private static RunSpec naturalRunSpec(String executionId, String imageName, List<String> args) {
     return RunSpec.builder()
@@ -593,7 +595,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    givenActiveStateAtSequenceCount(workflowInstance, RunState.create(workflowInstance,
+    givenActiveState(workflowInstance, RunState.create(workflowInstance,
         RunState.State.QUEUED, StateData.zero(),
         Instant.ofEpochMilli(timeOffsetSeconds(4)), 3L));
 
@@ -615,7 +617,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    givenActiveStateAtSequenceCount(workflowInstance, RunState.create(workflowInstance,
+    givenActiveState(workflowInstance, RunState.create(workflowInstance,
         RunState.State.QUEUED, StateData.newBuilder().trigger(TRIGGER1).build(),
         Instant.parse("2016-03-14T15:17:45Z"), 13L));
 
@@ -640,7 +642,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
-    givenActiveStateAtSequenceCount(workflowInstance, RunState.create(workflowInstance,
+    givenActiveState(workflowInstance, RunState.create(workflowInstance,
         RunState.State.RUNNING, StateData.newBuilder().trigger(TRIGGER1).build(),
         Instant.parse("2016-03-14T15:17:45Z"), 2L));
 
@@ -728,5 +730,20 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     // ("Resource limit reached for: [Resource{id=resource_4, concurrency=0}]")
     assertThat(getDockerRuns().size(), is(0));
     assertThat(getTransitionedEventsByName("dequeue").size(), is(0));
+  }
+
+  @Test
+  public void shouldLimitConcurrencyAcrossWorkflows() throws Exception {
+    givenResource(RESOURCE_5); // concurrency 1
+
+    givenWorkflowAboutToTriggerWithResources("foo", ImmutableSet.of(RESOURCE_5.id()));
+    givenWorkflowAboutToTriggerWithResources("bar", ImmutableSet.of(RESOURCE_5.id()));
+
+    styxStarts();
+    tickTriggerManager();
+    tickSchedulerUntil(() -> {
+      assertThat(getTransitionedEventsByName("info").size(), is(1));
+    });
+   assertThat(getTransitionedEventsByName("dequeue").size(), is(1));
   }
 }

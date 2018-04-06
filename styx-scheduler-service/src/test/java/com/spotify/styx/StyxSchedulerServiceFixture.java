@@ -316,7 +316,7 @@ public class StyxSchedulerServiceFixture {
     }
   }
 
-  void givenActiveStateAtSequenceCount(WorkflowInstance workflowInstance, long count) {
+  void givenActiveState(WorkflowInstance workflowInstance, long count) {
     try {
       storage.writeActiveState(workflowInstance, RunState.create(workflowInstance,
           RunState.State.QUEUED, StateData.zero(), Instant.now(), count));
@@ -325,7 +325,7 @@ public class StyxSchedulerServiceFixture {
     }
   }
 
-  void givenActiveStateAtSequenceCount(WorkflowInstance workflowInstance, RunState state) {
+  void givenActiveState(WorkflowInstance workflowInstance, RunState state) {
     try {
       storage.writeActiveState(workflowInstance, state);
     } catch (IOException e) {
