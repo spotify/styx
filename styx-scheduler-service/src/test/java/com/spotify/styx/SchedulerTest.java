@@ -408,8 +408,6 @@ public class SchedulerTest {
     verify(stats, times(2)).recordResourceUsed("r1", 3L);
   }
 
-  // TODO shouldLimitConcurrencyUsingMultipleResourcesAcrossWorkflows as an integration test?
-
   @Test
   public void shouldDecorateWorkflowInstanceResources() throws Exception {
     setUp(20);
