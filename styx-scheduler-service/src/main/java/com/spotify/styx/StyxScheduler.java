@@ -378,20 +378,18 @@ public class StyxScheduler implements AppInit {
     final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer =
         workflowConsumerFactory.apply(environment, stats);
 
-    // DATAEX-1903: this can be removed completely
+    // DATAEX-1903: this can be replaced by lookup
     final Consumer<Workflow> workflowRemoveListener =
         workflowRemoved(workflowCache, storage, workflowConsumer);
 
-    // DATAEX-1903: this can be removed completely, or if you want to keep the log, we can do
-    // a lookup, but it is potentially heavy because workflow change/create requests are frequent
+    // DATAEX-1903: this can be replaced by lookup
     final Consumer<Workflow> workflowChangeListener =
         workflowChanged(workflowCache, workflowInitializer, stats, stateManager, workflowConsumer);
 
     // DATAEX-1903: this can be replaced with concurrent lookups which go with each tick
     // we need to test how heavy it will be.
-    // We can probably tolerate reading weekly consistent workflows using global query for
-    // scheduler tick. If activate state has been created, we must have read already consistent
-    // workflow in that Kind.
+    // We probably cannot tolerate weak consistency, e.g. if user changes the workflow, they would
+    // expect for next retry the new configuration should be picked up
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
                                               storage, resourceDecorator, stats, dequeueRateLimiter,
                                               executionGateFactory.apply(environment, storage));
