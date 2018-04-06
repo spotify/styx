@@ -388,7 +388,10 @@ public class StyxScheduler implements AppInit {
         workflowChanged(workflowCache, workflowInitializer, stats, stateManager, workflowConsumer);
 
     // DATAEX-1903: this can be replaced with concurrent lookups which go with each tick
-    // we need to test how heavy it will be
+    // we need to test how heavy it will be.
+    // We can probably tolerate reading weekly consistent workflows using global query for
+    // scheduler tick. If activate state has been created, we must have read already consistent
+    // workflow in that Kind.
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
                                               storage, resourceDecorator, stats, dequeueRateLimiter,
                                               executionGateFactory.apply(environment, storage));
