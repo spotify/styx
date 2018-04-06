@@ -335,7 +335,7 @@ public class StyxScheduler implements AppInit {
     warmUpCache(workflowCache, storage);
 
     // DATAEX-1903: this can be replaced with concurrent lookups when it is eventually used by
-    // getResourcesUsageMap
+    // getResourcesUsageMap, or if we keep the cache just use it
     initializeResources(storage, shardedCounter, counterSnapshotFactory, timeoutConfig, workflowCache);
 
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
