@@ -408,8 +408,6 @@ public class SchedulerTest {
     verify(stats, times(2)).recordResourceUsed("r1", 3L);
   }
 
-  // TODO shouldLimitConcurrencyUsingMultipleResources as an integration test?
-
   // TODO shouldLimitConcurrencyUsingMultipleResourcesAcrossWorkflows as an integration test?
 
   @Test
@@ -436,8 +434,6 @@ public class SchedulerTest {
     verify(stateManager).receiveIgnoreClosed(eq(Event.dequeue(INSTANCE_1,
         ImmutableSet.of("baz", "quux", "GLOBAL_STYX_CLUSTER"))), anyLong());
   }
-
-  // TODO shouldLimitOnDecoratedWorkflowInstanceResourcesIfNotAvailable as an integration test?
 
   @Test
   public void shouldCountDecoratedResourcesOnNonQueuedStates() throws Exception {

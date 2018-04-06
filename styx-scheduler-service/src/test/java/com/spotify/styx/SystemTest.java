@@ -741,4 +741,19 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     });
     assertThat(getTransitionedEventsByName("dequeue").size(), is(1));
   }
+
+  @Test
+  public void shouldLimitConcurrencyUsingMultipleResources() throws Exception {
+    givenResource(RESOURCE_3); // concurrency 10000
+    givenResource(RESOURCE_4); // concurrency 3
+    givenResource(RESOURCE_5); // concurrency 1
+    givenQueuedWfisWithResources("foo", 5, ImmutableSet.of(RESOURCE_3.id(), RESOURCE_4.id()));
+
+    styxStarts();
+    tickSchedulerUntil(() -> {
+      assertThat(getDockerRuns().size(), is(3));
+      assertThat(getTransitionedEventsByName("dequeue").size(), is(3));
+      assertThat(getTransitionedEventsByName("info").size(), greaterThanOrEqualTo(2));
+    });
+  }
 }
