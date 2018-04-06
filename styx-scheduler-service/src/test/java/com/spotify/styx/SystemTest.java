@@ -690,4 +690,23 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     // TODO assert the message too?
     // ("Resource limit reached for: [Resource{id=resource_4, concurrency=3}]")
   }
+
+  @Test
+  public void shouldDequeueIfResourceValueIsIncreased() throws Exception {
+    givenResource(RESOURCE_4);
+    givenWorkflowAboutToTriggerWithResources("foo", ImmutableList.of(RESOURCE_4.id()));
+
+    styxStarts();
+    tickTriggerManager();
+    storage.updateLimitForCounter(RESOURCE_4.id(), 0);
+    tickSchedulerUntil(() -> {
+      assertThat(getTransitionedEventsByName("info").size(), greaterThanOrEqualTo(1));
+    });
+    assertThat(getDockerRuns().size(), is(0));
+    assertThat(getTransitionedEventsByName("dequeue").size(), is(0));
+    storage.updateLimitForCounter(RESOURCE_4.id(), 1);
+    tickSchedulerUntil(() -> {
+      assertThat(getTransitionedEventsByName("dequeue").size(), is(1));
+    });
+  }
 }

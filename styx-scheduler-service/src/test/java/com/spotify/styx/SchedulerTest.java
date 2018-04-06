@@ -358,8 +358,6 @@ public class SchedulerTest {
         anyLong());
   }
 
-  // TODO shouldDequeueIfResourceValueIsIncreased as an integration test?
-
   @Test
   public void shouldCountResourcesOnStatesConsumingResources() throws Exception {
     setUp(20);
