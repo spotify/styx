@@ -26,7 +26,6 @@ import static java.util.stream.Collectors.toSet;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
-import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
@@ -134,15 +133,7 @@ public class QueuedStateManager implements StateManager {
 
   @Override
   public CompletableFuture<Void> receive(Event event) throws IsClosedException {
-    ensureRunning();
-    // Read state counter at enqueueing time
-    final Optional<RunState> currentRunState = getActiveState(event.workflowInstance());
-    if (!currentRunState.isPresent()) {
-      String message = "Received event for unknown workflow instance: " + event;
-      LOG.warn(message);
-      return CompletableFutures.exceptionallyCompletedFuture(new IllegalArgumentException(message));
-    }
-    return receive(event, currentRunState.get().counter());
+    return receive(event, Long.MAX_VALUE);
   }
 
   @Override
@@ -301,6 +292,10 @@ public class QueuedStateManager implements StateManager {
   }
 
   private void verifyCounter(Event event, long expectedCounter, RunState currentRunState) {
+    if (expectedCounter == Long.MAX_VALUE) {
+      return;
+    }
+
     final long currentCounter = currentRunState.counter();
     if (currentCounter > expectedCounter) {
       final String message = "Stale event encountered. Expected counter is "
