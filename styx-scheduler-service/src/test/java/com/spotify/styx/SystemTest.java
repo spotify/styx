@@ -26,8 +26,11 @@ import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.Collectors.toList;
+import static org.hamcrest.Matchers.both;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -49,6 +52,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.state.handlers.TerminationHandler;
+import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -683,14 +687,13 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     }
 
     styxStarts();
-    // FIXME still flaky; I think sometimes we lose the info event because of transaction conflicts
     tickSchedulerUntil(() -> {
       assertThat(getDockerRuns().size(), is(3));
       assertThat(getTransitionedEventsByName("dequeue").size(), is(3));
       assertThat(getTransitionedEventsByName("info").size(), greaterThanOrEqualTo(1));
     });
-    // TODO assert the message too?
-    // ("Resource limit reached for: [Resource{id=resource_4, concurrency=3}]")
+    assertEquals(EventUtil.info(getTransitionedEventsByName("info").get(0)._1.event()),
+        "Resource limit reached for: [Resource{id=resource_4, concurrency=3}]");
   }
 
   @Test
@@ -723,8 +726,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickSchedulerUntil(() -> {
       assertThat(getTransitionedEventsByName("info").size(), greaterThanOrEqualTo(1));
     });
-    // TODO assert the message too?
-    // ("Resource limit reached for: [Resource{id=resource_4, concurrency=0}]")
+    assertEquals(EventUtil.info(getTransitionedEventsByName("info").get(0)._1.event()),
+        "Resource limit reached for: [Resource{id=resource_4, concurrency=0}]");
     assertThat(getDockerRuns().size(), is(0));
     assertThat(getTransitionedEventsByName("dequeue").size(), is(0));
   }
@@ -755,6 +758,9 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       assertThat(getTransitionedEventsByName("dequeue").size(), is(3));
       assertThat(getTransitionedEventsByName("info").size(), greaterThanOrEqualTo(2));
     });
+    assertThat(getTransitionedEventsByName("info").stream().map(
+        tuple -> EventUtil.info(tuple._1.event())).collect(toList()), hasItem(
+        "Resource limit reached for: [Resource{id=resource_4, concurrency=3}]"));
   }
 
   @Test
@@ -771,5 +777,9 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       assertThat(getTransitionedEventsByName("dequeue").size(), is(4));
       assertThat(getTransitionedEventsByName("info").size(), greaterThanOrEqualTo(4));
     });
+    assertThat(getTransitionedEventsByName("info").stream().map(
+        tuple -> EventUtil.info(tuple._1.event())).collect(toList()), both(
+            hasItem("Resource limit reached for: [Resource{id=resource_4, concurrency=3}]")).and(
+            hasItem("Resource limit reached for: [Resource{id=resource_5, concurrency=1}]")));
   }
 }
