@@ -302,9 +302,21 @@ public class BackfillTriggerManagerTest {
   }
 
   @Test
+  public void shouldNotTriggerBackfillsAndStoreBackfillWithMissingWorkflows() throws Exception {
+    backfills.put(BACKFILL_1.id(), BACKFILL_1);
+    when(storage.workflow(BACKFILL_1.workflowId())).thenReturn(Optional.empty());
+    doThrow(new IOException()).when(storage).storeBackfill(any());
+
+    backfillTriggerManager.tick();
+
+    verifyZeroInteractions(triggerListener);
+    verify(storage).storeBackfill(BACKFILL_1.builder().halted(true).build());
+  }
+
+  @Test
   public void shouldNotTriggerBackfillsWhenFailedToReadWorkflow() throws Exception {
     backfills.put(BACKFILL_1.id(), BACKFILL_1);
-    doThrow(new IOException()).when(storage).workflow(BACKFILL_1.workflowId());
+    when(storage.workflow(BACKFILL_1.workflowId())).thenThrow(new IOException());
 
     backfillTriggerManager.tick();
 

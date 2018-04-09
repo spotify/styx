@@ -375,7 +375,7 @@ public class StyxScheduler implements AppInit {
     final Consumer<Workflow> workflowRemoveListener = workflowRemoved(storage, workflowConsumer);
 
     final Consumer<Workflow> workflowChangeListener =
-        workflowChanged(workflowInitializer, stats, stateManager, workflowConsumer, storage);
+        workflowChanged(workflowInitializer, stats, stateManager, storage, workflowConsumer);
 
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager,
                                               storage, resourceDecorator, stats, dequeueRateLimiter,
@@ -648,23 +648,25 @@ public class StyxScheduler implements AppInit {
     stats.registerSubmissionRateLimitMetric(submissionRateLimiter::getRate);
   }
 
-  private static Consumer<Workflow> workflowChanged(
+  @VisibleForTesting
+  static Consumer<Workflow> workflowChanged(
       WorkflowInitializer workflowInitializer,
       Stats stats,
       StateManager stateManager,
-      BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer,
-      Storage storage) {
+      Storage storage,
+      BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
     return workflow -> {
-      stats.registerActiveStatesMetric(
-          workflow.id(), workflowActiveStates(stateManager, workflow));
-
       final Optional<Workflow> oldWorkflowOptional;
       try {
         oldWorkflowOptional = storage.workflow(workflow.id());
       } catch (IOException e) {
-        LOG.warn("Couldn't read workflow {}. ", workflow.id());
-        return;
+        final String message = String.format("Couldn't read workflow %s. ", workflow.id());
+        LOG.warn(message, e);
+        throw new RuntimeException(message, e);
       }
+
+      stats.registerActiveStatesMetric(
+          workflow.id(), workflowActiveStates(stateManager, workflow));
 
       workflowInitializer.inspectChange(oldWorkflowOptional, workflow);
       workflowConsumer.accept(oldWorkflowOptional, Optional.of(workflow));
@@ -678,15 +680,17 @@ public class StyxScheduler implements AppInit {
     };
   }
 
-  private static Consumer<Workflow> workflowRemoved(
+  @VisibleForTesting
+  static Consumer<Workflow> workflowRemoved(
       Storage storage,
       BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
     return workflow -> {
       try {
         storage.delete(workflow.id());
       } catch (IOException e) {
-        LOG.warn("Couldn't remove workflow {}. ", workflow.id());
-        return;
+        final String message = String.format("Couldn't remove workflow %s. ", workflow.id());
+        LOG.warn(message, e);
+        throw new RuntimeException(message, e);
       }
       workflowConsumer.accept(Optional.of(workflow), Optional.empty());
       LOG.info("Workflow removed: {}", workflow);

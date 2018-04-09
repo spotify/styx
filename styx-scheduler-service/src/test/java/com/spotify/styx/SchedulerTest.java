@@ -24,6 +24,8 @@ import static com.spotify.styx.state.TimeoutConfig.createWithDefaultTtl;
 import static java.time.Duration.ofSeconds;
 import static org.hamcrest.Matchers.either;
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anySetOf;
@@ -326,6 +328,26 @@ public class SchedulerTest {
             .receiveIgnoreClosed(eq(Event.dequeue(x, ImmutableSet.of())), anyLong()));
     inOrder.verify(stateManager).receiveIgnoreClosed(eq(
         Event.dequeue(INSTANCE_1, ImmutableSet.of())), anyLong());
+  }
+
+  @Test
+  public void shouldNotExecuteWhenFailedToReadWorkflows() throws Exception {
+    setUp(20);
+    final IOException exception = new IOException();
+    when(storage.workflow(WORKFLOW_ID1)).thenThrow(exception);
+
+    StateData stateData = StateData.newBuilder().tries(0).build();
+
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get()));
+
+    try {
+      scheduler.tick();
+      fail();
+    } catch (Exception e) {
+      assertThat(e.getCause(), is(exception));
+    }
+
+    verify(stateManager, never()).receiveIgnoreClosed(any());
   }
 
   @Test

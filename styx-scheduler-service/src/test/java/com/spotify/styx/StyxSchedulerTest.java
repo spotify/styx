@@ -20,31 +20,45 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.testdata.TestData.HOURLY_WORKFLOW_CONFIGURATION_WITH_VALID_OFFSET;
+import static com.spotify.styx.testdata.TestData.WORKFLOW_ID;
+import static com.spotify.styx.testdata.TestData.WORKFLOW_WITH_RESOURCES;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.theInstance;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.codahale.metrics.Gauge;
 import com.google.api.services.container.v1beta1.Container;
 import com.google.api.services.container.v1beta1.model.Cluster;
 import com.google.api.services.container.v1beta1.model.MasterAuth;
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.StyxScheduler.KubernetesClientFactory;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.monitoring.Stats;
+import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.util.Shard;
+import com.spotify.styx.workflow.WorkflowInitializer;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -65,11 +79,19 @@ public class StyxSchedulerTest {
   @Mock private Container.Projects.Locations.Clusters.Get gkeClusterGet;
   @Mock private Storage storage;
   @Mock private StorageTransaction transaction;
+  @Mock private WorkflowInitializer workflowInitializer;
+  @Mock private Stats stats;
+  @Mock private StateManager stateManager;
+  @Mock private BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
+
+  private StyxScheduler styxScheduler;
 
   @Before
   public void setUp() throws Exception {
     when(kubernetesClientFactory.apply(any())).thenReturn(kubernetesClient);
     when(gkeClient.projects().locations().clusters().get(any())).thenReturn(gkeClusterGet);
+
+    styxScheduler = StyxScheduler.newBuilder().build();
   }
 
   @Test
@@ -119,7 +141,6 @@ public class StyxSchedulerTest {
 
   @Test
   public void shouldUpdateShardsAccordingToUsedResources() throws IOException {
-    final StyxScheduler styxScheduler = StyxScheduler.newBuilder().build();
     when(storage.runInTransaction(any())).thenAnswer(
         a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
     final Map<String, Long> resourcesUsageMap = ImmutableMap.of("res1", 257L);
@@ -133,7 +154,6 @@ public class StyxSchedulerTest {
 
   @Test
   public void shouldFailToUpdateShardsAccordingToUsedResources() throws IOException {
-    final StyxScheduler styxScheduler = StyxScheduler.newBuilder().build();
     final IOException exception = new IOException();
     when(storage.runInTransaction(any())).thenThrow(exception);
     final Map<String, Long> resourcesUsageMap = ImmutableMap.of("res1", 257L);
@@ -144,11 +164,10 @@ public class StyxSchedulerTest {
     } catch (Exception e) {
       assertThat(e.getCause(), is(exception));
     }
-}
+  }
 
   @Test
   public void shouldResetShardsOfResource() throws IOException {
-    final StyxScheduler styxScheduler = StyxScheduler.newBuilder().build();
     when(storage.runInTransaction(any())).thenAnswer(
         a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
 
@@ -160,7 +179,6 @@ public class StyxSchedulerTest {
 
   @Test
   public void shouldFailToResetShardsOfResource() throws IOException {
-    final StyxScheduler styxScheduler = StyxScheduler.newBuilder().build();
     final IOException exception = new IOException();
     when(storage.runInTransaction(any())).thenThrow(exception);
 
@@ -170,6 +188,79 @@ public class StyxSchedulerTest {
     } catch (Exception e) {
       assertThat(e.getCause(), is(exception));
     }
+  }
+
+  @Test
+  public void shouldHandleWorkflowUnchanged() throws IOException {
+    when(storage.workflow(WORKFLOW_WITH_RESOURCES.id()))
+        .thenReturn(Optional.of(WORKFLOW_WITH_RESOURCES));
+    final Consumer<Workflow> consumer = StyxScheduler.workflowChanged(workflowInitializer, stats,
+        stateManager, storage, workflowConsumer);
+    consumer.accept(WORKFLOW_WITH_RESOURCES);
+    //noinspection unchecked
+    verify(stats).registerActiveStatesMetric(eq(WORKFLOW_WITH_RESOURCES.id()), any(Gauge.class));
+    verify(workflowInitializer).inspectChange(Optional.of(WORKFLOW_WITH_RESOURCES),
+        WORKFLOW_WITH_RESOURCES);
+    verify(workflowConsumer).accept(Optional.of(WORKFLOW_WITH_RESOURCES),
+        Optional.of(WORKFLOW_WITH_RESOURCES));
+  }
+
+  @Test
+  public void shouldHandleWorkflowChanged() throws IOException {
+    final Workflow workflow = Workflow.create(WORKFLOW_ID.componentId(),
+        HOURLY_WORKFLOW_CONFIGURATION_WITH_VALID_OFFSET);
+    when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
+    final Consumer<Workflow> consumer = StyxScheduler.workflowChanged(workflowInitializer, stats,
+        stateManager, storage, workflowConsumer);
+    consumer.accept(WORKFLOW_WITH_RESOURCES);
+    //noinspection unchecked
+    verify(stats).registerActiveStatesMetric(eq(WORKFLOW_WITH_RESOURCES.id()), any(Gauge.class));
+    verify(workflowInitializer).inspectChange(Optional.of(workflow), WORKFLOW_WITH_RESOURCES);
+    verify(workflowConsumer).accept(Optional.of(workflow), Optional.of(WORKFLOW_WITH_RESOURCES));
+  }
+
+  @Test
+  public void shouldFailToReadWorkflowForWorkflowChange() throws IOException {
+    final Workflow workflow = Workflow.create(WORKFLOW_ID.componentId(),
+        HOURLY_WORKFLOW_CONFIGURATION_WITH_VALID_OFFSET);
+    final IOException exception = new IOException();
+    when(storage.workflow(workflow.id())).thenThrow(exception);
+    final Consumer<Workflow> consumer = StyxScheduler.workflowChanged(workflowInitializer, stats,
+        stateManager, storage, workflowConsumer);
+    try {
+      consumer.accept(WORKFLOW_WITH_RESOURCES);
+      fail();
+    } catch (Exception e) {
+      assertThat(e.getCause(), is(exception));
+    }
+    //noinspection unchecked
+    verify(stats, never())
+        .registerActiveStatesMetric(eq(WORKFLOW_WITH_RESOURCES.id()), any(Gauge.class));
+    verify(workflowInitializer, never())
+        .inspectChange(Optional.of(workflow), WORKFLOW_WITH_RESOURCES);
+    verify(workflowConsumer, never())
+        .accept(Optional.of(workflow), Optional.of(WORKFLOW_WITH_RESOURCES));
+  }
+
+  @Test
+  public void shouldHandleWorkflowRemove() {
+    final Consumer<Workflow> consumer = StyxScheduler.workflowRemoved(storage, workflowConsumer);
+    consumer.accept(WORKFLOW_WITH_RESOURCES);
+    verify(workflowConsumer).accept(Optional.of(WORKFLOW_WITH_RESOURCES), Optional.empty());
+  }
+
+  @Test
+  public void shouldFailToDeleteWorkflow() throws IOException {
+    final IOException exception = new IOException();
+    doThrow(exception).when(storage).delete(WORKFLOW_WITH_RESOURCES.id());
+    final Consumer<Workflow> consumer = StyxScheduler.workflowRemoved(storage, workflowConsumer);
+    try {
+      consumer.accept(WORKFLOW_WITH_RESOURCES);
+      fail();
+    } catch (Exception e) {
+      assertThat(e.getCause(), is(exception));
+    }
+    verify(workflowConsumer, never()).accept(Optional.of(WORKFLOW_WITH_RESOURCES), Optional.empty());
   }
 
   private void shardsWithValue(ArgumentCaptor<Shard> shardArgumentCaptor, long value, long times) {
