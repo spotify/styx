@@ -24,7 +24,6 @@ import static com.spotify.styx.state.TimeoutConfig.createWithDefaultTtl;
 import static java.time.Duration.ofSeconds;
 import static org.hamcrest.Matchers.either;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anySetOf;
@@ -59,7 +58,6 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
 import java.time.Duration;
@@ -78,7 +76,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Matchers;
 import org.mockito.Mock;
@@ -89,8 +86,6 @@ public class SchedulerTest {
 
   private static final WorkflowId WORKFLOW_ID1 =
       WorkflowId.create("styx1", "example1");
-  private static final WorkflowId WORKFLOW_ID2 =
-      WorkflowId.create("styx2", "example2");
   private static final WorkflowInstance INSTANCE_1 =
       WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T01");
 
@@ -153,13 +148,6 @@ public class SchedulerTest {
   private void populateActiveStates(RunState... runStates) {
     for (RunState runState : runStates) {
       activeStates.put(runState.workflowInstance(), runState);
-    }
-    when(stateManager.getActiveStates()).thenReturn(activeStates);
-  }
-
-  private void removeActiveStates(Set<WorkflowInstance> workflowInstances) {
-    for (WorkflowInstance workflowInstance : workflowInstances) {
-      activeStates.remove(workflowInstance);
     }
     when(stateManager.getActiveStates()).thenReturn(activeStates);
   }
@@ -560,22 +548,5 @@ public class SchedulerTest {
 
   private WorkflowInstance instance(WorkflowId id, String instanceId) {
     return WorkflowInstance.create(id, instanceId);
-  }
-
-  private void issuedEvents(ArgumentCaptor<Event> events, String eventType, long times) {
-    assertThat(events.getAllValues()
-            .stream()
-            .filter(event -> eventType.equals(EventUtil.name(event)))
-            .count(),
-        is(times));
-  }
-
-  private void issuedEvents(ArgumentCaptor<Event> events, String eventType, long times, WorkflowId workflowId) {
-    assertThat(events.getAllValues()
-            .stream()
-            .filter(event -> eventType.equals(EventUtil.name(event)))
-            .filter(event -> event.workflowInstance().workflowId().equals(workflowId))
-            .count(),
-        is(times));
   }
 }
