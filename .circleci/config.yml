@@ -3,7 +3,7 @@ jobs:
   test_jdk8_with_coverage:
     working_directory: ~/styx
     docker:
-      - image: maven:3.5.2-jdk-8
+      - image: maven:3.5.3-jdk-8
     steps:
       - checkout
       - restore_cache:
@@ -33,7 +33,7 @@ jobs:
   test_jdk9:
     working_directory: ~/styx
     docker:
-      - image: maven:3.5.2-jdk-9-slim
+      - image: maven:3.5.3-jdk-9-slim
     steps:
       - checkout
       - restore_cache:
@@ -51,6 +51,21 @@ jobs:
             MAVEN_OPTS: -Xmx256m -Xms256m
           command: mvn verify
 
+  test_jdk10:
+    working_directory: ~/styx
+    docker:
+      - image: maven:3.5.3-jdk-10-slim
+    steps:
+      - checkout
+      - restore_cache:
+          key: v1-deps-jdk10-{{ checksum "pom.xml" }}
+      - run: mvn dependency:go-offline compile
+      - save_cache:
+          key: v1-deps-jdk10-{{ checksum "pom.xml" }}
+          paths:
+            - ~/.m2
+      - run: mvn verify
+
 
 workflows:
   version: 2
@@ -58,3 +73,4 @@ workflows:
     jobs:
       - test_jdk8_with_coverage
       - test_jdk9
+      - test_jdk10
