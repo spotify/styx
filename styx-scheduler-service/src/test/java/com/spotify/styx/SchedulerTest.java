@@ -29,7 +29,6 @@ import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anySetOf;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -89,7 +88,6 @@ public class SchedulerTest {
   private static final WorkflowInstance INSTANCE_1 =
       WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T01");
 
-  private WorkflowCache workflowCache;
   private Scheduler scheduler;
 
   private Instant now = Instant.parse("2016-12-02T22:00:00Z");
@@ -107,6 +105,7 @@ public class SchedulerTest {
   @Mock StyxConfig config;
   @Mock WorkflowExecutionGate gate;
   @Mock StateManager stateManager;
+  @Mock Storage storage;
 
   @Before
   public void setUp() {
@@ -120,10 +119,8 @@ public class SchedulerTest {
   }
 
   private void setUp(long timeoutSeconds) throws IOException {
-    workflowCache = new InMemWorkflowCache();
     TimeoutConfig timeoutConfig = createWithDefaultTtl(ofSeconds(timeoutSeconds));
 
-    final Storage storage = mock(Storage.class);
     when(storage.resources()).thenReturn(resourceLimits);
     when(config.globalConcurrency()).thenReturn(Optional.empty());
     when(storage.config()).thenReturn(config);
@@ -132,7 +129,7 @@ public class SchedulerTest {
         any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
         .thenAnswer(a -> a.getArgumentAt(2, Set.class));
 
-    scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache, storage, resourceDecorator,
+    scheduler = new Scheduler(time, timeoutConfig, stateManager, storage, resourceDecorator,
         stats, rateLimiter, gate);
   }
 
@@ -141,8 +138,8 @@ public class SchedulerTest {
     resourceLimits.add(Resource.create(resourceId, limit));
   }
 
-  private void initWorkflow(Workflow workflow) {
-    workflowCache.store(workflow);
+  private void initWorkflow(Workflow workflow) throws IOException {
+    when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
   }
 
   private void populateActiveStates(RunState... runStates) {
@@ -283,6 +280,37 @@ public class SchedulerTest {
     for (int i = 1; i <= 10; i++) {
       WorkflowId workflowId = WorkflowId.create("styx2", "example" + i);
       initWorkflow(workflowUsingResources(workflowId));
+      WorkflowInstance instance = WorkflowInstance.create(workflowId, "2016-12-02T01");
+      populateActiveStates(RunState.create(instance, State.QUEUED, stateData,
+          time.get().minus(i, ChronoUnit.SECONDS)));
+      workflowInstances.add(instance);
+    }
+
+    scheduler.tick();
+
+    InOrder inOrder = inOrder(stateManager);
+
+    Lists.reverse(workflowInstances)
+        .forEach(x -> inOrder.verify(stateManager)
+            .receiveIgnoreClosed(eq(Event.dequeue(x, ImmutableSet.of())), anyLong()));
+    inOrder.verify(stateManager).receiveIgnoreClosed(eq(
+        Event.dequeue(INSTANCE_1, ImmutableSet.of())), anyLong());
+  }
+
+  @Test
+  public void shouldDequeueEvenWhenMissingWorkflows() throws Exception {
+    setUp(20);
+
+    when(storage.workflow(any())).thenReturn(Optional.empty());
+
+    StateData stateData = StateData.newBuilder().tries(0).build();
+
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get()));
+
+    List<WorkflowInstance> workflowInstances = new ArrayList<>();
+
+    for (int i = 1; i <= 10; i++) {
+      WorkflowId workflowId = WorkflowId.create("styx2", "example" + i);
       WorkflowInstance instance = WorkflowInstance.create(workflowId, "2016-12-02T01");
       populateActiveStates(RunState.create(instance, State.QUEUED, stateData,
           time.get().minus(i, ChronoUnit.SECONDS)));

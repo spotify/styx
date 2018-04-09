@@ -25,7 +25,6 @@ import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.when;
 
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.storage.Storage;
@@ -62,24 +61,11 @@ public class WorkflowInitializerTest {
   }
 
   @Test
-  public void shouldFailToReadWorkflow() throws Exception {
-    when(storage.workflow(HOURLY_WORKFLOW.id())).thenThrow(new IOException("read error"));
-
-    try {
-      workflowInitializer.inspectChange(HOURLY_WORKFLOW);
-      fail();
-    } catch (RuntimeException e) {
-      assertEquals("read error", e.getCause().getMessage());
-    }
-  }
-
-  @Test
   public void shouldFailToStoreWorkflow() throws Exception {
     doThrow(new IOException("write error")).when(storage).storeWorkflow(HOURLY_WORKFLOW);
-    when(storage.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
 
     try {
-      workflowInitializer.inspectChange(HOURLY_WORKFLOW);
+      workflowInitializer.inspectChange(Optional.of(HOURLY_WORKFLOW), HOURLY_WORKFLOW);
       fail();
     } catch (RuntimeException e) {
       assertEquals("write error", e.getCause().getMessage());
@@ -87,21 +73,19 @@ public class WorkflowInitializerTest {
   }
 
   @Test(expected = WorkflowInitializationException.class)
-  public void shouldFailComputeNextTrigger() throws Exception {
-    when(storage.workflow(HOURLY_WORKFLOW.id()))
-        .thenReturn(Optional.of(HOURLY_WORKFLOW));
-    workflowInitializer.inspectChange(HOURLY_WORKFLOW_WITH_INVALID_OFFSET);
+  public void shouldFailComputeNextTrigger() {
+    workflowInitializer.inspectChange(Optional.of(HOURLY_WORKFLOW),
+        HOURLY_WORKFLOW_WITH_INVALID_OFFSET);
   }
 
   @Test
   public void shouldFailToUpdateNextNaturalTrigger() throws Exception {
     doThrow(new IOException("update error")).when(storage)
         .updateNextNaturalTrigger(eq(HOURLY_WORKFLOW.id()), any());
-    when(storage.workflow(HOURLY_WORKFLOW.id()))
-        .thenReturn(Optional.of(HOURLY_WORKFLOW));
 
     try {
-      workflowInitializer.inspectChange(HOURLY_WORKFLOW_WITH_VALID_OFFSET);
+      workflowInitializer.inspectChange(Optional.of(HOURLY_WORKFLOW),
+          HOURLY_WORKFLOW_WITH_VALID_OFFSET);
       fail();
     } catch (RuntimeException e) {
       assertEquals("update error", e.getCause().getMessage());

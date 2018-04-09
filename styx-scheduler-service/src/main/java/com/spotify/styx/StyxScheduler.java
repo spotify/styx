@@ -321,7 +321,6 @@ public class StyxScheduler implements AppInit {
     closer.register(executorCloser("event-consumer", eventConsumerExecutor));
 
     final Stats stats = statsFactory.apply(environment);
-    final WorkflowCache workflowCache = new InMemWorkflowCache();
     final Storage storage = instrument(Storage.class, storageFactory.apply(environment), stats, time);
 
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
@@ -330,12 +329,9 @@ public class StyxScheduler implements AppInit {
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
 
-    // DATAEX-1903: it is probably not needed or can be replaced with a timed cache and we do
-    // global query when evicting the cache (CachedSupplier)
-    warmUpCache(workflowCache, storage);
+    final WorkflowCache workflowCache = new InMemWorkflowCache(
+        new CachedSupplier<>(storage::workflows, time));
 
-    // DATAEX-1903: this can be replaced with concurrent lookups when it is eventually used by
-    // getResourcesUsageMap, or if we keep the cache just use it
     initializeResources(storage, shardedCounter, counterSnapshotFactory, timeoutConfig, workflowCache);
 
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
@@ -369,28 +365,19 @@ public class StyxScheduler implements AppInit {
         new StateInitializingTrigger(stateManager);
     final TriggerManager triggerManager = new TriggerManager(trigger, time, storage, stats);
 
-    // DATAEX-1903: this can be replaced with lookup and it will be one lookup per backfill,
-    // doesn't feel very heavy
     final BackfillTriggerManager backfillTriggerManager =
-        new BackfillTriggerManager(stateManager, workflowCache, storage, trigger, stats, time);
+        new BackfillTriggerManager(stateManager, storage, trigger, stats, time);
 
     final WorkflowInitializer workflowInitializer = new WorkflowInitializer(storage, time);
     final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer =
         workflowConsumerFactory.apply(environment, stats);
 
-    // DATAEX-1903: this can be replaced by lookup
-    final Consumer<Workflow> workflowRemoveListener =
-        workflowRemoved(workflowCache, storage, workflowConsumer);
+    final Consumer<Workflow> workflowRemoveListener = workflowRemoved(storage, workflowConsumer);
 
-    // DATAEX-1903: this can be replaced by lookup
     final Consumer<Workflow> workflowChangeListener =
-        workflowChanged(workflowCache, workflowInitializer, stats, stateManager, workflowConsumer);
+        workflowChanged(workflowInitializer, stats, stateManager, workflowConsumer, storage);
 
-    // DATAEX-1903: this can be replaced with concurrent lookups which go with each tick
-    // we need to test how heavy it will be.
-    // We probably cannot tolerate weak consistency, e.g. if user changes the workflow, they would
-    // expect for next retry the new configuration should be picked up
-    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
+    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager,
                                               storage, resourceDecorator, stats, dequeueRateLimiter,
                                               executionGateFactory.apply(environment, storage));
 
@@ -403,8 +390,6 @@ public class StyxScheduler implements AppInit {
     startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
     startCleaner(cleaner, executor);
 
-    // DATAEX-1903: this can be metrics using this cache are not so important, but if we want to
-    // keep them we can use timed cache and we do global query when evicting the cache (CachedSupplier)
     setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats);
 
     final SchedulerResource schedulerResource =
@@ -456,15 +441,6 @@ public class StyxScheduler implements AppInit {
   @VisibleForTesting
   Consumer<Workflow> getWorkflowChangeListener() {
     return workflowChangeListener;
-  }
-
-  private void warmUpCache(WorkflowCache cache, Storage storage) {
-    try {
-      storage.workflows().values().forEach(cache::store);
-    } catch (IOException e) {
-      LOG.error("Failed to get workflows from storage while warming up the cache");
-      throw new RuntimeException(e);
-    }
   }
 
   private void initializeResources(Storage storage, ShardedCounter shardedCounter,
@@ -674,20 +650,26 @@ public class StyxScheduler implements AppInit {
   }
 
   private static Consumer<Workflow> workflowChanged(
-      WorkflowCache cache,
       WorkflowInitializer workflowInitializer,
       Stats stats,
       StateManager stateManager,
-      BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
-    return (workflow) -> {
+      BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer,
+      Storage storage) {
+    return workflow -> {
       stats.registerActiveStatesMetric(
           workflow.id(), workflowActiveStates(stateManager, workflow));
 
-      final Optional<Workflow> oldWorkflowOptional = cache.workflow(workflow.id());
+      final Optional<Workflow> oldWorkflowOptional;
+      try {
+        oldWorkflowOptional = storage.workflow(workflow.id());
+      } catch (IOException e) {
+        LOG.warn("Couldn't read workflow {}. ", workflow.id());
+        return;
+      }
 
-      workflowInitializer.inspectChange(workflow);
-      cache.store(workflow);
+      workflowInitializer.inspectChange(oldWorkflowOptional, workflow);
       workflowConsumer.accept(oldWorkflowOptional, Optional.of(workflow));
+
       if (oldWorkflowOptional.isPresent()) {
         LOG.info("Workflow modified, old config: {}, new config: {}", oldWorkflowOptional.get(),
             workflow);
@@ -698,20 +680,18 @@ public class StyxScheduler implements AppInit {
   }
 
   private static Consumer<Workflow> workflowRemoved(
-      WorkflowCache cache,
       Storage storage,
       BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
-    return workflow -> cache.workflow(workflow.id()).ifPresent(existingWorkflow -> {
+    return workflow -> {
       try {
         storage.delete(workflow.id());
       } catch (IOException e) {
         LOG.warn("Couldn't remove workflow {}. ", workflow.id());
         return;
       }
-      cache.remove(workflow);
       workflowConsumer.accept(Optional.of(workflow), Optional.empty());
       LOG.info("Workflow removed: {}", workflow);
-    });
+    };
   }
 
   private static Gauge<Long> workflowActiveStates(StateManager stateManager, Workflow workflow) {

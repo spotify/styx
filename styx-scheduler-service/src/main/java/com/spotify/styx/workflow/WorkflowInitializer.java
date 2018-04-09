@@ -45,15 +45,7 @@ public class WorkflowInitializer {
     this.time = Objects.requireNonNull(time);
   }
 
-  public void inspectChange(Workflow workflow) {
-    final Optional<Workflow> previous;
-    try {
-      previous = storage.workflow(workflow.id());
-    } catch (IOException e) {
-      LOG.warn("failed to read workflow {} from storage", workflow.id(), e);
-      throw new RuntimeException(e);
-    }
-
+  public void inspectChange(Optional<Workflow> previous, Workflow workflow) {
     Optional<TriggerInstantSpec> nextSpec = Optional.empty();
 
     // either the workflow is completely new, or the schedule/offset has changed

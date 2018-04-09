@@ -21,42 +21,31 @@
 package com.spotify.styx;
 
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.function.Supplier;
 
 /**
  * Simple in memory implementation of {@link WorkflowCache}.
  */
 public class InMemWorkflowCache implements WorkflowCache {
 
-  private static final Logger LOG = LoggerFactory.getLogger(InMemWorkflowCache.class);
+  private final Supplier<Map<WorkflowId, Workflow>> supplier;
 
-  private final ConcurrentMap<WorkflowId, Workflow> workflowStore = Maps.newConcurrentMap();
-
-  @Override
-  public void store(Workflow workflow) {
-    LOG.debug("Adding to cache: {}", workflow);
-    workflowStore.put(workflow.id(), workflow);
-  }
-
-  @Override
-  public void remove(Workflow workflow) {
-    LOG.debug("Removing from cache: {}", workflow);
-    workflowStore.remove(workflow.id());
+  InMemWorkflowCache(Supplier<Map<WorkflowId, Workflow>> supplier) {
+    this.supplier = Objects.requireNonNull(supplier);
   }
 
   @Override
   public Optional<Workflow> workflow(WorkflowId workflowId) {
-    return Optional.ofNullable(workflowStore.get(workflowId));
+    return Optional.ofNullable(supplier.get().get(workflowId));
   }
 
   @Override
   public ImmutableSet<Workflow> all() {
-    return ImmutableSet.copyOf(workflowStore.values());
+    return ImmutableSet.copyOf(supplier.get().values());
   }
 }
