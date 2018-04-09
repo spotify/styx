@@ -156,8 +156,7 @@ public class Scheduler {
     // exceeded limit even if the real usage never exceeded the limit.
     final Map<String, Long> currentResourceUsage =
         getResourceUsage(globalConcurrency.isPresent(), activeStates, timedOutInstances,
-            resourceDecorator,
-            ImmutableSet.copyOf(workflows.values()));
+            resourceDecorator, ImmutableSet.copyOf(workflows.values()));
 
     // this reflects resource usage since last tick, so a couple of minutes delay
     updateResourceStats(resources, currentResourceUsage);
