@@ -22,16 +22,12 @@ package com.spotify.styx;
 
 import static com.spotify.styx.state.TimeoutConfig.createWithDefaultTtl;
 import static java.time.Duration.ofSeconds;
-import static java.util.stream.Collectors.toSet;
 import static org.hamcrest.Matchers.either;
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anySetOf;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Matchers.longThat;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -62,7 +58,6 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
 import java.time.Duration;
@@ -81,7 +76,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Matchers;
 import org.mockito.Mock;
@@ -92,8 +86,6 @@ public class SchedulerTest {
 
   private static final WorkflowId WORKFLOW_ID1 =
       WorkflowId.create("styx1", "example1");
-  private static final WorkflowId WORKFLOW_ID2 =
-      WorkflowId.create("styx2", "example2");
   private static final WorkflowInstance INSTANCE_1 =
       WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T01");
 
@@ -160,13 +152,6 @@ public class SchedulerTest {
     when(stateManager.getActiveStates()).thenReturn(activeStates);
   }
 
-  private void removeActiveStates(Set<WorkflowInstance> workflowInstances) {
-    for (WorkflowInstance workflowInstance : workflowInstances) {
-      activeStates.remove(workflowInstance);
-    }
-    when(stateManager.getActiveStates()).thenReturn(activeStates);
-  }
-
   private Workflow workflowUsingResources(WorkflowId id, String... resources) {
     return Workflow.create(
         id.componentId(),
@@ -188,10 +173,10 @@ public class SchedulerTest {
 
     scheduler.tick();
 
+    verify(stats).recordResourceUsed("r1", 0L);
     verify(stateManager).receiveIgnoreClosed(
         eq(Event.dequeue(INSTANCE_1, ImmutableSet.of("r1"))), anyLong());
     verify(rateLimiter).acquire();
-    verify(stats).recordResourceUsed("r1", 1L);
   }
 
   @Test
@@ -328,37 +313,6 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldIssueInfoIfGlobalResourceDepleted() throws Exception {
-    setUp(20);
-    initWorkflow(workflowUsingResources(WORKFLOW_ID1));
-    when(config.globalConcurrency()).thenReturn(Optional.of(0L));
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
-
-    scheduler.tick();
-
-    verify(stateManager).receiveIgnoreClosed(
-        eq(Event.info(INSTANCE_1,
-            Message.info("Resource limit reached for: "
-                         + "[Resource{id=GLOBAL_STYX_CLUSTER, concurrency=0}]"))),
-        anyLong());
-  }
-
-  @Test
-  public void shouldIssueInfoIfResourceDepleted() throws Exception {
-    setUp(20);
-    setResourceLimit("r1", 0);
-    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
-
-    scheduler.tick();
-
-    verify(stateManager).receiveIgnoreClosed(
-        eq(Event.info(INSTANCE_1,
-            Message.info("Resource limit reached for: [Resource{id=r1, concurrency=0}]"))),
-        anyLong());
-  }
-
-  @Test
   public void shouldFailWhenUnknownAndDepletedResources() throws Exception {
     setUp(20);
     setResourceLimit("r1", 0);
@@ -393,48 +347,6 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldDequeueIfResourceValueIsIncreased() throws Exception {
-    setUp(20);
-    setResourceLimit("r1", 0);
-    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
-
-    scheduler.tick();
-
-    verify(stateManager, never()).receiveIgnoreClosed(
-        eq(Event.dequeue(INSTANCE_1, ImmutableSet.of("r1"))),
-        anyLong());
-
-    setResourceLimit("r1", 1);
-    scheduler.tick();
-
-    verify(stateManager).receiveIgnoreClosed(
-        eq(Event.dequeue(INSTANCE_1, ImmutableSet.of("r1"))),
-        anyLong());
-  }
-
-  @Test
-  public void shouldLimitConcurrencyForResource() throws Exception {
-    setUp(20);
-    setResourceLimit("r1", 3);
-    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
-
-    for (int i = 0; i < 4; i++) {
-      populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.QUEUED, time.get()));
-    }
-
-    scheduler.tick();
-
-    ArgumentCaptor<Event> capturedEvents = ArgumentCaptor.forClass(Event.class);
-    ArgumentCaptor<Long> capturedCounters = ArgumentCaptor.forClass(Long.class);
-    verify(stateManager, times(4))
-        .receiveIgnoreClosed(capturedEvents.capture(), capturedCounters.capture());
-    issuedEvents(capturedEvents, "dequeue", 3);
-    issuedEvents(capturedEvents, "info", 1);
-    verify(stats).recordResourceUsed("r1", 3L);
-  }
-
-  @Test
   public void shouldCountResourcesOnStatesConsumingResources() throws Exception {
     setUp(20);
     setResourceLimit("r1", 2);
@@ -443,18 +355,14 @@ public class SchedulerTest {
     // do not consume resources
     populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i0"), State.NEW, time.get()));
     populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i1"), State.QUEUED, time.get()));
+    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i4"), State.TERMINATED, time.get()));
 
     // consume resources
     populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i2"), State.SUBMITTING, time.get()));
     populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i3"), State.PREPARE, time.get()));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i4"), State.TERMINATED, time.get()));
 
     scheduler.tick();
 
-    verify(stateManager, times(1)).receiveIgnoreClosed(
-        eq(Event.info(instance(WORKFLOW_ID1, "i1"),
-            Message.info("Resource limit reached for: [Resource{id=r1, concurrency=2}]"))),
-        anyLong());
     verify(stats).recordResourceUsed("r1", 2L);
   }
 
@@ -489,113 +397,6 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldLimitConcurrencyAcrossWorkflows() throws Exception {
-    setUp(20);
-    setResourceLimit("r1", 3);
-    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
-    initWorkflow(workflowUsingResources(WORKFLOW_ID2, "r1"));
-
-    for (int i = 0; i < 4; i++) {
-      populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.NEW, time.get()));
-      populateActiveStates(RunState.create(instance(WORKFLOW_ID2, "i" + i), State.QUEUED, time.get()));
-    }
-
-    ArgumentCaptor<Event> capturedEvents = ArgumentCaptor.forClass(Event.class);
-    ArgumentCaptor<Long> capturedCounters = ArgumentCaptor.forClass(Long.class);
-    scheduler.tick();
-    verify(stateManager, times(4))
-        .receiveIgnoreClosed(capturedEvents.capture(), capturedCounters.capture());
-
-    issuedEvents(capturedEvents, "dequeue", 3, WORKFLOW_ID2);
-    verify(stats).recordResourceUsed("r1", 3L);
-  }
-
-  @Test
-  public void shouldLimitConcurrencyUsingMultipleResources() throws Exception {
-    setUp(20);
-    setResourceLimit("r1", 3);
-    setResourceLimit("r2", 2);
-    setResourceLimit("r3", 2);
-    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1", "r2"));
-
-    for (int i = 0; i < 4; i++) {
-      populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.QUEUED, time.get()));
-    }
-
-    ArgumentCaptor<Event> capturedEvents = ArgumentCaptor.forClass(Event.class);
-    ArgumentCaptor<Long> capturedCounters = ArgumentCaptor.forClass(Long.class);
-    scheduler.tick();
-    verify(stateManager, times(4))
-        .receiveIgnoreClosed(capturedEvents.capture(), capturedCounters.capture());
-
-    issuedEvents(capturedEvents, "dequeue", 2, WORKFLOW_ID1);
-    verify(stats).recordResourceUsed("r1", 2L);
-    verify(stats).recordResourceUsed("r2", 2L);
-  }
-
-  @Test
-  public void shouldLimitConcurrencyUsingMultipleResourcesAcrossWorkflows() throws Exception {
-    setUp(20);
-    setResourceLimit("r1", 3);
-    setResourceLimit("r2", 2);
-    setResourceLimit("common", 4);
-    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1", "common"));
-    initWorkflow(workflowUsingResources(WORKFLOW_ID2, "r2", "common"));
-
-    for (int i = 0; i < 4; i++) {
-      populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i" + i), State.QUEUED, time.get()));
-      populateActiveStates(RunState.create(instance(WORKFLOW_ID2, "i" + i), State.QUEUED, time.get()));
-    }
-
-    ArgumentCaptor<Event> capturedEvents = ArgumentCaptor.forClass(Event.class);
-    ArgumentCaptor<Long> capturedCounters = ArgumentCaptor.forClass(Long.class);
-    scheduler.tick();
-    verify(stateManager, times(8))
-        .receiveIgnoreClosed(capturedEvents.capture(), capturedCounters.capture());
-
-    issuedEvents(capturedEvents, "dequeue", 4);
-
-    verify(stats).recordResourceUsed(eq("r1"), longThat(is(greaterThanOrEqualTo(1L))));
-    verify(stats).recordResourceUsed(eq("r2"), longThat(is(greaterThanOrEqualTo(1L))));
-    verify(stats).recordResourceUsed("common", 4L);
-  }
-
-  @Test
-  public void shouldFreeResourcesWhenStatesComplete() throws Exception {
-    shouldLimitConcurrencyUsingMultipleResourcesAcrossWorkflows();
-
-    // Get events issued from previous test
-    ArgumentCaptor<Event> capturedEvents = ArgumentCaptor.forClass(Event.class);
-    ArgumentCaptor<Long> capturedCounters = ArgumentCaptor.forClass(Long.class);
-
-    verify(stateManager, times(8))
-        .receiveIgnoreClosed(capturedEvents.capture(), capturedCounters.capture());
-
-    Set<WorkflowInstance> dequeuedInstances = capturedEvents.getAllValues().stream()
-        .filter(event -> "dequeue".equals(EventUtil.name(event))).map(
-            Event::workflowInstance).collect(toSet());
-
-    long completed1 = dequeuedInstances.stream().filter(wfi -> wfi.workflowId().equals(WORKFLOW_ID1)).count();
-    long completed2 = dequeuedInstances.stream().filter(wfi -> wfi.workflowId().equals(WORKFLOW_ID2)).count();
-    assertThat(completed1 + completed2, is(4L));
-
-    removeActiveStates(dequeuedInstances);
-
-    // Capture new events from this test
-    ArgumentCaptor<Event> newCapturedEvents = ArgumentCaptor.forClass(Event.class);
-    ArgumentCaptor<Long> newCapturedCounters = ArgumentCaptor.forClass(Long.class);
-
-    scheduler.tick();
-    verify(stateManager, times(12))
-        .receiveIgnoreClosed(newCapturedEvents.capture(), newCapturedCounters.capture());
-
-    long expectedRuns1 = Math.min(4 - completed1, 3); // limit r1
-    long expectedRuns2 = Math.min(4 - completed2, 2); // limit r2
-    issuedEvents(newCapturedEvents, "dequeue", dequeuedInstances.size() + (expectedRuns1 + expectedRuns2));
-  }
-
-
-  @Test
   public void shouldDecorateWorkflowInstanceResources() throws Exception {
     setUp(20);
 
@@ -618,37 +419,6 @@ public class SchedulerTest {
 
     verify(stateManager).receiveIgnoreClosed(eq(Event.dequeue(INSTANCE_1,
         ImmutableSet.of("baz", "quux", "GLOBAL_STYX_CLUSTER"))), anyLong());
-  }
-
-  @Test
-  public void shouldLimitOnDecoratedWorkflowInstanceResourcesIfNotAvailable() throws Exception {
-    setUp(20);
-
-    Workflow workflow = workflowUsingResources(WORKFLOW_ID1, "foo", "bar");
-    when(resourceDecorator.decorateResources(
-        any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
-        .thenReturn(ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"));
-
-    when(config.globalConcurrency()).thenReturn(Optional.of(17L));
-
-    setResourceLimit("baz", 0);
-    initWorkflow(workflow);
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
-
-    scheduler.tick();
-
-    verify(resourceDecorator).decorateResources(any(RunState.class), eq(workflow.configuration()),
-        eq(ImmutableSet.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
-
-    verify(stateManager).receiveIgnoreClosed(
-        eq(Event.info(INSTANCE_1,
-            Message.info("Resource limit reached for: [Resource{id=baz, concurrency=0}]"))),
-        anyLong());
-
-    verify(stateManager, never()).receiveIgnoreClosed(
-        eq(Event.dequeue(INSTANCE_1,
-            ImmutableSet.of("baz", "quux", "GLOBAL_STYX_CLUSTER"))),
-        anyLong());
   }
 
   @Test
@@ -684,7 +454,7 @@ public class SchedulerTest {
     verify(resourceDecorator, times(2 + 2)).decorateResources(any(RunState.class), eq(workflow.configuration()),
         eq(ImmutableSet.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
 
-    verify(stateManager).receiveIgnoreClosed(Matchers.argThat(
+    verify(stateManager, times(2)).receiveIgnoreClosed(Matchers.argThat(
         either(is(Event.dequeue(i0, ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"))))
             .or(is(Event.dequeue(i4, ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"))))),
         anyLong());
@@ -778,22 +548,5 @@ public class SchedulerTest {
 
   private WorkflowInstance instance(WorkflowId id, String instanceId) {
     return WorkflowInstance.create(id, instanceId);
-  }
-
-  private void issuedEvents(ArgumentCaptor<Event> events, String eventType, long times) {
-    assertThat(events.getAllValues()
-            .stream()
-            .filter(event -> eventType.equals(EventUtil.name(event)))
-            .count(),
-        is(times));
-  }
-
-  private void issuedEvents(ArgumentCaptor<Event> events, String eventType, long times, WorkflowId workflowId) {
-    assertThat(events.getAllValues()
-            .stream()
-            .filter(event -> eventType.equals(EventUtil.name(event)))
-            .filter(event -> event.workflowInstance().workflowId().equals(workflowId))
-            .count(),
-        is(times));
   }
 }

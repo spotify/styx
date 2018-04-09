@@ -28,6 +28,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
@@ -227,12 +228,8 @@ public class QueuedStateManager implements StateManager {
           tx.updateActiveState(event.workflowInstance(), nextRunState);
         }
 
-        try {
-          updateResourceCounters(tx, event, currentRunState.get(), nextRunState);
-        } catch (Exception e) {
-          // FIXME: should we continue or fail the transition?
-          LOG.error("Failed to update resource counters", e);
-        }
+        // Resource limiting occurs by throwing here, or by failing the commit with a conflict.
+        updateResourceCounters(tx, event, currentRunState.get(), nextRunState);
 
         final SequenceEvent sequenceEvent =
             SequenceEvent.create(event, nextRunState.counter(), nextRunState.timestamp());
@@ -251,17 +248,18 @@ public class QueuedStateManager implements StateManager {
       tryUpdatingCounter(currentRunState, tx, nextRunState.data().resourceIds().get());
     }
 
+    // decrement counters if transitioning from a state that consumes resources
+    // to a state that doesn't consume any resources
     if (isConsumingResources(currentRunState.state())
-        && !isConsumingResources(nextRunState.state())
-        && nextRunState.data().resourceIds().isPresent()) {
-      // decrement counters if transitioning from a state that consumes resources
-      // to a state that doesn't consume any resources
-      for (String resource : nextRunState.data().resourceIds().get()) {
-        tx.updateCounter(shardedCounter, resource, -1);
+        && !isConsumingResources(nextRunState.state())) {
+      if (nextRunState.data().resourceIds().isPresent()) {
+        for (String resource : nextRunState.data().resourceIds().get()) {
+          tx.updateCounter(shardedCounter, resource, -1);
+        }
+      } else {
+        LOG.error("Resource ids are missing for {} when transitioning from {} to {}.",
+            nextRunState.workflowInstance(), currentRunState, nextRunState);
       }
-    } else if (!nextRunState.data().resourceIds().isPresent()) {
-      LOG.error("Resource ids are missing for {} when transitioning from {} to {}.",
-                nextRunState.workflowInstance(), currentRunState, nextRunState);
     }
   }
 
@@ -273,19 +271,20 @@ public class QueuedStateManager implements StateManager {
             tx.updateCounter(shardedCounter, resource, 1))))
         .filter(x -> x._2.isFailure())
         .collect(toSet());
-    final Set<String> depletedResources = failedTries.stream()
+    final Set<String> depletedResourceIds = failedTries.stream()
         .filter(x -> x._2.getCause() instanceof CounterCapacityException)
         .map(x -> x._1)
         .sorted()
         .collect(toSet());
 
-    if (!depletedResources.isEmpty()) {
+    if (!depletedResourceIds.isEmpty()) {
+      final Set<Resource> depletedResources = depletedResourceIds.stream().map(x ->
+          Resource.create(x, shardedCounter.getCounterSnapshot(x).getLimit()))
+          .collect(toSet());
       final Message message = Message.info(
           String.format("Resource limit reached for: %s", depletedResources));
       if (!runState.data().message().map(message::equals).orElse(false)) {
-        // FIXME: uncomment the code to use new way of sending event and remove debug logging
-        LOG.debug(message.line());
-        // receiveIgnoreClosed(Event.info(runState.workflowInstance(), message), runState.counter());
+        receiveIgnoreClosed(Event.info(runState.workflowInstance(), message), runState.counter());
       }
     }
 
