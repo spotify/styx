@@ -120,6 +120,13 @@ public interface Storage {
    */
   Map<WorkflowId, Workflow> workflows() throws IOException;
 
+  /** Get all {@link Workflow}s by doing strongly consistent batch fetch.
+   * 
+   * @param workflowIds set of {@link WorkflowId}s
+   * @return all workflows
+   */
+  Map<WorkflowId,Workflow> workflows(Set<WorkflowId> workflowIds);
+
   /**
    * Stores information about an active {@link WorkflowInstance} to be tracked.
    * @param workflowInstance  The {@link WorkflowInstance} that entered an active state

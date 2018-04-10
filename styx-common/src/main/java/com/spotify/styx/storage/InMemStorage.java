@@ -128,6 +128,11 @@ public class InMemStorage implements Storage {
   }
 
   @Override
+  public Map<WorkflowId, Workflow> workflows(Set<WorkflowId> workflowIds) {
+    throw new UnsupportedOperationException("Unsupported Operation!");
+  }
+
+  @Override
   public WorkflowInstanceExecutionData executionData(WorkflowInstance workflowInstance)
       throws IOException {
     throw new UnsupportedOperationException("Unsupported Operation!");

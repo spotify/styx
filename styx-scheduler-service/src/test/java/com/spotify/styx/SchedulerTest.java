@@ -24,8 +24,6 @@ import static com.spotify.styx.state.TimeoutConfig.createWithDefaultTtl;
 import static java.time.Duration.ofSeconds;
 import static org.hamcrest.Matchers.either;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anySetOf;
@@ -37,6 +35,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -65,7 +64,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -100,6 +101,7 @@ public class SchedulerTest {
   private ExecutorService executor = Executors.newCachedThreadPool();
   private ConcurrentMap<WorkflowInstance, RunState> activeStates = Maps.newConcurrentMap();
 
+  private Map<WorkflowId, Workflow> workflows;
 
   @Mock WorkflowResourceDecorator resourceDecorator;
   @Mock RateLimiter rateLimiter;
@@ -111,6 +113,7 @@ public class SchedulerTest {
 
   @Before
   public void setUp() {
+    workflows = new HashMap<>();
     when(gate.executionBlocker(any()))
         .thenReturn(WorkflowExecutionGate.NO_BLOCKER);
   }
@@ -130,6 +133,8 @@ public class SchedulerTest {
     when(resourceDecorator.decorateResources(
         any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
         .thenAnswer(a -> a.getArgumentAt(2, Set.class));
+    
+    when(storage.workflows(anySetOf(WorkflowId.class))).thenReturn(workflows);
 
     scheduler = new Scheduler(time, timeoutConfig, stateManager, storage, resourceDecorator,
         stats, rateLimiter, gate);
@@ -140,8 +145,8 @@ public class SchedulerTest {
     resourceLimits.add(Resource.create(resourceId, limit));
   }
 
-  private void initWorkflow(Workflow workflow) throws IOException {
-    when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
+  private void initWorkflow(Workflow workflow) {
+    workflows.put(workflow.id(), workflow);
   }
 
   private void populateActiveStates(RunState... runStates) {
@@ -303,7 +308,7 @@ public class SchedulerTest {
   public void shouldDequeueEvenWhenMissingWorkflows() throws Exception {
     setUp(20);
 
-    when(storage.workflow(any())).thenReturn(Optional.empty());
+    when(storage.workflows(anySetOf(WorkflowId.class))).thenReturn(ImmutableMap.of());
 
     StateData stateData = StateData.newBuilder().tries(0).build();
 
@@ -328,26 +333,6 @@ public class SchedulerTest {
             .receiveIgnoreClosed(eq(Event.dequeue(x, ImmutableSet.of())), anyLong()));
     inOrder.verify(stateManager).receiveIgnoreClosed(eq(
         Event.dequeue(INSTANCE_1, ImmutableSet.of())), anyLong());
-  }
-
-  @Test
-  public void shouldNotExecuteWhenFailedToReadWorkflows() throws Exception {
-    setUp(20);
-    final IOException exception = new IOException();
-    when(storage.workflow(WORKFLOW_ID1)).thenThrow(exception);
-
-    StateData stateData = StateData.newBuilder().tries(0).build();
-
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get()));
-
-    try {
-      scheduler.tick();
-      fail();
-    } catch (Exception e) {
-      assertThat(e.getCause(), is(exception));
-    }
-
-    verify(stateManager, never()).receiveIgnoreClosed(any());
   }
 
   @Test

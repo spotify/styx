@@ -185,21 +185,10 @@ public class Scheduler {
   }
 
   private Map<WorkflowId, Workflow> getWorkflows(final List<InstanceState> activeStates) {
-    return activeStates.stream()
+    final Set<WorkflowId> workflowIds = activeStates.stream()
         .map(activeState -> activeState.workflowInstance().workflowId())
-        .collect(toSet())
-        .parallelStream()
-        .map(workflowId -> {
-          try {
-            return storage.workflow(workflowId);
-          } catch (IOException e) {
-            LOG.warn("Failed to read workflow {}", workflowId, e);
-            throw new RuntimeException(e);
-          }
-        })
-        .filter(Optional::isPresent)
-        .map(Optional::get)
-        .collect(toMap(Workflow::id, workflow -> workflow));
+        .collect(toSet());
+    return storage.workflows(workflowIds);
   }
 
   private void gateAndDequeueInstances(
