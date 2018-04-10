@@ -28,7 +28,6 @@ import static java.util.stream.Collectors.toSet;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.spotify.styx.WorkflowCache;
 import com.spotify.styx.WorkflowResourceDecorator;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
@@ -42,6 +41,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -86,7 +86,8 @@ public final class StateUtil {
   }
 
   public static Map<String, Long> getResourcesUsageMap(Storage storage, TimeoutConfig timeoutConfig,
-                                                       WorkflowCache workflowCache, Instant instant,
+                                                       Supplier<Map<WorkflowId, Workflow>> workflowCache,
+                                                       Instant instant,
                                                        WorkflowResourceDecorator resourceDecorator)
       throws IOException {
     // The only inconsistency left is to miss active workflow instances. Outdated instances or
@@ -105,7 +106,7 @@ public final class StateUtil {
     final Set<WorkflowInstance> timedOutInstances =
         getTimedOutInstances(activeInstanceStates, instant, timeoutConfig);
     return getResourceUsage(globalConcurrencyEnabled,
-        activeInstanceStates, timedOutInstances, resourceDecorator, workflowCache.all());
+        activeInstanceStates, timedOutInstances, resourceDecorator, workflowCache.get());
   }
 
   private static Stream<ResourceWithInstance> pairWithResources(boolean globalConcurrencyEnabled,

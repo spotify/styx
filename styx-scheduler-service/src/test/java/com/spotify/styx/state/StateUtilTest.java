@@ -32,9 +32,10 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
-import com.spotify.styx.WorkflowCache;
 import com.spotify.styx.WorkflowResourceDecorator;
 import com.spotify.styx.model.StyxConfig;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.time.Duration;
@@ -42,6 +43,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.junit.Before;
 import org.junit.Test;
@@ -54,7 +56,7 @@ public class StateUtilTest {
 
   @Mock private Storage storage;
   @Mock private TimeoutConfig timeoutConfig;
-  @Mock private WorkflowCache workflowCache;
+  @Mock private Supplier<Map<WorkflowId, Workflow>> workflowCache;
 
   private WorkflowResourceDecorator resourceDecorator = WorkflowResourceDecorator.NOOP;
   final private StyxConfig config = StyxConfig.newBuilder()
@@ -70,7 +72,7 @@ public class StateUtilTest {
     when(storage.readActiveState(WORKFLOW_INSTANCE)).thenReturn(Optional.of(runState));
     when(storage.config()).thenReturn(config);
     when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(2L));
-    when(workflowCache.all()).thenReturn(ImmutableMap.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES));
+    when(workflowCache.get()).thenReturn(ImmutableMap.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES));
   }
 
   @Test

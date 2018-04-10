@@ -329,8 +329,7 @@ public class StyxScheduler implements AppInit {
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
 
-    final WorkflowCache workflowCache = new InMemWorkflowCache(
-        new CachedSupplier<>(storage::workflows, time));
+    final Supplier<Map<WorkflowId, Workflow>> workflowCache = new CachedSupplier<>(storage::workflows, time);
 
     initializeResources(storage, shardedCounter, counterSnapshotFactory, timeoutConfig, workflowCache);
 
@@ -445,7 +444,7 @@ public class StyxScheduler implements AppInit {
   private void initializeResources(Storage storage, ShardedCounter shardedCounter,
                                    CounterSnapshotFactory counterSnapshotFactory,
                                    TimeoutConfig timeoutConfig,
-                                   WorkflowCache workflowCache) {
+                                   Supplier<Map<WorkflowId, Workflow>> workflowCache) {
     try {
       // Initialize resources
       storage.resources().parallelStream().forEach(
@@ -594,16 +593,16 @@ public class StyxScheduler implements AppInit {
 
   private void setupMetrics(
       QueuedStateManager stateManager,
-      WorkflowCache workflowCache,
+      Supplier<Map<WorkflowId, Workflow>> workflowCache,
       Storage storage,
       RateLimiter submissionRateLimiter,
       Stats stats) {
 
     stats.registerQueuedEventsMetric(stateManager::queuedEvents);
 
-    stats.registerWorkflowCountMetric("all", () -> (long) workflowCache.all().size());
+    stats.registerWorkflowCountMetric("all", () -> (long) workflowCache.get().size());
 
-    stats.registerWorkflowCountMetric("configured", () -> workflowCache.all().values()
+    stats.registerWorkflowCountMetric("configured", () -> workflowCache.get().values()
         .stream()
         .filter(workflow -> workflow.configuration().dockerImage().isPresent())
         .count());
@@ -611,7 +610,7 @@ public class StyxScheduler implements AppInit {
     final Supplier<Gauge<Long>> configuredEnabledWorkflowsCountGaugeSupplier = () -> {
       final Supplier<Set<WorkflowId>> enabledWorkflowSupplier =
           new CachedSupplier<>(storage::enabled, Instant::now);
-      return () -> workflowCache.all().values()
+      return () -> workflowCache.get().values()
           .stream()
           .filter(workflow -> workflow.configuration().dockerImage().isPresent())
           .filter(workflow -> enabledWorkflowSupplier.get().contains(WorkflowId.ofWorkflow(workflow)))
@@ -620,7 +619,7 @@ public class StyxScheduler implements AppInit {
     stats.registerWorkflowCountMetric("enabled", configuredEnabledWorkflowsCountGaugeSupplier.get());
 
     stats.registerWorkflowCountMetric("docker_termination_logging_enabled", () ->
-        workflowCache.all().values()
+        workflowCache.get().values()
             .stream()
             .filter(workflow -> workflow.configuration().dockerImage().isPresent())
             .filter(workflow -> workflow.configuration().dockerTerminationLogging())
@@ -645,7 +644,7 @@ public class StyxScheduler implements AppInit {
               .count());
     });
 
-    workflowCache.all().values().forEach(workflow -> stats.registerActiveStatesMetric(
+    workflowCache.get().values().forEach(workflow -> stats.registerActiveStatesMetric(
         workflow.id(), workflowActiveStates(stateManager, workflow)));
 
     stats.registerSubmissionRateLimitMetric(submissionRateLimiter::getRate);
