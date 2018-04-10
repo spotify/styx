@@ -375,7 +375,7 @@ public class StyxScheduler implements AppInit {
     final Consumer<Workflow> workflowRemoveListener = workflowRemoved(storage, workflowConsumer);
 
     final Consumer<Workflow> workflowChangeListener =
-        workflowChanged(workflowInitializer, stats, stateManager, storage, workflowConsumer);
+        workflowChanged(workflowInitializer, stats, stateManager, workflowConsumer);
 
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager,
                                               storage, resourceDecorator, stats, dequeueRateLimiter,
@@ -656,22 +656,13 @@ public class StyxScheduler implements AppInit {
       WorkflowInitializer workflowInitializer,
       Stats stats,
       StateManager stateManager,
-      Storage storage,
       BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
     return workflow -> {
-      final Optional<Workflow> oldWorkflowOptional;
-      try {
-        oldWorkflowOptional = storage.workflow(workflow.id());
-      } catch (IOException e) {
-        final String message = String.format("Couldn't read workflow %s. ", workflow.id());
-        LOG.warn(message, e);
-        throw new RuntimeException(message, e);
-      }
+      final Optional<Workflow> oldWorkflowOptional = workflowInitializer.inspectChange(workflow);
 
       stats.registerActiveStatesMetric(
           workflow.id(), workflowActiveStates(stateManager, workflow));
 
-      workflowInitializer.inspectChange(oldWorkflowOptional, workflow);
       workflowConsumer.accept(oldWorkflowOptional, Optional.of(workflow));
 
       if (oldWorkflowOptional.isPresent()) {

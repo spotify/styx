@@ -45,7 +45,15 @@ public class WorkflowInitializer {
     this.time = Objects.requireNonNull(time);
   }
 
-  public void inspectChange(Optional<Workflow> previous, Workflow workflow) {
+  public Optional<Workflow> inspectChange(Workflow workflow) {
+    final Optional<Workflow> previous;
+    try {
+      previous = storage.workflow(workflow.id());
+    } catch (IOException e) {
+      LOG.warn("failed to read workflow {} from storage", workflow.id(), e);
+      throw new RuntimeException(e);
+    }
+
     Optional<TriggerInstantSpec> nextSpec = Optional.empty();
 
     // either the workflow is completely new, or the schedule/offset has changed
@@ -71,6 +79,8 @@ public class WorkflowInitializer {
       LOG.warn("failed to write workflow {} to storage", workflow.id(), e);
       throw new RuntimeException(e);
     }
+
+    return previous;
   }
 
   private TriggerInstantSpec initializeNaturalTrigger(Workflow workflow) {

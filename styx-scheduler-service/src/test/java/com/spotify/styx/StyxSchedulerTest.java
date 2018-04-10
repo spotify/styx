@@ -20,8 +20,6 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.testdata.TestData.HOURLY_WORKFLOW_CONFIGURATION_WITH_VALID_OFFSET;
-import static com.spotify.styx.testdata.TestData.WORKFLOW_ID;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_WITH_RESOURCES;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.theInstance;
@@ -190,52 +188,26 @@ public class StyxSchedulerTest {
   }
 
   @Test
-  public void shouldHandleWorkflowUnchanged() throws IOException {
-    when(storage.workflow(WORKFLOW_WITH_RESOURCES.id()))
-        .thenReturn(Optional.of(WORKFLOW_WITH_RESOURCES));
+  public void shouldHandleModifyWorkflow() {
+    when(workflowInitializer.inspectChange(WORKFLOW_WITH_RESOURCES)).thenReturn(Optional.of(WORKFLOW_WITH_RESOURCES));
     final Consumer<Workflow> consumer = StyxScheduler.workflowChanged(workflowInitializer, stats,
-        stateManager, storage, workflowConsumer);
+        stateManager, workflowConsumer);
     consumer.accept(WORKFLOW_WITH_RESOURCES);
+    verify(workflowInitializer).inspectChange(WORKFLOW_WITH_RESOURCES);
     verify(stats).registerActiveStatesMetric(eq(WORKFLOW_WITH_RESOURCES.id()), any());
-    verify(workflowInitializer).inspectChange(Optional.of(WORKFLOW_WITH_RESOURCES),
-        WORKFLOW_WITH_RESOURCES);
     verify(workflowConsumer).accept(Optional.of(WORKFLOW_WITH_RESOURCES),
         Optional.of(WORKFLOW_WITH_RESOURCES));
   }
 
   @Test
-  public void shouldHandleWorkflowChanged() throws IOException {
-    final Workflow workflow = Workflow.create(WORKFLOW_ID.componentId(),
-        HOURLY_WORKFLOW_CONFIGURATION_WITH_VALID_OFFSET);
-    when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
+  public void shouldHandleWorkflowCreate() {
+    when(workflowInitializer.inspectChange(WORKFLOW_WITH_RESOURCES)).thenReturn(Optional.empty());
     final Consumer<Workflow> consumer = StyxScheduler.workflowChanged(workflowInitializer, stats,
-        stateManager, storage, workflowConsumer);
+        stateManager, workflowConsumer);
     consumer.accept(WORKFLOW_WITH_RESOURCES);
+    verify(workflowInitializer).inspectChange(WORKFLOW_WITH_RESOURCES);
     verify(stats).registerActiveStatesMetric(eq(WORKFLOW_WITH_RESOURCES.id()), any());
-    verify(workflowInitializer).inspectChange(Optional.of(workflow), WORKFLOW_WITH_RESOURCES);
-    verify(workflowConsumer).accept(Optional.of(workflow), Optional.of(WORKFLOW_WITH_RESOURCES));
-  }
-
-  @Test
-  public void shouldFailToReadWorkflowForWorkflowChange() throws IOException {
-    final Workflow workflow = Workflow.create(WORKFLOW_ID.componentId(),
-        HOURLY_WORKFLOW_CONFIGURATION_WITH_VALID_OFFSET);
-    final IOException exception = new IOException();
-    when(storage.workflow(workflow.id())).thenThrow(exception);
-    final Consumer<Workflow> consumer = StyxScheduler.workflowChanged(workflowInitializer, stats,
-        stateManager, storage, workflowConsumer);
-    try {
-      consumer.accept(WORKFLOW_WITH_RESOURCES);
-      fail();
-    } catch (Exception e) {
-      assertThat(e.getCause(), is(exception));
-    }
-    verify(stats, never())
-        .registerActiveStatesMetric(eq(WORKFLOW_WITH_RESOURCES.id()), any());
-    verify(workflowInitializer, never())
-        .inspectChange(Optional.of(workflow), WORKFLOW_WITH_RESOURCES);
-    verify(workflowConsumer, never())
-        .accept(Optional.of(workflow), Optional.of(WORKFLOW_WITH_RESOURCES));
+    verify(workflowConsumer).accept(Optional.empty(), Workflow.of(WORKFLOW_WITH_RESOURCES));
   }
 
   @Test
