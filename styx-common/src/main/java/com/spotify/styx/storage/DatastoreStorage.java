@@ -29,6 +29,7 @@ import static com.spotify.styx.util.ShardedCounter.PROPERTY_LIMIT;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_INDEX;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_VALUE;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -50,6 +51,7 @@ import com.google.cloud.datastore.StructuredQuery.Filter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.Value;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -78,6 +80,7 @@ import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -87,6 +90,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ForkJoinPool;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -162,16 +167,19 @@ public class DatastoreStorage {
   private final Datastore datastore;
   private final Duration retryBaseDelay;
   private final Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory;
+  private final ForkJoinPool forkJoinPool;
 
   DatastoreStorage(Datastore datastore, Duration retryBaseDelay) {
     this(datastore, retryBaseDelay, DatastoreStorageTransaction::new);
   }
 
+  @VisibleForTesting
   DatastoreStorage(Datastore datastore, Duration retryBaseDelay,
-      Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory) {
+                   Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory) {
     this.datastore = Objects.requireNonNull(datastore);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
     this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
+    this.forkJoinPool = new ForkJoinPool();
   }
 
   StyxConfig config() {
@@ -313,29 +321,41 @@ public class DatastoreStorage {
   }
 
   public Map<WorkflowId, Workflow> workflows(Set<WorkflowId> workflowIds) {
-    final Map<WorkflowId, Workflow> map = new HashMap<>();
-    for (List<WorkflowId> batch :Lists.partition(ImmutableList.copyOf(workflowIds),
-        MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH)) {
-      final Set<Key> keys = batch.stream()
-          .map(workflowId -> workflowKey(datastore.newKeyFactory(), workflowId))
-          .collect(toSet());
-      final Iterator<Entity> result = datastore.get(keys);
+    final Callable<Map<WorkflowId, Workflow>> callable =
+        () -> Lists
+            .partition(ImmutableList.copyOf(workflowIds), MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH)
+            .parallelStream()
+            .map(this::getBatchOfWorkflows)
+            .flatMap(Collection::stream)
+            .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-      while (result.hasNext()) {
-        final Entity entity = result.next();
-        final Workflow workflow;
-        try {
-          workflow =
-              OBJECT_MAPPER.readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
-        } catch (IOException e) {
-          LOG.warn("Failed to read workflow {}.", entity.getKey());
-          continue;
-        }
-        map.put(workflow.id(), workflow);
-      }
+    try {
+      return forkJoinPool.submit(callable).get();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to read workflows", e);
     }
+  }
 
-    return map;
+  private Set<Map.Entry<WorkflowId, Workflow>> getBatchOfWorkflows(final List<WorkflowId> batch) {
+    final Set<Key> keys = batch.stream()
+        .map(workflowId -> workflowKey(datastore.newKeyFactory(), workflowId))
+        .collect(toSet());
+    final Iterator<Entity> result = datastore.get(keys);
+
+    final Map<WorkflowId, Workflow> map = new HashMap<>();
+    while (result.hasNext()) {
+      final Entity entity = result.next();
+      final Workflow workflow;
+      try {
+        workflow = OBJECT_MAPPER
+            .readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
+      } catch (IOException e) {
+        LOG.warn("Failed to read workflow {}.", entity.getKey());
+        continue;
+      }
+      map.put(workflow.id(), workflow);
+    }
+    return map.entrySet();
   }
 
   public List<Workflow> workflows(String componentId) throws IOException {
