@@ -161,13 +161,14 @@ public class QueuedStateManager implements StateManager {
   private void initialize(WorkflowInstance workflowInstance) {
     // Write active state to datastore
 
-    final long counter;
+    final long nextCounter;
     try {
-      counter = storage.getLatestStoredCounter(workflowInstance).orElse(NO_EVENTS_PROCESSED);
+      final long counter = storage.getLatestStoredCounter(workflowInstance).orElse(NO_EVENTS_PROCESSED);
+      nextCounter = counter + 1;
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    final RunState runState = RunState.create(workflowInstance, State.NEW, time.get(), counter);
+    final RunState runState = RunState.create(workflowInstance, State.NEW, time.get(), nextCounter);
     try {
       storage.runInTransaction(tx -> {
         final Optional<Workflow> workflow = tx.workflow(workflowInstance.workflowId());
