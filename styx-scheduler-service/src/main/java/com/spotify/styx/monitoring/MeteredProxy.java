@@ -21,6 +21,7 @@
 package com.spotify.styx.monitoring;
 
 import com.spotify.styx.docker.DockerRunner;
+import com.spotify.styx.docker.InvalidExecutionException;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
 import io.fabric8.kubernetes.client.KubernetesClientException;
@@ -107,7 +108,12 @@ public class MeteredProxy implements InvocationHandler {
           : "kubernetes-client";
       stats.recordDockerOperationError(operation, type, kubernetesClientException.getCode(), durationMillis);
     } else {
-      stats.recordDockerOperationError(operation, "unknown", 0, durationMillis);
+      final InvalidExecutionException invalidExecutionException = findCause(e, InvalidExecutionException.class);
+      if (invalidExecutionException != null) {
+        stats.recordDockerOperationError(operation, "invalid-execution", 0, durationMillis);
+      } else {
+        stats.recordDockerOperationError(operation, "unknown", 0, durationMillis);
+      }
     }
   }
 

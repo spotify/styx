@@ -29,7 +29,7 @@ import static org.mockito.Mockito.verify;
 
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
-import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.docker.InvalidExecutionException;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
@@ -53,7 +53,6 @@ public class MeteredProxyTest {
 
   @Mock WorkflowInstance workflowInstance;
   @Mock RunSpec runSpec;
-  @Mock SequenceEvent event;
 
   Instant now = Instant.now();
   Instant later = now.plusMillis(123);
@@ -112,5 +111,38 @@ public class MeteredProxyTest {
     }
 
     verify(stats).recordDockerOperationError("start", "kubernetes-client", 429, 123);
+  }
+
+  @Test
+  public void reportInvalidExecutionException() throws Exception {
+    DockerRunner mock = mock(DockerRunner.class);
+    DockerRunner proxy = MeteredProxy.instrument(DockerRunner.class, mock, stats, time);
+
+    doThrow(new InvalidExecutionException("Maximum number of keys on service account reached"))
+        .when(mock).start(any(), any());
+
+    try {
+      proxy.start(workflowInstance, runSpec);
+      fail("Expected exception");
+    } catch (Exception ignored) {
+    }
+
+    verify(stats).recordDockerOperationError("start", "invalid-execution", 0, 123);
+  }
+
+  @Test
+  public void reportUnknownError() throws Exception {
+    DockerRunner mock = mock(DockerRunner.class);
+    DockerRunner proxy = MeteredProxy.instrument(DockerRunner.class, mock, stats, time);
+
+    doThrow(new RuntimeException()).when(mock).start(any(), any());
+
+    try {
+      proxy.start(workflowInstance, runSpec);
+      fail("Expected exception");
+    } catch (Exception ignored) {
+    }
+
+    verify(stats).recordDockerOperationError("start", "unknown", 0, 123);
   }
 }
