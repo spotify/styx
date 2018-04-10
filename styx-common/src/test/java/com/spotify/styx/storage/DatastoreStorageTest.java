@@ -84,6 +84,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -518,6 +519,29 @@ public class DatastoreStorageTest {
     assertThat(storage.workflows(), hasEntry(WORKFLOW_ID1, workflow1));
     assertThat(storage.workflows(), hasEntry(WORKFLOW_ID2, workflow2));
     assertThat(storage.workflows(), hasEntry(WORKFLOW_ID3, workflow3));
+  }
+
+  @Test
+  public void shouldReturnAllWorkflowsByDoingBatchGet() throws Exception {
+    assertThat(storage.workflows().isEmpty(), is(true));
+
+    final Set<WorkflowId> workflowIds = ImmutableSet.of(WORKFLOW_ID1, WORKFLOW_ID2, WORKFLOW_ID3);
+    Workflow workflow1 = workflow(WORKFLOW_ID1);
+    Workflow workflow2 = workflow(WORKFLOW_ID2);
+    Workflow workflow3 = workflow(WORKFLOW_ID3);
+
+    storage.store(workflow1);
+    storage.store(workflow2);
+    storage.store(workflow3);
+
+    storage.setEnabled(WORKFLOW_ID1, true);
+    storage.setEnabled(WORKFLOW_ID2, false);
+    storage.updateNextNaturalTrigger(WORKFLOW_ID3, TriggerInstantSpec.create(TIMESTAMP, TIMESTAMP.plus(Duration.ofHours(1))));
+
+    assertThat(storage.workflows(workflowIds).size(), is(3));
+    assertThat(storage.workflows(workflowIds), hasEntry(WORKFLOW_ID1, workflow1));
+    assertThat(storage.workflows(workflowIds), hasEntry(WORKFLOW_ID2, workflow2));
+    assertThat(storage.workflows(workflowIds), hasEntry(WORKFLOW_ID3, workflow3));
   }
 
   @Test
