@@ -207,7 +207,7 @@ public class StyxSchedulerTest {
     consumer.accept(WORKFLOW_WITH_RESOURCES);
     verify(workflowInitializer).inspectChange(WORKFLOW_WITH_RESOURCES);
     verify(stats).registerActiveStatesMetric(eq(WORKFLOW_WITH_RESOURCES.id()), any());
-    verify(workflowConsumer).accept(Optional.empty(), Workflow.of(WORKFLOW_WITH_RESOURCES));
+    verify(workflowConsumer).accept(Optional.empty(), Optional.of(WORKFLOW_WITH_RESOURCES));
   }
 
   @Test
