@@ -374,7 +374,7 @@ public class StyxScheduler implements AppInit {
     final Consumer<Workflow> workflowRemoveListener = workflowRemoved(storage, workflowConsumer);
 
     final Consumer<Workflow> workflowChangeListener =
-        workflowChanged(workflowInitializer, stats, stateManager, workflowConsumer);
+        workflowChanged(workflowInitializer, workflowConsumer);
 
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager,
                                               storage, resourceDecorator, stats, dequeueRateLimiter,
@@ -644,23 +644,15 @@ public class StyxScheduler implements AppInit {
               .count());
     });
 
-    workflowCache.get().values().forEach(workflow -> stats.registerActiveStatesMetric(
-        workflow.id(), workflowActiveStates(stateManager, workflow)));
-
     stats.registerSubmissionRateLimitMetric(submissionRateLimiter::getRate);
   }
 
   @VisibleForTesting
   static Consumer<Workflow> workflowChanged(
       WorkflowInitializer workflowInitializer,
-      Stats stats,
-      StateManager stateManager,
       BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
     return workflow -> {
       final Optional<Workflow> oldWorkflowOptional = workflowInitializer.inspectChange(workflow);
-
-      stats.registerActiveStatesMetric(
-          workflow.id(), workflowActiveStates(stateManager, workflow));
 
       workflowConsumer.accept(oldWorkflowOptional, Optional.of(workflow));
 
