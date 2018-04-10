@@ -522,7 +522,7 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldReturnAllWorkflowsByDoingBatchGet() throws Exception {
+  public void shouldGetAllWorkflowsByDoingBatchGet() throws Exception {
     assertThat(storage.workflows().isEmpty(), is(true));
 
     final Set<WorkflowId> workflowIds = ImmutableSet.of(WORKFLOW_ID1, WORKFLOW_ID2, WORKFLOW_ID3);

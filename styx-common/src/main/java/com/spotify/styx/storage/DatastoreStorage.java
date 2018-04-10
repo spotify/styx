@@ -328,12 +328,7 @@ public class DatastoreStorage {
             .map(this::getBatchOfWorkflows)
             .flatMap(Collection::stream)
             .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-    try {
-      return forkJoinPool.submit(callable).get();
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to read workflows", e);
-    }
+    return forkJoinPool.submit(callable).join();
   }
 
   private Set<Map.Entry<WorkflowId, Workflow>> getBatchOfWorkflows(final List<WorkflowId> batch) {
