@@ -28,9 +28,9 @@ import static java.util.stream.Collectors.toSet;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.spotify.styx.WorkflowCache;
 import com.spotify.styx.WorkflowResourceDecorator;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
@@ -72,7 +72,7 @@ public final class StateUtil {
                                                                  List<InstanceState> activeStates,
                                                                  Set<WorkflowInstance> timedOutInstances,
                                                                  WorkflowResourceDecorator resourceDecorator,
-                                                                 Set<Workflow> workflows) {
+                                                                 Map<WorkflowId, Workflow> workflows) {
     return activeStates.parallelStream()
         .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
         .filter(entry -> isConsumingResources(entry.runState().state()))
@@ -85,7 +85,7 @@ public final class StateUtil {
   }
 
   public static Map<String, Long> getResourcesUsageMap(Storage storage, TimeoutConfig timeoutConfig,
-                                                       WorkflowCache workflowCache, Instant instant,
+                                                       Map<WorkflowId, Workflow> workflows, Instant instant,
                                                        WorkflowResourceDecorator resourceDecorator)
       throws IOException {
     // The only inconsistency left is to miss active workflow instances. Outdated instances or
@@ -104,15 +104,15 @@ public final class StateUtil {
     final Set<WorkflowInstance> timedOutInstances =
         getTimedOutInstances(activeInstanceStates, instant, timeoutConfig);
     return getResourceUsage(globalConcurrencyEnabled,
-        activeInstanceStates, timedOutInstances, resourceDecorator, workflowCache.all());
+        activeInstanceStates, timedOutInstances, resourceDecorator, workflows);
   }
 
   private static Stream<ResourceWithInstance> pairWithResources(boolean globalConcurrencyEnabled,
                                                                           InstanceState instanceState,
-                                                                          Set<Workflow> workflows,
+                                                                          Map<WorkflowId, Workflow> workflows,
                                                                           WorkflowResourceDecorator resourceDecorator) {
-    final Optional<Workflow> workflowOpt = workflows.stream().filter(
-        wf -> wf.id().equals(instanceState.workflowInstance().workflowId())).findFirst();
+    final Optional<Workflow> workflowOpt = Optional.ofNullable(
+        workflows.get(instanceState.workflowInstance().workflowId()));
     final Set<String> workflowResources = workflowResources(globalConcurrencyEnabled, workflowOpt);
     return workflowOpt
         .map(workflow -> resourceDecorator.decorateResources(

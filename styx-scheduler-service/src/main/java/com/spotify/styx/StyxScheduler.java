@@ -470,7 +470,7 @@ public class StyxScheduler implements AppInit {
         // then we update shards with actual usage
         try {
           final Map<String, Long> resourcesUsageMap = getResourcesUsageMap(storage, timeoutConfig,
-              workflowCache, time.get(), resourceDecorator);
+              workflowCache.all(), time.get(), resourceDecorator);
           updateShards(storage, resourcesUsageMap);
         } catch (Exception e) {
           LOG.error("Error syncing resources", e);
@@ -603,14 +603,14 @@ public class StyxScheduler implements AppInit {
 
     stats.registerWorkflowCountMetric("all", () -> (long) workflowCache.all().size());
 
-    stats.registerWorkflowCountMetric("configured", () -> workflowCache.all().stream()
+    stats.registerWorkflowCountMetric("configured", () -> workflowCache.all().values().stream()
         .filter(workflow -> workflow.configuration().dockerImage().isPresent())
         .count());
 
     final Supplier<Gauge<Long>> configuredEnabledWorkflowsCountGaugeSupplier = () -> {
       final Supplier<Set<WorkflowId>> enabledWorkflowSupplier =
           new CachedSupplier<>(storage::enabled, Instant::now);
-      return () -> workflowCache.all().stream()
+      return () -> workflowCache.all().values().stream()
           .filter(workflow -> workflow.configuration().dockerImage().isPresent())
           .filter(workflow -> enabledWorkflowSupplier.get().contains(WorkflowId.ofWorkflow(workflow)))
           .count();
@@ -618,7 +618,7 @@ public class StyxScheduler implements AppInit {
     stats.registerWorkflowCountMetric("enabled", configuredEnabledWorkflowsCountGaugeSupplier.get());
 
     stats.registerWorkflowCountMetric("docker_termination_logging_enabled", () ->
-        workflowCache.all().stream()
+        workflowCache.all().values().stream()
             .filter(workflow -> workflow.configuration().dockerImage().isPresent())
             .filter(workflow -> workflow.configuration().dockerTerminationLogging())
             .count());
@@ -642,7 +642,7 @@ public class StyxScheduler implements AppInit {
               .count());
     });
 
-    workflowCache.all().forEach(workflow -> stats.registerActiveStatesMetric(
+    workflowCache.all().values().forEach(workflow -> stats.registerActiveStatesMetric(
         workflow.id(), workflowActiveStates(stateManager, workflow)));
 
     stats.registerSubmissionRateLimitMetric(submissionRateLimiter::getRate);

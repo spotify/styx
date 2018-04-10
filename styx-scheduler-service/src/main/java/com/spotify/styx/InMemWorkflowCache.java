@@ -45,7 +45,7 @@ public class InMemWorkflowCache implements WorkflowCache {
   }
 
   @Override
-  public ImmutableSet<Workflow> all() {
-    return ImmutableSet.copyOf(supplier.get().values());
+  public Map<WorkflowId, Workflow> all() {
+    return supplier.get();
   }
 }

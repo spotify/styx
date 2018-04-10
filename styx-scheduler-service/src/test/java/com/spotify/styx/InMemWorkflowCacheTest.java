@@ -26,11 +26,9 @@ import static com.spotify.styx.testdata.TestData.WORKFLOW_WITH_RESOURCES;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_WITH_RESOURCES_2;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import java.util.Map;
@@ -58,10 +56,9 @@ public class InMemWorkflowCacheTest {
 
   @Test
   public void shouldGetAllWorkflows() {
-    final ImmutableSet<Workflow> workflows = workflowCache.all();
-    assertThat(workflowCache.all().size(), is(2));
-    assertTrue(workflows.contains(WORKFLOW_WITH_RESOURCES));
-    assertTrue(workflows.contains(WORKFLOW_WITH_RESOURCES_2));
+    assertThat(workflowCache.all(), is(ImmutableMap.of(
+        WORKFLOW_ID, WORKFLOW_WITH_RESOURCES,
+        WORKFLOW_ID_2, WORKFLOW_WITH_RESOURCES_2)));
   }
 
   @Test

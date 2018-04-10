@@ -20,9 +20,9 @@
 
 package com.spotify.styx;
 
-import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -41,7 +41,7 @@ public interface WorkflowCache {
   /**
    * Get all stored {@link Workflow}s.
    *
-   * @return an unordered set containing all Workflows
+   * @return a map of all Workflows
    */
-  ImmutableSet<Workflow> all();
+  Map<WorkflowId, Workflow> all();
 }
