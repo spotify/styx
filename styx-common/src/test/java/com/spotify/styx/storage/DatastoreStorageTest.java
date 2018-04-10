@@ -738,12 +738,13 @@ public class DatastoreStorageTest {
   @Test
   public void shouldReturnShardsForCounter() throws Exception {
     storage.runInTransaction(tx -> {
+      tx.store(Shard.create(COUNTER_ID1, 0, 0));
       tx.store(Shard.create(COUNTER_ID1, 1, 3));
       return null;
     });
     final Map<Integer, Long> map = storage.shardsForCounter(COUNTER_ID1);
-    assertEquals(1, map.size());
-    assertTrue(map.containsKey(1));
+    assertEquals(2, map.size());
+    assertEquals(0, map.get(0).longValue());
     assertEquals(3, map.get(1).longValue());
   }
 
