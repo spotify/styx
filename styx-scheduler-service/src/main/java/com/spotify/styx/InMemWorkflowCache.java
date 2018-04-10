@@ -20,7 +20,6 @@
 
 package com.spotify.styx;
 
-import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import java.util.Map;
@@ -45,7 +44,7 @@ public class InMemWorkflowCache implements WorkflowCache {
   }
 
   @Override
-  public ImmutableSet<Workflow> all() {
-    return ImmutableSet.copyOf(supplier.get().values());
+  public Map<WorkflowId, Workflow> all() {
+    return supplier.get();
   }
 }

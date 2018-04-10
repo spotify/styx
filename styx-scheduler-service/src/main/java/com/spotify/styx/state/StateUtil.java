@@ -31,6 +31,7 @@ import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.WorkflowCache;
 import com.spotify.styx.WorkflowResourceDecorator;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
@@ -72,7 +73,7 @@ public final class StateUtil {
                                                                  List<InstanceState> activeStates,
                                                                  Set<WorkflowInstance> timedOutInstances,
                                                                  WorkflowResourceDecorator resourceDecorator,
-                                                                 Set<Workflow> workflows) {
+                                                                 Map<WorkflowId, Workflow> workflows) {
     return activeStates.parallelStream()
         .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
         .filter(entry -> isConsumingResources(entry.runState().state()))
@@ -108,11 +109,11 @@ public final class StateUtil {
   }
 
   private static Stream<ResourceWithInstance> pairWithResources(boolean globalConcurrencyEnabled,
-                                                                          InstanceState instanceState,
-                                                                          Set<Workflow> workflows,
-                                                                          WorkflowResourceDecorator resourceDecorator) {
-    final Optional<Workflow> workflowOpt = workflows.stream().filter(
-        wf -> wf.id().equals(instanceState.workflowInstance().workflowId())).findFirst();
+                                                                InstanceState instanceState,
+                                                                Map<WorkflowId, Workflow> workflows,
+                                                                WorkflowResourceDecorator resourceDecorator) {
+    final Optional<Workflow> workflowOpt =
+        Optional.ofNullable(workflows.get(instanceState.workflowInstance().workflowId()));
     final Set<String> workflowResources = workflowResources(globalConcurrencyEnabled, workflowOpt);
     return workflowOpt
         .map(workflow -> resourceDecorator.decorateResources(

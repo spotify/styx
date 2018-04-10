@@ -30,7 +30,6 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import java.util.Map;
@@ -58,10 +57,10 @@ public class InMemWorkflowCacheTest {
 
   @Test
   public void shouldGetAllWorkflows() {
-    final ImmutableSet<Workflow> workflows = workflowCache.all();
+    final Map<WorkflowId, Workflow> workflows = workflowCache.all();
     assertThat(workflowCache.all().size(), is(2));
-    assertTrue(workflows.contains(WORKFLOW_WITH_RESOURCES));
-    assertTrue(workflows.contains(WORKFLOW_WITH_RESOURCES_2));
+    assertTrue(workflows.containsValue(WORKFLOW_WITH_RESOURCES));
+    assertTrue(workflows.containsValue(WORKFLOW_WITH_RESOURCES_2));
   }
 
   @Test

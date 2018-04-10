@@ -22,6 +22,7 @@ package com.spotify.styx.state;
 
 import static com.spotify.styx.state.StateUtil.GLOBAL_RESOURCE_ID;
 import static com.spotify.styx.testdata.TestData.RESOURCE_IDS;
+import static com.spotify.styx.testdata.TestData.WORKFLOW_ID;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_WITH_RESOURCES;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -31,7 +32,6 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.WorkflowCache;
 import com.spotify.styx.WorkflowResourceDecorator;
 import com.spotify.styx.model.StyxConfig;
@@ -70,7 +70,7 @@ public class StateUtilTest {
     when(storage.readActiveState(WORKFLOW_INSTANCE)).thenReturn(Optional.of(runState));
     when(storage.config()).thenReturn(config);
     when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(2L));
-    when(workflowCache.all()).thenReturn(ImmutableSet.of(WORKFLOW_WITH_RESOURCES));
+    when(workflowCache.all()).thenReturn(ImmutableMap.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES));
   }
 
   @Test
