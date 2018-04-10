@@ -799,7 +799,8 @@ public class DatastoreStorage {
 
   Map<Integer,Long> shardsForCounter(String counterId) {
     final List<Key> shardKeys = IntStream.range(0, NUM_SHARDS).mapToObj(
-        index -> datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD).newKey(counterId + "-" + index))
+        index -> datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD).newKey(
+            String.format("%s-%d", counterId, index)))
         .collect(toList());
 
     final Iterator<Entity> shards = datastore.get(shardKeys);
