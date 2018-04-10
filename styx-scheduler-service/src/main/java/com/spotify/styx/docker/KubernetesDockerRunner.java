@@ -536,7 +536,8 @@ class KubernetesDockerRunner implements DockerRunner {
   private void emitPodEvents(Watcher.Action action, Pod pod, RunState runState) {
     final List<Event> events = translate(runState.workflowInstance(), runState, action, pod, stats);
 
-    for (Event event : events) {
+    for (int i = 0; i < events.size(); ++i) {
+      final Event event = events.get(i);
       if (event.accept(new PullImageErrorMatcher())) {
         stats.recordPullImageError();
       }
@@ -545,7 +546,7 @@ class KubernetesDockerRunner implements DockerRunner {
       }
 
       try {
-        stateManager.receive(event);
+        stateManager.receive(event, runState.counter() + i);
       } catch (IsClosedException isClosedException) {
         LOG.warn("Could not receive kubernetes event", isClosedException);
         throw new RuntimeException(isClosedException);

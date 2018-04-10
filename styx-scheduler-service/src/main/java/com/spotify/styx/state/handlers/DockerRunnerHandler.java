@@ -72,7 +72,7 @@ public class DockerRunnerHandler implements OutputHandler {
         // Emit submitted event first to guarantee it is observed before events from the pod
         final Event submitted = Event.submitted(state.workflowInstance(), runSpec.executionId());
         try {
-          stateManager.receive(submitted);
+          stateManager.receive(submitted, state.counter());
         } catch (IsClosedException isClosedException) {
           LOG.warn("Could not emit 'submitted' event", isClosedException);
           return;
@@ -90,7 +90,8 @@ public class DockerRunnerHandler implements OutputHandler {
             } else {
               LOG.error(msg, e);
             }
-            stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()));
+            stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()), 
+                state.counter() + 1);
           } catch (IsClosedException isClosedException) {
             LOG.warn("Failed to send 'runError' event", isClosedException);
           }

@@ -28,6 +28,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyListOf;
+import static org.mockito.Matchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
@@ -572,7 +573,8 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(terminated("Succeeded", 20, null));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
-    verify(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)));
+    verify(stateManager).receive(Event.started(WORKFLOW_INSTANCE), -1);
+    verify(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)), 0);
   }
 
   @Test
@@ -581,7 +583,8 @@ public class KubernetesDockerRunnerTest {
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
     verify(stateManager).receive(
-        Event.runError(WORKFLOW_INSTANCE, "One or more containers failed to pull their image"));
+        Event.runError(WORKFLOW_INSTANCE, "One or more containers failed to pull their image"),
+        -1);
   }
 
   @Test
@@ -591,7 +594,8 @@ public class KubernetesDockerRunnerTest {
 
     verify(stats, times(1)).recordPullImageError();
     verify(stateManager).receive(
-        Event.runError(WORKFLOW_INSTANCE, "One or more containers failed to pull their image"));
+        Event.runError(WORKFLOW_INSTANCE, "One or more containers failed to pull their image"),
+        -1);
   }
 
   @Test
@@ -607,7 +611,8 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatusNoContainer("Unknown"));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
-    verify(stateManager).receive(Event.runError(WORKFLOW_INSTANCE, "Pod entered Unknown phase"));
+    verify(stateManager).receive(Event.runError(WORKFLOW_INSTANCE, "Pod entered Unknown phase"),
+        -1);
   }
 
   @Test
@@ -615,7 +620,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatusNoContainer("Succeeded"));
     podWatcher.eventReceived(Watcher.Action.DELETED, createdPod);
 
-    verify(stateManager, never()).receive(any());
+    verify(stateManager, never()).receive(any(), anyLong());
   }
 
   @Test
@@ -623,7 +628,9 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatusNoContainer("Succeeded"));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
-    verify(stateManager).receive(Event.runError(WORKFLOW_INSTANCE, "Could not find our container in pod"));
+    verify(stateManager).receive(
+        Event.runError(WORKFLOW_INSTANCE, "Could not find our container in pod"),
+        -1);
   }
 
   @Test
@@ -631,7 +638,9 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(waiting("Failed", ""));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
-    verify(stateManager).receive(Event.runError(WORKFLOW_INSTANCE, "Unexpected null terminated status"));
+    verify(stateManager).receive(
+        Event.runError(WORKFLOW_INSTANCE, "Unexpected null terminated status"),
+        -1);
   }
 
   @Test
@@ -645,12 +654,12 @@ public class KubernetesDockerRunnerTest {
     when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(19));
     createdPod.setStatus(running(/* ready= */ false));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
-    verify(stateManager, never()).receive(Event.started(WORKFLOW_INSTANCE));
+    verify(stateManager, never()).receive(Event.started(WORKFLOW_INSTANCE), -1);
 
     when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(4711));
     createdPod.setStatus(running(/* ready= */ true));
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
-    verify(stateManager).receive(Event.started(WORKFLOW_INSTANCE));
+    verify(stateManager).receive(Event.started(WORKFLOW_INSTANCE), -1);
 
     verify(stats).recordRunning(POD_NAME);
   }
@@ -665,7 +674,7 @@ public class KubernetesDockerRunnerTest {
 
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
-    verify(stateManager, never()).receive(any());
+    verify(stateManager, never()).receive(any(), anyLong());
   }
 
   @Test
@@ -685,7 +694,8 @@ public class KubernetesDockerRunnerTest {
     kdr.restore();
 
     // Verify that the runner polled and found out that the pods is terminated
-    verify(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)));
+    verify(stateManager).receive(Event.started(WORKFLOW_INSTANCE), -1);
+    verify(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)), 0);
   }
 
   @Test
@@ -708,6 +718,11 @@ public class KubernetesDockerRunnerTest {
     when(podList.getItems()).thenReturn(ImmutableList.of(terminatedPod));
 
     // Verify that the runner eventually polls and finds out that the pod is terminated
-    verify(stateManager, timeout(30_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)));
+    verify(stateManager, timeout(30_000)).receive(
+        Event.started(WORKFLOW_INSTANCE),
+        -1);
+    verify(stateManager, timeout(30_000)).receive(
+        Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)),
+        0);
   }
 }
