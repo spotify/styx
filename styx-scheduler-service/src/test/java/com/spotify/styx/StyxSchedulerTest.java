@@ -36,7 +36,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.codahale.metrics.Gauge;
 import com.google.api.services.container.v1beta1.Container;
 import com.google.api.services.container.v1beta1.model.Cluster;
 import com.google.api.services.container.v1beta1.model.MasterAuth;
@@ -197,8 +196,7 @@ public class StyxSchedulerTest {
     final Consumer<Workflow> consumer = StyxScheduler.workflowChanged(workflowInitializer, stats,
         stateManager, storage, workflowConsumer);
     consumer.accept(WORKFLOW_WITH_RESOURCES);
-    //noinspection unchecked
-    verify(stats).registerActiveStatesMetric(eq(WORKFLOW_WITH_RESOURCES.id()), any(Gauge.class));
+    verify(stats).registerActiveStatesMetric(eq(WORKFLOW_WITH_RESOURCES.id()), any());
     verify(workflowInitializer).inspectChange(Optional.of(WORKFLOW_WITH_RESOURCES),
         WORKFLOW_WITH_RESOURCES);
     verify(workflowConsumer).accept(Optional.of(WORKFLOW_WITH_RESOURCES),
@@ -213,8 +211,7 @@ public class StyxSchedulerTest {
     final Consumer<Workflow> consumer = StyxScheduler.workflowChanged(workflowInitializer, stats,
         stateManager, storage, workflowConsumer);
     consumer.accept(WORKFLOW_WITH_RESOURCES);
-    //noinspection unchecked
-    verify(stats).registerActiveStatesMetric(eq(WORKFLOW_WITH_RESOURCES.id()), any(Gauge.class));
+    verify(stats).registerActiveStatesMetric(eq(WORKFLOW_WITH_RESOURCES.id()), any());
     verify(workflowInitializer).inspectChange(Optional.of(workflow), WORKFLOW_WITH_RESOURCES);
     verify(workflowConsumer).accept(Optional.of(workflow), Optional.of(WORKFLOW_WITH_RESOURCES));
   }
@@ -233,9 +230,8 @@ public class StyxSchedulerTest {
     } catch (Exception e) {
       assertThat(e.getCause(), is(exception));
     }
-    //noinspection unchecked
     verify(stats, never())
-        .registerActiveStatesMetric(eq(WORKFLOW_WITH_RESOURCES.id()), any(Gauge.class));
+        .registerActiveStatesMetric(eq(WORKFLOW_WITH_RESOURCES.id()), any());
     verify(workflowInitializer, never())
         .inspectChange(Optional.of(workflow), WORKFLOW_WITH_RESOURCES);
     verify(workflowConsumer, never())

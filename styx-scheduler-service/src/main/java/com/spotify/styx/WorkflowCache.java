@@ -23,20 +23,11 @@ package com.spotify.styx;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Simple caching interface for {@link Workflow}s
  */
 public interface WorkflowCache {
-
-  /**
-   * Get a stored {@link Workflow}.
-   *
-   * @param workflowId  Id of the workflow to get
-   * @return Optionally a Workflow, if found
-   */
-  Optional<Workflow> workflow(WorkflowId workflowId);
 
   /**
    * Get all stored {@link Workflow}s.

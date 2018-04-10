@@ -24,7 +24,6 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
@@ -36,11 +35,6 @@ public class InMemWorkflowCache implements WorkflowCache {
 
   InMemWorkflowCache(Supplier<Map<WorkflowId, Workflow>> supplier) {
     this.supplier = Objects.requireNonNull(supplier);
-  }
-
-  @Override
-  public Optional<Workflow> workflow(WorkflowId workflowId) {
-    return Optional.ofNullable(supplier.get().get(workflowId));
   }
 
   @Override
