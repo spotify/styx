@@ -324,6 +324,9 @@ public class DatastoreStorage {
     final Iterable<List<WorkflowId>> batches = Iterables.partition(workflowIds, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH);
     return StreamSupport.stream(batches.spliterator(), false)
         .map(batch -> forkJoinPool.submit(() -> this.getBatchOfWorkflows(batch)))
+        // `collect and stream` is crucial to make tasks running in parallel, otherwise they will
+        // be processed sequentially. Without `collect`, it will try to submit and wait for each task
+        // while iterating through the stream. This is somewhat subtle, so think twice.
         .collect(toList())
         .stream()
         .flatMap(task -> task.join().stream())
