@@ -20,18 +20,31 @@
 
 package com.spotify.styx;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.spotify.apollo.AppInit;
+import com.spotify.apollo.Environment;
 import com.spotify.apollo.httpservice.HttpService;
 import com.spotify.apollo.httpservice.LoadingException;
+import com.spotify.metrics.core.SemanticMetricRegistry;
+import com.spotify.styx.monitoring.MetricsStats;
+import com.spotify.styx.monitoring.Stats;
+import java.time.Instant;
 
 public class StyxService {
 
+  private static Stats STATS;
+
   private StyxService() {
+    throw new UnsupportedOperationException();
   }
 
   public static void main(String[] args) throws LoadingException {
-    final StyxScheduler scheduler = StyxScheduler.createDefault();
-    final StyxApi api = StyxApi.createDefault();
+    final StyxScheduler scheduler = StyxScheduler.newBuilder()
+        .setStatsFactory(StyxService::stats)
+        .build();
+    final StyxApi api = StyxApi.newBuilder()
+        .setStatsFactory(StyxService::stats)
+        .build();
 
     final AppInit init = (env) -> {
       scheduler.create(env);
@@ -39,5 +52,13 @@ public class StyxService {
     };
 
     HttpService.boot(init, "styx-standalone", args);
+  }
+
+  @VisibleForTesting
+  static synchronized Stats stats(Environment environment) {
+    if (STATS == null) {
+      STATS = new MetricsStats(environment.resolve(SemanticMetricRegistry.class), Instant::now);
+    }
+    return STATS;
   }
 }

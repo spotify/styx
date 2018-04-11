@@ -16,6 +16,10 @@
       <artifactId>apollo-api</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>apollo-metrics</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.google.auto.value</groupId>
       <artifactId>auto-value</artifactId>
       <scope>provided</scope>

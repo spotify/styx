@@ -21,6 +21,7 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.api.Middlewares.authValidator;
+import static com.spotify.styx.monitoring.MeteredProxy.instrument;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
@@ -32,13 +33,20 @@ import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
+import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.api.Api;
 import com.spotify.styx.api.BackfillResource;
 import com.spotify.styx.api.ResourceResource;
 import com.spotify.styx.api.SchedulerProxyResource;
 import com.spotify.styx.api.StatusResource;
 import com.spotify.styx.api.WorkflowResource;
+import com.spotify.styx.api.workflow.WorkflowInitializer;
 import com.spotify.styx.model.StyxConfig;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.monitoring.MeteredStorageProxy;
+import com.spotify.styx.monitoring.MetricsStats;
+import com.spotify.styx.monitoring.Stats;
+import com.spotify.styx.monitoring.StatsFactory;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
@@ -47,11 +55,15 @@ import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.ShardedCounterSnapshotFactory;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.StreamUtil;
+import com.spotify.styx.util.Time;
 import com.spotify.styx.util.WorkflowValidator;
 import com.typesafe.config.Config;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import okio.ByteString;
@@ -70,18 +82,42 @@ public class StyxApi implements AppInit {
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
 
   private final StorageFactory storageFactory;
+  private final WorkflowConsumerFactory workflowConsumerFactory;
+  private final StatsFactory statsFactory;
+  private final Time time;
+
+  public interface WorkflowConsumerFactory
+      extends BiFunction<Environment, Stats, BiConsumer<Optional<Workflow>, Optional<Workflow>>> { }
 
   public static class Builder {
 
     private StorageFactory storageFactory = StyxApi::storage;
+    private WorkflowConsumerFactory workflowConsumerFactory = (env, stats) -> (oldWorkflow, newWorkflow) -> { };
+    private StatsFactory statsFactory = StyxApi::stats;
+    private Time time = Instant::now;
 
     public Builder setStorageFactory(StorageFactory storageFactory) {
       this.storageFactory = storageFactory;
       return this;
     }
 
+    public Builder setWorkflowConsumerFactory(WorkflowConsumerFactory workflowConsumerFactory) {
+      this.workflowConsumerFactory = workflowConsumerFactory;
+      return this;
+    }
+
+    public Builder setStatsFactory(StatsFactory statsFactory) {
+      this.statsFactory = statsFactory;
+      return this;
+    }
+
+    public Builder setTime(Time time) {
+      this.time = time;
+      return this;
+    }
+
     public StyxApi build() {
-      return new StyxApi(storageFactory);
+      return new StyxApi(this);
     }
   }
 
@@ -93,8 +129,11 @@ public class StyxApi implements AppInit {
     return newBuilder().build();
   }
 
-  private StyxApi(StorageFactory storageFactory) {
-    this.storageFactory = requireNonNull(storageFactory);
+  private StyxApi(Builder builder) {
+    this.storageFactory = requireNonNull(builder.storageFactory);
+    this.workflowConsumerFactory = requireNonNull(builder.workflowConsumerFactory);
+    this.statsFactory = requireNonNull(builder.statsFactory);
+    this.time = requireNonNull(builder.time);
   }
 
   @Override
@@ -104,20 +143,25 @@ public class StyxApi implements AppInit {
                                            ? config.getString(SCHEDULER_SERVICE_BASE_URL)
                                            : DEFAULT_SCHEDULER_SERVICE_BASE_URL;
 
-    final Storage storage = storageFactory.apply(environment);
+    final Stats stats = statsFactory.apply(environment);
+    final Storage storage = instrument(Storage.class,
+        new MeteredStorageProxy(storageFactory.apply(environment), stats, time));
+    final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer =
+        workflowConsumerFactory.apply(environment, stats);
     
     // N.B. if we need to forward a request to scheduler that behind an nginx, we CAN NOT
     // use rc.requestScopedClient() and at the same time inherit all headers from original
     // request, because request scoped client would add Authorization header again which
-    // results duplicated headers, and that would make nginx unhappy.
+    // results duplicated headers, and that would make nginx unhappy. This has been fixed
+    // in later Apollo version.
 
     final WorkflowResource workflowResource = new WorkflowResource(storage,
-                                                                   schedulerServiceBaseUrl,
-                                                                   new WorkflowValidator(new DockerImageValidator()),
-                                                                   environment.client());
+        new WorkflowValidator(new DockerImageValidator()),
+        new WorkflowInitializer(storage, time),
+        workflowConsumer);
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
-                                                                   storage,
-                                                                   new WorkflowValidator(new DockerImageValidator()));
+        storage,
+        new WorkflowValidator(new DockerImageValidator()));
     final ShardedCounter shardedCounter = new ShardedCounter(storage, new ShardedCounterSnapshotFactory(storage));
     final ResourceResource resourceResource = new ResourceResource(storage, shardedCounter);
     final StatusResource statusResource = new StatusResource(storage);
@@ -149,5 +193,9 @@ public class StyxApi implements AppInit {
     final Connection bigTable = closer.register(createBigTableConnection(config));
     final Datastore datastore = createDatastore(config);
     return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
+  }
+
+  private static Stats stats(Environment environment) {
+    return new MetricsStats(environment.resolve(SemanticMetricRegistry.class), Instant::now);
   }
 }

@@ -27,7 +27,6 @@ import static com.spotify.styx.api.SchedulerResource.BASE;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
-import static com.spotify.styx.testdata.TestData.INVALID_SHA;
 import static com.spotify.styx.testdata.TestData.RESOURCE_IDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.hamcrest.CoreMatchers.is;
@@ -35,12 +34,9 @@ import static org.hamcrest.CoreMatchers.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
@@ -61,14 +57,12 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
-import com.spotify.styx.workflow.WorkflowInitializationException;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.function.Consumer;
 import okio.ByteString;
 import org.junit.Before;
 import org.junit.Rule;
@@ -88,8 +82,6 @@ public class SchedulerResourceTest {
 
   private final Workflow HOURLY_WORKFLOW = Workflow.create("styx",
                                                            TestData.HOURLY_WORKFLOW_CONFIGURATION);
-  private final Workflow HOURLY_WORKFLOW_WITH_INVALID_OFFSET =
-      Workflow.create("styx", TestData.HOURLY_WORKFLOW_CONFIGURATION_WITH_INVALID_OFFSET);
   private final Workflow DAILY_WORKFLOW = Workflow.create("styx",
                                                           TestData.DAILY_WORKFLOW_CONFIGURATION);
   private final Workflow FULL_DAILY_WORKFLOW = Workflow.create("styx",
@@ -99,7 +91,6 @@ public class SchedulerResourceTest {
   private final Workflow MONTHLY_WORKFLOW = Workflow.create("styx",
                                                             TestData.MONTHLY_WORKFLOW_CONFIGURATION);
   private Optional<Workflow> triggeredWorkflow = Optional.empty();
-  private Optional<Trigger> trigger = Optional.empty();
   private Optional<Instant> triggeredInstant = Optional.empty();
 
   @Mock WorkflowValidator workflowValidator;
@@ -108,9 +99,7 @@ public class SchedulerResourceTest {
 
   @Captor ArgumentCaptor<Trigger> triggerCaptor;
 
-  @Mock Consumer<Workflow> workflowChangeListener;
   @Mock StateManager stateManager;
-  @Mock Consumer<Workflow> workflowRemoveListener;
   @Mock TriggerListener triggerListener;
 
   @Rule
@@ -134,7 +123,7 @@ public class SchedulerResourceTest {
       final SchedulerResource schedulerResource = new SchedulerResource(
           stateManager,
           triggerListener,
-          workflowChangeListener, workflowRemoveListener, storage,
+          storage,
           () -> Instant.parse("2015-12-31T23:59:10.000Z"),
           workflowValidator);
 
@@ -272,120 +261,6 @@ public class SchedulerResourceTest {
         serviceHelper.request("POST", BASE + "/retry", eventPayload);
 
     return post.toCompletableFuture().get();
-  }
-
-  @Test
-  public void testCreateWorkflow() throws Exception {
-    final Response<ByteString> r = serviceHelper.request(
-        "POST", BASE + "/workflows/styx",
-        serialize(FULL_DAILY_WORKFLOW.configuration())).toCompletableFuture().get();
-    assertThat(r, hasStatus(withCode(Status.OK)));
-    verify(workflowValidator).validateWorkflowConfiguration(FULL_DAILY_WORKFLOW.configuration());
-    verify(workflowChangeListener).accept(FULL_DAILY_WORKFLOW);
-  }
-
-  @Test
-  public void testCreateWorkflowWithoutDockerImage() throws Exception {
-    final WorkflowConfiguration workflowConfiguration =
-        WorkflowConfigurationBuilder.from(FULL_DAILY_WORKFLOW.configuration())
-            .dockerImage(Optional.empty()).build();
-    final Response<ByteString> r = serviceHelper.request(
-        "POST", BASE + "/workflows/styx",
-        serialize(workflowConfiguration)).toCompletableFuture().get();
-    assertThat(r, hasStatus(withCode(Status.BAD_REQUEST)));
-    verify(workflowChangeListener, never()).accept(any());
-  }
-
-  @Test
-  public void testCreateWorkflowInvalidConfiguration() throws Exception {
-    when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(ImmutableList.of("bad", "f00d"));
-    final Response<ByteString> r = serviceHelper.request(
-        "POST", BASE + "/workflows/styx",
-        serialize(FULL_DAILY_WORKFLOW.configuration())).toCompletableFuture().get();
-    assertThat(r.status(),
-        is(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: bad, f00d")));
-    verify(workflowValidator).validateWorkflowConfiguration(FULL_DAILY_WORKFLOW.configuration());
-  }
-
-  @Test
-  public void testCreateWorkflowFailedToInitialize() throws Exception {
-    doThrow(new WorkflowInitializationException(new Exception()))
-        .when(workflowChangeListener).accept(FULL_DAILY_WORKFLOW);
-    final Response<ByteString> r = serviceHelper.request(
-        "POST", BASE + "/workflows/styx",
-        serialize(FULL_DAILY_WORKFLOW.configuration())).toCompletableFuture().get();
-    verify(workflowValidator).validateWorkflowConfiguration(FULL_DAILY_WORKFLOW.configuration());
-    verify(workflowChangeListener).accept(FULL_DAILY_WORKFLOW);
-    assertThat(r, hasStatus(withCode(Status.BAD_REQUEST)));
-  }
-
-  @Test
-  public void testUpdateWorkflow() throws Exception {
-    ByteString workflowPayload = serialize(HOURLY_WORKFLOW.configuration());
-    CompletionStage<Response<ByteString>> post = serviceHelper.request(
-        "POST", BASE + "/workflows/" + HOURLY_WORKFLOW.componentId(), workflowPayload);
-
-    assertThat(post.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
-    verify(workflowChangeListener).accept(HOURLY_WORKFLOW);
-
-    CompletionStage<Response<ByteString>> post2 = serviceHelper.request(
-        "POST", BASE + "/workflows/" + HOURLY_WORKFLOW.componentId(), workflowPayload);
-
-    assertThat(post2.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
-    verify(workflowChangeListener, times(2)).accept(HOURLY_WORKFLOW);
-  }
-
-  @Test
-  public void testUpdateWorkflowWithInvalidConfiguration() throws Exception {
-    ByteString workflowPayload = serialize(HOURLY_WORKFLOW.configuration());
-    CompletionStage<Response<ByteString>> post = serviceHelper.request(
-        "POST", BASE + "/workflows/" + HOURLY_WORKFLOW.componentId(), workflowPayload);
-
-    assertThat(post.toCompletableFuture().get(), hasStatus(withCode(Status.OK)));
-    verify(workflowChangeListener).accept(HOURLY_WORKFLOW);
-
-    when(workflowValidator.validateWorkflowConfiguration(any()))
-        .thenReturn(ImmutableList.of("bad", "f00d"));
-
-    ByteString workflowWithInvalidOffset =
-        serialize(HOURLY_WORKFLOW_WITH_INVALID_OFFSET.configuration());
-    CompletionStage<Response<ByteString>> post2 = serviceHelper.request(
-        "POST", BASE + "/workflows/" + HOURLY_WORKFLOW_WITH_INVALID_OFFSET.componentId(), workflowWithInvalidOffset);
-
-    assertThat(post2.toCompletableFuture().get(), hasStatus(withCode(Status.BAD_REQUEST)));
-    verifyNoMoreInteractions(workflowChangeListener);
-  }
-
-  @Test
-  public void testWorkflowWithInvalidShaFails() throws Exception {
-    final WorkflowConfiguration workflowConfiguration =
-        WorkflowConfigurationBuilder.from(HOURLY_WORKFLOW.configuration())
-            .commitSha(INVALID_SHA)
-            .build();
-    ByteString workflowPayload = serialize(workflowConfiguration);
-    CompletionStage<Response<ByteString>> post =
-        serviceHelper.request("POST", BASE + "/workflows/styx", workflowPayload);
-
-    assertThat(post.toCompletableFuture().get(), hasStatus(withCode(Status.BAD_REQUEST)));
-  }
-
-  @Test
-  public void testDeleteWorkflowWhenPresent() throws Exception {
-    when(storage.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
-    Response<ByteString> response = serviceHelper.request("DELETE", String
-        .join("/", BASE, "workflows", HOURLY_WORKFLOW.componentId(),
-              HOURLY_WORKFLOW.workflowId())).toCompletableFuture().get();
-    assertThat(response, hasStatus(withCode(Status.NO_CONTENT)));
-    verify(workflowRemoveListener).accept(HOURLY_WORKFLOW);
-  }
-
-  @Test
-  public void testDeleteWorkflowWhenNotPresent() throws Exception {
-    when(storage.workflow(any())).thenReturn(Optional.empty());
-    Response<ByteString> response = serviceHelper.request("DELETE", String
-        .join("/", BASE, "workflows", HOURLY_WORKFLOW.componentId(),
-              HOURLY_WORKFLOW.workflowId())).toCompletableFuture().get();
-    assertThat(response, hasStatus(withCode(Status.NOT_FOUND)));
   }
 
   @Test

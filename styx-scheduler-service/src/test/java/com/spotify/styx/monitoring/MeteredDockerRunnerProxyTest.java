@@ -24,20 +24,22 @@ import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import com.google.common.collect.ImmutableList;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.InvalidExecutionException;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
 import io.fabric8.kubernetes.api.model.Status;
 import io.fabric8.kubernetes.client.KubernetesClientException;
+import io.fabric8.kubernetes.client.KubernetesClientTimeoutException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -46,50 +48,42 @@ import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
-public class MeteredProxyTest {
+public class MeteredDockerRunnerProxyTest {
 
   @Rule
   public ExpectedException expect = ExpectedException.none();
 
-  @Mock WorkflowInstance workflowInstance;
-  @Mock RunSpec runSpec;
+  @Mock private WorkflowInstance workflowInstance;
+  @Mock private RunSpec runSpec;
+  @Mock private DockerRunner dockerRunner;
+  @Mock private Stats stats;
 
-  Instant now = Instant.now();
-  Instant later = now.plusMillis(123);
-  List<Instant> times = Arrays.asList(now, later);
-  int pos = 0;
+  private Instant now = Instant.now();
+  private Instant later = now.plusMillis(123);
+  private List<Instant> times = Arrays.asList(now, later);
+  private int pos = 0;
+  private Time time = () -> times.get(pos++);
 
-  Stats stats = mock(Stats.class);
-  Time time = () -> times.get(pos++);
+  private DockerRunner proxy;
 
-  @Test
-  public void instrumentStorageMethod() throws Exception {
-    Storage mock = mock(Storage.class);
-    Storage proxy = MeteredProxy.instrument(Storage.class, mock, stats, time);
-
-    proxy.resource("foobar");
-
-    verify(mock).resource("foobar");
-    verify(stats).recordStorageOperation("resource", 123, "success");
+  @Before
+  public void setUp() {
+    proxy = MeteredProxy.instrument(DockerRunner.class,
+        new MeteredDockerRunnerProxy(dockerRunner, stats, time));
   }
 
   @Test
-  public void instrumentDockerMethod() throws Exception {
-    DockerRunner mock = mock(DockerRunner.class);
-    DockerRunner proxy = MeteredProxy.instrument(DockerRunner.class, mock, stats, time);
-
+  public void instrumentDockerMethod() {
     proxy.cleanup(workflowInstance, "barbaz");
 
-    verify(mock).cleanup(workflowInstance, "barbaz");
+    verify(dockerRunner).cleanup(workflowInstance, "barbaz");
     verify(stats).recordDockerOperation("cleanup", 123, "success");
   }
 
   @Test
-  public void surfaceExceptions() throws Exception {
-    DockerRunner mock = mock(DockerRunner.class);
-    DockerRunner proxy = MeteredProxy.instrument(DockerRunner.class, mock, stats, time);
-
-    doThrow(new RuntimeException("with message")).when(mock).cleanup(any(WorkflowInstance.class), anyString());
+  public void surfaceExceptions() {
+    doThrow(new RuntimeException("with message")).when(dockerRunner)
+        .cleanup(any(WorkflowInstance.class), anyString());
 
     expect.expect(RuntimeException.class);
     expect.expectMessage("with message");
@@ -99,10 +93,8 @@ public class MeteredProxyTest {
 
   @Test
   public void reportKubernetesClientException() throws Exception {
-    DockerRunner mock = mock(DockerRunner.class);
-    DockerRunner proxy = MeteredProxy.instrument(DockerRunner.class, mock, stats, time);
-
-    doThrow(new KubernetesClientException("enhance your calm", 429, new Status())).when(mock).start(any(), any());
+    doThrow(new KubernetesClientException("enhance your calm", 429, new Status()))
+        .when(dockerRunner).start(any(), any());
 
     try {
       proxy.start(workflowInstance, runSpec);
@@ -114,12 +106,23 @@ public class MeteredProxyTest {
   }
 
   @Test
-  public void reportInvalidExecutionException() throws Exception {
-    DockerRunner mock = mock(DockerRunner.class);
-    DockerRunner proxy = MeteredProxy.instrument(DockerRunner.class, mock, stats, time);
+  public void reportKubernetesClientTimeoutException() throws Exception {
+    doThrow(new KubernetesClientTimeoutException(ImmutableList.of(), 10L, TimeUnit.SECONDS))
+        .when(dockerRunner).start(any(), any());
 
+    try {
+      proxy.start(workflowInstance, runSpec);
+      fail("Expected exception");
+    } catch (Exception ignored) {
+    }
+
+    verify(stats).recordDockerOperationError("start", "kubernetes-client-timeout", 0, 123);
+  }
+
+  @Test
+  public void reportInvalidExecutionException() throws Exception {
     doThrow(new InvalidExecutionException("Maximum number of keys on service account reached"))
-        .when(mock).start(any(), any());
+        .when(dockerRunner).start(any(), any());
 
     try {
       proxy.start(workflowInstance, runSpec);
@@ -132,10 +135,7 @@ public class MeteredProxyTest {
 
   @Test
   public void reportUnknownError() throws Exception {
-    DockerRunner mock = mock(DockerRunner.class);
-    DockerRunner proxy = MeteredProxy.instrument(DockerRunner.class, mock, stats, time);
-
-    doThrow(new RuntimeException()).when(mock).start(any(), any());
+    doThrow(new RuntimeException()).when(dockerRunner).start(any(), any());
 
     try {
       proxy.start(workflowInstance, runSpec);

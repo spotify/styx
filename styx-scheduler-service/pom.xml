@@ -21,10 +21,6 @@
       <groupId>com.spotify</groupId>
       <artifactId>apollo-entity</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.spotify</groupId>
-      <artifactId>apollo-metrics</artifactId>
-    </dependency>
 
     <dependency>
       <groupId>com.google.auto.value</groupId>

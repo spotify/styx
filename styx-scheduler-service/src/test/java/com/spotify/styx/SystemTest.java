@@ -215,53 +215,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @RunWith(JUnitParamsRunner.class)
-  public static class ShouldConsumeDeletedWorkflowTest extends SystemTest {
-  @Test
-  public void shouldConsumeDeletedWorkflow() throws Exception {
-    givenWorkflow(HOURLY_WORKFLOW);
-    styxStarts();
-
-    workflowDeleted(HOURLY_WORKFLOW);
-    awaitUntilConsumedWorkflow(Optional.of(HOURLY_WORKFLOW), Optional.empty());
-  }
-  }
-
-  @RunWith(JUnitParamsRunner.class)
-  public static class ShouldConsumeChangedWorkflowTest extends SystemTest {
-  @Test
-  public void shouldConsumeChangedWorkflow() throws Exception {
-    givenWorkflow(HOURLY_WORKFLOW);
-    styxStarts();
-
-    workflowChanges(DAILY_WORKFLOW);
-    awaitUntilConsumedWorkflow(Optional.of(HOURLY_WORKFLOW), Optional.of(DAILY_WORKFLOW));
-  }
-  }
-
-  @RunWith(JUnitParamsRunner.class)
-  public static class ShouldConsumeSameWorkflowTest extends SystemTest {
-  @Test
-  public void shouldConsumeSameWorkflow() throws Exception {
-    givenWorkflow(HOURLY_WORKFLOW);
-    styxStarts();
-
-    workflowChanges(HOURLY_WORKFLOW);
-    awaitUntilConsumedWorkflow(Optional.of(HOURLY_WORKFLOW), Optional.of(HOURLY_WORKFLOW));
-  }
-  }
-
-  @RunWith(JUnitParamsRunner.class)
-  public static class ShouldConsumeNewWorkflowTest extends SystemTest {
-  @Test
-  public void shouldConsumeNewWorkflow() throws Exception {
-    styxStarts();
-
-    workflowChanges(HOURLY_WORKFLOW);
-    awaitUntilConsumedWorkflow(Optional.empty(), Optional.of(HOURLY_WORKFLOW));
-  }
-  }
-
-  @RunWith(JUnitParamsRunner.class)
   public static class ShouldCatchUpWithNaturalTriggersTest extends SystemTest {
   @Test
   public void shouldCatchUpWithNaturalTriggers() throws Exception {

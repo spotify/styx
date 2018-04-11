@@ -20,15 +20,12 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.testdata.TestData.WORKFLOW_WITH_RESOURCES;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.theInstance;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,22 +36,15 @@ import com.google.api.services.container.v1beta1.model.MasterAuth;
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.StyxScheduler.KubernetesClientFactory;
 import com.spotify.styx.model.Resource;
-import com.spotify.styx.model.Workflow;
-import com.spotify.styx.monitoring.Stats;
-import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.util.Shard;
-import com.spotify.styx.workflow.WorkflowInitializer;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import java.io.IOException;
 import java.util.Map;
-import java.util.Optional;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -75,10 +65,6 @@ public class StyxSchedulerTest {
   @Mock private Container.Projects.Locations.Clusters.Get gkeClusterGet;
   @Mock private Storage storage;
   @Mock private StorageTransaction transaction;
-  @Mock private WorkflowInitializer workflowInitializer;
-  @Mock private Stats stats;
-  @Mock private StateManager stateManager;
-  @Mock private BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
 
   private StyxScheduler styxScheduler;
 
@@ -184,46 +170,6 @@ public class StyxSchedulerTest {
     } catch (Exception e) {
       assertThat(e.getCause(), is(exception));
     }
-  }
-
-  @Test
-  public void shouldHandleModifyWorkflow() {
-    when(workflowInitializer.inspectChange(WORKFLOW_WITH_RESOURCES)).thenReturn(Optional.of(WORKFLOW_WITH_RESOURCES));
-    final Consumer<Workflow> consumer = StyxScheduler.workflowChanged(workflowInitializer, workflowConsumer);
-    consumer.accept(WORKFLOW_WITH_RESOURCES);
-    verify(workflowInitializer).inspectChange(WORKFLOW_WITH_RESOURCES);
-    verify(workflowConsumer).accept(Optional.of(WORKFLOW_WITH_RESOURCES),
-        Optional.of(WORKFLOW_WITH_RESOURCES));
-  }
-
-  @Test
-  public void shouldHandleWorkflowCreate() {
-    when(workflowInitializer.inspectChange(WORKFLOW_WITH_RESOURCES)).thenReturn(Optional.empty());
-    final Consumer<Workflow> consumer = StyxScheduler.workflowChanged(workflowInitializer, workflowConsumer);
-    consumer.accept(WORKFLOW_WITH_RESOURCES);
-    verify(workflowInitializer).inspectChange(WORKFLOW_WITH_RESOURCES);
-    verify(workflowConsumer).accept(Optional.empty(), Optional.of(WORKFLOW_WITH_RESOURCES));
-  }
-
-  @Test
-  public void shouldHandleWorkflowRemove() {
-    final Consumer<Workflow> consumer = StyxScheduler.workflowRemoved(storage, workflowConsumer);
-    consumer.accept(WORKFLOW_WITH_RESOURCES);
-    verify(workflowConsumer).accept(Optional.of(WORKFLOW_WITH_RESOURCES), Optional.empty());
-  }
-
-  @Test
-  public void shouldFailToDeleteWorkflow() throws IOException {
-    final IOException exception = new IOException();
-    doThrow(exception).when(storage).delete(WORKFLOW_WITH_RESOURCES.id());
-    final Consumer<Workflow> consumer = StyxScheduler.workflowRemoved(storage, workflowConsumer);
-    try {
-      consumer.accept(WORKFLOW_WITH_RESOURCES);
-      fail();
-    } catch (Exception e) {
-      assertThat(e.getCause(), is(exception));
-    }
-    verify(workflowConsumer, never()).accept(Optional.of(WORKFLOW_WITH_RESOURCES), Optional.empty());
   }
 
   private void shardsWithValue(ArgumentCaptor<Shard> shardArgumentCaptor, long value, long times) {
