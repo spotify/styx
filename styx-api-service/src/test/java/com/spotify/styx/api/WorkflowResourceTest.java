@@ -36,7 +36,9 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,6 +53,8 @@ import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
+import com.spotify.styx.api.workflow.WorkflowInitializationException;
+import com.spotify.styx.api.workflow.WorkflowInitializer;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
@@ -61,13 +65,13 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
-import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Optional;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -80,16 +84,14 @@ import org.mockito.MockitoAnnotations;
 
 public class WorkflowResourceTest extends VersionedApiTest {
 
-  private static final String SCHEDULER_BASE = "http://localhost:12345";
-
   private static LocalDatastoreHelper localDatastore;
 
   private Datastore datastore = localDatastore.getOptions().getService();
   private Connection bigtable = setupBigTableMockTable();
   private AggregateStorage storage;
 
-  @Mock private ShardedCounter shardedCounter;
   @Mock private WorkflowValidator workflowValidator;
+  @Mock private WorkflowInitializer workflowInitializer;
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
@@ -126,11 +128,11 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
-    storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
+    storage = spy(new AggregateStorage(bigtable, datastore, Duration.ZERO));
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
-    WorkflowResource workflowResource = new WorkflowResource(storage, SCHEDULER_BASE, workflowValidator,
-                                                             environment.client());
+    WorkflowResource workflowResource =
+        new WorkflowResource(storage, workflowValidator, workflowInitializer);
 
     environment.routingEngine()
         .registerRoutes(Api.withCommonMiddleware(
@@ -144,7 +146,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @AfterClass
-  public static void tearDownClass() throws Exception {
+  public static void tearDownClass() {
     if (localDatastore != null) {
       try {
         localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
@@ -160,7 +162,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @After
-  public void tearDown() throws Exception {
+  public void tearDown() {
     // clear datastore after each test
     Datastore datastore = localDatastore.getOptions().getService();
     KeyQuery query = Query.newKeyQueryBuilder().build();
@@ -467,12 +469,10 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldReturnOkWhenSchedulerReturnsSuccessWorkflow() throws Exception {
+  public void shouldCreateWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
-
-    serviceHelper.stubClient()
-        .respond(Response.forPayload(serialize(WORKFLOW)))
-        .to(SCHEDULER_BASE + "/api/v0/workflows/foo");
+    
+    when(workflowInitializer.inspectChange(WORKFLOW)).thenReturn(Optional.of(WORKFLOW));
 
     Response<ByteString> response =
         awaitResponse(
@@ -480,18 +480,36 @@ public class WorkflowResourceTest extends VersionedApiTest {
                 .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
 
     verify(workflowValidator).validateWorkflowConfiguration(WORKFLOW_CONFIGURATION);
+    verify(workflowInitializer).inspectChange(WORKFLOW);
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(deserialize(response.payload().get(), Workflow.class), equalTo(WORKFLOW));
   }
 
   @Test
-  public void shouldReturnErrorMessageWhenSchedulerFailsWorkflow() throws Exception {
+  public void shoulUpdateWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    serviceHelper.stubClient()
-        .respond(Response.forStatus(Status.SERVICE_UNAVAILABLE))
-        .to(SCHEDULER_BASE + "/api/v0/workflows/foo");
+    when(workflowInitializer.inspectChange(WORKFLOW)).thenReturn(Optional.empty());
+
+    Response<ByteString> response =
+        awaitResponse(
+            serviceHelper
+                .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
+
+    verify(workflowValidator).validateWorkflowConfiguration(WORKFLOW_CONFIGURATION);
+    verify(workflowInitializer).inspectChange(WORKFLOW);
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertThat(deserialize(response.payload().get(), Workflow.class), equalTo(WORKFLOW));
+  }
+
+  @Test
+  public void shouldReturnErrorMessageWhenFailedToInspectChange() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(workflowInitializer.inspectChange(WORKFLOW))
+        .thenThrow(new WorkflowInitializationException(new Exception()));
 
     Response<ByteString> response =
         awaitResponse(
@@ -500,28 +518,37 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     verify(workflowValidator).validateWorkflowConfiguration(WORKFLOW_CONFIGURATION);
 
-    assertThat(response, hasStatus(withCode(Status.SERVICE_UNAVAILABLE)));
-    assertThat(response, hasNoPayload());
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
   }
 
   @Test
-  public void shouldForwardInternalResponseForDeleteWorkflow() throws Exception {
+  public void shouldDeleteWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
-
-    serviceHelper.stubClient()
-        .respond(Response.forStatus(Status.OK))
-        .to(SCHEDULER_BASE + "/api/v0/workflows/foo/bar");
 
     Response<ByteString> response =
         awaitResponse(
             serviceHelper.request("DELETE", path("/foo/bar")));
 
-    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertThat(response, hasStatus(withCode(Status.NO_CONTENT)));
     assertThat(response, hasNoPayload());
+    assertThat(storage.workflow(WORKFLOW.id()), is(Optional.empty()));
   }
 
   @Test
-  public void shouldFailInvalidWorkflowImageWithoutForwarding() throws Exception {
+  public void shouldReturnErrorWhenFailedToDeleteWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    doThrow(new IOException()).when(storage).delete(WORKFLOW.id());
+
+    Response<ByteString> response =
+        awaitResponse(
+            serviceHelper.request("DELETE", path("/foo/bar")));
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
+  }
+
+  @Test
+  public void shouldFailInvalidWorkflowImage() throws Exception {
     sinceVersion(Api.Version.V3);
 
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(ImmutableList.of("bad", "image"));

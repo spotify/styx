@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.workflow;
+package com.spotify.styx.api.workflow;
 
 import static com.spotify.styx.util.TimeUtil.lastInstant;
 

@@ -38,6 +38,7 @@ import com.spotify.styx.api.ResourceResource;
 import com.spotify.styx.api.SchedulerProxyResource;
 import com.spotify.styx.api.StatusResource;
 import com.spotify.styx.api.WorkflowResource;
+import com.spotify.styx.api.workflow.WorkflowInitializer;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
@@ -47,6 +48,7 @@ import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.ShardedCounterSnapshotFactory;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.StreamUtil;
+import com.spotify.styx.util.Time;
 import com.spotify.styx.util.WorkflowValidator;
 import com.typesafe.config.Config;
 import java.time.Duration;
@@ -70,18 +72,25 @@ public class StyxApi implements AppInit {
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
 
   private final StorageFactory storageFactory;
+  private final Time time;
 
   public static class Builder {
 
     private StorageFactory storageFactory = StyxApi::storage;
+    private Time time = Instant::now;
 
     public Builder setStorageFactory(StorageFactory storageFactory) {
       this.storageFactory = storageFactory;
       return this;
     }
 
+    public Builder setTime(Time time) {
+      this.time = time;
+      return this;
+    }
+
     public StyxApi build() {
-      return new StyxApi(storageFactory);
+      return new StyxApi(storageFactory, time);
     }
   }
 
@@ -93,8 +102,9 @@ public class StyxApi implements AppInit {
     return newBuilder().build();
   }
 
-  private StyxApi(StorageFactory storageFactory) {
+  private StyxApi(StorageFactory storageFactory, Time time) {
     this.storageFactory = requireNonNull(storageFactory);
+    this.time = requireNonNull(time);
   }
 
   @Override
@@ -109,15 +119,15 @@ public class StyxApi implements AppInit {
     // N.B. if we need to forward a request to scheduler that behind an nginx, we CAN NOT
     // use rc.requestScopedClient() and at the same time inherit all headers from original
     // request, because request scoped client would add Authorization header again which
-    // results duplicated headers, and that would make nginx unhappy.
+    // results duplicated headers, and that would make nginx unhappy. This has been fixed
+    // in later Apollo version.
 
     final WorkflowResource workflowResource = new WorkflowResource(storage,
-                                                                   schedulerServiceBaseUrl,
-                                                                   new WorkflowValidator(new DockerImageValidator()),
-                                                                   environment.client());
+        new WorkflowValidator(new DockerImageValidator()),
+        new WorkflowInitializer(storage, time));
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
-                                                                   storage,
-                                                                   new WorkflowValidator(new DockerImageValidator()));
+        storage,
+        new WorkflowValidator(new DockerImageValidator()));
     final ShardedCounter shardedCounter = new ShardedCounter(storage, new ShardedCounterSnapshotFactory(storage));
     final ResourceResource resourceResource = new ResourceResource(storage, shardedCounter);
     final StatusResource statusResource = new StatusResource(storage);
