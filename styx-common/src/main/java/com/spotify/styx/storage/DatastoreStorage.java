@@ -79,6 +79,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -797,12 +798,12 @@ public class DatastoreStorage {
   }
 
   Map<Integer,Long> shardsForCounter(String counterId) {
-    final EntityQuery queryShards = EntityQuery.newEntityQueryBuilder()
-        .setKind(KIND_COUNTER_SHARD)
-        .setFilter(PropertyFilter.eq(PROPERTY_COUNTER_ID, counterId))
-        .setLimit(NUM_SHARDS)
-        .build();
-    final QueryResults<Entity> shards = datastore.run(queryShards);
+    final List<Key> shardKeys = IntStream.range(0, NUM_SHARDS).mapToObj(
+        index -> datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD).newKey(
+            String.format("%s-%d", counterId, index)))
+        .collect(toList());
+
+    final Iterator<Entity> shards = datastore.get(shardKeys);
     final Map<Integer, Long> fetchedShards = new HashMap<>();
     while (shards.hasNext()) {
       Entity shard = shards.next();

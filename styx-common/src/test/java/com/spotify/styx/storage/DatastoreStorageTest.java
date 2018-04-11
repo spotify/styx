@@ -34,6 +34,7 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -75,7 +76,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
-import com.spotify.styx.util.ShardedCounter;
+import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.time.Duration;
 import java.time.Instant;
@@ -156,12 +157,12 @@ public class DatastoreStorageTest {
           .build();
   static final Workflow WORKFLOW = Workflow.create(WORKFLOW_ID.componentId(),
                                                            WORKFLOW_CONFIGURATION);
+  private static final String COUNTER_ID1 = "counter-id1";
 
   private static LocalDatastoreHelper helper;
   private DatastoreStorage storage;
   private Datastore datastore;
 
-  @Mock private ShardedCounter shardedCounter;
   @Mock TransactionFunction<String, FooException> transactionFunction;
   @Mock Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory;
 
@@ -732,6 +733,19 @@ public class DatastoreStorageTest {
     }
 
     verify(transactionFunction, never()).apply(any());
+  }
+
+  @Test
+  public void shouldReturnShardsForCounter() throws Exception {
+    storage.runInTransaction(tx -> {
+      tx.store(Shard.create(COUNTER_ID1, 0, 0));
+      tx.store(Shard.create(COUNTER_ID1, 1, 3));
+      return null;
+    });
+    final Map<Integer, Long> map = storage.shardsForCounter(COUNTER_ID1);
+    assertEquals(2, map.size());
+    assertEquals(0, map.get(0).longValue());
+    assertEquals(3, map.get(1).longValue());
   }
 
   private static class FooException extends Exception {
