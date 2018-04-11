@@ -48,7 +48,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.lang.NotImplementedException;
 
 /**
  * A Storage implementation with state stored in memory. For testing.
@@ -279,17 +278,17 @@ public class InMemStorage implements Storage {
 
   @Override
   public Map<Integer, Long> shardsForCounter(String counterId) {
-    throw new NotImplementedException();
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public void deleteShardsForCounter(String counterId) {
-    throw new NotImplementedException();
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public long getLimitForCounter(String counterId) {
-    throw new NotImplementedException();
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -300,12 +299,12 @@ public class InMemStorage implements Storage {
 
   @Override
   public void deleteLimitForCounter(String counterId) {
-    throw new NotImplementedException();
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public void updateLimitForCounter(String counterId, long limit) throws IOException {
-    throw new NotImplementedException();
+    throw new UnsupportedOperationException();
   }
 
   @Override
