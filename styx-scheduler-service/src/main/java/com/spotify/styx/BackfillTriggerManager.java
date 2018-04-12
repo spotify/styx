@@ -64,28 +64,26 @@ class BackfillTriggerManager {
   private final TriggerListener triggerListener;
   private final Storage storage;
   private final StateManager stateManager;
-  private final WorkflowCache workflowCache;
   private final Stats stats;
   private final Time time;
   private final Consumer<List<Backfill>> shuffler;
 
   BackfillTriggerManager(StateManager stateManager,
-                         WorkflowCache workflowCache, Storage storage,
+                         Storage storage,
                          TriggerListener triggerListener,
                          Stats stats,
                          Time time) {
-    this(stateManager, workflowCache, storage, triggerListener, stats, time, DEFAULT_SHUFFLER);
+    this(stateManager, storage, triggerListener, stats, time, DEFAULT_SHUFFLER);
   }
 
   @VisibleForTesting
   BackfillTriggerManager(StateManager stateManager,
-                         WorkflowCache workflowCache, Storage storage,
+                         Storage storage,
                          TriggerListener triggerListener,
                          Stats stats,
                          Time time,
                          Consumer<List<Backfill>> shuffler) {
     this.stateManager = Objects.requireNonNull(stateManager);
-    this.workflowCache = Objects.requireNonNull(workflowCache);
     this.storage = Objects.requireNonNull(storage);
     this.triggerListener = Objects.requireNonNull(triggerListener);
     this.stats = Objects.requireNonNull(stats);
@@ -113,7 +111,14 @@ class BackfillTriggerManager {
   }
 
   private void triggerAndProgress(Backfill backfill) {
-    final Optional<Workflow> workflowOpt = workflowCache.workflow(backfill.workflowId());
+    final Optional<Workflow> workflowOpt;
+    try {
+      workflowOpt = storage.workflow(backfill.workflowId());
+    } catch (IOException e) {
+      LOG.warn("Failed to read workflow {}", backfill.workflowId(), e);
+      return;
+    }
+
     if (!workflowOpt.isPresent()) {
       LOG.debug("workflow not found for backfill {}, halt it.", backfill);
       storeBackfill(backfill.builder().halted(true).build());
@@ -218,7 +223,7 @@ class BackfillTriggerManager {
     try {
       storage.storeBackfill(backfill);
     } catch (IOException e) {
-      LOG.warn("Failed to store updated backfill", e);
+      LOG.warn("Failed to store updated backfill {}", backfill.id(), e);
     }
   }
 }

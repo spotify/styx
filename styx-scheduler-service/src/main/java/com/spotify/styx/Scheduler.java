@@ -94,7 +94,6 @@ public class Scheduler {
   private final Time time;
   private final TimeoutConfig ttls;
   private final StateManager stateManager;
-  private final WorkflowCache workflowCache;
   private final Storage storage;
   private final WorkflowResourceDecorator resourceDecorator;
   private final Stats stats;
@@ -102,13 +101,12 @@ public class Scheduler {
   private final WorkflowExecutionGate gate;
 
   public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager,
-                   WorkflowCache workflowCache, Storage storage,
+                   Storage storage,
                    WorkflowResourceDecorator resourceDecorator,
                    Stats stats, RateLimiter dequeueRateLimiter, WorkflowExecutionGate gate) {
     this.time = Objects.requireNonNull(time);
     this.ttls = Objects.requireNonNull(ttls);
     this.stateManager = Objects.requireNonNull(stateManager);
-    this.workflowCache = Objects.requireNonNull(workflowCache);
     this.storage = Objects.requireNonNull(storage);
     this.resourceDecorator = Objects.requireNonNull(resourceDecorator);
     this.stats = Objects.requireNonNull(stats);
@@ -140,6 +138,8 @@ public class Scheduler {
     final List<InstanceState> activeStates = getActiveInstanceStates(activeStatesMap);
 
     final Set<WorkflowInstance> timedOutInstances = getTimedOutInstances(activeStates, time.get(), ttls);
+    
+    final Map<WorkflowId, Workflow> workflows = getWorkflows(activeStates);
 
     final Map<WorkflowId, Set<String>> workflowResourceReferences =
         activeStates.parallelStream()
@@ -148,13 +148,14 @@ public class Scheduler {
             .distinct()
             .collect(toMap(
                 workflowId -> workflowId,
-                workflowId -> workflowResources(globalConcurrency.isPresent(), workflowCache.workflow(workflowId))));
+                workflowId -> workflowResources(globalConcurrency.isPresent(),
+                    Optional.ofNullable(workflows.get(workflowId)))));
 
     // Note: not a strongly consistent number, so the graphed value can be imprecise or show
     // exceeded limit even if the real usage never exceeded the limit.
     final Map<String, Long> currentResourceUsage =
         getResourceUsage(globalConcurrency.isPresent(), activeStates, timedOutInstances,
-            resourceDecorator, workflowCache.all());
+            resourceDecorator, workflows);
 
     // this reflects resource usage since last tick, so a couple of minutes delay
     updateResourceStats(resources, currentResourceUsage);
@@ -168,7 +169,8 @@ public class Scheduler {
 
     timedOutInstances.forEach(wfi -> this.sendTimeout(wfi, activeStatesMap.get(wfi)));
 
-    gateAndDequeueInstances(config, resources, workflowResourceReferences, eligibleInstances);
+    gateAndDequeueInstances(config, resources, workflowResourceReferences,
+        workflows, eligibleInstances);
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
     stats.recordTickDuration(TICK_TYPE, durationMillis);
@@ -182,12 +184,19 @@ public class Scheduler {
         .forEach(r -> stats.recordResourceUsed(r, 0));
   }
 
+  private Map<WorkflowId, Workflow> getWorkflows(final List<InstanceState> activeStates) {
+    final Set<WorkflowId> workflowIds = activeStates.stream()
+        .map(activeState -> activeState.workflowInstance().workflowId())
+        .collect(toSet());
+    return storage.workflows(workflowIds);
+  }
+
   private void gateAndDequeueInstances(
       StyxConfig config,
       Map<String, Resource> resources,
       Map<WorkflowId, Set<String>> workflowResourceReferences,
+      Map<WorkflowId, Workflow> workflows,
       List<InstanceState> eligibleInstances) {
-
     // Enable gating unless disabled in runtime config
     final WorkflowExecutionGate gate = config.executionGatingEnabled() ? this.gate : NOOP;
 
@@ -202,13 +211,17 @@ public class Scheduler {
 
       // Evaluate each instance in the batch for dequeuing
       for (int i = 0; i < batch.size(); i++) {
-        dequeueInstance(resources, workflowResourceReferences, batch.get(i), blockers.get(i));
+        final InstanceState instanceState = batch.get(i);
+        dequeueInstance(resources, workflowResourceReferences,
+            Optional.ofNullable(workflows.get(instanceState.workflowInstance().workflowId())),
+            instanceState, blockers.get(i));
       }
     }
   }
 
   private void dequeueInstance(Map<String, Resource> resources,
                                Map<WorkflowId, Set<String>> workflowResourceReferences,
+                               Optional<Workflow> workflowOpt,
                                InstanceState instanceState,
                                CompletionStage<Optional<ExecutionBlocker>> executionBlockerFuture) {
 
@@ -235,10 +248,10 @@ public class Scheduler {
     final Set<String> workflowResourceRefs =
         workflowResourceReferences.getOrDefault(instanceState.workflowInstance().workflowId(), emptySet());
 
-    final Set<String> instanceResourceRefs = workflowCache.workflow(instanceState.workflowInstance().workflowId())
-        .map(workflow -> resourceDecorator.decorateResources(
-            instanceState.runState(), workflow.configuration(), workflowResourceRefs))
-        .orElse(workflowResourceRefs);
+    final Set<String> instanceResourceRefs = workflowOpt
+            .map(workflow -> resourceDecorator.decorateResources(
+                instanceState.runState(), workflow.configuration(), workflowResourceRefs))
+            .orElse(workflowResourceRefs);
 
     final Set<String> unknownResources = instanceResourceRefs.stream()
         .filter(resourceRef -> !resources.containsKey(resourceRef))

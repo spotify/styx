@@ -321,7 +321,6 @@ public class StyxScheduler implements AppInit {
     closer.register(executorCloser("event-consumer", eventConsumerExecutor));
 
     final Stats stats = statsFactory.apply(environment);
-    final WorkflowCache workflowCache = new InMemWorkflowCache();
     final Storage storage = instrument(Storage.class, storageFactory.apply(environment), stats, time);
 
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
@@ -330,7 +329,8 @@ public class StyxScheduler implements AppInit {
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
 
-    warmUpCache(workflowCache, storage);
+    final Supplier<Map<WorkflowId, Workflow>> workflowCache = new CachedSupplier<>(storage::workflows, time);
+
     initializeResources(storage, shardedCounter, counterSnapshotFactory, timeoutConfig, workflowCache);
 
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
@@ -363,18 +363,20 @@ public class StyxScheduler implements AppInit {
     final TriggerListener trigger =
         new StateInitializingTrigger(stateManager);
     final TriggerManager triggerManager = new TriggerManager(trigger, time, storage, stats);
+
     final BackfillTriggerManager backfillTriggerManager =
-        new BackfillTriggerManager(stateManager, workflowCache, storage, trigger, stats, time);
+        new BackfillTriggerManager(stateManager, storage, trigger, stats, time);
 
     final WorkflowInitializer workflowInitializer = new WorkflowInitializer(storage, time);
     final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer =
         workflowConsumerFactory.apply(environment, stats);
-    final Consumer<Workflow> workflowRemoveListener =
-        workflowRemoved(workflowCache, storage, workflowConsumer);
-    final Consumer<Workflow> workflowChangeListener =
-        workflowChanged(workflowCache, workflowInitializer, stats, stateManager, workflowConsumer);
 
-    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, workflowCache,
+    final Consumer<Workflow> workflowRemoveListener = workflowRemoved(storage, workflowConsumer);
+
+    final Consumer<Workflow> workflowChangeListener =
+        workflowChanged(workflowInitializer, stats, stateManager, workflowConsumer);
+
+    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager,
                                               storage, resourceDecorator, stats, dequeueRateLimiter,
                                               executionGateFactory.apply(environment, storage));
 
@@ -439,19 +441,10 @@ public class StyxScheduler implements AppInit {
     return workflowChangeListener;
   }
 
-  private void warmUpCache(WorkflowCache cache, Storage storage) {
-    try {
-      storage.workflows().values().forEach(cache::store);
-    } catch (IOException e) {
-      LOG.error("Failed to get workflows from storage while warming up the cache");
-      throw new RuntimeException(e);
-    }
-  }
-
   private void initializeResources(Storage storage, ShardedCounter shardedCounter,
                                    CounterSnapshotFactory counterSnapshotFactory,
                                    TimeoutConfig timeoutConfig,
-                                   WorkflowCache workflowCache) {
+                                   Supplier<Map<WorkflowId, Workflow>> workflowCache) {
     try {
       // Initialize resources
       storage.resources().parallelStream().forEach(
@@ -600,23 +593,25 @@ public class StyxScheduler implements AppInit {
 
   private void setupMetrics(
       QueuedStateManager stateManager,
-      WorkflowCache workflowCache,
+      Supplier<Map<WorkflowId, Workflow>> workflowCache,
       Storage storage,
       RateLimiter submissionRateLimiter,
       Stats stats) {
 
     stats.registerQueuedEventsMetric(stateManager::queuedEvents);
 
-    stats.registerWorkflowCountMetric("all", () -> (long) workflowCache.all().size());
+    stats.registerWorkflowCountMetric("all", () -> (long) workflowCache.get().size());
 
-    stats.registerWorkflowCountMetric("configured", () -> workflowCache.all().stream()
+    stats.registerWorkflowCountMetric("configured", () -> workflowCache.get().values()
+        .stream()
         .filter(workflow -> workflow.configuration().dockerImage().isPresent())
         .count());
 
     final Supplier<Gauge<Long>> configuredEnabledWorkflowsCountGaugeSupplier = () -> {
       final Supplier<Set<WorkflowId>> enabledWorkflowSupplier =
           new CachedSupplier<>(storage::enabled, Instant::now);
-      return () -> workflowCache.all().stream()
+      return () -> workflowCache.get().values()
+          .stream()
           .filter(workflow -> workflow.configuration().dockerImage().isPresent())
           .filter(workflow -> enabledWorkflowSupplier.get().contains(WorkflowId.ofWorkflow(workflow)))
           .count();
@@ -624,7 +619,8 @@ public class StyxScheduler implements AppInit {
     stats.registerWorkflowCountMetric("enabled", configuredEnabledWorkflowsCountGaugeSupplier.get());
 
     stats.registerWorkflowCountMetric("docker_termination_logging_enabled", () ->
-        workflowCache.all().stream()
+        workflowCache.get().values()
+            .stream()
             .filter(workflow -> workflow.configuration().dockerImage().isPresent())
             .filter(workflow -> workflow.configuration().dockerTerminationLogging())
             .count());
@@ -648,27 +644,26 @@ public class StyxScheduler implements AppInit {
               .count());
     });
 
-    workflowCache.all().forEach(workflow -> stats.registerActiveStatesMetric(
+    workflowCache.get().values().forEach(workflow -> stats.registerActiveStatesMetric(
         workflow.id(), workflowActiveStates(stateManager, workflow)));
 
     stats.registerSubmissionRateLimitMetric(submissionRateLimiter::getRate);
   }
 
-  private static Consumer<Workflow> workflowChanged(
-      WorkflowCache cache,
+  @VisibleForTesting
+  static Consumer<Workflow> workflowChanged(
       WorkflowInitializer workflowInitializer,
       Stats stats,
       StateManager stateManager,
       BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
-    return (workflow) -> {
+    return workflow -> {
+      final Optional<Workflow> oldWorkflowOptional = workflowInitializer.inspectChange(workflow);
+
       stats.registerActiveStatesMetric(
           workflow.id(), workflowActiveStates(stateManager, workflow));
 
-      final Optional<Workflow> oldWorkflowOptional = cache.workflow(workflow.id());
-
-      workflowInitializer.inspectChange(workflow);
-      cache.store(workflow);
       workflowConsumer.accept(oldWorkflowOptional, Optional.of(workflow));
+
       if (oldWorkflowOptional.isPresent()) {
         LOG.info("Workflow modified, old config: {}, new config: {}", oldWorkflowOptional.get(),
             workflow);
@@ -678,21 +673,21 @@ public class StyxScheduler implements AppInit {
     };
   }
 
-  private static Consumer<Workflow> workflowRemoved(
-      WorkflowCache cache,
+  @VisibleForTesting
+  static Consumer<Workflow> workflowRemoved(
       Storage storage,
       BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
-    return workflow -> cache.workflow(workflow.id()).ifPresent(existingWorkflow -> {
+    return workflow -> {
       try {
         storage.delete(workflow.id());
       } catch (IOException e) {
-        LOG.warn("Couldn't remove workflow {}. ", workflow.id());
-        return;
+        final String message = String.format("Couldn't remove workflow %s. ", workflow.id());
+        LOG.warn(message, e);
+        throw new RuntimeException(message, e);
       }
-      cache.remove(workflow);
       workflowConsumer.accept(Optional.of(workflow), Optional.empty());
       LOG.info("Workflow removed: {}", workflow);
-    });
+    };
   }
 
   private static Gauge<Long> workflowActiveStates(StateManager stateManager, Workflow workflow) {

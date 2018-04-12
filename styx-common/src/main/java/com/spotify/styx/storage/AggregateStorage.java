@@ -179,6 +179,11 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
+  public Map<WorkflowId, Workflow> workflows(Set<WorkflowId> workflowIds) {
+    return datastoreStorage.workflows(workflowIds);
+  }
+
+  @Override
   public void patchState(WorkflowId workflowId, WorkflowState state) throws IOException {
     datastoreStorage.patchState(workflowId, state);
   }

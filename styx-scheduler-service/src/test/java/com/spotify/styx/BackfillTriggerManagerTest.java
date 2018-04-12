@@ -29,6 +29,7 @@ import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.only;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -113,8 +114,6 @@ public class BackfillTriggerManagerTest {
   @Mock StyxConfig config;
   @Mock StateManager stateManager;
 
-  private WorkflowCache workflowCache;
-
   private BackfillTriggerManager backfillTriggerManager;
 
   private ExecutorService executor = Executors.newCachedThreadPool();
@@ -162,8 +161,7 @@ public class BackfillTriggerManagerTest {
     when(storage.runInTransaction(any())).then(
         a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
 
-    workflowCache = new InMemWorkflowCache();
-    backfillTriggerManager = new BackfillTriggerManager(stateManager, workflowCache, storage,
+    backfillTriggerManager = new BackfillTriggerManager(stateManager, storage,
                                                         triggerListener, Stats.NOOP, TIME,
                                                         (x) -> {});
   }
@@ -174,7 +172,7 @@ public class BackfillTriggerManagerTest {
   }
 
   @Test
-  public void shouldTriggerBackfillsNew() {
+  public void shouldTriggerBackfillsNew() throws IOException {
     final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
 
@@ -196,7 +194,7 @@ public class BackfillTriggerManagerTest {
   }
 
   @Test
-  public void shouldTriggerBackfillsInProgress() {
+  public void shouldTriggerBackfillsInProgress() throws IOException {
     final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
     backfills.put(BACKFILL_1.id(), BACKFILL_1.builder()
@@ -214,7 +212,7 @@ public class BackfillTriggerManagerTest {
   }
 
   @Test
-  public void shouldTriggerBackfillsToCompletion() {
+  public void shouldTriggerBackfillsToCompletion() throws IOException {
     final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
 
@@ -233,7 +231,7 @@ public class BackfillTriggerManagerTest {
   }
 
   @Test
-  public void shouldNotTriggerBackfillsIfNoCapacity() {
+  public void shouldNotTriggerBackfillsIfNoCapacity() throws IOException {
     final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
 
@@ -295,11 +293,35 @@ public class BackfillTriggerManagerTest {
   @Test
   public void shouldNotTriggerBackfillsWithMissingWorkflows() throws Exception {
     backfills.put(BACKFILL_1.id(), BACKFILL_1);
+    when(storage.workflow(BACKFILL_1.workflowId())).thenReturn(Optional.empty());
 
     backfillTriggerManager.tick();
 
     verifyZeroInteractions(triggerListener);
     verify(storage).storeBackfill(BACKFILL_1.builder().halted(true).build());
+  }
+
+  @Test
+  public void shouldNotTriggerBackfillsAndStoreBackfillWithMissingWorkflows() throws Exception {
+    backfills.put(BACKFILL_1.id(), BACKFILL_1);
+    when(storage.workflow(BACKFILL_1.workflowId())).thenReturn(Optional.empty());
+    doThrow(new IOException()).when(storage).storeBackfill(any());
+
+    backfillTriggerManager.tick();
+
+    verifyZeroInteractions(triggerListener);
+    verify(storage).storeBackfill(BACKFILL_1.builder().halted(true).build());
+  }
+
+  @Test
+  public void shouldNotTriggerBackfillsWhenFailedToReadWorkflow() throws Exception {
+    backfills.put(BACKFILL_1.id(), BACKFILL_1);
+    when(storage.workflow(BACKFILL_1.workflowId())).thenThrow(new IOException());
+
+    backfillTriggerManager.tick();
+
+    verifyZeroInteractions(triggerListener);
+    verify(storage, never()).storeBackfill(BACKFILL_1.builder().halted(true).build());
   }
 
   @Test
@@ -369,7 +391,8 @@ public class BackfillTriggerManagerTest {
   }
 
   @Test
-  public void shouldContinueTriggeringNextBackfillWhenUnknownExecutionException() {
+  public void shouldContinueTriggeringNextBackfillWhenUnknownExecutionException()
+      throws IOException {
     final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
 
@@ -397,7 +420,7 @@ public class BackfillTriggerManagerTest {
   }
 
   @Test
-  public void shouldContinueTriggeringNextBackfillWhenOtherException() {
+  public void shouldContinueTriggeringNextBackfillWhenOtherException() throws IOException {
     final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
 
@@ -425,7 +448,7 @@ public class BackfillTriggerManagerTest {
   }
 
   @Test
-  public void shouldIgnoreIfAlreadyInitialized() {
+  public void shouldIgnoreIfAlreadyInitialized() throws IOException {
     final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
 
@@ -451,8 +474,8 @@ public class BackfillTriggerManagerTest {
         .store(BACKFILL_1.builder().nextTrigger(instants.get(concurrency)).build());
   }
 
-  private void initWorkflow(Workflow workflow) {
-    workflowCache.store(workflow);
+  private void initWorkflow(Workflow workflow) throws IOException {
+    when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
   }
 
   private static Workflow createWorkflow(WorkflowId id) {

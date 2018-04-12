@@ -45,7 +45,7 @@ public class WorkflowInitializer {
     this.time = Objects.requireNonNull(time);
   }
 
-  public void inspectChange(Workflow workflow) {
+  public Optional<Workflow> inspectChange(Workflow workflow) {
     final Optional<Workflow> previous;
     try {
       previous = storage.workflow(workflow.id());
@@ -79,6 +79,8 @@ public class WorkflowInitializer {
       LOG.warn("failed to write workflow {} to storage", workflow.id(), e);
       throw new RuntimeException(e);
     }
+
+    return previous;
   }
 
   private TriggerInstantSpec initializeNaturalTrigger(Workflow workflow) {

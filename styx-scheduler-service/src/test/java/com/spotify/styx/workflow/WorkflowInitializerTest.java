@@ -43,7 +43,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 public class WorkflowInitializerTest {
 
   private final Workflow HOURLY_WORKFLOW = Workflow.create("styx",
-                                                           TestData.HOURLY_WORKFLOW_CONFIGURATION);
+      TestData.HOURLY_WORKFLOW_CONFIGURATION);
   private final Workflow HOURLY_WORKFLOW_WITH_INVALID_OFFSET =
       Workflow.create("styx", TestData.HOURLY_WORKFLOW_CONFIGURATION_WITH_INVALID_OFFSET);
 
@@ -58,7 +58,7 @@ public class WorkflowInitializerTest {
   @Before
   public void setUp() {
     workflowInitializer = new WorkflowInitializer(storage,
-                                                  () -> Instant.parse("2015-12-31T23:59:10.000Z"));
+        () -> Instant.parse("2015-12-31T23:59:10.000Z"));
   }
 
   @Test

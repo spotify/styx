@@ -35,6 +35,7 @@ import static org.hamcrest.CoreMatchers.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -60,6 +61,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
+import com.spotify.styx.workflow.WorkflowInitializationException;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
@@ -303,6 +305,18 @@ public class SchedulerResourceTest {
     assertThat(r.status(),
         is(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: bad, f00d")));
     verify(workflowValidator).validateWorkflowConfiguration(FULL_DAILY_WORKFLOW.configuration());
+  }
+
+  @Test
+  public void testCreateWorkflowFailedToInitialize() throws Exception {
+    doThrow(new WorkflowInitializationException(new Exception()))
+        .when(workflowChangeListener).accept(FULL_DAILY_WORKFLOW);
+    final Response<ByteString> r = serviceHelper.request(
+        "POST", BASE + "/workflows/styx",
+        serialize(FULL_DAILY_WORKFLOW.configuration())).toCompletableFuture().get();
+    verify(workflowValidator).validateWorkflowConfiguration(FULL_DAILY_WORKFLOW.configuration());
+    verify(workflowChangeListener).accept(FULL_DAILY_WORKFLOW);
+    assertThat(r, hasStatus(withCode(Status.BAD_REQUEST)));
   }
 
   @Test
