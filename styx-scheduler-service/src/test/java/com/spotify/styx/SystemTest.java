@@ -59,6 +59,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import junitparams.JUnitParamsRunner;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -363,6 +364,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @Test
+  @Ignore("this is flaky due to Datastore emulator")
   public void updatesNextNaturalTriggerWhenWFScheduleChangesFromFinerToCoarser() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
     givenWorkflow(HOURLY_WORKFLOW);
@@ -456,6 +458,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @Test
+  @Ignore("this is flaky due to Datastore emulator")
   public void updatesNextNaturalTriggerWhenWFScheduleChangesFromCoarserToFiner() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
     givenWorkflow(DAILY_WORKFLOW);
@@ -680,6 +683,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @Test
+  @Ignore("this is flaky due to Datastore emulator")
   public void shouldLimitConcurrencyForResource() throws Exception {
     givenResource(RESOURCE_4);
     for (int i = 0; i < 4; i++) {
@@ -764,6 +768,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
 
   @Test
+  @Ignore("this is flaky due to Datastore emulator")
   public void shouldLimitConcurrencyUsingMultipleResourcesAcrossWorkflows() throws Exception {
     givenResource(RESOURCE_3); // concurrency 10000
     givenResource(RESOURCE_4); // concurrency 3
