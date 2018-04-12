@@ -90,18 +90,8 @@ public final class StateUtil {
                                                        Instant instant,
                                                        WorkflowResourceDecorator resourceDecorator)
       throws IOException {
-    // The only inconsistency left is to miss active workflow instances. Outdated instances or
-    // inactive instances will be correctly updated or removed via the strongly consistent lookups
-    final Map<WorkflowInstance, RunState> strictActiveStates = storage.readActiveStates().entrySet()
-        .parallelStream().filter(entry -> {
-          try {
-            return storage.readActiveState(entry.getKey()).isPresent();
-          } catch (IOException e) {
-            throw new RuntimeException("Error while fetching active states", e);
-          }
-        }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(strictActiveStates);
+    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
+    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
     boolean globalConcurrencyEnabled = storage.config().globalConcurrency().isPresent();
     final Set<WorkflowInstance> timedOutInstances =
         getTimedOutInstances(activeInstanceStates, instant, timeoutConfig);
