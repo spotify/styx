@@ -376,8 +376,17 @@ public class DatastoreStorage {
     return workflows;
   }
 
+  /**
+   * Eventually consistently list all active states and strongly consistently fetch their values.
+   *
+   * <p>This method will return a map of active states that might be missing some recently created
+   * states, but the values of all the states returned should be fresh.
+   */
   Map<WorkflowInstance, RunState> readActiveStates() throws IOException {
+    // Eventually consistently read active state keys
     final List<Key> keys = readActiveInstanceKeys();
+
+    // Strongly consistently read values for the above keys
     return Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH).stream()
         .map(batch -> forkJoinPool.submit(() -> this.readRunStateBatch(batch)))
         .collect(toList()).stream() // collect here to execute batch reads in parallel
@@ -385,6 +394,9 @@ public class DatastoreStorage {
         .collect(toMap(RunState::workflowInstance, Function.identity()));
   }
 
+  /**
+   * Eventually consistently query for the keys of all active workflow instances.
+   */
   private List<Key> readActiveInstanceKeys() {
     final List<Key> keys = new ArrayList<>();
     final QueryResults<Key> keyResults = datastore
@@ -393,6 +405,9 @@ public class DatastoreStorage {
     return keys;
   }
 
+  /**
+   * Strongly consistently read a batch of {@link RunState}s.
+   */
   private List<RunState> readRunStateBatch(List<Key> keys) throws IOException {
     assert keys.size() <= MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH;
     final List<RunState> runStates = new ArrayList<>();
