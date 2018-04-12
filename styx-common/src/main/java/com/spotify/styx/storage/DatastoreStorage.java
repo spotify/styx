@@ -376,11 +376,48 @@ public class DatastoreStorage {
     return workflows;
   }
 
+  /**
+   * Eventually consistently list all active states and strongly consistently fetch their values.
+   *
+   * <p>This method will return a map of active states that might be missing some recently created
+   * states, but the values of all the states returned should be fresh.
+   */
   Map<WorkflowInstance, RunState> readActiveStates() throws IOException {
-    final EntityQuery query =
-        Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE).build();
+    // Eventually consistently read active state keys
+    final List<Key> keys = readActiveInstanceKeys();
 
-    return queryActiveStates(query);
+    // Strongly consistently read values for the above keys
+    return Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH).stream()
+        .map(batch -> forkJoinPool.submit(() -> this.readRunStateBatch(batch)))
+        .collect(toList()).stream() // collect here to execute batch reads in parallel
+        .flatMap(task -> task.join().stream())
+        .collect(toMap(RunState::workflowInstance, Function.identity()));
+  }
+
+  /**
+   * Eventually consistently query for the keys of all active workflow instances.
+   */
+  private List<Key> readActiveInstanceKeys() {
+    final List<Key> keys = new ArrayList<>();
+    final QueryResults<Key> keyResults = datastore
+        .run(Query.newKeyQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE).build());
+    keyResults.forEachRemaining(keys::add);
+    return keys;
+  }
+
+  /**
+   * Strongly consistently read a batch of {@link RunState}s.
+   */
+  private List<RunState> readRunStateBatch(List<Key> keys) throws IOException {
+    assert keys.size() <= MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH;
+    final List<RunState> runStates = new ArrayList<>();
+    final Iterator<Entity> entities = datastore.get(keys);
+    while (entities.hasNext()) {
+      final Entity entity = entities.next();
+      final RunState runState = entityToRunState(entity, parseWorkflowInstance(entity));
+      runStates.add(runState);
+    }
+    return runStates;
   }
 
   Map<WorkflowInstance, RunState> readActiveStates(String componentId) throws IOException {

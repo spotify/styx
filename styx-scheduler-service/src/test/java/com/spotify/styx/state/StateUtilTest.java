@@ -25,6 +25,7 @@ import static com.spotify.styx.testdata.TestData.RESOURCE_IDS;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_ID;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_WITH_RESOURCES;
+import static java.util.Collections.emptyMap;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertFalse;
@@ -69,7 +70,6 @@ public class StateUtilTest {
     final RunState runState =
         RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
     when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
-    when(storage.readActiveState(WORKFLOW_INSTANCE)).thenReturn(Optional.of(runState));
     when(storage.config()).thenReturn(config);
     when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(2L));
     when(workflowCache.get()).thenReturn(ImmutableMap.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES));
@@ -92,7 +92,6 @@ public class StateUtilTest {
         RunState.create(WORKFLOW_INSTANCE, RunState.State.QUEUED, Instant.ofEpochMilli(10L));
 
     when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
-    when(storage.readActiveState(WORKFLOW_INSTANCE)).thenReturn(Optional.of(runState));
     when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(2L));
 
     final Map<String, Long> resourcesUsageMap = StateUtil.getResourcesUsageMap(storage,
@@ -102,18 +101,16 @@ public class StateUtilTest {
   }
 
   @Test
-  public void shouldGetUsedResourcesWeakConsistency() throws IOException {
-    when(storage.readActiveState(WORKFLOW_INSTANCE)).thenReturn(Optional.empty());
-
+  public void shouldGetUsedResourcesNoStates() throws IOException {
+    when(storage.readActiveStates()).thenReturn(emptyMap());
     final Map<String, Long> resourcesUsageMap = StateUtil.getResourcesUsageMap(storage,
         timeoutConfig, workflowCache, Instant.ofEpochMilli(11L), resourceDecorator);
     assertThat(resourcesUsageMap, is(ImmutableMap.of()));
   }
 
-  @Test(expected = RuntimeException.class)
+  @Test(expected = IOException.class)
   public void shouldGetUsedResourcesStorageException() throws IOException {
-    when(storage.readActiveState(WORKFLOW_INSTANCE)).thenThrow(new IOException());
-
+    when(storage.readActiveStates()).thenThrow(new IOException());
     StateUtil.getResourcesUsageMap(storage, timeoutConfig, workflowCache,
         Instant.ofEpochMilli(11L), resourceDecorator);
   }
