@@ -377,10 +377,32 @@ public class DatastoreStorage {
   }
 
   Map<WorkflowInstance, RunState> readActiveStates() throws IOException {
-    final EntityQuery query =
-        Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE).build();
+    final List<Key> keys = readActiveInstanceKeys();
+    return Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH).stream()
+        .map(batch -> forkJoinPool.submit(() -> this.readRunStateBatch(batch)))
+        .collect(toList()).stream() // collect here to execute batch reads in parallel
+        .flatMap(task -> task.join().stream())
+        .collect(toMap(RunState::workflowInstance, Function.identity()));
+  }
 
-    return queryActiveStates(query);
+  private List<Key> readActiveInstanceKeys() {
+    final List<Key> keys = new ArrayList<>();
+    final QueryResults<Key> keyResults = datastore
+        .run(Query.newKeyQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE).build());
+    keyResults.forEachRemaining(keys::add);
+    return keys;
+  }
+
+  private List<RunState> readRunStateBatch(List<Key> keys) throws IOException {
+    assert keys.size() <= MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH;
+    final List<RunState> runStates = new ArrayList<>();
+    final Iterator<Entity> entities = datastore.get(keys);
+    while (entities.hasNext()) {
+      final Entity entity = entities.next();
+      final RunState runState = entityToRunState(entity, parseWorkflowInstance(entity));
+      runStates.add(runState);
+    }
+    return runStates;
   }
 
   Map<WorkflowInstance, RunState> readActiveStates(String componentId) throws IOException {
