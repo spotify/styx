@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.workflow;
+package com.spotify.styx.api.workflow;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;

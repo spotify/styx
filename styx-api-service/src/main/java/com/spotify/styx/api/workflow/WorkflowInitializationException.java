@@ -18,10 +18,13 @@
  * -/-/-
  */
 
-package com.spotify.styx.workflow;
+package com.spotify.styx.api.workflow;
+
+import com.google.common.annotations.VisibleForTesting;
 
 public class WorkflowInitializationException extends RuntimeException {
 
+  @VisibleForTesting
   public WorkflowInitializationException(Exception e) {
     super(e);
   }
