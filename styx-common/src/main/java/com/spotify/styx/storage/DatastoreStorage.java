@@ -225,7 +225,8 @@ public class DatastoreStorage {
     // Fetch index entries in batches
     for (List<Entity> expectedEntryBatch : Lists.partition(expectedIndexEntries, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH)) {
 
-      final List<Entity> actualEntryBatch = datastore.fetch(expectedEntryBatch.stream().map(Entity::getKey).toArray(Key[]::new));
+      final List<Entity> actualEntryBatch = datastore.fetch(expectedEntryBatch.stream()
+          .map(Entity::getKey).toArray(Key[]::new));
       assert actualEntryBatch.size() == expectedEntryBatch.size();
 
       for (int i = 0; i < expectedEntryBatch.size(); i++) {
