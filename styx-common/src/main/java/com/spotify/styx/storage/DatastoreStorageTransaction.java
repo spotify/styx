@@ -36,6 +36,7 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_START;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_ENABLED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_JSON;
+import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceIndexShardEntryKey;
 import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceKey;
 import static com.spotify.styx.storage.DatastoreStorage.entityToBackfill;
 import static com.spotify.styx.storage.DatastoreStorage.entityToRunState;
@@ -235,6 +236,10 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   @Override
   public WorkflowInstance writeActiveState(WorkflowInstance instance, RunState state)
       throws IOException {
+    // Note: the parent entity need not actually exist
+    final Key indexEntryKey = activeWorkflowInstanceIndexShardEntryKey(tx.getDatastore().newKeyFactory(), instance);
+    final Entity indexEntry = Entity.newBuilder(indexEntryKey).build();
+    tx.add(indexEntry);
     tx.add(runStateToEntity(tx.getDatastore().newKeyFactory(), instance, state));
     return instance;
   }
@@ -248,6 +253,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
 
   @Override
   public WorkflowInstance deleteActiveState(WorkflowInstance instance) {
+    tx.delete(activeWorkflowInstanceIndexShardEntryKey(tx.getDatastore().newKeyFactory(), instance));
     tx.delete(activeWorkflowInstanceKey(tx.getDatastore().newKeyFactory(), instance));
     return instance;
   }

@@ -24,6 +24,7 @@ import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED;
+import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceIndexShardEntryKey;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -34,6 +35,8 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
@@ -377,6 +380,35 @@ public class DatastoreStorageTest {
     storage.writeActiveState(WORKFLOW_INSTANCE2, RUN_STATE2);
 
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
+    assertThat(activeStates, is(ImmutableMap.of(
+        WORKFLOW_INSTANCE1, RUN_STATE,
+        WORKFLOW_INSTANCE2, RUN_STATE2)));
+  }
+
+  @Test
+  public void shouldBootstrapActiveStatesIndexes() throws Exception {
+    storage.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
+    storage.writeActiveState(WORKFLOW_INSTANCE2, RUN_STATE2);
+
+    final Key indexEntryKey1 = activeWorkflowInstanceIndexShardEntryKey(datastore.newKeyFactory(), WORKFLOW_INSTANCE1);
+    final Key indexEntryKey2 = activeWorkflowInstanceIndexShardEntryKey(datastore.newKeyFactory(), WORKFLOW_INSTANCE2);
+
+    assertThat(datastore.get(indexEntryKey1), notNullValue());
+    assertThat(datastore.get(indexEntryKey2), notNullValue());
+
+    datastore.delete(indexEntryKey1, indexEntryKey2);
+
+    assertThat(datastore.get(indexEntryKey1), is(nullValue()));
+    assertThat(datastore.get(indexEntryKey2), is(nullValue()));
+
+    // reinstantiate storage to reindex
+    storage = new DatastoreStorage(datastore, Duration.ZERO);
+
+    assertThat(datastore.get(indexEntryKey1), notNullValue());
+    assertThat(datastore.get(indexEntryKey2), notNullValue());
+
+    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
+
     assertThat(activeStates, is(ImmutableMap.of(
         WORKFLOW_INSTANCE1, RUN_STATE,
         WORKFLOW_INSTANCE2, RUN_STATE2)));
