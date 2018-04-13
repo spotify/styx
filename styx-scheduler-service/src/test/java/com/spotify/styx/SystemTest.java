@@ -60,11 +60,22 @@ import java.util.List;
 import java.util.Optional;
 import junitparams.JUnitParamsRunner;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
+import org.junit.rules.TestWatcher;
+import org.junit.runner.Description;
 import org.junit.runner.RunWith;
 
 @RunWith(JUnitParamsRunner.class)
 public class SystemTest extends StyxSchedulerServiceFixture {
+
+  @Rule
+  public TestRule watcher = new TestWatcher() {
+    protected void starting(Description description) {
+      System.out.println("Starting test: " + description.getMethodName());
+    }
+  };
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_HOURLY =
       WorkflowConfiguration.builder()
