@@ -458,7 +458,10 @@ public class DatastoreStorage {
     // Strongly read active state keys from index shards
     final List<Key> keys = activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
         .map(key -> forkJoinPool.submit(() ->
-            datastore.run(Query.newEntityQueryBuilder().setFilter(PropertyFilter.hasAncestor(key)).build())))
+            datastore.run(Query.newEntityQueryBuilder()
+                .setFilter(PropertyFilter.hasAncestor(key))
+                .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
+                .build())))
         .collect(toList()).stream() // collect here to execute batch reads in parallel
         .flatMap(task -> StreamUtil.stream(task.join()))
         .map(entity -> entity.getKey().getName())
