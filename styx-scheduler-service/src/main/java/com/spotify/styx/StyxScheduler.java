@@ -682,12 +682,6 @@ public class StyxScheduler implements AppInit {
     };
   }
 
-  private static Gauge<Long> workflowActiveStates(StateManager stateManager, Workflow workflow) {
-    return () -> stateManager.getActiveStates().keySet().stream()
-        .filter(wfi -> workflow.id().equals(wfi.workflowId()))
-        .count();
-  }
-
   private static Stats stats(Environment environment) {
     return new MetricsStats(environment.resolve(SemanticMetricRegistry.class), Instant::now);
   }
