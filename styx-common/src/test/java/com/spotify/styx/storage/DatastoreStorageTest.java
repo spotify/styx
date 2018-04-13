@@ -81,6 +81,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.TriggerInstantSpec;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -387,6 +388,17 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldBootstrapActiveStatesIndexes() throws Exception {
+    shouldReindexActiveStates(storage::indexActiveWorkflowInstances);
+  }
+
+  @Test
+  public void shouldConcurrentlyIndexActiveStates() throws IOException {
+    // XXX: this does not really test that this indexing method works as expected when running concurrently with the
+    //      scheduler, it only checks that it creates missing index entries at all.
+    shouldReindexActiveStates(storage::concurrentlyIndexActiveWorkflowInstances);
+  }
+
+  public void shouldReindexActiveStates(Runnable indexer) throws IOException {
     storage.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
     storage.writeActiveState(WORKFLOW_INSTANCE2, RUN_STATE2);
 
@@ -401,7 +413,7 @@ public class DatastoreStorageTest {
     assertThat(datastore.get(indexEntryKey1), is(nullValue()));
     assertThat(datastore.get(indexEntryKey2), is(nullValue()));
 
-    storage.indexActiveWorkflowInstances();
+    indexer.run();
 
     assertThat(datastore.get(indexEntryKey1), notNullValue());
     assertThat(datastore.get(indexEntryKey2), notNullValue());

@@ -309,6 +309,10 @@ public class InMemStorage implements Storage {
   }
 
   @Override
+  public void concurrentlyIndexActiveWorkflowInstances() {
+  }
+
+  @Override
   public SortedSet<SequenceEvent> readEvents(WorkflowInstance workflowInstance) {
     final SortedSet<SequenceEvent> events = Sets.newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
     writtenEvents.stream()

@@ -46,6 +46,9 @@ public interface Storage {
   // TODO: remove after bootstrapping the indexes once
   void indexActiveWorkflowInstances();
 
+
+  void concurrentlyIndexActiveWorkflowInstances();
+
   /**
    * Returns all {@link SequenceEvent} for a {@link WorkflowInstance} in time order.
    *
