@@ -190,6 +190,10 @@ public class DatastoreStorage {
     this.forkJoinPool = new ForkJoinPool(REQUEST_CONCURRENCY);
   }
 
+  /**
+   * Bootstrap active worflow instance index. This cannot run concurrently with the scheduler and must only
+   * be called once before the scheduler starts.
+   */
   void indexActiveWorkflowInstances() {
     // XXX: this listing is not strongly consistent
     final List<Entity> indexEntries = StreamUtil.stream(
@@ -201,6 +205,56 @@ public class DatastoreStorage {
 
     for (List<Entity> batch : Lists.partition(indexEntries, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH)) {
       datastore.put(batch.toArray(new Entity[0]));
+    }
+  }
+
+  /**
+   * This indexing can run concurrently with the scheduler operations as it is using transactions to ensure it
+   * consistently updates the index, but that also makes it too slow to do the initial bootstrap.
+   *
+   */
+  void concurrentlyIndexActiveWorkflowInstances() {
+    // Weak listing, but we'll eventually read _everything_, in due time...
+    final List<Entity> expectedIndexEntries = StreamUtil.stream(
+        datastore.run(Query.newKeyQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE).build()))
+        .map(Key::getName)
+        .map(wfiKey -> activeWorkflowInstanceIndexShardEntryKey(datastore.newKeyFactory(), wfiKey))
+        .map(indexEntryKey -> Entity.newBuilder(indexEntryKey).build())
+        .collect(toList());
+
+    // Fetch index entries in batches
+    for (List<Entity> expectedEntryBatch : Lists.partition(expectedIndexEntries, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH)) {
+
+      final List<Entity> actualEntryBatch = datastore.fetch(expectedEntryBatch.stream().map(Entity::getKey).toArray(Key[]::new));
+      assert actualEntryBatch.size() == expectedEntryBatch.size();
+
+      for (int i = 0; i < expectedEntryBatch.size(); i++) {
+
+        // If an entry is null, it might be missing
+        if (actualEntryBatch.get(i) == null) {
+
+          final Entity expectedEntry = expectedEntryBatch.get(i);
+
+          // Check again in a transaction and add the entry if it is really missing
+          datastore.runInTransaction(tx -> {
+            final String wfiName = expectedEntry.getKey().getName();
+
+            // Is the wfi really there?
+            if (tx.get(activeWorkflowInstanceKey(datastore.newKeyFactory(), wfiName)) == null) {
+              return null;
+            }
+
+            // Is the index entry really missing?
+            if (tx.get(expectedEntry.getKey()) != null) {
+              return null;
+            }
+
+            // Add the missing entry
+            tx.add(expectedEntry);
+            return null;
+          });
+        }
+      }
     }
   }
 

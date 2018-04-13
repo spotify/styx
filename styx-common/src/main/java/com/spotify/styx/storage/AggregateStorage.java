@@ -67,6 +67,11 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
+  public void concurrentlyIndexActiveWorkflowInstances() {
+    datastoreStorage.concurrentlyIndexActiveWorkflowInstances();
+  }
+
+  @Override
   public SortedSet<SequenceEvent> readEvents(WorkflowInstance workflowInstance) throws IOException {
     return bigtableStorage.readEvents(workflowInstance);
   }
