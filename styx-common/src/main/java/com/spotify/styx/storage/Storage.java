@@ -43,6 +43,9 @@ import java.util.SortedSet;
  */
 public interface Storage {
 
+  // TODO: remove after bootstrapping the indexes once
+  void indexActiveWorkflowInstances();
+
   /**
    * Returns all {@link SequenceEvent} for a {@link WorkflowInstance} in time order.
    *

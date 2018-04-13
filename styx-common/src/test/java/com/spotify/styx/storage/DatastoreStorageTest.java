@@ -401,8 +401,7 @@ public class DatastoreStorageTest {
     assertThat(datastore.get(indexEntryKey1), is(nullValue()));
     assertThat(datastore.get(indexEntryKey2), is(nullValue()));
 
-    // reinstantiate storage to reindex
-    storage = new DatastoreStorage(datastore, Duration.ZERO);
+    storage.indexActiveWorkflowInstances();
 
     assertThat(datastore.get(indexEntryKey1), notNullValue());
     assertThat(datastore.get(indexEntryKey2), notNullValue());

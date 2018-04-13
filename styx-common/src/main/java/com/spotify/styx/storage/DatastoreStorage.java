@@ -188,10 +188,6 @@ public class DatastoreStorage {
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
     this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
     this.forkJoinPool = new ForkJoinPool(REQUEST_CONCURRENCY);
-
-    // TODO: remove after bootstrapping the indexes once
-    // XXX: bootstrap indexes as an offline operation instead of here in the styx scheduler process?
-    indexActiveWorkflowInstances();
   }
 
   void indexActiveWorkflowInstances() {

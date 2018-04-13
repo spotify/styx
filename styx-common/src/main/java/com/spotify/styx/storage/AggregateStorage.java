@@ -60,6 +60,12 @@ public class AggregateStorage implements Storage {
     this.datastoreStorage = Objects.requireNonNull(datastoreStorage, "datastoreStorage");
   }
 
+  // TODO: remove after bootstrapping the indexes once
+  @Override
+  public void indexActiveWorkflowInstances() {
+    datastoreStorage.indexActiveWorkflowInstances();
+  }
+
   @Override
   public SortedSet<SequenceEvent> readEvents(WorkflowInstance workflowInstance) throws IOException {
     return bigtableStorage.readEvents(workflowInstance);
