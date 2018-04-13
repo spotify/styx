@@ -48,6 +48,7 @@ import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.util.ShardedCounter;
 import java.time.Duration;
+import java.util.logging.Level;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -89,6 +90,10 @@ public class ResourceResourceTest extends VersionedApiTest {
 
   @BeforeClass
   public static void setUpClass() throws Exception {
+    final java.util.logging.Logger datastoreEmulatorLogger =
+        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
+    datastoreEmulatorLogger.setLevel(Level.OFF);
+
     localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
     localDatastore.start();
   }

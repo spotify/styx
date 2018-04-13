@@ -62,6 +62,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
 import javaslang.Tuple;
 import javaslang.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
@@ -104,6 +105,10 @@ public class StyxSchedulerServiceFixture {
 
   @BeforeClass
   public static void setUpClass() throws Exception {
+    final java.util.logging.Logger datastoreEmulatorLogger =
+    java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
+    datastoreEmulatorLogger.setLevel(Level.OFF);
+      
     // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
     localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
     localDatastore.start();

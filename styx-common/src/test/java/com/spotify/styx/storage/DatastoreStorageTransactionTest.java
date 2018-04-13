@@ -59,6 +59,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Optional;
+import java.util.logging.Level;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -76,6 +77,10 @@ public class DatastoreStorageTransactionTest {
 
   @BeforeClass
   public static void setUpClass() throws Exception {
+    final java.util.logging.Logger datastoreEmulatorLogger =
+        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
+    datastoreEmulatorLogger.setLevel(Level.OFF);
+
     // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
     helper = LocalDatastoreHelper.create(1.0); // 100% global consistency
     helper.start();

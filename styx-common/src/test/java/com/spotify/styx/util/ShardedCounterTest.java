@@ -56,6 +56,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.logging.Level;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -82,6 +83,10 @@ public class ShardedCounterTest {
 
   @BeforeClass
   public static void setUpClass() throws IOException, InterruptedException {
+    final java.util.logging.Logger datastoreEmulatorLogger =
+        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
+    datastoreEmulatorLogger.setLevel(Level.OFF);
+
     helper = LocalDatastoreHelper.create(1.0);
     helper.start();
     datastore = helper.getOptions().getService();
