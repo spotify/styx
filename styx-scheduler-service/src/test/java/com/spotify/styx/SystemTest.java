@@ -57,6 +57,8 @@ import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
@@ -78,17 +80,23 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     protected void starting(Description description) {
       startNanos = System.nanoTime();
-      System.err.println("TEST STARTING : " + name(description));
+      System.err.println(time() + " TEST STARTING : " + name(description));
     }
 
     @Override
     protected void succeeded(Description description) {
-      System.err.println("TEST SUCCEEDED: " + name(description) + " (" + duration() + ")");
+      System.err.println(time() + " TEST SUCCEEDED: " + name(description) + " (" + duration() + ")");
     }
 
     @Override
     protected void failed(Throwable e, Description description) {
-      System.err.println("TEST FAILED   : " + name(description) + " (" + duration() + ")" + ": " + e);
+      System.err.println(time() + " TEST FAILED   : " + name(description) + " (" + duration() + ")" + ": " + e);
+    }
+
+    private String time() {
+      final LocalTime now = LocalTime.now();
+      return String.format("%02d:%02d:%02d.%03d", now.getHour(), now.getMinute(), now.getSecond(),
+          now.getLong(ChronoField.MILLI_OF_SECOND));
     }
 
     private String name(Description description) {
