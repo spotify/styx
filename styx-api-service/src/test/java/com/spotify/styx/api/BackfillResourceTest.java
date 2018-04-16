@@ -104,6 +104,16 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   private static final Backfill BACKFILL_2 = Backfill.newBuilder()
       .id("backfill-2")
+      .start(Instant.parse("2017-01-02T00:00:00Z"))
+      .end(Instant.parse("2017-01-01T00:00:00Z"))
+      .workflowId(WorkflowId.create("component", "workflow1"))
+      .concurrency(1)
+      .nextTrigger(Instant.parse("2017-01-02T00:00:00Z"))
+      .schedule(Schedule.HOURS)
+      .build();
+
+  private static final Backfill BACKFILL_3 = Backfill.newBuilder()
+      .id("backfill-3")
       .start(Instant.parse("2017-01-01T00:00:00Z"))
       .end(Instant.parse("2017-01-02T00:00:00Z"))
       .workflowId(WorkflowId.create("component", "workflow2"))
@@ -112,8 +122,8 @@ public class BackfillResourceTest extends VersionedApiTest {
       .schedule(Schedule.DAYS)
       .build();
 
-  private static final Backfill BACKFILL_3 = Backfill.newBuilder()
-      .id("backfill-3")
+  private static final Backfill BACKFILL_4 = Backfill.newBuilder()
+      .id("backfill-4")
       .start(Instant.parse("2017-01-01T00:00:00Z"))
       .end(Instant.parse("2017-01-02T00:00:00Z"))
       .workflowId(WorkflowId.create("other_component", "other_workflow"))
@@ -172,16 +182,16 @@ public class BackfillResourceTest extends VersionedApiTest {
             .dockerImage("foobar")
             .build()));
     storage.storeWorkflow(Workflow.create(
-        BACKFILL_2.workflowId().componentId(),
+        BACKFILL_3.workflowId().componentId(),
         WorkflowConfiguration.builder()
-            .id(BACKFILL_2.workflowId().id())
+            .id(BACKFILL_3.workflowId().id())
             .schedule(Schedule.HOURS)
             .dockerImage("foobar")
             .build()));
     storage.storeWorkflow(Workflow.create(
-        BACKFILL_3.workflowId().componentId(),
+        BACKFILL_4.workflowId().componentId(),
         WorkflowConfiguration.builder()
-            .id(BACKFILL_3.workflowId().id())
+            .id(BACKFILL_4.workflowId().id())
             .schedule(Schedule.HOURS)
             .build()));
     storage.storeBackfill(BACKFILL_1);
@@ -220,10 +230,10 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldFilterBackfillsOnComponentEvenWhenInactive() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.storeBackfill(BACKFILL_3.builder().allTriggered(true).build());
+    storage.storeBackfill(BACKFILL_4.builder().allTriggered(true).build());
 
     final String uri = path(String.format("?showAll=true&component=%s",
-                                          BACKFILL_3.workflowId().componentId()));
+                                          BACKFILL_4.workflowId().componentId()));
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", uri));
 
@@ -235,7 +245,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldFilterBackfillsOnComponent() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.storeBackfill(BACKFILL_3);
+    storage.storeBackfill(BACKFILL_4);
 
     final String uri = path(String.format("?component=%s",
                                           BACKFILL_1.workflowId().componentId()));
@@ -250,8 +260,8 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldFilterBackfillsOnWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.storeBackfill(BACKFILL_2);
     storage.storeBackfill(BACKFILL_3);
+    storage.storeBackfill(BACKFILL_4);
 
     final String uri = path(String.format("?workflow=%s",
                                           BACKFILL_1.workflowId().id()));
@@ -267,8 +277,8 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldFilterBackfillsOnComponentWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.storeBackfill(BACKFILL_2);
     storage.storeBackfill(BACKFILL_3);
+    storage.storeBackfill(BACKFILL_4);
 
     final String uri = path(String.format("?component=%s&workflow=%s",
                                           BACKFILL_1.workflowId().componentId(),
@@ -285,7 +295,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldListActiveBackfillsByDefault() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.storeBackfill(BACKFILL_2.builder().allTriggered(true).build());
+    storage.storeBackfill(BACKFILL_3.builder().allTriggered(true).build());
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("")));
 
@@ -297,7 +307,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldListAllBackfillsWithFlag() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.storeBackfill(BACKFILL_2.builder().halted(true).build());
+    storage.storeBackfill(BACKFILL_3.builder().halted(true).build());
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("?showAll=true")));
 
@@ -308,7 +318,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldListMultipleBackfills() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.storeBackfill(BACKFILL_2);
+    storage.storeBackfill(BACKFILL_3);
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("")));
 
@@ -335,6 +345,32 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
     assertJson(response, "backfill.id", equalTo(BACKFILL_1.id()));
+    assertJson(response, "statuses.active_states[0].state", equalTo("UNKNOWN"));
+    assertJson(response, "statuses.active_states[1].state", equalTo("RUNNING"));
+    assertJson(response, "statuses.active_states[2].state", equalTo("WAITING"));
+    assertJson(response, "statuses.active_states[23].state", equalTo("WAITING"));
+    assertJson(response, "statuses.active_states", hasSize(24));
+  }
+
+  @Test
+  public void shouldGetBackfillStatusWithStatusByDefaultReversed() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_2.workflowId(), "2017-01-01T23");
+    storage.storeBackfill(BACKFILL_2.builder().nextTrigger(Instant.parse("2017-01-01T22:00:00Z")).build());
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(wfi, Trigger.backfill("backfill-2")), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi, RESOURCE_IDS),                            2L, 2L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"),          3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                              4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                          5L, 5L));
+    storage.writeActiveState(wfi, RunState.create(wfi, State.RUNNING,
+        StateData.zero(), Instant.now(), 5L));
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/" + BACKFILL_2.id())));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfill.id", equalTo(BACKFILL_2.id()));
     assertJson(response, "statuses.active_states[0].state", equalTo("UNKNOWN"));
     assertJson(response, "statuses.active_states[1].state", equalTo("RUNNING"));
     assertJson(response, "statuses.active_states[2].state", equalTo("WAITING"));
@@ -390,6 +426,35 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(postedBackfill.concurrency(), equalTo(1));
     assertThat(postedBackfill.description(), equalTo(Optional.empty()));
     assertThat(postedBackfill.nextTrigger(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
+    assertThat(postedBackfill.schedule(), equalTo(Schedule.HOURS));
+    assertThat(postedBackfill.allTriggered(), equalTo(false));
+    assertThat(postedBackfill.halted(), equalTo(false));
+  }
+
+  @Test
+  public void shouldPostBackfillReversed() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final String json = "{\"start\":\"2017-02-01T00:00:00Z\"," +
+                        "\"end\":\"2017-01-01T00:00:00Z\"," +
+                        "\"component\":\"component\"," +
+                        "\"workflow\":\"workflow2\","+
+                        "\"concurrency\":1}";
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path(""), ByteString.encodeUtf8(json)));
+
+    assertThat(response.status().reasonPhrase(),
+        response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
+        response.payload().get().toByteArray(), Backfill.class);
+    assertThat(postedBackfill.id().matches("backfill-[\\d-]+"), is(true));
+    assertThat(postedBackfill.start(), equalTo(Instant.parse("2017-02-01T00:00:00Z")));
+    assertThat(postedBackfill.end(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
+    assertThat(postedBackfill.workflowId(), equalTo(WorkflowId.create("component", "workflow2")));
+    assertThat(postedBackfill.concurrency(), equalTo(1));
+    assertThat(postedBackfill.description(), equalTo(Optional.empty()));
+    assertThat(postedBackfill.nextTrigger(), equalTo(Instant.parse("2017-02-01T00:00:00Z")));
     assertThat(postedBackfill.schedule(), equalTo(Schedule.HOURS));
     assertThat(postedBackfill.allTriggered(), equalTo(false));
     assertThat(postedBackfill.halted(), equalTo(false));

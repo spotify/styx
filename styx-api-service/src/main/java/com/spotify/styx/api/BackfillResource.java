@@ -23,9 +23,10 @@ package com.spotify.styx.api;
 import static com.spotify.apollo.StatusType.Family.SUCCESSFUL;
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.serialization.Json.serialize;
-import static com.spotify.styx.util.ParameterUtil.rangeOfInstants;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 import static com.spotify.styx.util.StreamUtil.cat;
+import static com.spotify.styx.util.TimeUtil.instantsInRange;
+import static com.spotify.styx.util.TimeUtil.instantsInReversedRange;
 import static java.util.stream.Collectors.toList;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -281,8 +282,10 @@ public final class BackfillResource {
           Status.BAD_REQUEST.withReasonPhrase("end parameter not aligned with schedule"));
     }
 
+    final boolean reversed = input.start().isAfter(input.end());
+
     final List<WorkflowInstance> alreadyActive =
-        rangeOfInstants(input.start(), input.end(), schedule).stream()
+        instants(input.start(), input.end(), schedule, reversed).stream()
             .map(instant -> WorkflowInstance.create(workflowId, toParameter(schedule, instant)))
             .filter(activeWorkflowInstances::contains)
             .collect(toList());
@@ -347,8 +350,10 @@ public final class BackfillResource {
       throw new RuntimeException(e);
     }
 
-    final List<Instant> processedInstants = rangeOfInstants(
-        backfill.start(), backfill.nextTrigger(), backfill.schedule());
+    final boolean reversed = backfill.start().isAfter(backfill.end());
+
+    final List<Instant> processedInstants = instants(
+        backfill.start(), backfill.nextTrigger(), backfill.schedule(), reversed);
     processedStates = processedInstants.parallelStream()
         .map(instant -> {
           final WorkflowInstance wfi = WorkflowInstance
@@ -367,8 +372,8 @@ public final class BackfillResource {
         })
         .collect(toList());
 
-    final List<Instant> waitingInstants = rangeOfInstants(
-        backfill.nextTrigger(), backfill.end(), backfill.schedule());
+    final List<Instant> waitingInstants = instants(
+        backfill.nextTrigger(), backfill.end(), backfill.schedule(), reversed);
     waitingStates = waitingInstants.stream()
         .map(instant -> {
           final WorkflowInstance wfi = WorkflowInstance.create(
@@ -378,5 +383,11 @@ public final class BackfillResource {
         .collect(toList());
 
     return Stream.concat(processedStates.stream(), waitingStates.stream()).collect(toList());
+  }
+
+  private static List<Instant> instants(Instant start, Instant end, Schedule schedule,
+                                        boolean reversed) {
+    return reversed ? instantsInReversedRange(start, end, schedule) :
+           instantsInRange(start, end, schedule);
   }
 }

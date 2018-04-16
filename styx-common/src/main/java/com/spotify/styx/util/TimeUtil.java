@@ -35,6 +35,8 @@ import java.time.Period;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Static utility functions for manipulating time based on {@link Schedule} and offsets.
@@ -104,15 +106,16 @@ public class TimeUtil {
   }
 
   /**
-   * Gets the number of workflow instances between firstInstant (inclusive) and lastInstant (exclusive)
-   * according to the workflow's schedule.
+   * Gets the number of instants between firstInstant (inclusive) and lastInstant (exclusive)
+   * according to the {@link Schedule}.
    *
    * @param firstInstant The first instant
    * @param lastInstant  The last instant
    * @param schedule     The schedule of the workflow
-   * @return the number of instances within the range
+   * @return instants within the range
    */
-  public static int instancesInRange(Instant firstInstant, Instant lastInstant, Schedule schedule) {
+  public static List<Instant> instantsInRange(Instant firstInstant, Instant lastInstant,
+                                              Schedule schedule) {
     if (!isAligned(firstInstant, schedule) || !isAligned(lastInstant, schedule)) {
       throw new IllegalArgumentException("unaligned instant");
     }
@@ -122,17 +125,53 @@ public class TimeUtil {
     }
 
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
+    final List<Instant> listOfInstants = new ArrayList<>();
 
     Instant currentInstant = firstInstant;
-    int number = 0;
     while (currentInstant.isBefore(lastInstant)) {
+      listOfInstants.add(currentInstant);
       final ZonedDateTime utcDateTime = currentInstant.atZone(UTC);
       currentInstant = executionTime.nextExecution(utcDateTime)
           .orElseThrow(IllegalArgumentException::new) // with unix cron, this should not happen
           .toInstant();
-      number++;
     }
-    return number;
+
+    return listOfInstants;
+  }
+
+  /**
+   * Gets the number of instants between firstInstant (inclusive) and lastInstant (exclusive)
+   * according to the {@link Schedule}. This works in a reversed order, meaning firstInstant should
+   * be after lastInstant.
+   *
+   * @param firstInstant The first instant
+   * @param lastInstant  The last instant
+   * @param schedule     The schedule of the workflow
+   * @return instants within the range
+   */
+  public static List<Instant> instantsInReversedRange(Instant firstInstant, Instant lastInstant,
+                                                      Schedule schedule) {
+    if (!isAligned(firstInstant, schedule) || !isAligned(lastInstant, schedule)) {
+      throw new IllegalArgumentException("unaligned instant");
+    }
+
+    if (lastInstant.isAfter(firstInstant)) {
+      throw new IllegalArgumentException("last instant should not be after first instant");
+    }
+
+    final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
+    final List<Instant> listOfInstants = new ArrayList<>();
+
+    Instant currentInstant = firstInstant;
+    while (currentInstant.isAfter(lastInstant)) {
+      listOfInstants.add(currentInstant);
+      final ZonedDateTime utcDateTime = currentInstant.atZone(UTC);
+      currentInstant = executionTime.lastExecution(utcDateTime)
+          .orElseThrow(IllegalArgumentException::new) // with unix cron, this should not happen
+          .toInstant();
+    }
+
+    return listOfInstants;
   }
 
   /**

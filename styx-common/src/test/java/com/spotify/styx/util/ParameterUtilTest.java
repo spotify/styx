@@ -26,10 +26,7 @@ import static com.spotify.styx.model.Schedule.MONTHS;
 import static com.spotify.styx.model.Schedule.WEEKS;
 import static com.spotify.styx.model.Schedule.YEARS;
 import static com.spotify.styx.util.ParameterUtil.parseAlignedInstant;
-import static com.spotify.styx.util.ParameterUtil.rangeOfInstants;
 import static java.time.Instant.parse;
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
@@ -137,75 +134,6 @@ public class ParameterUtilTest {
     final Instant instant = ParameterUtil.parseDate("2016-01-19");
 
     assertThat(instant, is(parse("2016-01-19T00:00:00.000Z")));
-  }
-
-  @Test
-  public void shouldRangeOfInstantsHours() {
-    final Instant startInstant = parse("2016-12-31T23:00:00.00Z");
-    final Instant endInstant = parse("2017-01-01T02:00:00.00Z");
-
-    List<Instant> list = rangeOfInstants(startInstant, endInstant, HOURS);
-    assertThat(list, contains(
-        parse("2016-12-31T23:00:00.00Z"),
-        parse("2017-01-01T00:00:00.00Z"),
-        parse("2017-01-01T01:00:00.00Z"))
-    );
-  }
-
-  @Test
-  public void shouldRangeOfInstantsDays() {
-    final Instant startInstant = parse("2016-12-31T00:00:00.00Z");
-    final Instant endInstant = parse("2017-01-03T00:00:00.00Z");
-
-    List<Instant> list = rangeOfInstants(startInstant, endInstant, DAYS);
-    assertThat(list, contains(
-        parse("2016-12-31T00:00:00.00Z"),
-        parse("2017-01-01T00:00:00.00Z"),
-        parse("2017-01-02T00:00:00.00Z"))
-    );
-  }
-
-  @Test
-  public void shouldRangeOfInstantsWeeks() {
-    final Instant startInstant = parse("2016-12-26T00:00:00.00Z");
-    final Instant endInstant = parse("2017-01-16T00:00:00.00Z");
-
-    List<Instant> list = rangeOfInstants(startInstant, endInstant, WEEKS);
-    assertThat(list, contains(
-        parse("2016-12-26T00:00:00.00Z"),
-        parse("2017-01-02T00:00:00.00Z"),
-        parse("2017-01-09T00:00:00.00Z"))
-    );
-  }
-
-  @Test
-  public void shouldRangeOfInstantsMonths() {
-    final Instant startInstant = parse("2017-01-01T00:00:00.00Z");
-    final Instant endInstant = parse("2017-04-01T00:00:00.00Z");
-
-    List<Instant> list = rangeOfInstants(startInstant, endInstant, MONTHS);
-    assertThat(list, contains(
-        parse("2017-01-01T00:00:00.00Z"),
-        parse("2017-02-01T00:00:00.00Z"),
-        parse("2017-03-01T00:00:00.00Z"))
-    );
-  }
-
-  @Test
-  public void shouldReturnEmptyListStartEqualsEnd() {
-    final Instant startInstant = parse("2016-12-31T23:00:00.00Z");
-    final Instant endInstant = parse("2016-12-31T23:00:00.00Z");
-
-    List<Instant> list = rangeOfInstants(startInstant, endInstant, HOURS);
-    assertThat(list, hasSize(0));
-  }
-
-  @Test(expected=IllegalArgumentException.class)
-  public void shouldRaiseRangeOfInstantsStartAfterEnd() {
-    final Instant startInstant = parse("2016-12-31T23:00:00.00Z");
-    final Instant endInstant = parse("2016-01-01T01:00:00.00Z");
-
-    rangeOfInstants(startInstant, endInstant, HOURS);
   }
 
   @Test
