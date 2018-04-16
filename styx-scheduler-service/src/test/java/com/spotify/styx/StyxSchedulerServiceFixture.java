@@ -27,10 +27,6 @@ import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 
 import com.google.cloud.datastore.Datastore;
-import com.google.cloud.datastore.Key;
-import com.google.cloud.datastore.KeyQuery;
-import com.google.cloud.datastore.Query;
-import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
@@ -152,20 +148,14 @@ public class StyxSchedulerServiceFixture {
         .setWorkflowConsumerFactory(workflowConsumerFactory)
         .build();
 
-    serviceHelper = ServiceHelper.create(styxScheduler, StyxScheduler.SERVICE_NAME);
+    serviceHelper = ServiceHelper.create(styxScheduler, StyxScheduler.SERVICE_NAME)
+        .startTimeoutSeconds(30);
   }
 
   @After
   public void tearDown() throws Exception {
     serviceHelper.close();
-
-    // clear datastore after each test
-    Datastore datastore = localDatastore.getOptions().getService();
-    KeyQuery query = Query.newKeyQueryBuilder().build();
-    final QueryResults<Key> keys = datastore.run(query);
-    while (keys.hasNext()) {
-      datastore.delete(keys.next());
-    }
+    localDatastore.reset();
   }
 
   void injectEvent(Event event) throws IsClosedException, InterruptedException, ExecutionException, TimeoutException {

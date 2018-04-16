@@ -41,10 +41,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.datastore.Datastore;
-import com.google.cloud.datastore.Key;
-import com.google.cloud.datastore.KeyQuery;
-import com.google.cloud.datastore.Query;
-import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -166,13 +162,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @After
   public void tearDown() throws Exception {
-    // clear datastore after each test
-    Datastore datastore = localDatastore.getOptions().getService();
-    KeyQuery query = Query.newKeyQueryBuilder().build();
-    final QueryResults<Key> keys = datastore.run(query);
-    while (keys.hasNext()) {
-      datastore.delete(keys.next());
-    }
+    localDatastore.reset();
     serviceHelper.stubClient().clear();
   }
 
