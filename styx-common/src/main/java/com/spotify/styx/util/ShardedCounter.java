@@ -181,7 +181,7 @@ public class ShardedCounter {
   /**
    * Returns a recent snapshot, possibly read from inMemSnapshot.
    */
-  public CounterSnapshot getCounterSnapshot(String counterId) {
+  private CounterSnapshot getCounterSnapshot(String counterId) {
     final CounterSnapshot snapshot = inMemSnapshot.getIfPresent(counterId);
     if (snapshot != null) {
       return snapshot;

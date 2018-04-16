@@ -464,9 +464,6 @@ public class StyxScheduler implements AppInit {
 
       // Sync resources usage
       if (storage.config().resourcesSyncEnabled()) {
-        // first we reset all shards for each resource
-        storage.resources().parallelStream().forEach(resource -> resetShards(storage, resource));
-        // then we update shards with actual usage
         try {
           final Map<String, Long> resourcesUsageMap = getResourcesUsageMap(storage, timeoutConfig,
               workflowCache, time.get(), resourceDecorator);

@@ -21,11 +21,8 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
-import static java.time.temporal.ChronoUnit.HOURS;
-import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.stream.Collectors.toList;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 
@@ -37,16 +34,13 @@ import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import com.spotify.apollo.test.ServiceHelper;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
-import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
@@ -55,7 +49,6 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
-import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
@@ -65,9 +58,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.Queue;
-import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -75,7 +65,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javaslang.Tuple;
 import javaslang.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
-import org.awaitility.core.ConditionTimeoutException;
 import org.jmock.lib.concurrent.DeterministicScheduler;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -98,7 +87,6 @@ public class StyxSchedulerServiceFixture {
   private Connection bigtable = setupBigTableMockTable(0);
   protected AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
   private DeterministicScheduler executor = new QuietDeterministicScheduler();
-  private Set<String> resourceIdsToDecorateWith = Sets.newHashSet();
 
   // circumstantial fields, set by test cases
 
@@ -106,8 +94,8 @@ public class StyxSchedulerServiceFixture {
   private List<Tuple2<Optional<Workflow>, Optional<Workflow>>> workflowChanges = Lists.newArrayList();
 
   // captured fields from fakes
-  Queue<Tuple2<WorkflowInstance, DockerRunner.RunSpec>> dockerRuns = new ConcurrentLinkedQueue();
-  Queue<String> dockerCleans = new ConcurrentLinkedQueue();
+  List<Tuple2<WorkflowInstance, DockerRunner.RunSpec>> dockerRuns = Lists.newArrayList();
+  List<String> dockerCleans = Lists.newArrayList();
   AtomicInteger dockerRestores = new AtomicInteger();
 
   // service and helper
@@ -141,10 +129,8 @@ public class StyxSchedulerServiceFixture {
     StyxScheduler.PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
     StyxScheduler.DockerRunnerFactory dockerRunnerFactory =
         (id, env, states, exec, stats, debug) -> fakeDockerRunner();
-    WorkflowResourceDecorator resourceDecorator = (rs, cfg, res) ->
-        Sets.union(res, resourceIdsToDecorateWith);
     StyxScheduler.EventConsumerFactory eventConsumerFactory =
-        (env, stats) -> (event, state) -> transitionedEvents.add(Tuple.of(event, state.state()));
+        (env, stats) -> (event, state) ->  transitionedEvents.add(Tuple.of(event, state.state()));
     StyxScheduler.WorkflowConsumerFactory workflowConsumerFactory =
         (env, stats) -> (oldWorkflow, newWorkflow) ->
             workflowChanges.add(Tuple.of(oldWorkflow, newWorkflow));
@@ -157,7 +143,6 @@ public class StyxSchedulerServiceFixture {
         .setStatsFactory(statsFactory)
         .setExecutorFactory(executorFactory)
         .setPublisherFactory(publisherFactory)
-        .setResourceDecorator(resourceDecorator)
         .setEventConsumerFactory(eventConsumerFactory)
         .setWorkflowConsumerFactory(workflowConsumerFactory)
         .build();
@@ -186,50 +171,8 @@ public class StyxSchedulerServiceFixture {
     return styxScheduler.getState(workflowInstance);
   }
 
-  /**
-   * @return a best effort snapshot, without throwing ConcurrentModificationException.
-   */
-  List<Tuple2<WorkflowInstance, DockerRunner.RunSpec>> getDockerRuns() {
-    return Lists.newArrayList(dockerRuns);
-  }
-
-  /**
-   * @return a best effort snapshot, without throwing ConcurrentModificationException.
-   */
-  List<Tuple2<SequenceEvent, RunState.State>> getTransitionedEventsByName(String name) {
-    return Lists.newArrayList(transitionedEvents).stream()
-        .filter(item -> name.equals(EventUtil.name(item._1.event())))
-        .collect(toList());
-  }
-
   void tickScheduler() {
     styxScheduler.tickScheduler();
-  }
-
-  void tickSchedulerUntil(Runnable asserter) {
-    List<AssertionError> errors = Lists.newArrayList();
-    try {
-      await().atMost(30, SECONDS).until(() -> {
-        tickScheduler();
-        // Simulation time is sped up to exceed some stale-state-ttls during the entire await, so
-        // that those states time out like in production. Needed because of dropped events. (E.g.
-        // when submit event can't transition because of a transaction conflict, the state will be
-        // stuck and no immediate docker run will result.)
-        timePasses(3, MINUTES);
-        try {
-          asserter.run();
-          return true;
-        } catch (AssertionError ae) {
-          errors.add(ae);
-          return false;
-        }
-      });
-    } catch (ConditionTimeoutException cte) {
-      if (errors.size() > 0) {
-        cte.addSuppressed(errors.get(errors.size() - 1));
-      }
-      throw cte;
-    }
   }
 
   void tickTriggerManager() {
@@ -250,26 +193,6 @@ public class StyxSchedulerServiceFixture {
     storage.storeWorkflow(workflow);
   }
 
-  void givenQueuedWfisWithResources(String workflowId, int numInstances, Set<String> resourceIds)
-      throws Exception {
-    final WorkflowConfiguration configuration = WorkflowConfiguration.builder()
-        .id(workflowId)
-        .schedule(Schedule.HOURS)
-        .dockerImage("busybox")
-        .dockerArgs(asList("--hour", "{}"))
-        .resources(resourceIds)
-        .build();
-    final Workflow workflow = Workflow.create("styx", configuration);
-//    final Instant now = Instant.parse("2018-03-27T16:00:00Z");
-//    givenTheTimeIs(now.toString());
-    givenWorkflow(workflow);
-    givenWorkflowEnabledStateIs(workflow, true);
-    for (int i = 0; i < numInstances; i++) {
-      givenActiveState(WorkflowInstance.create(workflow.id(),
-          now.plus(i + 1, HOURS).toString().substring(0, 13)), 1);
-    }
-  }
-
   void givenNextNaturalTrigger(Workflow workflow, String nextNaturalTrigger) throws IOException {
     Instant next = Instant.parse(nextNaturalTrigger);
     Instant offset = workflow.configuration().addOffset(next);
@@ -284,11 +207,6 @@ public class StyxSchedulerServiceFixture {
 
   void givenResource(Resource resource) throws IOException {
     storage.storeResource(resource);
-    storage.updateLimitForCounter(resource.id(), resource.concurrency());
-  }
-
-  void givenResourceIdsToDecorateWith(Set<String> resourceIds) throws IOException {
-    resourceIdsToDecorateWith = resourceIds;
   }
 
   void workflowChanges(Workflow workflow) {
@@ -326,16 +244,16 @@ public class StyxSchedulerServiceFixture {
     }
   }
 
-  void givenActiveState(WorkflowInstance workflowInstance, long count) {
+  void givenActiveStateAtSequenceCount(WorkflowInstance workflowInstance, long count) {
     try {
       storage.writeActiveState(workflowInstance, RunState.create(workflowInstance,
-          RunState.State.QUEUED, StateData.newBuilder().retryDelayMillis(0L).build(), now, count));
+          RunState.State.QUEUED, StateData.zero(), Instant.now(), count));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
   }
 
-  void givenActiveState(WorkflowInstance workflowInstance, RunState state) {
+  void givenActiveStateAtSequenceCount(WorkflowInstance workflowInstance, RunState state) {
     try {
       storage.writeActiveState(workflowInstance, state);
     } catch (IOException e) {
@@ -403,7 +321,7 @@ public class StyxSchedulerServiceFixture {
   private void printTime() {
     LOG.info("The time is {}", now);
   }
-
+  
   private DockerRunner fakeDockerRunner() {
     return new DockerRunner() {
       @Override
