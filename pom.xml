@@ -425,6 +425,7 @@
         <configuration>
           <argLine>-Xmx256m ${argLine}</argLine>
           <reuseForks>false</reuseForks>
+          <forkCount>1</forkCount>
         </configuration>
       </plugin>
 
