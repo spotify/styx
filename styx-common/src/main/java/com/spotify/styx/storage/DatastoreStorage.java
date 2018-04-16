@@ -172,7 +172,7 @@ public class DatastoreStorage implements Closeable {
   public static final int MAX_RETRIES = 100;
   public static final int MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH = 1000;
 
-  private static final int REQUEST_CONCURRENCY = 2;
+  private static final int REQUEST_CONCURRENCY = 32;
 
   private final Datastore datastore;
   private final Duration retryBaseDelay;
