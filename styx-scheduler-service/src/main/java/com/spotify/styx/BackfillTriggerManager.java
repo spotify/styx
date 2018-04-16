@@ -22,6 +22,7 @@ package com.spotify.styx;
 
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
+import static com.spotify.styx.util.ExceptionUtil.findCause;
 import static com.spotify.styx.util.GuardedRunnable.guard;
 import static com.spotify.styx.util.TimeUtil.instancesInRange;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
@@ -44,7 +45,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -188,19 +188,16 @@ class BackfillTriggerManager {
           .toCompletableFuture();
       // Wait for the trigger execution to complete before proceeding to the next partition
       processed.get();
-    } catch (ExecutionException e) {
-      if (e.getCause() instanceof AlreadyInitializedException) {
+    } catch (Exception e) {
+      if (findCause(e, AlreadyInitializedException.class) != null) {
         // just encountered an ad-hoc trigger or it has been triggered by another scheduler instance
         // do not propagate the exception but instead letting transaction decide what to do
         LOG.debug("{} already triggered for backfill {}", momentNextTrigger, momentBackfill, e);
       } else {
+        // can be interrupted, we give up this backfill and retry in next tick
         LOG.debug("Failed to trigger {} for backfill {}", momentNextTrigger, momentBackfill, e);
         throw new RuntimeException(e);
       }
-    } catch (Exception e) {
-      // can be interrupted, we give up this backfill and retry in next tick
-      LOG.debug("Failed to trigger {} for backfill {}", momentNextTrigger, momentBackfill, e);
-      throw new RuntimeException(e);
     }
 
     final Instant nextPartition = nextInstant(momentNextTrigger, momentBackfill.schedule());

@@ -22,6 +22,7 @@ package com.spotify.styx;
 
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
+import static com.spotify.styx.util.ExceptionUtil.findCause;
 import static com.spotify.styx.util.GuardedRunnable.guard;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
@@ -44,7 +45,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,22 +117,17 @@ class TriggerManager {
               instantSpec.instant());
           // Wait for the event to be processed before proceeding to the next trigger
           processed.toCompletableFuture().get();
-        } catch (ExecutionException e) {
+        } catch (Exception e) {
           final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(),
               toParameter(workflow.configuration().schedule(), instantSpec.instant()));
 
-          if (e.getCause() instanceof AlreadyInitializedException) {
+          if (findCause(e, AlreadyInitializedException.class) != null) {
             LOG.debug("{} already triggered", workflowInstance.toKey(), e);
             // move on to update next natural trigger
           } else {
             LOG.debug("Failed to trigger {}", workflowInstance.toKey(), e);
             return;
           }
-        } catch (Exception e) {
-          final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(),
-              toParameter(workflow.configuration().schedule(), instantSpec.instant()));
-          LOG.debug("Failed to trigger {}", workflowInstance.toKey(), e);
-          return;
         }
 
         stats.recordNaturalTrigger();
