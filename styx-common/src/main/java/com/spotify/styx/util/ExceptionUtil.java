@@ -20,7 +20,11 @@
 
 package com.spotify.styx.util;
 
-public class ExceptionUtil {
+public final class ExceptionUtil {
+  private ExceptionUtil() {
+    throw new UnsupportedOperationException();
+  }
+
   public static <T> T findCause(Throwable throwable, Class<T> needle) {
     Throwable target = throwable;
     while (target != null) {
