@@ -17,7 +17,7 @@ jobs:
       - run:
           environment:
             # Configure datastore emulator heap size
-            JAVA: java -Xmx256m -Xms256m
+            JAVA: java -Xmx512m -Xms512m
             # Maven heap size
             MAVEN_OPTS: -Xmx256m -Xms256m
           command: mvn verify
