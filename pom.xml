@@ -426,6 +426,9 @@
           <argLine>-Xmx256m ${argLine}</argLine>
           <reuseForks>false</reuseForks>
           <forkCount>1</forkCount>
+          <excludes>
+            <exclude><!-- disable exclusion of inner classes--></exclude>
+          </excludes>
         </configuration>
       </plugin>
 
