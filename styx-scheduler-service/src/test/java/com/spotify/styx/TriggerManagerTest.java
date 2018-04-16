@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.futures.CompletableFutures.exceptionallyCompletedFuture;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static java.time.Instant.parse;
 import static org.mockito.Matchers.any;
@@ -163,10 +164,23 @@ public class TriggerManagerTest {
   @Test
   public void shouldUpdateNextNaturalTriggerIfAlreadyInitialized() throws Exception {
     setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"));
-    doThrow(new AlreadyInitializedException("")).when(triggerListener).event(any(), any(), any());
+    when(triggerListener.event(any(), any(), any()))
+        .thenReturn(exceptionallyCompletedFuture(new AlreadyInitializedException("")));
     triggerManager.tick();
 
     verify(storage).updateNextNaturalTrigger(
+        WORKFLOW_DAILY.id(),
+        TriggerInstantSpec.create(parse("2016-10-02T00:00:00Z"), parse("2016-10-03T00:00:00Z")));
+  }
+
+  @Test
+  public void shouldNotUpdateNextNaturalTriggerIfOtherException() throws Exception {
+    setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"));
+    when(triggerListener.event(any(), any(), any()))
+        .thenReturn(exceptionallyCompletedFuture(new RuntimeException()));
+    triggerManager.tick();
+
+    verify(storage, never()).updateNextNaturalTrigger(
         WORKFLOW_DAILY.id(),
         TriggerInstantSpec.create(parse("2016-10-02T00:00:00Z"), parse("2016-10-03T00:00:00Z")));
   }
