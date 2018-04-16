@@ -424,6 +424,7 @@
         <version>2.19.1</version>
         <configuration>
           <argLine>-Xmx256m ${argLine}</argLine>
+          <reuseForks>false</reuseForks>
         </configuration>
       </plugin>
 
