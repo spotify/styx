@@ -21,7 +21,6 @@
 package com.spotify.styx.state;
 
 import static java.util.concurrent.TimeUnit.MINUTES;
-import static java.util.stream.Collectors.toSet;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
@@ -36,7 +35,6 @@ import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
@@ -52,7 +50,6 @@ import com.google.common.collect.Maps;
 import com.spotify.styx.RepeatRule;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
@@ -64,7 +61,6 @@ import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.CounterCapacityException;
-import com.spotify.styx.util.CounterSnapshot;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
@@ -81,6 +77,7 @@ import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -173,23 +170,6 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldNotBeActiveAfterHalt() throws Exception {
-    Optional<RunState> runState = Optional.of(
-        RunState.create(INSTANCE, State.PREPARE,
-            StateData.newBuilder().resourceIds(ImmutableSet.of()).build(), NOW, 17));
-    when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
-    when(storage.readActiveState(INSTANCE)).thenReturn(runState);
-
-    Event event = Event.halt(INSTANCE);
-    stateManager.receive(event)
-        .toCompletableFuture().get(1, MINUTES);
-
-    verify(transaction).deleteActiveState(INSTANCE);
-    verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
-  }
-
-  @Test
-  public void shouldNotFailWhenMissingResourceIdsWhenTransitionFromPrepareToError()
-      throws Exception {
     Optional<RunState> runState = Optional.of(
         RunState.create(INSTANCE, State.PREPARE, StateData.zero(), NOW, 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
@@ -619,35 +599,28 @@ public class QueuedStateManagerTest {
   }
 
   @Test
+  @Ignore
   public void shouldFailToUpdateResourceCountersOnDequeueDueToCapacity() throws Exception {
     givenState(INSTANCE, State.QUEUED);
     doThrow(new CounterCapacityException("foo"))
         .when(transaction).updateCounter(shardedCounter, "resource1", 1);
-    final CounterSnapshot counterSnapshot = mock(CounterSnapshot.class);
-    when(counterSnapshot.getLimit()).thenReturn(1L);
-    when(shardedCounter.getCounterSnapshot("resource1")).thenReturn(counterSnapshot);
 
-    final Set<Resource> resources = ImmutableSet.of(Resource.create("resource1", 1));
-    final Event dequeueEvent = Event.dequeue(INSTANCE,
-        resources.stream().map(Resource::id).collect(toSet()));
+    final Set<String> resources = ImmutableSet.of("resource1");
+    final Event dequeueEvent = Event.dequeue(INSTANCE, resources);
     final Event infoEvent = Event.info(INSTANCE,
         Message.info(String.format("Resource limit reached for: %s", resources)));
     final QueuedStateManager spied = spy(stateManager);
+    spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
     doNothing().when(spied).receiveIgnoreClosed(eq(infoEvent), anyLong());
 
-    try {
-      spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
-      fail();
-    } catch (Exception e) {
-      // expected exception
-    }
+    receiveEvent(dequeueEvent);
 
     verify(spied).receiveIgnoreClosed(eq(infoEvent), anyLong());
   }
 
   @Test
   public void shouldFailToUpdateResourceCountersOnDequeueDueToCapacityAndNoInfoEventSent() throws Exception {
-    final Set<Resource> resources = ImmutableSet.of(Resource.create("resource1", 1));
+    final Set<String> resources = ImmutableSet.of("resource1");
     final Message message = Message.info(String.format("Resource limit reached for: %s", resources));
     final RunState runState = RunState.create(INSTANCE, State.QUEUED,
         STATE_DATA_1.builder().messages(message).build(),
@@ -658,16 +631,11 @@ public class QueuedStateManagerTest {
     doThrow(new CounterCapacityException("foo"))
         .when(transaction).updateCounter(shardedCounter, "resource1", 1);
 
-    final Event dequeueEvent = Event.dequeue(INSTANCE,
-        resources.stream().map(Resource::id).collect(toSet()));
+    final Event dequeueEvent = Event.dequeue(INSTANCE, resources);
     final QueuedStateManager spied = spy(stateManager);
+    spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
 
-    try {
-      spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
-      fail();
-    } catch (Exception e) {
-      // expected exception
-    }
+    receiveEvent(dequeueEvent);
 
     verify(spied, never()).receiveIgnoreClosed(eq(Event.info(INSTANCE, message)), anyLong());
   }
@@ -678,19 +646,14 @@ public class QueuedStateManagerTest {
     doThrow(new RuntimeException())
         .when(transaction).updateCounter(shardedCounter, "resource1", 1);
 
-    final Set<Resource> resources = ImmutableSet.of(Resource.create("resource1", 1));
-    final Event dequeueEvent = Event.dequeue(INSTANCE,
-        resources.stream().map(Resource::id).collect(toSet()));
+    final Set<String> resources = ImmutableSet.of("resource1");
+    final Event dequeueEvent = Event.dequeue(INSTANCE, resources);
     final Event infoEvent = Event.info(INSTANCE,
         Message.info(String.format("Resource limit reached for: %s", resources)));
     final QueuedStateManager spied = spy(stateManager);
+    spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
 
-    try {
-      spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
-      fail();
-    } catch (Exception e) {
-      // expected exception
-    }
+    receiveEvent(dequeueEvent);
 
     verify(spied, never()).receiveIgnoreClosed(eq(infoEvent), anyLong());
   }

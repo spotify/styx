@@ -47,6 +47,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.InstanceState;
+import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
@@ -138,7 +139,7 @@ public class Scheduler {
     final List<InstanceState> activeStates = getActiveInstanceStates(activeStatesMap);
 
     final Set<WorkflowInstance> timedOutInstances = getTimedOutInstances(activeStates, time.get(), ttls);
-    
+
     final Map<WorkflowId, Workflow> workflows = getWorkflows(activeStates);
 
     final Map<WorkflowId, Set<String>> workflowResourceReferences =
@@ -151,14 +152,9 @@ public class Scheduler {
                 workflowId -> workflowResources(globalConcurrency.isPresent(),
                     Optional.ofNullable(workflows.get(workflowId)))));
 
-    // Note: not a strongly consistent number, so the graphed value can be imprecise or show
-    // exceeded limit even if the real usage never exceeded the limit.
     final Map<String, Long> currentResourceUsage =
         getResourceUsage(globalConcurrency.isPresent(), activeStates, timedOutInstances,
             resourceDecorator, workflows);
-
-    // this reflects resource usage since last tick, so a couple of minutes delay
-    updateResourceStats(resources, currentResourceUsage);
 
     final List<InstanceState> eligibleInstances =
         activeStates.parallelStream()
@@ -169,8 +165,10 @@ public class Scheduler {
 
     timedOutInstances.forEach(wfi -> this.sendTimeout(wfi, activeStatesMap.get(wfi)));
 
-    gateAndDequeueInstances(config, resources, workflowResourceReferences,
+    limitAndDequeue(config, resources, workflowResourceReferences, currentResourceUsage,
         workflows, eligibleInstances);
+
+    updateResourceStats(resources, currentResourceUsage);
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
     stats.recordTickDuration(TICK_TYPE, durationMillis);
@@ -191,12 +189,14 @@ public class Scheduler {
     return storage.workflows(workflowIds);
   }
 
-  private void gateAndDequeueInstances(
+  private void limitAndDequeue(
       StyxConfig config,
       Map<String, Resource> resources,
       Map<WorkflowId, Set<String>> workflowResourceReferences,
+      Map<String, Long> currentResourceUsage,
       Map<WorkflowId, Workflow> workflows,
       List<InstanceState> eligibleInstances) {
+
     // Enable gating unless disabled in runtime config
     final WorkflowExecutionGate gate = config.executionGatingEnabled() ? this.gate : NOOP;
 
@@ -212,17 +212,17 @@ public class Scheduler {
       // Evaluate each instance in the batch for dequeuing
       for (int i = 0; i < batch.size(); i++) {
         final InstanceState instanceState = batch.get(i);
-        dequeueInstance(resources, workflowResourceReferences,
+        limitAndDequeue(resources, workflowResourceReferences,
             Optional.ofNullable(workflows.get(instanceState.workflowInstance().workflowId())),
-            instanceState, blockers.get(i));
+            currentResourceUsage, batch.get(i), blockers.get(i));
       }
     }
   }
 
-  private void dequeueInstance(Map<String, Resource> resources,
+  private void limitAndDequeue(Map<String, Resource> resources,
                                Map<WorkflowId, Set<String>> workflowResourceReferences,
                                Optional<Workflow> workflowOpt,
-                               InstanceState instanceState,
+                               Map<String, Long> currentResourceUsage, InstanceState instanceState,
                                CompletionStage<Optional<ExecutionBlocker>> executionBlockerFuture) {
 
     // Check for execution blocker
@@ -257,19 +257,44 @@ public class Scheduler {
         .filter(resourceRef -> !resources.containsKey(resourceRef))
         .collect(toSet());
 
+    final Set<String> depletedResources = instanceResourceRefs.stream()
+        .filter(resourceId -> {
+          if (!resources.containsKey(resourceId)) {
+            return false;
+          }
+
+          final Resource resource = resources.get(resourceId);
+          final long usage = currentResourceUsage.getOrDefault(resourceId, 0L);
+          return usage >= resource.concurrency();
+        })
+        .collect(toSet());
+
     if (!unknownResources.isEmpty()) {
       stateManager.receiveIgnoreClosed(
           Event.runError(instanceState.workflowInstance(),
               String.format("Referenced resources not found: %s", unknownResources)),
           instanceState.runState().counter());
+    } else if (!depletedResources.isEmpty()) {
+      final Message message = Message.info(
+          String.format("Resource limit reached for: %s",
+              depletedResources.stream()
+                  .map(resources::get)
+                  // Sort resource descriptions to get deterministic message contents
+                  .map(Resource::toString)
+                  .sorted()
+                  .collect(toList())));
+      if (!instanceState.runState().data().message().map(message::equals).orElse(false)) {
+        stateManager.receiveIgnoreClosed(Event.info(instanceState.workflowInstance(), message),
+            instanceState.runState().counter());
+      }
     } else {
       double sleepingTime = dequeueRateLimiter.acquire();
       if (sleepingTime > 0.0001) {
         LOG.debug("Dequeue rate limited and slept for {} ms", sleepingTime * 1000);
       }
 
-      // Racy: some resources may have been removed (become unknown) by now; in that case the
-      // counters code during dequeue will treat them as unlimited...
+      instanceResourceRefs.forEach(id -> currentResourceUsage.computeIfAbsent(id, id_ -> 0L));
+      instanceResourceRefs.forEach(id -> currentResourceUsage.compute(id, (id_, l) -> l + 1));
       sendDequeue(instanceState, instanceResourceRefs);
     }
   }
