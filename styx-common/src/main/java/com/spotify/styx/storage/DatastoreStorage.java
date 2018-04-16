@@ -582,10 +582,6 @@ public class DatastoreStorage implements Closeable {
         .collect(toList());
   }
 
-  static String activeWorkflowInstanceIndexShardName(WorkflowInstance workflowInstance) {
-    return activeWorkflowInstanceIndexShardName(workflowInstance.toKey());
-  }
-
   private static String activeWorkflowInstanceIndexShardName(String workflowInstanceKey) {
     final long hash = Hashing.murmur3_32().hashString(workflowInstanceKey, StandardCharsets.UTF_8).asInt();
     final long index = Long.remainderUnsigned(hash, ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS);
