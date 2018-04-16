@@ -13,7 +13,11 @@ jobs:
           key: v1-deps-{{ checksum "pom.xml" }}
           paths:
             - ~/.m2
-      - run: mvn verify
+      - run:
+          environment:
+            # Configure datastore emulator heap size
+            JAVA: java -Xmx256m -Xms256m
+          command: mvn verify
       - run: bash <(curl -s https://codecov.io/bash) -f '!**/jacoco-aggregate/**'
       - run: |
           mkdir test-reports
@@ -37,7 +41,11 @@ jobs:
           key: v1-deps-jdk9-{{ checksum "pom.xml" }}
           paths:
             - ~/.m2
-      - run: mvn verify
+      - run:
+          environment:
+            # Configure datastore emulator heap size
+            JAVA: java -Xmx256m -Xms256m
+          command: mvn verify
 
 
 workflows:
