@@ -64,9 +64,7 @@ import javaslang.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
 import org.jmock.lib.concurrent.DeterministicScheduler;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,11 +76,11 @@ public class StyxSchedulerServiceFixture {
   private static final Logger LOG = LoggerFactory.getLogger(StyxSchedulerServiceFixture.class);
 
   private Instant now = Instant.parse("1970-01-01T00:00:00Z");
-  private static LocalDatastoreHelper localDatastore;
+  private LocalDatastoreHelper localDatastore;
 
-  private Datastore datastore = localDatastore.getOptions().getService();
+  private Datastore datastore;
   private Connection bigtable = setupBigTableMockTable(0);
-  protected AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
+  protected AggregateStorage storage;
   private DeterministicScheduler executor = new QuietDeterministicScheduler();
 
   // circumstantial fields, set by test cases
@@ -99,30 +97,23 @@ public class StyxSchedulerServiceFixture {
   private StyxScheduler styxScheduler;
   private ServiceHelper serviceHelper;
 
-  @BeforeClass
-  public static void setUpClass() throws Exception {
-    final java.util.logging.Logger datastoreEmulatorLogger =
-    java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
-    datastoreEmulatorLogger.setLevel(Level.OFF);
-      
-    // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
-    localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
-    localDatastore.start();
-  }
-
-  @AfterClass
-  public static void tearDownClass() throws Exception {
-    if (localDatastore != null) {
-      try {
-        localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
-      } catch (Throwable e) {
-        e.printStackTrace();
-      }
-    }
-  }
-
   @Before
   public void setUp() throws Exception {
+
+    final java.util.logging.Logger datastoreEmulatorLogger =
+        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
+    datastoreEmulatorLogger.setLevel(Level.OFF);
+
+    // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
+    localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
+    try {
+      localDatastore.start();
+    } catch (IOException | InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+    datastore = localDatastore.getOptions().getService();
+    storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
+
     StorageFactory storageFactory = (env) -> storage;
     Time time = () -> now;
     StyxScheduler.StatsFactory statsFactory = (env) -> Stats.NOOP;
@@ -155,7 +146,14 @@ public class StyxSchedulerServiceFixture {
   @After
   public void tearDown() throws Exception {
     serviceHelper.close();
-    localDatastore.reset();
+
+    if (localDatastore != null) {
+      try {
+        localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
+      } catch (Throwable e) {
+        e.printStackTrace();
+      }
+    }
   }
 
   void injectEvent(Event event) throws IsClosedException, InterruptedException, ExecutionException, TimeoutException {
