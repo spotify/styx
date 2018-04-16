@@ -113,6 +113,10 @@ public class StyxSchedulerServiceFixture {
 
   @BeforeClass
   public static void setUpClass() throws Exception {
+    // Schedule a full GC to run every second to mitigate off-heap/direct memory usage.
+    // Without this, the system tests cause the test process memory usage (according to the system) to
+    // balloon to several GB even though the JVM itself is configured to and reports that it is only using a few
+    // hundred MB.
     // (T-T)
     Executors.newSingleThreadScheduledExecutor().scheduleWithFixedDelay(System::gc, 1, 1, SECONDS);
   }
