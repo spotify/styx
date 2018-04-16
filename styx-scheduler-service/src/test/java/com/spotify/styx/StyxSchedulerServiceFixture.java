@@ -55,6 +55,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -65,6 +66,7 @@ import org.apache.hadoop.hbase.client.Connection;
 import org.jmock.lib.concurrent.DeterministicScheduler;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,6 +98,16 @@ public class StyxSchedulerServiceFixture {
   // service and helper
   private StyxScheduler styxScheduler;
   private ServiceHelper serviceHelper;
+
+  @BeforeClass
+  public static void setUpClass() throws Exception {
+    // Schedule a full GC to run every second to mitigate off-heap/direct memory usage.
+    // Without this, the system tests cause the test process memory usage (according to the system) to
+    // balloon to several GB even though the JVM itself is configured to and reports that it is only using a few
+    // hundred MB.
+    // (T-T)
+    Executors.newSingleThreadScheduledExecutor().scheduleWithFixedDelay(System::gc, 1, 1, SECONDS);
+  }
 
   @Before
   public void setUp() throws Exception {
