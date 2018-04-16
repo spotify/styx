@@ -5,6 +5,7 @@ jobs:
     docker:
       - image: maven:3.5.2-jdk-8
     steps:
+      - run: ulimit -a
       - checkout
       - restore_cache:
           key: v1-deps-{{ checksum "pom.xml" }}
@@ -35,6 +36,7 @@ jobs:
     docker:
       - image: maven:3.5.2-jdk-9-slim
     steps:
+      - run: ulimit -a
       - checkout
       - restore_cache:
           key: v1-deps-jdk9-{{ checksum "pom.xml" }}
