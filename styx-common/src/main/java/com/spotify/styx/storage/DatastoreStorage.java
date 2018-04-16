@@ -78,6 +78,7 @@ import com.spotify.styx.util.StreamUtil;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.TriggerInstantSpec;
 import com.spotify.styx.util.TriggerUtil;
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -93,6 +94,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -103,7 +105,7 @@ import org.slf4j.LoggerFactory;
 /**
  * A backend for {@link AggregateStorage} backed by Google Datastore
  */
-public class DatastoreStorage {
+public class DatastoreStorage implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(DatastoreStorage.class);
 
@@ -188,6 +190,16 @@ public class DatastoreStorage {
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
     this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
     this.forkJoinPool = new ForkJoinPool(REQUEST_CONCURRENCY);
+  }
+
+  @Override
+  public void close() {
+    forkJoinPool.shutdownNow();
+    try {
+      forkJoinPool.awaitTermination(30, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   /**

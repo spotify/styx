@@ -31,6 +31,7 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.TriggerInstantSpec;
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +42,7 @@ import java.util.SortedSet;
 /**
  * The interface to the persistence layer.
  */
-public interface Storage {
+public interface Storage extends Closeable {
 
   // TODO: remove after bootstrapping the indexes once
   void indexActiveWorkflowInstances();
