@@ -65,6 +65,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -76,6 +77,7 @@ import org.awaitility.core.ConditionTimeoutException;
 import org.jmock.lib.concurrent.DeterministicScheduler;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,6 +110,12 @@ public class StyxSchedulerServiceFixture {
   // service and helper
   private StyxScheduler styxScheduler;
   private ServiceHelper serviceHelper;
+
+  @BeforeClass
+  public static void setUpClass() throws Exception {
+    // (T-T)
+    Executors.newSingleThreadScheduledExecutor().scheduleWithFixedDelay(System::gc, 1, 1, SECONDS);
+  }
 
   @Before
   public void setUp() throws Exception {
