@@ -76,6 +76,10 @@ public class InMemStorage implements Storage {
   }
 
   @Override
+  public void close() {
+  }
+
+  @Override
   public StyxConfig config() {
     return StyxConfig.newBuilder()
         .globalEnabled(true)
@@ -302,6 +306,14 @@ public class InMemStorage implements Storage {
   @Override
   public void updateLimitForCounter(String counterId, long limit) throws IOException {
     throw new NotImplementedException();
+  }
+
+  @Override
+  public void indexActiveWorkflowInstances() {
+  }
+
+  @Override
+  public void concurrentlyIndexActiveWorkflowInstances() {
   }
 
   @Override

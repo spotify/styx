@@ -23,7 +23,9 @@ package com.spotify.styx.storage;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONFIG_BOOTSTRAP_ACTIVE_WFI_ENABLED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED;
+import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceIndexShardEntryKey;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -34,6 +36,8 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
@@ -78,6 +82,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.TriggerInstantSpec;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -383,6 +388,45 @@ public class DatastoreStorageTest {
   }
 
   @Test
+  public void shouldBootstrapActiveStatesIndexes() throws Exception {
+    shouldReindexActiveStates(storage::indexActiveWorkflowInstances);
+  }
+
+  @Test
+  public void shouldConcurrentlyIndexActiveStates() throws IOException {
+    // XXX: this does not really test that this indexing method works as expected when running concurrently with the
+    //      scheduler, it only checks that it creates missing index entries at all.
+    shouldReindexActiveStates(storage::concurrentlyIndexActiveWorkflowInstances);
+  }
+
+  public void shouldReindexActiveStates(Runnable indexer) throws IOException {
+    storage.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
+    storage.writeActiveState(WORKFLOW_INSTANCE2, RUN_STATE2);
+
+    final Key indexEntryKey1 = activeWorkflowInstanceIndexShardEntryKey(datastore.newKeyFactory(), WORKFLOW_INSTANCE1);
+    final Key indexEntryKey2 = activeWorkflowInstanceIndexShardEntryKey(datastore.newKeyFactory(), WORKFLOW_INSTANCE2);
+
+    assertThat(datastore.get(indexEntryKey1), notNullValue());
+    assertThat(datastore.get(indexEntryKey2), notNullValue());
+
+    datastore.delete(indexEntryKey1, indexEntryKey2);
+
+    assertThat(datastore.get(indexEntryKey1), is(nullValue()));
+    assertThat(datastore.get(indexEntryKey2), is(nullValue()));
+
+    indexer.run();
+
+    assertThat(datastore.get(indexEntryKey1), notNullValue());
+    assertThat(datastore.get(indexEntryKey2), notNullValue());
+
+    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
+
+    assertThat(activeStates, is(ImmutableMap.of(
+        WORKFLOW_INSTANCE1, RUN_STATE,
+        WORKFLOW_INSTANCE2, RUN_STATE2)));
+  }
+
+  @Test
   public void shouldReturnAllActiveStatesForAComponent() throws Exception {
     storage.writeActiveState(WORKFLOW_INSTANCE2, RUN_STATE2);
     storage.writeActiveState(WORKFLOW_INSTANCE3, RUN_STATE3);
@@ -475,6 +519,16 @@ public class DatastoreStorageTest {
     helper.getOptions().getService().put(config);
 
     assertThat(storage.config().resourcesSyncEnabled(), is(true));
+  }
+
+  @Test
+  public void getsBootstrapActiveWFIEnabled() {
+    Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
+        .set(PROPERTY_CONFIG_BOOTSTRAP_ACTIVE_WFI_ENABLED, true)
+        .build();
+    helper.getOptions().getService().put(config);
+
+    assertThat(storage.config().bootstrapActiveWFIEnabled(), is(true));
   }
 
   @Test

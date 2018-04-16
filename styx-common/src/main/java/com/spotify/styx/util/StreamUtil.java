@@ -21,7 +21,10 @@
 package com.spotify.styx.util;
 
 import java.util.Arrays;
+import java.util.Iterator;
+import java.util.Spliterators;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 public final class StreamUtil {
 
@@ -39,5 +42,9 @@ public final class StreamUtil {
   @SafeVarargs
   public static <T> Stream<T> cat(Stream<T>... streams) {
     return Arrays.stream(streams).reduce(Stream.empty(), Stream::concat);
+  }
+
+  public static <T> Stream<T> stream(Iterator<T> iterator) {
+    return StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterator, 0), false);
   }
 }

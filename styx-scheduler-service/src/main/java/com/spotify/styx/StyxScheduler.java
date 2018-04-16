@@ -141,6 +141,7 @@ public class StyxScheduler implements AppInit {
   public static final int SCHEDULER_TICK_INTERVAL_SECONDS = 2;
   public static final int TRIGGER_MANAGER_TICK_INTERVAL_SECONDS = 1;
   public static final long CLEANER_TICK_INTERVAL_SECONDS = MINUTES.toSeconds(30);
+  public static final long CONCURRENT_WORKFLOW_INSTANCE_INDEXING_INTERVAL_SECONDS = MINUTES.toSeconds(30);
   public static final int RUNTIME_CONFIG_UPDATE_INTERVAL_SECONDS = 5;
   public static final Duration DEFAULT_RETRY_BASE_DELAY = Duration.ofMinutes(3);
   public static final int DEFAULT_RETRY_MAX_EXPONENT = 4;
@@ -322,6 +323,11 @@ public class StyxScheduler implements AppInit {
 
     final Stats stats = statsFactory.apply(environment);
     final Storage storage = instrument(Storage.class, storageFactory.apply(environment), stats, time);
+    closer.register(storage);
+
+    // XXX: bootstrap indexes as an offline operation instead of here in the styx scheduler process?
+    // TODO: remove after bootstrapping the indexes once
+    indexActiveWorkflowInstances(storage);
 
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
     final ShardedCounter shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
@@ -388,6 +394,7 @@ public class StyxScheduler implements AppInit {
     startScheduler(scheduler, executor);
     startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
     startCleaner(cleaner, executor);
+    startConcurrentWorkflowInstanceIndexing(storage, executor);
     setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats);
 
     final SchedulerResource schedulerResource =
@@ -404,6 +411,17 @@ public class StyxScheduler implements AppInit {
     this.backfillTriggerManager = backfillTriggerManager;
     this.workflowRemoveListener = workflowRemoveListener;
     this.workflowChangeListener = workflowChangeListener;
+  }
+
+  private void indexActiveWorkflowInstances(Storage storage) {
+    try {
+      if (storage.config().bootstrapActiveWFIEnabled()) {
+        storage.indexActiveWorkflowInstances();
+      }
+    } catch (IOException e) {
+      LOG.error("Error while bootstrapping active workflow instances", e);
+      throw new RuntimeException(e);
+    }
   }
 
   @VisibleForTesting
@@ -536,6 +554,14 @@ public class StyxScheduler implements AppInit {
         guard(cleaner::tick),
         0,
         CLEANER_TICK_INTERVAL_SECONDS,
+        SECONDS);
+  }
+
+  private static void startConcurrentWorkflowInstanceIndexing(Storage storage, ScheduledExecutorService exec) {
+    exec.scheduleWithFixedDelay(
+        guard(storage::concurrentlyIndexActiveWorkflowInstances),
+        CONCURRENT_WORKFLOW_INSTANCE_INDEXING_INTERVAL_SECONDS,
+        CONCURRENT_WORKFLOW_INSTANCE_INDEXING_INTERVAL_SECONDS,
         SECONDS);
   }
 
