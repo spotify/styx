@@ -120,9 +120,9 @@ public class StyxSchedulerServiceFixture {
   @Before
   public void setUp() throws Exception {
 
-//    final java.util.logging.Logger datastoreEmulatorLogger =
-//        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
-//    datastoreEmulatorLogger.setLevel(Level.OFF);
+    final java.util.logging.Logger datastoreEmulatorLogger =
+        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
+    datastoreEmulatorLogger.setLevel(Level.OFF);
 
     // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
     localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
