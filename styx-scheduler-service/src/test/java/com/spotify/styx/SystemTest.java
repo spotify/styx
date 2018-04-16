@@ -21,6 +21,7 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.model.WorkflowInstance.create;
+import static java.time.temporal.ChronoUnit.NANOS;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.HOURS;
@@ -54,6 +55,7 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.TriggerInstantSpec;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -72,8 +74,31 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
   @Rule
   public TestRule watcher = new TestWatcher() {
+    private long startNanos;
+
     protected void starting(Description description) {
-      System.out.println("Starting test: " + description.getMethodName());
+      startNanos = System.nanoTime();
+      System.err.println("TEST STARTING : " + name(description));
+    }
+
+    @Override
+    protected void succeeded(Description description) {
+      System.err.println("TEST SUCCEEDED: " + name(description) + " (" + duration() + ")");
+    }
+
+    @Override
+    protected void failed(Throwable e, Description description) {
+      System.err.println("TEST FAILED   : " + name(description) + " (" + duration() + ")" + ": " + e);
+    }
+
+    private String name(Description description) {
+      return description.getClassName() + '#' + description.getMethodName();
+    }
+
+    private Duration duration() {
+      final Duration raw = Duration.of(System.nanoTime() - startNanos, NANOS);
+      final Duration rounded = raw.plusNanos(Duration.of(1, ChronoUnit.SECONDS).toNanos() - raw.getNano());
+      return rounded;
     }
   };
 
