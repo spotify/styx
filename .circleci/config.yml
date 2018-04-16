@@ -5,6 +5,7 @@ jobs:
     docker:
       - image: maven:3.5.2-jdk-8
     steps:
+      - run: ulimit -a
       - checkout
       - restore_cache:
           key: v1-deps-{{ checksum "pom.xml" }}
@@ -13,7 +14,13 @@ jobs:
           key: v1-deps-{{ checksum "pom.xml" }}
           paths:
             - ~/.m2
-      - run: mvn verify
+      - run:
+          environment:
+            # Configure datastore emulator heap size
+            JAVA: java -Xmx512m -Xms512m
+            # Maven heap size
+            MAVEN_OPTS: -Xmx256m -Xms256m
+          command: mvn verify
       - run: bash <(curl -s https://codecov.io/bash) -f '!**/jacoco-aggregate/**'
       - run: |
           mkdir test-reports
@@ -29,6 +36,7 @@ jobs:
     docker:
       - image: maven:3.5.2-jdk-9-slim
     steps:
+      - run: ulimit -a
       - checkout
       - restore_cache:
           key: v1-deps-jdk9-{{ checksum "pom.xml" }}
@@ -37,7 +45,13 @@ jobs:
           key: v1-deps-jdk9-{{ checksum "pom.xml" }}
           paths:
             - ~/.m2
-      - run: mvn verify
+      - run:
+          environment:
+            # Configure datastore emulator heap size
+            JAVA: java -Xmx512m -Xms512m
+            # Maven heap size
+            MAVEN_OPTS: -Xmx256m -Xms256m
+          command: mvn verify
 
 
 workflows:

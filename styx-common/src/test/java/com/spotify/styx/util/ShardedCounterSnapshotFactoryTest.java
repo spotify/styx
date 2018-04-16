@@ -22,7 +22,6 @@ package com.spotify.styx.util;
 
 import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
 import static com.spotify.styx.util.ShardedCounterSnapshotFactory.TRANSACTION_GROUP_SIZE;
-import static com.spotify.styx.util.ShardedCounterTest.clearDatastore;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.spy;
@@ -35,6 +34,7 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.logging.Level;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -58,6 +58,10 @@ public class ShardedCounterSnapshotFactoryTest {
 
   @BeforeClass
   public static void setUpClass() throws IOException, InterruptedException {
+    final java.util.logging.Logger datastoreEmulatorLogger =
+        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
+    datastoreEmulatorLogger.setLevel(Level.OFF);
+
     helper = LocalDatastoreHelper.create(1.0);
     helper.start();
     datastore = helper.getOptions().getService();
@@ -83,8 +87,8 @@ public class ShardedCounterSnapshotFactoryTest {
   }
 
   @After
-  public void tearDown() {
-    clearDatastore(datastore);
+  public void tearDown() throws IOException {
+    helper.reset();
   }
 
   @Test

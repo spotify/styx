@@ -57,6 +57,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.hash.Hashing;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.ExecutionDescription;
@@ -73,10 +74,13 @@ import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.FnWithException;
 import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.StreamUtil;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.TriggerInstantSpec;
 import com.spotify.styx.util.TriggerUtil;
+import java.io.Closeable;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -90,6 +94,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -100,7 +105,7 @@ import org.slf4j.LoggerFactory;
 /**
  * A backend for {@link AggregateStorage} backed by Google Datastore
  */
-public class DatastoreStorage {
+public class DatastoreStorage implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(DatastoreStorage.class);
 
@@ -108,6 +113,8 @@ public class DatastoreStorage {
   public static final String KIND_COMPONENT = "Component";
   public static final String KIND_WORKFLOW = "Workflow";
   public static final String KIND_ACTIVE_WORKFLOW_INSTANCE = "ActiveWorkflowInstance";
+  public static final String KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD = "ActiveWorkflowInstanceIndexShard";
+  public static final String KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY = "ActiveWorkflowInstanceIndexShardEntry";
   public static final String KIND_RESOURCE = "Resource";
   public static final String KIND_BACKFILL = "Backfill";
 
@@ -118,6 +125,7 @@ public class DatastoreStorage {
   public static final String PROPERTY_CONFIG_EXECUTION_GATING_ENABLED = "executionGatingEnabled";
   public static final String PROPERTY_CONFIG_DEBUG_ENABLED = "debug";
   public static final String PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED = "resourcesSyncEnabled";
+  public static final String PROPERTY_CONFIG_BOOTSTRAP_ACTIVE_WFI_ENABLED = "bootstrapActiveWFIEnabled";
 
   public static final String PROPERTY_WORKFLOW_JSON = "json";
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
@@ -159,6 +167,9 @@ public class DatastoreStorage {
   public static final boolean DEFAULT_CONFIG_DEBUG_ENABLED = false;
   public static final boolean DEFAULT_CONFIG_EXECUTION_GATING_ENABLED = false;
   public static final boolean DEFAULT_CONFIG_RESOURCES_SYNC_ENABLED = false;
+  private static final boolean DEFAULT_CONFIG_BOOTSTRAP_ACTIVE_WFI_ENABLED = false;
+
+  public static final int ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS = 128;
 
   public static final int MAX_RETRIES = 100;
   public static final int MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH = 1000;
@@ -183,6 +194,85 @@ public class DatastoreStorage {
     this.forkJoinPool = new ForkJoinPool(REQUEST_CONCURRENCY);
   }
 
+  @Override
+  public void close() {
+    forkJoinPool.shutdownNow();
+    try {
+      forkJoinPool.awaitTermination(30, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  /**
+   * Bootstrap active worflow instance index. This cannot run concurrently with the scheduler and must only
+   * be called once before the scheduler starts.
+   */
+  void indexActiveWorkflowInstances() {
+    // XXX: this listing is not strongly consistent
+    final List<Entity> indexEntries = StreamUtil.stream(
+        datastore.run(Query.newKeyQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE).build()))
+        .map(Key::getName)
+        .map(wfiKey -> activeWorkflowInstanceIndexShardEntryKey(datastore.newKeyFactory(), wfiKey))
+        .map(indexEntryKey -> Entity.newBuilder(indexEntryKey).build())
+        .collect(toList());
+
+    for (List<Entity> batch : Lists.partition(indexEntries, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH)) {
+      datastore.put(batch.toArray(new Entity[0]));
+    }
+  }
+
+  /**
+   * This indexing can run concurrently with the scheduler operations as it is using transactions to ensure it
+   * consistently updates the index, but that also makes it too slow to do the initial bootstrap.
+   *
+   */
+  void concurrentlyIndexActiveWorkflowInstances() {
+    // Weak listing, but we'll eventually read _everything_, in due time...
+    final List<Entity> expectedIndexEntries = StreamUtil.stream(
+        datastore.run(Query.newKeyQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE).build()))
+        .map(Key::getName)
+        .map(wfiKey -> activeWorkflowInstanceIndexShardEntryKey(datastore.newKeyFactory(), wfiKey))
+        .map(indexEntryKey -> Entity.newBuilder(indexEntryKey).build())
+        .collect(toList());
+
+    // Fetch index entries in batches
+    for (List<Entity> expectedEntryBatch : Lists.partition(expectedIndexEntries, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH)) {
+
+      final List<Entity> actualEntryBatch = datastore.fetch(expectedEntryBatch.stream()
+          .map(Entity::getKey).toArray(Key[]::new));
+      assert actualEntryBatch.size() == expectedEntryBatch.size();
+
+      for (int i = 0; i < expectedEntryBatch.size(); i++) {
+
+        // If an entry is null, it might be missing
+        if (actualEntryBatch.get(i) == null) {
+
+          final Entity expectedEntry = expectedEntryBatch.get(i);
+
+          // Check again in a transaction and add the entry if it is really missing
+          datastore.runInTransaction(tx -> {
+            final String wfiName = expectedEntry.getKey().getName();
+
+            // Is the wfi really there?
+            if (tx.get(activeWorkflowInstanceKey(datastore.newKeyFactory(), wfiName)) == null) {
+              return null;
+            }
+
+            // Is the index entry really missing?
+            if (tx.get(expectedEntry.getKey()) != null) {
+              return null;
+            }
+
+            // Add the missing entry
+            tx.add(expectedEntry);
+            return null;
+          });
+        }
+      }
+    }
+  }
+
   StyxConfig config() {
     final Entity entity = asBuilderOrNew(
         getOpt(datastore, globalConfigKey(datastore.newKeyFactory())),
@@ -205,6 +295,8 @@ public class DatastoreStorage {
             .collect(toList()))
         .executionGatingEnabled(
             read(entity, PROPERTY_CONFIG_EXECUTION_GATING_ENABLED, DEFAULT_CONFIG_EXECUTION_GATING_ENABLED))
+        .bootstrapActiveWFIEnabled(
+            read(entity, PROPERTY_CONFIG_BOOTSTRAP_ACTIVE_WFI_ENABLED, DEFAULT_CONFIG_BOOTSTRAP_ACTIVE_WFI_ENABLED))
         .build();
   }
 
@@ -377,14 +469,21 @@ public class DatastoreStorage {
   }
 
   /**
-   * Eventually consistently list all active states and strongly consistently fetch their values.
-   *
-   * <p>This method will return a map of active states that might be missing some recently created
-   * states, but the values of all the states returned should be fresh.
+   * Strongly consistently read all active states
    */
   Map<WorkflowInstance, RunState> readActiveStates() throws IOException {
-    // Eventually consistently read active state keys
-    final List<Key> keys = readActiveInstanceKeys();
+    // Strongly read active state keys from index shards
+    final List<Key> keys = activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
+        .map(key -> forkJoinPool.submit(() ->
+            datastore.run(Query.newEntityQueryBuilder()
+                .setFilter(PropertyFilter.hasAncestor(key))
+                .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
+                .build())))
+        .collect(toList()).stream() // collect here to execute batch reads in parallel
+        .flatMap(task -> StreamUtil.stream(task.join()))
+        .map(entity -> entity.getKey().getName())
+        .map(name -> activeWorkflowInstanceKey(datastore.newKeyFactory(), name))
+        .collect(toList());
 
     // Strongly consistently read values for the above keys
     return Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH).stream()
@@ -392,17 +491,6 @@ public class DatastoreStorage {
         .collect(toList()).stream() // collect here to execute batch reads in parallel
         .flatMap(task -> task.join().stream())
         .collect(toMap(RunState::workflowInstance, Function.identity()));
-  }
-
-  /**
-   * Eventually consistently query for the keys of all active workflow instances.
-   */
-  private List<Key> readActiveInstanceKeys() {
-    final List<Key> keys = new ArrayList<>();
-    final QueryResults<Key> keyResults = datastore
-        .run(Query.newKeyQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE).build());
-    keyResults.forEachRemaining(keys::add);
-    return keys;
   }
 
   /**
@@ -486,10 +574,38 @@ public class DatastoreStorage {
     return RunState.create(instance, state, data, Instant.ofEpochMilli(timestamp), counter);
   }
 
-  void writeActiveState(WorkflowInstance workflowInstance, RunState state)
+  WorkflowInstance writeActiveState(WorkflowInstance workflowInstance, RunState state)
       throws IOException {
-    storeWithRetries(() -> datastore.put(
-        runStateToEntity(datastore.newKeyFactory(), workflowInstance, state)));
+    return storeWithRetries(() -> runInTransaction(tx -> tx.writeActiveState(workflowInstance, state)));
+  }
+
+  static List<Key> activeWorkflowInstanceIndexShardKeys(KeyFactory keyFactory) {
+    return IntStream.range(0, ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS)
+        .mapToObj(DatastoreStorage::activeWorkflowInstanceIndexShardName)
+        .map(name -> keyFactory.setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD).newKey(name))
+        .collect(toList());
+  }
+
+  private static String activeWorkflowInstanceIndexShardName(String workflowInstanceKey) {
+    final long hash = Hashing.murmur3_32().hashString(workflowInstanceKey, StandardCharsets.UTF_8).asInt();
+    final long index = Long.remainderUnsigned(hash, ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS);
+    return activeWorkflowInstanceIndexShardName(index);
+  }
+
+  private static String activeWorkflowInstanceIndexShardName(long index) {
+    return "shard-" + index;
+  }
+
+  static Key activeWorkflowInstanceIndexShardEntryKey(KeyFactory keyFactory, WorkflowInstance workflowInstance) {
+    final String workflowInstanceKey = workflowInstance.toKey();
+    return activeWorkflowInstanceIndexShardEntryKey(keyFactory, workflowInstanceKey);
+  }
+
+  private static Key activeWorkflowInstanceIndexShardEntryKey(KeyFactory keyFactory, String workflowInstanceKey) {
+    return keyFactory.setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
+        .addAncestor(PathElement.of(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD,
+            activeWorkflowInstanceIndexShardName(workflowInstanceKey)))
+        .newKey(workflowInstanceKey);
   }
 
   static Entity runStateToEntity(KeyFactory keyFactory, WorkflowInstance wfi, RunState state)
@@ -529,10 +645,7 @@ public class DatastoreStorage {
   }
 
   void deleteActiveState(WorkflowInstance workflowInstance) throws IOException {
-    storeWithRetries(() -> {
-      datastore.delete(activeWorkflowInstanceKey(workflowInstance));
-      return null;
-    });
+    storeWithRetries(() -> runInTransaction(tx -> tx.deleteActiveState(workflowInstance)));
   }
 
   void patchState(WorkflowId workflowId, WorkflowState state) throws IOException {
@@ -589,9 +702,14 @@ public class DatastoreStorage {
   }
 
   static Key activeWorkflowInstanceKey(KeyFactory keyFactory, WorkflowInstance workflowInstance) {
+    final String name = workflowInstance.toKey();
+    return activeWorkflowInstanceKey(keyFactory, name);
+  }
+
+  private static Key activeWorkflowInstanceKey(KeyFactory keyFactory, String name) {
     return keyFactory
         .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE)
-        .newKey(workflowInstance.toKey());
+        .newKey(name);
   }
 
   private WorkflowInstance parseWorkflowInstance(Entity activeWorkflowInstance) {
