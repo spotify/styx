@@ -23,6 +23,7 @@ package com.spotify.styx;
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.spotify.styx.util.GuardedRunnable.guard;
+import static com.spotify.styx.util.ParameterUtil.toParameter;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.Objects.requireNonNull;
 
@@ -30,6 +31,7 @@ import com.google.common.base.Throwables;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
@@ -42,6 +44,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -114,11 +117,22 @@ class TriggerManager {
               instantSpec.instant());
           // Wait for the event to be processed before proceeding to the next trigger
           processed.toCompletableFuture().get();
-        } catch (AlreadyInitializedException ignored) {
-          // nop
-        } catch (Throwable e) {
-          LOG.warn("Triggering {} threw exception", workflow.id(), e);
-          return; // so we don't update the trigger time
+        } catch (ExecutionException e) {
+          final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(),
+              toParameter(workflow.configuration().schedule(), instantSpec.instant()));
+
+          if (e.getCause() instanceof AlreadyInitializedException) {
+            LOG.debug("{} already triggered for {}", workflowInstance.toKey(), e);
+            // move on to update next natural trigger
+          } else {
+            LOG.debug("Failed to trigger {}", workflowInstance.toKey(), e);
+            return;
+          }
+        } catch (Exception e) {
+          final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(),
+              toParameter(workflow.configuration().schedule(), instantSpec.instant()));
+          LOG.debug("Failed to trigger {}", workflowInstance.toKey(), e);
+          return;
         }
 
         stats.recordNaturalTrigger();
