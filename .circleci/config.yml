@@ -18,7 +18,7 @@ jobs:
             # Configure datastore emulator heap size
             JAVA: java -Xmx256m -Xms256m
             # Maven heap size
-            MAVEN_OPTS: -Xmx128m -Xms128m
+            MAVEN_OPTS: -Xmx256m -Xms256m
           command: mvn verify
       - run: bash <(curl -s https://codecov.io/bash) -f '!**/jacoco-aggregate/**'
       - run: |
@@ -48,7 +48,7 @@ jobs:
             # Configure datastore emulator heap size
             JAVA: java -Xmx256m -Xms256m
             # Maven heap size
-            MAVEN_OPTS: -Xmx128m -Xms128m
+            MAVEN_OPTS: -Xmx256m -Xms256m
           command: mvn verify
 
 
