@@ -141,6 +141,7 @@ public class StyxScheduler implements AppInit {
   public static final int SCHEDULER_TICK_INTERVAL_SECONDS = 2;
   public static final int TRIGGER_MANAGER_TICK_INTERVAL_SECONDS = 1;
   public static final long CLEANER_TICK_INTERVAL_SECONDS = MINUTES.toSeconds(30);
+  public static final long CONCURRENT_WORKFLOW_INSTANCE_INDEXING_INTERVAL_SECONDS = MINUTES.toSeconds(30);
   public static final int RUNTIME_CONFIG_UPDATE_INTERVAL_SECONDS = 5;
   public static final Duration DEFAULT_RETRY_BASE_DELAY = Duration.ofMinutes(3);
   public static final int DEFAULT_RETRY_MAX_EXPONENT = 4;
@@ -393,6 +394,7 @@ public class StyxScheduler implements AppInit {
     startScheduler(scheduler, executor);
     startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
     startCleaner(cleaner, executor);
+    startConcurrentWorkflowInstanceIndexing(storage, executor);
     setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats);
 
     final SchedulerResource schedulerResource =
@@ -544,6 +546,14 @@ public class StyxScheduler implements AppInit {
         guard(cleaner::tick),
         0,
         CLEANER_TICK_INTERVAL_SECONDS,
+        SECONDS);
+  }
+
+  private static void startConcurrentWorkflowInstanceIndexing(Storage storage, ScheduledExecutorService exec) {
+    exec.scheduleWithFixedDelay(
+        guard(storage::concurrentlyIndexActiveWorkflowInstances),
+        CONCURRENT_WORKFLOW_INSTANCE_INDEXING_INTERVAL_SECONDS,
+        CONCURRENT_WORKFLOW_INSTANCE_INDEXING_INTERVAL_SECONDS,
         SECONDS);
   }
 
