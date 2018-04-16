@@ -108,8 +108,8 @@ public class ShardedCounterTest {
   }
 
   @After
-  public void tearDown() {
-    clearDatastore(datastore);
+  public void tearDown() throws IOException {
+    helper.reset();
   }
 
   @Test
@@ -432,11 +432,6 @@ public class ShardedCounterTest {
   private Key getKey(String counterId, int shardIndex) {
     return datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD)
         .newKey(counterId + "-" + shardIndex);
-  }
-
-  public static void clearDatastore(Datastore datastore) {
-    deleteAllOfKind(datastore, KIND_COUNTER_SHARD);
-    deleteAllOfKind(datastore, KIND_COUNTER_LIMIT);
   }
 
   private static void deleteAllOfKind(Datastore datastore, String kind) {

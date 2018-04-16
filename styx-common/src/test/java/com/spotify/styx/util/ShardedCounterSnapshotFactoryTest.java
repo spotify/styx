@@ -22,7 +22,6 @@ package com.spotify.styx.util;
 
 import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
 import static com.spotify.styx.util.ShardedCounterSnapshotFactory.TRANSACTION_GROUP_SIZE;
-import static com.spotify.styx.util.ShardedCounterTest.clearDatastore;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.spy;
@@ -83,8 +82,8 @@ public class ShardedCounterSnapshotFactoryTest {
   }
 
   @After
-  public void tearDown() {
-    clearDatastore(datastore);
+  public void tearDown() throws IOException {
+    helper.reset();
   }
 
   @Test

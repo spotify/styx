@@ -57,7 +57,6 @@ import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
-import com.google.cloud.datastore.KeyQuery;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
@@ -197,12 +196,7 @@ public class DatastoreStorageTest {
 
   @After
   public void tearDown() throws Exception {
-    // clear datastore after each test
-    KeyQuery query = Query.newKeyQueryBuilder().build();
-    final QueryResults<Key> keys = datastore.run(query);
-    while (keys.hasNext()) {
-      datastore.delete(keys.next());
-    }
+    helper.reset();
   }
 
   @Test
