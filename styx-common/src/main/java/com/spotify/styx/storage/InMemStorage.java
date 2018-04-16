@@ -76,6 +76,10 @@ public class InMemStorage implements Storage {
   }
 
   @Override
+  public void close() {
+  }
+
+  @Override
   public StyxConfig config() {
     return StyxConfig.newBuilder()
         .globalEnabled(true)

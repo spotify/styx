@@ -60,6 +60,11 @@ public class AggregateStorage implements Storage {
     this.datastoreStorage = Objects.requireNonNull(datastoreStorage, "datastoreStorage");
   }
 
+  @Override
+  public void close() {
+    datastoreStorage.close();
+  }
+
   // TODO: remove after bootstrapping the indexes once
   @Override
   public void indexActiveWorkflowInstances() {
