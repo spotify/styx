@@ -23,6 +23,7 @@ package com.spotify.styx.storage;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONFIG_BOOTSTRAP_ACTIVE_WFI_ENABLED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED;
 import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceIndexShardEntryKey;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
@@ -518,6 +519,16 @@ public class DatastoreStorageTest {
     helper.getOptions().getService().put(config);
 
     assertThat(storage.config().resourcesSyncEnabled(), is(true));
+  }
+
+  @Test
+  public void getsBootstrapActiveWFIEnabled() {
+    Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
+        .set(PROPERTY_CONFIG_BOOTSTRAP_ACTIVE_WFI_ENABLED, true)
+        .build();
+    helper.getOptions().getService().put(config);
+
+    assertThat(storage.config().bootstrapActiveWFIEnabled(), is(true));
   }
 
   @Test

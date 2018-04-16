@@ -327,7 +327,7 @@ public class StyxScheduler implements AppInit {
 
     // XXX: bootstrap indexes as an offline operation instead of here in the styx scheduler process?
     // TODO: remove after bootstrapping the indexes once
-    storage.indexActiveWorkflowInstances();
+    indexActiveWorkflowInstances(storage);
 
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
     final ShardedCounter shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
@@ -411,6 +411,17 @@ public class StyxScheduler implements AppInit {
     this.backfillTriggerManager = backfillTriggerManager;
     this.workflowRemoveListener = workflowRemoveListener;
     this.workflowChangeListener = workflowChangeListener;
+  }
+
+  private void indexActiveWorkflowInstances(Storage storage) {
+    try {
+      if (storage.config().bootstrapActiveWFIEnabled()) {
+        storage.indexActiveWorkflowInstances();
+      }
+    } catch (IOException e) {
+      LOG.error("Error while bootstrapping active workflow instances", e);
+      throw new RuntimeException(e);
+    }
   }
 
   @VisibleForTesting
