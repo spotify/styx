@@ -122,7 +122,7 @@ class TriggerManager {
               toParameter(workflow.configuration().schedule(), instantSpec.instant()));
 
           if (e.getCause() instanceof AlreadyInitializedException) {
-            LOG.debug("{} already triggered for {}", workflowInstance.toKey(), e);
+            LOG.debug("{} already triggered", workflowInstance.toKey(), e);
             // move on to update next natural trigger
           } else {
             LOG.debug("Failed to trigger {}", workflowInstance.toKey(), e);
