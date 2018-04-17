@@ -48,7 +48,6 @@ import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.util.IsClosedException;
 import io.fabric8.kubernetes.api.model.DoneablePod;
 import io.fabric8.kubernetes.api.model.DoneableSecret;
 import io.fabric8.kubernetes.api.model.ObjectMeta;
@@ -115,22 +114,22 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   private ExecutorService executor;
 
-  @Mock NamespacedKubernetesClient k8sClient;
+  @Mock private NamespacedKubernetesClient k8sClient;
 
-  @Mock ServiceAccountKeyManager serviceAccountKeyManager;
+  @Mock private ServiceAccountKeyManager serviceAccountKeyManager;
 
-  @Mock MixedOperation<Pod, PodList, DoneablePod, PodResource<Pod, DoneablePod>> pods;
-  @Mock MixedOperation<Secret, SecretList, DoneableSecret, Resource<Secret, DoneableSecret>> secrets;
-  @Mock Resource<Secret, DoneableSecret> namedResource;
-  @Mock SecretList secretList;
+  @Mock private MixedOperation<Pod, PodList, DoneablePod, PodResource<Pod, DoneablePod>> pods;
+  @Mock private MixedOperation<Secret, SecretList, DoneableSecret, Resource<Secret, DoneableSecret>> secrets;
+  @Mock private Resource<Secret, DoneableSecret> namedResource;
+  @Mock private SecretList secretList;
 
-  @Mock PodList podList;
-  @Captor ArgumentCaptor<Secret> secretCaptor;
+  @Mock private PodList podList;
+  @Captor private ArgumentCaptor<Secret> secretCaptor;
 
-  KubernetesGCPServiceAccountSecretManager sut;
+  private KubernetesGCPServiceAccountSecretManager sut;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     MockitoAnnotations.initMocks(this);
 
     executor = Executors.newCachedThreadPool();
@@ -149,12 +148,12 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @After
-  public void tearDown() throws Exception {
+  public void tearDown() {
     executor.shutdownNow();
   }
 
   @Test
-  public void shouldCreateServiceAccountKeysAndSecret() throws IsClosedException, IOException {
+  public void shouldCreateServiceAccountKeysAndSecret() throws IOException {
     when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(true);
 
     ServiceAccountKey jsonKey = new ServiceAccountKey();
@@ -179,7 +178,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test(expected = RuntimeException.class)
-  public void shouldCleanupKeysIfKeyCreationFails() throws IsClosedException, IOException {
+  public void shouldCleanupKeysIfKeyCreationFails() throws IOException {
     when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(true);
 
     ServiceAccountKey jsonKey = new ServiceAccountKey();
@@ -199,7 +198,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test
-  public void shouldDeleteGCPKeysIfSecretAlreadyExists() throws IsClosedException, IOException {
+  public void shouldDeleteGCPKeysIfSecretAlreadyExists() throws IOException {
     when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(true);
 
     ServiceAccountKey jsonKey = new ServiceAccountKey();
@@ -223,7 +222,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   @Test
   public void shouldNotConcurrentlyCreateServiceAccountKeysAndSecrets()
-      throws IsClosedException, IOException, ExecutionException, InterruptedException {
+      throws IOException, ExecutionException, InterruptedException {
 
     final ServiceAccountKey jsonKey = new ServiceAccountKey();
     jsonKey.setName("key.json");
@@ -307,7 +306,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     final KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
         .serviceAccountSecret(secret.getMetadata().getName())
         .build();
-    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
+    final Pod pod = KubernetesDockerRunnerTestUtil
+        .createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
 
     final PodStatus podStatus = podStatus(phase);
     pod.setStatus(podStatus);
@@ -364,7 +364,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     final KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
         .serviceAccountSecret(secret.getMetadata().getName())
         .build();
-    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
+    final Pod pod = KubernetesDockerRunnerTestUtil
+        .createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
     pod.setStatus(podStatus("Running"));
     when(podList.getItems()).thenReturn(ImmutableList.of(pod));
     sut.cleanup();
@@ -425,7 +426,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test
-  public void shouldUseExistingServiceAccountSecret() throws IsClosedException, IOException {
+  public void shouldUseExistingServiceAccountSecret() throws IOException {
 
     final String jsonKeyId = "json-key";
     final String p12KeyId = "p12-key";
@@ -451,7 +452,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test
-  public void shouldFailIfServiceAccountDoesNotExist() throws IsClosedException, IOException {
+  public void shouldFailIfServiceAccountDoesNotExist() throws IOException {
     when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(false);
 
     exception.expect(InvalidExecutionException.class);
@@ -509,7 +510,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test
-  public void shouldSmearRotationWeekly() throws Exception {
+  public void shouldSmearRotationWeekly() {
     final long hours = Duration.ofDays(7).toHours();
     final int[] rotationsPerHour = new int[(int) hours];
     final int n = 10000;

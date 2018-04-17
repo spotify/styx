@@ -54,10 +54,15 @@ import io.fabric8.kubernetes.api.model.ContainerBuilder;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.EnvVarBuilder;
+import io.fabric8.kubernetes.api.model.Job;
+import io.fabric8.kubernetes.api.model.JobBuilder;
+import io.fabric8.kubernetes.api.model.JobSpec;
+import io.fabric8.kubernetes.api.model.JobSpecBuilder;
 import io.fabric8.kubernetes.api.model.Pod;
-import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.PodList;
+import io.fabric8.kubernetes.api.model.PodSpec;
 import io.fabric8.kubernetes.api.model.PodSpecBuilder;
+import io.fabric8.kubernetes.api.model.PodTemplateSpecBuilder;
 import io.fabric8.kubernetes.api.model.Quantity;
 import io.fabric8.kubernetes.api.model.ResourceRequirementsBuilder;
 import io.fabric8.kubernetes.api.model.Secret;
@@ -87,7 +92,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
@@ -163,9 +167,11 @@ class KubernetesDockerRunner implements DockerRunner {
     final KubernetesSecretSpec secretSpec = ensureSecrets(workflowInstance, runSpec);
     stats.recordSubmission(runSpec.executionId());
     try {
-      client.pods().create(createPod(workflowInstance, runSpec, secretSpec));
+      // TODO: stop using extensions when fabric8 starts supporting job in a standard way
+      // check https://github.com/fabric8io/kubernetes-model/issues/297
+      client.extensions().jobs().create(createJob(workflowInstance, runSpec, secretSpec));
     } catch (KubernetesClientException kce) {
-      throw new IOException("Failed to create Kubernetes pod", kce);
+      throw new IOException("Failed to create Kubernetes job", kce);
     }
   }
 
@@ -220,18 +226,37 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   @VisibleForTesting
-  static Pod createPod(WorkflowInstance workflowInstance, RunSpec runSpec, KubernetesSecretSpec secretSpec) {
-    final String imageWithTag = runSpec.imageName().contains(":")
-        ? runSpec.imageName()
-        : runSpec.imageName() + ":latest";
+  static Job createJob(WorkflowInstance workflowInstance, RunSpec runSpec, KubernetesSecretSpec secretSpec) {
+    final JobSpec jobSpec = new JobSpecBuilder()
+        .withTemplate(new PodTemplateSpecBuilder()
+            .withNewMetadata()
+            .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
+            .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION,
+                String.valueOf(runSpec.terminationLogging()))
+            .endMetadata()
+            .withSpec(createPodSpec(workflowInstance, runSpec, secretSpec))
+            .build())
+        .build();
+    // TODO: use builder instead
+    // check https://github.com/fabric8io/kubernetes-model/issues/297
+    jobSpec.setAdditionalProperty("backoffLimit", 0);
 
-    final PodBuilder podBuilder = new PodBuilder()
+    final Job job = new JobBuilder()
         .withNewMetadata()
         .withName(runSpec.executionId())
-        .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
-        .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION,
-                          String.valueOf(runSpec.terminationLogging()))
-        .endMetadata();
+        .endMetadata()
+        .build();
+    job.setSpec(jobSpec); // cannot use builder because it does't copy additional property
+
+    return job;
+  }
+
+  @VisibleForTesting
+  static PodSpec createPodSpec(WorkflowInstance workflowInstance, RunSpec runSpec,
+                                       KubernetesSecretSpec secretSpec) {
+    final String imageWithTag = runSpec.imageName().contains(":")
+                                ? runSpec.imageName()
+                                : runSpec.imageName() + ":latest";
 
     final PodSpecBuilder specBuilder = new PodSpecBuilder()
         .withRestartPolicy("Never");
@@ -264,7 +289,7 @@ class KubernetesDockerRunner implements DockerRunner {
           .build();
       containerBuilder.addToVolumeMounts(saMount);
       containerBuilder.addToEnv(envVar(STYX_WORKFLOW_SA_ENV_VARIABLE,
-                                       saMount.getMountPath() + STYX_WORKFLOW_SA_JSON_KEY));
+          saMount.getMountPath() + STYX_WORKFLOW_SA_JSON_KEY));
     });
 
     secretSpec.customSecret().ifPresent(secret -> {
@@ -286,9 +311,8 @@ class KubernetesDockerRunner implements DockerRunner {
     });
 
     specBuilder.addToContainers(containerBuilder.build());
-    podBuilder.withSpec(specBuilder.build());
 
-    return podBuilder.build();
+    return specBuilder.build();
   }
 
   @VisibleForTesting
@@ -322,53 +346,45 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   @VisibleForTesting
-  void cleanupWithRunState(WorkflowInstance workflowInstance, String executionId) {
-    cleanup(workflowInstance, executionId, pod ->
+  void cleanupWithRunState(WorkflowInstance workflowInstance, String executionId, Pod pod) {
+    cleanup(workflowInstance, executionId, pod, () ->
         getStyxContainer(pod).ifPresent(containerStatus -> {
+          final String podName = pod.getMetadata().getName();
           if (hasPullImageError(containerStatus)) {
-            deletePod(workflowInstance, executionId);
+            deleteJob(workflowInstance, executionId, podName);
           } else {
             if (containerStatus.getState().getTerminated() != null) {
-              deletePodIfNonDeletePeriodExpired(workflowInstance, executionId, containerStatus);
+              deleteJobIfNonDeletePeriodExpired(workflowInstance, executionId,
+                  podName, containerStatus);
             }
           }
         }));
   }
 
   @VisibleForTesting
-  void cleanupWithoutRunState(WorkflowInstance workflowInstance, String executionId) {
-    cleanup(workflowInstance, executionId, pod ->
+  void cleanupWithoutRunState(WorkflowInstance workflowInstance, String executionId, Pod pod) {
+    cleanup(workflowInstance, executionId, pod, () ->
         getStyxContainer(pod).ifPresent(containerStatus -> {
+          final String podName = pod.getMetadata().getName();
           if (containerStatus.getState().getTerminated() != null) {
-            deletePodIfNonDeletePeriodExpired(workflowInstance, executionId, containerStatus);
+            deleteJobIfNonDeletePeriodExpired(workflowInstance, executionId,
+                podName, containerStatus);
           } else {
             // if not terminated, delete it directly
-            deletePod(workflowInstance, executionId);
+            deleteJob(workflowInstance, executionId, podName);
           }
         }));
   }
 
-  private void deletePodIfNonDeletePeriodExpired(WorkflowInstance workflowInstance,
-                                                 String executionId,
-                                                 ContainerStatus containerStatus) {
-    if (isNonDeletePeriodExpired(containerStatus)) {
-      // if terminated and after graceful period, delete the pod
-      // otherwise wait until next polling happens
-      deletePod(workflowInstance, executionId);
-    }
-  }
-
   private void cleanup(WorkflowInstance workflowInstance, String executionId,
-                       Consumer<Pod> cleaner) {
-    Optional.ofNullable(client.pods().withName(executionId).get()).ifPresent(pod -> {
-      final List<ContainerStatus> containerStatuses = pod.getStatus().getContainerStatuses();
-      if (!containerStatuses.isEmpty()) {
-        cleaner.accept(pod);
-      } else {
-        // for some cases such as evicted pod, there is no container status, so we delete directly
-        deletePod(workflowInstance, executionId);
-      }
-    });
+                       Pod pod, Runnable cleaner) {
+    final List<ContainerStatus> containerStatuses = pod.getStatus().getContainerStatuses();
+    if (!containerStatuses.isEmpty()) {
+      cleaner.run();
+    } else {
+      // for some cases such as evicted pod, there is no container status, so we delete directly
+      deleteJob(workflowInstance, executionId, pod.getMetadata().getName());
+    }
   }
 
   static Optional<ContainerStatus> getStyxContainer(Pod pod) {
@@ -384,17 +400,31 @@ class KubernetesDockerRunner implements DockerRunner {
         .orElse(true);
   }
 
-  private void deletePod(WorkflowInstance workflowInstance, String executionId) {
+  private void deleteJobIfNonDeletePeriodExpired(WorkflowInstance workflowInstance,
+                                                 final String executionId, String podName,
+                                                 ContainerStatus containerStatus) {
+    if (isNonDeletePeriodExpired(containerStatus)) {
+      // if terminated and after graceful period, delete the pod
+      // otherwise wait until next polling happens
+      deleteJob(workflowInstance, executionId, podName);
+    }
+  }
+
+  private void deleteJob(WorkflowInstance workflowInstance, final String jobName, String podName) {
     if (!debug.get()) {
-      client.pods().withName(executionId).delete();
-      LOG.info("Cleaned up {} pod: {}", workflowInstance.toKey(), executionId);
+      // delete job first to make sure if exception happens we won't zombify the job
+      client.extensions().jobs().withName(jobName).delete();
+      LOG.info("Cleaned up {} job: {}", workflowInstance.toKey(), jobName);
+      client.pods().withName(podName).delete();
+      LOG.info("Cleaned up {} pod: {}", workflowInstance.toKey(), podName);
     } else {
-      LOG.info("Keeping {} pod: {}", workflowInstance.toKey(), executionId);
+      LOG.info("Keeping {} job: {}", workflowInstance.toKey(), jobName);
+      LOG.info("Keeping {} pod: {}", workflowInstance.toKey(), podName);
     }
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     if (watch != null) {
       watch.close();
     }
@@ -441,16 +471,15 @@ class KubernetesDockerRunner implements DockerRunner {
         .watch(new PodWatcher());
   }
 
-  private Set<WorkflowInstance> getRunningWorkflowInstances() {
+  private Set<RunState> getRunningActiveStates() {
     return stateManager.getActiveStates()
         .values()
         .stream()
         .filter(runState -> runState.state().equals(RUNNING))
-        .map(RunState::workflowInstance)
         .collect(toSet());
   }
 
-  private void examineRunningWFISandAssociatedPods(Set<WorkflowInstance> runningWorkflowInstances,
+  private void examineRunningWFISandAssociatedPods(Set<RunState> runningActiveStates,
                                                    PodList podList) {
     final Set<WorkflowInstance> workflowInstancesForPods = podList.getItems().stream()
         .filter(pod -> pod.getMetadata().getAnnotations()
@@ -459,9 +488,16 @@ class KubernetesDockerRunner implements DockerRunner {
             .parseKey(pod.getMetadata().getAnnotations().get(STYX_WORKFLOW_INSTANCE_ANNOTATION)))
         .collect(toSet());
 
-    runningWorkflowInstances.removeAll(workflowInstancesForPods);
-    runningWorkflowInstances.forEach(workflowInstance -> stateManager.receiveIgnoreClosed(
-        Event.runError(workflowInstance, "No pod associated with this instance")));
+    runningActiveStates.stream()
+        .filter(runState -> !workflowInstancesForPods.contains(runState.workflowInstance()))
+        .forEach(runState -> {
+          // delete the job if its pod is gone somehow
+          // in case exception happens, retry during next polling
+          runState.data().executionId()
+              .ifPresent(executionId -> client.extensions().jobs().withName(executionId).delete());
+          stateManager.receiveIgnoreClosed(
+              Event.runError(runState.workflowInstance(), "No pod associated with this instance"));
+        });
   }
 
   @VisibleForTesting
@@ -474,9 +510,9 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private synchronized void tryPollPods() {
-    final Set<WorkflowInstance> runningWorkflowInstances = getRunningWorkflowInstances();
+    final Set<RunState> runningActiveStates = getRunningActiveStates();
     final PodList list = client.pods().list();
-    examineRunningWFISandAssociatedPods(runningWorkflowInstances, list);
+    examineRunningWFISandAssociatedPods(runningActiveStates, list);
 
     for (Pod pod : list.getItems()) {
       logEvent(Watcher.Action.MODIFIED, pod, list.getMetadata().getResourceVersion(), true);
@@ -484,14 +520,22 @@ class KubernetesDockerRunner implements DockerRunner {
       if (!workflowInstance.isPresent()) {
         continue;
       }
-      final Optional<RunState> runState = lookupPodRunState(pod, workflowInstance.get());
+
+      final String executionId = getExecutionId(pod);
+      final Optional<RunState> runState = lookupPodRunState(executionId, workflowInstance.get());
       if (runState.isPresent()) {
         emitPodEvents(Watcher.Action.MODIFIED, pod, runState.get());
-        cleanupWithRunState(workflowInstance.get(), pod.getMetadata().getName());
+        cleanupWithRunState(workflowInstance.get(), executionId, pod);
       } else {
-        cleanupWithoutRunState(workflowInstance.get(), pod.getMetadata().getName());
+        cleanupWithoutRunState(workflowInstance.get(), executionId, pod);
       }
     }
+  }
+  
+  private static String getExecutionId(Pod pod) {
+    return Optional.ofNullable(pod.getMetadata().getLabels())
+        .flatMap((x -> Optional.ofNullable(x.get("job-name"))))
+        .orElse(pod.getMetadata().getName());
   }
 
   private static Optional<WorkflowInstance> readPodWorkflowInstance(Pod pod) {
@@ -508,9 +552,8 @@ class KubernetesDockerRunner implements DockerRunner {
     return Optional.of(workflowInstance);
   }
 
-  private Optional<RunState> lookupPodRunState(Pod pod, WorkflowInstance workflowInstance) {
-    final String podName = pod.getMetadata().getName();
-
+  private Optional<RunState> lookupPodRunState(String executionIdFromPod,
+                                               WorkflowInstance workflowInstance) {
     final Optional<RunState> runState = stateManager.getActiveState(workflowInstance);
     if (!runState.isPresent()) {
       LOG.debug("Pod event for unknown or inactive workflow instance {}", workflowInstance);
@@ -519,14 +562,14 @@ class KubernetesDockerRunner implements DockerRunner {
 
     final Optional<String> executionIdOpt = runState.get().data().executionId();
     if (!executionIdOpt.isPresent()) {
-      LOG.debug("Pod event for state with no current executionId: {}", podName);
+      LOG.debug("Pod event for state with no current executionId: {}", executionIdFromPod);
       return Optional.empty();
     }
 
     final String executionId = executionIdOpt.get();
-    if (!podName.equals(executionId)) {
+    if (!executionIdFromPod.equals(executionId)) {
       LOG.debug("Pod event not matching current exec id, current:{} != pod:{}",
-          executionId, podName);
+          executionId, executionIdFromPod);
       return Optional.empty();
     }
 
@@ -548,7 +591,7 @@ class KubernetesDockerRunner implements DockerRunner {
       try {
         stateManager.receive(event, runState.counter() + i);
       } catch (IsClosedException isClosedException) {
-        LOG.warn("Could not receive kubernetes event", isClosedException);
+        LOG.warn("Could not receive Kubernetes event", isClosedException);
         throw new RuntimeException(isClosedException);
       }
     }
@@ -587,7 +630,7 @@ class KubernetesDockerRunner implements DockerRunner {
       logEvent(action, pod, pod.getMetadata().getResourceVersion(), false);
 
       readPodWorkflowInstance(pod)
-          .flatMap(workflowInstance -> lookupPodRunState(pod, workflowInstance))
+          .flatMap(workflowInstance -> lookupPodRunState(getExecutionId(pod), workflowInstance))
           .ifPresent(runState -> emitPodEvents(action, pod, runState));
     }
 
