@@ -363,6 +363,7 @@ public class StyxScheduler implements AppInit {
     final TriggerListener trigger =
         new StateInitializingTrigger(stateManager);
     final TriggerManager triggerManager = new TriggerManager(trigger, time, storage, stats);
+    closer.register(triggerManager);
 
     final BackfillTriggerManager backfillTriggerManager =
         new BackfillTriggerManager(stateManager, storage, trigger, stats, time);

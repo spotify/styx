@@ -37,6 +37,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerInstantSpec;
+import java.io.Closeable;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -45,13 +46,14 @@ import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Triggers natural executions for {@link Workflow}s.
  */
-class TriggerManager {
+class TriggerManager implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(TriggerManager.class);
 
@@ -147,5 +149,15 @@ class TriggerManager {
         throw Throwables.propagate(e);
       }
     });
+  }
+
+  @Override
+  public void close() {
+    forkJoinPool.shutdownNow();
+    try {
+      forkJoinPool.awaitTermination(30, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 }

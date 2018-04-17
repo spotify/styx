@@ -71,8 +71,9 @@ public class TriggerManagerTest {
   private final ExecutorService executor = Executors.newCachedThreadPool();
 
   @After
-  public void tearDown() throws Exception {
+  public void tearDown() {
     executor.shutdownNow();
+    triggerManager.close();
   }
 
   @Before
