@@ -316,7 +316,7 @@ public class StyxScheduler implements AppInit {
 
     final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
     closer.register(executorCloser("scheduler", executor));
-    final StripedExecutorService eventTransitionExecutor = new StripedExecutorService(16);
+    final StripedExecutorService eventTransitionExecutor = new StripedExecutorService(32);
     closer.register(executorCloser("event-transition", eventTransitionExecutor));
     final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
     closer.register(executorCloser("event-consumer", eventConsumerExecutor));
