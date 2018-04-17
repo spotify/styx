@@ -172,7 +172,8 @@ public class DatastoreStorage implements Closeable {
   public static final int ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS = 128;
 
   public static final int MAX_RETRIES = 100;
-  public static final int MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH = 1000;
+  public static final int MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ = 1000;
+  public static final int MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_WRITE = 500;
 
   private static final int REQUEST_CONCURRENCY = 32;
 
@@ -217,7 +218,8 @@ public class DatastoreStorage implements Closeable {
         .map(indexEntryKey -> Entity.newBuilder(indexEntryKey).build())
         .collect(toList());
 
-    for (List<Entity> batch : Lists.partition(indexEntries, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH)) {
+    for (List<Entity> batch : Lists.partition(indexEntries,
+        MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_WRITE)) {
       datastore.put(batch.toArray(new Entity[0]));
     }
   }
@@ -237,7 +239,8 @@ public class DatastoreStorage implements Closeable {
         .collect(toList());
 
     // Fetch index entries in batches
-    for (List<Entity> expectedEntryBatch : Lists.partition(expectedIndexEntries, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH)) {
+    for (List<Entity> expectedEntryBatch : Lists.partition(expectedIndexEntries,
+        MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ)) {
 
       final List<Entity> actualEntryBatch = datastore.fetch(expectedEntryBatch.stream()
           .map(Entity::getKey).toArray(Key[]::new));
@@ -414,7 +417,8 @@ public class DatastoreStorage implements Closeable {
   }
 
   public Map<WorkflowId, Workflow> workflows(Set<WorkflowId> workflowIds) {
-    final Iterable<List<WorkflowId>> batches = Iterables.partition(workflowIds, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH);
+    final Iterable<List<WorkflowId>> batches = Iterables.partition(workflowIds,
+        MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ);
     return StreamSupport.stream(batches.spliterator(), false)
         .map(batch -> forkJoinPool.submit(() -> this.getBatchOfWorkflows(batch)))
         // `collect and stream` is crucial to make tasks running in parallel, otherwise they will
@@ -486,7 +490,7 @@ public class DatastoreStorage implements Closeable {
         .collect(toList());
 
     // Strongly consistently read values for the above keys
-    return Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH).stream()
+    return Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ).stream()
         .map(batch -> forkJoinPool.submit(() -> this.readRunStateBatch(batch)))
         .collect(toList()).stream() // collect here to execute batch reads in parallel
         .flatMap(task -> task.join().stream())
@@ -497,7 +501,7 @@ public class DatastoreStorage implements Closeable {
    * Strongly consistently read a batch of {@link RunState}s.
    */
   private List<RunState> readRunStateBatch(List<Key> keys) throws IOException {
-    assert keys.size() <= MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH;
+    assert keys.size() <= MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ;
     final List<RunState> runStates = new ArrayList<>();
     final Iterator<Entity> entities = datastore.get(keys);
     while (entities.hasNext()) {
