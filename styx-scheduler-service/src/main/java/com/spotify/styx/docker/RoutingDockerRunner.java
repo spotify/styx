@@ -22,6 +22,7 @@ package com.spotify.styx.docker;
 
 import com.google.common.collect.Maps;
 import com.google.common.io.Closer;
+import com.spotify.styx.cleaner.CleanupException;
 import com.spotify.styx.model.WorkflowInstance;
 import java.io.IOException;
 import java.util.Objects;
@@ -57,7 +58,7 @@ class RoutingDockerRunner implements DockerRunner {
   }
 
   @Override
-  public void cleanup() throws IOException {
+  public void cleanup() throws CleanupException {
     runner().cleanup();
   }
 

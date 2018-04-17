@@ -29,6 +29,7 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyListOf;
 import static org.mockito.Matchers.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
@@ -38,6 +39,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.spotify.styx.cleaner.CleanupException;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.Event;
@@ -510,6 +512,13 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldCleanupServiceAccountSecrets() throws Exception {
+    kdr.cleanup();
+    verify(serviceAccountSecretManager).cleanup();
+  }
+
+  @Test(expected = CleanupException.class)
+  public void shouldFailToCleanupServiceAccountSecrets() throws Exception {
+    doThrow(new IOException()).when(serviceAccountSecretManager).cleanup();
     kdr.cleanup();
     verify(serviceAccountSecretManager).cleanup();
   }

@@ -111,7 +111,7 @@ class LocalDockerRunner implements DockerRunner {
   }
 
   @Override
-  public void cleanup() throws IOException {
+  public void cleanup() {
     // nop
   }
 

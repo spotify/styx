@@ -18,42 +18,40 @@
  * -/-/-
  */
 
-package com.spotify.styx;
+package com.spotify.styx.cleaner;
 
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
-import com.spotify.styx.docker.DockerRunner;
-import java.io.IOException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class CleanerTest {
 
-  @Mock
-  private DockerRunner dockerRunner;
+  private CleanerOperation cleanerOperation;
 
   private Cleaner cleaner;
 
   @Before
   public void setUp() {
-    cleaner = new Cleaner(dockerRunner);
+    cleanerOperation = spy(CleanerOperation.NOOP);
+    cleaner = new Cleaner(cleanerOperation);
   }
 
   @Test
-  public void shouldCleanup() throws IOException {
+  public void shouldCleanup() throws CleanupException {
     cleaner.tick();
-    verify(dockerRunner).cleanup();
+    verify(cleanerOperation).cleanup();
   }
 
   @Test
-  public void shouldSwallowException() throws IOException {
-    doThrow(new IOException()).when(dockerRunner).cleanup();
+  public void shouldSwallowException() throws CleanupException {
+    doThrow(new CleanupException("Failed to cleanup")).when(cleanerOperation).cleanup();
     cleaner.tick();
-    verify(dockerRunner).cleanup();
+    verify(cleanerOperation).cleanup();
   }
 }
