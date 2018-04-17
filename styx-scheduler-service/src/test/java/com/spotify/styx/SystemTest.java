@@ -135,6 +135,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
         .build();
   }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class ShouldRunCustomWorkflowScheduleTest extends SystemTest {
   @Test
   public void shouldRunCustomWorkflowSchedule() throws Exception {
     Workflow customWorkflow = Workflow.create(
@@ -174,7 +176,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(workflowInstance.parameter(), is("2016-03-14T15:15:00Z"));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class ShouldConsumeEventTest extends SystemTest {
   @Test
   public void shouldConsumeEvent() throws Exception {
     Workflow customWorkflow = Workflow.create(
@@ -204,7 +209,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     awaitUntilConsumedEvent(expectedEvent, RunState.State.QUEUED);
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class ShouldConsumeDeletedWorkflowTest extends SystemTest {
   @Test
   public void shouldConsumeDeletedWorkflow() throws Exception {
     givenWorkflow(HOURLY_WORKFLOW);
@@ -213,7 +221,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     workflowDeleted(HOURLY_WORKFLOW);
     awaitUntilConsumedWorkflow(Optional.of(HOURLY_WORKFLOW), Optional.empty());
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class ShouldConsumeChangedWorkflowTest extends SystemTest {
   @Test
   public void shouldConsumeChangedWorkflow() throws Exception {
     givenWorkflow(HOURLY_WORKFLOW);
@@ -222,7 +233,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     workflowChanges(DAILY_WORKFLOW);
     awaitUntilConsumedWorkflow(Optional.of(HOURLY_WORKFLOW), Optional.of(DAILY_WORKFLOW));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class ShouldConsumeSameWorkflowTest extends SystemTest {
   @Test
   public void shouldConsumeSameWorkflow() throws Exception {
     givenWorkflow(HOURLY_WORKFLOW);
@@ -231,7 +245,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     workflowChanges(HOURLY_WORKFLOW);
     awaitUntilConsumedWorkflow(Optional.of(HOURLY_WORKFLOW), Optional.of(HOURLY_WORKFLOW));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class ShouldConsumeNewWorkflowTest extends SystemTest {
   @Test
   public void shouldConsumeNewWorkflow() throws Exception {
     styxStarts();
@@ -239,7 +256,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     workflowChanges(HOURLY_WORKFLOW);
     awaitUntilConsumedWorkflow(Optional.empty(), Optional.of(HOURLY_WORKFLOW));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class ShouldCatchUpWithNaturalTriggersTest extends SystemTest {
   @Test
   public void shouldCatchUpWithNaturalTriggers() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
@@ -281,7 +301,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(workflowInstance.parameter(), is("2016-03-14T14"));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class TestTriggerBackfillsWithinResourceLimitTest extends SystemTest {
   @Test
   public void testTriggerBackfillsWithinResourceLimit() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
@@ -301,7 +324,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
     awaitNumberOfDockerRuns(2);
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class TestTriggerBackfillsWillCompleteTest extends SystemTest {
   @Test
   public void testTriggerBackfillsWillComplete() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
@@ -328,7 +354,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
     assertThat(getState(workflowInstance), is(Optional.empty()));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class RemovedEnabledWorkflowWontGetScheduledTest extends SystemTest {
   @Test
   public void removedEnabledWorkflowWontGetScheduled() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
@@ -352,7 +381,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     assertThat(getState(instance2), is(Optional.empty()));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class UpdatesNextNaturalTriggerWhenWFScheduleChangesFromFinerToCoarserTest extends SystemTest {
   @Test
   @Ignore("this is flaky due to Datastore emulator")
   public void updatesNextNaturalTriggerWhenWFScheduleChangesFromFinerToCoarser() throws Exception {
@@ -384,7 +416,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     workflowInstance = dockerRuns.get(1)._1;
     assertThat(workflowInstance.parameter(), is("2016-03-14"));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class UpdatesNextNaturalTriggerWhenWFOffsetChangesTest extends SystemTest {
   @Test
   public void updatesNextNaturalTriggerWhenWFOffsetChanges() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
@@ -446,7 +481,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(triggerInstantSpec.offsetInstant(),
                is(Instant.parse("2016-03-14T16:00:00Z")));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class UpdatesNextNaturalTriggerWhenWFScheduleChangesFromCoarserToFinerTest extends SystemTest {
   @Test
   @Ignore("this is flaky due to Datastore emulator")
   public void updatesNextNaturalTriggerWhenWFScheduleChangesFromCoarserToFiner() throws Exception {
@@ -478,7 +516,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     workflowInstance = dockerRuns.get(1)._1;
     assertThat(workflowInstance.parameter(), is("2016-03-14T15"));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class RunsDockerImageWithArgsTemplateTest extends SystemTest {
   @Test
   public void runsDockerImageWithArgsTemplate() throws Exception {
     givenTheTimeIs("2016-03-14T15:59:01Z");
@@ -495,7 +536,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(naturalRunSpec(runSpec.executionId(), "busybox", ImmutableList.of("--hour", "2016-03-14T15"))));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class RetriesUseLatestWorkflowSpecificationTest extends SystemTest {
   @Test
   public void retriesUseLatestWorkflowSpecification() throws Exception {
     givenTheTimeIs("2016-03-14T15:59:01Z");
@@ -541,7 +585,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec2, is(naturalRunSpec(runSpec2.executionId(), "busybox:v777", ImmutableList.of("other", "args"))));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class CleansUpDockerRunsWhenTerminatingTest extends SystemTest {
   @Test
   public void cleansUpDockerRunsWhenTerminating() throws Exception {
     givenTheTimeIs("2016-03-14T15:59:01Z");
@@ -562,7 +609,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     assertThat(dockerCleans, contains(runSpec.executionId()));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class CleansUpDockerRunsWhenFailingTest extends SystemTest {
   @Test
   public void cleansUpDockerRunsWhenFailing() throws Exception {
     givenTheTimeIs("2016-03-14T15:59:01Z");
@@ -582,7 +632,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     assertThat(dockerCleans, contains(runSpec.executionId()));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class RestoredStatesUseOriginalTimestampsTest extends SystemTest {
   @Test
   public void restoredStatesUseOriginalTimestamps() throws Exception {
     WorkflowInstance workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T10");
@@ -604,7 +657,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     assertThat(stateTime, is(Instant.parse("2016-03-14T15:17:49Z")));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class RestoresActiveStatesTest extends SystemTest {
   @Test
   public void restoresActiveStates() throws Exception {
     WorkflowInstance workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
@@ -629,7 +685,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(runSpec, is(
         unknownRunSpec(runSpec.executionId(), "busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig1")));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class RestoresContainerStateWhenStartingTest extends SystemTest {
   @Test
   public void restoresContainerStateWhenStarting() throws Exception {
     WorkflowInstance workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
@@ -655,7 +714,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
     assertThat(getState(workflowInstance), is(Optional.empty()));
   }
+  }
 
+  @RunWith(JUnitParamsRunner.class)
+  public static class CreatesCounterShardsForExistingResourcesTest extends SystemTest {
   @Test
   public void createsCounterShardsForExistingResources() throws Exception {
     givenResource(RESOURCE_1);
@@ -670,5 +732,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertEquals(128, storage.shardsForCounter(RESOURCE_1.id()).size());
     assertEquals(128, storage.shardsForCounter(RESOURCE_2.id()).size());
     assertEquals(128, storage.shardsForCounter(RESOURCE_3.id()).size());
+  }
   }
 }

@@ -56,6 +56,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.logging.Level;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -82,6 +83,10 @@ public class ShardedCounterTest {
 
   @BeforeClass
   public static void setUpClass() throws IOException, InterruptedException {
+    final java.util.logging.Logger datastoreEmulatorLogger =
+        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
+    datastoreEmulatorLogger.setLevel(Level.OFF);
+
     helper = LocalDatastoreHelper.create(1.0);
     helper.start();
     datastore = helper.getOptions().getService();
@@ -108,8 +113,8 @@ public class ShardedCounterTest {
   }
 
   @After
-  public void tearDown() {
-    clearDatastore(datastore);
+  public void tearDown() throws IOException {
+    helper.reset();
   }
 
   @Test
@@ -432,11 +437,6 @@ public class ShardedCounterTest {
   private Key getKey(String counterId, int shardIndex) {
     return datastore.newKeyFactory().setKind(KIND_COUNTER_SHARD)
         .newKey(counterId + "-" + shardIndex);
-  }
-
-  public static void clearDatastore(Datastore datastore) {
-    deleteAllOfKind(datastore, KIND_COUNTER_SHARD);
-    deleteAllOfKind(datastore, KIND_COUNTER_LIMIT);
   }
 
   private static void deleteAllOfKind(Datastore datastore, String kind) {

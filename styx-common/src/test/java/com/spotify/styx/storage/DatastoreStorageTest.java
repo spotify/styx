@@ -58,7 +58,6 @@ import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
-import com.google.cloud.datastore.KeyQuery;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
@@ -92,6 +91,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.logging.Level;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -174,6 +174,10 @@ public class DatastoreStorageTest {
 
   @BeforeClass
   public static void setUpClass() throws Exception {
+    final java.util.logging.Logger datastoreEmulatorLogger =
+        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
+    datastoreEmulatorLogger.setLevel(Level.OFF);
+
     // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
     helper = LocalDatastoreHelper.create(1.0); // 100% global consistency
     helper.start();
@@ -198,12 +202,7 @@ public class DatastoreStorageTest {
 
   @After
   public void tearDown() throws Exception {
-    // clear datastore after each test
-    KeyQuery query = Query.newKeyQueryBuilder().build();
-    final QueryResults<Key> keys = datastore.run(query);
-    while (keys.hasNext()) {
-      datastore.delete(keys.next());
-    }
+    helper.reset();
   }
 
   @Test

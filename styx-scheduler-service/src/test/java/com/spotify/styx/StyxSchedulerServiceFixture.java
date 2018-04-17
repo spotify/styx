@@ -27,10 +27,6 @@ import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 
 import com.google.cloud.datastore.Datastore;
-import com.google.cloud.datastore.Key;
-import com.google.cloud.datastore.KeyQuery;
-import com.google.cloud.datastore.Query;
-import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
@@ -59,15 +55,16 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
 import javaslang.Tuple;
 import javaslang.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
 import org.jmock.lib.concurrent.DeterministicScheduler;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
@@ -81,11 +78,11 @@ public class StyxSchedulerServiceFixture {
   private static final Logger LOG = LoggerFactory.getLogger(StyxSchedulerServiceFixture.class);
 
   private Instant now = Instant.parse("1970-01-01T00:00:00Z");
-  private static LocalDatastoreHelper localDatastore;
+  private LocalDatastoreHelper localDatastore;
 
-  private Datastore datastore = localDatastore.getOptions().getService();
+  private Datastore datastore;
   private Connection bigtable = setupBigTableMockTable(0);
-  protected AggregateStorage storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
+  protected AggregateStorage storage;
   private DeterministicScheduler executor = new QuietDeterministicScheduler();
 
   // circumstantial fields, set by test cases
@@ -104,24 +101,31 @@ public class StyxSchedulerServiceFixture {
 
   @BeforeClass
   public static void setUpClass() throws Exception {
-    // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
-    localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
-    localDatastore.start();
-  }
-
-  @AfterClass
-  public static void tearDownClass() throws Exception {
-    if (localDatastore != null) {
-      try {
-        localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
-      } catch (Throwable e) {
-        e.printStackTrace();
-      }
-    }
+    // Schedule a full GC to run every second to mitigate off-heap/direct memory usage.
+    // Without this, the system tests cause the test process memory usage (according to the system) to
+    // balloon to several GB even though the JVM itself is configured to and reports that it is only using a few
+    // hundred MB.
+    // (T-T)
+    Executors.newSingleThreadScheduledExecutor().scheduleWithFixedDelay(System::gc, 1, 1, SECONDS);
   }
 
   @Before
   public void setUp() throws Exception {
+
+    final java.util.logging.Logger datastoreEmulatorLogger =
+        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
+    datastoreEmulatorLogger.setLevel(Level.OFF);
+
+    // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
+    localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
+    try {
+      localDatastore.start();
+    } catch (IOException | InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+    datastore = localDatastore.getOptions().getService();
+    storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
+
     StorageFactory storageFactory = (env) -> storage;
     Time time = () -> now;
     StyxScheduler.StatsFactory statsFactory = (env) -> Stats.NOOP;
@@ -147,19 +151,20 @@ public class StyxSchedulerServiceFixture {
         .setWorkflowConsumerFactory(workflowConsumerFactory)
         .build();
 
-    serviceHelper = ServiceHelper.create(styxScheduler, StyxScheduler.SERVICE_NAME);
+    serviceHelper = ServiceHelper.create(styxScheduler, StyxScheduler.SERVICE_NAME)
+        .startTimeoutSeconds(30);
   }
 
   @After
   public void tearDown() throws Exception {
     serviceHelper.close();
 
-    // clear datastore after each test
-    Datastore datastore = localDatastore.getOptions().getService();
-    KeyQuery query = Query.newKeyQueryBuilder().build();
-    final QueryResults<Key> keys = datastore.run(query);
-    while (keys.hasNext()) {
-      datastore.delete(keys.next());
+    if (localDatastore != null) {
+      try {
+        localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
+      } catch (Throwable e) {
+        e.printStackTrace();
+      }
     }
   }
 

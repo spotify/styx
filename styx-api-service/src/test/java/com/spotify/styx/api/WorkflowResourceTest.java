@@ -41,10 +41,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.datastore.Datastore;
-import com.google.cloud.datastore.Key;
-import com.google.cloud.datastore.KeyQuery;
-import com.google.cloud.datastore.Query;
-import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -68,6 +64,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.logging.Level;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -139,6 +136,10 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @BeforeClass
   public static void setUpClass() throws Exception {
+    final java.util.logging.Logger datastoreEmulatorLogger =
+        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
+    datastoreEmulatorLogger.setLevel(Level.OFF);
+
     localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
     localDatastore.start();
   }
@@ -161,13 +162,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @After
   public void tearDown() throws Exception {
-    // clear datastore after each test
-    Datastore datastore = localDatastore.getOptions().getService();
-    KeyQuery query = Query.newKeyQueryBuilder().build();
-    final QueryResults<Key> keys = datastore.run(query);
-    while (keys.hasNext()) {
-      datastore.delete(keys.next());
-    }
+    localDatastore.reset();
     serviceHelper.stubClient().clear();
   }
 

@@ -40,9 +40,6 @@ import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.KeyFactory;
-import com.google.cloud.datastore.KeyQuery;
-import com.google.cloud.datastore.Query;
-import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.styx.model.Backfill;
@@ -59,6 +56,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Optional;
+import java.util.logging.Level;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -76,6 +74,10 @@ public class DatastoreStorageTransactionTest {
 
   @BeforeClass
   public static void setUpClass() throws Exception {
+    final java.util.logging.Logger datastoreEmulatorLogger =
+        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
+    datastoreEmulatorLogger.setLevel(Level.OFF);
+
     // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
     helper = LocalDatastoreHelper.create(1.0); // 100% global consistency
     helper.start();
@@ -100,12 +102,7 @@ public class DatastoreStorageTransactionTest {
 
   @After
   public void tearDown() throws Exception {
-    // clear datastore after each test
-    KeyQuery query = Query.newKeyQueryBuilder().build();
-    final QueryResults<Key> keys = datastore.run(query);
-    while (keys.hasNext()) {
-      datastore.delete(keys.next());
-    }
+    helper.reset();
   }
 
   @Test
