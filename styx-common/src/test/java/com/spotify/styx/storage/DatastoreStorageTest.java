@@ -51,6 +51,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.api.client.http.protobuf.ProtoHttpContent;
 import com.google.bigtable.repackaged.com.google.common.collect.ImmutableList;
 import com.google.bigtable.repackaged.com.google.common.collect.ImmutableMap;
 import com.google.cloud.datastore.Datastore;
@@ -59,12 +60,15 @@ import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.KeyQuery;
+import com.google.cloud.datastore.PathElement;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.ByteStreams;
+import com.google.datastore.v1.LookupRequest;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.StyxConfig;
@@ -83,6 +87,8 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -96,6 +102,7 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -827,5 +834,106 @@ public class DatastoreStorageTest {
   }
 
   private static class FooException extends Exception {
+  }
+
+  /**
+   * A test to illustrate unbounded memory usage.
+   *
+   * Run with -Xmx256m or some similar sane heap size. Keep an eye on the memory usage as reported by the system,
+   * see it grow unboundedly.
+   *
+   * This behavior was discovered when running SystemTest.retriesUseLatestWorkflowSpecification()
+   */
+  @Test
+  @Ignore("do not run automatically")
+  public void testMemoryUsageUsingGet() {
+    final Key key = datastore.newKeyFactory().setKind("foo").newKey("bar");
+    while (true) {
+      datastore.get(key);
+    }
+  }
+
+  /**
+   * Attempts to produce the above memory usage using the raw HttpURLConnection used by the datastore client by default.
+   *
+   * Does not currently seem to reproduce the issue.
+   */
+  @Test
+  @Ignore("do not run automatically")
+  public void testMemoryUsageUsingHttpUrlConnection() throws IOException, InterruptedException {
+    final String host = helper.getOptions().getHost();
+    final String projectId = helper.getOptions().getProjectId();
+    System.err.println("namespace " + helper.getOptions().getNamespace());
+    final Key key = datastore.newKeyFactory().setKind("foo").newKey("bar");
+    datastore.get(key);
+
+    final String url = "http://" + host + "/v1/projects/" + projectId + ":lookup";
+
+    long bytesRead = 0;
+
+    final ProtoHttpContent protoHttpContent = new ProtoHttpContent(
+        LookupRequest.newBuilder().addKeys(toPb(key)).build());
+
+    for (int i = 1;; i++) {
+      try {
+        URL connUrl = new URL(url);
+        HttpURLConnection connection = (HttpURLConnection) connUrl.openConnection();
+        connection.setRequestMethod("POST");
+        connection.setDoOutput(true);
+        connection.setFixedLengthStreamingMode(protoHttpContent.getLength());
+
+        connection.addRequestProperty("accept-encoding", "gzip");
+        connection.addRequestProperty("user-agent", "gcloud-java/1.0.0 Google-HTTP-Java-Client/1.22.0 (gzip)");
+        connection.addRequestProperty("x-goog-api-format-version", "2");
+        connection.addRequestProperty("x-goog-api-client", "gl-java/1.8.0_121 gccl/1.0.0");
+        connection.addRequestProperty("content-type", "application/x-protobuf");
+        connection.addRequestProperty("content-length", Long.toString(protoHttpContent.getLength()));
+
+        protoHttpContent.writeTo(connection.getOutputStream());
+
+        byte[] response = ByteStreams.toByteArray(connection.getInputStream());
+        bytesRead += response.length;
+      } catch (IOException ignore) {
+      }
+
+      if (i % 1024 == 0) {
+        System.err.println("requests executed = " + i + ", bytes read = " + bytesRead);
+      }
+    }
+  }
+
+  static com.google.datastore.v1.Key toPb(Key key) {
+    com.google.datastore.v1.Key.Builder keyPb = com.google.datastore.v1.Key.newBuilder();
+    com.google.datastore.v1.PartitionId.Builder partitionIdPb =
+        com.google.datastore.v1.PartitionId.newBuilder();
+    partitionIdPb.setProjectId(key.getProjectId());
+    partitionIdPb.setNamespaceId(key.getNamespace());
+    keyPb.setPartitionId(partitionIdPb.build());
+
+    for (PathElement pathEntry : key.getAncestors()) {
+      keyPb.addPath(toPb(pathEntry));
+    }
+    final PathElement leaf;
+    if (key.getId() != null) {
+      leaf = PathElement.of(key.getKind(), key.getId());
+    } else if (key.getName() != null) {
+      leaf = PathElement.of(key.getKind(), key.getName());
+    } else {
+      throw new AssertionError();
+    }
+    keyPb.addPath(toPb(leaf));
+    return keyPb.build();
+  }
+
+  private static com.google.datastore.v1.Key.PathElement toPb(PathElement pathEntry) {
+    com.google.datastore.v1.Key.PathElement.Builder pathElementPb =
+        com.google.datastore.v1.Key.PathElement.newBuilder();
+    pathElementPb.setKind(pathEntry.getKind());
+    if (pathEntry.getId() != null) {
+      pathElementPb.setId(pathEntry.getId());
+    } else if (pathElementPb.getName() != null) {
+      pathElementPb.setName(pathEntry.getName());
+    }
+    return pathElementPb.build();
   }
 }
