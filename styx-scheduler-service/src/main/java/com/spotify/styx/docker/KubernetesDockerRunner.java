@@ -545,8 +545,9 @@ class KubernetesDockerRunner implements DockerRunner {
         runState.data().executionId().ifPresent(stats::recordRunning);
       }
 
+      final String executionId = pod.getMetadata().getName();
       try {
-        stateManager.receive(event, runState.counter() + i);
+        stateManager.receive(event, executionId);
       } catch (IsClosedException isClosedException) {
         LOG.warn("Could not receive kubernetes event", isClosedException);
         throw new RuntimeException(isClosedException);

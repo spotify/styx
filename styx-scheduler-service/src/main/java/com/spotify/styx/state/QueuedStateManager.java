@@ -137,15 +137,25 @@ public class QueuedStateManager implements StateManager {
 
   @Override
   public CompletableFuture<Void> receive(Event event, long expectedCounter) throws IsClosedException {
+    return receive(event, expectedCounter, Optional.empty());
+  }
+
+  private CompletableFuture<Void> receive(Event event, long expectedCounter, Optional<String> executionId)
+      throws IsClosedException {
     ensureRunning();
-    LOG.info("Received event {}", event);
+    LOG.info("Received event {}, executionId={}", event, executionId);
 
     // TODO: optional retry on transaction conflict
 
     queuedEvents.increment();
     return Striping.supplyAsyncStriped(() ->
-        transition(event, expectedCounter), event.workflowInstance(), eventTransitionExecutor)
+        transition(event, expectedCounter, executionId), event.workflowInstance(), eventTransitionExecutor)
         .thenAccept((tuple) -> postTransition(tuple._1, tuple._2));
+  }
+
+  @Override
+  public CompletionStage<Void> receive(Event event, String executionId) throws IsClosedException {
+    return receive(event, Long.MAX_VALUE, Optional.of(executionId));
   }
 
   private void initialize(WorkflowInstance workflowInstance) {
@@ -184,7 +194,8 @@ public class QueuedStateManager implements StateManager {
     }
   }
 
-  private Tuple2<SequenceEvent, RunState> transition(Event event, long expectedCounter) {
+  private Tuple2<SequenceEvent, RunState> transition(Event event, long expectedCounter,
+      Optional<String> executionId) {
     queuedEvents.decrement();
     try {
       return storage.runInTransaction(tx -> {
@@ -198,8 +209,8 @@ public class QueuedStateManager implements StateManager {
           throw new IllegalArgumentException(message);
         }
 
-        // Verify counters for in-order event processing
-        verifyCounter(event, expectedCounter, currentRunState.get());
+        // Verify counters & executionId for in-order event processing
+        verifyNotStaleEvent(event, expectedCounter, currentRunState.get(), executionId);
 
         final RunState nextRunState;
         try {
@@ -292,7 +303,20 @@ public class QueuedStateManager implements StateManager {
                                       runState.data().resourceIds().orElse(ImmutableSet.of())));
   }
 
-  private void verifyCounter(Event event, long expectedCounter, RunState currentRunState) {
+  private void verifyNotStaleEvent(Event event, long expectedCounter, RunState currentRunState,
+      Optional<String> executionId) {
+
+    // If the event and run state executionId do not match, the event is stale (from a previous pod/execution).
+    // The executionId is persisted _before_ spawning pods, so the run state executionId is always at least as new
+    // as the event executionId here.
+    if (!currentRunState.data().executionId().equals(executionId)) {
+      final String message = "Stale event encountered. Expected executionId="
+          + executionId + " but current executionId="
+          + currentRunState.data().executionId() + ". Discarding event " + event;
+      LOG.debug(message);
+      throw new StaleEventException(message);
+    }
+
     if (expectedCounter == Long.MAX_VALUE) {
       return;
     }

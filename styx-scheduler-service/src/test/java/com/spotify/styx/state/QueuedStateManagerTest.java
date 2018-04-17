@@ -375,6 +375,25 @@ public class QueuedStateManagerTest {
 
     verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
   }
+  @Test
+  public void shouldFailReceiveEventWithWrongExecutionId() throws Exception {
+    Event event = Event.started(INSTANCE);
+
+    final StateData stateData = StateData.newBuilder().executionId("foo").build();
+    final RunState runState = RunState.create(INSTANCE, State.SUBMITTED, stateData, NOW, 17);
+
+    when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.of(runState));
+
+    try {
+      stateManager.receive(event, "bar")
+          .toCompletableFuture().get(1, MINUTES);
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(e.getCause(), is(instanceOf(StaleEventException.class)));
+    }
+
+    verify(storage, never()).writeEvent(any());
+  }
 
   @Test
   public void shouldFailReceiveEventWithHigherCounter() throws Exception {
@@ -382,7 +401,6 @@ public class QueuedStateManagerTest {
 
     when(transaction.readActiveState(INSTANCE)).thenReturn(
         Optional.of(RunState.create(INSTANCE, State.SUBMITTED, StateData.zero(), NOW, 17)));
-    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.of(17L));
 
     try {
       stateManager.receive(event, 16)
@@ -401,7 +419,6 @@ public class QueuedStateManagerTest {
     Optional<RunState> runState = Optional.of(
         RunState.create(INSTANCE, State.SUBMITTED, StateData.zero(), NOW.minusMillis(1), 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
-    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.of(17L));
 
     try {
       stateManager.receive(event, 18)
