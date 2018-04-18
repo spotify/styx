@@ -28,7 +28,7 @@ import org.jmock.lib.concurrent.DeterministicScheduler;
 /**
  * Overrides some of the methods that throw {@link UnsupportedOperationException}.
  */
-class QuietDeterministicScheduler extends DeterministicScheduler {
+public class QuietDeterministicScheduler extends DeterministicScheduler {
 
   @Override
   public void shutdown() {
