@@ -81,9 +81,12 @@ public class KubernetesDockerRunnerPodPollerTest {
   PodList podList;
   @Mock PodResource<Pod, DoneablePod> namedPod1;
   @Mock PodResource<Pod, DoneablePod> namedPod2;
-  @Mock PodStatus podStatus;
-  @Mock ContainerStatus containerStatus;
-  @Mock ContainerState containerState;
+  @Mock PodStatus podStatus1;
+  @Mock PodStatus podStatus2;
+  @Mock ContainerStatus containerStatus1;
+  @Mock ContainerStatus containerStatus2;
+  @Mock ContainerState containerState1;
+  @Mock ContainerState containerState2;
   @Mock ContainerStateTerminated containerStateTerminated;
   @Mock
   StateManager stateManager;
@@ -176,21 +179,22 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(namedPod2.get()).thenReturn(createdPod2);
     when(stateManager.getActiveState(any())).thenReturn(Optional.empty());
 
-    setStatusAndState(createdPod1, RUN_SPEC.executionId());
-    setStatusAndState(createdPod2, RUN_SPEC_2.executionId());
+    createdPod1.setStatus(podStatus1);
+    when(podStatus1.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus1));
+    when(containerStatus1.getName()).thenReturn(RUN_SPEC.executionId());
+    when(containerStatus1.getState()).thenReturn(containerState1);
+    when(containerState1.getTerminated()).thenReturn(containerStateTerminated);
+
+    createdPod2.setStatus(podStatus2);
+    when(podStatus2.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus2));
+    when(containerStatus2.getName()).thenReturn(RUN_SPEC_2.executionId());
+    when(containerStatus2.getState()).thenReturn(containerState2);
+    when(containerState2.getTerminated()).thenReturn(containerStateTerminated);
 
     kdr.pollPods();
 
     verify(namedPod1).delete();
     verify(namedPod2).delete();
-  }
-
-  private void setStatusAndState(Pod createdPod, String containerName) {
-    createdPod.setStatus(podStatus);
-    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus));
-    when(containerStatus.getName()).thenReturn(containerName);
-    when(containerStatus.getState()).thenReturn(containerState);
-    when(containerState.getTerminated()).thenReturn(containerStateTerminated);
   }
 
   @Test
