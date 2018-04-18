@@ -342,7 +342,7 @@ class KubernetesDockerRunner implements DockerRunner {
   @VisibleForTesting
   void cleanupWithRunState(WorkflowInstance workflowInstance, String executionId) {
     cleanup(workflowInstance, executionId, pod ->
-        getMainContainer(pod).ifPresent(containerStatus -> {
+        getMainContainerStatus(pod).ifPresent(containerStatus -> {
           if (hasPullImageError(containerStatus)) {
             deletePod(workflowInstance, executionId);
           } else {
@@ -356,7 +356,7 @@ class KubernetesDockerRunner implements DockerRunner {
   @VisibleForTesting
   void cleanupWithoutRunState(WorkflowInstance workflowInstance, String executionId) {
     cleanup(workflowInstance, executionId, pod ->
-        getMainContainer(pod).ifPresent(containerStatus -> {
+        getMainContainerStatus(pod).ifPresent(containerStatus -> {
           if (containerStatus.getState().getTerminated() != null) {
             deletePodIfNonDeletePeriodExpired(workflowInstance, executionId, containerStatus);
           } else {
@@ -389,7 +389,7 @@ class KubernetesDockerRunner implements DockerRunner {
     });
   }
 
-  static Optional<ContainerStatus> getMainContainer(Pod pod) {
+  static Optional<ContainerStatus> getMainContainerStatus(Pod pod) {
     return readPodWorkflowInstance(pod)
         .flatMap(wfi -> pod.getStatus().getContainerStatuses().stream()
             .filter(status -> mainContainerName(pod.getMetadata().getName()).equals(status.getName()))
