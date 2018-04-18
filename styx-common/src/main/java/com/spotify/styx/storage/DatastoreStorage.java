@@ -267,6 +267,9 @@ public class DatastoreStorage implements Closeable {
               return null;
             }
 
+            LOG.debug("adding the missing entry {} of WFI {} to shard {}", expectedEntry, wfiName,
+                activeWorkflowInstanceIndexShardName(wfiName));
+
             // Add the missing entry
             tx.add(expectedEntry);
             return null;
