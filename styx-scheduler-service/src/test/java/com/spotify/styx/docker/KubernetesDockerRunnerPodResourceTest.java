@@ -70,7 +70,8 @@ public class KubernetesDockerRunnerPodResourceTest {
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
     List<Container> containers = pod.getSpec().getContainers();
-    assertThat(containers.size(), is(1));
+    assertThat(containers.size(), is(2));
+    assertThat(containers.get(0).getName(), is("eid"));
 
     Container container = containers.get(0);
     assertThat(container.getImage(), is("busybox:latest"));
@@ -83,7 +84,8 @@ public class KubernetesDockerRunnerPodResourceTest {
         DockerRunner.RunSpec.simple("eid", "busybox:v7"), EMPTY_SECRET_SPEC);
 
     List<Container> containers = pod.getSpec().getContainers();
-    assertThat(containers.size(), is(1));
+    assertThat(containers.size(), is(2));
+    assertThat(containers.get(0).getName(), is("eid"));
 
     Container container = containers.get(0);
     assertThat(container.getImage(), is("busybox:v7"));
@@ -96,7 +98,8 @@ public class KubernetesDockerRunnerPodResourceTest {
         DockerRunner.RunSpec.simple("eid", "busybox", "echo", "foo", "bar"), EMPTY_SECRET_SPEC);
 
     List<Container> containers = pod.getSpec().getContainers();
-    assertThat(containers.size(), is(1));
+    assertThat(containers.size(), is(2));
+    assertThat(containers.get(0).getName(), is("eid"));
 
     Container container = containers.get(0);
     assertThat(container.getArgs(), contains("echo", "foo", "bar"));
@@ -169,7 +172,8 @@ public class KubernetesDockerRunnerPodResourceTest {
     List<Volume> volumes = pod.getSpec().getVolumes();
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(volumes.size(), is(0));
-    assertThat(containers.size(), is(1));
+    assertThat(containers.size(), is(2));
+    assertThat(containers.get(0).getName(), is("eid"));
 
     Container container = containers.get(0);
     List<VolumeMount> volumeMounts = container.getVolumeMounts();
@@ -194,7 +198,8 @@ public class KubernetesDockerRunnerPodResourceTest {
     List<Volume> volumes = pod.getSpec().getVolumes();
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(volumes.size(), is(1));
-    assertThat(containers.size(), is(1));
+    assertThat(containers.size(), is(2));
+    assertThat(containers.get(0).getName(), is("eid"));
 
     Volume volume = volumes.get(0);
     assertThat(volume.getName(), is("my-secret"));
