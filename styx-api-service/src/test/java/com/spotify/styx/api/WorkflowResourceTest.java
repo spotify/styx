@@ -470,7 +470,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shoulCreateWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(workflowInitializer.inspectChangeAndStore(WORKFLOW)).thenReturn(Optional.empty());
+    when(workflowInitializer.store(WORKFLOW)).thenReturn(Optional.empty());
 
     Response<ByteString> response =
         awaitResponse(
@@ -478,7 +478,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
                 .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
 
     verify(workflowValidator).validateWorkflowConfiguration(WORKFLOW_CONFIGURATION);
-    verify(workflowInitializer).inspectChangeAndStore(WORKFLOW);
+    verify(workflowInitializer).store(WORKFLOW);
     verify(workflowConsumer).accept(Optional.empty(), Optional.of(WORKFLOW));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
@@ -489,7 +489,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldUpdateWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(workflowInitializer.inspectChangeAndStore(WORKFLOW)).thenReturn(Optional.of(WORKFLOW));
+    when(workflowInitializer.store(WORKFLOW)).thenReturn(Optional.of(WORKFLOW));
 
     Response<ByteString> response =
         awaitResponse(
@@ -497,7 +497,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
                 .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
 
     verify(workflowValidator).validateWorkflowConfiguration(WORKFLOW_CONFIGURATION);
-    verify(workflowInitializer).inspectChangeAndStore(WORKFLOW);
+    verify(workflowInitializer).store(WORKFLOW);
     verify(workflowConsumer).accept(Optional.of(WORKFLOW), Optional.of(WORKFLOW));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
@@ -505,10 +505,10 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldReturnErrorMessageWhenFailedToInspectChange() throws Exception {
+  public void shouldReturnErrorMessageWhenFailedToStore() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(workflowInitializer.inspectChangeAndStore(WORKFLOW))
+    when(workflowInitializer.store(WORKFLOW))
         .thenThrow(new WorkflowInitializationException(new Exception()));
 
     Response<ByteString> response =

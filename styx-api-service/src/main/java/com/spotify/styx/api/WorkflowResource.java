@@ -167,7 +167,7 @@ public final class WorkflowResource {
     final Workflow workflow = Workflow.create(componentId, workflowConfig);
     final Optional<Workflow> oldWorkflowOptional;
     try {
-      oldWorkflowOptional = workflowInitializer.inspectChangeAndStore(workflow);
+      oldWorkflowOptional = workflowInitializer.store(workflow);
     } catch (WorkflowInitializationException e) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(e.getMessage()));
     }

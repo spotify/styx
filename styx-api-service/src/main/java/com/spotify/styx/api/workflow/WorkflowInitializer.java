@@ -45,7 +45,7 @@ public class WorkflowInitializer {
     this.time = Objects.requireNonNull(time);
   }
 
-  public Optional<Workflow> inspectChangeAndStore(Workflow workflow)
+  public Optional<Workflow> store(Workflow workflow)
       throws WorkflowInitializationException {
     final Optional<Workflow> previous;
     try {
