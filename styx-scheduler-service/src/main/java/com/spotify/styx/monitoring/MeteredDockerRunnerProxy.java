@@ -24,7 +24,6 @@ import static com.spotify.styx.util.ExceptionUtil.findCause;
 
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.InvalidExecutionException;
-import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.KubernetesClientTimeoutException;

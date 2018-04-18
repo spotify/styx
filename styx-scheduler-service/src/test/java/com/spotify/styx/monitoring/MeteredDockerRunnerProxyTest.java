@@ -68,8 +68,7 @@ public class MeteredDockerRunnerProxyTest {
 
   @Before
   public void setUp() {
-    proxy = MeteredProxy.instrument(DockerRunner.class,
-        new MeteredDockerRunnerProxy(dockerRunner, stats, time));
+    proxy = MeteredDockerRunnerProxy.instrument(dockerRunner, stats, time);
   }
 
   @Test

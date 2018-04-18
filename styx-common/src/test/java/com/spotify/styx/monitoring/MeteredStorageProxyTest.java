@@ -55,8 +55,7 @@ public class MeteredStorageProxyTest {
 
   @Before
   public void setUp() {
-    proxy = MeteredProxy.instrument(Storage.class,
-        new MeteredStorageProxy(storage, stats, time));
+    proxy = MeteredStorageProxy.instrument(storage, stats, time);
   }
 
   @Test
