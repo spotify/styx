@@ -53,7 +53,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import junitparams.JUnitParamsRunner;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -390,7 +389,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @RunWith(JUnitParamsRunner.class)
   public static class UpdatesNextNaturalTriggerWhenWFScheduleChangesFromFinerToCoarserTest extends SystemTest {
   @Test
-  @Ignore("this is flaky due to Datastore emulator")
   public void updatesNextNaturalTriggerWhenWFScheduleChangesFromFinerToCoarser() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
     givenWorkflow(HOURLY_WORKFLOW);
@@ -490,7 +488,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @RunWith(JUnitParamsRunner.class)
   public static class UpdatesNextNaturalTriggerWhenWFScheduleChangesFromCoarserToFinerTest extends SystemTest {
   @Test
-  @Ignore("this is flaky due to Datastore emulator")
   public void updatesNextNaturalTriggerWhenWFScheduleChangesFromCoarserToFiner() throws Exception {
     givenTheTimeIs("2016-03-14T15:30:00Z");
     givenWorkflow(DAILY_WORKFLOW);
