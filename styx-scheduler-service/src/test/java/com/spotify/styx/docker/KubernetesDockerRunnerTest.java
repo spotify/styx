@@ -262,7 +262,7 @@ public class KubernetesDockerRunnerTest {
     when(containerStateTerminated.getFinishedAt())
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(5)).toString());
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod);
     verify(k8sClient.pods(), never()).delete(any(Pod.class));
     verify(k8sClient.pods(), never()).delete(any(Pod[].class));
     verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
@@ -285,7 +285,7 @@ public class KubernetesDockerRunnerTest {
     when(containerStateTerminated.getFinishedAt())
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(5)).toString());
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod);
     verify(namedPod).delete();
   }
 
@@ -302,7 +302,7 @@ public class KubernetesDockerRunnerTest {
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod);
     verify(namedPod).delete();
   }
 
@@ -315,7 +315,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod);
     verify(namedPod).delete();
   }
 
@@ -328,7 +328,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     KubernetesPodEventTranslatorTest.setWaiting(createdPod, "Pending", "ErrImagePull");
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod);
     verify(namedPod).delete();
   }
 
@@ -347,7 +347,7 @@ public class KubernetesDockerRunnerTest {
     when(containerStateTerminated.getFinishedAt())
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(1)).toString());
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod);
     verify(namedPod, never()).delete();
   }
 
@@ -363,7 +363,7 @@ public class KubernetesDockerRunnerTest {
     when(containerStatus.getName()).thenReturn(EXECUTION_ID);
     when(containerStatus.getState()).thenReturn(containerState);
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod);
     verify(namedPod, never()).delete();
   }
 
@@ -379,7 +379,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod);
     verify(namedPod, never()).delete();
   }
 
@@ -395,7 +395,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
 
-    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, createdPod);
     verify(namedPod, never()).delete();
   }
 
@@ -411,7 +411,7 @@ public class KubernetesDockerRunnerTest {
     when(containerStatus.getName()).thenReturn(EXECUTION_ID);
     when(containerStatus.getState()).thenReturn(containerState);
 
-    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, createdPod);
     verify(namedPod).delete();
   }
 
@@ -430,7 +430,7 @@ public class KubernetesDockerRunnerTest {
     when(containerStateTerminated.getFinishedAt())
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(1)).toString());
 
-    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, createdPod);
     verify(namedPod, never()).delete();
   }
 
@@ -449,7 +449,7 @@ public class KubernetesDockerRunnerTest {
     when(containerStateTerminated.getFinishedAt())
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(5)).toString());
 
-    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, name);
+    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, createdPod);
     verify(namedPod).delete();
   }
 
@@ -742,7 +742,7 @@ public class KubernetesDockerRunnerTest {
 
     // Stop the runner and change the pod status to terminated while styx is "down"
     kdr.close();
-    setTerminated(createdPod, "Succeeded", 20, null);
+    setTerminated(createdPod, "Succeeded", FIXED_INSTANT.toString(), 20, null);
 
     // Start a new runner
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,

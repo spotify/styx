@@ -316,12 +316,24 @@ public class KubernetesPodEventTranslatorTest {
     pod.setStatus(terminated(phase, exitCode, message, pod.getMetadata().getName()));
   }
 
+  static void setTerminated(Pod pod, String phase, String finishedAt, Integer exitCode, String message) {
+    pod.setStatus(terminated(phase, finishedAt, exitCode, message, pod.getMetadata().getName()));
+  }
+
   static PodStatus terminated(String phase, Integer exitCode, String message, String containerName) {
     return podStatus(phase, true, containerName, terminatedContainerState(exitCode, message));
   }
 
+  static PodStatus terminated(String phase, String finishedAt, Integer exitCode, String message, String containerName) {
+    return podStatus(phase, true, containerName, terminatedContainerState(finishedAt, exitCode, message));
+  }
+
   static ContainerState terminatedContainerState(Integer exitCode, String message) {
     return new ContainerState(null, new ContainerStateTerminated("", exitCode, "", message, "", 0, ""), null);
+  }
+
+  static ContainerState terminatedContainerState(String finishedAt, Integer exitCode, String message) {
+    return new ContainerState(null, new ContainerStateTerminated("", exitCode, finishedAt, message, "", 0, ""), null);
   }
 
   static void setWaiting(Pod pod, String phase, String reason) {

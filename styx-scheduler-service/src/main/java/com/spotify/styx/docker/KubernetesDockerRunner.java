@@ -88,7 +88,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
@@ -340,28 +339,30 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   @VisibleForTesting
-  void cleanupWithRunState(WorkflowInstance workflowInstance, String executionId) {
-    cleanup(workflowInstance, executionId, pod ->
+  void cleanupWithRunState(WorkflowInstance workflowInstance, Pod pod) {
+    cleanup(workflowInstance, pod, () ->
         getMainContainerStatus(pod).ifPresent(containerStatus -> {
           if (hasPullImageError(containerStatus)) {
-            deletePod(workflowInstance, executionId);
+            deletePod(workflowInstance, pod.getMetadata().getName());
           } else {
             if (containerStatus.getState().getTerminated() != null) {
-              deletePodIfNonDeletePeriodExpired(workflowInstance, executionId, containerStatus);
+              deletePodIfNonDeletePeriodExpired(workflowInstance,
+                  pod.getMetadata().getName(), containerStatus);
             }
           }
         }));
   }
 
   @VisibleForTesting
-  void cleanupWithoutRunState(WorkflowInstance workflowInstance, String executionId) {
-    cleanup(workflowInstance, executionId, pod ->
+  void cleanupWithoutRunState(WorkflowInstance workflowInstance, Pod pod) {
+    cleanup(workflowInstance, pod, () ->
         getMainContainerStatus(pod).ifPresent(containerStatus -> {
           if (containerStatus.getState().getTerminated() != null) {
-            deletePodIfNonDeletePeriodExpired(workflowInstance, executionId, containerStatus);
+            deletePodIfNonDeletePeriodExpired(workflowInstance,
+                pod.getMetadata().getName(), containerStatus);
           } else {
             // if not terminated, delete it directly
-            deletePod(workflowInstance, executionId);
+            deletePod(workflowInstance, pod.getMetadata().getName());
           }
         }));
   }
@@ -376,17 +377,14 @@ class KubernetesDockerRunner implements DockerRunner {
     }
   }
 
-  private void cleanup(WorkflowInstance workflowInstance, String executionId,
-                       Consumer<Pod> cleaner) {
-    Optional.ofNullable(client.pods().withName(executionId).get()).ifPresent(pod -> {
-      final List<ContainerStatus> containerStatuses = pod.getStatus().getContainerStatuses();
-      if (!containerStatuses.isEmpty()) {
-        cleaner.accept(pod);
-      } else {
-        // for some cases such as evicted pod, there is no container status, so we delete directly
-        deletePod(workflowInstance, executionId);
-      }
-    });
+  private void cleanup(WorkflowInstance workflowInstance, Pod pod, Runnable cleaner) {
+    final List<ContainerStatus> containerStatuses = pod.getStatus().getContainerStatuses();
+    if (!containerStatuses.isEmpty()) {
+      cleaner.run();
+    } else {
+      // for some cases such as evicted pod, there is no container status, so we delete directly
+      deletePod(workflowInstance, pod.getMetadata().getName());
+    }
   }
 
   static Optional<ContainerStatus> getMainContainerStatus(Pod pod) {
@@ -507,9 +505,9 @@ class KubernetesDockerRunner implements DockerRunner {
       final Optional<RunState> runState = lookupPodRunState(pod, workflowInstance.get());
       if (runState.isPresent()) {
         emitPodEvents(Watcher.Action.MODIFIED, pod, runState.get());
-        cleanupWithRunState(workflowInstance.get(), pod.getMetadata().getName());
+        cleanupWithRunState(workflowInstance.get(), pod);
       } else {
-        cleanupWithoutRunState(workflowInstance.get(), pod.getMetadata().getName());
+        cleanupWithoutRunState(workflowInstance.get(), pod);
       }
     }
   }
