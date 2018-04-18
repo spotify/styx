@@ -33,20 +33,20 @@ import javaslang.control.Try;
 /**
  * A proxy for instrumenting an instance using {@link Proxy#newProxyInstance}.
  */
-public abstract class MeteredProxy implements InvocationHandler {
+public abstract class MeteredProxy<T> implements InvocationHandler {
 
-  private final Object delegate;
+  private final T delegate;
   private final Stats stats;
   private final Time time;
 
-  MeteredProxy(Object delegate, Stats stats, Time time) {
+  MeteredProxy(T delegate, Stats stats, Time time) {
     this.delegate = Objects.requireNonNull(delegate);
     this.stats = Objects.requireNonNull(stats);
     this.time = Objects.requireNonNull(time);
   }
 
   @SuppressWarnings("unchecked")
-  public static <T> T instrument(Class<? extends T> clazz, MeteredProxy meteredProxy) {
+  protected static <T> T instrument(Class<? extends T> clazz, MeteredProxy<T> meteredProxy) {
     return (T) Proxy.newProxyInstance(
         clazz.getClassLoader(),
         new Class[]{ clazz },

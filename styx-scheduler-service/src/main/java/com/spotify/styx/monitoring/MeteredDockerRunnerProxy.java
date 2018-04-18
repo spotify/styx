@@ -24,6 +24,7 @@ import static com.spotify.styx.util.ExceptionUtil.findCause;
 
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.InvalidExecutionException;
+import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.KubernetesClientTimeoutException;
@@ -33,10 +34,14 @@ import javaslang.control.Try;
 /**
  * A proxy for instrumenting an instance of {@link DockerRunner} using {@link Proxy#newProxyInstance}.
  */
-public class MeteredDockerRunnerProxy extends MeteredProxy {
+public class MeteredDockerRunnerProxy extends MeteredProxy<DockerRunner> {
 
-  public MeteredDockerRunnerProxy(Object delegate, Stats stats, Time time) {
+  MeteredDockerRunnerProxy(DockerRunner delegate, Stats stats, Time time) {
     super(delegate, stats, time);
+  }
+
+  public static DockerRunner instrument(DockerRunner dockerRunner, Stats stats, Time time) {
+    return MeteredProxy.instrument(DockerRunner.class, new MeteredDockerRunnerProxy(dockerRunner, stats, time));
   }
 
   @Override

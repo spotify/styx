@@ -20,7 +20,6 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.monitoring.MeteredProxy.instrument;
 import static com.spotify.styx.state.OutputHandler.fanOutput;
 import static com.spotify.styx.state.StateUtil.getResourcesUsageMap;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
@@ -308,8 +307,7 @@ public class StyxScheduler implements AppInit {
     closer.register(executorCloser("event-consumer", eventConsumerExecutor));
 
     final Stats stats = statsFactory.apply(environment);
-    final Storage storage = instrument(Storage.class,
-        new MeteredStorageProxy(storageFactory.apply(environment), stats, time));
+    final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment), stats, time);
     closer.register(storage);
 
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
@@ -336,8 +334,7 @@ public class StyxScheduler implements AppInit {
     final DockerRunner routingDockerRunner = DockerRunner.routing(
         id -> dockerRunnerFactory.create(id, environment, stateManager, executor, stats, debug),
         dockerId);
-    final DockerRunner dockerRunner = instrument(DockerRunner.class,
-        new MeteredDockerRunnerProxy(routingDockerRunner, stats, time));
+    final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(routingDockerRunner, stats, time);
 
     final RateLimiter dequeueRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
 

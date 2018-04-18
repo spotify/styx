@@ -28,10 +28,14 @@ import javaslang.control.Try;
 /**
  * A proxy for instrumenting an instance of {@link Storage} {@link Proxy#newProxyInstance}.
  */
-public class MeteredStorageProxy extends MeteredProxy {
+public class MeteredStorageProxy extends MeteredProxy<Storage> {
 
-  public MeteredStorageProxy(Object delegate, Stats stats, Time time) {
+  MeteredStorageProxy(Storage delegate, Stats stats, Time time) {
     super(delegate, stats, time);
+  }
+
+  public static Storage instrument(Storage storage, Stats stats, Time time) {
+    return MeteredProxy.instrument(Storage.class, new MeteredStorageProxy(storage, stats, time));
   }
 
   @Override

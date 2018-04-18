@@ -21,7 +21,6 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.api.Middlewares.authValidator;
-import static com.spotify.styx.monitoring.MeteredProxy.instrument;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
@@ -144,8 +143,7 @@ public class StyxApi implements AppInit {
                                            : DEFAULT_SCHEDULER_SERVICE_BASE_URL;
 
     final Stats stats = statsFactory.apply(environment);
-    final Storage storage = instrument(Storage.class,
-        new MeteredStorageProxy(storageFactory.apply(environment), stats, time));
+    final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment), stats, time);
     final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer =
         workflowConsumerFactory.apply(environment, stats);
     
