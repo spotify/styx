@@ -305,11 +305,11 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   static PodStatus running(boolean ready, String containerName) {
-    return podStatus("Running", ready, containerName,
-        new ContainerState(
-            new ContainerStateRunning("2016-05-30T09:46:48Z"),
-            null,
-            null));
+    return podStatus("Running", ready, containerName, runningContainerState());
+  }
+
+  private static ContainerState runningContainerState() {
+    return new ContainerState(new ContainerStateRunning("2016-05-30T09:46:48Z"), null, null);
   }
 
   static void setTerminated(Pod pod, String phase, Integer exitCode, String message) {
@@ -317,11 +317,11 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   static PodStatus terminated(String phase, Integer exitCode, String message, String containerName) {
-    return podStatus(phase, true, containerName,
-        new ContainerState(
-            null,
-            new ContainerStateTerminated("", exitCode, "", message, "", 0, ""),
-            null));
+    return podStatus(phase, true, containerName, terminatedContainerState(exitCode, message));
+  }
+
+  static ContainerState terminatedContainerState(Integer exitCode, String message) {
+    return new ContainerState(null, new ContainerStateTerminated("", exitCode, "", message, "", 0, ""), null);
   }
 
   static void setWaiting(Pod pod, String phase, String reason) {
@@ -329,11 +329,11 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   static PodStatus waiting(String phase, String reason, String containerName) {
-    return podStatus(phase, true, containerName,
-        new ContainerState(
-            null,
-            null,
-            new ContainerStateWaiting("", reason)));
+    return podStatus(phase, true, containerName, waitingContainerState(reason));
+  }
+
+  private static ContainerState waitingContainerState(String reason) {
+    return new ContainerState(null, null, new ContainerStateWaiting("", reason));
   }
 
   static PodStatus podStatus(String phase, boolean ready, String containerName, ContainerState containerState) {

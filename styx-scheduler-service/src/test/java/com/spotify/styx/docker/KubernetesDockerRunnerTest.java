@@ -25,6 +25,7 @@ import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.podStatus
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.setRunning;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.setTerminated;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminated;
+import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminatedContainerState;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
@@ -587,19 +588,48 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Parameters({
-      "Running,   20",
-      "Running,   1",
-      "Running,   0",
-      "Succeeded, 20",
-      "Succeeded, 1",
-      "Succeeded, 0",
-      "Failed,    20",
-      "Failed,    1",
-      "Failed,    0",
+      "Running,   20, true",
+      "Running,   1,  true",
+      "Running,   0,  true",
+      "Succeeded, 20, true",
+      "Succeeded, 1,  true",
+      "Succeeded, 0,  true",
+      "Failed,    20, true",
+      "Failed,    1,  true",
+      "Failed,    0,  true",
+      "Running,   20, false",
+      "Running,   1,  false",
+      "Running,   0,  false",
+      "Succeeded, 20, false",
+      "Succeeded, 1,  false",
+      "Succeeded, 0,  false",
+      "Failed,    20, false",
+      "Failed,    1,  false",
+      "Failed,    0,  false",
   })
   @Test
-  public void shouldCompleteWithStatusCodeOnMainContainerTerminated(String phase, int code) throws Exception {
-    setTerminated(createdPod, phase, code, null);
+  public void shouldCompleteWithStatusCodeOnMainContainerTerminated(String phase, int code,
+      boolean withKeepaliveContainer) throws Exception {
+    final String executionId = createdPod.getMetadata().getName();
+
+    final PodStatus podStatus = podStatusNoContainer(phase);
+
+    podStatus.getContainerStatuses()
+        .add(new ContainerStatusBuilder()
+            .withState(terminatedContainerState(code, ""))
+            .withName(executionId)
+            .build());
+
+    // Verify that old pods without a keepalive container are also correctly handled
+    if (withKeepaliveContainer) {
+      podStatus.getContainerStatuses()
+          .add(new ContainerStatusBuilder()
+              .withName(KEEPALIVE_CONTAINER_NAME)
+              .withNewState().withNewRunning().endRunning().endState()
+              .build());
+    }
+
+    createdPod.setStatus(podStatus);
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
     verify(stateManager).receive(Event.started(WORKFLOW_INSTANCE), -1);
