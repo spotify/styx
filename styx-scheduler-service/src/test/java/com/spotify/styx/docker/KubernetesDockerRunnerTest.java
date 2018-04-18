@@ -38,6 +38,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.spotify.styx.QuietDeterministicScheduler;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.Event;
@@ -134,7 +135,7 @@ public class KubernetesDockerRunnerTest {
       .serviceAccount(SERVICE_ACCOUNT)
       .build();
 
-  private static final int NO_POLL = Integer.MAX_VALUE;
+  private static final int POLL_INTERVAL_SECONDS = 60;
   private static final int POD_DELETION_DELAY_SECONDS = 120;
   private static final Instant FIXED_INSTANT = Instant.parse("2017-09-01T01:00:00Z");
 
@@ -165,6 +166,7 @@ public class KubernetesDockerRunnerTest {
 
   KubernetesDockerRunner kdr;
   Watcher<Pod> podWatcher;
+  QuietDeterministicScheduler executor = new QuietDeterministicScheduler();
 
   @Before
   public void setUp() throws Exception {
@@ -186,8 +188,8 @@ public class KubernetesDockerRunnerTest {
 
     when(time.get()).thenReturn(FIXED_INSTANT);
 
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug, NO_POLL,
-                                     POD_DELETION_DELAY_SECONDS, time);
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager, debug,
+        POLL_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time, executor);
     kdr.init();
 
     podWatcher = watchCaptor.getValue();
@@ -687,7 +689,7 @@ public class KubernetesDockerRunnerTest {
 
     // Start a new runner
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, NO_POLL, 0, time);
+        debug, POLL_INTERVAL_SECONDS, 0, time, executor);
     kdr.init();
 
     // Make the runner poll states for all pods
@@ -704,18 +706,14 @@ public class KubernetesDockerRunnerTest {
 
     createdPod.setStatus(running(/* ready= */ true));
 
-    // Set up a runner with short poll interval to avoid this test having to wait a long time for the poll
-    kdr.close();
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, 1, 0, time);
-    kdr.init();
-    kdr.restore();
-
     // Change the pod status to terminated without notifying the runner through the pod watcher
     final Pod terminatedPod = new PodBuilder(createdPod)
         .withStatus(terminated("Succeeded", 20, null))
         .build();
     when(podList.getItems()).thenReturn(ImmutableList.of(terminatedPod));
+
+    // Make time pass so the runner polls
+    executor.tick(POLL_INTERVAL_SECONDS, TimeUnit.SECONDS);
 
     // Verify that the runner eventually polls and finds out that the pod is terminated
     verify(stateManager, timeout(30_000)).receive(

@@ -123,8 +123,8 @@ class KubernetesDockerRunner implements DockerRunner {
       .setNameFormat("k8s-scheduler-thread-%d")
       .build();
 
-  private final ScheduledExecutorService executor =
-      Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY);
+  private final ScheduledExecutorService executor;
+
 
   private final KubernetesClient client;
   private final StateManager stateManager;
@@ -140,7 +140,7 @@ class KubernetesDockerRunner implements DockerRunner {
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
                          Debug debug, int pollPodsIntervalSeconds, int podDeletionDelaySeconds,
-                         Time time) {
+                         Time time, ScheduledExecutorService executor) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client);
     this.stats = Objects.requireNonNull(stats);
@@ -149,13 +149,15 @@ class KubernetesDockerRunner implements DockerRunner {
     this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
     this.podDeletionDelaySeconds = podDeletionDelaySeconds;
     this.time = Objects.requireNonNull(time);
+    this.executor = Objects.requireNonNull(executor);
   }
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
                          Debug debug) {
     this(client, stateManager, stats, serviceAccountSecretManager, debug,
-        DEFAULT_POLL_PODS_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_TIME);
+        DEFAULT_POLL_PODS_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_TIME,
+        Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY));
   }
 
   @Override
