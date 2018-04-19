@@ -24,6 +24,7 @@ import static com.spotify.styx.docker.KubernetesDockerRunner.KEEPALIVE_CONTAINER
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.podStatusNoContainer;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.setRunning;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.setTerminated;
+import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.setWaiting;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminated;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminatedContainerState;
 import static org.hamcrest.Matchers.empty;
@@ -326,7 +327,7 @@ public class KubernetesDockerRunnerTest {
     when(namedPod.get()).thenReturn(createdPod);
 
     // inject mock status in real instance
-    KubernetesPodEventTranslatorTest.setWaiting(createdPod, "Pending", "ErrImagePull");
+    setWaiting(createdPod, "Pending", "ErrImagePull");
 
     kdr.cleanupWithRunState(WORKFLOW_INSTANCE, name);
     verify(namedPod).delete();
@@ -638,7 +639,7 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldFailOnErrImagePull() throws Exception {
-    KubernetesPodEventTranslatorTest.setWaiting(createdPod, "Pending", "ErrImagePull");
+    setWaiting(createdPod, "Pending", "ErrImagePull");
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
     verify(stateManager).receive(
@@ -648,7 +649,7 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldSendStatsOnErrImagePull() throws Exception {
-    KubernetesPodEventTranslatorTest.setWaiting(createdPod, "Pending", "ErrImagePull");
+    setWaiting(createdPod, "Pending", "ErrImagePull");
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
     verify(stats, times(1)).recordPullImageError();
@@ -694,7 +695,7 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldFailOnUnexpectedTerminatedStatus() throws Exception {
-    KubernetesPodEventTranslatorTest.setWaiting(createdPod, "Failed", "");
+    setWaiting(createdPod, "Failed", "");
     podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
 
     verify(stateManager).receive(
