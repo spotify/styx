@@ -123,11 +123,9 @@ public class DockerRunnerHandler implements OutputHandler {
         () -> new ResourceNotFoundException("Missing execution description for "
                                             + state.workflowInstance().toKey()));
 
-    // For backwards compatibility, create an execution ID here for RunStates that do not have one as
-    // they transitioned through a SUBMITTING state that did not create execution IDs. This execution ID
-    // will be added to the RunState through the submitted event.
-    final String executionId = state.data().executionId()
-        .orElseGet(ExecutionDescriptionHandler::createExecutionId);
+    final String executionId = state.data().executionId().orElseThrow(
+        () -> new ResourceNotFoundException("Missing execution id for "
+                                            + state.workflowInstance().toKey()));
 
     final String dockerImage = executionDescription.dockerImage();
     final List<String> dockerArgs = executionDescription.dockerArgs();
