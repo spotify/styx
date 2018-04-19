@@ -25,7 +25,6 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toSet;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
@@ -37,6 +36,7 @@ import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.storage.TransactionException;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.CounterCapacityException;
+import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
@@ -235,7 +235,7 @@ public class QueuedStateManager implements StateManager {
   private void updateResourceCounters(StorageTransaction tx, Event event,
                                       RunState currentRunState, RunState nextRunState) {
     // increment counters if event is dequeue
-    if (isDequeue(event, nextRunState) && nextRunState.data().resourceIds().isPresent()) {
+    if (isDequeue(event) && nextRunState.data().resourceIds().isPresent()) {
       tryUpdatingCounter(currentRunState, tx, nextRunState.data().resourceIds().get());
     }
 
@@ -286,9 +286,8 @@ public class QueuedStateManager implements StateManager {
     }
   }
 
-  private boolean isDequeue(Event event, RunState runState) {
-    return event.equals(Event.dequeue(event.workflowInstance(),
-                                      runState.data().resourceIds().orElse(ImmutableSet.of())));
+  private boolean isDequeue(Event event) {
+    return EventUtil.name(event).equals("dequeue");
   }
 
   private void verifyCounter(Event event, long expectedCounter, RunState currentRunState) {
