@@ -303,7 +303,8 @@ class KubernetesDockerRunner implements DockerRunner {
     return new ContainerBuilder()
         .withName(KEEPALIVE_CONTAINER_NAME)
         .withImage("busybox")
-        .withArgs("/bin/sh", "-c", "trap : TERM INT; while :; do sleep 1000; done")
+        // Sleep forever and exit immediately on SIGTERM or SIGINT
+        .withArgs("/bin/sh", "-c", "trap : INT TERM; mkfifo pipe && read < pipe")
         .build();
   }
 
