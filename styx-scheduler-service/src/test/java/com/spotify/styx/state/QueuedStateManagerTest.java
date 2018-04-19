@@ -84,8 +84,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
@@ -107,16 +105,12 @@ public class QueuedStateManagerTest {
   private final StripedExecutorService eventTransitionExecutor = new StripedExecutorService(16);
   private final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
 
-
   private QueuedStateManager stateManager;
-
-  @Captor private ArgumentCaptor<RunState> runStateCaptor;
 
   @Rule public RepeatRule repeatRule = new RepeatRule();
 
   @Mock private Storage storage;
   @Mock private StorageTransaction transaction;
-  @Mock private OutputHandler outputHandler;
   @Mock private Time time;
   @Mock private ShardedCounter shardedCounter;
 
@@ -125,10 +119,9 @@ public class QueuedStateManagerTest {
     when(time.get()).thenReturn(NOW);
     when(storage.runInTransaction(any())).thenAnswer(
         a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
-    doNothing().when(outputHandler).transitionInto(runStateCaptor.capture());
     stateManager = new QueuedStateManager(
         time, eventTransitionExecutor, storage, eventConsumer,
-        eventConsumerExecutor, OutputHandler.fanOutput(outputHandler), shardedCounter);
+        eventConsumerExecutor, shardedCounter);
   }
 
   @After
@@ -298,7 +291,7 @@ public class QueuedStateManagerTest {
     reset(storage);
     stateManager = spy(new QueuedStateManager(
         time, eventTransitionExecutor, storage, eventConsumer,
-        eventConsumerExecutor, outputHandler, shardedCounter));
+        eventConsumerExecutor, shardedCounter));
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
     doThrow(new IsClosedException()).when(stateManager).receive(any());
@@ -317,7 +310,7 @@ public class QueuedStateManagerTest {
     reset(storage);
     stateManager = spy(new QueuedStateManager(
         time, eventTransitionExecutor, storage, eventConsumer,
-        eventConsumerExecutor, outputHandler, shardedCounter));
+        eventConsumerExecutor, shardedCounter));
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     doThrow(new IOException()).when(storage).deleteActiveState(any());
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
@@ -377,9 +370,6 @@ public class QueuedStateManagerTest {
     barrier.complete(null);
 
     f.get(1, MINUTES);
-
-    verify(outputHandler).transitionInto(any());
-    assertThat(runStateCaptor.getValue().state(), is(State.PREPARE));
   }
 
   @Test
@@ -557,43 +547,6 @@ public class QueuedStateManagerTest {
 
     assertThat(returnedRunStates.get(INSTANCE), is(runState));
     assertThat(returnedRunStates.size(), is(1));
-  }
-
-  @Test
-  public void triggerShouldHandleThrowingOutputHandler() throws Exception {
-    Optional<RunState> runState = Optional.of(RunState.create(INSTANCE, State.NEW, NOW, -1));
-    when(storage.readActiveState(INSTANCE)).thenReturn(runState);
-    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.of(-1L));
-    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
-    when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
-    final RuntimeException rootCause = new RuntimeException("foo!");
-    doThrow(rootCause).when(outputHandler).transitionInto(any());
-    CompletableFuture<Void> f = stateManager.trigger(INSTANCE, TRIGGER1).toCompletableFuture();
-    try {
-      f.get(1, MINUTES);
-      fail();
-    } catch (ExecutionException e) {
-      assertThat(Throwables.getRootCause(e), is(rootCause));
-    }
-  }
-
-  @Test
-  public void receiveShouldHandleThrowingOutputHandler() throws Exception {
-    Optional<RunState> runState = Optional.of(
-        RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW.minusMillis(1), 17));
-    when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
-    when(storage.readActiveState(INSTANCE)).thenReturn(runState);
-    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.of(17L));
-
-    final RuntimeException rootCause = new RuntimeException("foo!");
-    doThrow(rootCause).when(outputHandler).transitionInto(any());
-    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of())).toCompletableFuture();
-    try {
-      f.get(1, MINUTES);
-      fail();
-    } catch (ExecutionException e) {
-      assertThat(Throwables.getRootCause(e), is(rootCause));
-    }
   }
 
   @Test

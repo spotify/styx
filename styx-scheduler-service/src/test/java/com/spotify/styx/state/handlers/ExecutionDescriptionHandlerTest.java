@@ -87,7 +87,7 @@ public class ExecutionDescriptionHandlerTest {
 
     when(stateManager.receive(any())).thenReturn(CompletableFuture.completedFuture(null));
     when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Collections.emptyList());
-    toTest = new ExecutionDescriptionHandler(storage, stateManager, workflowValidator);
+    toTest = new ExecutionDescriptionHandler(storage, workflowValidator);
 
   }
 

@@ -44,52 +44,48 @@ public class TerminationHandler implements OutputHandler {
   public static final int MISSING_DEPS_RETRY_DELAY_MINUTES = 10;
 
   private final RetryUtil retryUtil;
-  private final StateManager stateManager;
 
-  public TerminationHandler(RetryUtil retryUtil, StateManager stateManager) {
+  public TerminationHandler(RetryUtil retryUtil) {
     this.retryUtil = Objects.requireNonNull(retryUtil);
-    this.stateManager = Objects.requireNonNull(stateManager);
   }
 
   @Override
-  public void transitionInto(RunState state) {
+  public Optional<Event> transitionInto(RunState state) {
     switch (state.state()) {
       case TERMINATED:
         if (state.data().lastExit().map(v -> v.equals(0)).orElse(false)) {
-          stateManager.receiveIgnoreClosed(Event.success(state.workflowInstance()));
+          return Optional.of(Event.success(state.workflowInstance()));
         } else {
-          checkRetry(state);
+          return checkRetry(state);
         }
-        break;
 
       case FAILED:
-        checkRetry(state);
-        break;
+        return checkRetry(state);
 
       default:
-        // do nothing
+        return Optional.empty();
     }
   }
 
-  private void checkRetry(RunState state) {
+  private Optional<Event> checkRetry(RunState state) {
     final WorkflowInstance workflowInstance = state.workflowInstance();
 
-    if (state.data().retryCost() < MAX_RETRY_COST) {
-      final Optional<Integer> exitCode = state.data().lastExit();
-      if (shouldFailFast(exitCode)) {
-        stateManager.receiveIgnoreClosed(Event.stop(workflowInstance));
-      } else {
-        final long delayMillis;
-        if (isMissingDependency(exitCode)) {
-          delayMillis = Duration.ofMinutes(MISSING_DEPS_RETRY_DELAY_MINUTES).toMillis();
-        } else {
-          delayMillis = retryUtil.calculateDelay(state.data().consecutiveFailures()).toMillis();
-        }
-        stateManager.receiveIgnoreClosed(Event.retryAfter(workflowInstance, delayMillis));
-      }
-    } else {
-      stateManager.receiveIgnoreClosed(Event.stop(workflowInstance));
+    if (!(state.data().retryCost() < MAX_RETRY_COST)) {
+      return Optional.of(Event.stop(workflowInstance));
     }
+
+    final Optional<Integer> exitCode = state.data().lastExit();
+    if (shouldFailFast(exitCode)) {
+      return Optional.of(Event.stop(workflowInstance));
+    }
+
+    final long delayMillis;
+    if (isMissingDependency(exitCode)) {
+      delayMillis = Duration.ofMinutes(MISSING_DEPS_RETRY_DELAY_MINUTES).toMillis();
+    } else {
+      delayMillis = retryUtil.calculateDelay(state.data().consecutiveFailures()).toMillis();
+    }
+    return Optional.of(Event.retryAfter(workflowInstance, delayMillis));
   }
 
   private static boolean isMissingDependency(Optional<Integer> exitCode) {

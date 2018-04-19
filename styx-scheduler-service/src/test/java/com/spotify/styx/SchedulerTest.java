@@ -52,6 +52,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Message;
+import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
@@ -102,6 +103,7 @@ public class SchedulerTest {
   private ConcurrentMap<WorkflowInstance, RunState> activeStates = Maps.newConcurrentMap();
 
   private Map<WorkflowId, Workflow> workflows;
+  private List<OutputHandler> outputHandlers = new ArrayList<>();
 
   @Mock WorkflowResourceDecorator resourceDecorator;
   @Mock RateLimiter rateLimiter;
@@ -137,7 +139,7 @@ public class SchedulerTest {
     when(storage.workflows(anySetOf(WorkflowId.class))).thenReturn(workflows);
 
     scheduler = new Scheduler(time, timeoutConfig, stateManager, storage, resourceDecorator,
-        stats, rateLimiter, gate);
+        stats, rateLimiter, gate, outputHandlers);
   }
 
   private void setResourceLimit(String resourceId, long limit) {

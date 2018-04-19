@@ -67,9 +67,6 @@ import org.slf4j.LoggerFactory;
  * <p>The events are all processed on an injected {@link Executor}, but sequentially per
  * {@link WorkflowInstance}. This allows event processing to scale across many separate workflow
  * instances while guaranteeing that each state machine progresses sequentially.
- *
- * <p>All {@link #outputHandler} transitions are also executed on the injected
- * {@link Executor}.
  */
 public class QueuedStateManager implements StateManager {
 
@@ -86,7 +83,6 @@ public class QueuedStateManager implements StateManager {
   private final Storage storage;
   private final BiConsumer<SequenceEvent, RunState> eventConsumer;
   private final Executor eventConsumerExecutor;
-  private final OutputHandler outputHandler;
   private final ShardedCounter shardedCounter;
 
   private volatile boolean running = true;
@@ -97,14 +93,12 @@ public class QueuedStateManager implements StateManager {
       Storage storage,
       BiConsumer<SequenceEvent, RunState> eventConsumer,
       Executor eventConsumerExecutor,
-      OutputHandler outputHandler,
       ShardedCounter shardedCounter) {
     this.time = Objects.requireNonNull(time);
     this.storage = Objects.requireNonNull(storage);
     this.eventConsumer = Objects.requireNonNull(eventConsumer);
     this.eventConsumerExecutor = Objects.requireNonNull(eventConsumerExecutor);
     this.eventTransitionExecutor = Objects.requireNonNull(eventTransitionExecutor);
-    this.outputHandler = Objects.requireNonNull(outputHandler);
     this.shardedCounter = Objects.requireNonNull(shardedCounter);
   }
 
@@ -328,9 +322,6 @@ public class QueuedStateManager implements StateManager {
     } catch (Exception e) {
       LOG.warn("Error while consuming event {}", sequenceEvent, e);
     }
-
-    // Execute output handler(s)
-    outputHandler.transitionInto(runState);
   }
 
   @Override

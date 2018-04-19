@@ -67,6 +67,11 @@ class RoutingDockerRunner implements DockerRunner {
   }
 
   @Override
+  public JobStatus status(String executionId) {
+    return runner().status(executionId);
+  }
+
+  @Override
   public void close() throws IOException {
     final Closer closer = Closer.create();
     dockerRunners.values().forEach(closer::register);

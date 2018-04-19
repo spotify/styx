@@ -21,6 +21,7 @@
 package com.spotify.styx.state.handlers;
 
 import com.google.common.base.Preconditions;
+import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.publisher.Publisher;
@@ -29,6 +30,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.Retrier;
 import java.time.Duration;
 import java.util.Objects;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,31 +55,34 @@ public class PublisherHandler implements OutputHandler {
   }
 
   @Override
-  public void transitionInto(RunState state) {
+  public Optional<Event> transitionInto(RunState state) {
     final WorkflowInstance workflowInstance = state.workflowInstance();
     switch (state.state()) {
-      case SUBMITTED:
+      // TODO: Publishing these events might need to be more effectively-once
+      //       Have this be listening for the submitted and started events instead?
+      case SUBMITTING:
         try {
           Preconditions.checkArgument(state.data().executionDescription().isPresent());
           final ExecutionDescription executionDescription = state.data().executionDescription().get();
           RETRIER.runWithRetries(() -> publisher.deploying(workflowInstance, executionDescription));
         } catch (Exception e) {
-          LOG.error("Failed to publish event for PREPARE state", e);
+          LOG.error("Failed to publish event for SUBMITTING state", e);
         }
         break;
 
-      case RUNNING:
+      case SUBMITTED:
         try {
           Preconditions.checkArgument(state.data().executionDescription().isPresent());
           final ExecutionDescription executionDescription = state.data().executionDescription().get();
           RETRIER.runWithRetries(() -> publisher.deployed(workflowInstance, executionDescription));
         } catch (Exception e) {
-          LOG.error("Failed to publish event for RUNNING state", e);
+          LOG.error("Failed to publish event for SUBMITTED state", e);
         }
         break;
 
       default:
         // do nothing
     }
+    return Optional.empty();
   }
 }

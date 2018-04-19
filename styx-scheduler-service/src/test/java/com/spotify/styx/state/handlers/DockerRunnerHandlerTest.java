@@ -76,7 +76,7 @@ public class DockerRunnerHandlerTest {
 
   @Before
   public void setUp() {
-    dockerRunnerHandler = new DockerRunnerHandler(dockerRunner, stateManager);
+    dockerRunnerHandler = new DockerRunnerHandler(dockerRunner);
   }
 
   @Test

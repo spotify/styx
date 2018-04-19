@@ -434,6 +434,11 @@ public class StyxSchedulerServiceFixture {
       }
 
       @Override
+      public JobStatus status(String executionId) {
+        return null;
+      }
+
+      @Override
       public void close() {
         // nop
       }

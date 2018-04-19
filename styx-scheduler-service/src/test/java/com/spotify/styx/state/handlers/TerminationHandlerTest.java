@@ -55,7 +55,7 @@ public class TerminationHandlerTest {
 
   @Before
   public void setUp() throws Exception {
-    terminationHandler = new TerminationHandler(retryUtil, stateManager);
+    terminationHandler = new TerminationHandler(retryUtil);
   }
 
   @Test

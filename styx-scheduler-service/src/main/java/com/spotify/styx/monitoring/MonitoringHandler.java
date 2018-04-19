@@ -20,9 +20,11 @@
 
 package com.spotify.styx.monitoring;
 
+import com.spotify.styx.model.Event;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * An {@link OutputHandler} handler that reports execution elapsed time between submitted and
@@ -37,7 +39,7 @@ public class MonitoringHandler implements OutputHandler {
   }
 
   @Override
-  public void transitionInto(RunState state) {
+  public Optional<Event> transitionInto(RunState state) {
     switch (state.state()) {
       case TERMINATED:
         if (state.data().lastExit().isPresent()) {
@@ -48,5 +50,6 @@ public class MonitoringHandler implements OutputHandler {
       default:
         // do nothing
     }
+    return Optional.empty();
   }
 }

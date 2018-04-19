@@ -123,8 +123,9 @@ public class RunStateTest {
     when(time.get()).thenReturn(Instant.now());
   }
 
-  private void record(RunState state) {
+  private Optional<Event> record(RunState state) {
     outputs.add(state.state());
+    return Optional.empty();
   }
 
   @Test

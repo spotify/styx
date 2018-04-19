@@ -29,8 +29,6 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.state.StateManager;
-import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.ResourceNotFoundException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -47,17 +45,13 @@ public class DockerRunnerHandler implements OutputHandler {
   private static final Logger LOG = LoggerFactory.getLogger(DockerRunnerHandler.class);
 
   private final DockerRunner dockerRunner;
-  private final StateManager stateManager;
 
-  public DockerRunnerHandler(
-      DockerRunner dockerRunner,
-      StateManager stateManager) {
+  public DockerRunnerHandler(DockerRunner dockerRunner) {
     this.dockerRunner = requireNonNull(dockerRunner);
-    this.stateManager = requireNonNull(stateManager);
   }
 
   @Override
-  public void transitionInto(RunState state) {
+  public Optional<Event> transitionInto(RunState state) {
     switch (state.state()) {
       case SUBMITTING:
         final RunSpec runSpec;
@@ -65,50 +59,83 @@ public class DockerRunnerHandler implements OutputHandler {
           runSpec = createRunSpec(state);
         } catch (ResourceNotFoundException e) {
           LOG.error("Unable to start docker procedure.", e);
-          stateManager.receiveIgnoreClosed(Event.halt(state.workflowInstance()));
-          return;
-        }
-
-        // Emit submitted event first to guarantee it is observed before events from the pod
-        final Event submitted = Event.submitted(state.workflowInstance(), runSpec.executionId());
-        try {
-          stateManager.receive(submitted, state.counter());
-        } catch (IsClosedException isClosedException) {
-          LOG.warn("Could not emit 'submitted' event", isClosedException);
-          return;
+          return Optional.of(Event.halt(state.workflowInstance()));
         }
 
         try {
           LOG.info("running:{} image:{} args:{} termination_logging:{}", state.workflowInstance().toKey(),
               runSpec.imageName(), runSpec.args(), runSpec.terminationLogging());
           dockerRunner.start(state.workflowInstance(), runSpec);
-        } catch (Throwable e) {
-          try {
-            final String msg = "Failed the docker starting procedure for " + state.workflowInstance().toKey();
-            if (isUserError(e)) {
-              LOG.info("{}: {}", msg, e.getMessage());
-            } else {
-              LOG.error(msg, e);
-            }
-            stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()), 
-                state.counter() + 1);
-          } catch (IsClosedException isClosedException) {
-            LOG.warn("Failed to send 'runError' event", isClosedException);
+        } catch (Exception e) {
+          final String msg = "Failed the docker starting procedure for " + state.workflowInstance().toKey();
+          if (isUserError(e)) {
+            LOG.info("{}: {}", msg, e.getMessage());
+          } else {
+            LOG.error(msg, e);
           }
+          return Optional.of(Event.runError(state.workflowInstance(), e.getMessage()));
         }
-        break;
+
+        return Optional.of(Event.submitted(state.workflowInstance(), runSpec.executionId()));
+
+      case SUBMITTED: {
+        final DockerRunner.JobStatus jobStatus = dockerRunner.status(state.data().executionId().get());
+        if (jobStatus == null) {
+          // Gone...
+          return Optional.of(Event.runError(state.workflowInstance(), "Job gone"));
+        }
+        if (jobStatus.error().isPresent()) {
+          return Optional.of(Event.runError(state.workflowInstance(), "Job error: " + jobStatus.error().get()));
+        }
+
+        switch (jobStatus.phase()) {
+          case PENDING:
+            // Let's wait some more
+            return Optional.empty();
+          case RUNNING:
+          case SUCCEEDED:
+          case FAILED:
+            return Optional.of(Event.started(state.workflowInstance()));
+          default:
+            throw new AssertionError();
+        }
+      }
+
+      case RUNNING:
+        final DockerRunner.JobStatus jobStatus = dockerRunner.status(state.data().executionId().get());
+        if (jobStatus == null) {
+          // Gone...
+          return Optional.of(Event.runError(state.workflowInstance(), "Job gone"));
+        }
+        if (jobStatus.error().isPresent()) {
+          return Optional.of(Event.runError(state.workflowInstance(), "Job error: " + jobStatus.error().get()));
+        }
+
+        switch (jobStatus.phase()) {
+          case PENDING:
+            return Optional.of(Event.runError(state.workflowInstance(), "Unexpected job phase: " + jobStatus.phase()));
+          case RUNNING:
+            // Let's wait some more
+            return Optional.empty();
+          case SUCCEEDED:
+          case FAILED:
+            return Optional.of(Event.terminate(state.workflowInstance(), jobStatus.exitCode()));
+          default:
+            throw new AssertionError();
+        }
 
       case TERMINATED:
       case FAILED:
       case ERROR:
+        // TODO: remove this effectively unused cleanup?
         if (state.data().executionId().isPresent()) {
           final String executionId = state.data().executionId().get();
           dockerRunner.cleanup(state.workflowInstance(), executionId);
         }
-        break;
+        return Optional.empty();
 
       default:
-        // do nothing
+        return Optional.empty();
     }
   }
 

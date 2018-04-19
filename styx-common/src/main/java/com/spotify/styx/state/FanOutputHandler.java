@@ -20,7 +20,11 @@
 
 package com.spotify.styx.state;
 
+import com.spotify.styx.model.Event;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,14 +42,22 @@ class FanOutputHandler implements OutputHandler {
   }
 
   @Override
-  public void transitionInto(RunState state) {
+  public Optional<Event> transitionInto(RunState state) {
+    final List<Event> events = new ArrayList<>();
     for (OutputHandler handler : outputHandlers) {
       try {
-        handler.transitionInto(state);
+        final Optional<Event> event = handler.transitionInto(state);
+        event.ifPresent(events::add);
       } catch (Throwable e) {
         LOG.warn("Output handler {} threw", handler, e);
         throw e;
       }
+    }
+    // TODO: let scheduler deal with the multiple events instead?
+    if (events.isEmpty()) {
+      return Optional.empty();
+    } else {
+      return Optional.of(events.get(0));
     }
   }
 }

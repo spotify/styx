@@ -120,6 +120,11 @@ class LocalDockerRunner implements DockerRunner {
     // nop
   }
 
+  @Override
+  public JobStatus status(String executionId) {
+    throw new UnsupportedOperationException("TODO");
+  }
+
   private void checkStatuses() {
     LOG.debug("Checking running statuses, {} statuses to check", inFlight.size());
 

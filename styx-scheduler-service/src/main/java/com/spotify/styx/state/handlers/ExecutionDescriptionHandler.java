@@ -30,7 +30,6 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.MissingRequiredPropertyException;
@@ -40,6 +39,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,52 +51,39 @@ public class ExecutionDescriptionHandler implements OutputHandler {
   private static final String STYX_RUN = "styx-run";
 
   private final Storage storage;
-  private final StateManager stateManager;
   private final WorkflowValidator validator;
 
   public ExecutionDescriptionHandler(
       Storage storage,
-      StateManager stateManager,
       WorkflowValidator validator) {
     this.storage = requireNonNull(storage);
-    this.stateManager = requireNonNull(stateManager);
     this.validator = requireNonNull(validator);
   }
 
   @Override
-  public void transitionInto(RunState state) {
+  public Optional<Event> transitionInto(RunState state) {
     final WorkflowInstance workflowInstance = state.workflowInstance();
 
     switch (state.state()) {
       case PREPARE:
         try {
-          final Event submitEvent = Event.submit(
-              state.workflowInstance(), getExecDescription(workflowInstance), createExecutionId());
-          try {
-            stateManager.receive(submitEvent);
-          } catch (IsClosedException isClosedException) {
-            LOG.warn("Could not send 'submit' event", isClosedException);
-          }
+          return Optional.of(Event.submit(
+              state.workflowInstance(), getExecDescription(workflowInstance), createExecutionId()));
         } catch (ResourceNotFoundException e) {
           LOG.info("Workflow {} does not exist, halting {}", workflowInstance.workflowId(),
                    workflowInstance);
-          stateManager.receiveIgnoreClosed(Event.halt(workflowInstance));
+          return Optional.of(Event.halt(workflowInstance));
         } catch (MissingRequiredPropertyException e) {
           LOG.warn("Failed to prepare execution description for "
                    + state.workflowInstance().toKey(), e);
-          stateManager.receiveIgnoreClosed(Event.halt(workflowInstance));
+          return Optional.of(Event.halt(workflowInstance));
         } catch (IOException e) {
-          try {
-            LOG.error("Failed to retrieve execution description for " + state.workflowInstance().toKey(), e);
-            stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()));
-          } catch (IsClosedException isClosedException) {
-            LOG.warn("Failed to send 'runError' event", isClosedException);
-          }
+          LOG.error("Failed to retrieve execution description for " + state.workflowInstance().toKey(), e);
+          return Optional.of(Event.runError(state.workflowInstance(), e.getMessage()));
         }
-        break;
 
       default:
-        // do nothing
+        return Optional.empty();
     }
   }
 

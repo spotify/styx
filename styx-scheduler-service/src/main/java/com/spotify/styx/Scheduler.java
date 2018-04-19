@@ -47,11 +47,13 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.InstanceState;
+import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
 import java.time.Instant;
@@ -65,6 +67,8 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -99,11 +103,13 @@ public class Scheduler {
   private final Stats stats;
   private final RateLimiter dequeueRateLimiter;
   private final WorkflowExecutionGate gate;
+  private final List<OutputHandler> outputHandlers;
 
   public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager,
-                   Storage storage,
-                   WorkflowResourceDecorator resourceDecorator,
-                   Stats stats, RateLimiter dequeueRateLimiter, WorkflowExecutionGate gate) {
+      Storage storage,
+      WorkflowResourceDecorator resourceDecorator,
+      Stats stats, RateLimiter dequeueRateLimiter, WorkflowExecutionGate gate,
+      List<OutputHandler> outputHandlers) {
     this.time = Objects.requireNonNull(time);
     this.ttls = Objects.requireNonNull(ttls);
     this.stateManager = Objects.requireNonNull(stateManager);
@@ -112,6 +118,7 @@ public class Scheduler {
     this.stats = Objects.requireNonNull(stats);
     this.dequeueRateLimiter = Objects.requireNonNull(dequeueRateLimiter, "dequeueRateLimiter");
     this.gate = Objects.requireNonNull(gate, "gate");
+    this.outputHandlers = outputHandlers;
   }
 
   void tick() {
@@ -160,20 +167,49 @@ public class Scheduler {
     // this reflects resource usage since last tick, so a couple of minutes delay
     updateResourceStats(resources, currentResourceUsage);
 
-    final List<InstanceState> eligibleInstances =
-        activeStates.parallelStream()
+    final List<InstanceState> aliveInstances = activeStates.parallelStream()
             .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
-            .filter(entry -> shouldExecute(entry.runState()))
-            .sorted(comparingLong(i -> i.runState().timestamp()))
             .collect(toList());
+
+    final Map<State, List<InstanceState>> instancesByState = aliveInstances.stream()
+        .collect(Collectors.groupingBy(instance -> instance.runState().state()));
+
+    final List<InstanceState> dequeueEligibleInstances = instancesByState.get(State.QUEUED).stream()
+        .filter(entry -> isDueForDequeue(entry.runState()))
+        .sorted(comparingLong(i -> i.runState().timestamp()))
+        .collect(toList());
+
+    final List<InstanceState> executingInstances = Stream.of(State.values())
+        .filter(state -> state != State.QUEUED && state != State.NEW)
+        .flatMap(state -> instancesByState.get(state).stream())
+        .collect(toList());
 
     timedOutInstances.forEach(wfi -> this.sendTimeout(wfi, activeStatesMap.get(wfi)));
 
     gateAndDequeueInstances(config, resources, workflowResourceReferences,
-        workflows, eligibleInstances);
+        workflows, dequeueEligibleInstances);
+
+    processExecutingInstances(executingInstances);
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
     stats.recordTickDuration(TICK_TYPE, durationMillis);
+  }
+
+  private void processExecutingInstances(List<InstanceState> instances) {
+    for (InstanceState instance : instances) {
+      // TODO: have handlers register their state interests and avoid having to loop through all of them
+      // TODO: we really want just one event here...?
+      for (OutputHandler outputHandler : outputHandlers) {
+        final Optional<Event> event = outputHandler.transitionInto(instance.runState());
+        if (event.isPresent()) {
+          try {
+            stateManager.receive(event.get());
+          } catch (IsClosedException e) {
+            return;
+          }
+        }
+      }
+    }
   }
 
   private void updateResourceStats(Map<String, Resource> resources,
@@ -274,11 +310,7 @@ public class Scheduler {
     }
   }
 
-  private boolean shouldExecute(RunState runState) {
-    if (runState.state() != State.QUEUED) {
-      return false;
-    }
-
+  private boolean isDueForDequeue(RunState runState) {
     final Instant now = time.get();
     final Instant deadline = Instant
         .ofEpochMilli(runState.timestamp())

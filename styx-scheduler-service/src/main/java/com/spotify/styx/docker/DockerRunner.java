@@ -72,6 +72,8 @@ public interface DockerRunner extends Closeable {
    */
   void cleanup(WorkflowInstance workflowInstance, String executionId);
 
+  JobStatus status(String executionId);
+
   @AutoMatter
   interface RunSpec {
 
@@ -143,4 +145,21 @@ public interface DockerRunner extends Closeable {
    * Factory for {@link DockerRunner} instances identified by a string identifier
    */
   interface DockerRunnerFactory extends Function<String, DockerRunner> { }
+
+  @AutoMatter
+  interface JobStatus {
+
+    Optional<Integer> exitCode();
+
+    Optional<String> error();
+
+    enum Phase {
+      PENDING,
+      RUNNING,
+      SUCCEEDED,
+      FAILED
+    }
+
+    Phase phase();
+  }
 }

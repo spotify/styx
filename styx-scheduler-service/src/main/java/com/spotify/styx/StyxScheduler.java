@@ -105,7 +105,6 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -320,13 +319,9 @@ public class StyxScheduler implements AppInit {
 
     initializeResources(storage, shardedCounter, counterSnapshotFactory, timeoutConfig, workflowCache);
 
-    // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
-    //       take StateManager as argument instead?
-    final List<OutputHandler> outputHandlers = new ArrayList<>();
     final QueuedStateManager stateManager = closer.register(
         new QueuedStateManager(time, eventTransitionExecutor, storage,
-            eventConsumerFactory.apply(environment, stats), eventConsumerExecutor,
-            fanOutput(outputHandlers), shardedCounter));
+            eventConsumerFactory.apply(environment, stats), eventConsumerExecutor, shardedCounter));
 
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
     final Supplier<String> dockerId = () -> styxConfig.get().globalDockerRunnerId();
@@ -338,14 +333,14 @@ public class StyxScheduler implements AppInit {
 
     final RateLimiter dequeueRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
 
-    outputHandlers.addAll(ImmutableList.of(
+    final List<OutputHandler> outputHandlers = ImmutableList.of(
         new TransitionLogger(""),
         new DockerRunnerHandler(
-            dockerRunner, stateManager),
-        new TerminationHandler(retryUtil, stateManager),
+            dockerRunner),
+        new TerminationHandler(retryUtil),
         new MonitoringHandler(stats),
         new PublisherHandler(publisher),
-        new ExecutionDescriptionHandler(storage, stateManager, new WorkflowValidator(new DockerImageValidator()))));
+        new ExecutionDescriptionHandler(storage, new WorkflowValidator(new DockerImageValidator())));
 
     final TriggerListener trigger =
         new StateInitializingTrigger(stateManager);
@@ -356,7 +351,7 @@ public class StyxScheduler implements AppInit {
 
     final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager,
                                               storage, resourceDecorator, stats, dequeueRateLimiter,
-                                              executionGateFactory.apply(environment, storage));
+                                              executionGateFactory.apply(environment, storage), outputHandlers);
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 

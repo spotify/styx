@@ -163,11 +163,16 @@ class KubernetesDockerRunner implements DockerRunner {
   @Override
   public void start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
     final KubernetesSecretSpec secretSpec = ensureSecrets(workflowInstance, runSpec);
-    stats.recordSubmission(runSpec.executionId());
     try {
       client.pods().create(createPod(workflowInstance, runSpec, secretSpec));
+      stats.recordSubmission(runSpec.executionId());
     } catch (KubernetesClientException kce) {
-      throw new IOException("Failed to create Kubernetes pod", kce);
+      if (kce.getCode() == 409) {
+        // Already launched, success!
+        return;
+      } else {
+        throw new IOException("Failed to create Kubernetes pod", kce);
+      }
     }
   }
 
@@ -319,6 +324,15 @@ class KubernetesDockerRunner implements DockerRunner {
   public void cleanup(WorkflowInstance workflowInstance, String executionId) {
     // do not cleanup pod along with state machine transition and let polling thread
     // take care of it
+  }
+
+  @Override
+  public JobStatus status(String executionId) {
+    final Pod pod = client.pods().withName(executionId).get();
+    if (pod == null) {
+      return null;
+    }
+    return null;
   }
 
   @VisibleForTesting

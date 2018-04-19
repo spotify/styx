@@ -23,9 +23,11 @@ package com.spotify.styx.state.handlers;
 import static java.lang.String.format;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.spotify.styx.model.Event;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import java.util.Objects;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,16 +37,19 @@ public class TransitionLogger implements OutputHandler {
 
   private final String prefix;
 
+  // TODO: this probably wants to be an event listener instead?
+
   public TransitionLogger(String prefix) {
     this.prefix = Objects.requireNonNull(prefix);
   }
 
   @Override
-  public void transitionInto(RunState state) {
+  public Optional<Event> transitionInto(RunState state) {
     final String instanceKey = state.workflowInstance().toKey();
     LOG.info(
         "{}{} transition -> {} {}",
         this.prefix, instanceKey, state.state().name().toLowerCase(), stateInfo(state));
+    return Optional.empty();
   }
 
   @VisibleForTesting
