@@ -23,9 +23,7 @@ package com.spotify.styx.model;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.auto.value.AutoValue;
-import com.google.common.collect.ImmutableSet;
 import java.util.Locale;
-import java.util.Set;
 
 @AutoValue
 public abstract class Schedule {
@@ -121,11 +119,6 @@ public abstract class Schedule {
         break;
     }
     return new AutoValue_Schedule(normalizedExpression);
-  }
-
-  // todo: remove
-  public static Set<Schedule> values() {
-    return ImmutableSet.of(HOURS, DAYS, WEEKS, MONTHS);
   }
 
   public enum WellKnown {

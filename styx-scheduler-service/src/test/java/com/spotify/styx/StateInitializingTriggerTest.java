@@ -25,15 +25,12 @@ import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.model.Schedule.MONTHS;
 import static com.spotify.styx.model.Schedule.WEEKS;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Sets;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -148,11 +145,6 @@ public class StateInitializingTriggerTest {
 
       verify(stateManager).trigger(expectedInstance, Trigger.natural());
     }
-  }
-
-  @Test
-  public void testsShouldCoverAllScheduleCases() throws Exception {
-    assertThat(SCHEDULE_ARG_EXPECTS.keySet(), is(Sets.newHashSet(Schedule.values())));
   }
 
   private WorkflowConfiguration workflowConfiguration(Schedule schedule, String... args) {
