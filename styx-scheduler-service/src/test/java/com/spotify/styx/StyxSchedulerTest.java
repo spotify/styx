@@ -27,7 +27,6 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -190,11 +189,9 @@ public class StyxSchedulerTest {
   @Test
   public void shouldHandleModifyWorkflow() {
     when(workflowInitializer.inspectChange(WORKFLOW_WITH_RESOURCES)).thenReturn(Optional.of(WORKFLOW_WITH_RESOURCES));
-    final Consumer<Workflow> consumer = StyxScheduler.workflowChanged(workflowInitializer, stats,
-        stateManager, workflowConsumer);
+    final Consumer<Workflow> consumer = StyxScheduler.workflowChanged(workflowInitializer, workflowConsumer);
     consumer.accept(WORKFLOW_WITH_RESOURCES);
     verify(workflowInitializer).inspectChange(WORKFLOW_WITH_RESOURCES);
-    verify(stats).registerActiveStatesMetric(eq(WORKFLOW_WITH_RESOURCES.id()), any());
     verify(workflowConsumer).accept(Optional.of(WORKFLOW_WITH_RESOURCES),
         Optional.of(WORKFLOW_WITH_RESOURCES));
   }
@@ -202,11 +199,9 @@ public class StyxSchedulerTest {
   @Test
   public void shouldHandleWorkflowCreate() {
     when(workflowInitializer.inspectChange(WORKFLOW_WITH_RESOURCES)).thenReturn(Optional.empty());
-    final Consumer<Workflow> consumer = StyxScheduler.workflowChanged(workflowInitializer, stats,
-        stateManager, workflowConsumer);
+    final Consumer<Workflow> consumer = StyxScheduler.workflowChanged(workflowInitializer, workflowConsumer);
     consumer.accept(WORKFLOW_WITH_RESOURCES);
     verify(workflowInitializer).inspectChange(WORKFLOW_WITH_RESOURCES);
-    verify(stats).registerActiveStatesMetric(eq(WORKFLOW_WITH_RESOURCES.id()), any());
     verify(workflowConsumer).accept(Optional.empty(), Optional.of(WORKFLOW_WITH_RESOURCES));
   }
 

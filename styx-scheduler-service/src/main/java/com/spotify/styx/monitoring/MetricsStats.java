@@ -54,10 +54,6 @@ public final class MetricsStats implements Stats {
       .tagged("what", "active-states-per-runstate-per-trigger-count")
       .tagged("unit", "state");
 
-  static final MetricId ACTIVE_STATES_PER_WORKFLOW = BASE
-      .tagged("what", "active-states-per-workflow-count")
-      .tagged("unit", "state");
-
   static final MetricId WORKFLOW_COUNT = BASE
       .tagged("what", "workflow-count")
       .tagged("unit", "workflow");
@@ -152,7 +148,6 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Meter> storageOperationMeters;
   private final ConcurrentMap<String, Histogram> dockerOperationHistograms;
   private final ConcurrentMap<String, Meter> dockerOperationMeters;
-  private final ConcurrentMap<WorkflowId, Gauge> activeStatesPerWorkflowGauges;
   private final ConcurrentMap<Tuple2<WorkflowId, Integer>, Meter> exitCodePerWorkflowMeters;
   private final ConcurrentMap<Tuple3<String, String, Integer>, Meter> dockerOperationErrorMeters;
   private final ConcurrentMap<String, Histogram> resourceConfiguredHistograms;
@@ -184,7 +179,6 @@ public final class MetricsStats implements Stats {
     this.storageOperationMeters = new ConcurrentHashMap<>();
     this.dockerOperationHistograms = new ConcurrentHashMap<>();
     this.dockerOperationMeters = new ConcurrentHashMap<>();
-    this.activeStatesPerWorkflowGauges = new ConcurrentHashMap<>();
     this.exitCodePerWorkflowMeters = new ConcurrentHashMap<>();
     this.dockerOperationErrorMeters = new ConcurrentHashMap<>();
     this.resourceConfiguredHistograms = new ConcurrentHashMap<>();
@@ -205,16 +199,6 @@ public final class MetricsStats implements Stats {
                                          Gauge<Long> activeStatesCount) {
     registry.register(ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER.tagged(
         "state", state.name(), "trigger", triggerName), activeStatesCount);
-  }
-
-  @Override
-  public void registerActiveStatesMetric(WorkflowId workflowId, Gauge<Long> activeStatesCount) {
-    // fixme temporarily disabled due to heavy load in presence of high volume of registered workflows
-    //activeStatesPerWorkflowGauges.computeIfAbsent(
-    //    workflowId, (ignoreKey) -> registry.register(
-    //        ACTIVE_STATES_PER_WORKFLOW.tagged(
-    //           "component-id", workflowId.componentId(), "workflow-id", workflowId.id()),
-    //        activeStatesCount));
   }
 
   @Override
