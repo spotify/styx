@@ -325,10 +325,6 @@ public class StyxScheduler implements AppInit {
     final Storage storage = instrument(Storage.class, storageFactory.apply(environment), stats, time);
     closer.register(storage);
 
-    // XXX: bootstrap indexes as an offline operation instead of here in the styx scheduler process?
-    // TODO: remove after bootstrapping the indexes once
-    indexActiveWorkflowInstances(storage);
-
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
     final ShardedCounter shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
 
@@ -394,7 +390,7 @@ public class StyxScheduler implements AppInit {
     startScheduler(scheduler, executor);
     startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
     startCleaner(cleaner, executor);
-    startConcurrentWorkflowInstanceIndexing(storage, executor);
+
     setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats);
 
     final SchedulerResource schedulerResource =
@@ -411,17 +407,6 @@ public class StyxScheduler implements AppInit {
     this.backfillTriggerManager = backfillTriggerManager;
     this.workflowRemoveListener = workflowRemoveListener;
     this.workflowChangeListener = workflowChangeListener;
-  }
-
-  private void indexActiveWorkflowInstances(Storage storage) {
-    try {
-      if (storage.config().bootstrapActiveWFIEnabled()) {
-        storage.indexActiveWorkflowInstances();
-      }
-    } catch (IOException e) {
-      LOG.error("Error while bootstrapping active workflow instances", e);
-      throw new RuntimeException(e);
-    }
   }
 
   @VisibleForTesting
@@ -557,14 +542,6 @@ public class StyxScheduler implements AppInit {
         guard(cleaner::tick),
         0,
         CLEANER_TICK_INTERVAL_SECONDS,
-        SECONDS);
-  }
-
-  private static void startConcurrentWorkflowInstanceIndexing(Storage storage, ScheduledExecutorService exec) {
-    exec.scheduleWithFixedDelay(
-        guard(storage::concurrentlyIndexActiveWorkflowInstances),
-        CONCURRENT_WORKFLOW_INSTANCE_INDEXING_INTERVAL_SECONDS,
-        CONCURRENT_WORKFLOW_INSTANCE_INDEXING_INTERVAL_SECONDS,
         SECONDS);
   }
 
