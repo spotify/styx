@@ -325,10 +325,6 @@ public class StyxScheduler implements AppInit {
     final Storage storage = instrument(Storage.class, storageFactory.apply(environment), stats, time);
     closer.register(storage);
 
-    // XXX: bootstrap indexes as an offline operation instead of here in the styx scheduler process?
-    // TODO: remove after bootstrapping the indexes once
-    indexActiveWorkflowInstances(storage);
-
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
     final ShardedCounter shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
 
