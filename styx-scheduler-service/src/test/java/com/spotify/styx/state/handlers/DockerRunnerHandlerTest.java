@@ -104,7 +104,10 @@ public class DockerRunnerHandlerTest {
     Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
-        StateData.newBuilder().executionDescription(EXECUTION_DESCRIPTION).build());
+        StateData.newBuilder()
+            .executionId(TEST_EXECUTION_ID)
+            .executionDescription(EXECUTION_DESCRIPTION)
+            .build());
 
     dockerRunnerHandler.transitionInto(runState);
 
@@ -179,7 +182,22 @@ public class DockerRunnerHandlerTest {
   public void shouldHaltIfMissingExecutionDescription() {
     Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING);
+    RunState runState = RunState.create(workflowInstance, State.SUBMITTING, StateData.newBuilder()
+        .executionId(TEST_EXECUTION_ID)
+        .build());
+
+    dockerRunnerHandler.transitionInto(runState);
+
+    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance));
+  }
+
+  @Test
+  public void shouldHaltIfMissingExecutionId() {
+    Workflow workflow = Workflow.create("id", configuration());
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
+    RunState runState = RunState.create(workflowInstance, State.SUBMITTING, StateData.newBuilder()
+        .executionDescription(EXECUTION_DESCRIPTION)
+        .build());
 
     dockerRunnerHandler.transitionInto(runState);
 

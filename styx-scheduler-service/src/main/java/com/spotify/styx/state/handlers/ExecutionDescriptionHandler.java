@@ -134,7 +134,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         .build();
   }
 
-  static String createExecutionId() {
+  private static String createExecutionId() {
     return STYX_RUN + "-" + UUID.randomUUID().toString();
   }
 }
