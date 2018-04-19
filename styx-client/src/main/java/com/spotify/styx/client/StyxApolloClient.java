@@ -170,6 +170,14 @@ class StyxApolloClient implements StyxClient {
   }
 
   @Override
+  public CompletionStage<List<Workflow>> workflows() {
+    final HttpUrl.Builder urlBuilder = getUrlBuilder()
+        .addPathSegment("workflows");
+    return executeRequest(Request.forUri(urlBuilder.build().toString()), Workflow[].class)
+        .thenApply(ImmutableList::copyOf);
+  }
+
+  @Override
   public CompletionStage<Workflow> createOrUpdateWorkflow(String componentId, WorkflowConfiguration workflowConfig) {
     final HttpUrl.Builder urlBuilder = getUrlBuilder()
         .addPathSegment("workflows")

@@ -50,6 +50,7 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.serialization.Json;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -67,6 +68,24 @@ import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnitParamsRunner.class)
 public class StyxApolloClientTest {
+
+  private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_1 = WorkflowConfiguration.builder()
+      .id("bar-wf_1")
+      .dockerImage("busybox")
+      .dockerArgs(ImmutableList.of("echo", "hello world"))
+      .schedule(Schedule.DAYS)
+      .build();
+
+  private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_2 = WorkflowConfiguration.builder()
+      .id("bar-wf_2")
+      .dockerImage("busybox")
+      .dockerArgs(ImmutableList.of("echo", "hello world"))
+      .schedule(Schedule.DAYS)
+      .build();
+
+  private static final Workflow WORKFLOW_1 = Workflow.create("foo-comp", WORKFLOW_CONFIGURATION_1);
+
+  private static final Workflow WORKFLOW_2 = Workflow.create("foo-comp", WORKFLOW_CONFIGURATION_2);
 
   @Mock Client client;
   @Mock GoogleIdTokenAuth auth;
@@ -112,6 +131,21 @@ public class StyxApolloClientTest {
   }
 
   @Test
+  public void shouldGetAllWorkflows() throws Exception {
+    final List<Workflow> workflows = ImmutableList.of(WORKFLOW_1, WORKFLOW_2);
+    when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
+        Response.forStatus(Status.OK).withPayload(Json.serialize(workflows))));
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+    final CompletableFuture<List<Workflow>> r = styx.workflows().toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    assertThat(request.uri(), is(API_URL + "/workflows"));
+    assertThat(request.method(), is("GET"));
+    assertThat(r.get(), is(workflows));
+  }
+
+  @Test
   public void deleteWorkflow() {
     when(client.send(any(Request.class))).thenReturn(
         CompletableFuture.completedFuture(Response.forStatus(Status.NO_CONTENT)));
@@ -127,22 +161,17 @@ public class StyxApolloClientTest {
 
   @Test
   public void createOrUpdateWorkflow() throws Exception {
-    final WorkflowConfiguration config = WorkflowConfiguration.builder()
-        .id("bar-wf")
-        .dockerImage("busybox")
-        .dockerArgs(ImmutableList.of("echo", "hello world"))
-        .schedule(Schedule.DAYS)
-        .build();
-    final Workflow workflow = Workflow.create("foo-comp", config);
     when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
-        Response.forStatus(Status.OK).withPayload(Json.serialize(workflow))));
+        Response.forStatus(Status.OK).withPayload(Json.serialize(WORKFLOW_1))));
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
-    final CompletableFuture<Workflow> r = styx.createOrUpdateWorkflow("foo-comp", config).toCompletableFuture();
+    final CompletableFuture<Workflow> r = styx.createOrUpdateWorkflow("foo-comp",
+        WORKFLOW_CONFIGURATION_1).toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
     assertThat(request.uri(), is(API_URL + "/workflows/foo-comp"));
-    assertThat(Json.deserialize(request.payload().get(), WorkflowConfiguration.class), is(config));
+    assertThat(Json.deserialize(request.payload().get(), WorkflowConfiguration.class),
+        is(WORKFLOW_CONFIGURATION_1));
     assertThat(request.method(), is("POST"));
   }
 
