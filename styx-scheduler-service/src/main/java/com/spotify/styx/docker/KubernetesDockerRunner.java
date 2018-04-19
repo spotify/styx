@@ -99,8 +99,6 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
   static final String DOCKER_TERMINATION_LOGGING_ANNOTATION = "styx-docker-termination-logging";
   static final String COMPONENT_ID = "STYX_COMPONENT_ID";
-  // TODO: for backward compatibility, delete later
-  private static final String ENDPOINT_ID = "STYX_ENDPOINT_ID";
   static final String WORKFLOW_ID = "STYX_WORKFLOW_ID";
   static final String SERVICE_ACCOUNT = "STYX_SERVICE_ACCOUNT";
   static final String DOCKER_ARGS = "STYX_DOCKER_ARGS";
@@ -304,8 +302,6 @@ class KubernetesDockerRunner implements DockerRunner {
                                        RunSpec runSpec) {
     return Arrays.asList(
         envVar(COMPONENT_ID,    workflowInstance.workflowId().componentId()),
-        // TODO: for backward compatibility, delete later
-        envVar(ENDPOINT_ID,     workflowInstance.workflowId().id()),
         envVar(WORKFLOW_ID,     workflowInstance.workflowId().id()),
         envVar(PARAMETER,       workflowInstance.parameter()),
         envVar(COMMIT_SHA,      runSpec.commitSha().orElse("")),
