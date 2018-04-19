@@ -243,7 +243,7 @@ class KubernetesDockerRunner implements DockerRunner {
     runSpec.memRequest().ifPresent(s -> resourceRequirements.addToRequests("memory", new Quantity(s)));
     runSpec.memLimit().ifPresent(s -> resourceRequirements.addToLimits("memory", new Quantity(s)));
 
-    final ContainerBuilder containerBuilder = new ContainerBuilder()
+    final ContainerBuilder mainContainerBuilder = new ContainerBuilder()
         .withName(mainContainerName(executionId))
         .withImage(imageWithTag)
         .withArgs(runSpec.args())
@@ -265,8 +265,8 @@ class KubernetesDockerRunner implements DockerRunner {
           .withName(saVolume.getName())
           .withReadOnly(true)
           .build();
-      containerBuilder.addToVolumeMounts(saMount);
-      containerBuilder.addToEnv(envVar(STYX_WORKFLOW_SA_ENV_VARIABLE,
+      mainContainerBuilder.addToVolumeMounts(saMount);
+      mainContainerBuilder.addToEnv(envVar(STYX_WORKFLOW_SA_ENV_VARIABLE,
                                        saMount.getMountPath() + STYX_WORKFLOW_SA_JSON_KEY));
     });
 
@@ -285,10 +285,10 @@ class KubernetesDockerRunner implements DockerRunner {
           .withName(secretVolume.getName())
           .withReadOnly(true)
           .build();
-      containerBuilder.addToVolumeMounts(secretMount);
+      mainContainerBuilder.addToVolumeMounts(secretMount);
     });
 
-    specBuilder.addToContainers(containerBuilder.build());
+    specBuilder.addToContainers(mainContainerBuilder.build());
     specBuilder.addToContainers(keepaliveContainer());
     podBuilder.withSpec(specBuilder.build());
 
