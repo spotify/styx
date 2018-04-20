@@ -279,7 +279,7 @@ public class SchedulerResource {
         // TODO: propagate error information using a more specific exception type
         return Response.forStatus(CONFLICT.withReasonPhrase(cause.getMessage()));
       } else {
-        return Response.forStatus(INTERNAL_SERVER_ERROR);
+        return Response.forStatus(INTERNAL_SERVER_ERROR.withReasonPhrase(cause.getMessage()));
       }
     }
 
