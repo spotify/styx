@@ -22,6 +22,7 @@ package com.spotify.styx.state;
 
 import static com.spotify.styx.state.StateUtil.isConsumingResources;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -43,6 +44,7 @@ import com.spotify.styx.util.Time;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -262,16 +264,17 @@ public class QueuedStateManager implements StateManager {
             tx.updateCounter(shardedCounter, resource, 1))))
         .filter(x -> x._2.isFailure())
         .collect(toSet());
-    final Set<String> depletedResourceIds = failedTries.stream()
+    final List<String> depletedResourceIds = failedTries.stream()
         .filter(x -> x._2.getCause() instanceof CounterCapacityException)
         .map(x -> x._1)
+        // Sort resource ids to get deterministic message contents
         .sorted()
-        .collect(toSet());
+        .collect(toList());
 
     if (!depletedResourceIds.isEmpty()) {
-      final Set<Resource> depletedResources = depletedResourceIds.stream().map(x ->
+      final List<Resource> depletedResources = depletedResourceIds.stream().map(x ->
           Resource.create(x, shardedCounter.getCounterSnapshot(x).getLimit()))
-          .collect(toSet());
+          .collect(toList());
       final Message message = Message.info(
           String.format("Resource limit reached for: %s", depletedResources));
       if (!runState.data().message().map(message::equals).orElse(false)) {
