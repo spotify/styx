@@ -59,6 +59,7 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import com.spotify.styx.workflow.WorkflowInitializationException;
@@ -529,7 +530,7 @@ public class SchedulerResourceTest {
 
   @Test
   public void testTriggerAlreadyActiveWorkflowInstance() throws Exception {
-    final IllegalStateException cause = new IllegalStateException("already active!");
+    final AlreadyInitializedException cause = new AlreadyInitializedException("already active!");
 
     when(storage.workflow(DAILY_WORKFLOW.id())).thenReturn(Optional.of(DAILY_WORKFLOW));
     WorkflowInstance toTrigger = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2015-12-31");
@@ -540,7 +541,9 @@ public class SchedulerResourceTest {
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
     assertThat(response.status(),
-               is(Status.CONFLICT.withReasonPhrase(cause.getMessage())));
+               is(Status.CONFLICT.withReasonPhrase(
+                   "This workflow instance is already triggered. Did you want to `retry` running it instead? " + cause
+                       .getMessage())));
   }
 
   @Test

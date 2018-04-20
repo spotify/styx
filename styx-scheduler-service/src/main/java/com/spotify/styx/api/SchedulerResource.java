@@ -45,6 +45,7 @@ import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RandomGenerator;
@@ -278,6 +279,10 @@ public class SchedulerResource {
           || cause instanceof IllegalArgumentException) {
         // TODO: propagate error information using a more specific exception type
         return Response.forStatus(CONFLICT.withReasonPhrase(cause.getMessage()));
+      } else if (cause instanceof AlreadyInitializedException) {
+        return Response.forStatus(CONFLICT.withReasonPhrase(
+            "This workflow instance is already triggered. Did you want to `retry` running it instead? " + cause
+                .getMessage()));
       } else {
         return Response.forStatus(INTERNAL_SERVER_ERROR.withReasonPhrase(cause.getMessage()));
       }
