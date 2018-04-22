@@ -32,6 +32,10 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.Time;
+import eu.toolchain.ffwd.FastForward;
+import java.io.IOException;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -136,6 +140,7 @@ public final class MetricsStats implements Stats {
 
   private final SemanticMetricRegistry registry;
   private final Time time;
+  private final FastForward ffwd;
 
   private final Histogram submitToRunning;
   private final Meter pullImageErrorMeter;
@@ -187,6 +192,13 @@ public final class MetricsStats implements Stats {
     this.eventConsumerMeters = new ConcurrentHashMap<>();
     this.workflowConsumerMeters = new ConcurrentHashMap<>();
     this.tickHistograms = new ConcurrentHashMap<>();
+
+    try {
+      // TODO: specify host & port?
+      this.ffwd = FastForward.setup();
+    } catch (UnknownHostException | SocketException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
@@ -280,7 +292,15 @@ public final class MetricsStats implements Stats {
 
   @Override
   public void recordResourceUsed(String resource, long used) {
-    resourceUsedHistogram(resource).update(used);
+    try {
+      ffwd.send(FastForward.event("styx")
+          .attribute("what", "resource-used")
+          .attribute("resource", resource)
+          .value(used));
+    } catch (IOException e) {
+      // TODO
+    }
+//    resourceUsedHistogram(resource).update(used);
   }
 
   @Override
