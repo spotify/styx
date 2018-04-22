@@ -96,6 +96,7 @@ import com.spotify.styx.util.WorkflowValidator;
 import com.spotify.styx.workflow.WorkflowInitializer;
 import com.typesafe.config.Config;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
+import eu.toolchain.ffwd.FastForward;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
