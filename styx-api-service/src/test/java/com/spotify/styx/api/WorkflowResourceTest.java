@@ -467,7 +467,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shoulCreateWorkflow() throws Exception {
+  public void shouldCreateWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
     when(workflowInitializer.store(WORKFLOW)).thenReturn(Optional.empty());
