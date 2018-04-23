@@ -302,9 +302,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private static Container keepaliveContainer() {
     return new ContainerBuilder()
         .withName(KEEPALIVE_CONTAINER_NAME)
-        .withImage("busybox")
-        // Sleep forever and exit immediately on SIGTERM or SIGINT
-        .withArgs("/bin/sh", "-c", "trap : INT TERM; mkfifo pipe && read < pipe")
+        .withImage("kubernetes/pause")
         .build();
   }
 
