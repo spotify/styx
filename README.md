@@ -42,7 +42,7 @@ Instance executions and provides information about them via the API.
 ## Development status
 
 Styx is actively being developed and deployed internally at Spotify where it is being used to run
-around 2200 production workflows. Because of how we build and integrate infrastructure components at
+around 6000 production workflows. Because of how we build and integrate infrastructure components at
 Spotify, this repository does not contain a GUI at the time of writing, while we do have one
 internally. The goal is to break out more of these components into open source projects that
 complement each other.
@@ -70,6 +70,7 @@ to be specified for the service to work:
 styx.gke.default.project-id = ""
 styx.gke.default.cluster-zone = ""
 styx.gke.default.cluster-id = ""
+styx.gke.default.namespace = ""
 
 # Google Cloud Bigtable instance
 styx.bigtable.project-id = ""
@@ -230,6 +231,10 @@ For each execution, Styx will inject a set of environment variables into the Doc
 | `STYX_EXECUTION_ID` | A unique identifier for the execution. This is the execution id used to identify execution attempts of a trigger. |
 | `STYX_EXECUTION_COUNTER` | **to be implemented** - A counter indicating which execution this is. Goes from 0..N per trigger. |
 
+### High availability
+
+Since version 2.0, Styx supports full HA (High Availability) where both [styx-api-service] and [styx-scheduler-service] can be set up
+to have multiple instances.
 
 ## Development
 
@@ -277,3 +282,5 @@ expected to honor this code.
 [Google Cloud Platform]: https://cloud.google.com/
 [Granting Roles to Service Accounts]: https://cloud.google.com/iam/docs/granting-roles-to-service-accounts
 [codecov.io]: https://codecov.io/gh/spotify/styx
+[styx-api-service]: https://github.com/spotify/styx/tree/master/styx-api-service
+[styx-scheduler-service]: https://github.com/spotify/styx/tree/master/styx-scheduler-service
