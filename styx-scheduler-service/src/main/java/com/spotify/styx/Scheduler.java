@@ -151,8 +151,6 @@ public class Scheduler {
                 workflowId -> workflowResources(globalConcurrency.isPresent(),
                     Optional.ofNullable(workflows.get(workflowId)))));
 
-    // Note: not a strongly consistent number, so the graphed value can be imprecise or show
-    // exceeded limit even if the real usage never exceeded the limit.
     final Map<String, Long> currentResourceUsage =
         getResourceUsage(globalConcurrency.isPresent(), activeStates, timedOutInstances,
             resourceDecorator, workflows);
