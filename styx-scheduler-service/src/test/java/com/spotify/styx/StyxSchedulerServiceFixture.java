@@ -21,6 +21,7 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
+import static com.spotify.styx.util.TimeUtil.lastInstant;
 import static java.time.temporal.ChronoUnit.HOURS;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -45,6 +46,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
+import com.spotify.styx.monitoring.StatsFactory;
 import com.spotify.styx.publisher.Publisher;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
@@ -89,7 +91,9 @@ public class StyxSchedulerServiceFixture {
   private static final Logger LOG = LoggerFactory.getLogger(StyxSchedulerServiceFixture.class);
 
   private Instant now = Instant.parse("1970-01-01T00:00:00Z");
+
   private LocalDatastoreHelper localDatastore;
+  private Time time = () -> now;
 
   private Datastore datastore;
   private Connection bigtable = setupBigTableMockTable(0);
@@ -100,7 +104,6 @@ public class StyxSchedulerServiceFixture {
   // circumstantial fields, set by test cases
 
   private List<Tuple2<SequenceEvent, RunState.State>> transitionedEvents = Lists.newArrayList();
-  private List<Tuple2<Optional<Workflow>, Optional<Workflow>>> workflowChanges = Lists.newArrayList();
 
   // captured fields from fakes
   Queue<Tuple2<WorkflowInstance, DockerRunner.RunSpec>> dockerRuns = new ConcurrentLinkedQueue();
@@ -139,8 +142,7 @@ public class StyxSchedulerServiceFixture {
     storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
 
     StorageFactory storageFactory = (env) -> storage;
-    Time time = () -> now;
-    StyxScheduler.StatsFactory statsFactory = (env) -> Stats.NOOP;
+    StatsFactory statsFactory = (env) -> Stats.NOOP;
     StyxScheduler.ExecutorFactory executorFactory = (ts, tf) -> executor;
     StyxScheduler.PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
     StyxScheduler.DockerRunnerFactory dockerRunnerFactory =
@@ -148,11 +150,7 @@ public class StyxSchedulerServiceFixture {
     WorkflowResourceDecorator resourceDecorator = (rs, cfg, res) ->
         Sets.union(res, resourceIdsToDecorateWith);
     StyxScheduler.EventConsumerFactory eventConsumerFactory =
-        (env, stats) -> (event, state) -> transitionedEvents.add(Tuple.of(event, state.state()));
-    StyxScheduler.WorkflowConsumerFactory workflowConsumerFactory =
-        (env, stats) -> (oldWorkflow, newWorkflow) ->
-            workflowChanges.add(Tuple.of(oldWorkflow, newWorkflow));
-
+        (env, stats) -> (event, state) ->  transitionedEvents.add(Tuple.of(event, state.state()));
 
     styxScheduler = StyxScheduler.newBuilder()
         .setTime(time)
@@ -163,7 +161,6 @@ public class StyxSchedulerServiceFixture {
         .setPublisherFactory(publisherFactory)
         .setResourceDecorator(resourceDecorator)
         .setEventConsumerFactory(eventConsumerFactory)
-        .setWorkflowConsumerFactory(workflowConsumerFactory)
         .build();
 
     serviceHelper = ServiceHelper.create(styxScheduler, StyxScheduler.SERVICE_NAME)
@@ -296,12 +293,22 @@ public class StyxSchedulerServiceFixture {
     resourceIdsToDecorateWith = resourceIds;
   }
 
-  void workflowChanges(Workflow workflow) {
-    styxScheduler.getWorkflowChangeListener().accept(workflow);
+  void workflowChanges(Workflow workflow) throws IOException {
+    final TriggerInstantSpec triggerInstantSpec = initializeNaturalTrigger(workflow);
+    storage.storeWorkflow(workflow);
+    storage.updateNextNaturalTrigger(workflow.id(), triggerInstantSpec);
   }
 
-  void workflowDeleted(Workflow workflow) {
-    styxScheduler.getWorkflowRemoveListener().accept(workflow);
+  void workflowDeleted(Workflow workflow) throws IOException {
+    storage.delete(workflow.id());
+  }
+
+  private TriggerInstantSpec initializeNaturalTrigger(Workflow workflow) {
+    final Instant now = time.get();
+    final Schedule schedule = workflow.configuration().schedule();
+    final Instant nextTrigger = lastInstant(now, schedule);
+    final Instant nextWithOffset = workflow.configuration().addOffset(nextTrigger);
+    return TriggerInstantSpec.create(nextTrigger, nextWithOffset);
   }
 
   /**
@@ -398,11 +405,6 @@ public class StyxSchedulerServiceFixture {
   void awaitUntilConsumedEvent(SequenceEvent sequenceEvent, RunState.State state) {
     await().atMost(30, SECONDS).until(() ->
         transitionedEvents.contains(Tuple.of(sequenceEvent, state)));
-  }
-
-  void awaitUntilConsumedWorkflow(Optional<Workflow> oldWorkflow, Optional<Workflow> newWorkflow) {
-    await().atMost(30, SECONDS).until(() ->
-        workflowChanges.contains(Tuple.of(oldWorkflow, newWorkflow)));
   }
 
   private void printTime() {

@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.workflow;
+package com.spotify.styx.api.workflow;
 
 import static com.spotify.styx.util.TimeUtil.lastInstant;
 
@@ -45,7 +45,8 @@ public class WorkflowInitializer {
     this.time = Objects.requireNonNull(time);
   }
 
-  public Optional<Workflow> inspectChange(Workflow workflow) {
+  public Optional<Workflow> store(Workflow workflow)
+      throws WorkflowInitializationException {
     final Optional<Workflow> previous;
     try {
       previous = storage.workflow(workflow.id());

@@ -23,17 +23,30 @@ package com.spotify.styx;
 import com.spotify.apollo.AppInit;
 import com.spotify.apollo.httpservice.HttpService;
 import com.spotify.apollo.httpservice.LoadingException;
+import com.spotify.metrics.core.SemanticMetricRegistry;
+import com.spotify.styx.monitoring.MetricsStats;
+import com.spotify.styx.monitoring.StatsFactory;
+import java.time.Instant;
 
 public class StyxService {
 
   private StyxService() {
+    throw new UnsupportedOperationException();
   }
 
   public static void main(String[] args) throws LoadingException {
-    final StyxScheduler scheduler = StyxScheduler.createDefault();
-    final StyxApi api = StyxApi.createDefault();
-
     final AppInit init = (env) -> {
+      final MetricsStats stats =
+          new MetricsStats(env.resolve(SemanticMetricRegistry.class), Instant::now);
+      final StatsFactory statsFactory = (ignored) -> stats;
+
+      final StyxScheduler scheduler = StyxScheduler.newBuilder()
+          .setStatsFactory(statsFactory)
+          .build();
+      final StyxApi api = StyxApi.newBuilder()
+          .setStatsFactory(statsFactory)
+          .build();
+
       scheduler.create(env);
       api.create(env);
     };

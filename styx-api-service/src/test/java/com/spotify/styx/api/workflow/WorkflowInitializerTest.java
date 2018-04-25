@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.workflow;
+package com.spotify.styx.api.workflow;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -66,7 +66,7 @@ public class WorkflowInitializerTest {
     when(storage.workflow(HOURLY_WORKFLOW.id())).thenThrow(new IOException("read error"));
 
     try {
-      workflowInitializer.inspectChange(HOURLY_WORKFLOW);
+      workflowInitializer.store(HOURLY_WORKFLOW);
       fail();
     } catch (RuntimeException e) {
       assertEquals("read error", e.getCause().getMessage());
@@ -79,7 +79,7 @@ public class WorkflowInitializerTest {
     when(storage.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
 
     try {
-      workflowInitializer.inspectChange(HOURLY_WORKFLOW);
+      workflowInitializer.store(HOURLY_WORKFLOW);
       fail();
     } catch (RuntimeException e) {
       assertEquals("write error", e.getCause().getMessage());
@@ -90,7 +90,7 @@ public class WorkflowInitializerTest {
   public void shouldFailComputeNextTrigger() throws Exception {
     when(storage.workflow(HOURLY_WORKFLOW.id()))
         .thenReturn(Optional.of(HOURLY_WORKFLOW));
-    workflowInitializer.inspectChange(HOURLY_WORKFLOW_WITH_INVALID_OFFSET);
+    workflowInitializer.store(HOURLY_WORKFLOW_WITH_INVALID_OFFSET);
   }
 
   @Test
@@ -101,7 +101,7 @@ public class WorkflowInitializerTest {
         .thenReturn(Optional.of(HOURLY_WORKFLOW));
 
     try {
-      workflowInitializer.inspectChange(HOURLY_WORKFLOW_WITH_VALID_OFFSET);
+      workflowInitializer.store(HOURLY_WORKFLOW_WITH_VALID_OFFSET);
       fail();
     } catch (RuntimeException e) {
       assertEquals("update error", e.getCause().getMessage());
