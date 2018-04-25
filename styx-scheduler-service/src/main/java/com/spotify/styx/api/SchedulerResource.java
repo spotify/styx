@@ -24,6 +24,7 @@ import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.CONFLICT;
 import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
 import static com.spotify.apollo.Status.OK;
+import static com.spotify.styx.util.ExceptionUtil.findCause;
 import static com.spotify.styx.util.ParameterUtil.parseAlignedInstant;
 
 import com.spotify.apollo.RequestContext;
@@ -275,11 +276,11 @@ public class SchedulerResource {
       throw new RuntimeException(e);
     } catch (ExecutionException e) {
       final Throwable cause = e.getCause();
-      if (cause instanceof IllegalStateException
-          || cause instanceof IllegalArgumentException) {
+      if (findCause(e, IllegalStateException.class) != null
+          || findCause(e, IllegalArgumentException.class) != null) {
         // TODO: propagate error information using a more specific exception type
         return Response.forStatus(CONFLICT.withReasonPhrase(cause.getMessage()));
-      } else if (cause instanceof AlreadyInitializedException) {
+      } else if (findCause(e, AlreadyInitializedException.class) != null) {
         return Response.forStatus(CONFLICT.withReasonPhrase(
             "This workflow instance is already triggered. Did you want to `retry` running it instead? " + cause
                 .getMessage()));
