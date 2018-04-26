@@ -23,7 +23,7 @@
 
     <dependency>
       <groupId>com.google.cloud.bigtable</groupId>
-      <artifactId>bigtable-hbase-1.2</artifactId>
+      <artifactId>bigtable-hbase-1.x</artifactId>
     </dependency>
 
     <dependency>
