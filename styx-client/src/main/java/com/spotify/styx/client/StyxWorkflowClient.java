@@ -23,6 +23,7 @@ package com.spotify.styx.client;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowState;
+import java.util.List;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -38,6 +39,13 @@ public interface StyxWorkflowClient {
    * @return the {@link Workflow}
    */
   CompletionStage<Workflow> workflow(final String componentId, final String workflowId);
+
+  /**
+   * Get all {@link Workflow}s
+   *
+   * @return all {@link Workflow}s
+   */
+  CompletionStage<List<Workflow>> workflows();
 
   /**
    * Create or update a workflow
