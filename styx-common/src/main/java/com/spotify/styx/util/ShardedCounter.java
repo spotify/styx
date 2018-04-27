@@ -259,10 +259,10 @@ public class ShardedCounter {
       // then a decrement of shards[0] will try to set it to 6. The new value = 6 > 1 = the shardCapacity.
       // This is therefore a valid scenario and should not fail
       if (delta < 0 && newShardValue >= 0) {
-        transaction.store(Shard.create(counterId, shardIndex, (int) (shard.get().value() + delta)));
+        transaction.store(Shard.create(counterId, shardIndex, (int) newShardValue));
       } else if (delta > 0 && Range.closed(0L, shardCapacity).contains(newShardValue)) {
         // when incrementing we want to make sure that the newShardValue is within [0, shardCapacity]
-        transaction.store(Shard.create(counterId, shardIndex, (int) (shard.get().value() + delta)));
+        transaction.store(Shard.create(counterId, shardIndex, (int) newShardValue));
       } else {
         final String message = String.format("Chosen shard %s-%s has no more capacity.",
             counterId, shardIndex);
