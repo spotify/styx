@@ -268,7 +268,7 @@ public class DatastoreStorage implements Closeable {
   Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
     final Optional<Entity> entityOptional = Optional.ofNullable(
         getOpt(datastore, workflowKey(datastore.newKeyFactory(), workflowId))
-            .orElse(getOpt(datastore,
+            .orElseGet(() -> getOpt(datastore,
                 legacyWorkflowKey(datastore.newKeyFactory(), workflowId)).orElse(null)));
     if (entityOptional.isPresent()) {
       return Optional.of(parseWorkflowJson(entityOptional.get(), workflowId));

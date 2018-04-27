@@ -200,7 +200,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
     final Optional<Entity> entityOptional = Optional.ofNullable(
         DatastoreStorage.getOpt(tx,
             DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflowId))
-            .orElse(DatastoreStorage.getOpt(tx,
+            .orElseGet(() -> DatastoreStorage.getOpt(tx,
                 DatastoreStorage.legacyWorkflowKey(tx.getDatastore().newKeyFactory(), workflowId))
                 .orElse(null)));
     if (entityOptional.isPresent()) {
