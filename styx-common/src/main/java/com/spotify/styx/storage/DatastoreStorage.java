@@ -233,7 +233,7 @@ public class DatastoreStorage implements Closeable {
   }
 
   boolean enabled(WorkflowId workflowId) throws IOException {
-    final Key workflowKey = workflowKey(datastore.newKeyFactory(), workflowId);
+    final Key workflowKey = legacyWorkflowKey(datastore.newKeyFactory(), workflowId);
 
     return getOpt(datastore, workflowKey)
         .filter(w -> w.contains(PROPERTY_WORKFLOW_ENABLED))
@@ -266,9 +266,10 @@ public class DatastoreStorage implements Closeable {
   }
 
   Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
-    final Optional<Entity> entityOptional =
+    final Optional<Entity> entityOptional = Optional.ofNullable(
         getOpt(datastore, workflowKey(datastore.newKeyFactory(), workflowId))
-            .filter(e -> e.contains(PROPERTY_WORKFLOW_JSON));
+            .orElse(getOpt(datastore,
+                legacyWorkflowKey(datastore.newKeyFactory(), workflowId)).orElse(null)));
     if (entityOptional.isPresent()) {
       return Optional.of(parseWorkflowJson(entityOptional.get(), workflowId));
     } else {
@@ -278,7 +279,7 @@ public class DatastoreStorage implements Closeable {
 
   void delete(WorkflowId workflowId) throws IOException {
     storeWithRetries(() -> {
-      datastore.delete(workflowKey(datastore.newKeyFactory(), workflowId));
+      datastore.delete(legacyWorkflowKey(datastore.newKeyFactory(), workflowId));
       return null;
     });
   }
@@ -361,7 +362,7 @@ public class DatastoreStorage implements Closeable {
 
   private List<Workflow> getBatchOfWorkflows(final List<WorkflowId> batch) {
     final List<Key> keys = batch.stream()
-        .map(workflowId -> workflowKey(datastore.newKeyFactory(), workflowId))
+        .map(workflowId -> legacyWorkflowKey(datastore.newKeyFactory(), workflowId))
         .collect(toList());
     final List<Workflow> workflows = new ArrayList<>();
     datastore.get(keys).forEachRemaining(entity -> {
@@ -587,7 +588,7 @@ public class DatastoreStorage implements Closeable {
 
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
     final WorkflowState.Builder builder = WorkflowState.builder();
-    final Optional<Entity> workflowEntity = getOpt(datastore, workflowKey(datastore.newKeyFactory(), workflowId));
+    final Optional<Entity> workflowEntity = getOpt(datastore, legacyWorkflowKey(datastore.newKeyFactory(), workflowId));
 
     builder.enabled(workflowEntity.filter(w -> w.contains(PROPERTY_WORKFLOW_ENABLED))
                         .map(workflow -> workflow.getBoolean(PROPERTY_WORKFLOW_ENABLED))
@@ -705,10 +706,14 @@ public class DatastoreStorage implements Closeable {
         .orElse(Entity.newBuilder(key));
   }
 
-  static Key workflowKey(KeyFactory keyFactory, WorkflowId workflowId) {
+  static Key legacyWorkflowKey(KeyFactory keyFactory, WorkflowId workflowId) {
     return keyFactory.addAncestor(PathElement.of(KIND_COMPONENT, workflowId.componentId()))
         .setKind(KIND_WORKFLOW)
         .newKey(workflowId.id());
+  }
+
+  static Key workflowKey(KeyFactory keyFactory, WorkflowId workflowId) {
+    return keyFactory.setKind(KIND_WORKFLOW).newKey(workflowId.toKey());
   }
 
   static Key componentKey(KeyFactory keyFactory, String componentId) {

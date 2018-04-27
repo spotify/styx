@@ -156,15 +156,14 @@ public class DatastoreStorageTransaction implements StorageTransaction {
 
   @Override
   public WorkflowId store(Workflow workflow) throws IOException {
-    final Key componentKey = DatastoreStorage.componentKey(tx.getDatastore().newKeyFactory(), workflow.componentId());
-    if (tx.get(componentKey) == null) {
-      tx.put(Entity.newBuilder(componentKey).build());
-    }
-
     final String json = OBJECT_MAPPER.writeValueAsString(workflow);
     final Key workflowKey = DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflow.id());
-    final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey);
+    final Key legacyWorkflowKey = DatastoreStorage.legacyWorkflowKey(tx.getDatastore().newKeyFactory(), workflow.id());
+    final Optional<Entity> workflowOpt = Optional.ofNullable(
+        DatastoreStorage.getOpt(tx, workflowKey)
+            .orElseGet(() -> DatastoreStorage.getOpt(tx, legacyWorkflowKey).orElse(null)));
     final Entity workflowEntity = DatastoreStorage.asBuilderOrNew(workflowOpt, workflowKey)
+        .setKey(workflowKey)
         .set(PROPERTY_WORKFLOW_JSON,
             StringValue.newBuilder(json).setExcludeFromIndexes(true).build())
         .build();
@@ -198,8 +197,12 @@ public class DatastoreStorageTransaction implements StorageTransaction {
 
   @Override
   public Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
-    final Optional<Entity> entityOptional =
-        DatastoreStorage.getOpt(tx, DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflowId));
+    final Optional<Entity> entityOptional = Optional.ofNullable(
+        DatastoreStorage.getOpt(tx,
+            DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflowId))
+            .orElse(DatastoreStorage.getOpt(tx,
+                DatastoreStorage.legacyWorkflowKey(tx.getDatastore().newKeyFactory(), workflowId))
+                .orElse(null)));
     if (entityOptional.isPresent()) {
       return Optional.of(DatastoreStorage.parseWorkflowJson(entityOptional.get(), workflowId));
     } else {
@@ -210,7 +213,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   @Override
   public WorkflowId updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec triggerSpec) throws IOException {
     final Key workflowKey = DatastoreStorage
-        .workflowKey(tx.getDatastore().newKeyFactory(), workflowId);
+        .legacyWorkflowKey(tx.getDatastore().newKeyFactory(), workflowId);
     final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey);
     if (!workflowOpt.isPresent()) {
       throw new ResourceNotFoundException(
@@ -229,7 +232,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   @Override
   public WorkflowId patchState(WorkflowId workflowId, WorkflowState state) throws IOException {
     final Key workflowKey = DatastoreStorage
-        .workflowKey(tx.getDatastore().newKeyFactory(), workflowId);
+        .legacyWorkflowKey(tx.getDatastore().newKeyFactory(), workflowId);
     final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey);
     if (!workflowOpt.isPresent()) {
       throw new ResourceNotFoundException(
