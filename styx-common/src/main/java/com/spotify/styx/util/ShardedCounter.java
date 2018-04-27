@@ -250,9 +250,18 @@ public class ShardedCounter {
 
     if (shard.isPresent()) {
       final long newShardValue = shard.get().value() + delta;
+      // when decrementing, we only care that the newShardValue is >=0
+      // if we bound it up to shardCapacity then we fail to decrement. This is especially important in cases where
+      // the limit was significantly decreased and therefore the new shardCapacity will be decreased and
+      // the newShardValue could be > shardCapacity even after decrementing.
+      // ex. Limit = 20, shards = [7, 7, 6], shardCapacity = [7, 7, 6]
+      // ex. newLimit = 2, shards = [7, 7, 6], shardCapacity = [1, 1, 0]
+      // then a decrement of shards[0] will try to set it to 6. The new value = 6 > 1 = the shardCapacity.
+      // This is therefore a valid scenario and should not fail
       if (delta < 0 && newShardValue >= 0) {
         transaction.store(Shard.create(counterId, shardIndex, (int) (shard.get().value() + delta)));
       } else if (delta > 0 && Range.closed(0L, shardCapacity).contains(newShardValue)) {
+        // when incrementing we want to make sure that the newShardValue is within [0, shardCapacity]
         transaction.store(Shard.create(counterId, shardIndex, (int) (shard.get().value() + delta)));
       } else {
         final String message = String.format("Chosen shard %s-%s has no more capacity.",
