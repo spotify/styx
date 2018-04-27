@@ -482,6 +482,9 @@ class KubernetesDockerRunner implements DockerRunner {
       if (!workflowInstance.isPresent()) {
         continue;
       }
+      // do an extra lookup to get latest state
+      // this is crucial because after fetching all states in datastore, some states might
+      // have transitioned already
       final Optional<RunState> runState = lookupPodRunState(pod, workflowInstance.get());
       if (runState.isPresent()) {
         emitPodEvents(Watcher.Action.MODIFIED, pod, runState.get());
