@@ -250,7 +250,9 @@ public class ShardedCounter {
 
     if (shard.isPresent()) {
       final long newShardValue = shard.get().value() + delta;
-      if (Range.closed(0L, shardCapacity).contains(newShardValue)) {
+      if (delta < 0 && newShardValue >= 0) {
+        transaction.store(Shard.create(counterId, shardIndex, (int) (shard.get().value() + delta)));
+      } else if (delta > 0 && Range.closed(0L, shardCapacity).contains(newShardValue)) {
         transaction.store(Shard.create(counterId, shardIndex, (int) (shard.get().value() + delta)));
       } else {
         final String message = String.format("Chosen shard %s-%s has no more capacity.",

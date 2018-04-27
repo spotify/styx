@@ -227,6 +227,34 @@ public class ShardedCounterTest {
   }
 
   @Test
+  public void shouldDecrementShardWithALotOfExcessUsage() {
+    // init counter
+    assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
+
+    updateShard(COUNTER_ID1, 0, 10);
+    updateShard(COUNTER_ID1, 1, 0);
+    updateLimitInStorage(COUNTER_ID1, 1);
+
+    // Invalidate snapshot to force pull changes from Datastore emulator
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    // assert cache is updated with the new value
+    assertEquals(10L, shardedCounter.getCounter(COUNTER_ID1));
+
+    //decrement counter by 1
+    updateCounterInTransaction(COUNTER_ID1, -1L);
+
+    // assert that the only shard in excess was chosen to be decremented
+    assertEquals(9L, datastore.get(getKey(COUNTER_ID1, 0))
+        .getLong(PROPERTY_SHARD_VALUE));
+    assertEquals(0L, datastore.get(getKey(COUNTER_ID1, 1))
+        .getLong(PROPERTY_SHARD_VALUE));
+
+    // assert cache is updated with the new value
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertEquals(9L, shardedCounter.getCounter(COUNTER_ID1));
+  }
+
+  @Test
   public void shouldDecrementShardWithNoExcessUsage() {
     // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
