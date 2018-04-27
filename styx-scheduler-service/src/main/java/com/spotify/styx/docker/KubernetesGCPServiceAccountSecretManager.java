@@ -118,7 +118,9 @@ class KubernetesGCPServiceAccountSecretManager {
       } else if (GcpUtil.isPermissionDenied(cause)) {
         throw new InvalidExecutionException("Permission denied to service account: " + serviceAccount);
       } else if (GcpUtil.isResourceExhausted(cause)) {
-        throw new InvalidExecutionException("Maximum number of keys on service account reached: " + serviceAccount);
+        throw new InvalidExecutionException(String.format(
+            "Maximum number of keys on service account reached: %s. Styx requires 4 keys to operate.",
+            serviceAccount));
       } else {
         throw new RuntimeException(e);
       }

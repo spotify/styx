@@ -419,7 +419,9 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     doThrow(resourceExhausted).when(serviceAccountKeyManager).createP12Key(any());
 
     exception.expect(InvalidExecutionException.class);
-    exception.expectMessage("Maximum number of keys on service account reached: " + SERVICE_ACCOUNT);
+    exception.expectMessage(String.format(
+        "Maximum number of keys on service account reached: %s. Styx requires 4 keys to operate.",
+        SERVICE_ACCOUNT));
 
     sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(), SERVICE_ACCOUNT);
   }
