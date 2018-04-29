@@ -23,9 +23,11 @@ package com.spotify.styx.storage;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
+import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_ALL_TRIGGERED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_COMPONENT;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONCURRENCY;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONFIG_MIGRATE_WORKFLOWS_ENABLED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_END;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_HALTED;
@@ -33,8 +35,11 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_TRIGGER;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_SCHEDULE;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_START;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_JSON;
+import static com.spotify.styx.storage.DatastoreStorage.asBuilderOrNew;
 import static com.spotify.styx.storage.DatastoreStorage.globalConfigKey;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
+import static com.spotify.styx.storage.DatastoreStorage.legacyWorkflowKey;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
@@ -96,6 +101,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -499,6 +505,16 @@ public class DatastoreStorageTest {
   }
 
   @Test
+  public void getsMigrateWorkflowsEnabled() {
+    Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
+        .set(PROPERTY_CONFIG_MIGRATE_WORKFLOWS_ENABLED, true)
+        .build();
+    helper.getOptions().getService().put(config);
+
+    assertThat(storage.config().migrateWorkflowsEnabled(), is(true));
+  }
+
+  @Test
   public void shouldReturnEmptyClientBlacklist() {
     Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
@@ -621,6 +637,7 @@ public class DatastoreStorageTest {
         .globalEnabled(true)
         .debugEnabled(false)
         .resourcesSyncEnabled(false)
+        .migrateWorkflowsEnabled(false)
         .executionGatingEnabled(false)
         .build();
 
@@ -882,6 +899,122 @@ public class DatastoreStorageTest {
         (counterId)))
         .set(PROPERTY_LIMIT, limit)
         .build());
+  }
+
+  // TODO: remove after migration
+  @Test
+  public void shouldMigrateWorkflows() throws Exception {
+    assertThat(storage.workflows().isEmpty(), is(true));
+
+    Workflow workflow1 = workflow(WORKFLOW_ID1);
+    Workflow workflow2 = workflow(WORKFLOW_ID2);
+    Workflow workflow3 = workflow(WORKFLOW_ID3);
+
+    storeWorkflowInLegacyWay(workflow1);
+    storeWorkflowInLegacyWay(workflow2);
+    storeWorkflowInLegacyWay(workflow3);
+
+    storage.migrateWorkflows();
+
+    storage.setEnabled(WORKFLOW_ID1, true);
+    storage.setEnabled(WORKFLOW_ID2, false);
+    storage.updateNextNaturalTrigger(WORKFLOW_ID3,
+        TriggerInstantSpec.create(TIMESTAMP, TIMESTAMP.plus(Duration.ofHours(1))));
+
+    assertThat(storage.workflows().size(), is(3));
+    assertThat(storage.workflows(), hasEntry(WORKFLOW_ID1, workflow1));
+    assertThat(storage.workflows(), hasEntry(WORKFLOW_ID2, workflow2));
+    assertThat(storage.workflows(), hasEntry(WORKFLOW_ID3, workflow3));
+
+    Key key1 = legacyWorkflowKey(datastore.newKeyFactory(), workflow1.id());
+    Key key2 = legacyWorkflowKey(datastore.newKeyFactory(), workflow2.id());
+    Key key3 = legacyWorkflowKey(datastore.newKeyFactory(), workflow3.id());
+
+    final Iterator<Entity> entityIterator = datastore.get(key1, key2, key3);
+    assertFalse(entityIterator.hasNext());
+  }
+
+  // TODO: remove after migration
+  @Test
+  public void shouldReturnAllWorkflowsIncludingLegacyOne() throws Exception {
+    assertThat(storage.workflows().isEmpty(), is(true));
+
+    Workflow workflow1 = workflow(WORKFLOW_ID1);
+    Workflow workflow2 = workflow(WORKFLOW_ID2);
+    Workflow workflow3 = workflow(WORKFLOW_ID3);
+
+    storeWorkflowInLegacyWay(workflow1);
+    storage.store(workflow2);
+    storage.store(workflow3);
+
+    storage.setEnabled(WORKFLOW_ID1, true);
+    storage.setEnabled(WORKFLOW_ID2, false);
+    storage.updateNextNaturalTrigger(WORKFLOW_ID3, TriggerInstantSpec.create(TIMESTAMP, TIMESTAMP.plus(Duration.ofHours(1))));
+
+    assertThat(storage.workflows().size(), is(3));
+    assertThat(storage.workflows(), hasEntry(WORKFLOW_ID1, workflow1));
+    assertThat(storage.workflows(), hasEntry(WORKFLOW_ID2, workflow2));
+    assertThat(storage.workflows(), hasEntry(WORKFLOW_ID3, workflow3));
+  }
+
+  // TODO: remove after migration
+  @Test
+  public void shouldReturnAllWorkflowsInComponentIncludingLegacyOne() throws Exception {
+    String componentId = "component";
+
+    Workflow workflow1 = workflow(WORKFLOW_ID1);
+    Workflow workflow2 = workflow(WORKFLOW_ID2);
+    Workflow workflow3 = workflow(WORKFLOW_ID3);
+
+    assertThat(workflow1.componentId(), is(componentId));
+    assertThat(workflow2.componentId(), is(componentId));
+    assertThat(workflow3.componentId(), not(componentId));
+
+    storeWorkflowInLegacyWay(workflow1);
+    storage.store(workflow2);
+    storage.store(workflow3);
+
+    List<Workflow> l = storage.workflows(componentId);
+    assertThat(l, hasSize(2));
+
+    assertThat(l, hasItem(workflow1));
+    assertThat(l, hasItem(workflow2));
+  }
+
+  // TODO: remove after migration
+  @Test
+  public void shouldGetAllWorkflowsByDoingBatchGetIncludingLegacyOne() throws Exception {
+    assertThat(storage.workflows().isEmpty(), is(true));
+
+    final Set<WorkflowId> workflowIds = ImmutableSet.of(WORKFLOW_ID1, WORKFLOW_ID2, WORKFLOW_ID3);
+    Workflow workflow1 = workflow(WORKFLOW_ID1);
+    Workflow workflow2 = workflow(WORKFLOW_ID2);
+    Workflow workflow3 = workflow(WORKFLOW_ID3);
+
+    storeWorkflowInLegacyWay(workflow1);
+    storage.store(workflow2);
+    storage.store(workflow3);
+
+    storage.setEnabled(WORKFLOW_ID1, true);
+    storage.setEnabled(WORKFLOW_ID2, false);
+    storage.updateNextNaturalTrigger(WORKFLOW_ID3, TriggerInstantSpec.create(TIMESTAMP, TIMESTAMP.plus(Duration.ofHours(1))));
+
+    assertThat(storage.workflows(workflowIds).size(), is(3));
+    assertThat(storage.workflows(workflowIds), hasEntry(WORKFLOW_ID1, workflow1));
+    assertThat(storage.workflows(workflowIds), hasEntry(WORKFLOW_ID2, workflow2));
+    assertThat(storage.workflows(workflowIds), hasEntry(WORKFLOW_ID3, workflow3));
+  }
+
+  // TODO: remove after migration
+  private void storeWorkflowInLegacyWay(Workflow workflow) throws Exception {
+    final String json = OBJECT_MAPPER.writeValueAsString(workflow);
+    final Key key = legacyWorkflowKey(datastore.newKeyFactory(), workflow.id());
+    final Entity workflowEntity = asBuilderOrNew(Optional.empty(), key)
+        .setKey(key)
+        .set(PROPERTY_WORKFLOW_JSON,
+            StringValue.newBuilder(json).setExcludeFromIndexes(true).build())
+        .build();
+    datastore.put(workflowEntity);
   }
 
   private static class FooException extends Exception {

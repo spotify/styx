@@ -135,6 +135,12 @@ public class InMemStorage implements Storage {
     throw new UnsupportedOperationException("Unsupported Operation!");
   }
 
+  // TODO: remove after migration
+  @Override
+  public void migrateWorkflows() {
+    // nop
+  }
+
   @Override
   public WorkflowInstanceExecutionData executionData(WorkflowInstance workflowInstance)
       throws IOException {

@@ -134,6 +134,9 @@ public interface Storage extends Closeable {
    */
   Map<WorkflowId,Workflow> workflows(Set<WorkflowId> workflowIds);
 
+  // TODO: remove after migration
+  void migrateWorkflows();
+
   /**
    * Stores information about an active {@link WorkflowInstance} to be tracked.
    * @param workflowInstance  The {@link WorkflowInstance} that entered an active state

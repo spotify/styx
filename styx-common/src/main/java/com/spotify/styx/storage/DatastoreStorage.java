@@ -127,6 +127,8 @@ public class DatastoreStorage implements Closeable {
   public static final String PROPERTY_CONFIG_EXECUTION_GATING_ENABLED = "executionGatingEnabled";
   public static final String PROPERTY_CONFIG_DEBUG_ENABLED = "debug";
   public static final String PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED = "resourcesSyncEnabled";
+  // TODO: remove after migration
+  public static final String PROPERTY_CONFIG_MIGRATE_WORKFLOWS_ENABLED = "migrateWorkflowsEnabled";
 
   public static final String PROPERTY_WORKFLOW_JSON = "json";
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
@@ -169,7 +171,8 @@ public class DatastoreStorage implements Closeable {
   public static final boolean DEFAULT_CONFIG_DEBUG_ENABLED = false;
   public static final boolean DEFAULT_CONFIG_EXECUTION_GATING_ENABLED = false;
   public static final boolean DEFAULT_CONFIG_RESOURCES_SYNC_ENABLED = false;
-  private static final boolean DEFAULT_CONFIG_BOOTSTRAP_ACTIVE_WFI_ENABLED = false;
+  // TODO: remove after migration
+  public static final boolean DEFAULT_CONFIG_MIGRATE_WORKFLOWS_ENABLED = false;
 
   public static final int ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS = 128;
 
@@ -222,6 +225,8 @@ public class DatastoreStorage implements Closeable {
         .debugEnabled(read(entity, PROPERTY_CONFIG_DEBUG_ENABLED, DEFAULT_CONFIG_DEBUG_ENABLED))
         .resourcesSyncEnabled(read(entity, PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED,
             DEFAULT_CONFIG_RESOURCES_SYNC_ENABLED))
+        .migrateWorkflowsEnabled(read(entity, PROPERTY_CONFIG_MIGRATE_WORKFLOWS_ENABLED,
+            DEFAULT_CONFIG_MIGRATE_WORKFLOWS_ENABLED))
         .submissionRateLimit(readOpt(entity, PROPERTY_SUBMISSION_RATE_LIMIT))
         .globalDockerRunnerId(
             read(entity, PROPERTY_CONFIG_DOCKER_RUNNER_ID, DEFAULT_CONFIG_DOCKER_RUNNER_ID))
@@ -447,7 +452,17 @@ public class DatastoreStorage implements Closeable {
     return workflows;
   }
 
-  // TODO: remove the fallback reading
+  void migrateWorkflows() {
+    final Map<WorkflowId, Workflow> map = workflows();
+    map.values().forEach(workflow -> {
+      try {
+        store(workflow);
+      } catch (IOException e) {
+        LOG.warn("Failed to store workflow {} when migrating.", workflow.id(), e);
+      }
+    });
+  }
+
   static Optional<Entity> getWorkflowOpt(DatastoreReader datastoreReader,
                                          final WorkflowId workflowId,
                                          final Key workflowKey,

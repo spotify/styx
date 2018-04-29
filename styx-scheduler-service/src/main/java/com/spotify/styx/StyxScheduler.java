@@ -320,6 +320,8 @@ public class StyxScheduler implements AppInit {
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
 
+    migrateWorkflows(storage);
+
     final Supplier<Map<WorkflowId, Workflow>> workflowCache = new CachedSupplier<>(storage::workflows, time);
 
     initializeResources(storage, shardedCounter, counterSnapshotFactory, timeoutConfig, workflowCache);
@@ -386,6 +388,17 @@ public class StyxScheduler implements AppInit {
     this.scheduler = scheduler;
     this.triggerManager = triggerManager;
     this.backfillTriggerManager = backfillTriggerManager;
+  }
+
+  private void migrateWorkflows(Storage storage) {
+    try {
+      if (storage.config().migrateWorkflowsEnabled()) {
+        storage.migrateWorkflows();
+      }
+    } catch (IOException e) {
+      LOG.error("Error while migrating workflows", e);
+      throw new RuntimeException(e);
+    }
   }
 
   @VisibleForTesting

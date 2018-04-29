@@ -188,6 +188,12 @@ public class AggregateStorage implements Storage {
     return datastoreStorage.workflows(workflowIds);
   }
 
+  // TODO: remove after migration
+  @Override
+  public void migrateWorkflows() {
+    datastoreStorage.migrateWorkflows();
+  }
+
   @Override
   public void patchState(WorkflowId workflowId, WorkflowState state) throws IOException {
     datastoreStorage.patchState(workflowId, state);

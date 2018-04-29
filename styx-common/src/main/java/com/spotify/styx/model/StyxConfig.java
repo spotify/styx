@@ -48,6 +48,11 @@ public interface StyxConfig {
   boolean resourcesSyncEnabled();
 
   /**
+   * Get the flag for enabling migrate workflows at startup.
+   */
+  boolean migrateWorkflowsEnabled();
+
+  /**
    * Controls whether workflow instance execution gating should be performed. If set to false,
    * instances will be executed without checking for blockers.
    */
