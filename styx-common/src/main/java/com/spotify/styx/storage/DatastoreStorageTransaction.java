@@ -41,6 +41,7 @@ import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceIn
 import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceKey;
 import static com.spotify.styx.storage.DatastoreStorage.entityToBackfill;
 import static com.spotify.styx.storage.DatastoreStorage.entityToRunState;
+import static com.spotify.styx.storage.DatastoreStorage.getWorkflowOpt;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
 import static com.spotify.styx.storage.DatastoreStorage.runStateToEntity;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
@@ -157,11 +158,12 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   @Override
   public WorkflowId store(Workflow workflow) throws IOException {
     final String json = OBJECT_MAPPER.writeValueAsString(workflow);
+
     final Key workflowKey = DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflow.id());
     final Key legacyWorkflowKey = DatastoreStorage.legacyWorkflowKey(tx.getDatastore().newKeyFactory(), workflow.id());
-    final Optional<Entity> workflowOpt = Optional.ofNullable(
-        DatastoreStorage.getOpt(tx, workflowKey)
-            .orElseGet(() -> DatastoreStorage.getOpt(tx, legacyWorkflowKey).orElse(null)));
+
+    final Optional<Entity> workflowOpt = getWorkflowOpt(tx, workflow.id(), workflowKey, legacyWorkflowKey);
+
     final Entity workflowEntity = DatastoreStorage.asBuilderOrNew(workflowOpt, workflowKey)
         .setKey(workflowKey)
         .set(PROPERTY_WORKFLOW_JSON,
@@ -169,6 +171,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
         .build();
 
     tx.put(workflowEntity);
+    tx.delete(legacyWorkflowKey);
 
     return workflow.id();
   }
@@ -197,12 +200,10 @@ public class DatastoreStorageTransaction implements StorageTransaction {
 
   @Override
   public Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
-    final Optional<Entity> entityOptional = Optional.ofNullable(
-        DatastoreStorage.getOpt(tx,
-            DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflowId))
-            .orElseGet(() -> DatastoreStorage.getOpt(tx,
-                DatastoreStorage.legacyWorkflowKey(tx.getDatastore().newKeyFactory(), workflowId))
-                .orElse(null)));
+    final Key workflowKey = DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflowId);
+    final Key legacyWorkflowKey = DatastoreStorage.legacyWorkflowKey(tx.getDatastore().newKeyFactory(), workflowId);
+
+    final Optional<Entity> entityOptional = getWorkflowOpt(tx, workflowId, workflowKey, legacyWorkflowKey);
     if (entityOptional.isPresent()) {
       return Optional.of(DatastoreStorage.parseWorkflowJson(entityOptional.get(), workflowId));
     } else {
@@ -212,9 +213,10 @@ public class DatastoreStorageTransaction implements StorageTransaction {
 
   @Override
   public WorkflowId updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec triggerSpec) throws IOException {
-    final Key workflowKey = DatastoreStorage
-        .legacyWorkflowKey(tx.getDatastore().newKeyFactory(), workflowId);
-    final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey);
+    final Key workflowKey = DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflowId);
+    final Key legacyWorkflowKey = DatastoreStorage.legacyWorkflowKey(tx.getDatastore().newKeyFactory(), workflowId);
+
+    final Optional<Entity> workflowOpt = getWorkflowOpt(tx, workflowId, workflowKey, legacyWorkflowKey);
     if (!workflowOpt.isPresent()) {
       throw new ResourceNotFoundException(
           String.format("%s:%s doesn't exist.", workflowId.componentId(), workflowId.id()));
@@ -231,9 +233,10 @@ public class DatastoreStorageTransaction implements StorageTransaction {
 
   @Override
   public WorkflowId patchState(WorkflowId workflowId, WorkflowState state) throws IOException {
-    final Key workflowKey = DatastoreStorage
-        .legacyWorkflowKey(tx.getDatastore().newKeyFactory(), workflowId);
-    final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey);
+    final Key workflowKey = DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflowId);
+    final Key legacyWorkflowKey = DatastoreStorage.legacyWorkflowKey(tx.getDatastore().newKeyFactory(), workflowId);
+
+    final Optional<Entity> workflowOpt = getWorkflowOpt(tx, workflowId, workflowKey, legacyWorkflowKey);
     if (!workflowOpt.isPresent()) {
       throw new ResourceNotFoundException(
           String.format("%s:%s doesn't exist.", workflowId.componentId(), workflowId.id()));
