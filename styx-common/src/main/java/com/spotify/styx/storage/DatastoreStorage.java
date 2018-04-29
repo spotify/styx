@@ -452,6 +452,8 @@ public class DatastoreStorage implements Closeable {
     return workflows;
   }
 
+  // TODO: remove after migration
+  // this method is not well optimized and does redundant reading
   void migrateWorkflows() {
     final Map<WorkflowId, Workflow> map = workflows();
     map.values().forEach(workflow -> {
