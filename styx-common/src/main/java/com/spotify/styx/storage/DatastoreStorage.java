@@ -96,6 +96,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.IntStream;
@@ -465,13 +466,16 @@ public class DatastoreStorage implements Closeable {
   // this method is not well optimized and does redundant reading
   void migrateWorkflows() {
     final Map<WorkflowId, Workflow> map = workflows();
-    map.values().forEach(workflow -> {
-      try {
-        store(workflow);
-      } catch (IOException e) {
-        LOG.warn("Failed to store workflow {} when migrating.", workflow.id(), e);
-      }
-    });
+    map.values().stream().map(workflow ->
+        forkJoinPool.submit(() -> {
+          try {
+            store(workflow);
+          } catch (IOException e) {
+            LOG.warn("Failed to store workflow {} when migrating.", workflow.id(), e);
+          }
+        }))
+        .collect(toList())
+        .forEach(ForkJoinTask::join);
   }
 
   static Optional<Entity> getWorkflowOpt(DatastoreReader datastoreReader,
