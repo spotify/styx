@@ -101,7 +101,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -910,9 +909,15 @@ public class DatastoreStorageTest {
     Workflow workflow2 = workflow(WORKFLOW_ID2);
     Workflow workflow3 = workflow(WORKFLOW_ID3);
 
+    Key key1 = legacyWorkflowKey(datastore.newKeyFactory(), workflow1.id());
+    Key key2 = legacyWorkflowKey(datastore.newKeyFactory(), workflow2.id());
+    Key key3 = legacyWorkflowKey(datastore.newKeyFactory(), workflow3.id());
+
     storeWorkflowInLegacyWay(workflow1);
     storeWorkflowInLegacyWay(workflow2);
     storeWorkflowInLegacyWay(workflow3);
+
+    assertTrue(datastore.get(key1, key2, key3).hasNext());
 
     storage.migrateWorkflows();
 
@@ -926,12 +931,7 @@ public class DatastoreStorageTest {
     assertThat(storage.workflows(), hasEntry(WORKFLOW_ID2, workflow2));
     assertThat(storage.workflows(), hasEntry(WORKFLOW_ID3, workflow3));
 
-    Key key1 = legacyWorkflowKey(datastore.newKeyFactory(), workflow1.id());
-    Key key2 = legacyWorkflowKey(datastore.newKeyFactory(), workflow2.id());
-    Key key3 = legacyWorkflowKey(datastore.newKeyFactory(), workflow3.id());
-
-    final Iterator<Entity> entityIterator = datastore.get(key1, key2, key3);
-    assertFalse(entityIterator.hasNext());
+    assertFalse(datastore.get(key1, key2, key3).hasNext());
   }
 
   // TODO: remove after migration
