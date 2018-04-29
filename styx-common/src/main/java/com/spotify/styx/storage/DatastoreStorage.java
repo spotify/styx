@@ -411,7 +411,16 @@ public class DatastoreStorage implements Closeable {
     // FIXME: there might be a performance penalty but not too bad because this is only used by an API
     while (result.hasNext()) {
       final Entity entity = result.next();
-      if (!entity.getKey().getName().startsWith(componentId + "#")) {
+
+      final WorkflowId workflowId;
+      try {
+        workflowId = WorkflowId.parseKey(entity.getKey().getName());
+      } catch (IllegalArgumentException e) {
+        LOG.warn("Invalid workflow Id {}", entity.getKey().getName(), e);
+        continue;
+      }
+
+      if (!workflowId.componentId().equals(componentId)) {
         continue;
       }
 
