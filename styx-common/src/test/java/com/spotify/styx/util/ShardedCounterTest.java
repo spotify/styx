@@ -40,7 +40,9 @@ import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
@@ -56,6 +58,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hbase.client.Connection;
@@ -65,7 +68,6 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.Mockito;
 import org.mockito.runners.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -90,9 +92,8 @@ public class ShardedCounterTest {
     helper = LocalDatastoreHelper.create(1.0);
     helper.start();
     datastore = helper.getOptions().getService();
-    connection = Mockito.mock(Connection.class);
+    connection = mock(Connection.class);
     storage = new AggregateStorage(connection, datastore, Duration.ZERO);
-    counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
   }
 
   @AfterClass
@@ -109,6 +110,7 @@ public class ShardedCounterTest {
 
   @Before
   public void setUp() {
+    counterSnapshotFactory = spy(new ShardedCounterSnapshotFactory(storage));
     shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
   }
 
@@ -121,7 +123,9 @@ public class ShardedCounterTest {
   public void shouldCreateCounterEmpty() {
     assertEquals(shardedCounter.getCounter(COUNTER_ID1), 0L);
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
+
     // assert all shards exist
+    assertThat(shardedCounter.getCounterSnapshot(COUNTER_ID1).getShards().size(), is(128));
     IntStream.range(0, ShardedCounter.NUM_SHARDS).forEach(i -> {
       assertTrue(results.hasNext());
       results.next();
@@ -227,6 +231,34 @@ public class ShardedCounterTest {
   }
 
   @Test
+  public void shouldDecrementShardWithALotOfExcessUsage() {
+    // init counter
+    assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
+
+    updateShard(COUNTER_ID1, 0, 10);
+    updateShard(COUNTER_ID1, 1, 0);
+    updateLimitInStorage(COUNTER_ID1, 1);
+
+    // Invalidate snapshot to force pull changes from Datastore emulator
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    // assert cache is updated with the new value
+    assertEquals(10L, shardedCounter.getCounter(COUNTER_ID1));
+
+    //decrement counter by 1
+    updateCounterInTransaction(COUNTER_ID1, -1L);
+
+    // assert that the only shard in excess was chosen to be decremented
+    assertEquals(9L, datastore.get(getKey(COUNTER_ID1, 0))
+        .getLong(PROPERTY_SHARD_VALUE));
+    assertEquals(0L, datastore.get(getKey(COUNTER_ID1, 1))
+        .getLong(PROPERTY_SHARD_VALUE));
+
+    // assert cache is updated with the new value
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertEquals(9L, shardedCounter.getCounter(COUNTER_ID1));
+  }
+
+  @Test
   public void shouldDecrementShardWithNoExcessUsage() {
     // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
@@ -317,6 +349,32 @@ public class ShardedCounterTest {
     updateCounterInTransaction(COUNTER_ID1, -1L);
   }
 
+  @Test(expected = CounterCapacityException.class)
+  public void shouldFailIncrementingFullShard() throws IOException {
+    shardedCounter.getCounter(COUNTER_ID1);
+    updateShard(COUNTER_ID1, 0, 10);
+    storage.runInTransaction(tx -> {
+      shardedCounter.updateCounterShard(tx, COUNTER_ID1, 1, 0, 10);
+      return null;
+    });
+  }
+
+  @Test(expected = CounterCapacityException.class)
+  public void shouldFailDecrementingEmptyShard() throws IOException {
+    shardedCounter.getCounter(COUNTER_ID1);
+
+    storage.runInTransaction(tx -> {
+      shardedCounter.updateCounterShard(tx, COUNTER_ID1, -1, 0, 10);
+      return null;
+    });
+  }
+
+  @Test(expected = ShardNotFoundException.class)
+  public void shouldThrowExceptionOnUninitializedShards() {
+    when(counterSnapshotFactory.create(COUNTER_ID1)).thenReturn(new ShardedCounter.Snapshot(COUNTER_ID1, 100, new HashMap<>()));
+    updateCounterInTransaction(COUNTER_ID1, -1L);
+  }
+
   @Test
   public void shouldFailIncrementingFullCounter() throws IOException {
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
@@ -397,21 +455,6 @@ public class ShardedCounterTest {
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
     assertFalse(results.hasNext());
     assertNull(getLimitFromStorage(COUNTER_ID1));
-  }
-
-  /**
-   * TODO: We should be able to decrease a counter limit and keep a valid state for the counter shards.
-   *
-   * <p>Ex. Counter is at 75% usage. Decrease the limit for 50%.
-   * That leaves the counter at 25% extra usage (now 50% relative to the new limit).
-   * This state is still valid, but we should not allow further increases, only decreases.
-   * When the counter usage goes below the new limit, then we should allow increase operations again.
-   */
-  @Test
-  public void decreaseLimitBelowCurrentCounterValue() {
-    //1. increase counter to an X value
-    //2. lower the limit to a L < X value
-    //3. fail further increases, but allow for decreases of the counter
   }
 
   private void updateCounterInTransaction(String counterId, long delta) {
