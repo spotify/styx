@@ -153,13 +153,20 @@ class BackfillTriggerManager {
     }
   }
 
-  private boolean triggerNextPartitionAndProgress(StorageTransaction tx,
-                                                  String id,
-                                                  Workflow workflow,
-                                                  Instant initialNextTrigger,
-                                                  int remainingCapacity) {
+  @VisibleForTesting
+  boolean triggerNextPartitionAndProgress(StorageTransaction tx,
+                                          String id,
+                                          Workflow workflow,
+                                          Instant initialNextTrigger,
+                                          int remainingCapacity) {
     final Backfill momentBackfill = tx.backfill(id).orElseThrow(() ->
         new RuntimeException("Error while fetching backfill " + id));
+
+    if (momentBackfill.halted()) {
+      LOG.debug("Backfill {} halted", momentBackfill);
+      return false;
+    }
+
     final Instant momentNextTrigger = momentBackfill.nextTrigger();
 
     if (instancesInRange(initialNextTrigger, momentNextTrigger,
