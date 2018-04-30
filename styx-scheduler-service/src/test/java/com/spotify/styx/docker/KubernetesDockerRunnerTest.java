@@ -597,7 +597,6 @@ public class KubernetesDockerRunnerTest {
       "Succeeded, 0,  true",
       "Failed,    20, true",
       "Failed,    1,  true",
-      "Failed,    0,  true",
       "Running,   20, false",
       "Running,   1,  false",
       "Running,   0,  false",
@@ -605,8 +604,7 @@ public class KubernetesDockerRunnerTest {
       "Succeeded, 1,  false",
       "Succeeded, 0,  false",
       "Failed,    20, false",
-      "Failed,    1,  false",
-      "Failed,    0,  false",
+      "Failed,    1,  false"
   })
   @Test
   public void shouldCompleteWithStatusCodeOnMainContainerTerminated(String phase, int code,

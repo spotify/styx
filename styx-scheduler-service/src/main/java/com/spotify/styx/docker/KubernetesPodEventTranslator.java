@@ -128,6 +128,10 @@ final class KubernetesPodEventTranslator {
                status.getContainerID());
       return Optional.empty();
     } else {
+      // there are cases k8s marks the pod failed but with exitCode 0
+      if ("Failed".equals(pod.getStatus().getPhase()) && terminated.getExitCode() == 0) {
+        return Optional.empty();
+      }
       return Optional.of(terminated.getExitCode());
     }
   }
