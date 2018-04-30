@@ -32,6 +32,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.Backfill;
@@ -159,5 +160,51 @@ public class InMemStorageTest {
 
     storage.storeBackfill(backfill);
     assertThat(storage.backfill(backfill.id()), equalTo(Optional.of(backfill)));
+  }
+
+  @Test
+  public void shouldDeleteComponentWithNoWorkflowAndWithoutCascading() throws Exception {
+    WorkflowId workflowId = WorkflowId.create("someComponent1", "someEndpoint1");
+    storage.storeWorkflow(workflow(workflowId));
+
+    storage.delete(workflowId);
+
+    storage.delete(workflowId.componentId(), false);
+    assertThat(storage.workflow(workflowId), is(Optional.empty()));
+  }
+
+  @Test
+  public void shouldDeleteComponentWithNoWorkflowAndWithCascading() throws Exception {
+    WorkflowId workflowId = WorkflowId.create("someComponent1", "someEndpoint1");
+    storage.storeWorkflow(workflow(workflowId));
+
+    storage.delete(workflowId);
+
+    storage.delete(workflowId.componentId(), true);
+    assertThat(storage.workflow(workflowId), is(Optional.empty()));
+  }
+
+  @Test
+  public void shouldNotDeleteComponentWithoutCascading() throws Exception {
+    WorkflowId workflowId = WorkflowId.create("someComponent1", "someEndpoint1");
+    storage.storeWorkflow(workflow(workflowId));
+
+    try {
+      storage.delete(workflowId.componentId(), false);
+      fail();
+    } catch (IOException e) {
+      assertThat(e.getMessage(),
+          is(String.format("Component %s has workflows", workflowId.componentId())));
+      assertThat(storage.workflow(workflowId).map(Workflow::id), is(Optional.of(workflowId)));
+    }
+  }
+
+  @Test
+  public void shouldDeleteComponentWithCascading() throws Exception {
+    WorkflowId workflowId = WorkflowId.create("someComponent1", "someEndpoint1");
+    storage.storeWorkflow(workflow(workflowId));
+
+    storage.delete(workflowId.componentId(), true);
+    assertThat(storage.workflow(workflowId), is(Optional.empty()));
   }
 }

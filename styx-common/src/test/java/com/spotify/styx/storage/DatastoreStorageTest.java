@@ -76,6 +76,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.TriggerInstantSpec;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -219,6 +220,70 @@ public class DatastoreStorageTest {
 
     storage.delete(workflow.id());
     assertThat(entitiesOfKind(DatastoreStorage.KIND_WORKFLOW), hasSize(1));
+  }
+
+  @Test
+  public void shouldDeleteComponentWithNoWorkflowAndWithoutCascading() throws Exception {
+    final Workflow workflow = Workflow.create("foo", WORKFLOW_CONFIGURATION);
+    storage.store(workflow);
+
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_WORKFLOW), hasSize(1));
+
+    storage.delete(workflow.id());
+
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_WORKFLOW), hasSize(0));
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_COMPONENT), hasSize(1));
+
+    storage.delete("foo", false);
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_COMPONENT), hasSize(0));
+  }
+
+  @Test
+  public void shouldDeleteComponentWithNoWorkflowAndWithCascading() throws Exception {
+    final Workflow workflow = Workflow.create("foo", WORKFLOW_CONFIGURATION);
+    storage.store(workflow);
+
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_WORKFLOW), hasSize(1));
+
+    storage.delete(workflow.id());
+
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_WORKFLOW), hasSize(0));
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_COMPONENT), hasSize(1));
+
+    storage.delete("foo", true);
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_COMPONENT), hasSize(0));
+  }
+
+  @Test
+  public void shouldNotDeleteComponentWithoutCascading() throws Exception {
+    final Workflow workflow = Workflow.create("foo", WORKFLOW_CONFIGURATION);
+    storage.store(workflow);
+
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_WORKFLOW), hasSize(1));
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_COMPONENT), hasSize(1));
+
+    try {
+      storage.delete("foo", false);
+      fail();
+    } catch (IOException e) {
+      assertThat(e.getMessage(), is(String.format("Component %s has workflows", "foo")));
+      assertThat(entitiesOfKind(DatastoreStorage.KIND_WORKFLOW), hasSize(1));
+      assertThat(entitiesOfKind(DatastoreStorage.KIND_COMPONENT), hasSize(1));
+    }
+  }
+
+  @Test
+  public void shouldDeleteComponentWithCascading() throws Exception {
+    final Workflow workflow = Workflow.create("foo", WORKFLOW_CONFIGURATION);
+    storage.store(workflow);
+
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_WORKFLOW), hasSize(1));
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_COMPONENT), hasSize(1));
+
+    storage.delete("foo", true);
+
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_WORKFLOW), hasSize(0));
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_COMPONENT), hasSize(0));
   }
 
   @Test

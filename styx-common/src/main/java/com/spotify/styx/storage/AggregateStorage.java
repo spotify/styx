@@ -168,6 +168,11 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
+  public void delete(String componentId, boolean cascade) throws IOException {
+    datastoreStorage.delete(componentId, cascade);
+  }
+
+  @Override
   public void updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec triggerSpec)
       throws IOException {
     datastoreStorage.updateNextNaturalTrigger(workflowId, triggerSpec);

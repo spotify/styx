@@ -102,6 +102,14 @@ public interface Storage extends Closeable {
   void delete(WorkflowId workflowId) throws IOException;
 
   /**
+   * Removes a component definition.
+   *
+   * @param componentId The component id to remove.
+   * @param cascade Indicating whether workflows belonging to the component should be deleted first.
+   */
+  void delete(String componentId, boolean cascade) throws IOException;
+
+  /**
    * Updates the next natural trigger for a {@link Workflow}.
    *
    * @param workflowId  The {@link WorkflowId} to update the next natural trigger for.
