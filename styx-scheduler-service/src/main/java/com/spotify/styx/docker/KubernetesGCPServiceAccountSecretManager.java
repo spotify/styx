@@ -175,7 +175,7 @@ class KubernetesGCPServiceAccountSecretManager {
         throw e;
       }
     } catch (IOException e) {
-      LOG.warn("[AUDIT] Failed to create keys for {} used by workflow {}",
+      LOG.warn("[AUDIT] Failed to create keys for {} used by workflow {} {}",
           serviceAccount, workflowId, e);
       throw e;
     }

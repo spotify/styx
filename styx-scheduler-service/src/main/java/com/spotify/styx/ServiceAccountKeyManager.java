@@ -88,7 +88,7 @@ public class ServiceAccountKeyManager {
     try {
       deleteKey(keyName);
     } catch (IOException e) {
-      LOG.debug("Ignoring error while deleting key {}", keyName, e);
+      LOG.debug("Ignoring error while deleting key {} {}", keyName, e);
     }
   }
 
@@ -104,10 +104,10 @@ public class ServiceAccountKeyManager {
         LOG.debug("Couldn't find key to delete {}", keyName);
         return;
       }
-      LOG.warn("[AUDIT] Failed to delete key {}", keyName, e);
+      LOG.warn("[AUDIT] Failed to delete key {} {}", keyName, e);
       throw e;
     } catch (IOException e) {
-      LOG.warn("[AUDIT] Failed to delete key {}", keyName, e);
+      LOG.warn("[AUDIT] Failed to delete key {} {}", keyName, e);
       throw e;
     }
   }
