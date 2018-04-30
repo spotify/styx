@@ -77,7 +77,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -89,7 +88,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
@@ -441,15 +439,17 @@ class KubernetesDockerRunner implements DockerRunner {
         .watch(new PodWatcher());
   }
 
-  private void examineRunningWFISandAssociatedPods(Map<WorkflowInstance, RunState> activeStates,
-                                                   PodList podList) {
-
-    final Set<WorkflowInstance> runningWorkflowInstances = activeStates.values()
+  private Set<WorkflowInstance> getRunningWorkflowInstances() {
+    return stateManager.getActiveStates()
+        .values()
         .stream()
         .filter(runState -> runState.state().equals(RUNNING))
         .map(RunState::workflowInstance)
-        .collect(Collectors.toCollection(HashSet::new));
+        .collect(toSet());
+  }
 
+  private void examineRunningWFISandAssociatedPods(Set<WorkflowInstance> runningWorkflowInstances,
+                                                   PodList podList) {
     final Set<WorkflowInstance> workflowInstancesForPods = podList.getItems().stream()
         .filter(pod -> pod.getMetadata().getAnnotations()
             .containsKey(STYX_WORKFLOW_INSTANCE_ANNOTATION))
@@ -472,10 +472,9 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private synchronized void tryPollPods() {
-    final Map<WorkflowInstance, RunState> activeStates = stateManager.getActiveStates();
-
+    final Set<WorkflowInstance> runningWorkflowInstances = getRunningWorkflowInstances();
     final PodList list = client.pods().list();
-    examineRunningWFISandAssociatedPods(activeStates, list);
+    examineRunningWFISandAssociatedPods(runningWorkflowInstances, list);
 
     for (Pod pod : list.getItems()) {
       logEvent(Watcher.Action.MODIFIED, pod, list.getMetadata().getResourceVersion(), true);
@@ -483,9 +482,13 @@ class KubernetesDockerRunner implements DockerRunner {
       if (!workflowInstance.isPresent()) {
         continue;
       }
-      final RunState runState = activeStates.get(workflowInstance.get());
-      if (runState != null && isPodRunState(pod, runState)) {
-        emitPodEvents(Watcher.Action.MODIFIED, pod, runState);
+      // do an extra lookup to get latest state
+      // this is crucial because after fetching all states in datastore, some states might
+      // have transitioned already; there could even be cases that we observe pods whose
+      // states where created after fetching the states.
+      final Optional<RunState> runState = lookupPodRunState(pod, workflowInstance.get());
+      if (runState.isPresent()) {
+        emitPodEvents(Watcher.Action.MODIFIED, pod, runState.get());
         cleanupWithRunState(workflowInstance.get(), pod.getMetadata().getName());
       } else {
         cleanupWithoutRunState(workflowInstance.get(), pod.getMetadata().getName());
@@ -508,31 +511,28 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private Optional<RunState> lookupPodRunState(Pod pod, WorkflowInstance workflowInstance) {
-    final Optional<RunState> runStateOpt = stateManager.getActiveState(workflowInstance);
-    if (!runStateOpt.isPresent()) {
+    final String podName = pod.getMetadata().getName();
+
+    final Optional<RunState> runState = stateManager.getActiveState(workflowInstance);
+    if (!runState.isPresent()) {
       LOG.debug("Pod event for unknown or inactive workflow instance {}", workflowInstance);
       return Optional.empty();
     }
-    return runStateOpt.filter(runState -> isPodRunState(pod, runState));
-  }
 
-  private boolean isPodRunState(Pod pod, RunState runState) {
-    final String podName = pod.getMetadata().getName();
-
-    final Optional<String> executionIdOpt = runState.data().executionId();
+    final Optional<String> executionIdOpt = runState.get().data().executionId();
     if (!executionIdOpt.isPresent()) {
       LOG.debug("Pod event for state with no current executionId: {}", podName);
-      return false;
+      return Optional.empty();
     }
 
     final String executionId = executionIdOpt.get();
     if (!podName.equals(executionId)) {
       LOG.debug("Pod event not matching current exec id, current:{} != pod:{}",
           executionId, podName);
-      return false;
+      return Optional.empty();
     }
 
-    return true;
+    return runState;
   }
 
   private void emitPodEvents(Watcher.Action action, Pod pod, RunState runState) {
