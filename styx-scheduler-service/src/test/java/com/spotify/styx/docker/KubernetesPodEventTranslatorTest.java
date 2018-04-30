@@ -251,13 +251,23 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void zeroExitButFailedPhaseWithoutTerminationLog() throws Exception {
+  public void zeroExitCodeFailedPhaseWithoutTerminationLog() throws Exception {
     pod.setStatus(terminated("Failed", 0, null));
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.started(WFI),
         Event.terminate(WFI, Optional.empty()));
+  }
+  
+  @Test
+  public void nonZeroExitCodeFailedPhaseWithoutTerminationLog() throws Exception {
+    pod.setStatus(terminated("Failed", 2, null));
+
+    assertGeneratesEventsAndTransitions(
+        RunState.State.SUBMITTED, pod,
+        Event.started(WFI),
+        Event.terminate(WFI, Optional.of(2)));
   }
 
   @Test
