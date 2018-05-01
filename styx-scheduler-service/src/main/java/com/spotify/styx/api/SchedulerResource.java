@@ -275,17 +275,17 @@ public class SchedulerResource {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
     } catch (ExecutionException e) {
-      final Throwable cause = e.getCause();
-      if (findCause(e, IllegalStateException.class) != null
-          || findCause(e, IllegalArgumentException.class) != null) {
+      Throwable cause;
+      if ((cause = findCause(e, IllegalStateException.class)) != null
+          || (cause = findCause(e, IllegalArgumentException.class)) != null) {
         // TODO: propagate error information using a more specific exception type
         return Response.forStatus(CONFLICT.withReasonPhrase(cause.getMessage()));
-      } else if (findCause(e, AlreadyInitializedException.class) != null) {
+      } else if ((cause = findCause(e, AlreadyInitializedException.class)) != null) {
         return Response.forStatus(CONFLICT.withReasonPhrase(
             "This workflow instance is already triggered. Did you want to `retry` running it instead? " + cause
                 .getMessage()));
       } else {
-        return Response.forStatus(INTERNAL_SERVER_ERROR.withReasonPhrase(cause.getMessage()));
+        return Response.forStatus(INTERNAL_SERVER_ERROR.withReasonPhrase(e.getCause().getMessage()));
       }
     }
 
