@@ -551,8 +551,7 @@ public class SchedulerResourceTest {
   public void failTriggeringAlreadyActiveWorkflowInstance() throws Exception {
     final AlreadyInitializedException exception = new AlreadyInitializedException("already active!");
     failtriggeringOnException(DAILY_WORKFLOW, exception, Status.CONFLICT.withReasonPhrase(
-        "This workflow instance is already triggered. Did you want to `retry` running it instead? " + exception
-            .getMessage()));
+        "This workflow instance is already triggered. Did you want to `retry` running it instead?"));
   }
 
   @Test
