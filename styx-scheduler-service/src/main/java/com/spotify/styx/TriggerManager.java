@@ -27,6 +27,7 @@ import static com.spotify.styx.util.GuardedRunnable.guard;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 
 import com.google.common.base.Throwables;
 import com.spotify.styx.model.Schedule;
@@ -39,29 +40,35 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerInstantSpec;
+import java.io.Closeable;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Triggers natural executions for {@link Workflow}s.
  */
-class TriggerManager {
+class TriggerManager implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(TriggerManager.class);
 
   private static final String TICK_TYPE = UPPER_CAMEL.to(LOWER_UNDERSCORE,
                                                          TriggerManager.class.getSimpleName());
+  private static final int TRIGGER_CONCURRENCY = 32;
 
   private final TriggerListener triggerListener;
   private final Time time;
   private final Storage storage;
   private final Stats stats;
+  private final ForkJoinPool forkJoinPool;
 
   TriggerManager(TriggerListener triggerListener,
                  Time time,
@@ -71,6 +78,7 @@ class TriggerManager {
     this.time = requireNonNull(time);
     this.storage = requireNonNull(storage);
     this.stats = requireNonNull(stats);
+    this.forkJoinPool = new ForkJoinPool(TRIGGER_CONCURRENCY);
   }
 
   void tick() {
@@ -97,18 +105,21 @@ class TriggerManager {
     }
 
     final Instant now = time.get();
-    canBeTriggeredWorkflows.entrySet().parallelStream()
+    canBeTriggeredWorkflows.entrySet().stream()
         .filter(entry -> now.isAfter(entry.getValue().offsetInstant()))
-        .forEach(entry -> tryTriggering(entry.getKey(), entry.getValue(), enabledWorkflows));
+        .map(entry -> forkJoinPool
+            .submit(tryTriggering(entry.getKey(), entry.getValue(), enabledWorkflows)))
+        .collect(toList()) // collect here to trigger in parallel
+        .forEach(ForkJoinTask::join);
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
     stats.recordTickDuration(TICK_TYPE, durationMillis);
   }
 
-  private void tryTriggering(Workflow workflow,
+  private Runnable tryTriggering(Workflow workflow,
                              TriggerInstantSpec instantSpec,
                              Set<WorkflowId> enabledWorkflows) {
-    guard(() -> {
+    return guard(() -> {
       if (enabledWorkflows.contains(workflow.id())) {
         try {
           final CompletionStage<Void> processed = triggerListener.event(
@@ -146,6 +157,16 @@ class TriggerManager {
             workflow.id(), nextTrigger);
         throw Throwables.propagate(e);
       }
-    }).run();
+    });
+  }
+
+  @Override
+  public void close() {
+    forkJoinPool.shutdownNow();
+    try {
+      forkJoinPool.awaitTermination(30, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 }
