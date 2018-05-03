@@ -82,7 +82,7 @@ public class QueuedStateManager implements StateManager {
   private final LongAdder queuedEvents = new LongAdder();
 
   private final Time time;
-  private final StripedExecutorService eventTransitionExecutor;
+  private final StripedExecutorService eventProcessingExecutor;
   private final Storage storage;
   private final BiConsumer<SequenceEvent, RunState> eventConsumer;
   private final Executor eventConsumerExecutor;
@@ -93,7 +93,7 @@ public class QueuedStateManager implements StateManager {
 
   public QueuedStateManager(
       Time time,
-      StripedExecutorService eventTransitionExecutor,
+      StripedExecutorService eventProcessingExecutor,
       Storage storage,
       BiConsumer<SequenceEvent, RunState> eventConsumer,
       Executor eventConsumerExecutor,
@@ -103,7 +103,7 @@ public class QueuedStateManager implements StateManager {
     this.storage = Objects.requireNonNull(storage);
     this.eventConsumer = Objects.requireNonNull(eventConsumer);
     this.eventConsumerExecutor = Objects.requireNonNull(eventConsumerExecutor);
-    this.eventTransitionExecutor = Objects.requireNonNull(eventTransitionExecutor);
+    this.eventProcessingExecutor = Objects.requireNonNull(eventProcessingExecutor);
     this.outputHandler = Objects.requireNonNull(outputHandler);
     this.shardedCounter = Objects.requireNonNull(shardedCounter);
   }
@@ -147,7 +147,7 @@ public class QueuedStateManager implements StateManager {
 
     queuedEvents.increment();
     return Striping.supplyAsyncStriped(() ->
-        transition(event, expectedCounter), event.workflowInstance(), eventTransitionExecutor)
+        transition(event, expectedCounter), event.workflowInstance(), eventProcessingExecutor)
         .thenAccept((tuple) -> postTransition(tuple._1, tuple._2));
   }
 
@@ -367,9 +367,9 @@ public class QueuedStateManager implements StateManager {
     }
     running = false;
 
-    eventTransitionExecutor.shutdown();
+    eventProcessingExecutor.shutdown();
     try {
-      if (!eventTransitionExecutor
+      if (!eventProcessingExecutor
           .awaitTermination(SHUTDOWN_GRACE_PERIOD.toMillis(), MILLISECONDS)) {
         throw new IOException(
             "Graceful shutdown failed, event loop did not finish within grace period");

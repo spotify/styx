@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.apollo.environment.ConfigUtil.optionalInt;
 import static com.spotify.styx.state.OutputHandler.fanOutput;
 import static com.spotify.styx.state.StateUtil.getResourcesUsageMap;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
@@ -137,7 +138,9 @@ public class StyxScheduler implements AppInit {
   public static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
   public static final String STYX_MODE = "styx.mode";
   public static final String STYX_MODE_DEVELOPMENT = "development";
+  public static final String STYX_EVENT_PROCESSING_THREADS = "styx.event-processing-threads";
 
+  public static final int DEFAULT_STYX_EVENT_PROCESSING_THREADS = 32;
   public static final int SCHEDULER_TICK_INTERVAL_SECONDS = 2;
   public static final int TRIGGER_MANAGER_TICK_INTERVAL_SECONDS = 1;
   public static final long CLEANER_TICK_INTERVAL_SECONDS = MINUTES.toSeconds(30);
@@ -301,8 +304,9 @@ public class StyxScheduler implements AppInit {
 
     final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
     closer.register(executorCloser("scheduler", executor));
-    final StripedExecutorService eventTransitionExecutor = new StripedExecutorService(32);
-    closer.register(executorCloser("event-transition", eventTransitionExecutor));
+    final StripedExecutorService eventProcessingExecutor = new StripedExecutorService(
+        optionalInt(config, STYX_EVENT_PROCESSING_THREADS).orElse(DEFAULT_STYX_EVENT_PROCESSING_THREADS));
+    closer.register(executorCloser("event-processing", eventProcessingExecutor));
     final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
     closer.register(executorCloser("event-consumer", eventConsumerExecutor));
 
@@ -324,7 +328,7 @@ public class StyxScheduler implements AppInit {
     //       take StateManager as argument instead?
     final List<OutputHandler> outputHandlers = new ArrayList<>();
     final QueuedStateManager stateManager = closer.register(
-        new QueuedStateManager(time, eventTransitionExecutor, storage,
+        new QueuedStateManager(time, eventProcessingExecutor, storage,
             eventConsumerFactory.apply(environment, stats), eventConsumerExecutor,
             fanOutput(outputHandlers), shardedCounter));
 
