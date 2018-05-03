@@ -42,6 +42,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
+import com.spotify.apollo.StatusType;
 import com.spotify.apollo.test.ServiceHelper;
 import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.TriggerListener;
@@ -55,6 +56,7 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
@@ -403,19 +405,28 @@ public class SchedulerResourceTest {
   }
 
   @Test
-  public void testTriggerAlreadyActiveWorkflowInstance() throws Exception {
-    final IllegalStateException cause = new IllegalStateException("already active!");
+  public void failTriggeringOnUnknownException() throws Exception {
+    final Exception exception = new Exception("unknown exception!");
+    failtriggeringOnException(DAILY_WORKFLOW, exception, Status.INTERNAL_SERVER_ERROR.withReasonPhrase(exception.getMessage()));
+  }
 
-    when(storage.workflow(DAILY_WORKFLOW.id())).thenReturn(Optional.of(DAILY_WORKFLOW));
-    WorkflowInstance toTrigger = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2015-12-31");
+  @Test
+  public void failTriggeringOnIllegalArgumentException() throws Exception {
+    final IllegalArgumentException exception = new IllegalArgumentException("illegal argument!");
+    failtriggeringOnException(DAILY_WORKFLOW, exception, Status.CONFLICT.withReasonPhrase(exception.getMessage()));
+  }
 
-    when(triggerListener.event(any(), any(), any())).thenReturn(
-        CompletableFutures.exceptionallyCompletedFuture(cause));
+  @Test
+  public void failTriggeringOnIllegalStateException() throws Exception {
+    final IllegalStateException exception = new IllegalStateException("illegal state!");
+    failtriggeringOnException(DAILY_WORKFLOW, exception, Status.CONFLICT.withReasonPhrase(exception.getMessage()));
+  }
 
-    Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
-
-    assertThat(response.status(),
-               is(Status.CONFLICT.withReasonPhrase(cause.getMessage())));
+  @Test
+  public void failTriggeringAlreadyActiveWorkflowInstance() throws Exception {
+    final AlreadyInitializedException exception = new AlreadyInitializedException("already active!");
+    failtriggeringOnException(DAILY_WORKFLOW, exception, Status.CONFLICT.withReasonPhrase(
+        "This workflow instance is already triggered. Did you want to `retry` running it instead?"));
   }
 
   @Test
@@ -448,5 +459,17 @@ public class SchedulerResourceTest {
                is(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: bad, f00d")));
     assertThat(triggeredWorkflow, isEmpty());
     assertThat(triggeredInstant, isEmpty());
+  }
+
+  void failtriggeringOnException(Workflow wf, Exception e, StatusType preferredStatusType) throws Exception {
+    when(storage.workflow(wf.id())).thenReturn(Optional.of(wf));
+    WorkflowInstance toTrigger = WorkflowInstance.create(wf.id(), "2015-12-31");
+
+    when(triggerListener.event(any(), any(), any())).thenReturn(
+        CompletableFutures.exceptionallyCompletedFuture(e));
+
+    Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
+
+    assertThat(response.status(), is(preferredStatusType));
   }
 }

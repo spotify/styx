@@ -24,6 +24,7 @@ import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.CONFLICT;
 import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
 import static com.spotify.apollo.Status.OK;
+import static com.spotify.styx.util.ExceptionUtil.findCause;
 import static com.spotify.styx.util.ParameterUtil.parseAlignedInstant;
 
 import com.spotify.apollo.RequestContext;
@@ -42,6 +43,7 @@ import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RandomGenerator;
@@ -213,13 +215,16 @@ public class SchedulerResource {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
     } catch (ExecutionException e) {
-      final Throwable cause = e.getCause();
-      if (cause instanceof IllegalStateException
-          || cause instanceof IllegalArgumentException) {
+      Throwable cause;
+      if ((cause = findCause(e, IllegalStateException.class)) != null
+          || (cause = findCause(e, IllegalArgumentException.class)) != null) {
         // TODO: propagate error information using a more specific exception type
         return Response.forStatus(CONFLICT.withReasonPhrase(cause.getMessage()));
+      } else if (findCause(e, AlreadyInitializedException.class) != null) {
+        return Response.forStatus(CONFLICT.withReasonPhrase(
+            "This workflow instance is already triggered. Did you want to `retry` running it instead?"));
       } else {
-        return Response.forStatus(INTERNAL_SERVER_ERROR);
+        return Response.forStatus(INTERNAL_SERVER_ERROR.withReasonPhrase(e.getCause().getMessage()));
       }
     }
 
