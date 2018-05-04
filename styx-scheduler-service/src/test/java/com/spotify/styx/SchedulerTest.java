@@ -43,7 +43,6 @@ import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.WorkflowExecutionGate.ExecutionBlocker;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -74,6 +73,8 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javaslang.Tuple;
+import javaslang.Tuple2;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -96,7 +97,7 @@ public class SchedulerTest {
   private Instant now = Instant.parse("2016-12-02T22:00:00Z");
   private Time time = () -> now;
 
-  private List<Resource> resourceLimits = Lists.newArrayList();
+  private List<Tuple2<String, Long>> counterLimits = Lists.newArrayList();
 
   private ExecutorService executor = Executors.newCachedThreadPool();
   private ConcurrentMap<WorkflowInstance, RunState> activeStates = Maps.newConcurrentMap();
@@ -126,7 +127,7 @@ public class SchedulerTest {
   private void setUp(long timeoutSeconds) throws IOException {
     TimeoutConfig timeoutConfig = createWithDefaultTtl(ofSeconds(timeoutSeconds));
 
-    when(storage.resources()).thenReturn(resourceLimits);
+    when(storage.getCounterLimits()).thenReturn(counterLimits);
     when(config.globalConcurrency()).thenReturn(Optional.empty());
     when(storage.config()).thenReturn(config);
 
@@ -141,8 +142,8 @@ public class SchedulerTest {
   }
 
   private void setResourceLimit(String resourceId, long limit) {
-    resourceLimits.removeIf(r -> r.id().equals(resourceId));
-    resourceLimits.add(Resource.create(resourceId, limit));
+    counterLimits.removeIf(r -> r._1.equals(resourceId));
+    counterLimits.add(Tuple.of(resourceId, limit));
   }
 
   private void initWorkflow(Workflow workflow) {

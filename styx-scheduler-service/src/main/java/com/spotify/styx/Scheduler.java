@@ -121,7 +121,9 @@ public class Scheduler {
     final Optional<Long> globalConcurrency;
     final StyxConfig config;
     try {
-      resources = storage.resources().stream().collect(toMap(Resource::id, identity()));
+      resources = storage.getCounterLimits().stream()
+          .map(counterLimit -> Resource.create(counterLimit._1, counterLimit._2))
+          .collect(toMap(Resource::id, identity()));
       config = storage.config();
       globalConcurrency = config.globalConcurrency();
     } catch (IOException e) {

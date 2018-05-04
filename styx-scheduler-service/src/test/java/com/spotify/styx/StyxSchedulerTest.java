@@ -35,7 +35,6 @@ import com.google.api.services.container.v1beta1.model.Cluster;
 import com.google.api.services.container.v1beta1.model.MasterAuth;
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.StyxScheduler.KubernetesClientFactory;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.storage.TransactionFunction;
@@ -153,7 +152,7 @@ public class StyxSchedulerTest {
     when(storage.runInTransaction(any())).thenAnswer(
         a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
 
-    styxScheduler.resetShards(storage, Resource.create("res1", 300));
+    styxScheduler.resetShards(storage, "res1");
 
     verify(transaction, times(128)).store(shardArgumentCaptor.capture());
     shardsWithValue(shardArgumentCaptor, 0L, 128);
@@ -165,7 +164,7 @@ public class StyxSchedulerTest {
     when(storage.runInTransaction(any())).thenThrow(exception);
 
     try {
-      styxScheduler.resetShards(storage, Resource.create("res1", 300));
+      styxScheduler.resetShards(storage, "res1");
       fail();
     } catch (Exception e) {
       assertThat(e.getCause(), is(exception));

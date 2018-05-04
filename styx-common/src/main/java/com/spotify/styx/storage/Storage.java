@@ -21,7 +21,6 @@
 package com.spotify.styx.storage;
 
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -38,6 +37,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
+import javaslang.Tuple2;
 
 /**
  * The interface to the persistence layer.
@@ -257,14 +257,6 @@ public interface Storage extends Closeable {
    */
   WorkflowState workflowState(WorkflowId workflowId) throws IOException;
 
-  Optional<Resource> resource(String id) throws IOException;
-
-  void storeResource(Resource resource) throws IOException;
-
-  List<Resource> resources() throws IOException;
-
-  void deleteResource(String id) throws IOException;
-
   List<Backfill> backfills(boolean showAll) throws IOException;
 
   List<Backfill> backfillsForComponent(boolean showAll, String component) throws IOException;
@@ -290,7 +282,11 @@ public interface Storage extends Closeable {
   <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
       throws IOException, E;
 
-  void deleteLimitForCounter(String counterId) throws IOException;
+  Optional<Tuple2<String, Long>> getCounterLimit(String id) throws IOException;
 
-  void updateLimitForCounter(String counterId, long limit) throws IOException;
+  List<Tuple2<String, Long>> getCounterLimits() throws IOException;
+
+  void deleteCounterLimit(String counterId) throws IOException;
+
+  void updateCounterLimit(String counterId, long limit) throws IOException;
 }

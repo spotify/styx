@@ -21,7 +21,6 @@
 package com.spotify.styx.storage;
 
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
-import static com.spotify.styx.storage.DatastoreStorage.KIND_RESOURCE;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_ALL_TRIGGERED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_COMPONENT;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONCURRENCY;
@@ -49,14 +48,12 @@ import static com.spotify.styx.util.ShardedCounter.PROPERTY_LIMIT;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_INDEX;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_VALUE;
 
-import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.Transaction;
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -130,26 +127,14 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   }
 
   @Override
-  public void updateLimitForCounter(String counterId, long limit) {
+  public void updateCounterLimit(String counterId, long limit) {
     final Key limitKey = tx.getDatastore().newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId);
     tx.put(Entity.newBuilder(limitKey).set(PROPERTY_LIMIT, limit).build());
   }
 
   @Override
-  public void store(Resource resource) {
-    tx.put(resourceToEntity(tx.getDatastore(), resource));
-  }
-
-  @Override
   public void deleteCounterLimit(String counterId) {
     tx.delete(tx.getDatastore().newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId));
-  }
-
-  private Entity resourceToEntity(Datastore datastore, Resource resource) {
-    final Key key = datastore.newKeyFactory().setKind(KIND_RESOURCE).newKey(resource.id());
-    return Entity.newBuilder(key)
-        .set(PROPERTY_CONCURRENCY, resource.concurrency())
-        .build();
   }
 
   @Override

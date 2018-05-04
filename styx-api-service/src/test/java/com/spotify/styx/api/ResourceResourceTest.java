@@ -106,8 +106,7 @@ public class ResourceResourceTest extends VersionedApiTest {
 
   @Before
   public void setUp() throws Exception {
-    storage.storeResource(RESOURCE_1);
-    storage.updateLimitForCounter(RESOURCE_1.id(), RESOURCE_1.concurrency());
+    storage.updateCounterLimit(RESOURCE_1.id(), RESOURCE_1.concurrency());
   }
 
   @After
@@ -131,7 +130,7 @@ public class ResourceResourceTest extends VersionedApiTest {
   public void shouldListMultipleResources() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.storeResource(RESOURCE_2);
+    storage.updateCounterLimit(RESOURCE_2.id(), RESOURCE_2.concurrency());
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("")));
 
@@ -167,8 +166,9 @@ public class ResourceResourceTest extends VersionedApiTest {
     assertJson(response, "id", equalTo("resource2"));
     assertJson(response, "concurrency", equalTo(2));
 
-    assertThat(storage.resource(RESOURCE_2.id()), hasValue(RESOURCE_2));
-    verify(storage).updateLimitForCounter(RESOURCE_2.id(), RESOURCE_2.concurrency());
+    assertThat(storage.getCounterLimit(RESOURCE_2.id()).map(x -> Resource.create(x._1, x._2)),
+        hasValue(RESOURCE_2));
+    verify(storage).updateCounterLimit(RESOURCE_2.id(), RESOURCE_2.concurrency());
     assertThat(storage.getLimitForCounter(RESOURCE_2.id()), is(RESOURCE_2.concurrency()));
   }
 
@@ -184,8 +184,9 @@ public class ResourceResourceTest extends VersionedApiTest {
     assertJson(response, "id", equalTo("resource1"));
     assertJson(response, "concurrency", equalTo(21));
 
-    assertThat(storage.resource(RESOURCE_1.id()), hasValue(Resource.create(RESOURCE_1.id(), 21)));
-    verify(storage).updateLimitForCounter(RESOURCE_1.id(), 21L);
+    assertThat(storage.getCounterLimit(RESOURCE_1.id()).map(x -> Resource.create(x._1, x._2)),
+        hasValue(Resource.create(RESOURCE_1.id(), 21)));
+    verify(storage).updateCounterLimit(RESOURCE_1.id(), 21L);
     assertThat(storage.getLimitForCounter(RESOURCE_1.id()), is(21L));
   }
 
@@ -198,7 +199,7 @@ public class ResourceResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
 
-    assertThat(storage.resource(RESOURCE_1.id()).isPresent(), is(false));
+    assertThat(storage.getCounterLimit(RESOURCE_1.id()).isPresent(), is(false));
     assertThat(storage.getLimitForCounter(RESOURCE_1.id()), is(Long.MAX_VALUE));
   }
 
@@ -235,8 +236,10 @@ public class ResourceResourceTest extends VersionedApiTest {
         ImmutableMap.of("id", "resource1", "concurrency", 1),
         ImmutableMap.of("id", "resource2", "concurrency", 3)
     ));
-    assertThat(storage.resource(RESOURCE_1.id()), hasValue(RESOURCE_1));
-    assertThat(storage.resource("resource2"), hasValue(Resource.create("resource2", 3)));
+    assertThat(storage.getCounterLimit(RESOURCE_1.id()).map(x -> Resource.create(x._1, x._2)),
+        hasValue(RESOURCE_1));
+    assertThat(storage.getCounterLimit("resource2").map(x -> Resource.create(x._1, x._2)),
+        hasValue(Resource.create("resource2", 3)));
     assertThat(storage.getLimitForCounter(RESOURCE_1.id()), is(RESOURCE_1.concurrency()));
     assertThat(storage.getLimitForCounter(RESOURCE_2.id()), is(3L));
 
@@ -253,8 +256,9 @@ public class ResourceResourceTest extends VersionedApiTest {
     assertJson(listResponse3, "resources", containsInAnyOrder(
         ImmutableMap.of("id", "resource1", "concurrency", 1)
     ));
-    assertThat(storage.resource(RESOURCE_1.id()), hasValue(RESOURCE_1));
-    assertThat(storage.resource("resource2"), isEmpty());
+    assertThat(storage.getCounterLimit(RESOURCE_1.id()).map(x -> Resource.create(x._1, x._2)),
+        hasValue(RESOURCE_1));
+    assertThat(storage.getCounterLimit("resource2"), isEmpty());
     assertThat(storage.getLimitForCounter(RESOURCE_1.id()), is(RESOURCE_1.concurrency()));
     assertThat(storage.getLimitForCounter(RESOURCE_2.id()), is(Long.MAX_VALUE));
   }

@@ -60,19 +60,19 @@ public class MeteredStorageProxyTest {
 
   @Test
   public void instrumentStorageMethod() throws Exception {
-    proxy.resource("foobar");
+    proxy.getCounterLimit("foobar");
 
-    verify(storage).resource("foobar");
-    verify(stats).recordStorageOperation("resource", 123, "success");
+    verify(storage).getCounterLimit("foobar");
+    verify(stats).recordStorageOperation("getCounterLimit", 123, "success");
   }
 
   @Test
   public void surfaceExceptions() throws Exception {
-    doThrow(new RuntimeException("with message")).when(storage).resource("foobar");
+    doThrow(new RuntimeException("with message")).when(storage).getCounterLimit("foobar");
 
     expect.expect(RuntimeException.class);
     expect.expectMessage("with message");
 
-    proxy.resource("foobar");
+    proxy.getCounterLimit("foobar");
   }
 }

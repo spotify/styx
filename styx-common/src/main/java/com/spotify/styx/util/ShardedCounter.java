@@ -206,7 +206,7 @@ public class ShardedCounter {
    * updateCounter operations on this counter.
    */
   public void updateLimit(StorageTransaction tx, String counterId, long limit) {
-    tx.updateLimitForCounter(counterId, limit);
+    tx.updateCounterLimit(counterId, limit);
   }
 
   /**
@@ -304,6 +304,6 @@ public class ShardedCounter {
    */
   public void deleteCounter(String counterId) throws IOException {
     storage.deleteShardsForCounter(counterId);
-    storage.deleteLimitForCounter(counterId);
+    storage.deleteCounterLimit(counterId);
   }
 }

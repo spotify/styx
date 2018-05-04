@@ -21,7 +21,6 @@
 package com.spotify.styx.storage;
 
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -149,12 +148,7 @@ public interface StorageTransaction {
   /**
    * Updates the limit for the given counter
    */
-  void updateLimitForCounter(String counterId, long limit);
-
-  /**
-   * Stores a resource
-   */
-  void store(Resource resource);
+  void updateCounterLimit(String counterId, long limit);
 
   /**
    * Deletes the limit configured for the given counter

@@ -22,7 +22,6 @@ package com.spotify.styx.storage;
 
 import com.google.cloud.datastore.Datastore;
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -40,6 +39,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
+import javaslang.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
 
 /**
@@ -199,21 +199,6 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public Optional<Resource> resource(String id) throws IOException {
-    return datastoreStorage.getResource(id);
-  }
-
-  @Override
-  public List<Resource> resources() throws IOException {
-    return datastoreStorage.getResources();
-  }
-
-  @Override
-  public void deleteResource(String id) throws IOException {
-    datastoreStorage.deleteResource(id);
-  }
-
-  @Override
   public void storeBackfill(Backfill backfill) throws IOException {
     datastoreStorage.storeBackfill(backfill);
   }
@@ -231,11 +216,6 @@ public class AggregateStorage implements Storage {
   @Override
   public long getLimitForCounter(String counterId) {
     return datastoreStorage.getLimitForCounter(counterId);
-  }
-
-  @Override
-  public void storeResource(Resource resource) throws IOException {
-    datastoreStorage.postResource(resource);
   }
 
   @Override
@@ -269,12 +249,23 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public void deleteLimitForCounter(String counterId) throws IOException {
-    datastoreStorage.deleteLimitForCounter(counterId);
+  public Optional<Tuple2<String, Long>> getCounterLimit(String id) throws IOException {
+    return datastoreStorage.getCounterLimit(id);
   }
 
   @Override
-  public void updateLimitForCounter(String counterId, long limit) throws IOException {
-    datastoreStorage.updateLimitForCounter(counterId, limit);
+  public List<Tuple2<String, Long>> getCounterLimits() throws IOException {
+    return datastoreStorage.getCounterLimits();
+  }
+
+
+  @Override
+  public void deleteCounterLimit(String counterId) throws IOException {
+    datastoreStorage.deleteCounterLimit(counterId);
+  }
+
+  @Override
+  public void updateCounterLimit(String counterId, long limit) throws IOException {
+    datastoreStorage.updateCounterLimit(counterId, limit);
   }
 }

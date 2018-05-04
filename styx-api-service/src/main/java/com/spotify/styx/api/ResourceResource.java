@@ -87,7 +87,9 @@ public final class ResourceResource {
 
   private ResourcesPayload getResources() {
     try {
-      return ResourcesPayload.create(storage.resources());
+      return ResourcesPayload.create(storage.getCounterLimits().stream()
+          .map(counterLimit -> Resource.create(counterLimit._1, counterLimit._2))
+          .collect(toList()));
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
@@ -95,7 +97,9 @@ public final class ResourceResource {
 
   private Response<Resource> getResource(String id) {
     try {
-      return storage.resource(id).map(Response::forPayload)
+      return storage.getCounterLimit(id)
+          .map(counterLimit -> Resource.create(counterLimit._1, counterLimit._2))
+          .map(Response::forPayload)
           .orElse(Response.forStatus(Status.NOT_FOUND));
     } catch (IOException e) {
       throw Throwables.propagate(e);
@@ -104,8 +108,7 @@ public final class ResourceResource {
 
   private Response<Void> deleteResource(String id) {
     try {
-      storage.deleteResource(id);
-      storage.deleteLimitForCounter(id);
+      storage.deleteCounterLimit(id);
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
@@ -114,8 +117,7 @@ public final class ResourceResource {
 
   private Resource postResource(Resource resource) {
     try {
-      storage.storeResource(resource);
-      storage.updateLimitForCounter(resource.id(), resource.concurrency());
+      storage.updateCounterLimit(resource.id(), resource.concurrency());
       return resource;
     } catch (IOException e) {
       throw Throwables.propagate(e);
@@ -129,8 +131,7 @@ public final class ResourceResource {
     }
 
     try {
-      storage.storeResource(resource);
-      storage.updateLimitForCounter(resource.id(), resource.concurrency());
+      storage.updateCounterLimit(resource.id(), resource.concurrency());
     } catch (IOException e) {
       return Response
           .forStatus(

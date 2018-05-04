@@ -39,7 +39,6 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Lists;
 import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -70,6 +69,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import javaslang.Tuple2;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -106,7 +106,7 @@ public class BackfillTriggerManagerTest {
 
   private static final Time TIME =  () -> Instant.parse("2016-12-02T22:00:00Z");
 
-  private List<Resource> resourceLimits = Lists.newArrayList();
+  private List<Tuple2<String, Long>> counterLimits = Lists.newArrayList();
 
   @Mock TriggerListener triggerListener;
   @Mock Storage storage;
@@ -143,7 +143,7 @@ public class BackfillTriggerManagerTest {
 
     when(stateManager.getActiveStatesByTriggerId(anyString())).thenReturn(activeStates);
 
-    when(storage.resources()).thenReturn(resourceLimits);
+    when(storage.getCounterLimits()).thenReturn(counterLimits);
     when(config.globalConcurrency()).thenReturn(Optional.empty());
     when(storage.config()).thenReturn(config);
 

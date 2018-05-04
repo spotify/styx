@@ -61,7 +61,6 @@ import com.google.common.hash.Hashing;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -99,6 +98,8 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import javaslang.Tuple;
+import javaslang.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,7 +116,6 @@ public class DatastoreStorage implements Closeable {
   public static final String KIND_ACTIVE_WORKFLOW_INSTANCE = "ActiveWorkflowInstance";
   public static final String KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD = "ActiveWorkflowInstanceIndexShard";
   public static final String KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY = "ActiveWorkflowInstanceIndexShardEntry";
-  public static final String KIND_RESOURCE = "Resource";
   public static final String KIND_BACKFILL = "Backfill";
 
   public static final String PROPERTY_CONFIG_ENABLED = "enabled";
@@ -732,42 +732,22 @@ public class DatastoreStorage implements Closeable {
     return Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos());
   }
 
-  Optional<Resource> getResource(String id) {
-    Entity entity = datastore.get(datastore.newKeyFactory().setKind(KIND_RESOURCE).newKey(id));
+  Optional<Tuple2<String, Long>> getCounterLimit(String id) {
+    Entity entity = datastore.get(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(id));
     if (entity == null) {
       return Optional.empty();
     }
-    return Optional.of(entityToResource(entity));
+    return Optional.of(Tuple.of(entity.getKey().getName(), entity.getLong(PROPERTY_LIMIT)));
   }
 
-  void postResource(Resource resource) throws IOException {
-    storeWithRetries(() -> runInTransaction(transaction -> {
-      transaction.store(resource);
-      return null;
-      // TODO store just in one place, eliminate one of the two calls ^?
-    }));
-  }
-
-  List<Resource> getResources() {
-    final EntityQuery query = Query.newEntityQueryBuilder().setKind(KIND_RESOURCE).build();
+  List<Tuple2<String, Long>> getCounterLimits() {
+    final EntityQuery query = Query.newEntityQueryBuilder().setKind(KIND_COUNTER_LIMIT).build();
     final QueryResults<Entity> results = datastore.run(query);
-    final List<Resource> resources = Lists.newArrayList();
-    while (results.hasNext()) {
-      resources.add(entityToResource(results.next()));
-    }
+    final List<Tuple2<String, Long>> resources = Lists.newArrayList();
+    results.forEachRemaining(entity ->
+        resources.add(Tuple.of(entity.getKey().getName(), entity.getLong(PROPERTY_LIMIT)))
+    );
     return resources;
-  }
-
-  private Resource entityToResource(Entity entity) {
-    return Resource.create(entity.getKey().getName(), entity.getLong(PROPERTY_CONCURRENCY));
-  }
-
-  void deleteResource(String id) throws IOException {
-    final Key key = datastore.newKeyFactory().setKind(KIND_RESOURCE).newKey(id);
-    storeWithRetries(() -> {
-      datastore.delete(key);
-      return null;
-    });
   }
 
   Optional<Backfill> getBackfill(String id) {
@@ -969,16 +949,16 @@ public class DatastoreStorage implements Closeable {
     }
   }
 
-  void deleteLimitForCounter(String counterId) throws IOException {
+  void deleteCounterLimit(String counterId) throws IOException {
     storeWithRetries(() -> runInTransaction(tx -> {
       tx.deleteCounterLimit(counterId);
       return null;
     }));
   }
 
-  void updateLimitForCounter(String counterId, long limit) throws IOException {
+  void updateCounterLimit(String counterId, long limit) throws IOException {
     storeWithRetries(() -> runInTransaction(tx -> {
-      tx.updateLimitForCounter(counterId, limit);
+      tx.updateCounterLimit(counterId, limit);
       return null;
     }));
   }

@@ -57,7 +57,6 @@ import com.spotify.styx.api.Api;
 import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -322,7 +321,7 @@ public class StyxScheduler implements AppInit {
 
     final Supplier<Map<WorkflowId, Workflow>> workflowCache = new CachedSupplier<>(storage::workflows, time);
 
-    initializeResources(storage, shardedCounter, counterSnapshotFactory, timeoutConfig, workflowCache);
+    initializeResources(storage, timeoutConfig, workflowCache);
 
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
     //       take StateManager as argument instead?
@@ -413,31 +412,15 @@ public class StyxScheduler implements AppInit {
     backfillTriggerManager.tick();
   }
 
-  private void initializeResources(Storage storage, ShardedCounter shardedCounter,
-                                   CounterSnapshotFactory counterSnapshotFactory,
+  private void initializeResources(Storage storage,
                                    TimeoutConfig timeoutConfig,
                                    Supplier<Map<WorkflowId, Workflow>> workflowCache) {
     try {
-      // Initialize resources
-      storage.resources().parallelStream().forEach(
-          resource -> {
-            counterSnapshotFactory.create(resource.id());
-            try {
-              storage.runInTransaction(tx -> {
-                shardedCounter.updateLimit(tx, resource.id(), resource.concurrency());
-                return null;
-              });
-            } catch (IOException e) {
-              LOG.error("Error creating a counter limit for {}", resource, e);
-              throw new RuntimeException(e);
-            }
-          });
-      LOG.info("Finished initializing resources");
-
       // Sync resources usage
       if (storage.config().resourcesSyncEnabled()) {
         // first we reset all shards for each resource
-        storage.resources().parallelStream().forEach(resource -> resetShards(storage, resource));
+        storage.getCounterLimits().parallelStream()
+            .forEach(counterLimit -> resetShards(storage, counterLimit._1));
         // then we update shards with actual usage
         try {
           final Map<String, Long> resourcesUsageMap = getResourcesUsageMap(storage, timeoutConfig,
@@ -450,23 +433,23 @@ public class StyxScheduler implements AppInit {
         LOG.info("Finished syncing resources");
       }
     } catch (IOException e) {
-      LOG.error("Error while initializing/syncing resources", e);
+      LOG.error("Error while syncing resources", e);
       throw new RuntimeException(e);
     }
   }
 
   @VisibleForTesting
-  void resetShards(final Storage storage, final Resource resource) {
-    LOG.info("Resetting shards of resource {}", resource.id());
+  void resetShards(final Storage storage, final String counterId) {
+    LOG.info("Resetting shards of resource {}", counterId);
     for (int i = 0; i < NUM_SHARDS; i++) {
       final int index = i;
       try {
         storage.runInTransaction(tx -> {
-          tx.store(Shard.create(resource.id(), index, 0));
+          tx.store(Shard.create(counterId, index, 0));
           return null;
         });
       } catch (IOException e) {
-        LOG.error("Error resetting shards of resource {}", resource, e);
+        LOG.error("Error resetting shards of resource {}", counterId, e);
         throw new RuntimeException(e);
       }
     }

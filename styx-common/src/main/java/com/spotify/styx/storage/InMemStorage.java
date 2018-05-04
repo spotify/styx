@@ -20,6 +20,8 @@
 
 package com.spotify.styx.storage;
 
+import static java.util.stream.Collectors.toList;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -48,6 +50,8 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javaslang.Tuple;
+import javaslang.Tuple2;
 
 /**
  * A Storage implementation with state stored in memory. For testing.
@@ -106,7 +110,7 @@ public class InMemStorage implements Storage {
   public List<Workflow> workflows(String componentId) throws IOException {
     return workflowStore.values().stream()
         .filter(w -> w.componentId().equals(componentId))
-        .collect(Collectors.toList());
+        .collect(toList());
   }
 
   @Override
@@ -193,23 +197,17 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public Optional<Resource> resource(String id) throws IOException {
-    return Optional.ofNullable(resourceStore.get(id));
+  public Optional<Tuple2<String, Long>> getCounterLimit(String id) throws IOException {
+    return Optional.ofNullable(resourceStore.get(id))
+        .map(resource -> Tuple.of(resource.id(), resource.concurrency()));
   }
 
   @Override
-  public void storeResource(Resource resource) throws IOException {
-    resourceStore.put(resource.id(), resource);
-  }
-
-  @Override
-  public List<Resource> resources() throws IOException {
-    return ImmutableList.copyOf(resourceStore.values());
-  }
-
-  @Override
-  public void deleteResource(String id) throws IOException {
-    resourceStore.remove(id);
+  public List<Tuple2<String, Long>> getCounterLimits() throws IOException {
+    return ImmutableList.copyOf(
+        resourceStore.values().stream()
+            .map(resource -> Tuple.of(resource.id(), resource.concurrency()))
+            .collect(toList()));
   }
 
   @Override
@@ -221,7 +219,7 @@ public class InMemStorage implements Storage {
           .filter(backfill -> backfill.halted() && backfill.allTriggered());
     }
 
-    return ImmutableList.copyOf(backfillStream.collect(Collectors.toList())
+    return ImmutableList.copyOf(backfillStream.collect(toList())
     );
   }
 
@@ -236,7 +234,7 @@ public class InMemStorage implements Storage {
           .filter(backfill -> backfill.halted() && backfill.allTriggered());
     }
 
-    return ImmutableList.copyOf(backfillStream.collect(Collectors.toList()));
+    return ImmutableList.copyOf(backfillStream.collect(toList()));
   }
 
   @Override
@@ -249,7 +247,7 @@ public class InMemStorage implements Storage {
           .filter(backfill -> backfill.halted() && backfill.allTriggered());
     }
 
-    return ImmutableList.copyOf(backfillStream.collect(Collectors.toList()));
+    return ImmutableList.copyOf(backfillStream.collect(toList()));
   }
 
   @Override
@@ -263,7 +261,7 @@ public class InMemStorage implements Storage {
           .filter(backfill -> backfill.halted() && backfill.allTriggered());
     }
 
-    return ImmutableList.copyOf(backfillStream.collect(Collectors.toList()));
+    return ImmutableList.copyOf(backfillStream.collect(toList()));
   }
 
   @Override
@@ -298,12 +296,12 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public void deleteLimitForCounter(String counterId) {
+  public void deleteCounterLimit(String counterId) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public void updateLimitForCounter(String counterId, long limit) throws IOException {
+  public void updateCounterLimit(String counterId, long limit) throws IOException {
     throw new UnsupportedOperationException();
   }
 
