@@ -86,6 +86,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.logging.Level;
+import javaslang.Tuple2;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -108,7 +109,6 @@ public class DatastoreStorageTest {
 
   static final Instant TIMESTAMP = Instant.parse("2017-01-01T00:00:00Z");
 
-
   static final RunState RUN_STATE = RunState.create(WORKFLOW_INSTANCE1, State.NEW,
       StateData.zero(), TIMESTAMP, 42L);
 
@@ -120,7 +120,6 @@ public class DatastoreStorageTest {
 
   static final RunState RUN_STATE3 = RunState.create(WORKFLOW_INSTANCE3, State.NEW,
       StateData.zero(), TIMESTAMP, 17L);
-
 
   static final RunState FULLY_POPULATED_RUNSTATE = RunState.create(WORKFLOW_INSTANCE, State.QUEUED,
       StateData.newBuilder()
@@ -158,6 +157,7 @@ public class DatastoreStorageTest {
   static final Workflow WORKFLOW = Workflow.create(WORKFLOW_ID.componentId(),
                                                            WORKFLOW_CONFIGURATION);
   private static final String COUNTER_ID1 = "counter-id1";
+  private static final String COUNTER_ID2 = "counter-id2";
 
   private static LocalDatastoreHelper helper;
   private DatastoreStorage storage;
@@ -768,6 +768,35 @@ public class DatastoreStorageTest {
     assertEquals(2, map.size());
     assertEquals(0, map.get(0).longValue());
     assertEquals(3, map.get(1).longValue());
+  }
+
+  @Test
+  public void shouldReturnCounterLimits() throws Exception {
+    storage.updateCounterLimit(COUNTER_ID1, 10);
+    storage.updateCounterLimit(COUNTER_ID2, 20);
+
+    assertEquals(2, storage.getCounterLimits().size());
+
+    final Optional<Tuple2<String, Long>> counterLimit1 = storage.getCounterLimit(COUNTER_ID1);
+    assertTrue(counterLimit1.isPresent());
+    assertEquals(Long.valueOf(10L), counterLimit1.get()._2);
+
+    final Optional<Tuple2<String, Long>> counterLimit2 = storage.getCounterLimit(COUNTER_ID2);
+    assertTrue(counterLimit2.isPresent());
+    assertEquals(Long.valueOf(20L), counterLimit2.get()._2);
+  }
+
+  @Test
+  public void shouldDeleteCounterLimit() throws Exception {
+    storage.updateCounterLimit(COUNTER_ID1, 10);
+    storage.updateCounterLimit(COUNTER_ID2, 20);
+
+    assertEquals(2, storage.getCounterLimits().size());
+
+    storage.deleteCounterLimit(COUNTER_ID1);
+    storage.deleteCounterLimit(COUNTER_ID2);
+
+    assertEquals(0, storage.getCounterLimits().size());
   }
 
   private static class FooException extends Exception {

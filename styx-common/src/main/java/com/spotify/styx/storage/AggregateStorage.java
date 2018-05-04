@@ -258,7 +258,6 @@ public class AggregateStorage implements Storage {
     return datastoreStorage.getCounterLimits();
   }
 
-
   @Override
   public void deleteCounterLimit(String counterId) throws IOException {
     datastoreStorage.deleteCounterLimit(counterId);

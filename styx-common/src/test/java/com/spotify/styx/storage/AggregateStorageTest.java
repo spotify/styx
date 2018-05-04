@@ -41,10 +41,10 @@ public class AggregateStorageTest {
 
   private static final String COMPONENT = "test-component";
 
-  @Mock BigtableStorage bigtable;
-  @Mock DatastoreStorage datastore;
-  @Mock WorkflowInstance workflowInstance;
-  @Mock RunState runState;
+  @Mock private BigtableStorage bigtable;
+  @Mock private DatastoreStorage datastore;
+  @Mock private WorkflowInstance workflowInstance;
+  @Mock private RunState runState;
 
   private AggregateStorage sut;
 
@@ -82,5 +82,29 @@ public class AggregateStorageTest {
   public void writeActiveState() throws Exception {
     sut.writeActiveState(workflowInstance, runState);
     verify(datastore).writeActiveState(workflowInstance, runState);
+  }
+
+  @Test
+  public void getCounterLimit() throws Exception {
+    sut.getCounterLimit("res1");
+    verify(datastore).getCounterLimit("res1");
+  }
+
+  @Test
+  public void getCounterLimits() throws Exception {
+    sut.getCounterLimits();
+    verify(datastore).getCounterLimits();
+  }
+
+  @Test
+  public void deleteCounterLimit() throws Exception {
+    sut.deleteCounterLimit("res1");
+    verify(datastore).deleteCounterLimit("res1");
+  }
+
+  @Test
+  public void updateCounterLimit() throws Exception {
+    sut.updateCounterLimit("res1", 1L);
+    verify(datastore).updateCounterLimit("res1", 1L);
   }
 }
