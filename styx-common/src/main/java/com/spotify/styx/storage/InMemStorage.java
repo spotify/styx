@@ -20,8 +20,6 @@
 
 package com.spotify.styx.storage;
 
-import static java.util.stream.Collectors.toList;
-
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -110,7 +108,7 @@ public class InMemStorage implements Storage {
   public List<Workflow> workflows(String componentId) throws IOException {
     return workflowStore.values().stream()
         .filter(w -> w.componentId().equals(componentId))
-        .collect(toList());
+        .collect(Collectors.toList());
   }
 
   @Override
@@ -207,7 +205,7 @@ public class InMemStorage implements Storage {
     return ImmutableList.copyOf(
         resourceStore.values().stream()
             .map(resource -> Tuple.of(resource.id(), resource.concurrency()))
-            .collect(toList()));
+            .collect(Collectors.toList()));
   }
 
   @Override
@@ -219,7 +217,7 @@ public class InMemStorage implements Storage {
           .filter(backfill -> backfill.halted() && backfill.allTriggered());
     }
 
-    return ImmutableList.copyOf(backfillStream.collect(toList())
+    return ImmutableList.copyOf(backfillStream.collect(Collectors.toList())
     );
   }
 
@@ -234,7 +232,7 @@ public class InMemStorage implements Storage {
           .filter(backfill -> backfill.halted() && backfill.allTriggered());
     }
 
-    return ImmutableList.copyOf(backfillStream.collect(toList()));
+    return ImmutableList.copyOf(backfillStream.collect(Collectors.toList()));
   }
 
   @Override
@@ -247,7 +245,7 @@ public class InMemStorage implements Storage {
           .filter(backfill -> backfill.halted() && backfill.allTriggered());
     }
 
-    return ImmutableList.copyOf(backfillStream.collect(toList()));
+    return ImmutableList.copyOf(backfillStream.collect(Collectors.toList()));
   }
 
   @Override
@@ -261,7 +259,7 @@ public class InMemStorage implements Storage {
           .filter(backfill -> backfill.halted() && backfill.allTriggered());
     }
 
-    return ImmutableList.copyOf(backfillStream.collect(toList()));
+    return ImmutableList.copyOf(backfillStream.collect(Collectors.toList()));
   }
 
   @Override
@@ -286,7 +284,7 @@ public class InMemStorage implements Storage {
 
   @Override
   public long getLimitForCounter(String counterId) {
-    throw new UnsupportedOperationException();
+    return resourceStore.get(counterId).concurrency();
   }
 
   @Override
@@ -297,12 +295,12 @@ public class InMemStorage implements Storage {
 
   @Override
   public void deleteCounterLimit(String counterId) {
-    throw new UnsupportedOperationException();
+    resourceStore.remove(counterId);
   }
 
   @Override
   public void updateCounterLimit(String counterId, long limit) throws IOException {
-    throw new UnsupportedOperationException();
+    resourceStore.put(counterId, Resource.create(counterId, limit));
   }
 
   @Override

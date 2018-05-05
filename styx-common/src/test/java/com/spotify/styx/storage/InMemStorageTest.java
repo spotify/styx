@@ -31,7 +31,9 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.Backfill;
@@ -47,6 +49,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import javaslang.Tuple2;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -58,6 +61,9 @@ public class InMemStorageTest {
   private static final WorkflowId WORKFLOW_ID1 = WorkflowId.create("component", "endpoint1");
   private static final WorkflowId WORKFLOW_ID2 = WorkflowId.create("component", "endpoint2");
   private static final WorkflowId WORKFLOW_ID3 = WorkflowId.create("component2", "pointless");
+
+  private static final String COUNTER_ID1 = "counter-id1";
+  private static final String COUNTER_ID2 = "counter-id2";
 
   private Storage storage;
 
@@ -159,5 +165,34 @@ public class InMemStorageTest {
 
     storage.storeBackfill(backfill);
     assertThat(storage.backfill(backfill.id()), equalTo(Optional.of(backfill)));
+  }
+
+  @Test
+  public void shouldReturnCounterLimits() throws Exception {
+    storage.updateCounterLimit(COUNTER_ID1, 10);
+    storage.updateCounterLimit(COUNTER_ID2, 20);
+
+    assertEquals(2, storage.getCounterLimits().size());
+
+    final Optional<Tuple2<String, Long>> counterLimit1 = storage.getCounterLimit(COUNTER_ID1);
+    assertTrue(counterLimit1.isPresent());
+    assertEquals(Long.valueOf(10L), counterLimit1.get()._2);
+
+    final Optional<Tuple2<String, Long>> counterLimit2 = storage.getCounterLimit(COUNTER_ID2);
+    assertTrue(counterLimit2.isPresent());
+    assertEquals(Long.valueOf(20L), counterLimit2.get()._2);
+  }
+
+  @Test
+  public void shouldDeleteCounterLimit() throws Exception {
+    storage.updateCounterLimit(COUNTER_ID1, 10);
+    storage.updateCounterLimit(COUNTER_ID2, 20);
+
+    assertEquals(2, storage.getCounterLimits().size());
+
+    storage.deleteCounterLimit(COUNTER_ID1);
+    storage.deleteCounterLimit(COUNTER_ID2);
+
+    assertEquals(0, storage.getCounterLimits().size());
   }
 }

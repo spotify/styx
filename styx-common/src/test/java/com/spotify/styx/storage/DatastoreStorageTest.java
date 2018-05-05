@@ -787,6 +787,14 @@ public class DatastoreStorageTest {
   }
 
   @Test
+  public void shouldReturnEmptyIfNotFound() throws Exception {
+    storage.updateCounterLimit(COUNTER_ID1, 10);
+
+    final Optional<Tuple2<String, Long>> counterLimit2 = storage.getCounterLimit(COUNTER_ID2);
+    assertFalse(counterLimit2.isPresent());
+  }
+
+  @Test
   public void shouldDeleteCounterLimit() throws Exception {
     storage.updateCounterLimit(COUNTER_ID1, 10);
     storage.updateCounterLimit(COUNTER_ID2, 20);
