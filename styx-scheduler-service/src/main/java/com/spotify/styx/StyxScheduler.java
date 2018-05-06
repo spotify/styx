@@ -487,16 +487,13 @@ public class StyxScheduler implements AppInit {
       final Long usage = entity.getValue();
       LOG.info("Syncing {} -> {}", resource, usage);
       try {
-        int result = (int) (usage / NUM_SHARDS);
-        int remainder = (int) (usage % NUM_SHARDS);
         for (int i = 0; i < NUM_SHARDS; i++) {
           final int index = i;
-          final int shardValue = remainder <= 0 ? result : result + 1;
+          final int shardValue = (int) (usage / NUM_SHARDS + (index < usage % NUM_SHARDS ? 1 : 0));
           storage.runInTransaction(tx -> {
             tx.store(Shard.create(resource, index, shardValue));
             return null;
           });
-          remainder--;
           LOG.info("Stored {}#shard-{} -> {}", resource, index, shardValue);
         }
       } catch (IOException e) {
