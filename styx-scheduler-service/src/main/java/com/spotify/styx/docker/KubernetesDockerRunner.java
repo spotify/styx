@@ -302,9 +302,8 @@ class KubernetesDockerRunner implements DockerRunner {
   private static Container keepaliveContainer() {
     return new ContainerBuilder()
         .withName(KEEPALIVE_CONTAINER_NAME)
-        // Use the GKE pause container image. It sleeps forever until terminated.
-        .withImage("gcr.io/google-containers/pause"
-            + "@sha256:f78411e19d84a252e53bff71a4407a5686c46983a2c2eeed83929b888179acea")
+        // Use the k8s pause container image. It sleeps forever until terminated.
+        .withImage("k8s.gcr.io/pause:3.1")
         .build();
   }
 
