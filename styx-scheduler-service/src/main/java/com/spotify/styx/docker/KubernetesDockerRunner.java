@@ -290,7 +290,7 @@ class KubernetesDockerRunner implements DockerRunner {
     });
 
     specBuilder.addToContainers(mainContainerBuilder.build());
-    specBuilder.addToContainers(keepaliveContainer());
+    // specBuilder.addToContainers(keepaliveContainer());
     podBuilder.withSpec(specBuilder.build());
 
     return podBuilder.build();
