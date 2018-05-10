@@ -50,6 +50,7 @@ import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
+import io.fabric8.kubernetes.api.model.Container;
 import io.fabric8.kubernetes.api.model.ContainerBuilder;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.EnvVar;
@@ -120,6 +121,7 @@ class KubernetesDockerRunner implements DockerRunner {
       .setDaemon(true)
       .setNameFormat("k8s-scheduler-thread-%d")
       .build();
+  static final String KEEPALIVE_CONTAINER_NAME = "keepalive";
 
   private final ScheduledExecutorService executor;
 
@@ -225,9 +227,10 @@ class KubernetesDockerRunner implements DockerRunner {
         ? runSpec.imageName()
         : runSpec.imageName() + ":latest";
 
+    final String executionId = runSpec.executionId();
     final PodBuilder podBuilder = new PodBuilder()
         .withNewMetadata()
-        .withName(runSpec.executionId())
+        .withName(executionId)
         .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
         .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION,
                           String.valueOf(runSpec.terminationLogging()))
@@ -240,8 +243,8 @@ class KubernetesDockerRunner implements DockerRunner {
     runSpec.memRequest().ifPresent(s -> resourceRequirements.addToRequests("memory", new Quantity(s)));
     runSpec.memLimit().ifPresent(s -> resourceRequirements.addToLimits("memory", new Quantity(s)));
 
-    final ContainerBuilder containerBuilder = new ContainerBuilder()
-        .withName(runSpec.executionId())
+    final ContainerBuilder mainContainerBuilder = new ContainerBuilder()
+        .withName(mainContainerName(executionId))
         .withImage(imageWithTag)
         .withArgs(runSpec.args())
         .withEnv(buildEnv(workflowInstance, runSpec))
@@ -262,8 +265,8 @@ class KubernetesDockerRunner implements DockerRunner {
           .withName(saVolume.getName())
           .withReadOnly(true)
           .build();
-      containerBuilder.addToVolumeMounts(saMount);
-      containerBuilder.addToEnv(envVar(STYX_WORKFLOW_SA_ENV_VARIABLE,
+      mainContainerBuilder.addToVolumeMounts(saMount);
+      mainContainerBuilder.addToEnv(envVar(STYX_WORKFLOW_SA_ENV_VARIABLE,
                                        saMount.getMountPath() + STYX_WORKFLOW_SA_JSON_KEY));
     });
 
@@ -282,13 +285,26 @@ class KubernetesDockerRunner implements DockerRunner {
           .withName(secretVolume.getName())
           .withReadOnly(true)
           .build();
-      containerBuilder.addToVolumeMounts(secretMount);
+      mainContainerBuilder.addToVolumeMounts(secretMount);
     });
 
-    specBuilder.addToContainers(containerBuilder.build());
+    specBuilder.addToContainers(mainContainerBuilder.build());
+    specBuilder.addToContainers(keepaliveContainer());
     podBuilder.withSpec(specBuilder.build());
 
     return podBuilder.build();
+  }
+
+  private static String mainContainerName(String executionId) {
+    return executionId;
+  }
+
+  private static Container keepaliveContainer() {
+    return new ContainerBuilder()
+        .withName(KEEPALIVE_CONTAINER_NAME)
+        // Use the k8s pause container image. It sleeps forever until terminated.
+        .withImage("k8s.gcr.io/pause:3.1")
+        .build();
   }
 
   @VisibleForTesting
@@ -322,7 +338,7 @@ class KubernetesDockerRunner implements DockerRunner {
   @VisibleForTesting
   void cleanupWithRunState(WorkflowInstance workflowInstance, String executionId) {
     cleanup(workflowInstance, executionId, pod ->
-        getStyxContainer(pod).ifPresent(containerStatus -> {
+        getMainContainerStatus(pod).ifPresent(containerStatus -> {
           if (hasPullImageError(containerStatus)) {
             deletePod(workflowInstance, executionId);
           } else {
@@ -336,7 +352,7 @@ class KubernetesDockerRunner implements DockerRunner {
   @VisibleForTesting
   void cleanupWithoutRunState(WorkflowInstance workflowInstance, String executionId) {
     cleanup(workflowInstance, executionId, pod ->
-        getStyxContainer(pod).ifPresent(containerStatus -> {
+        getMainContainerStatus(pod).ifPresent(containerStatus -> {
           if (containerStatus.getState().getTerminated() != null) {
             deletePodIfNonDeletePeriodExpired(workflowInstance, executionId, containerStatus);
           } else {
@@ -369,9 +385,11 @@ class KubernetesDockerRunner implements DockerRunner {
     });
   }
 
-  static Optional<ContainerStatus> getStyxContainer(Pod pod) {
+  static Optional<ContainerStatus> getMainContainerStatus(Pod pod) {
     return readPodWorkflowInstance(pod)
-        .flatMap(wfi -> pod.getStatus().getContainerStatuses().stream().findFirst());
+        .flatMap(wfi -> pod.getStatus().getContainerStatuses().stream()
+            .filter(status -> mainContainerName(pod.getMetadata().getName()).equals(status.getName()))
+            .findAny());
   }
 
   private boolean isNonDeletePeriodExpired(ContainerStatus containerStatus) {

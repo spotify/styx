@@ -22,7 +22,7 @@ package com.spotify.styx.docker;
 
 import static com.spotify.styx.docker.DockerRunner.LOG;
 import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_TERMINATION_LOGGING_ANNOTATION;
-import static com.spotify.styx.docker.KubernetesDockerRunner.getStyxContainer;
+import static com.spotify.styx.docker.KubernetesDockerRunner.getMainContainerStatus;
 import static java.util.Collections.emptyList;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -34,6 +34,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.RunState;
+import io.fabric8.kubernetes.api.model.ContainerState;
 import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
 import io.fabric8.kubernetes.api.model.ContainerStateWaiting;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
@@ -167,24 +168,27 @@ final class KubernetesPodEventTranslator {
 
     boolean exited = false;
     boolean started = false;
-    Optional<Integer> exitCode = Optional.empty();
 
+    final Optional<ContainerStatus> containerStatus = getMainContainerStatus(pod);
     switch (phase) {
       case "Running":
-        // check that the styx container is ready
-        started = getStyxContainer(pod)
-            .map(ContainerStatus::getReady)
-            .orElse(false);
+        // Check if the main container has exited
+        exited = containerStatus.map(ContainerStatus::getState)
+                                .map(ContainerState::getTerminated)
+                                .isPresent();
+        if (exited) {
+          break;
+        }
+
+        // check that the main container is ready
+        // TODO: is checking for "ready" meaningful without a readiness probe configured?
+        started = containerStatus.map(ContainerStatus::getReady)
+                                 .orElse(false);
         break;
 
       case "Succeeded":
       case "Failed":
         exited = true;
-        exitCode = getStyxContainer(pod)
-            .flatMap(cs -> getExitCodeIfValid(
-                workflowInstance.toKey(),
-                pod,
-                cs, stats));
         break;
 
       default:
@@ -213,6 +217,8 @@ final class KubernetesPodEventTranslator {
           // intentional fall-through
 
         case RUNNING:
+          final Optional<Integer> exitCode = containerStatus.flatMap(cs ->
+              getExitCodeIfValid(workflowInstance.toKey(), pod, cs, stats));
           generatedEvents.add(Event.terminate(workflowInstance, exitCode));
           break;
 
@@ -232,13 +238,13 @@ final class KubernetesPodEventTranslator {
     switch (phase) {
       case "Pending":
         // check if one or more docker contains failed to pull their image, a possible silent error
-        return getStyxContainer(pod)
+        return getMainContainerStatus(pod)
             .filter(KubernetesPodEventTranslator::hasPullImageError)
             .map(x -> Event.runError(workflowInstance, "One or more containers failed to pull their image"));
 
       case "Succeeded":
       case "Failed":
-        final Optional<ContainerStatus> containerStatusOpt = getStyxContainer(pod);
+        final Optional<ContainerStatus> containerStatusOpt = getMainContainerStatus(pod);
         if (!containerStatusOpt.isPresent()) {
           return Optional.of(Event.runError(workflowInstance, "Could not find our container in pod"));
         }
