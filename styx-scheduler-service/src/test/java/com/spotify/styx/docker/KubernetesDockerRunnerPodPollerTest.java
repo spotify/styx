@@ -22,9 +22,11 @@ package com.spotify.styx.docker;
 
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyListOf;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
@@ -61,9 +63,6 @@ import org.mockito.runners.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class KubernetesDockerRunnerPodPollerTest {
 
-  private static final String POD_NAME = "test-pod-1";
-  private static final String POD_NAME_2 = "test-pod-2";
-
   private static final WorkflowInstance WORKFLOW_INSTANCE =
       WorkflowInstance.create(TestData.WORKFLOW_ID, "foo");
   private static final WorkflowInstance WORKFLOW_INSTANCE_2 =
@@ -73,6 +72,9 @@ public class KubernetesDockerRunnerPodPollerTest {
   private static final DockerRunner.RunSpec RUN_SPEC_2 =
       DockerRunner.RunSpec.simple("eid2", "busybox");
   private final static KubernetesSecretSpec SECRET_SPEC = KubernetesSecretSpec.builder().build();
+
+  private static final String POD_NAME = RUN_SPEC.executionId();
+  private static final String POD_NAME_2 = RUN_SPEC_2.executionId();
 
   @Mock
   NamespacedKubernetesClient k8sClient;
@@ -115,42 +117,56 @@ public class KubernetesDockerRunnerPodPollerTest {
   public void shouldSendRunErrorWhenPodForRunningWFIDoesntExist() throws Exception {
     Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
     podList.setItems(Arrays.asList(createdPod));
+    createdPod.setStatus(podStatus1);
+    when(podStatus1.getPhase()).thenReturn("Pending");
     when(k8sClient.pods().list()).thenReturn(podList);
+    when(namedPod1.get()).thenReturn(createdPod);
+    when(namedPod2.get()).thenReturn(null);
+    when(k8sClient.pods().withName(POD_NAME)).thenReturn(namedPod1);
+    when(k8sClient.pods().withName(POD_NAME_2)).thenReturn(namedPod2);
     setupActiveInstances(RunState.State.RUNNING, POD_NAME, POD_NAME_2);
 
-    kdr.pollPods();
+    kdr.tryPollPods();
 
     verify(stateManager, times(1)).receiveIgnoreClosed(
-        Event.runError(WORKFLOW_INSTANCE_2, "No pod associated with this instance"));
+        Event.runError(WORKFLOW_INSTANCE_2, "No pod associated with this instance"), -1);
   }
 
   @Test
   public void shouldNotSendRunErrorWhenPodForRunningWFIExists() throws Exception {
     Pod createdPod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
     Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
+    when(podStatus1.getPhase()).thenReturn("Pending");
+    when(podStatus2.getPhase()).thenReturn("Pending");
+    createdPod.setStatus(podStatus1);
+    createdPod2.setStatus(podStatus2);
     podList.setItems(Arrays.asList(createdPod, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
+    when(namedPod1.get()).thenReturn(createdPod);
+    when(namedPod2.get()).thenReturn(createdPod2);
+    when(k8sClient.pods().withName(POD_NAME)).thenReturn(namedPod1);
+    when(k8sClient.pods().withName(POD_NAME_2)).thenReturn(namedPod2);
     setupActiveInstances(RunState.State.RUNNING, POD_NAME, POD_NAME_2);
 
-    kdr.pollPods();
+    kdr.tryPollPods();
 
-    verify(stateManager, never()).receiveIgnoreClosed(
-        Event.runError(WORKFLOW_INSTANCE, "No pod associated with this instance"));
-    verify(stateManager, never()).receiveIgnoreClosed(
-        Event.runError(WORKFLOW_INSTANCE_2, "No pod associated with this instance"));
+    verify(stateManager).getActiveStates();
+    verifyNoMoreInteractions(stateManager);
   }
 
   @Test
   public void shouldHandleEmptyPodList() throws Exception {
     when(k8sClient.pods().list()).thenReturn(podList);
+    when(namedPod1.get()).thenReturn(null);
+    when(k8sClient.pods().withName(anyString())).thenReturn(namedPod1);
     setupActiveInstances(RunState.State.RUNNING, POD_NAME, POD_NAME_2);
 
-    kdr.pollPods();
+    kdr.tryPollPods();
 
     verify(stateManager, times(1)).receiveIgnoreClosed(
-        Event.runError(WORKFLOW_INSTANCE, "No pod associated with this instance"));
+        Event.runError(WORKFLOW_INSTANCE, "No pod associated with this instance"), -1);
     verify(stateManager, times(1)).receiveIgnoreClosed(
-        Event.runError(WORKFLOW_INSTANCE_2, "No pod associated with this instance"));
+        Event.runError(WORKFLOW_INSTANCE_2, "No pod associated with this instance"), -1);
   }
 
   @Test
@@ -158,12 +174,10 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(k8sClient.pods().list()).thenReturn(podList);
     setupActiveInstances(RunState.State.SUBMITTED, POD_NAME, POD_NAME_2);
 
-    kdr.pollPods();
+    kdr.tryPollPods();
 
-    verify(stateManager, never()).receiveIgnoreClosed(
-        Event.runError(WORKFLOW_INSTANCE, "No pod associated with this instance"));
-    verify(stateManager, never()).receiveIgnoreClosed(
-        Event.runError(WORKFLOW_INSTANCE_2, "No pod associated with this instance"));
+    verify(stateManager).getActiveStates();
+    verifyNoMoreInteractions(stateManager);
   }
 
   @Test
@@ -191,7 +205,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(containerStatus2.getState()).thenReturn(containerState2);
     when(containerState2.getTerminated()).thenReturn(containerStateTerminated);
 
-    kdr.pollPods();
+    kdr.tryPollPods();
 
     verify(namedPod1).delete();
     verify(namedPod2).delete();
@@ -209,7 +223,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(k8sClient.pods().withName(RUN_SPEC.executionId())).thenReturn(namedPod1);
     when(k8sClient.pods().withName(RUN_SPEC_2.executionId())).thenReturn(namedPod2);
 
-    kdr.pollPods();
+    kdr.tryPollPods();
 
     verify(k8sClient.pods(), never()).delete(any(Pod.class));
     verify(k8sClient.pods(), never()).delete(any(Pod[].class));
@@ -232,7 +246,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(k8sClient.pods().withName(RUN_SPEC.executionId())).thenReturn(namedPod1);
     when(k8sClient.pods().withName(RUN_SPEC_2.executionId())).thenReturn(namedPod2);
 
-    kdr.pollPods();
+    kdr.tryPollPods();
 
     verify(k8sClient.pods(), never()).delete(any(Pod.class));
     verify(k8sClient.pods(), never()).delete(any(Pod[].class));
@@ -247,14 +261,20 @@ public class KubernetesDockerRunnerPodPollerTest {
     final Pod createdPod1 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC, SECRET_SPEC);
     final Pod createdPod2 = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE_2, RUN_SPEC, SECRET_SPEC);
 
+    createdPod1.setStatus(podStatus1);
+    createdPod2.setStatus(podStatus2);
+    when(podStatus1.getPhase()).thenReturn("Pending");
+    when(podStatus2.getPhase()).thenReturn("Pending");
     podList.setItems(Arrays.asList(createdPod1, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
     when(k8sClient.pods().withName(RUN_SPEC.executionId())).thenReturn(namedPod1);
     when(k8sClient.pods().withName(RUN_SPEC_2.executionId())).thenReturn(namedPod2);
+    when(namedPod1.get()).thenReturn(createdPod1);
+    when(namedPod1.get()).thenReturn(createdPod2);
 
     setupActiveInstances(RunState.State.RUNNING, RUN_SPEC.executionId(), RUN_SPEC_2.executionId());
 
-    kdr.pollPods();
+    kdr.tryPollPods();
 
     verify(k8sClient.pods(), never()).delete(any(Pod.class));
     verify(k8sClient.pods(), never()).delete(any(Pod[].class));

@@ -503,8 +503,7 @@ class KubernetesDockerRunner implements DockerRunner {
     });
   }
 
-  @VisibleForTesting
-  void pollPods() {
+  private void pollPods() {
     try {
       tryPollPods();
     } catch (Throwable t) {
@@ -512,7 +511,8 @@ class KubernetesDockerRunner implements DockerRunner {
     }
   }
 
-  private synchronized void tryPollPods() {
+  @VisibleForTesting
+  synchronized void tryPollPods() {
     // Fetch pods _before_ fetching all active states
     final PodList list = client.pods().list();
     final Map<WorkflowInstance, RunState> activeStates = stateManager.getActiveStates();
