@@ -21,6 +21,7 @@ package com.spotify.styx;
 
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyBoolean;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.only;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
@@ -472,6 +474,19 @@ public class BackfillTriggerManagerTest {
 
     verify(transaction)
         .store(BACKFILL_1.builder().nextTrigger(instants.get(concurrency)).build());
+  }
+
+  @Test
+  public void shouldNotTriggerNextPartitionAndProgressIfBackfillHalted() throws Exception {
+    final Workflow workflow = createWorkflow(WORKFLOW_ID1);
+    initWorkflow(workflow);
+
+    backfills.put(BACKFILL_1.id(), BACKFILL_1.builder().halted(true).build());
+
+    final boolean moveOn = backfillTriggerManager.triggerNextPartitionAndProgress(transaction,
+        BACKFILL_1.id(), workflow, BACKFILL_1.nextTrigger(), 10);
+    assertFalse(moveOn);
+    verifyNoMoreInteractions(triggerListener);
   }
 
   private void initWorkflow(Workflow workflow) throws IOException {
