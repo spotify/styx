@@ -271,4 +271,14 @@ final class KubernetesPodEventTranslator {
         || "ErrImagePull".equals(waiting.getReason())
         || "ImagePullBackOff".equals(waiting.getReason()));
   }
+
+  static boolean isTerminated(ContainerStatus cs) {
+    return cs.getState().getTerminated() != null;
+  }
+
+  static boolean isTerminated(Pod pod) {
+    return getMainContainerStatus(pod)
+        .map(KubernetesPodEventTranslator::isTerminated)
+        .orElse(false);
+  }
 }
