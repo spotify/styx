@@ -607,7 +607,7 @@ public class BackfillTriggerManagerTest {
     backfills.put(BACKFILL_1.id(), BACKFILL_1.builder().halted(true).build());
 
     final boolean moveOn = backfillTriggerManager.triggerNextPartitionAndProgress(transaction,
-        BACKFILL_1.id(), workflow, BACKFILL_1.nextTrigger(), 10);
+        BACKFILL_1.id(), workflow, BACKFILL_1.nextTrigger(), 10, false);
     assertFalse(moveOn);
     verifyNoMoreInteractions(triggerListener);
   }
