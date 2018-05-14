@@ -69,6 +69,7 @@ import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.PodStatus;
+import io.fabric8.kubernetes.api.model.PodStatusBuilder;
 import io.fabric8.kubernetes.api.model.Quantity;
 import io.fabric8.kubernetes.api.model.ResourceRequirements;
 import io.fabric8.kubernetes.api.model.Secret;
@@ -408,7 +409,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldNotCleanupPodWithoutRunStateBeforeNonDeletePeriod() {
+  public void shouldNotCleanupTerminatedPodWithoutRunStateBeforeNonDeletePeriod() {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
     when(namedPod.get()).thenReturn(createdPod);
@@ -423,6 +424,45 @@ public class KubernetesDockerRunnerTest {
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(1)).toString());
 
     kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, createdPod);
+    verifyPodNeverDeleted(namedPod);
+  }
+
+  @Test
+  public void shouldNotCleanupRunningPodWithoutRunStateIfTerminatedAfterRefresh() {
+    final String name = createdPod.getMetadata().getName();
+
+    final ContainerStatus runningMainContainer = new ContainerStatusBuilder()
+        .withName(EXECUTION_ID)
+        .withNewState().withNewRunning().endRunning().endState()
+        .build();
+
+    final ContainerStatus terminatedMainContainer = new ContainerStatusBuilder()
+        .withName(EXECUTION_ID)
+        .withNewState()
+        .withNewTerminated().withFinishedAt(FIXED_INSTANT.minus(Duration.ofDays(1)).toString()).endTerminated()
+        .endState()
+        .build();
+
+    createdPod.setStatus(new PodStatusBuilder()
+        .withContainerStatuses(runningMainContainer, keepaliveContainerStatus)
+        .build());
+
+    final Pod refreshedPod = new PodBuilder(createdPod)
+        .withStatus(new PodStatusBuilder()
+            .withContainerStatuses(terminatedMainContainer, keepaliveContainerStatus)
+            .build())
+        .build();
+
+    // Return terminated container when refreshing by name
+    when(k8sClient.pods().withName(name)).thenReturn(namedPod);
+    when(namedPod.get()).thenReturn(refreshedPod);
+
+    kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, createdPod);
+
+    verify(pods).withName(EXECUTION_ID);
+    verify(namedPod).get();
+
+    // Leave the pod to expire and be deleted by a later poll tick
     verifyPodNeverDeleted(namedPod);
   }
 
