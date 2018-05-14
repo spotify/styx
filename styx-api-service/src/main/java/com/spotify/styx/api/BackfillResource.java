@@ -282,10 +282,8 @@ public final class BackfillResource {
           Status.BAD_REQUEST.withReasonPhrase("end parameter not aligned with schedule"));
     }
 
-    final boolean reversed = input.start().isAfter(input.end());
-
     final List<WorkflowInstance> alreadyActive =
-        instants(input.start(), input.end(), schedule, reversed).stream()
+        instants(input.start(), input.end(), schedule).stream()
             .map(instant -> WorkflowInstance.create(workflowId, toParameter(schedule, instant)))
             .filter(activeWorkflowInstances::contains)
             .collect(toList());
@@ -350,10 +348,8 @@ public final class BackfillResource {
       throw new RuntimeException(e);
     }
 
-    final boolean reversed = backfill.start().isAfter(backfill.end());
-
     final List<Instant> processedInstants = instants(
-        backfill.start(), backfill.nextTrigger(), backfill.schedule(), reversed);
+        backfill.start(), backfill.nextTrigger(), backfill.schedule());
     processedStates = processedInstants.parallelStream()
         .map(instant -> {
           final WorkflowInstance wfi = WorkflowInstance
@@ -373,7 +369,7 @@ public final class BackfillResource {
         .collect(toList());
 
     final List<Instant> waitingInstants = instants(
-        backfill.nextTrigger(), backfill.end(), backfill.schedule(), reversed);
+        backfill.nextTrigger(), backfill.end(), backfill.schedule());
     waitingStates = waitingInstants.stream()
         .map(instant -> {
           final WorkflowInstance wfi = WorkflowInstance.create(
@@ -385,9 +381,8 @@ public final class BackfillResource {
     return Stream.concat(processedStates.stream(), waitingStates.stream()).collect(toList());
   }
 
-  private static List<Instant> instants(Instant start, Instant end, Schedule schedule,
-                                        boolean reversed) {
-    return reversed ? instantsInReversedRange(start, end, schedule) :
+  private static List<Instant> instants(Instant start, Instant end, Schedule schedule) {
+    return start.isAfter(end) ? instantsInReversedRange(start, end, schedule) :
            instantsInRange(start, end, schedule);
   }
 }
