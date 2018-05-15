@@ -34,6 +34,7 @@ import com.github.rholder.retry.RetryerBuilder;
 import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.WaitStrategies;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
@@ -466,17 +467,12 @@ class KubernetesDockerRunner implements DockerRunner {
         .watch(new PodWatcher());
   }
 
-  private Set<WorkflowInstance> getRunningWorkflowInstances() {
-    return stateManager.getActiveStates()
-        .values()
-        .stream()
-        .filter(runState -> runState.state().equals(RUNNING))
-        .map(RunState::workflowInstance)
-        .collect(toSet());
-  }
-
-  private void examineRunningWFISandAssociatedPods(Set<WorkflowInstance> runningWorkflowInstances,
+  private void examineRunningWFISandAssociatedPods(Map<WorkflowInstance, RunState> activeStates,
                                                    PodList podList) {
+
+    final Map<WorkflowInstance, RunState> runningWorkflowInstances = Maps.filterValues(activeStates, runState ->
+        runState.state().equals(RUNNING) && runState.data().executionId().isPresent());
+
     final Set<WorkflowInstance> workflowInstancesForPods = podList.getItems().stream()
         .filter(pod -> pod.getMetadata().getAnnotations()
             .containsKey(STYX_WORKFLOW_INSTANCE_ANNOTATION))
@@ -484,13 +480,30 @@ class KubernetesDockerRunner implements DockerRunner {
             .parseKey(pod.getMetadata().getAnnotations().get(STYX_WORKFLOW_INSTANCE_ANNOTATION)))
         .collect(toSet());
 
-    runningWorkflowInstances.removeAll(workflowInstancesForPods);
-    runningWorkflowInstances.forEach(workflowInstance -> stateManager.receiveIgnoreClosed(
-        Event.runError(workflowInstance, "No pod associated with this instance")));
+    // Emit errors for workflow instances that seem to be missing its pod
+    runningWorkflowInstances.forEach((workflowInstance, runState) -> {
+
+      // Is there a matching pod in the list? Bail.
+      if (workflowInstancesForPods.contains(workflowInstance)) {
+        return;
+      }
+
+      // The pod list might be stale so explicitly look for a pod using the execution ID.
+      final String executionId = runState.data().executionId().get();
+      final Pod pod = client.pods().withName(executionId).get();
+
+      // We found a pod? Bail.
+      if (pod != null) {
+        return;
+      }
+
+      // No pod found. Emit an error guarded by the state counter we are basing the error conclusion on.
+      stateManager.receiveIgnoreClosed(
+          Event.runError(workflowInstance, "No pod associated with this instance"), runState.counter());
+    });
   }
 
-  @VisibleForTesting
-  void pollPods() {
+  private void pollPods() {
     try {
       tryPollPods();
     } catch (Throwable t) {
@@ -498,10 +511,12 @@ class KubernetesDockerRunner implements DockerRunner {
     }
   }
 
-  private synchronized void tryPollPods() {
-    final Set<WorkflowInstance> runningWorkflowInstances = getRunningWorkflowInstances();
+  @VisibleForTesting
+  synchronized void tryPollPods() {
+    // Fetch pods _before_ fetching all active states
     final PodList list = client.pods().list();
-    examineRunningWFISandAssociatedPods(runningWorkflowInstances, list);
+    final Map<WorkflowInstance, RunState> activeStates = stateManager.getActiveStates();
+    examineRunningWFISandAssociatedPods(activeStates, list);
 
     for (Pod pod : list.getItems()) {
       logEvent(Watcher.Action.MODIFIED, pod, list.getMetadata().getResourceVersion(), true);
@@ -509,15 +524,13 @@ class KubernetesDockerRunner implements DockerRunner {
       if (!workflowInstance.isPresent()) {
         continue;
       }
-      // do an extra lookup to get latest state
-      // this is crucial because after fetching all states in datastore, some states might
-      // have transitioned already; there could even be cases that we observe pods whose
-      // states where created after fetching the states.
-      final Optional<RunState> runState = lookupPodRunState(pod, workflowInstance.get());
-      if (runState.isPresent()) {
-        emitPodEvents(Watcher.Action.MODIFIED, pod, runState.get());
+
+      final RunState runState = activeStates.get(workflowInstance.get());
+      if (runState != null && isPodRunState(pod, runState)) {
+        emitPodEvents(Watcher.Action.MODIFIED, pod, runState);
         cleanupWithRunState(workflowInstance.get(), pod.getMetadata().getName());
       } else {
+        // The pod is stale as we fetched the active states _after_ listing all pods.
         cleanupWithoutRunState(workflowInstance.get(), pod.getMetadata().getName());
       }
     }
@@ -538,28 +551,31 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private Optional<RunState> lookupPodRunState(Pod pod, WorkflowInstance workflowInstance) {
-    final String podName = pod.getMetadata().getName();
-
-    final Optional<RunState> runState = stateManager.getActiveState(workflowInstance);
-    if (!runState.isPresent()) {
+    final Optional<RunState> runStateOpt = stateManager.getActiveState(workflowInstance);
+    if (!runStateOpt.isPresent()) {
       LOG.debug("Pod event for unknown or inactive workflow instance {}", workflowInstance);
       return Optional.empty();
     }
+    return runStateOpt.filter(runState -> isPodRunState(pod, runState));
+  }
 
-    final Optional<String> executionIdOpt = runState.get().data().executionId();
+  private boolean isPodRunState(Pod pod, RunState runState) {
+    final String podName = pod.getMetadata().getName();
+
+    final Optional<String> executionIdOpt = runState.data().executionId();
     if (!executionIdOpt.isPresent()) {
       LOG.debug("Pod event for state with no current executionId: {}", podName);
-      return Optional.empty();
+      return false;
     }
 
     final String executionId = executionIdOpt.get();
     if (!podName.equals(executionId)) {
       LOG.debug("Pod event not matching current exec id, current:{} != pod:{}",
           executionId, podName);
-      return Optional.empty();
+      return false;
     }
 
-    return runState;
+    return true;
   }
 
   private void emitPodEvents(Watcher.Action action, Pod pod, RunState runState) {
@@ -575,6 +591,8 @@ class KubernetesDockerRunner implements DockerRunner {
       }
 
       try {
+        // TODO: spoofing counter values like this can give unexpected results, e.g. if we emit two events here the
+        // first one might be discarded and the second one accepted.
         stateManager.receive(event, runState.counter() + i);
       } catch (IsClosedException isClosedException) {
         LOG.warn("Could not receive kubernetes event", isClosedException);
