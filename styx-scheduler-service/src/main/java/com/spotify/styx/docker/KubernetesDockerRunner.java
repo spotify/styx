@@ -367,15 +367,21 @@ class KubernetesDockerRunner implements DockerRunner {
     } else if (isTerminated(containerStatus.get())) {
       deletePodIfNonDeletePeriodExpired(workflowInstance, pod, containerStatus.get());
     } else {
-      // Refresh the pod if it is not terminated as it might be stale
-      pod = client.pods().withName(pod.getMetadata().getName()).get();
-      if (pod == null) {
-        return;
-      }
-      // if not terminated, delete directly
-      if (!isTerminated(pod)) {
-        deletePod(workflowInstance, pod, "No RunState, not terminated");
-      }
+      // Only pass in the pod name and not the potentially stale pod information
+      deleteNonTerminatedPodWithoutRunState(workflowInstance, pod.getMetadata().getName());
+    }
+  }
+
+  private void deleteNonTerminatedPodWithoutRunState(WorkflowInstance workflowInstance, String name) {
+    // Fetch the pod here to avoid acting on stale information
+    final Pod pod = client.pods().withName(name).get();
+    if (pod == null) {
+      // The pod is gone, nothing left to do here
+      return;
+    }
+    // if not terminated, delete directly
+    if (!isTerminated(pod)) {
+      deletePod(workflowInstance, pod, "No RunState, not terminated");
     }
   }
 
