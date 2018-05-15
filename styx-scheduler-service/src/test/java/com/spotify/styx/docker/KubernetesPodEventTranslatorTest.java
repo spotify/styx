@@ -254,7 +254,7 @@ public class KubernetesPodEventTranslatorTest {
 
   @Test
   public void zeroExitCodeFailedPhaseWithoutTerminationLog() throws Exception {
-    pod.setStatus(terminated("Failed", 0, null));
+    pod.setStatus(terminated("Failed", 0, null, pod.getMetadata().getName()));
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -264,7 +264,7 @@ public class KubernetesPodEventTranslatorTest {
   
   @Test
   public void nonZeroExitCodeFailedPhaseWithoutTerminationLog() throws Exception {
-    pod.setStatus(terminated("Failed", 2, null));
+    pod.setStatus(terminated("Failed", 2, null, pod.getMetadata().getName()));
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
