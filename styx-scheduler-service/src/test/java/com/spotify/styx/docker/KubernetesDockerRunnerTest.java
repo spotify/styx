@@ -439,7 +439,9 @@ public class KubernetesDockerRunnerTest {
     final ContainerStatus terminatedMainContainer = new ContainerStatusBuilder()
         .withName(EXECUTION_ID)
         .withNewState()
-        .withNewTerminated().withFinishedAt(FIXED_INSTANT.minus(Duration.ofDays(1)).toString()).endTerminated()
+        .withNewTerminated()
+        .withFinishedAt(FIXED_INSTANT.minus(Duration.ofDays(1)).toString())
+        .endTerminated()
         .endState()
         .build();
 
