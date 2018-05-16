@@ -235,7 +235,7 @@ public class CliMainTest {
     verify(client).backfillCreate(component, "foo", start, end, 1, "Description");
     verify(cliOutput).printBackfill(backfill, true);
   }
-  
+
   @Test
   public void testBackfillShow() throws Exception {
     final String backfillId = "backfill-2";
@@ -250,7 +250,7 @@ public class CliMainTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
         .build();
-    
+
     final BackfillPayload backfillPayload = BackfillPayload.create(backfill,
         Optional.empty());
 
@@ -258,7 +258,7 @@ public class CliMainTest {
         .thenReturn(CompletableFuture.completedFuture(backfillPayload));
 
     CliMain.run(cliContext, "backfill", "show", backfillId, "--no-trunc");
-    
+
     verify(client).backfill(backfillId, true);
     verify(cliOutput).printBackfillPayload(backfillPayload, true);
   }
@@ -277,7 +277,7 @@ public class CliMainTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
         .build();
-    
+
     final BackfillPayload backfillPayload = BackfillPayload.create(backfill,
         Optional.empty());
 
@@ -285,7 +285,7 @@ public class CliMainTest {
         .thenReturn(CompletableFuture.completedFuture(backfillPayload));
 
     CliMain.run(cliContext, "backfill", "show", backfillId);
-    
+
     verify(client).backfill(backfillId, true);
     verify(cliOutput).printBackfillPayload(backfillPayload, false);
   }
@@ -331,7 +331,7 @@ public class CliMainTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
         .build();
-    
+
     final BackfillsPayload backfillsPayload = BackfillsPayload.create(
         ImmutableList.of(BackfillPayload.create(backfill, Optional.empty())));
 
@@ -361,7 +361,7 @@ public class CliMainTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
         .build();
-    
+
     final BackfillsPayload backfillsPayload = BackfillsPayload.create(
         ImmutableList.of(BackfillPayload.create(backfill, Optional.empty())));
 
@@ -526,7 +526,7 @@ public class CliMainTest {
       assertThat(e.status(), is(ExitStatus.ClientError));
     }
 
-    verify(cliOutput).printError("Client error: " + exception.getMessage());
+    verify(cliOutput).printError(Throwables.getStackTraceAsString(exception));
   }
 
   @Test
