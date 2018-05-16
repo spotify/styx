@@ -309,19 +309,6 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldCleanupPodWhenPullImageError() {
-    final String name = createdPod.getMetadata().getName();
-    when(k8sClient.pods().withName(name)).thenReturn(namedPod);
-    when(namedPod.get()).thenReturn(createdPod);
-
-    // inject mock status in real instance
-    setWaiting(createdPod, "Pending", "ErrImagePull");
-
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod);
-    verify(namedPod).delete();
-  }
-
-  @Test
   public void shouldNotCleanupPodBeforeNonDeletePeriod() {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
