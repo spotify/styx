@@ -382,7 +382,8 @@ public final class BackfillResource {
   }
 
   private static List<Instant> instants(Instant start, Instant end, Schedule schedule) {
-    return start.isAfter(end) ? instantsInReversedRange(start, end, schedule) :
-           instantsInRange(start, end, schedule);
+    return start.isAfter(end)
+           ? instantsInReversedRange(start, end, schedule)
+           : instantsInRange(start, end, schedule);
   }
 }

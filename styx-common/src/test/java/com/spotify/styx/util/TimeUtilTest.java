@@ -33,6 +33,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import com.spotify.styx.model.Schedule;
 import java.time.Instant;
@@ -195,7 +196,7 @@ public class TimeUtilTest {
   }
 
   @Test
-  public void shouldGetCorrectNumberOfInstants() {
+  public void shouldGetCorrectInstants() {
     final Instant firstTimeHours = parse("2016-01-19T00:00:00.00Z");
     final Instant lastTimeHours = parse("2016-01-19T03:00:00.00Z");
     final Instant firstTimeDays = parse("2016-01-10T00:00:00.00Z");
@@ -225,7 +226,7 @@ public class TimeUtilTest {
   }
 
   @Test
-  public void shouldGetCorrectNumberOfInstantsForCron() {
+  public void shouldGetCorrectInstantsForCron() {
     final Instant firstTimeHours = parse("2016-01-19T00:00:00.00Z");
     final Instant lastTimeHours = parse("2016-01-19T03:00:00.00Z");
 
@@ -244,29 +245,44 @@ public class TimeUtilTest {
         instantsInRange(firstTimeHours, lastTimeHours, Schedule.parse("0 * * * *")).isEmpty());
   }
 
-  @Test(expected = IllegalArgumentException.class)
+  @Test
   public void shouldGetExceptionIfLastInstantIsBeforeFirstInstant() {
     final Instant firstTimeHours = parse("2016-01-19T10:00:00.00Z");
     final Instant lastTimeHours = parse("2016-01-19T09:00:00.00Z");
-    instantsInRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
-  }
-
-  @Test(expected = IllegalArgumentException.class)
-  public void shouldGetExceptionIfLastInstantIsNotAlignedWithSchedule() {
-    final Instant firstTimeHours = parse("2016-01-19T08:00:00.00Z");
-    final Instant lastTimeHours = parse("2016-01-19T09:10:00.00Z");
-    instantsInRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
-  }
-
-  @Test(expected = IllegalArgumentException.class)
-  public void shouldGetExceptionIfFirstInstantIsNotAlignedWithSchedule() {
-    final Instant firstTimeHours = parse("2016-01-19T08:10:00.00Z");
-    final Instant lastTimeHours = parse("2016-01-19T09:00:00.00Z");
-    instantsInRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
+    try {
+      instantsInRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
+      fail();
+    } catch (IllegalArgumentException e) {
+      assertThat(e.getMessage(), is("last instant should not be before first instant"));
+    }
   }
 
   @Test
-  public void shouldGetCorrectNumberOfInstantsReversed() {
+  public void shouldGetExceptionIfLastInstantIsNotAlignedWithSchedule() {
+    final Instant firstTimeHours = parse("2016-01-19T08:00:00.00Z");
+    final Instant lastTimeHours = parse("2016-01-19T09:10:00.00Z");
+    try {
+      instantsInRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
+      fail();
+    } catch (IllegalArgumentException e) {
+      assertThat(e.getMessage(), is("unaligned instant"));
+    }
+  }
+
+  @Test
+  public void shouldGetExceptionIfFirstInstantIsNotAlignedWithSchedule() {
+    final Instant firstTimeHours = parse("2016-01-19T08:10:00.00Z");
+    final Instant lastTimeHours = parse("2016-01-19T09:00:00.00Z");
+    try {
+      instantsInRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
+      fail();
+    } catch (IllegalArgumentException e) {
+      assertThat(e.getMessage(), is("unaligned instant"));
+    }
+  }
+
+  @Test
+  public void shouldGetCorrectInstantsReversed() {
     final Instant firstTimeHours = parse("2016-01-19T03:00:00.00Z");
     final Instant lastTimeHours = parse("2016-01-19T00:00:00.00Z");
     final Instant firstTimeDays = parse("2016-01-13T00:00:00.00Z");
@@ -296,7 +312,7 @@ public class TimeUtilTest {
   }
 
   @Test
-  public void shouldGetCorrectNumberOfInstantsForCronReversed() {
+  public void shouldGetCorrectInstantsForCronReversed() {
     final Instant firstTimeHours = parse("2016-01-19T03:00:00.00Z");
     final Instant lastTimeHours = parse("2016-01-19T00:00:00.00Z");
 
@@ -316,24 +332,39 @@ public class TimeUtilTest {
   }
 
 
-  @Test(expected = IllegalArgumentException.class)
+  @Test
   public void shouldGetExceptionIfLastInstantIsBeforeFirstInstantReversed() {
     final Instant firstTimeHours = parse("2016-01-19T09:00:00.00Z");
     final Instant lastTimeHours = parse("2016-01-19T10:00:00.00Z");
-    instantsInReversedRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
+    try {
+      instantsInReversedRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
+      fail();
+    } catch (IllegalArgumentException e) {
+      assertThat(e.getMessage(), is("last instant should not be after first instant"));
+    }
   }
 
-  @Test(expected = IllegalArgumentException.class)
+  @Test
   public void shouldGetExceptionIfLastInstantIsNotAlignedWithScheduleReversed() {
     final Instant firstTimeHours = parse("2016-01-19T09:00:00.00Z");
     final Instant lastTimeHours = parse("2016-01-19T08:10:00.00Z");
-    instantsInReversedRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
+    try {
+      instantsInReversedRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
+      fail();
+    } catch (IllegalArgumentException e) {
+      assertThat(e.getMessage(), is("unaligned instant"));
+    }
   }
 
-  @Test(expected = IllegalArgumentException.class)
+  @Test
   public void shouldGetExceptionIfFirstInstantIsNotAlignedWithScheduleReversed() {
     final Instant firstTimeHours = parse("2016-01-19T09:10:00.00Z");
     final Instant lastTimeHours = parse("2016-01-19T08:00:00.00Z");
-    instantsInReversedRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
+    try {
+      instantsInReversedRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
+      fail();
+    } catch (IllegalArgumentException e) {
+      assertThat(e.getMessage(), is("unaligned instant"));
+    }
   }
 }

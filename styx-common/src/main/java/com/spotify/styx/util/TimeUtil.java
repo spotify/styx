@@ -106,7 +106,7 @@ public class TimeUtil {
   }
 
   /**
-   * Gets the number of instants between firstInstant (inclusive) and lastInstant (exclusive)
+   * Gets an ordered list of instants between firstInstant (inclusive) and lastInstant (exclusive)
    * according to the {@link Schedule}.
    *
    * @param firstInstant The first instant
@@ -125,22 +125,22 @@ public class TimeUtil {
     }
 
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
-    final List<Instant> listOfInstants = new ArrayList<>();
+    final List<Instant> instants = new ArrayList<>();
 
     Instant currentInstant = firstInstant;
     while (currentInstant.isBefore(lastInstant)) {
-      listOfInstants.add(currentInstant);
+      instants.add(currentInstant);
       final ZonedDateTime utcDateTime = currentInstant.atZone(UTC);
       currentInstant = executionTime.nextExecution(utcDateTime)
           .orElseThrow(IllegalArgumentException::new) // with unix cron, this should not happen
           .toInstant();
     }
 
-    return listOfInstants;
+    return instants;
   }
 
   /**
-   * Gets the number of instants between firstInstant (inclusive) and lastInstant (exclusive)
+   * Gets an ordered list instants between firstInstant (inclusive) and lastInstant (exclusive)
    * according to the {@link Schedule}. This works in a reversed order, meaning firstInstant should
    * be after lastInstant.
    *
@@ -160,18 +160,18 @@ public class TimeUtil {
     }
 
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
-    final List<Instant> listOfInstants = new ArrayList<>();
+    final List<Instant> instants = new ArrayList<>();
 
     Instant currentInstant = firstInstant;
     while (currentInstant.isAfter(lastInstant)) {
-      listOfInstants.add(currentInstant);
+      instants.add(currentInstant);
       final ZonedDateTime utcDateTime = currentInstant.atZone(UTC);
       currentInstant = executionTime.lastExecution(utcDateTime)
           .orElseThrow(IllegalArgumentException::new) // with unix cron, this should not happen
           .toInstant();
     }
 
-    return listOfInstants;
+    return instants;
   }
 
   /**
