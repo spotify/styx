@@ -79,12 +79,12 @@ public class DockerRunnerHandler implements OutputHandler {
         }
 
         try {
-          LOG.info("running:{} image:{} args:{} termination_logging:{}", state.workflowInstance().toKey(),
+          LOG.info("running:{} image:{} args:{} termination_logging:{}", state.workflowInstance(),
               runSpec.imageName(), runSpec.args(), runSpec.terminationLogging());
           dockerRunner.start(state.workflowInstance(), runSpec);
         } catch (Throwable e) {
           try {
-            final String msg = "Failed the docker starting procedure for " + state.workflowInstance().toKey();
+            final String msg = "Failed the docker starting procedure for " + state.workflowInstance();
             if (isUserError(e)) {
               LOG.info("{}: {}", msg, e.getMessage());
             } else {
@@ -120,12 +120,10 @@ public class DockerRunnerHandler implements OutputHandler {
     final Optional<ExecutionDescription> executionDescriptionOpt = state.data().executionDescription();
 
     final ExecutionDescription executionDescription = executionDescriptionOpt.orElseThrow(
-        () -> new ResourceNotFoundException("Missing execution description for "
-                                            + state.workflowInstance().toKey()));
+        () -> new ResourceNotFoundException("Missing execution description for " + state.workflowInstance()));
 
     final String executionId = state.data().executionId().orElseThrow(
-        () -> new ResourceNotFoundException("Missing execution id for "
-                                            + state.workflowInstance().toKey()));
+        () -> new ResourceNotFoundException("Missing execution id for " + state.workflowInstance()));
 
     final String dockerImage = executionDescription.dockerImage();
     final List<String> dockerArgs = executionDescription.dockerArgs();

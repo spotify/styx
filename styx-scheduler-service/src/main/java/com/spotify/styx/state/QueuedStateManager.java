@@ -172,12 +172,9 @@ public class QueuedStateManager implements StateManager {
       });
     } catch (TransactionException e) {
       if (e.isAlreadyExists()) {
-        throw new AlreadyInitializedException(
-            "Workflow instance is already triggered: " + workflowInstance.toKey());
+        throw new AlreadyInitializedException("Workflow instance is already triggered: " + workflowInstance);
       } else if (e.isConflict()) {
-        LOG.debug(
-            "Transactional conflict, abort triggering Workflow instance: " + workflowInstance
-                .toKey());
+        LOG.debug("Transactional conflict, abort triggering Workflow instance: " + workflowInstance);
         throw new RuntimeException(e);
       } else {
         throw new RuntimeException(e);

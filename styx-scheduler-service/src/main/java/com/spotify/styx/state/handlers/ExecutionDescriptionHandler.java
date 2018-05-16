@@ -82,12 +82,11 @@ public class ExecutionDescriptionHandler implements OutputHandler {
                    workflowInstance);
           stateManager.receiveIgnoreClosed(Event.halt(workflowInstance));
         } catch (MissingRequiredPropertyException e) {
-          LOG.warn("Failed to prepare execution description for "
-                   + state.workflowInstance().toKey(), e);
+          LOG.warn("Failed to prepare execution description for " + state.workflowInstance(), e);
           stateManager.receiveIgnoreClosed(Event.halt(workflowInstance));
         } catch (IOException e) {
           try {
-            LOG.error("Failed to retrieve execution description for " + state.workflowInstance().toKey(), e);
+            LOG.error("Failed to retrieve execution description for " + state.workflowInstance(), e);
             stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()));
           } catch (IsClosedException isClosedException) {
             LOG.warn("Failed to send 'runError' event", isClosedException);

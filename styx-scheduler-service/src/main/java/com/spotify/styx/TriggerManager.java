@@ -133,10 +133,10 @@ class TriggerManager implements Closeable {
               toParameter(workflow.configuration().schedule(), instantSpec.instant()));
 
           if (findCause(e, AlreadyInitializedException.class) != null) {
-            LOG.debug("{} already triggered", workflowInstance.toKey(), e);
+            LOG.debug("{} already triggered", workflowInstance, e);
             // move on to update next natural trigger
           } else {
-            LOG.debug("Failed to trigger {}", workflowInstance.toKey(), e);
+            LOG.debug("Failed to trigger {}", workflowInstance, e);
             return;
           }
         }

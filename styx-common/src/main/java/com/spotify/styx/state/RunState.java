@@ -397,8 +397,7 @@ public abstract class RunState {
   }
 
   private IllegalStateException illegalTransition(String event) {
-    final String key = workflowInstance().toKey();
-    return new IllegalStateException(key + " received " + event + " while in " + state());
+    return new IllegalStateException(workflowInstance() + " received " + event + " while in " + state());
   }
 
   public static RunState create(

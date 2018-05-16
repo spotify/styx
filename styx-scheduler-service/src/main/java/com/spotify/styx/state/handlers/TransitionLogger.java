@@ -41,10 +41,8 @@ public class TransitionLogger implements OutputHandler {
 
   @Override
   public void transitionInto(RunState state) {
-    final String instanceKey = state.workflowInstance().toKey();
-    LOG.info(
-        "{}{} transition -> {} {}",
-        this.prefix, instanceKey, state.state().name().toLowerCase(), stateInfo(state));
+    final String name = state.state().name().toLowerCase();
+    LOG.info("{}{} transition -> {} {}", prefix, state.workflowInstance(), name, stateInfo(state));
   }
 
   @VisibleForTesting

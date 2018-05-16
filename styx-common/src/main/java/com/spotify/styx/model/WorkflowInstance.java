@@ -65,4 +65,10 @@ public abstract class WorkflowInstance {
     final WorkflowId workflowId = WorkflowId.parseKey(key.substring(0, lastHashPos));
     return create(workflowId, key.substring(lastHashPos + 1));
   }
+
+  @Override
+  public String toString() {
+    // Ensure that the key gets printed when containing objects are logged
+    return toKey();
+  }
 }
