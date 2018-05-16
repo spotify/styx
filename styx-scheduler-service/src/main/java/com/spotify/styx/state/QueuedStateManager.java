@@ -203,6 +203,7 @@ public class QueuedStateManager implements StateManager {
 
         // Verify counters for in-order event processing
         verifyCounter(event, expectedCounter, currentRunState.get());
+        LOG.info("Received event (verified) {}", event);
 
         final RunState nextRunState;
         try {
