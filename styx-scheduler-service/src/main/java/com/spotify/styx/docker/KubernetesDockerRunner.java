@@ -351,6 +351,7 @@ class KubernetesDockerRunner implements DockerRunner {
   void cleanupWithRunState(WorkflowInstance workflowInstance, Pod pod) {
     final Optional<ContainerStatus> containerStatus = getMainContainerStatus(pod);
     if (!containerStatus.isPresent()) {
+      // TODO: this might delete recently created pods?
       deletePod(workflowInstance, pod, "No container status");
     } else if (isTerminated(containerStatus.get())) {
       deletePodIfNonDeletePeriodExpired(workflowInstance, pod, containerStatus.get());
@@ -363,6 +364,7 @@ class KubernetesDockerRunner implements DockerRunner {
   void cleanupWithoutRunState(WorkflowInstance workflowInstance, Pod pod) {
     final Optional<ContainerStatus> containerStatus = getMainContainerStatus(pod);
     if (!containerStatus.isPresent()) {
+      // TODO: this might delete recently created pods?
       deletePod(workflowInstance, pod, "No RunState, no container status");
     } else if (isTerminated(containerStatus.get())) {
       deletePodIfNonDeletePeriodExpired(workflowInstance, pod, containerStatus.get());
