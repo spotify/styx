@@ -294,7 +294,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldCleanupPodWhenMissingContainerStatus() {
+  public void shouldNotCleanupPodWhenMissingContainerStatus() {
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
     when(namedPod.get()).thenReturn(createdPod);
@@ -303,7 +303,9 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatus);
 
     kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod);
-    verify(namedPod).delete();
+
+    // It is normal for a pod to not have any container status for a while after creation
+    verifyPodNeverDeleted(namedPod);
   }
 
   @Test
