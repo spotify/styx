@@ -292,9 +292,9 @@ public class Scheduler {
     final RunState state = instanceState.runState();
 
     if (state.data().tries() == 0) {
-      LOG.info("Executing {}", workflowInstance.toKey());
+      LOG.info("Executing {}", workflowInstance);
     } else {
-      LOG.info("Executing {}, retry #{}", workflowInstance.toKey(), state.data().tries());
+      LOG.info("Executing {}, retry #{}", workflowInstance, state.data().tries());
     }
     stateManager.receiveIgnoreClosed(Event.dequeue(workflowInstance, resourceIds),
         instanceState.runState().counter());

@@ -423,9 +423,9 @@ class KubernetesDockerRunner implements DockerRunner {
     final String name = pod.getMetadata().getName();
     if (!debug.get()) {
       client.pods().withName(name).delete();
-      LOG.info("Deleted {} pod: {}, reason: '{}'", workflowInstance.toKey(), name, reason);
+      LOG.info("Deleted {} pod: {}, reason: '{}'", workflowInstance, name, reason);
     } else {
-      LOG.info("Keeping {} pod: {}, reason: '{}'", workflowInstance.toKey(), name, reason);
+      LOG.info("Keeping {} pod: {}, reason: '{}'", workflowInstance, name, reason);
     }
   }
 
