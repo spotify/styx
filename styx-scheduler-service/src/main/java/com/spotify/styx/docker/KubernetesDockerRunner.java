@@ -375,8 +375,9 @@ class KubernetesDockerRunner implements DockerRunner {
       case ERROR:
       case DONE:
         return false;
+      default:
+        return true;
     }
-    return true;
   }
 
   @VisibleForTesting
