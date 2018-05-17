@@ -314,7 +314,7 @@ public final class CliMain {
           throw CliExitException.of(ExitStatus.ApiError);
         }
       } else if (cause instanceof ClientErrorException) {
-        final Throwable rootCause = Throwables.getRootCause(cause.getCause());
+        final Throwable rootCause = Throwables.getRootCause(cause);
         cliOutput.printError("Client error: " + cause.getMessage() + ": "
             + rootCause.getClass().getSimpleName() + ": " + rootCause.getMessage());
         throw CliExitException.of(ExitStatus.ClientError);
