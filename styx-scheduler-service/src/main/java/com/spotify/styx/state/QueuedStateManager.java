@@ -26,6 +26,7 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Throwables;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
@@ -73,7 +74,8 @@ import org.slf4j.LoggerFactory;
  */
 public class QueuedStateManager implements StateManager {
 
-  private static final Logger LOG = LoggerFactory.getLogger(QueuedStateManager.class);
+  private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(QueuedStateManager.class);
+  private final Logger log;
 
   private static final long NO_EVENTS_PROCESSED = -1L;
 
@@ -99,6 +101,19 @@ public class QueuedStateManager implements StateManager {
       Executor eventConsumerExecutor,
       OutputHandler outputHandler,
       ShardedCounter shardedCounter) {
+    this(time, eventProcessingExecutor, storage, eventConsumer, eventConsumerExecutor, outputHandler, shardedCounter,
+        DEFAULT_LOG);
+  }
+
+  public QueuedStateManager(
+      Time time,
+      StripedExecutorService eventProcessingExecutor,
+      Storage storage,
+      BiConsumer<SequenceEvent, RunState> eventConsumer,
+      Executor eventConsumerExecutor,
+      OutputHandler outputHandler,
+      ShardedCounter shardedCounter,
+      Logger logger) {
     this.time = Objects.requireNonNull(time);
     this.storage = Objects.requireNonNull(storage);
     this.eventConsumer = Objects.requireNonNull(eventConsumer);
@@ -106,13 +121,14 @@ public class QueuedStateManager implements StateManager {
     this.eventProcessingExecutor = Objects.requireNonNull(eventProcessingExecutor);
     this.outputHandler = Objects.requireNonNull(outputHandler);
     this.shardedCounter = Objects.requireNonNull(shardedCounter);
+    this.log = Objects.requireNonNull(logger, "logger");
   }
 
   @Override
   public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger)
       throws IsClosedException {
     ensureRunning();
-    LOG.debug("Trigger {}", workflowInstance);
+    log.debug("Trigger {}", workflowInstance);
 
     // TODO: optional retry on transaction conflict
 
@@ -121,12 +137,12 @@ public class QueuedStateManager implements StateManager {
       try {
         return receive(event);
       } catch (IsClosedException isClosedException) {
-        LOG.warn("Failed to send 'triggerExecution' event", isClosedException);
+        log.warn("Failed to send 'triggerExecution' event", isClosedException);
         // Best effort attempt to rollback the creation of the NEW state
         try {
           storage.deleteActiveState(workflowInstance);
         } catch (IOException e) {
-          LOG.warn("Failed to remove dangling NEW state for: {}", workflowInstance);
+          log.warn("Failed to remove dangling NEW state for: {}", workflowInstance);
         }
         throw new RuntimeException(isClosedException);
       }
@@ -141,7 +157,7 @@ public class QueuedStateManager implements StateManager {
   @Override
   public CompletableFuture<Void> receive(Event event, long expectedCounter) throws IsClosedException {
     ensureRunning();
-    LOG.info("Received event {}", event);
+    log.info("Received event {}", event);
 
     // TODO: optional retry on transaction conflict
 
@@ -174,12 +190,17 @@ public class QueuedStateManager implements StateManager {
       if (e.isAlreadyExists()) {
         throw new AlreadyInitializedException("Workflow instance is already triggered: " + workflowInstance);
       } else if (e.isConflict()) {
-        LOG.debug("Transactional conflict, abort triggering Workflow instance: " + workflowInstance);
+        log.debug("Transaction conflict when triggering workflow instance. Aborted: {}",
+            workflowInstance);
         throw new RuntimeException(e);
       } else {
+        log.debug("Transaction failure when triggering workflow instance: {}: {}",
+            workflowInstance, e.getMessage(), e);
         throw new RuntimeException(e);
       }
-    } catch (IOException e) {
+    } catch (Exception e) {
+      log.debug("Failure when triggering workflow instance: {}: {}", workflowInstance, e.getMessage(), e);
+      Throwables.propagateIfPossible(e, RuntimeException.class);
       throw new RuntimeException(e);
     }
   }
@@ -194,13 +215,13 @@ public class QueuedStateManager implements StateManager {
             tx.readActiveState(event.workflowInstance());
         if (!currentRunState.isPresent()) {
           String message = "Received event for unknown workflow instance: " + event;
-          LOG.warn(message);
+          log.warn(message);
           throw new IllegalArgumentException(message);
         }
 
         // Verify counters for in-order event processing
         verifyCounter(event, expectedCounter, currentRunState.get());
-        LOG.info("Received event (verified) {}", event);
+        log.info("Received event (verified) {}", event);
 
         final RunState nextRunState;
         try {
@@ -208,7 +229,7 @@ public class QueuedStateManager implements StateManager {
         } catch (IllegalStateException e) {
           // TODO: illegal state transitions might become common as multiple scheduler
           //       instances concurrently consume events from k8s.
-          LOG.warn("Illegal state transition", e);
+          log.warn("Illegal state transition", e);
           throw e;
         }
 
@@ -227,7 +248,20 @@ public class QueuedStateManager implements StateManager {
 
         return Tuple.of(sequenceEvent, nextRunState);
       });
-    } catch (IOException e) {
+    } catch (TransactionException e) {
+      if (e.isConflict()) {
+        log.debug("Transaction conflict during workflow instance transition. Aborted: {}, counter={}",
+            event, expectedCounter);
+        throw new RuntimeException(e);
+      } else {
+        log.debug("Transaction failure during workflow instance transition: {}, counter={}",
+            event, expectedCounter, e);
+        throw new RuntimeException(e);
+      }
+    } catch (Exception e) {
+      log.debug("Failure during workflow instance transition: {}, counter={}",
+          event, expectedCounter, e);
+      Throwables.propagateIfPossible(e, RuntimeException.class);
       throw new RuntimeException(e);
     }
   }
@@ -248,7 +282,7 @@ public class QueuedStateManager implements StateManager {
           tx.updateCounter(shardedCounter, resource, -1);
         }
       } else {
-        LOG.error("Resource ids are missing for {} when transitioning from {} to {}.",
+        log.error("Resource ids are missing for {} when transitioning from {} to {}.",
             nextRunState.workflowInstance(), currentRunState, nextRunState);
       }
     }
@@ -301,13 +335,13 @@ public class QueuedStateManager implements StateManager {
       final String message = "Stale event encountered. Expected counter is "
                              + expectedCounter  + " but current counter is "
                              + currentCounter + ". Discarding event " + event;
-      LOG.debug(message);
+      log.debug(message);
       throw new StaleEventException(message);
     } else if (currentCounter < expectedCounter) {
       // This should never happen
       final String message = "Unexpected current counter is less than last observed one for "
                              + currentRunState;
-      LOG.error(message);
+      log.error(message);
       throw new RuntimeException(message);
     }
   }
@@ -317,14 +351,14 @@ public class QueuedStateManager implements StateManager {
     try {
       storage.writeEvent(sequenceEvent);
     } catch (IOException e) {
-      LOG.warn("Error writing event {}", sequenceEvent, e);
+      log.warn("Error writing event {}", sequenceEvent, e);
     }
 
     // Publish event
     try {
       eventConsumerExecutor.execute(() -> eventConsumer.accept(sequenceEvent, runState));
     } catch (Exception e) {
-      LOG.warn("Error while consuming event {}", sequenceEvent, e);
+      log.warn("Error while consuming event {}", sequenceEvent, e);
     }
 
     // Execute output handler(s)
