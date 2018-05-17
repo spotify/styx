@@ -29,6 +29,7 @@ import static net.sourceforge.argparse4j.impl.Arguments.fileType;
 
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectReader;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.core.Service;
@@ -100,6 +101,7 @@ public final class CliMain {
   private final Service cliService;
   private final CliOutput cliOutput;
   private final CliContext cliContext;
+  private final boolean debug;
   private StyxClient styxClient;
 
   private CliMain(
@@ -108,13 +110,15 @@ public final class CliMain {
       String apiHost,
       Service cliService,
       CliOutput cliOutput,
-      CliContext cliContext) {
+      CliContext cliContext,
+      boolean debug) {
     this.parser = Objects.requireNonNull(parser);
     this.namespace = Objects.requireNonNull(namespace);
     this.apiHost = Objects.requireNonNull(apiHost);
     this.cliService = Objects.requireNonNull(cliService);
     this.cliOutput = Objects.requireNonNull(cliOutput);
     this.cliContext = Objects.requireNonNull(cliContext);
+    this.debug = debug;
   }
 
   public static void main(String... args) {
@@ -169,7 +173,9 @@ public final class CliMain {
       cliOutput = cliContext.output(Output.PRETTY);
     }
 
-    new CliMain(parser, namespace, apiHost, cliService, cliOutput, cliContext).run();
+    final boolean debug = namespace.getBoolean(parser.debug.getDest());
+
+    new CliMain(parser, namespace, apiHost, cliService, cliOutput, cliContext, debug).run();
   }
 
   private void run() {
@@ -284,6 +290,9 @@ public final class CliMain {
       throw CliExitException.of(ExitStatus.ArgumentError);
     } catch (ExecutionException e) {
       final Throwable cause = e.getCause();
+      if (debug) {
+        cliOutput.printError(getStackTraceAsString(cause));
+      }
       if (cause instanceof ApiErrorException) {
         final ApiErrorException apiError = (ApiErrorException) cause;
         if (apiError.getCode() == UNAUTHORIZED.code()) {
@@ -305,7 +314,9 @@ public final class CliMain {
           throw CliExitException.of(ExitStatus.ApiError);
         }
       } else if (cause instanceof ClientErrorException) {
-        cliOutput.printError("Client error: " + cause.getMessage());
+        final Throwable rootCause = Throwables.getRootCause(cause);
+        cliOutput.printError("Client error: " + cause.getMessage() + ": "
+            + rootCause.getClass().getSimpleName() + ": " + rootCause.getMessage());
         throw CliExitException.of(ExitStatus.ClientError);
       } else {
         cliOutput.printError(getStackTraceAsString(cause));
@@ -748,6 +759,11 @@ public final class CliMain {
 
     final Argument plain = parser.addArgument("-p", "--plain")
         .help("plain output")
+        .setDefault(false)
+        .action(Arguments.storeTrue());
+
+    final Argument debug = parser.addArgument("--debug")
+        .help("debug output")
         .setDefault(false)
         .action(Arguments.storeTrue());
 
