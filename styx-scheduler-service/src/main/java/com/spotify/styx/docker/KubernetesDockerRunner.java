@@ -349,11 +349,15 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @VisibleForTesting
   void cleanupWithRunState(WorkflowInstance workflowInstance, Pod pod) {
+    // Precondition: The run states were fetched after the pods
     final Optional<ContainerStatus> containerStatus = getMainContainerStatus(pod);
     if (!containerStatus.isPresent()) {
-      deletePod(workflowInstance, pod, "No container status");
-    } else if (isTerminated(containerStatus.get())) {
-      deletePodIfNonDeletePeriodExpired(workflowInstance, pod, containerStatus.get());
+      // Do nothing, let the RunState time out if the pod fails to start. Then cleanupWithoutRunState will delete it.
+      // Note: It is natural for pods to not have any container statuses for a while after creation.
+      return;
+    }
+    if (isTerminated(containerStatus.get())) {
+      deletePodIfNonDeletePeriodExpired(workflowInstance, pod);
     } else if (hasPullImageError(containerStatus.get())) {
       deletePod(workflowInstance, pod, "Pull image error");
     }
@@ -361,18 +365,16 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @VisibleForTesting
   void cleanupWithoutRunState(WorkflowInstance workflowInstance, Pod pod) {
-    final Optional<ContainerStatus> containerStatus = getMainContainerStatus(pod);
-    if (!containerStatus.isPresent()) {
-      deletePod(workflowInstance, pod, "No RunState, no container status");
-    } else if (isTerminated(containerStatus.get())) {
-      deletePodIfNonDeletePeriodExpired(workflowInstance, pod, containerStatus.get());
+    // Precondition: The run states were fetched after the pods
+    if (isTerminated(pod)) {
+      deletePodIfNonDeletePeriodExpired(workflowInstance, pod);
     } else {
       // Only pass in the pod name and not the potentially stale pod information
-      deleteNonTerminatedPodWithoutRunState(workflowInstance, pod.getMetadata().getName());
+      refreshAndDeleteNonTerminatedPodWithoutRunState(workflowInstance, pod.getMetadata().getName());
     }
   }
 
-  private void deleteNonTerminatedPodWithoutRunState(WorkflowInstance workflowInstance, String name) {
+  private void refreshAndDeleteNonTerminatedPodWithoutRunState(WorkflowInstance workflowInstance, String name) {
     // Fetch the pod here to avoid acting on stale information
     final Pod pod = client.pods().withName(name).get();
     if (pod == null) {
@@ -385,10 +387,8 @@ class KubernetesDockerRunner implements DockerRunner {
     }
   }
 
-  private void deletePodIfNonDeletePeriodExpired(WorkflowInstance workflowInstance,
-                                                 Pod pod,
-                                                 ContainerStatus containerStatus) {
-    if (isNonDeletePeriodExpired(containerStatus)) {
+  private void deletePodIfNonDeletePeriodExpired(WorkflowInstance workflowInstance, Pod pod) {
+    if (getMainContainerStatus(pod).map(this::isNonDeletePeriodExpired).orElse(false)) {
       // if terminated and after graceful period, delete the pod
       // otherwise wait until next polling happens
       deletePod(workflowInstance, pod, "Terminated and expired");
