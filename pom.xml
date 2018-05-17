@@ -183,7 +183,6 @@
         <groupId>io.norberg</groupId>
         <artifactId>auto-matter-jackson</artifactId>
         <version>0.14.1</version>
-        <scope>provided</scope>
       </dependency>
       <dependency>
         <groupId>com.cronutils</groupId>
