@@ -44,6 +44,7 @@ public abstract class WorkflowId {
   public abstract String id();
 
   public String toKey() {
+    // Used as ID in storage etc. Do not change.
     return componentId() + "#" + id();
   }
 

@@ -46,6 +46,7 @@ public abstract class WorkflowInstance {
   public abstract String parameter();
 
   public String toKey() {
+    // Used as ID in storage etc. Do not change.
     return workflowId().toKey() + "#" + parameter();
   }
 
