@@ -348,7 +348,7 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   @VisibleForTesting
-  void cleanupWithRunState(WorkflowInstance workflowInstance, Pod pod) {
+  void cleanupWithRunState(WorkflowInstance workflowInstance, Pod pod, RunState runState) {
     // Precondition: The run states were fetched after the pods
     final Optional<ContainerStatus> containerStatus = getMainContainerStatus(pod);
     if (!containerStatus.isPresent()) {
@@ -356,10 +356,27 @@ class KubernetesDockerRunner implements DockerRunner {
       // Note: It is natural for pods to not have any container statuses for a while after creation.
       return;
     }
+    if (wantsPod(runState)) {
+      // Do not delete the pod if the workflow instance still wants it, e.g. it is still RUNNING.
+      return;
+    }
     if (isTerminated(containerStatus.get())) {
       deletePodIfNonDeletePeriodExpired(workflowInstance, pod);
     } else if (hasPullImageError(containerStatus.get())) {
       deletePod(workflowInstance, pod, "Pull image error");
+    }
+  }
+
+  private boolean wantsPod(RunState runState) {
+    switch (runState.state()) {
+      // Be conservative and only let the pod go when we really know it is not needed anymore.
+      case TERMINATED:
+      case FAILED:
+      case ERROR:
+      case DONE:
+        return false;
+      default:
+        return true;
     }
   }
 
@@ -538,7 +555,7 @@ class KubernetesDockerRunner implements DockerRunner {
       final RunState runState = activeStates.get(workflowInstance.get());
       if (runState != null && isPodRunState(pod, runState)) {
         emitPodEvents(Watcher.Action.MODIFIED, pod, runState);
-        cleanupWithRunState(workflowInstance.get(), pod);
+        cleanupWithRunState(workflowInstance.get(), pod, runState);
       } else {
         // The pod is stale as we fetched the active states _after_ listing all pods.
         cleanupWithoutRunState(workflowInstance.get(), pod);

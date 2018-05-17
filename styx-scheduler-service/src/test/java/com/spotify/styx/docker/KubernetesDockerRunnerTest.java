@@ -257,8 +257,10 @@ public class KubernetesDockerRunnerTest {
     verifyPodNeverDeleted(namedPod);
   }
 
+  @Parameters({"TERMINATED", "FAILED", "ERROR", "DONE"})
   @Test
-  public void shouldCleanupPodAfterNonDeletePeriod() {
+  public void shouldCleanupPodAfterNonDeletePeriodIfRunStateNotRunning(String stateName) {
+    final State state = State.valueOf(stateName);
     final String name = createdPod.getMetadata().getName();
     when(k8sClient.pods().withName(name)).thenReturn(namedPod);
     when(namedPod.get()).thenReturn(createdPod);
@@ -272,8 +274,28 @@ public class KubernetesDockerRunnerTest {
     when(containerStateTerminated.getFinishedAt())
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(5)).toString());
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod, RunState.create(WORKFLOW_INSTANCE, state));
     verify(namedPod).delete();
+  }
+
+  @Parameters({"NEW", "QUEUED", "PREPARE", "SUBMITTING", "SUBMITTED", "RUNNING"})
+  @Test
+  public void shouldNotDeletePodAfterNonDeletePeriodIfRunStateStillRunning(String stateName) {
+    final State state = State.valueOf(stateName);
+    final String name = createdPod.getMetadata().getName();
+    when(k8sClient.pods().withName(name)).thenReturn(namedPod);
+    when(namedPod.get()).thenReturn(createdPod);
+
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
+    when(containerStatus.getName()).thenReturn(EXECUTION_ID);
+    when(containerStatus.getState()).thenReturn(containerState);
+    when(containerState.getTerminated()).thenReturn(containerStateTerminated);
+    when(containerStateTerminated.getFinishedAt())
+        .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(5)).toString());
+
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod, RunState.create(WORKFLOW_INSTANCE, state));
+    verifyPodNeverDeleted(namedPod);
   }
 
   @Test
@@ -289,7 +311,7 @@ public class KubernetesDockerRunnerTest {
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod, RunState.create(WORKFLOW_INSTANCE, State.TERMINATED));
     verify(namedPod).delete();
   }
 
@@ -302,7 +324,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod, RunState.create(WORKFLOW_INSTANCE, State.TERMINATED));
 
     // It is normal for a pod to not have any container status for a while after creation
     verifyPodNeverDeleted(namedPod);
@@ -317,7 +339,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     setWaiting(createdPod, "Pending", "ErrImagePull");
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod, RunState.create(WORKFLOW_INSTANCE, State.TERMINATED));
     verify(namedPod).delete();
   }
 
@@ -336,7 +358,7 @@ public class KubernetesDockerRunnerTest {
     when(containerStateTerminated.getFinishedAt())
         .thenReturn(FIXED_INSTANT.minus(Duration.ofMinutes(1)).toString());
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod, RunState.create(WORKFLOW_INSTANCE, State.TERMINATED));
     verifyPodNeverDeleted(namedPod);
   }
 
@@ -352,7 +374,7 @@ public class KubernetesDockerRunnerTest {
     when(containerStatus.getName()).thenReturn(EXECUTION_ID);
     when(containerStatus.getState()).thenReturn(containerState);
 
-    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod);
+    kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod, RunState.create(WORKFLOW_INSTANCE, State.TERMINATED));
     verifyPodNeverDeleted(namedPod);
   }
 
