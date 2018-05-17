@@ -45,13 +45,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CompletionException;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import okio.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 /**
  * A collection of static methods implementing the apollo Middleware interface, useful for
@@ -65,6 +66,9 @@ public final class Middlewares {
   public static final String BEARER_PREFIX = "Bearer ";
   private static final Set<String> BLACKLISTED_HEADERS = ImmutableSet.of(HttpHeaders.AUTHORIZATION);
   private static final GoogleIdTokenVerifier GOOGLE_ID_TOKEN_VERIFIER;
+
+  private static final String REQUEST_ID = "request-id";
+  private static final String X_REQUEST_ID = "X-Request-Id";
 
   static {
     final NetHttpTransport transport;
@@ -126,22 +130,31 @@ public final class Middlewares {
     };
   }
 
-  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> exceptionHandler() {
+  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> exceptionAndRequestIdHandler() {
     return innerHandler -> requestContext -> {
+      final String requestId = UUID.randomUUID().toString();
+
+      MDC.put(REQUEST_ID, requestId);
+
       try {
         return innerHandler.invoke(requestContext).handle((r, t) -> {
+          MDC.remove(REQUEST_ID);
+
+          final Response<T> response;
           if (t != null) {
             if (t instanceof ResponseException) {
-              return ((ResponseException) t).getResponse();
+              response = ((ResponseException) t).getResponse();
             } else {
-              throw new CompletionException(t);
+              response = Response.forStatus(Status.INTERNAL_SERVER_ERROR);
             }
           } else {
-            return r;
+            response = r;
           }
+          return response.withHeader(X_REQUEST_ID, requestId);
         });
       } catch (ResponseException e) {
-        return completedFuture(e.getResponse());
+        return completedFuture(e.<T>getResponse()
+            .withHeader(X_REQUEST_ID, requestId));
       }
     };
   }

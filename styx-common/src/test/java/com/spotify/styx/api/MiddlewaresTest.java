@@ -20,9 +20,11 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.apollo.test.unit.ResponseMatchers.hasHeader;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.belongsToFamily;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
+import static com.spotify.styx.StringIsValidUUID.isValidUUID;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -55,6 +57,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import okio.ByteString;
 import org.junit.Test;
+import org.slf4j.LoggerFactory;
 
 /**
  * Tests Middlewares
@@ -249,7 +252,7 @@ public class MiddlewaresTest {
         .withPayload(ByteString.encodeUtf8("hello"));
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = Middlewares.httpLogger().and(Middlewares.exceptionHandler())
+    Response<Object> response = Middlewares.httpLogger().and(Middlewares.exceptionAndRequestIdHandler())
         .apply(mockInnerHandler(requestContext))
         .invoke(requestContext)
         .toCompletableFuture().get(5, SECONDS);
@@ -258,18 +261,41 @@ public class MiddlewaresTest {
   }
 
   @Test
-  public void testExceptionHandler()
+  public void testExceptionAndRequestIdHandlerOnException()
       throws InterruptedException, ExecutionException, TimeoutException {
     RequestContext requestContext = mock(RequestContext.class);
     Request request = Request.forUri("/", "GET");
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = Middlewares.exceptionHandler()
-        .apply(mockInnerHandler(requestContext, new ResponseException(Response.forStatus(Status.IM_A_TEAPOT))))
+    Response<Object> response = Middlewares.exceptionAndRequestIdHandler()
+        .apply(rc -> {
+          LoggerFactory.getLogger(MiddlewaresTest.class).error("I'm a teapot!");
+          throw new ResponseException(Response.forStatus(Status.IM_A_TEAPOT));
+        })
         .invoke(requestContext)
         .toCompletableFuture().get(5, SECONDS);
 
     assertThat(response, hasStatus(withCode(Status.IM_A_TEAPOT)));
+    assertThat(response, hasHeader("X-Request-Id", isValidUUID()));
+  }
+
+  @Test
+  public void testExceptionAndRequestIdHandlerOnResponse()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = Request.forUri("/", "GET");
+    when(requestContext.request()).thenReturn(request);
+
+    Response<Object> response = Middlewares.exceptionAndRequestIdHandler()
+        .apply(rc -> {
+          LoggerFactory.getLogger(MiddlewaresTest.class).info("I'm OK!");
+          return completedFuture(Response.forStatus(Status.OK));
+        })
+        .invoke(requestContext)
+        .toCompletableFuture().get(5, SECONDS);
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertThat(response, hasHeader("X-Request-Id", isValidUUID()));
   }
 
   @Test
@@ -282,7 +308,7 @@ public class MiddlewaresTest {
     CompletableFuture<?> failedFuture = new CompletableFuture();
     failedFuture.completeExceptionally(new ResponseException(Response.forStatus(Status.IM_A_TEAPOT)));
 
-    Response<Object> response = Middlewares.exceptionHandler()
+    Response<Object> response = Middlewares.exceptionAndRequestIdHandler()
         .apply(mockInnerHandler(requestContext, failedFuture))
         .invoke(requestContext)
         .toCompletableFuture().get(5, SECONDS);

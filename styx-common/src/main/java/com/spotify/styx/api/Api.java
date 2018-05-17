@@ -21,7 +21,7 @@
 package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Middlewares.clientValidator;
-import static com.spotify.styx.api.Middlewares.exceptionHandler;
+import static com.spotify.styx.api.Middlewares.exceptionAndRequestIdHandler;
 import static com.spotify.styx.api.Middlewares.httpLogger;
 
 import com.spotify.apollo.Response;
@@ -62,7 +62,7 @@ public final class Api {
     return routes.map(r -> r
         .withMiddleware(httpLogger())
         .withMiddleware(clientValidator(clientBlacklistSupplier))
-        .withMiddleware(exceptionHandler()));
+        .withMiddleware(exceptionAndRequestIdHandler()));
   }
   private Api() {
   }
