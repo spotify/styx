@@ -27,9 +27,9 @@ import org.junit.Test;
 
 public class WorkflowInstanceTest {
 
-  public static final WorkflowId WORKFLOW_ID = WorkflowId.create("foo", "bar");
-  public static final String PARAMETER = "baz";
-  public static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(WORKFLOW_ID, PARAMETER);
+  private static final WorkflowId WORKFLOW_ID = WorkflowId.create("foo", "bar");
+  private static final String PARAMETER = "baz";
+  private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(WORKFLOW_ID, PARAMETER);
 
   @Test
   public void create() {
