@@ -57,6 +57,7 @@ import com.spotify.styx.util.WorkflowValidator;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.ConnectException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -514,10 +515,11 @@ public class CliMainTest {
 
   @Test
   public void testClientError() {
-    final ClientErrorException exception = new ClientErrorException(
-        "foo failure", new IOException());
     when(client.triggerWorkflowInstance(any(), any(), any()))
-        .thenReturn(exceptionallyCompletedFuture(exception));
+        .thenReturn(exceptionallyCompletedFuture(
+            new ClientErrorException("foo failure",
+                new IOException("bar failure",
+                    new ConnectException("failed to connect to baz")))));
 
     try {
       CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02");
@@ -526,7 +528,26 @@ public class CliMainTest {
       assertThat(e.status(), is(ExitStatus.ClientError));
     }
 
-    verify(cliOutput).printError("Client error: " + exception.getMessage());
+    verify(cliOutput).printError("Client error: foo failure: ConnectException: failed to connect to baz");
+  }
+
+  @Test
+  public void testClientErrorDebug() {
+    final Throwable cause = new ClientErrorException("foo failure",
+        new IOException("bar failure",
+            new ConnectException("failed to connect to baz")));
+    when(client.triggerWorkflowInstance(any(), any(), any()))
+        .thenReturn(exceptionallyCompletedFuture(cause));
+
+    try {
+      CliMain.run(cliContext, "--debug", "t", "foo", "bar", "2017-01-02");
+      fail();
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.ClientError));
+    }
+
+    verify(cliOutput).printError(Throwables.getStackTraceAsString(cause));
+    verify(cliOutput).printError("Client error: foo failure: ConnectException: failed to connect to baz");
   }
 
   @Test
