@@ -31,6 +31,11 @@ public class WorkflowInstanceTest {
       .create(WorkflowId.create("foo", "bar"), "baz");
 
   @Test
+  public void toKey() {
+    assertThat(WORKFLOW_INSTANCE.toKey(), is("foo#bar#baz"));
+  }
+
+  @Test
   public void verifyToStringPrintsKey() {
     assertThat(WORKFLOW_INSTANCE.toString(), is(WORKFLOW_INSTANCE.toKey()));
   }
