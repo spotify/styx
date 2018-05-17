@@ -42,7 +42,6 @@ import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.cli.CliExitException.ExitStatus;
 import com.spotify.styx.cli.CliMain.CliContext.Output;
 import com.spotify.styx.client.ApiErrorException;
-import com.spotify.styx.client.ClientErrorException;
 import com.spotify.styx.client.StyxClient;
 import com.spotify.styx.client.StyxClientFactory;
 import com.spotify.styx.model.Backfill;
@@ -304,9 +303,6 @@ public final class CliMain {
           cliOutput.printError("API error: " + cause.getMessage());
           throw CliExitException.of(ExitStatus.ApiError);
         }
-      } else if (cause instanceof ClientErrorException) {
-        cliOutput.printError("Client error: " + cause.getMessage());
-        throw CliExitException.of(ExitStatus.ClientError);
       } else {
         cliOutput.printError(getStackTraceAsString(cause));
         throw CliExitException.of(ExitStatus.ClientError);
