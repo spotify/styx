@@ -27,16 +27,28 @@ import org.junit.Test;
 
 public class WorkflowInstanceTest {
 
-  public static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance
-      .create(WorkflowId.create("foo", "bar"), "baz");
+  public static final WorkflowId WORKFLOW_ID = WorkflowId.create("foo", "bar");
+  public static final String PARAMETER = "baz";
+  public static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(WORKFLOW_ID, PARAMETER);
 
   @Test
-  public void toKey() {
-    assertThat(WORKFLOW_INSTANCE.toKey(), is("foo#bar#baz"));
+  public void create() {
+    assertThat(WORKFLOW_INSTANCE.workflowId(), is(WORKFLOW_ID));
+    assertThat(WORKFLOW_INSTANCE.parameter(), is(PARAMETER));
   }
 
   @Test
-  public void verifyToStringPrintsKey() {
+  public void toKey() {
+    assertThat(WORKFLOW_INSTANCE.toKey(), is(WORKFLOW_ID.toKey() + "#" + PARAMETER));
+  }
+
+  @Test
+  public void toStringShouldReturnKey() {
     assertThat(WORKFLOW_INSTANCE.toString(), is(WORKFLOW_INSTANCE.toKey()));
+  }
+
+  @Test
+  public void parseKey() {
+    assertThat(WorkflowInstance.parseKey(WORKFLOW_INSTANCE.toKey()), is(WORKFLOW_INSTANCE));
   }
 }
