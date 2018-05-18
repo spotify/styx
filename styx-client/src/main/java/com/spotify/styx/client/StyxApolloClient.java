@@ -58,6 +58,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import okhttp3.HttpUrl;
 import okhttp3.HttpUrl.Builder;
@@ -418,9 +419,10 @@ class StyxApolloClient implements StyxClient {
   }
 
   private Request decorateRequest(
-      final Request request, final Optional<String> authToken) {
+      final Request request, String requestId, final Optional<String> authToken) {
     return request
         .withHeader("User-Agent", STYX_CLIENT_VERSION)
+        .withHeader("X-Request-Id", requestId)
         .withTtl(TTL)
         .withHeaders(authToken
             .map(t -> ImmutableMap.of("Authorization", "Bearer " + t))
@@ -436,7 +438,8 @@ class StyxApolloClient implements StyxClient {
       return CompletableFutures.exceptionallyCompletedFuture(
           new ClientErrorException("Authentication failure: " + e.getMessage(), e));
     }
-    return client.send(decorateRequest(request, authToken)).handle((response, e) -> {
+    final String requestId = UUID.randomUUID().toString();
+    return client.send(decorateRequest(request, requestId, authToken)).handle((response, e) -> {
       if (e != null) {
         throw new ClientErrorException("Request failed: " + request.method() + " " + request.uri(), e);
       } else {
@@ -445,7 +448,7 @@ class StyxApolloClient implements StyxClient {
             return response;
           default:
             final String message = response.status().code() + " " + response.status().reasonPhrase();
-            throw new ApiErrorException(message, response.status().code(), authToken.isPresent());
+            throw new ApiErrorException(message, response.status().code(), authToken.isPresent(), requestId);
         }
       }
     });

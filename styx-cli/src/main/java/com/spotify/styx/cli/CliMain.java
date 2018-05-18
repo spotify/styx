@@ -298,7 +298,8 @@ public final class CliMain {
         if (apiError.getCode() == UNAUTHORIZED.code()) {
           if (!apiError.isAuthenticated()) {
             cliOutput.printError(
-                "API error: Unauthorized: Please set up Application Default Credentials or set the "
+                "API error: Unauthorized: " + apiError.getMessage() + "\n"
+                    + "Please set up Application Default Credentials or set the "
                     + "GOOGLE_APPLICATION_CREDENTIALS env var to point to a file defining the "
                     + "credentials.\n"
                     + "\n"
@@ -306,11 +307,11 @@ public final class CliMain {
                     + "\n"
                     + "\t$ gcloud auth application-default login");
           } else {
-            cliOutput.printError("API error: Unauthorized");
+            cliOutput.printError("API error: Unauthorized: " + apiError.getMessage());
           }
           throw CliExitException.of(ExitStatus.AuthError);
         } else {
-          cliOutput.printError("API error: " + cause.getMessage());
+          cliOutput.printError("API error: " + apiError.getMessage());
           throw CliExitException.of(ExitStatus.ApiError);
         }
       } else if (cause instanceof ClientErrorException) {
