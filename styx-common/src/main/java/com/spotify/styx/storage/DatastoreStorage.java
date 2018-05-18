@@ -74,7 +74,6 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.FnWithException;
-import com.spotify.styx.util.MDCUtil;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.StreamUtil;
 import com.spotify.styx.util.TimeUtil;
