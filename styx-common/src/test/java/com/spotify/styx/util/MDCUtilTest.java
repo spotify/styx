@@ -39,6 +39,8 @@ import org.slf4j.MDC;
 
 public class MDCUtilTest {
 
+  private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor();
+
   @Before
   public void setUp() throws Exception {
     MDC.clear();
@@ -52,19 +54,16 @@ public class MDCUtilTest {
   @Test
   public void withMDCRunnable() throws ExecutionException, InterruptedException {
     MDC.put("foo", "bar");
-    Executors.newSingleThreadExecutor()
-        .submit(withMDC(() -> assertThat(MDC.get("foo"), is("bar"))))
-        .get();
+    final CompletableFuture<String> value = new CompletableFuture<>();
+    EXECUTOR.submit(withMDC(() -> value.complete(MDC.get("foo"))));
+    assertThat(value.get(), is("bar"));
   }
 
   @Test
   public void withMDCCallable() throws ExecutionException, InterruptedException {
     MDC.put("foo", "bar");
-    Executors.newSingleThreadExecutor()
-        .submit(withMDC(() -> {
-          assertThat(MDC.get("foo"), is("bar"));
-          return null;
-        })).get();
+    final String value = EXECUTOR.submit(withMDC(() -> MDC.get("foo"))).get();
+    assertThat(value, is("bar"));
   }
 
   @Test
@@ -86,16 +85,15 @@ public class MDCUtilTest {
   @Test
   public void withMDCExecutor() throws ExecutionException, InterruptedException {
     MDC.put("foo", "bar");
-    final ExecutorService executor = Executors.newSingleThreadExecutor();
     CompletableFuture.runAsync(
         () -> assertThat(MDC.get("foo"), is("bar")),
-        withMDC(executor))
+        withMDC(EXECUTOR))
         // Later stages should also have the MDC applied
         .thenRun(() -> assertThat(MDC.get("foo"), is("bar")))
         .get();
 
     // MDC should not leak
-    executor
+    EXECUTOR
         .submit(() -> assertThat(MDC.getCopyOfContextMap(), is(anyOf(nullValue(), is(emptyMap())))))
         .get();
   }
