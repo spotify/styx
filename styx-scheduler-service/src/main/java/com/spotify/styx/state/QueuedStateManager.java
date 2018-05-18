@@ -21,6 +21,7 @@
 package com.spotify.styx.state;
 
 import static com.spotify.styx.state.StateUtil.isConsumingResources;
+import static com.spotify.styx.util.MDCUtil.withMDC;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
@@ -39,6 +40,7 @@ import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
+import com.spotify.styx.util.MDCUtil;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
@@ -49,9 +51,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
 import javaslang.Tuple;
@@ -116,7 +121,7 @@ public class QueuedStateManager implements StateManager {
 
     // TODO: optional retry on transaction conflict
 
-    return CompletableFuture.runAsync(() -> initialize(workflowInstance)).thenCompose((ignore) -> {
+    return CompletableFuture.runAsync(() -> initialize(workflowInstance), withMDC()).thenCompose((ignore) -> {
       final Event event = Event.triggerExecution(workflowInstance, trigger);
       try {
         return receive(event);
@@ -322,7 +327,7 @@ public class QueuedStateManager implements StateManager {
 
     // Publish event
     try {
-      eventConsumerExecutor.execute(() -> eventConsumer.accept(sequenceEvent, runState));
+      eventConsumerExecutor.execute(withMDC(() -> eventConsumer.accept(sequenceEvent, runState)));
     } catch (Exception e) {
       LOG.warn("Error while consuming event {}", sequenceEvent, e);
     }
