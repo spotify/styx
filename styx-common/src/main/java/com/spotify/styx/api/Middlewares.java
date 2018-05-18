@@ -20,6 +20,7 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 
@@ -29,6 +30,9 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.common.base.CharMatcher;
+import com.google.common.base.Strings;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HttpHeaders;
 import com.spotify.apollo.Request;
@@ -107,7 +111,7 @@ public final class Middlewares {
             .withHeader("Content-Type", "application/json");
       } catch (JsonProcessingException e) {
         return Response.forStatus(
-            Status.INTERNAL_SERVER_ERROR.withReasonPhrase(
+            INTERNAL_SERVER_ERROR.withReasonPhrase(
                 "Failed to serialize response " + e.getMessage()));
       }
     });
@@ -150,7 +154,8 @@ public final class Middlewares {
             if (t instanceof ResponseException) {
               response = ((ResponseException) t).getResponse();
             } else {
-              response = Response.forStatus(Status.INTERNAL_SERVER_ERROR);
+              response = Response.forStatus(INTERNAL_SERVER_ERROR
+                  .withReasonPhrase(internalServerErrorReason(t)));
             }
           } else {
             response = r;
@@ -160,8 +165,28 @@ public final class Middlewares {
       } catch (ResponseException e) {
         return completedFuture(e.<T>getResponse()
             .withHeader(X_REQUEST_ID, requestId));
+      } catch (Exception e) {
+        return completedFuture(Response.<T>forStatus(INTERNAL_SERVER_ERROR
+            .withReasonPhrase(internalServerErrorReason(e)))
+            .withHeader(X_REQUEST_ID, requestId));
       }
     };
+  }
+
+  private static String internalServerErrorReason(Throwable t) {
+    final StringBuilder reason = new StringBuilder(INTERNAL_SERVER_ERROR.reasonPhrase())
+        .append(": ").append(escapeReason(t.getClass().getSimpleName()))
+        .append(": ").append(escapeReason(t.getMessage()));
+    final Throwable rootCause = Throwables.getRootCause(t);
+    if (rootCause != t) {
+      reason.append(": ").append(escapeReason(rootCause.getClass().getSimpleName()))
+            .append(": ").append(escapeReason(rootCause.getMessage()));
+    }
+    return reason.toString();
+  }
+
+  private static String escapeReason(String s) {
+    return CharMatcher.anyOf("\n\r").replaceFrom(!Strings.isNullOrEmpty(s) ? s : "", ' ');
   }
 
   private static GoogleIdToken verifyIdToken(String s) {

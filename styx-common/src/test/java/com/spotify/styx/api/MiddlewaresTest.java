@@ -24,6 +24,7 @@ import static com.spotify.apollo.test.unit.ResponseMatchers.hasHeader;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.belongsToFamily;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
+import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
 import static com.spotify.styx.StringIsValidUUID.isValidUUID;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -46,6 +47,7 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.request.RequestContexts;
 import com.spotify.apollo.request.RequestMetadataImpl;
 import com.spotify.apollo.route.AsyncHandler;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -262,7 +264,7 @@ public class MiddlewaresTest {
   }
 
   @Test
-  public void testExceptionAndRequestIdHandlerOnException()
+  public void testExceptionAndRequestIdHandlerOnImmediateResponseException()
       throws InterruptedException, ExecutionException, TimeoutException {
     RequestContext requestContext = mock(RequestContext.class);
     Request request = Request.forUri("/", "GET");
@@ -276,7 +278,73 @@ public class MiddlewaresTest {
         .invoke(requestContext)
         .toCompletableFuture().get(5, SECONDS);
 
-    assertThat(response, hasStatus(withCode(Status.IM_A_TEAPOT)));
+    assertThat(response, hasStatus(is(Status.IM_A_TEAPOT)));
+    assertThat(response, hasHeader("X-Request-Id", isValidUUID()));
+  }
+
+  @Test
+  public void testExceptionAndRequestIdHandlerOnFutureResponseException()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = Request.forUri("/", "GET");
+    when(requestContext.request()).thenReturn(request);
+
+    Response<Object> response = Middlewares.exceptionAndRequestIdHandler()
+        .apply(rc -> {
+          LoggerFactory.getLogger(MiddlewaresTest.class).error("I'm a teapot!");
+          final CompletableFuture<Response<Object>> failure = new CompletableFuture<>();
+          LoggerFactory.getLogger(MiddlewaresTest.class).error("deadbeef");
+          failure.completeExceptionally(new ResponseException(Response.forStatus(Status.IM_A_TEAPOT)));
+          return failure;
+        })
+        .invoke(requestContext)
+        .toCompletableFuture().get(5, SECONDS);
+
+    assertThat(response, hasStatus(is(Status.IM_A_TEAPOT)));
+    assertThat(response, hasHeader("X-Request-Id", isValidUUID()));
+  }
+
+  @Test
+  public void testExceptionAndRequestIdHandlerOnImmediateUnhandledException()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = Request.forUri("/", "GET");
+    when(requestContext.request()).thenReturn(request);
+
+    Response<Object> response = Middlewares.exceptionAndRequestIdHandler()
+        .apply(rc -> {
+          LoggerFactory.getLogger(MiddlewaresTest.class).error("deadbeef");
+          throw new RuntimeException("fubar", new IOException("deadbeef"));
+        })
+        .invoke(requestContext)
+        .toCompletableFuture().get(5, SECONDS);
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
+    assertThat(response, hasStatus(withReasonPhrase(is(
+        "Internal Server Error: RuntimeException: fubar: IOException: deadbeef"))));
+    assertThat(response, hasHeader("X-Request-Id", isValidUUID()));
+  }
+
+  @Test
+  public void testExceptionAndRequestIdHandlerOnFutureUnhandledException()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = Request.forUri("/", "GET");
+    when(requestContext.request()).thenReturn(request);
+
+    Response<Object> response = Middlewares.exceptionAndRequestIdHandler()
+        .apply(rc -> {
+          final CompletableFuture<Response<Object>> failure = new CompletableFuture<>();
+          LoggerFactory.getLogger(MiddlewaresTest.class).error("deadbeef");
+          failure.completeExceptionally(new RuntimeException("fubar", new IOException("deadbeef")));
+          return failure;
+        })
+        .invoke(requestContext)
+        .toCompletableFuture().get(5, SECONDS);
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
+    assertThat(response, hasStatus(withReasonPhrase(is(
+        "Internal Server Error: RuntimeException: fubar: IOException: deadbeef"))));
     assertThat(response, hasHeader("X-Request-Id", isValidUUID()));
   }
 
