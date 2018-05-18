@@ -50,6 +50,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
@@ -296,6 +297,26 @@ public class MiddlewaresTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("X-Request-Id", isValidUUID()));
+  }
+  @Test
+  public void testExceptionAndRequestIdHandlerAcceptsRequestIdHeader()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    RequestContext requestContext = mock(RequestContext.class);
+    String requestId = UUID.randomUUID().toString();
+    Request request = Request.forUri("/", "GET")
+        .withHeader("X-Request-Id", requestId);
+    when(requestContext.request()).thenReturn(request);
+
+    Response<Object> response = Middlewares.exceptionAndRequestIdHandler()
+        .apply(rc -> {
+          LoggerFactory.getLogger(MiddlewaresTest.class).info("I'm OK!");
+          return completedFuture(Response.forStatus(Status.OK));
+        })
+        .invoke(requestContext)
+        .toCompletableFuture().get(5, SECONDS);
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertThat(response, hasHeader("X-Request-Id", is(requestId)));
   }
 
   @Test

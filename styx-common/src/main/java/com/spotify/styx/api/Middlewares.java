@@ -132,7 +132,12 @@ public final class Middlewares {
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> exceptionAndRequestIdHandler() {
     return innerHandler -> requestContext -> {
-      final String requestId = UUID.randomUUID().toString();
+
+      // Accept the request id from the incoming request if present. Otherwise generate one.
+      final String requestIdHeader = requestContext.request().headers().get(X_REQUEST_ID);
+      final String requestId = (requestIdHeader != null)
+          ? requestIdHeader
+          : UUID.randomUUID().toString();
 
       MDC.put(REQUEST_ID, requestId);
 
