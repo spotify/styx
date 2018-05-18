@@ -163,9 +163,11 @@ public final class Middlewares {
           return response.withHeader(X_REQUEST_ID, requestId);
         });
       } catch (ResponseException e) {
+        MDC.remove(REQUEST_ID);
         return completedFuture(e.<T>getResponse()
             .withHeader(X_REQUEST_ID, requestId));
       } catch (Exception e) {
+        MDC.remove(REQUEST_ID);
         return completedFuture(Response.<T>forStatus(INTERNAL_SERVER_ERROR
             .withReasonPhrase(internalServerErrorReason(e)))
             .withHeader(X_REQUEST_ID, requestId));
