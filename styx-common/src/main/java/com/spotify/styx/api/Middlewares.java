@@ -31,7 +31,6 @@ import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.common.base.CharMatcher;
-import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HttpHeaders;
@@ -185,11 +184,8 @@ public final class Middlewares {
       reason.append(": ").append(rootCause.getClass().getSimpleName())
             .append(": ").append(rootCause.getMessage());
     }
-    return escapeReason(reason.toString());
-  }
-
-  private static String escapeReason(String s) {
-    return CharMatcher.anyOf("\n\r").replaceFrom(!Strings.isNullOrEmpty(s) ? s : "", ' ');
+    // Remove any line breaks
+    return CharMatcher.anyOf("\n\r").replaceFrom(reason.toString(), ' ');
   }
 
   private static GoogleIdToken verifyIdToken(String s) {
