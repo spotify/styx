@@ -177,9 +177,7 @@ public final class Middlewares {
 
   private static String internalServerErrorReason(String requestId, Throwable t) {
     final StringBuilder reason = new StringBuilder(INTERNAL_SERVER_ERROR.reasonPhrase())
-        .append(" (")
-        .append("Request ID: ")
-        .append(requestId).append(")")
+        .append(" (").append("Request ID: ").append(requestId).append(")")
         .append(": ").append(escapeReason(t.getClass().getSimpleName()))
         .append(": ").append(escapeReason(t.getMessage()));
     final Throwable rootCause = Throwables.getRootCause(t);

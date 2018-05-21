@@ -70,10 +70,12 @@ import okio.ByteString;
  * as {@link RuntimeException} instead.
  */
 class StyxApolloClient implements StyxClient {
+
   private static final String STYX_API_VERSION = V3.name().toLowerCase();
   private static final String STYX_CLIENT_VERSION =
       "Styx Client " + StyxApolloClient.class.getPackage().getImplementationVersion();
   private static final Duration TTL = Duration.ofSeconds(90);
+  private static final String X_REQUEST_ID = "X-Request-Id";
 
   private final URI apiHost;
   private final Client client;
@@ -448,7 +450,7 @@ class StyxApolloClient implements StyxClient {
             return response;
           default:
             final String message = response.status().code() + " " + response.status().reasonPhrase();
-            final String responseRequestId = response.headers().getOrDefault("X-Request-Id", requestId);
+            final String responseRequestId = response.headers().getOrDefault(X_REQUEST_ID, requestId);
             throw new ApiErrorException(message, response.status().code(), authToken.isPresent(), responseRequestId);
         }
       }
