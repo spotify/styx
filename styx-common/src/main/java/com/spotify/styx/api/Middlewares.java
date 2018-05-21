@@ -178,14 +178,14 @@ public final class Middlewares {
   private static String internalServerErrorReason(String requestId, Throwable t) {
     final StringBuilder reason = new StringBuilder(INTERNAL_SERVER_ERROR.reasonPhrase())
         .append(" (").append("Request ID: ").append(requestId).append(")")
-        .append(": ").append(escapeReason(t.getClass().getSimpleName()))
-        .append(": ").append(escapeReason(t.getMessage()));
+        .append(": ").append(t.getClass().getSimpleName())
+        .append(": ").append(t.getMessage());
     final Throwable rootCause = Throwables.getRootCause(t);
     if (!t.equals(rootCause)) {
-      reason.append(": ").append(escapeReason(rootCause.getClass().getSimpleName()))
-            .append(": ").append(escapeReason(rootCause.getMessage()));
+      reason.append(": ").append(rootCause.getClass().getSimpleName())
+            .append(": ").append(rootCause.getMessage());
     }
-    return reason.toString();
+    return escapeReason(reason.toString());
   }
 
   private static String escapeReason(String s) {
