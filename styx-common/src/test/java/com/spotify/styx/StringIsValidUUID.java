@@ -30,11 +30,11 @@ public class StringIsValidUUID extends TypeSafeMatcher<String> {
 
   @Override
   protected boolean matchesSafely(String s) {
-    if (!s.contains("-")) {
-      s = s.replaceFirst("(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})", "$1-$2-$3-$4-$5");
-    }
+    final String uuid = !s.contains("-")
+        ? s.replaceFirst("(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})", "$1-$2-$3-$4-$5")
+        : s;
     try {
-      UUID.fromString(s);
+      UUID.fromString(uuid);
       return true;
     } catch (IllegalArgumentException e) {
       return false;
