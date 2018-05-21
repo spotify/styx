@@ -175,6 +175,7 @@ public final class Middlewares {
   }
 
   private static String internalServerErrorReason(String requestId, Throwable t) {
+    // TODO: returning internal error messages in reason phrase might be a security issue. Make configurable?
     final StringBuilder reason = new StringBuilder(INTERNAL_SERVER_ERROR.reasonPhrase())
         .append(" (").append("Request ID: ").append(requestId).append(")")
         .append(": ").append(t.getClass().getSimpleName())
