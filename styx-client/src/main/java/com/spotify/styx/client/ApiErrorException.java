@@ -20,8 +20,6 @@
 
 package com.spotify.styx.client;
 
-import java.util.Objects;
-
 /**
  * Exception used in case of API errors, i.e. API requests whose response has status code
  * different than 2xx.
@@ -36,7 +34,7 @@ public class ApiErrorException extends RuntimeException {
     super(message);
     this.code = code;
     this.authenticated = authenticated;
-    this.requestId = Objects.requireNonNull(requestId, "requestId");
+    this.requestId = requestId;
   }
 
   public int getCode() {
@@ -53,6 +51,9 @@ public class ApiErrorException extends RuntimeException {
 
   @Override
   public String getMessage() {
-    return super.getMessage() + " (Request ID: " + requestId + ")";
+    final String message = super.getMessage();
+    return requestId == null || message.contains(requestId)
+        ? message
+        : message + " (Request ID: " + requestId + ")";
   }
 }

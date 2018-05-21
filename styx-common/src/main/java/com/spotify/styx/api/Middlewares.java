@@ -141,7 +141,7 @@ public final class Middlewares {
       final String requestIdHeader = requestContext.request().headers().get(X_REQUEST_ID);
       final String requestId = (requestIdHeader != null)
           ? requestIdHeader
-          : UUID.randomUUID().toString();
+          : UUID.randomUUID().toString().replace("-",""); // UUID with no dashes, easier to deal with
 
       MDC.put(REQUEST_ID, requestId);
 
@@ -155,7 +155,7 @@ public final class Middlewares {
               response = ((ResponseException) t).getResponse();
             } else {
               response = Response.forStatus(INTERNAL_SERVER_ERROR
-                  .withReasonPhrase(internalServerErrorReason(t)));
+                  .withReasonPhrase(internalServerErrorReason(requestId, t)));
             }
           } else {
             response = r;
@@ -169,14 +169,17 @@ public final class Middlewares {
       } catch (Exception e) {
         MDC.remove(REQUEST_ID);
         return completedFuture(Response.<T>forStatus(INTERNAL_SERVER_ERROR
-            .withReasonPhrase(internalServerErrorReason(e)))
+            .withReasonPhrase(internalServerErrorReason(requestId, e)))
             .withHeader(X_REQUEST_ID, requestId));
       }
     };
   }
 
-  private static String internalServerErrorReason(Throwable t) {
+  private static String internalServerErrorReason(String requestId, Throwable t) {
     final StringBuilder reason = new StringBuilder(INTERNAL_SERVER_ERROR.reasonPhrase())
+        .append(" (")
+        .append("Request ID: ")
+        .append(requestId).append(")")
         .append(": ").append(escapeReason(t.getClass().getSimpleName()))
         .append(": ").append(escapeReason(t.getMessage()));
     final Throwable rootCause = Throwables.getRootCause(t);

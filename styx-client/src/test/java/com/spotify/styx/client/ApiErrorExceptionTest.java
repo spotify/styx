@@ -29,10 +29,23 @@ import org.junit.Test;
 public class ApiErrorExceptionTest {
 
   private static final String REQUEST_ID = UUID.randomUUID().toString();
-  private static final ApiErrorException EXCEPTION = new ApiErrorException("fubared!", 4711, true, REQUEST_ID);
 
   @Test
   public void getMessage() {
-    assertThat(EXCEPTION.getMessage(), is("fubared! (Request ID: " + REQUEST_ID + ")"));
+    final String message = "fubared: rid=" + REQUEST_ID;
+    ApiErrorException exception = new ApiErrorException(message, 4711, true, REQUEST_ID);
+    assertThat(exception.getMessage(), is(message));
+  }
+
+  @Test
+  public void getMessageNoRequestIdInMessage() {
+    ApiErrorException exception = new ApiErrorException("fubared!", 4711, true, REQUEST_ID);
+    assertThat(exception.getMessage(), is("fubared! (Request ID: " + REQUEST_ID + ")"));
+  }
+
+  @Test
+  public void getMessageNoRequestId() {
+    ApiErrorException exception = new ApiErrorException("fubared!", 4711, true, null);
+    assertThat(exception.getMessage(), is("fubared!"));
   }
 }

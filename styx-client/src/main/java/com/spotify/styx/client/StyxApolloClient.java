@@ -448,7 +448,8 @@ class StyxApolloClient implements StyxClient {
             return response;
           default:
             final String message = response.status().code() + " " + response.status().reasonPhrase();
-            throw new ApiErrorException(message, response.status().code(), authToken.isPresent(), requestId);
+            final String responseRequestId = response.headers().getOrDefault("X-Request-Id", requestId);
+            throw new ApiErrorException(message, response.status().code(), authToken.isPresent(), responseRequestId);
         }
       }
     });

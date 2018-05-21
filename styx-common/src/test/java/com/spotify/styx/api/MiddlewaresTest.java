@@ -57,10 +57,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import okio.ByteString;
 import org.junit.Test;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 /**
  * Tests Middlewares
@@ -307,12 +309,14 @@ public class MiddlewaresTest {
   @Test
   public void testExceptionAndRequestIdHandlerOnImmediateUnhandledException()
       throws InterruptedException, ExecutionException, TimeoutException {
-    RequestContext requestContext = mock(RequestContext.class);
-    Request request = Request.forUri("/", "GET");
+    final RequestContext requestContext = mock(RequestContext.class);
+    final Request request = Request.forUri("/", "GET");
+    final AtomicReference<String> requestId = new AtomicReference<>();
     when(requestContext.request()).thenReturn(request);
 
     Response<Object> response = Middlewares.exceptionAndRequestIdHandler()
         .apply(rc -> {
+          requestId.set(MDC.get("request-id"));
           LoggerFactory.getLogger(MiddlewaresTest.class).error("deadbeef");
           throw new RuntimeException("fubar", new IOException("deadbeef"));
         })
@@ -321,19 +325,21 @@ public class MiddlewaresTest {
 
     assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
     assertThat(response, hasStatus(withReasonPhrase(is(
-        "Internal Server Error: RuntimeException: fubar: IOException: deadbeef"))));
-    assertThat(response, hasHeader("X-Request-Id", isValidUUID()));
+        "Internal Server Error (Request ID: " + requestId.get() + "): RuntimeException: fubar: IOException: deadbeef"))));
+    assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
   }
 
   @Test
   public void testExceptionAndRequestIdHandlerOnFutureUnhandledException()
       throws InterruptedException, ExecutionException, TimeoutException {
-    RequestContext requestContext = mock(RequestContext.class);
-    Request request = Request.forUri("/", "GET");
+    final RequestContext requestContext = mock(RequestContext.class);
+    final Request request = Request.forUri("/", "GET");
+    final AtomicReference<String> requestId = new AtomicReference<>();
     when(requestContext.request()).thenReturn(request);
 
     Response<Object> response = Middlewares.exceptionAndRequestIdHandler()
         .apply(rc -> {
+          requestId.set(MDC.get("request-id"));
           final CompletableFuture<Response<Object>> failure = new CompletableFuture<>();
           LoggerFactory.getLogger(MiddlewaresTest.class).error("deadbeef");
           failure.completeExceptionally(new RuntimeException("fubar", new IOException("deadbeef")));
@@ -344,8 +350,8 @@ public class MiddlewaresTest {
 
     assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
     assertThat(response, hasStatus(withReasonPhrase(is(
-        "Internal Server Error: RuntimeException: fubar: IOException: deadbeef"))));
-    assertThat(response, hasHeader("X-Request-Id", isValidUUID()));
+        "Internal Server Error (Request ID: " + requestId.get() + "): RuntimeException: fubar: IOException: deadbeef"))));
+    assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
   }
 
   @Test
