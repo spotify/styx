@@ -27,6 +27,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -71,32 +72,42 @@ public class MDCUtilTest {
   @Test
   public void withMDCCommonPool() throws ExecutionException, InterruptedException {
     MDC.put("foo", "bar");
+    final CompletableFuture<String> value1 = new CompletableFuture<>();
+    final CompletableFuture<String> value2 = new CompletableFuture<>();
     CompletableFuture.runAsync(
-        () -> assertThat(MDC.get("foo"), is("bar")),
+        () -> value1.complete(MDC.get("foo")),
         withMDC())
         // Later stages should also have the MDC applied
-        .thenRun(() -> assertThat(MDC.get("foo"), is("bar")))
+        .thenRun(() -> value2.complete(MDC.get("foo")))
         .get();
+    assertThat(value1.getNow(""), is("bar"));
+    assertThat(value2.getNow(""), is("bar"));
 
     // MDC should not leak
-    ForkJoinPool.commonPool()
-        .submit(() -> assertThat(MDC.getCopyOfContextMap(), is(anyOf(nullValue(), is(emptyMap())))))
+    final Map<String, String> mdc = ForkJoinPool.commonPool()
+        .submit(MDC::getCopyOfContextMap)
         .get();
+    assertThat(mdc, is(anyOf(nullValue(), is(emptyMap()))));
   }
 
   @Test
   public void withMDCExecutor() throws ExecutionException, InterruptedException {
     MDC.put("foo", "bar");
+    final CompletableFuture<String> value1 = new CompletableFuture<>();
+    final CompletableFuture<String> value2 = new CompletableFuture<>();
     CompletableFuture.runAsync(
-        () -> assertThat(MDC.get("foo"), is("bar")),
+        () -> value1.complete(MDC.get("foo")),
         withMDC(executor))
         // Later stages should also have the MDC applied
-        .thenRun(() -> assertThat(MDC.get("foo"), is("bar")))
+        .thenRun(() -> value2.complete(MDC.get("foo")))
         .get();
+    assertThat(value1.getNow(""), is("bar"));
+    assertThat(value2.getNow(""), is("bar"));
 
     // MDC should not leak
-    executor
-        .submit(() -> assertThat(MDC.getCopyOfContextMap(), is(anyOf(nullValue(), is(emptyMap())))))
+    final Map<String, String> mdc = executor
+        .submit(MDC::getCopyOfContextMap)
         .get();
+    assertThat(mdc, is(anyOf(nullValue(), is(emptyMap()))));
   }
 }
