@@ -180,7 +180,7 @@ public final class Middlewares {
         .append(": ").append(escapeReason(t.getClass().getSimpleName()))
         .append(": ").append(escapeReason(t.getMessage()));
     final Throwable rootCause = Throwables.getRootCause(t);
-    if (rootCause != t) {
+    if (!t.equals(rootCause)) {
       reason.append(": ").append(escapeReason(rootCause.getClass().getSimpleName()))
             .append(": ").append(escapeReason(rootCause.getMessage()));
     }
