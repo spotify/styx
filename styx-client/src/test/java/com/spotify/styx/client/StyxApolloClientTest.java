@@ -21,7 +21,6 @@
 package com.spotify.styx.client;
 
 import static com.google.common.collect.Iterables.getLast;
-import static com.spotify.styx.StringIsValidUUID.isValidUUID;
 import static java.util.Arrays.asList;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
@@ -34,6 +33,7 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import static com.spotify.styx.util.StringIsValidUuid.isValidUuid;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Client;
@@ -333,7 +333,7 @@ public class StyxApolloClientTest {
         Response.forStatus(Status.OK).withPayload(Json.serialize(Collections.emptyList()))));
     styx.workflows();
     final Request request = requestCaptor.getValue();
-    assertThat(request.header("X-Request-Id").get(), isValidUUID());
+    assertThat(request.header("X-Request-Id").get(), isValidUuid());
   }
 
   @Test
