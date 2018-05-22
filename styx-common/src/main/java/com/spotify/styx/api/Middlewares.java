@@ -140,14 +140,10 @@ public final class Middlewares {
       final String requestIdHeader = requestContext.request().headers().get(X_REQUEST_ID);
       final String requestId = (requestIdHeader != null)
           ? requestIdHeader
-          : UUID.randomUUID().toString().replace("-",""); // UUID with no dashes, easier to deal with
+          : UUID.randomUUID().toString().replace("-", ""); // UUID with no dashes, easier to deal with
 
-      MDC.put(REQUEST_ID, requestId);
-
-      try {
+      try (MDC.MDCCloseable mdc = MDC.putCloseable(REQUEST_ID, requestId)) {
         return innerHandler.invoke(requestContext).handle((r, t) -> {
-          MDC.remove(REQUEST_ID);
-
           final Response<T> response;
           if (t != null) {
             if (t instanceof ResponseException) {
@@ -162,11 +158,9 @@ public final class Middlewares {
           return response.withHeader(X_REQUEST_ID, requestId);
         });
       } catch (ResponseException e) {
-        MDC.remove(REQUEST_ID);
         return completedFuture(e.<T>getResponse()
             .withHeader(X_REQUEST_ID, requestId));
       } catch (Exception e) {
-        MDC.remove(REQUEST_ID);
         return completedFuture(Response.<T>forStatus(INTERNAL_SERVER_ERROR
             .withReasonPhrase(internalServerErrorReason(requestId, e)))
             .withHeader(X_REQUEST_ID, requestId));
