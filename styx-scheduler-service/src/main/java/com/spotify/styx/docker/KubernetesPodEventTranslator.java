@@ -239,6 +239,10 @@ final class KubernetesPodEventTranslator {
     final PodStatus status = pod.getStatus();
     final String phase = status.getPhase();
 
+    if ("NodeLost".equals(pod.getStatus().getReason())) {
+      return Optional.of(Event.runError(workflowInstance, "Lost node running pod"));
+    }
+
     switch (phase) {
       case "Pending":
         // check if one or more docker contains failed to pull their image, a possible silent error
