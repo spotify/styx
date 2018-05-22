@@ -445,12 +445,15 @@ class StyxApolloClient implements StyxClient {
       if (e != null) {
         throw new ClientErrorException("Request failed: " + request.method() + " " + request.uri(), e);
       } else {
+        final String responseRequestId = response.headers().get(X_REQUEST_ID);
+        if (responseRequestId != null && !responseRequestId.equals(requestId)) {
+          throw new ClientErrorException("Request ID mismatch: '" + requestId + "' != '" + responseRequestId + "'");
+        }
         switch (response.status().family()) {
           case SUCCESSFUL:
             return response;
           default:
             final String message = response.status().code() + " " + response.status().reasonPhrase();
-            final String responseRequestId = response.headers().getOrDefault(X_REQUEST_ID, requestId);
             throw new ApiErrorException(message, response.status().code(), authToken.isPresent(), responseRequestId);
         }
       }

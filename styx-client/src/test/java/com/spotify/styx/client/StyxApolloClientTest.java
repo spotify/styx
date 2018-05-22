@@ -62,6 +62,7 @@ import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import okhttp3.HttpUrl;
 import okio.ByteString;
+import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -335,5 +336,25 @@ public class StyxApolloClientTest {
     styx.workflows();
     final Request request = requestCaptor.getValue();
     assertThat(request.header("X-Request-Id").get(), isValidUUID());
+  }
+
+  @Test
+  public void testErrorOnRequestIdMismatch() throws JsonProcessingException, InterruptedException {
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+    when(client.send(requestCaptor.capture())).thenReturn(CompletableFuture.completedFuture(
+        Response.forStatus(Status.OK)
+            .withHeader("X-Request-Id", "foobar")
+            .withPayload(Json.serialize(Collections.emptyList()))));
+
+    try {
+      styx.workflows().toCompletableFuture().get();
+      fail();
+    } catch (ExecutionException e) {
+      final Request request = requestCaptor.getValue();
+      final String requestId = request.header("X-Request-Id").get();
+      final Throwable cause = e.getCause();
+      assertThat(cause, instanceOf(ClientErrorException.class));
+      assertThat(cause.getMessage(), is("Request ID mismatch: '" + requestId + "' != 'foobar'"));
+    }
   }
 }
