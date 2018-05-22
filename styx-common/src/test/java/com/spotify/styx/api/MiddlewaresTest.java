@@ -25,7 +25,7 @@ import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.belongsToFamily;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
-import static com.spotify.styx.util.StringIsValidUUID.isValidUUID;
+import static com.spotify.styx.util.StringIsValidUuid.isValidUuid;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -284,7 +284,7 @@ public class MiddlewaresTest {
 
     assertThat(response, hasStatus(is(Status.IM_A_TEAPOT)));
     assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
-    assertThat(requestId.get(), isValidUUID());
+    assertThat(requestId.get(), isValidUuid());
   }
 
   @Test
@@ -309,7 +309,7 @@ public class MiddlewaresTest {
 
     assertThat(response, hasStatus(is(Status.IM_A_TEAPOT)));
     assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
-    assertThat(requestId.get(), isValidUUID());
+    assertThat(requestId.get(), isValidUuid());
   }
 
   @Test
@@ -333,7 +333,7 @@ public class MiddlewaresTest {
     assertThat(response, hasStatus(withReasonPhrase(is(
         "Internal Server Error (Request ID: " + requestId.get() + "): RuntimeException: fubar: IOException: deadbeef"))));
     assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
-    assertThat(requestId.get(), isValidUUID());
+    assertThat(requestId.get(), isValidUuid());
   }
 
   @Test
@@ -359,7 +359,7 @@ public class MiddlewaresTest {
     assertThat(response, hasStatus(withReasonPhrase(is(
         "Internal Server Error (Request ID: " + requestId.get() + "): RuntimeException: fubar: IOException: deadbeef"))));
     assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
-    assertThat(requestId.get(), isValidUUID());
+    assertThat(requestId.get(), isValidUuid());
   }
 
   @Test
@@ -381,7 +381,7 @@ public class MiddlewaresTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
-    assertThat(requestId.get(), isValidUUID());
+    assertThat(requestId.get(), isValidUuid());
   }
   @Test
   public void testExceptionAndRequestIdHandlerAcceptsRequestIdHeader()

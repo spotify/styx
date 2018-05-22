@@ -26,7 +26,7 @@ import org.hamcrest.Factory;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
 
-public class StringIsValidUUID extends TypeSafeMatcher<String> {
+public class StringIsValidUuid extends TypeSafeMatcher<String> {
 
   @Override
   protected boolean matchesSafely(String s) {
@@ -47,7 +47,7 @@ public class StringIsValidUUID extends TypeSafeMatcher<String> {
   }
 
   @Factory
-  public static Matcher<String> isValidUUID() {
-    return new StringIsValidUUID();
+  public static Matcher<String> isValidUuid() {
+    return new StringIsValidUuid();
   }
 }

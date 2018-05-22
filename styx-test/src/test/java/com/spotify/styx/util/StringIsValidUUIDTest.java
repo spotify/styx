@@ -26,14 +26,14 @@ import static org.junit.Assert.assertThat;
 import java.util.UUID;
 import org.junit.Test;
 
-public class StringIsValidUUIDTest {
+public class StringIsValidUuidTest {
 
   @Test
   public void matchesSafely() {
-    assertThat(new StringIsValidUUID().matchesSafely(UUID.randomUUID().toString()), is(true));
-    assertThat(new StringIsValidUUID().matchesSafely(UUID.randomUUID().toString().replace("-", "")), is(true));
-    assertThat(new StringIsValidUUID().matchesSafely("foobar"), is(false));
-    assertThat(new StringIsValidUUID().matchesSafely("foo-bar"), is(false));
-    assertThat(new StringIsValidUUID().matchesSafely(""), is(false));
+    assertThat(new StringIsValidUuid().matchesSafely(UUID.randomUUID().toString()), is(true));
+    assertThat(new StringIsValidUuid().matchesSafely(UUID.randomUUID().toString().replace("-", "")), is(true));
+    assertThat(new StringIsValidUuid().matchesSafely("foobar"), is(false));
+    assertThat(new StringIsValidUuid().matchesSafely("foo-bar"), is(false));
+    assertThat(new StringIsValidUuid().matchesSafely(""), is(false));
   }
 }
