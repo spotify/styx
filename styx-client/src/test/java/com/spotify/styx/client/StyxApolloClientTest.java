@@ -33,6 +33,8 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import static com.spotify.styx.util.StringIsValidUuid.isValidUuid;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
@@ -50,6 +52,7 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.serialization.Json;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -320,6 +323,36 @@ public class StyxApolloClientTest {
       assertThat(e.getCause(), instanceOf(ApiErrorException.class));
       ApiErrorException apiErrorException = (ApiErrorException) e.getCause();
       assertThat(apiErrorException.isAuthenticated(), is(true));
+    }
+  }
+
+  @Test
+  public void testSendsRequestId() throws JsonProcessingException {
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+    when(client.send(requestCaptor.capture())).thenReturn(CompletableFuture.completedFuture(
+        Response.forStatus(Status.OK).withPayload(Json.serialize(Collections.emptyList()))));
+    styx.workflows();
+    final Request request = requestCaptor.getValue();
+    assertThat(request.header("X-Request-Id").get(), isValidUuid());
+  }
+
+  @Test
+  public void testErrorOnRequestIdMismatch() throws JsonProcessingException, InterruptedException {
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+    when(client.send(requestCaptor.capture())).thenReturn(CompletableFuture.completedFuture(
+        Response.forStatus(Status.OK)
+            .withHeader("X-Request-Id", "foobar")
+            .withPayload(Json.serialize(Collections.emptyList()))));
+
+    try {
+      styx.workflows().toCompletableFuture().get();
+      fail();
+    } catch (ExecutionException e) {
+      final Request request = requestCaptor.getValue();
+      final String requestId = request.header("X-Request-Id").get();
+      final Throwable cause = e.getCause();
+      assertThat(cause, instanceOf(ClientErrorException.class));
+      assertThat(cause.getMessage(), is("Request ID mismatch: '" + requestId + "' != 'foobar'"));
     }
   }
 }

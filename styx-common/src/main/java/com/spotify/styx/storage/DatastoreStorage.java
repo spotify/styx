@@ -21,6 +21,7 @@
 package com.spotify.styx.storage;
 
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
+import static com.spotify.styx.util.MDCUtil.withMDC;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_SHARD;
 import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
@@ -346,7 +347,7 @@ public class DatastoreStorage implements Closeable {
     final Iterable<List<WorkflowId>> batches = Iterables.partition(workflowIds,
         MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ);
     return StreamSupport.stream(batches.spliterator(), false)
-        .map(batch -> forkJoinPool.submit(() -> this.getBatchOfWorkflows(batch)))
+        .map(batch -> forkJoinPool.submit(withMDC(() -> this.getBatchOfWorkflows(batch))))
         // `collect and stream` is crucial to make tasks running in parallel, otherwise they will
         // be processed sequentially. Without `collect`, it will try to submit and wait for each task
         // while iterating through the stream. This is somewhat subtle, so think twice.
@@ -404,11 +405,11 @@ public class DatastoreStorage implements Closeable {
   Map<WorkflowInstance, RunState> readActiveStates() throws IOException {
     // Strongly read active state keys from index shards
     final List<Key> keys = activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
-        .map(key -> forkJoinPool.submit(() ->
+        .map(key -> forkJoinPool.submit(withMDC(() ->
             datastore.run(Query.newEntityQueryBuilder()
                 .setFilter(PropertyFilter.hasAncestor(key))
                 .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
-                .build())))
+                .build()))))
         .collect(toList()).stream() // collect here to execute batch reads in parallel
         .flatMap(task -> StreamUtil.stream(task.join()))
         .map(entity -> entity.getKey().getName())
@@ -417,7 +418,7 @@ public class DatastoreStorage implements Closeable {
 
     // Strongly consistently read values for the above keys
     return Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ).stream()
-        .map(batch -> forkJoinPool.submit(() -> this.readRunStateBatch(batch)))
+        .map(batch -> forkJoinPool.submit(withMDC(() -> this.readRunStateBatch(batch))))
         .collect(toList()).stream() // collect here to execute batch reads in parallel
         .flatMap(task -> task.join().stream())
         .collect(toMap(RunState::workflowInstance, Function.identity()));
