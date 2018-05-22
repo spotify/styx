@@ -97,7 +97,7 @@ public class MDCUtil {
     try {
       return MDC.getCopyOfContextMap();
     } catch (Exception e) {
-      log.warn("Failed to copy MDC");
+      log.error("Failed to copy MDC", e);
       return null;
     }
   }
@@ -110,7 +110,7 @@ public class MDCUtil {
         MDC.clear();
       }
     } catch (Exception e) {
-      log.warn("Failed to set MDC");
+      log.error("Failed to set MDC", e);
     }
   }
 
@@ -118,7 +118,7 @@ public class MDCUtil {
     try {
       MDC.clear();
     } catch (Exception e) {
-      log.warn("Failed to reset MDC");
+      log.error("Failed to reset MDC", e);
     }
   }
 }
