@@ -25,7 +25,7 @@ import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.belongsToFamily;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
-import static com.spotify.styx.StringIsValidUUID.isValidUUID;
+import static com.spotify.styx.util.StringIsValidUUID.isValidUUID;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.MatcherAssert.assertThat;
