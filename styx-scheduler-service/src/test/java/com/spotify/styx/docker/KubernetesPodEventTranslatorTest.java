@@ -33,6 +33,7 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.testdata.TestData;
 import io.fabric8.kubernetes.api.model.ContainerState;
 import io.fabric8.kubernetes.api.model.ContainerStateRunning;
@@ -129,6 +130,15 @@ public class KubernetesPodEventTranslatorTest {
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.runError(WFI, "Unexpected null terminated status"));
+  }
+  @Test
+  public void runErrorOnNodeLost() throws Exception {
+    setRunning(pod, true);
+    pod.getStatus().setReason("NodeLost");
+
+    assertGeneratesEventsAndTransitions(
+        State.RUNNING, pod,
+        Event.runError(WFI, "Lost node running pod"));
   }
 
   @Test
