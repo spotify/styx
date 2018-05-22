@@ -37,13 +37,6 @@
     </dependency>
 
     <dependency>
-      <groupId>com.spotify</groupId>
-      <artifactId>styx-common</artifactId>
-      <type>test-jar</type>
-      <version>${project.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <scope>test</scope>
