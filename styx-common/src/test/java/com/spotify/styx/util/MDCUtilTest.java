@@ -37,6 +37,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.MDC;
+import org.slf4j.MDC.MDCCloseable;
 
 public class MDCUtilTest {
 
@@ -109,5 +110,13 @@ public class MDCUtilTest {
         .submit(MDC::getCopyOfContextMap)
         .get();
     assertThat(mdc, is(anyOf(nullValue(), is(emptyMap()))));
+  }
+
+  @Test
+  public void safePutCloseable() {
+    try (MDCCloseable mdc = MDCUtil.safePutCloseable("foo", "bar")) {
+      assertThat(MDC.get("foo"), is("bar"));
+    }
+    assertThat(MDC.get("foo"), is(nullValue()));
   }
 }

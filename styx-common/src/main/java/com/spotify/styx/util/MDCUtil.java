@@ -121,4 +121,14 @@ public class MDCUtil {
       log.error("Failed to reset MDC", e);
     }
   }
+
+  public static MDC.MDCCloseable safePutCloseable(String key, String value) {
+    try {
+      return MDC.putCloseable(key, value);
+    } catch (Exception e) {
+      log.error("Failed to put MDC", e);
+      // Returning null here is ok as try-with-resources ignores null resources.
+      return null;
+    }
+  }
 }

@@ -41,6 +41,7 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.SyncHandler;
+import com.spotify.styx.util.MDCUtil;
 import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -142,7 +143,7 @@ public final class Middlewares {
           ? requestIdHeader
           : UUID.randomUUID().toString().replace("-", ""); // UUID with no dashes, easier to deal with
 
-      try (MDC.MDCCloseable mdc = MDC.putCloseable(REQUEST_ID, requestId)) {
+      try (MDC.MDCCloseable mdc = MDCUtil.safePutCloseable(REQUEST_ID, requestId)) {
         return innerHandler.invoke(requestContext).handle((r, t) -> {
           final Response<T> response;
           if (t != null) {
