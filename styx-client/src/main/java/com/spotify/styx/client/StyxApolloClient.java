@@ -440,7 +440,7 @@ class StyxApolloClient implements StyxClient {
       return CompletableFutures.exceptionallyCompletedFuture(
           new ClientErrorException("Authentication failure: " + e.getMessage(), e));
     }
-    final String requestId = UUID.randomUUID().toString();
+    final String requestId = UUID.randomUUID().toString().replace("-", "");  // UUID with no dashes, easier to deal with
     return client.send(decorateRequest(request, requestId, authToken)).handle((response, e) -> {
       if (e != null) {
         throw new ClientErrorException("Request failed: " + request.method() + " " + request.uri(), e);
