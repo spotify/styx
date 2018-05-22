@@ -268,12 +268,14 @@ public class MiddlewaresTest {
   @Test
   public void testExceptionAndRequestIdHandlerOnImmediateResponseException()
       throws InterruptedException, ExecutionException, TimeoutException {
-    RequestContext requestContext = mock(RequestContext.class);
-    Request request = Request.forUri("/", "GET");
+    final RequestContext requestContext = mock(RequestContext.class);
+    final Request request = Request.forUri("/", "GET");
+    final AtomicReference<String> requestId = new AtomicReference<>();
     when(requestContext.request()).thenReturn(request);
 
     Response<Object> response = Middlewares.exceptionAndRequestIdHandler()
         .apply(rc -> {
+          requestId.set(MDC.get("request-id"));
           LoggerFactory.getLogger(MiddlewaresTest.class).error("I'm a teapot!");
           throw new ResponseException(Response.forStatus(Status.IM_A_TEAPOT));
         })
@@ -281,18 +283,21 @@ public class MiddlewaresTest {
         .toCompletableFuture().get(5, SECONDS);
 
     assertThat(response, hasStatus(is(Status.IM_A_TEAPOT)));
-    assertThat(response, hasHeader("X-Request-Id", isValidUUID()));
+    assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
+    assertThat(requestId.get(), isValidUUID());
   }
 
   @Test
   public void testExceptionAndRequestIdHandlerOnFutureResponseException()
       throws InterruptedException, ExecutionException, TimeoutException {
-    RequestContext requestContext = mock(RequestContext.class);
-    Request request = Request.forUri("/", "GET");
+    final RequestContext requestContext = mock(RequestContext.class);
+    final Request request = Request.forUri("/", "GET");
+    final AtomicReference<String> requestId = new AtomicReference<>();
     when(requestContext.request()).thenReturn(request);
 
     Response<Object> response = Middlewares.exceptionAndRequestIdHandler()
         .apply(rc -> {
+          requestId.set(MDC.get("request-id"));
           LoggerFactory.getLogger(MiddlewaresTest.class).error("I'm a teapot!");
           final CompletableFuture<Response<Object>> failure = new CompletableFuture<>();
           LoggerFactory.getLogger(MiddlewaresTest.class).error("deadbeef");
@@ -303,7 +308,8 @@ public class MiddlewaresTest {
         .toCompletableFuture().get(5, SECONDS);
 
     assertThat(response, hasStatus(is(Status.IM_A_TEAPOT)));
-    assertThat(response, hasHeader("X-Request-Id", isValidUUID()));
+    assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
+    assertThat(requestId.get(), isValidUUID());
   }
 
   @Test
@@ -327,6 +333,7 @@ public class MiddlewaresTest {
     assertThat(response, hasStatus(withReasonPhrase(is(
         "Internal Server Error (Request ID: " + requestId.get() + "): RuntimeException: fubar: IOException: deadbeef"))));
     assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
+    assertThat(requestId.get(), isValidUUID());
   }
 
   @Test
@@ -352,17 +359,20 @@ public class MiddlewaresTest {
     assertThat(response, hasStatus(withReasonPhrase(is(
         "Internal Server Error (Request ID: " + requestId.get() + "): RuntimeException: fubar: IOException: deadbeef"))));
     assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
+    assertThat(requestId.get(), isValidUUID());
   }
 
   @Test
   public void testExceptionAndRequestIdHandlerOnResponse()
       throws InterruptedException, ExecutionException, TimeoutException {
-    RequestContext requestContext = mock(RequestContext.class);
-    Request request = Request.forUri("/", "GET");
+    final RequestContext requestContext = mock(RequestContext.class);
+    final Request request = Request.forUri("/", "GET");
+    final AtomicReference<String> requestId = new AtomicReference<>();
     when(requestContext.request()).thenReturn(request);
 
     Response<Object> response = Middlewares.exceptionAndRequestIdHandler()
         .apply(rc -> {
+          requestId.set(MDC.get("request-id"));
           LoggerFactory.getLogger(MiddlewaresTest.class).info("I'm OK!");
           return completedFuture(Response.forStatus(Status.OK));
         })
@@ -370,19 +380,22 @@ public class MiddlewaresTest {
         .toCompletableFuture().get(5, SECONDS);
 
     assertThat(response, hasStatus(withCode(Status.OK)));
-    assertThat(response, hasHeader("X-Request-Id", isValidUUID()));
+    assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
+    assertThat(requestId.get(), isValidUUID());
   }
   @Test
   public void testExceptionAndRequestIdHandlerAcceptsRequestIdHeader()
       throws InterruptedException, ExecutionException, TimeoutException {
-    RequestContext requestContext = mock(RequestContext.class);
-    String requestId = UUID.randomUUID().toString();
-    Request request = Request.forUri("/", "GET")
+    final RequestContext requestContext = mock(RequestContext.class);
+    final String requestId = UUID.randomUUID().toString();
+    final Request request = Request.forUri("/", "GET")
         .withHeader("X-Request-Id", requestId);
+    final AtomicReference<String> propagatedRequestId = new AtomicReference<>();
     when(requestContext.request()).thenReturn(request);
 
     Response<Object> response = Middlewares.exceptionAndRequestIdHandler()
         .apply(rc -> {
+          propagatedRequestId.set(MDC.get("request-id"));
           LoggerFactory.getLogger(MiddlewaresTest.class).info("I'm OK!");
           return completedFuture(Response.forStatus(Status.OK));
         })
@@ -391,6 +404,7 @@ public class MiddlewaresTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("X-Request-Id", is(requestId)));
+    assertThat(propagatedRequestId.get(), is(requestId));
   }
 
   @Test
