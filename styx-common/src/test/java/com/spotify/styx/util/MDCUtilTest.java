@@ -32,45 +32,56 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ForkJoinPool;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.MDC;
 import org.slf4j.MDC.MDCCloseable;
+import repeat.Repeat;
+import repeat.RepeatRule;
 
 public class MDCUtilTest {
 
-  private ExecutorService executor;
+  @Rule public RepeatRule rule = new RepeatRule();
+
+  private static final ExecutorService EXECUTOR_SERVICE = Executors.newWorkStealingPool();
 
   @Before
   public void setUp() throws Exception {
     MDC.clear();
-    executor = Executors.newSingleThreadExecutor();
   }
 
   @After
   public void tearDown() throws Exception {
-    executor.shutdownNow();
     MDC.clear();
   }
 
+  @AfterClass
+  public static void tearDownClass() throws Exception {
+    EXECUTOR_SERVICE.shutdownNow();
+  }
+
   @Test
+  @Repeat(times = 10000, threads = 4)
   public void withMDCRunnable() throws ExecutionException, InterruptedException {
     MDC.put("foo", "bar");
     final CompletableFuture<String> value = new CompletableFuture<>();
-    executor.submit(withMDC(() -> value.complete(MDC.get("foo"))));
+    EXECUTOR_SERVICE.submit(withMDC(() -> value.complete(MDC.get("foo"))));
     assertThat(value.get(), is("bar"));
   }
 
   @Test
+  @Repeat(times = 10000, threads = 4)
   public void withMDCCallable() throws ExecutionException, InterruptedException {
     MDC.put("foo", "bar");
-    final String value = executor.submit(withMDC(() -> MDC.get("foo"))).get();
+    final String value = EXECUTOR_SERVICE.submit(withMDC(() -> MDC.get("foo"))).get();
     assertThat(value, is("bar"));
   }
 
   @Test
+  @Repeat(times = 10000, threads = 4)
   public void withMDCCommonPool() throws ExecutionException, InterruptedException {
     MDC.put("foo", "bar");
     final CompletableFuture<String> value1 = new CompletableFuture<>();
@@ -92,13 +103,14 @@ public class MDCUtilTest {
   }
 
   @Test
+  @Repeat(times = 10000, threads = 4)
   public void withMDCExecutor() throws ExecutionException, InterruptedException {
     MDC.put("foo", "bar");
     final CompletableFuture<String> value1 = new CompletableFuture<>();
     final CompletableFuture<String> value2 = new CompletableFuture<>();
     CompletableFuture.runAsync(
         () -> value1.complete(MDC.get("foo")),
-        withMDC(executor))
+        withMDC(EXECUTOR_SERVICE))
         // Later stages should also have the MDC applied
         .thenRun(() -> value2.complete(MDC.get("foo")))
         .get();
@@ -106,13 +118,14 @@ public class MDCUtilTest {
     assertThat(value2.getNow(""), is("bar"));
 
     // MDC should not leak
-    final Map<String, String> mdc = executor
+    final Map<String, String> mdc = EXECUTOR_SERVICE
         .submit(MDC::getCopyOfContextMap)
         .get();
     assertThat(mdc, is(anyOf(nullValue(), is(emptyMap()))));
   }
 
   @Test
+  @Repeat(times = 10000, threads = 4)
   public void safePutCloseable() {
     try (MDCCloseable mdc = MDCUtil.safePutCloseable("foo", "bar")) {
       assertThat(MDC.get("foo"), is("bar"));
