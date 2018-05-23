@@ -142,5 +142,9 @@
       <artifactId>logback-classic</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>com.github.cbismuth</groupId>
+      <artifactId>junit-repeat-rule</artifactId>
+    </dependency>
   </dependencies>
 </project>
