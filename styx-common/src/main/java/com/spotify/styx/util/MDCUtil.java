@@ -59,7 +59,7 @@ public class MDCUtil {
   public static Runnable withMDC(Runnable r) {
     return new Runnable() {
 
-      private Map<String, String> contextMap = safeCopyOfContextMap();
+      private final Map<String, String> contextMap = safeCopyOfContextMap();
 
       @Override
       public void run() {
@@ -79,7 +79,7 @@ public class MDCUtil {
   public static <V> Callable<V> withMDC(Callable<V> r) {
     return new Callable<V>() {
 
-      private Map<String, String> contextMap = safeCopyOfContextMap();
+      private final Map<String, String> contextMap = safeCopyOfContextMap();
 
       @Override
       public V call() throws Exception {
