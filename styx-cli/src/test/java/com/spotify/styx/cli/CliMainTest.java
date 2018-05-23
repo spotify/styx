@@ -57,12 +57,14 @@ import com.spotify.styx.util.WorkflowValidator;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.ConnectException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -84,6 +86,8 @@ public class CliMainTest {
   @Mock StyxClient client;
   @Mock CliOutput cliOutput;
   @Mock WorkflowValidator validator;
+
+  private String requestId = UUID.randomUUID().toString();
 
   @Before
   public void setUp() {
@@ -487,7 +491,7 @@ public class CliMainTest {
         .enabled(true)
         .build();
 
-    final ApiErrorException exception = new ApiErrorException("not found", 404, true);
+    final ApiErrorException exception = new ApiErrorException("not found", 404, true, requestId);
     when(client.updateWorkflowState(any(), any(), eq(workflowState)))
         .thenReturn(exceptionallyCompletedFuture(exception));
 
@@ -503,7 +507,7 @@ public class CliMainTest {
         .enabled(false)
         .build();
 
-    final ApiErrorException exception = new ApiErrorException("not found", 404, true);
+    final ApiErrorException exception = new ApiErrorException("not found", 404, true, requestId);
     when(client.updateWorkflowState(any(), any(), eq(workflowState)))
         .thenReturn(exceptionallyCompletedFuture(exception));
 
@@ -514,10 +518,11 @@ public class CliMainTest {
 
   @Test
   public void testClientError() {
-    final ClientErrorException exception = new ClientErrorException(
-        "foo failure", new IOException());
     when(client.triggerWorkflowInstance(any(), any(), any()))
-        .thenReturn(exceptionallyCompletedFuture(exception));
+        .thenReturn(exceptionallyCompletedFuture(
+            new ClientErrorException("foo failure",
+                new IOException("bar failure",
+                    new ConnectException("failed to connect to baz")))));
 
     try {
       CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02");
@@ -526,12 +531,31 @@ public class CliMainTest {
       assertThat(e.status(), is(ExitStatus.ClientError));
     }
 
-    verify(cliOutput).printError("Client error: " + exception.getMessage());
+    verify(cliOutput).printError("Client error: foo failure: ConnectException: failed to connect to baz");
+  }
+
+  @Test
+  public void testClientErrorDebug() {
+    final Throwable cause = new ClientErrorException("foo failure",
+        new IOException("bar failure",
+            new ConnectException("failed to connect to baz")));
+    when(client.triggerWorkflowInstance(any(), any(), any()))
+        .thenReturn(exceptionallyCompletedFuture(cause));
+
+    try {
+      CliMain.run(cliContext, "--debug", "t", "foo", "bar", "2017-01-02");
+      fail();
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.ClientError));
+    }
+
+    verify(cliOutput).printError(Throwables.getStackTraceAsString(cause));
+    verify(cliOutput).printError("Client error: foo failure: ConnectException: failed to connect to baz");
   }
 
   @Test
   public void testApiError() {
-    final ApiErrorException exception = new ApiErrorException("bar failure", 500, true);
+    final ApiErrorException exception = new ApiErrorException("bar failure", 500, true, requestId);
     when(client.triggerWorkflowInstance(any(), any(), any()))
         .thenReturn(exceptionallyCompletedFuture(exception));
 
@@ -580,8 +604,9 @@ public class CliMainTest {
 
   @Test
   public void testMissingCredentialsHelpMessage() {
+    final ApiErrorException apiError = new ApiErrorException("foo", 401, false, requestId);
     when(client.triggerWorkflowInstance(any(), any(), any()))
-        .thenReturn(exceptionallyCompletedFuture(new ApiErrorException("foo", 401, false)));
+        .thenReturn(exceptionallyCompletedFuture(apiError));
 
     try {
       CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02");
@@ -591,12 +616,14 @@ public class CliMainTest {
     }
 
     verify(cliOutput).printError(contains("gcloud auth application-default login"));
+    verify(cliOutput).printError(contains(apiError.getMessage()));
   }
 
   @Test
   public void testUnauthorizedMessage() {
+    final ApiErrorException apiError = new ApiErrorException("foo", 401, true, requestId);
     when(client.triggerWorkflowInstance(any(), any(), any()))
-        .thenReturn(exceptionallyCompletedFuture(new ApiErrorException("foo", 401, true)));
+        .thenReturn(exceptionallyCompletedFuture(apiError));
 
     try {
       CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02");
@@ -605,7 +632,7 @@ public class CliMainTest {
       assertThat(e.status(), is(ExitStatus.AuthError));
     }
 
-    verify(cliOutput).printError("API error: Unauthorized");
+    verify(cliOutput).printError("API error: Unauthorized: " + apiError.getMessage());
   }
 
   @Test

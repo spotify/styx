@@ -28,7 +28,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.spotify.apollo.Client;
@@ -52,7 +51,6 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.util.EventUtil;
 import java.io.IOException;
-import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
@@ -60,6 +58,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import okhttp3.HttpUrl;
 import okhttp3.HttpUrl.Builder;
@@ -71,10 +70,12 @@ import okio.ByteString;
  * as {@link RuntimeException} instead.
  */
 class StyxApolloClient implements StyxClient {
+
   private static final String STYX_API_VERSION = V3.name().toLowerCase();
   private static final String STYX_CLIENT_VERSION =
       "Styx Client " + StyxApolloClient.class.getPackage().getImplementationVersion();
   private static final Duration TTL = Duration.ofSeconds(90);
+  private static final String X_REQUEST_ID = "X-Request-Id";
 
   private final URI apiHost;
   private final Client client;
@@ -420,9 +421,10 @@ class StyxApolloClient implements StyxClient {
   }
 
   private Request decorateRequest(
-      final Request request, final Optional<String> authToken) {
+      final Request request, String requestId, final Optional<String> authToken) {
     return request
         .withHeader("User-Agent", STYX_CLIENT_VERSION)
+        .withHeader("X-Request-Id", requestId)
         .withTtl(TTL)
         .withHeaders(authToken
             .map(t -> ImmutableMap.of("Authorization", "Bearer " + t))
@@ -438,21 +440,21 @@ class StyxApolloClient implements StyxClient {
       return CompletableFutures.exceptionallyCompletedFuture(
           new ClientErrorException("Authentication failure: " + e.getMessage(), e));
     }
-    return client.send(decorateRequest(request, authToken)).handle((response, e) -> {
+    final String requestId = UUID.randomUUID().toString().replace("-", "");  // UUID with no dashes, easier to deal with
+    return client.send(decorateRequest(request, requestId, authToken)).handle((response, e) -> {
       if (e != null) {
-        final Throwable rootCause = Throwables.getRootCause(e);
-        if (rootCause instanceof SocketTimeoutException) {
-          throw new ClientErrorException("Connection failed: " + rootCause.getMessage() + ": " + apiHost, e);
-        } else {
-          throw new ClientErrorException("Request failed: " + request, e);
-        }
+        throw new ClientErrorException("Request failed: " + request.method() + " " + request.uri(), e);
       } else {
+        final String responseRequestId = response.headers().get(X_REQUEST_ID);
+        if (responseRequestId != null && !responseRequestId.equals(requestId)) {
+          throw new ClientErrorException("Request ID mismatch: '" + requestId + "' != '" + responseRequestId + "'");
+        }
         switch (response.status().family()) {
           case SUCCESSFUL:
             return response;
           default:
             final String message = response.status().code() + " " + response.status().reasonPhrase();
-            throw new ApiErrorException(message, response.status().code(), authToken.isPresent());
+            throw new ApiErrorException(message, response.status().code(), authToken.isPresent(), responseRequestId);
         }
       }
     });

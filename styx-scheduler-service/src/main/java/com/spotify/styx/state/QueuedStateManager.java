@@ -21,6 +21,7 @@
 package com.spotify.styx.state;
 
 import static com.spotify.styx.state.StateUtil.isConsumingResources;
+import static com.spotify.styx.util.MDCUtil.withMDC;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
@@ -132,7 +133,7 @@ public class QueuedStateManager implements StateManager {
 
     // TODO: optional retry on transaction conflict
 
-    return CompletableFuture.runAsync(() -> initialize(workflowInstance)).thenCompose((ignore) -> {
+    return CompletableFuture.runAsync(() -> initialize(workflowInstance), withMDC()).thenCompose((ignore) -> {
       final Event event = Event.triggerExecution(workflowInstance, trigger);
       try {
         return receive(event);
@@ -142,7 +143,7 @@ public class QueuedStateManager implements StateManager {
         try {
           storage.deleteActiveState(workflowInstance);
         } catch (IOException e) {
-          log.warn("Failed to remove dangling NEW state for: {}", workflowInstance);
+          log.warn("Failed to remove dangling NEW state for: {}", workflowInstance, e);
         }
         throw new RuntimeException(isClosedException);
       }
@@ -356,7 +357,7 @@ public class QueuedStateManager implements StateManager {
 
     // Publish event
     try {
-      eventConsumerExecutor.execute(() -> eventConsumer.accept(sequenceEvent, runState));
+      eventConsumerExecutor.execute(withMDC(() -> eventConsumer.accept(sequenceEvent, runState)));
     } catch (Exception e) {
       log.warn("Error while consuming event {}", sequenceEvent, e);
     }

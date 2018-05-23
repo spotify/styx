@@ -4,7 +4,7 @@
   <parent>
     <groupId>com.spotify</groupId>
     <artifactId>styx</artifactId>
-    <version>2.0.6-SNAPSHOT</version>
+    <version>2.0.9-SNAPSHOT</version>
   </parent>
 
   <name>Spotify Styx Common</name>
@@ -136,6 +136,15 @@
       <groupId>pl.pragmatists</groupId>
       <artifactId>JUnitParams</artifactId>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.github.cbismuth</groupId>
+      <artifactId>junit-repeat-rule</artifactId>
     </dependency>
   </dependencies>
 </project>
