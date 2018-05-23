@@ -207,6 +207,43 @@ public class StyxApolloClientTest {
   }
 
   @Test
+  public void shouldCreateBackfillFromInput() throws Exception {
+    final Instant start = Instant.parse("2017-01-01T00:00:00Z");
+    final Instant end = Instant.parse("2017-01-30T00:00:00Z");
+    final BackfillInput backfillInput = BackfillInput.newBuilder()
+        .start(start)
+        .end(end)
+        .component("foo-comp")
+        .workflow("bar-wf")
+        .concurrency(1)
+        .reverse(true)
+        .build();
+
+    final Backfill backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(start)
+        .end(end)
+        .reverse(true)
+        .workflowId(WorkflowId.create("foo-comp", "bar-wf"))
+        .concurrency(1)
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+    when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
+        Response.forStatus(Status.OK).withPayload(Json.serialize(backfill))));
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+    final CompletableFuture<Backfill> r = styx.backfillCreate(backfillInput)
+        .toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    assertThat(request.uri(), is(API_URL + "/backfills"));
+    assertThat(Json.deserialize(request.payload().get(), BackfillInput.class),
+        equalTo(backfillInput));
+    assertThat(request.method(), is("POST"));
+  }
+
+  @Test
   public void shouldCreateBackfillWithDescription() throws Exception {
     final Instant start = Instant.parse("2017-01-01T00:00:00Z");
     final Instant end = Instant.parse("2017-01-30T00:00:00Z");

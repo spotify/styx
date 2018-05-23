@@ -46,6 +46,7 @@ import com.spotify.styx.client.ClientErrorException;
 import com.spotify.styx.client.StyxClient;
 import com.spotify.styx.client.StyxClientFactory;
 import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -57,6 +58,7 @@ import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -451,11 +453,19 @@ public final class CliMain {
     final String workflow = namespace.getString(parser.backfillCreateWorkflow.getDest());
     final String start = namespace.getString(parser.backfillCreateStart.getDest());
     final String end = namespace.getString(parser.backfillCreateEnd.getDest());
+    final boolean reverse = namespace.getBoolean(parser.backfillCreateReverse.getDest());
     final int concurrency = namespace.getInt(parser.backfillCreateConcurrency.getDest());
     final String description = namespace.getString(parser.backfillCreateDescription.getDest());
-    final Backfill backfill =
-        styxClient.backfillCreate(component, workflow, start, end, concurrency, description)
-            .toCompletableFuture().get();
+    final BackfillInput configuration = BackfillInput.newBuilder()
+        .component(component)
+        .workflow(workflow)
+        .start(Instant.parse(start))
+        .end(Instant.parse(end))
+        .reverse(reverse)
+        .concurrency(concurrency)
+        .description(description)
+        .build();
+    final Backfill backfill = styxClient.backfillCreate(configuration).toCompletableFuture().get();
     cliOutput.printBackfill(backfill, true);
   }
 
@@ -655,6 +665,11 @@ public final class CliMain {
         backfillCreate.addArgument("start").help("Start date/datehour (inclusive)").action(partitionAction);
     final Argument backfillCreateEnd =
         backfillCreate.addArgument("end").help("End date/datehour (exclusive)").action(partitionAction);
+    final Argument backfillCreateReverse =
+        backfillCreate.addArgument("--reverse")
+            .setDefault(false)
+            .help("Run backfill in reverse, from end (exclusive) to beginning (inclusive)")
+            .action(Arguments.storeTrue());
     final Argument backfillCreateConcurrency =
         backfillCreate.addArgument("concurrency").help("The number of jobs to run in parallel").type(Integer.class);
     final Argument backfillCreateDescription =
