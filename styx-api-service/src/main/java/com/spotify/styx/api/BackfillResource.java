@@ -26,10 +26,11 @@ import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 import static com.spotify.styx.util.StreamUtil.cat;
 import static com.spotify.styx.util.TimeUtil.instantsInRange;
-import static com.spotify.styx.util.TimeUtil.instantsInReversedRange;
+import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.stream.Collectors.toList;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.Iterables;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -272,6 +273,11 @@ public final class BackfillResource {
           + String.join(", ", errors)));
     }
 
+    if (!input.start().isBefore(input.end())) {
+      return Response.forStatus(
+          Status.BAD_REQUEST.withReasonPhrase("start must be before end"));
+    }
+
     if (!TimeUtil.isAligned(input.start(), schedule)) {
       return Response.forStatus(
           Status.BAD_REQUEST.withReasonPhrase("start parameter not aligned with schedule"));
@@ -282,8 +288,9 @@ public final class BackfillResource {
           Status.BAD_REQUEST.withReasonPhrase("end parameter not aligned with schedule"));
     }
 
+    final List<Instant> instants = instantsInRange(input.start(), input.end(), schedule);
     final List<WorkflowInstance> alreadyActive =
-        instants(input.start(), input.end(), schedule).stream()
+        instants.stream()
             .map(instant -> WorkflowInstance.create(workflowId, toParameter(schedule, instant)))
             .filter(activeWorkflowInstances::contains)
             .collect(toList());
@@ -305,8 +312,11 @@ public final class BackfillResource {
         .start(input.start())
         .end(input.end())
         .schedule(schedule)
-        .nextTrigger(input.start())
+        .nextTrigger(input.reverse()
+            ? Iterables.getLast(instants)
+            : input.start())
         .description(input.description())
+        .reverse(input.reverse())
         .halted(false);
 
     final Backfill backfill = builder.build();
@@ -348,8 +358,9 @@ public final class BackfillResource {
       throw new RuntimeException(e);
     }
 
-    final List<Instant> processedInstants = instants(
-        backfill.start(), backfill.nextTrigger(), backfill.schedule());
+    final List<Instant> processedInstants = backfill.reverse()
+        ? instantsInRange(nextInstant(backfill.nextTrigger(), backfill.schedule()), backfill.end(), backfill.schedule())
+        : instantsInRange(backfill.start(), backfill.nextTrigger(), backfill.schedule());
     processedStates = processedInstants.parallelStream()
         .map(instant -> {
           final WorkflowInstance wfi = WorkflowInstance
@@ -368,8 +379,9 @@ public final class BackfillResource {
         })
         .collect(toList());
 
-    final List<Instant> waitingInstants = instants(
-        backfill.nextTrigger(), backfill.end(), backfill.schedule());
+    final List<Instant> waitingInstants = backfill.reverse()
+        ? instantsInRange(backfill.start(), nextInstant(backfill.nextTrigger(), backfill.schedule()), backfill.schedule())
+        : instantsInRange(backfill.nextTrigger(), backfill.end(), backfill.schedule());
     waitingStates = waitingInstants.stream()
         .map(instant -> {
           final WorkflowInstance wfi = WorkflowInstance.create(
@@ -378,12 +390,9 @@ public final class BackfillResource {
         })
         .collect(toList());
 
-    return Stream.concat(processedStates.stream(), waitingStates.stream()).collect(toList());
+    return backfill.reverse()
+        ? Stream.concat(waitingStates.stream(), processedStates.stream()).collect(toList())
+        : Stream.concat(processedStates.stream(), waitingStates.stream()).collect(toList());
   }
 
-  private static List<Instant> instants(Instant start, Instant end, Schedule schedule) {
-    return start.isAfter(end)
-           ? instantsInReversedRange(start, end, schedule)
-           : instantsInRange(start, end, schedule);
-  }
 }

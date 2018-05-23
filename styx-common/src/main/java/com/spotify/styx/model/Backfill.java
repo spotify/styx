@@ -49,6 +49,8 @@ public interface Backfill {
 
   boolean halted();
 
+  boolean reverse();
+
   BackfillBuilder builder();
 
   static BackfillBuilder newBuilder() {

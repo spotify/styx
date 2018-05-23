@@ -39,6 +39,8 @@ public interface BackfillInput {
 
   int concurrency();
 
+  boolean reverse();
+
   Optional<String> description();
 
   BackfillInputBuilder builder();
