@@ -88,6 +88,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
+import org.slf4j.Logger;
 
 @RunWith(MockitoJUnitRunner.class)
 public class QueuedStateManagerTest {
@@ -120,6 +121,8 @@ public class QueuedStateManagerTest {
   @Mock private Time time;
   @Mock private ShardedCounter shardedCounter;
 
+  @Mock private Logger logger;
+
   @Before
   public void setUp() throws Exception {
     when(time.get()).thenReturn(NOW);
@@ -128,7 +131,7 @@ public class QueuedStateManagerTest {
     doNothing().when(outputHandler).transitionInto(runStateCaptor.capture());
     stateManager = new QueuedStateManager(
         time, eventTransitionExecutor, storage, eventConsumer,
-        eventConsumerExecutor, OutputHandler.fanOutput(outputHandler), shardedCounter);
+        eventConsumerExecutor, OutputHandler.fanOutput(outputHandler), shardedCounter, logger);
   }
 
   @After
@@ -594,6 +597,103 @@ public class QueuedStateManagerTest {
     } catch (ExecutionException e) {
       assertThat(Throwables.getRootCause(e), is(rootCause));
     }
+  }
+
+  @Test
+  public void receiveShouldLogTransactionConflict() throws Exception {
+    final TransactionException cause = new TransactionException(
+        new DatastoreException(10, "foo", "bar"));
+    reset(storage);
+    when(storage.runInTransaction(any())).thenThrow(cause);
+    final Event event = Event.started(INSTANCE);
+    try {
+      stateManager.receive(event, 4711L).get();
+      fail();
+    } catch (ExecutionException ignore) {
+    }
+    verify(logger).debug(
+        "Transaction conflict during workflow instance transition. Aborted: {}, counter={}",
+        event, 4711L);
+  }
+
+  @Test
+  public void receiveShouldLogTransactionFailure() throws Exception {
+    final TransactionException cause = new TransactionException(
+        new DatastoreException(new IOException("netsplit!")));
+    reset(storage);
+    when(storage.runInTransaction(any())).thenThrow(cause);
+    final Event event = Event.started(INSTANCE);
+    try {
+      stateManager.receive(event, 4711L).get();
+      fail();
+    } catch (ExecutionException ignore) {
+    }
+    verify(logger).debug(
+        "Transaction failure during workflow instance transition: {}, counter={}",
+        event, 4711L, cause);
+  }
+
+  @Test
+  public void receiveShouldLogFailure() throws Exception {
+    final Exception cause = new Exception("fubared");
+    reset(storage);
+    when(storage.runInTransaction(any())).thenThrow(cause);
+    final Event event = Event.started(INSTANCE);
+    try {
+      stateManager.receive(event, 4711L).get();
+      fail();
+    } catch (ExecutionException ignore) {
+    }
+    verify(logger).debug(
+        "Failure during workflow instance transition: {}, counter={}",
+        event, 4711L, cause);
+  }
+
+  @Test
+  public void triggerShouldLogTransactionConflict() throws Exception {
+    final TransactionException cause = new TransactionException(
+        new DatastoreException(10, "foo", "bar"));
+    reset(storage);
+    when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
+    when(storage.runInTransaction(any())).thenThrow(cause);
+    try {
+      stateManager.trigger(INSTANCE, Trigger.natural()).toCompletableFuture().get();
+      fail();
+    } catch (ExecutionException ignore) {
+    }
+    verify(logger).debug("Transaction conflict when triggering workflow instance. Aborted: {}",
+        INSTANCE);
+  }
+
+  @Test
+  public void triggerShouldLogTransactionFailure() throws Exception {
+    final TransactionException cause = new TransactionException(
+        new DatastoreException(new IOException("netsplit!")));
+    reset(storage);
+    when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
+    when(storage.runInTransaction(any())).thenThrow(cause);
+    try {
+      stateManager.trigger(INSTANCE, Trigger.natural()).toCompletableFuture().get();
+      fail();
+    } catch (ExecutionException ignore) {
+    }
+    verify(logger).debug("Transaction failure when triggering workflow instance: {}: {}",
+        INSTANCE, cause.getMessage(), cause);
+  }
+
+  @Test
+  public void triggerShouldLogFailure() throws Exception {
+    final Exception cause = new Exception("fubared");
+    reset(storage);
+    when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
+    when(storage.runInTransaction(any())).thenThrow(cause);
+    try {
+      stateManager.trigger(INSTANCE, Trigger.natural()).toCompletableFuture().get();
+      fail();
+    } catch (ExecutionException ignore) {
+    }
+    verify(logger).debug("Failure when triggering workflow instance: {}: {}",
+        INSTANCE, cause.getMessage(), cause);
   }
 
   @Test
