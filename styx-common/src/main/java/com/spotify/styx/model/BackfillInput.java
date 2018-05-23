@@ -39,10 +39,16 @@ public interface BackfillInput {
 
   int concurrency();
 
+  boolean reverse();
+
   Optional<String> description();
 
   BackfillInputBuilder builder();
 
+  /**
+   * @deprecated Use {@link #newBuilder()} instead.
+   */
+  @Deprecated
   static BackfillInput create(Instant start, Instant end, String component, String workflow,
                               int concurrency, Optional<String> description) {
     return newBuilder()

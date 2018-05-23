@@ -139,13 +139,12 @@ class BackfillTriggerManager {
       return;
     }
 
-    final boolean reversed = backfill.start().isAfter(backfill.end());
     final Instant initialNextTrigger = backfill.nextTrigger();
     while (true) {
       try {
         if (!storage.runInTransaction(tx ->
             triggerNextPartitionAndProgress(tx, backfill.id(), workflow,
-                initialNextTrigger, remainingCapacity, reversed))) {
+                initialNextTrigger, remainingCapacity, backfill.reverse()))) {
           break;
         }
       } catch (IOException e) {
@@ -179,7 +178,7 @@ class BackfillTriggerManager {
       return false;
     }
 
-    if (momentNextTrigger.equals(momentBackfill.end())) {
+    if (isAllTriggered(momentBackfill, momentNextTrigger)) {
       LOG.debug("Backfill {} all triggered", momentBackfill);
       tx.store(momentBackfill.builder()
           .allTriggered(true)
@@ -216,7 +215,7 @@ class BackfillTriggerManager {
                       .nextTrigger(nextPartition)
                       .build());
 
-    if (nextPartition.equals(momentBackfill.end())) {
+    if (isAllTriggered(momentBackfill, nextPartition)) {
       tx.store(momentBackfill.builder()
                            .nextTrigger(momentBackfill.end())
                            .allTriggered(true)
@@ -225,6 +224,20 @@ class BackfillTriggerManager {
       return false;
     }
     return true;
+  }
+
+  private boolean isAllTriggered(Backfill backfill, Instant nextTrigger) {
+    return nextTrigger.equals(exclusiveEndTrigger(backfill));
+  }
+
+  private Instant exclusiveEndTrigger(Backfill backfill) {
+    final Instant exclusiveLastTrigger;
+    if (backfill.reverse()) {
+      exclusiveLastTrigger = previousInstant(backfill.start(), backfill.schedule());
+    } else {
+      exclusiveLastTrigger = backfill.end();
+    }
+    return exclusiveLastTrigger;
   }
 
   private void storeBackfill(Backfill backfill) {
@@ -238,8 +251,9 @@ class BackfillTriggerManager {
   private static Instant getNextPartition(Backfill momentBackfill,
                                    Instant momentNextTrigger,
                                    boolean reversed) {
-    return reversed ? previousInstant(momentNextTrigger, momentBackfill.schedule())
-             : nextInstant(momentNextTrigger, momentBackfill.schedule());
+    return reversed
+        ? previousInstant(momentNextTrigger, momentBackfill.schedule())
+        : nextInstant(momentNextTrigger, momentBackfill.schedule());
   }
 
   private static boolean capacityReached(Backfill momentBackfill, Instant initialNextTrigger,

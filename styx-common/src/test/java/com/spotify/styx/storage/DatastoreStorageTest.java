@@ -60,6 +60,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -86,6 +87,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.logging.Level;
+import junitparams.JUnitParamsRunner;
+import junitparams.Parameters;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -93,9 +96,9 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.MockitoAnnotations;
 
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(JUnitParamsRunner.class)
 public class DatastoreStorageTest {
 
   static final WorkflowId WORKFLOW_ID1 = WorkflowId.create("component", "endpoint1");
@@ -190,6 +193,7 @@ public class DatastoreStorageTest {
 
   @Before
   public void setUp() throws Exception {
+    MockitoAnnotations.initMocks(this);
     datastore = helper.getOptions().getService();
     storage = new DatastoreStorage(datastore, Duration.ZERO);
   }
@@ -586,17 +590,23 @@ public class DatastoreStorageTest {
     assertThat(storage.config(), is(expectedConfig));
   }
 
+  @Parameters({"true", "false", ""})
   @Test
-  public void shouldStoreAndReadBackfill() throws Exception {
-    final Backfill backfill = Backfill.newBuilder()
+  public void shouldStoreAndReadBackfill(String reverse) throws Exception {
+    final BackfillBuilder builder = Backfill.newBuilder()
         .id("backfill-2")
         .start(Instant.parse("2017-01-01T00:00:00Z"))
         .end(Instant.parse("2017-01-02T00:00:00Z"))
         .workflowId(WorkflowId.create("component", "workflow2"))
         .concurrency(2)
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
-        .schedule(DAYS)
-        .build();
+        .schedule(DAYS);
+
+    if (!reverse.isEmpty()) {
+      builder.reverse(Boolean.parseBoolean(reverse));
+    }
+
+    final Backfill backfill = builder.build();
 
     storage.storeBackfill(backfill);
     assertThat(storage.getBackfill(backfill.id()), equalTo(Optional.of(backfill)));
