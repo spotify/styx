@@ -358,9 +358,13 @@ public final class BackfillResource {
       throw new RuntimeException(e);
     }
 
-    final List<Instant> processedInstants = backfill.reverse()
-        ? instantsInRange(nextInstant(backfill.nextTrigger(), backfill.schedule()), backfill.end(), backfill.schedule())
-        : instantsInRange(backfill.start(), backfill.nextTrigger(), backfill.schedule());
+    final List<Instant> processedInstants;
+    if (backfill.reverse()) {
+      final Instant firstInstant = nextInstant(backfill.nextTrigger(), backfill.schedule());
+      processedInstants = instantsInRange(firstInstant, backfill.end(), backfill.schedule());
+    } else {
+      processedInstants = instantsInRange(backfill.start(), backfill.nextTrigger(), backfill.schedule());
+    }
     processedStates = processedInstants.parallelStream()
         .map(instant -> {
           final WorkflowInstance wfi = WorkflowInstance
@@ -379,9 +383,13 @@ public final class BackfillResource {
         })
         .collect(toList());
 
-    final List<Instant> waitingInstants = backfill.reverse()
-        ? instantsInRange(backfill.start(), nextInstant(backfill.nextTrigger(), backfill.schedule()), backfill.schedule())
-        : instantsInRange(backfill.nextTrigger(), backfill.end(), backfill.schedule());
+    final List<Instant> waitingInstants;
+    if (backfill.reverse()) {
+      final Instant lastInstant = nextInstant(backfill.nextTrigger(), backfill.schedule());
+      waitingInstants = instantsInRange(backfill.start(), lastInstant, backfill.schedule());
+    } else {
+      waitingInstants = instantsInRange(backfill.nextTrigger(), backfill.end(), backfill.schedule());
+    }
     waitingStates = waitingInstants.stream()
         .map(instant -> {
           final WorkflowInstance wfi = WorkflowInstance.create(
