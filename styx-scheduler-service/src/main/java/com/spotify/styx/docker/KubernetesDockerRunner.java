@@ -428,7 +428,7 @@ class KubernetesDockerRunner implements DockerRunner {
     try {
       finishedAt = Instant.parse(t.getFinishedAt());
     } catch (DateTimeParseException e) {
-      LOG.warn("Failed to parse container state terminated finishedAt: '{}'", t.getFinishedAt());
+      LOG.warn("Failed to parse container state terminated finishedAt: '{}'", t.getFinishedAt(), e);
       return true;
     }
     final Instant deadline = time.get().minus(Duration.ofSeconds(podDeletionDelaySeconds));

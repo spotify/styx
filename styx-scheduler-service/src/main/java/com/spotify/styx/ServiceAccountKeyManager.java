@@ -101,7 +101,7 @@ public class ServiceAccountKeyManager {
     } catch (GoogleJsonResponseException e) {
       // TODO: handle 403 correctly once google fixes their API
       if (e.getStatusCode() == 403 || e.getStatusCode() == 404) {
-        LOG.debug("Couldn't find key to delete {}", keyName);
+        LOG.debug("Couldn't find key to delete {}", keyName, e);
         return;
       }
       LOG.warn("[AUDIT] Failed to delete key {}", keyName, e);

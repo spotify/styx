@@ -90,7 +90,7 @@ class TriggerManager implements Closeable {
         return;
       }
     } catch (IOException e) {
-      LOG.warn("Couldn't fetch global enabled status, skipping this run.");
+      LOG.warn("Couldn't fetch global enabled status, skipping this run", e);
       return;
     }
 
@@ -100,7 +100,7 @@ class TriggerManager implements Closeable {
       canBeTriggeredWorkflows = storage.workflowsWithNextNaturalTrigger();
       enabledWorkflows = storage.enabled();
     } catch (IOException e) {
-      LOG.warn("Couldn't fetch workflows to trigger, skipping this run.");
+      LOG.warn("Couldn't fetch workflows to trigger, skipping this run", e);
       return;
     }
 

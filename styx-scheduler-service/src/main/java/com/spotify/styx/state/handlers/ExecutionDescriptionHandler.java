@@ -78,8 +78,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
             LOG.warn("Could not send 'submit' event", isClosedException);
           }
         } catch (ResourceNotFoundException e) {
-          LOG.info("Workflow {} does not exist, halting {}", workflowInstance.workflowId(),
-                   workflowInstance);
+          LOG.info("Halting {}: {}", workflowInstance, e.getMessage());
           stateManager.receiveIgnoreClosed(Event.halt(workflowInstance));
         } catch (MissingRequiredPropertyException e) {
           LOG.warn("Failed to prepare execution description for " + state.workflowInstance(), e);

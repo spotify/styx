@@ -253,9 +253,9 @@ class KubernetesGCPServiceAccountSecretManager {
         keyManager.deleteKey(annotations.get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION));
         keyManager.deleteKey(annotations.get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION));
         deleteSecret(secret);
-      } catch (KubernetesClientException | IOException ignored) {
+      } catch (KubernetesClientException | IOException e) {
         LOG.warn("Failed to cleanup secret or keys for service account {}",
-            annotations.get(STYX_WORKFLOW_SA_ID_ANNOTATION));
+            annotations.get(STYX_WORKFLOW_SA_ID_ANNOTATION), e);
       }
     }
   }
