@@ -200,7 +200,7 @@ public class QueuedStateManager implements StateManager {
       }
     } catch (Exception e) {
       log.debug("Failure when triggering workflow instance: {}: {}", workflowInstance, e.getMessage(), e);
-      Throwables.propagateIfPossible(e, RuntimeException.class);
+      Throwables.throwIfUnchecked(e);
       throw new RuntimeException(e);
     }
   }
@@ -261,7 +261,7 @@ public class QueuedStateManager implements StateManager {
     } catch (Exception e) {
       log.debug("Failure during workflow instance transition: {}, counter={}",
           event, expectedCounter, e);
-      Throwables.propagateIfPossible(e, RuntimeException.class);
+      Throwables.throwIfUnchecked(e);
       throw new RuntimeException(e);
     }
   }
