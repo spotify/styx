@@ -85,8 +85,8 @@ public class MDCUtilTest {
     assertThat(value2.getNow(""), is("bar"));
 
     // MDC should not leak
-    final Map<String, String> mdc = ForkJoinPool.commonPool()
-        .submit(MDC::getCopyOfContextMap)
+    final Map<String, String> mdc = CompletableFuture
+        .supplyAsync(MDC::getCopyOfContextMap)
         .get();
     assertThat(mdc, is(anyOf(nullValue(), is(emptyMap()))));
   }
