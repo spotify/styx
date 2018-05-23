@@ -70,7 +70,7 @@ public class CachedSupplier<T> implements Supplier<T> {
         if (value == null) {
           throw Throwables.propagate(e);
         } else {
-          LOG.warn("Failed to update from delegate supplier, using old value");
+          LOG.warn("Failed to update from delegate supplier, using old value", e);
         }
       }
     }

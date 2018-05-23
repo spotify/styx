@@ -296,7 +296,7 @@ public class DatastoreStorage implements Closeable {
       try {
         workflow = OBJECT_MAPPER.readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
       } catch (IOException e) {
-        LOG.warn("Failed to read workflow {}.", entity.getKey());
+        LOG.warn("Failed to read workflow {}.", entity.getKey(), e);
         continue;
       }
 
@@ -333,7 +333,7 @@ public class DatastoreStorage implements Closeable {
       try {
         workflow = OBJECT_MAPPER.readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
       } catch (IOException e) {
-        LOG.warn("Failed to read workflow {}.", entity.getKey());
+        LOG.warn("Failed to read workflow {}.", entity.getKey(), e);
         continue;
       }
       map.put(workflow.id(), workflow);
@@ -365,7 +365,7 @@ public class DatastoreStorage implements Closeable {
       try {
         workflows.add(OBJECT_MAPPER.readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class));
       } catch (IOException e) {
-        LOG.warn("Failed to read workflow {}.", entity.getKey());
+        LOG.warn("Failed to read workflow {}.", entity.getKey(), e);
       }
     });
     return workflows;
@@ -388,7 +388,7 @@ public class DatastoreStorage implements Closeable {
         try {
           workflow = OBJECT_MAPPER.readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
         } catch (IOException e) {
-          LOG.warn("Failed to read workflow {}.", entity.getKey());
+          LOG.warn("Failed to read workflow {}.", entity.getKey(), e);
           continue;
         }
         workflows.add(workflow);
@@ -711,7 +711,7 @@ public class DatastoreStorage implements Closeable {
   static Key componentKey(KeyFactory keyFactory, String componentId) {
     return keyFactory.setKind(KIND_COMPONENT).newKey(componentId);
   }
-  
+
   static Key backfillKey(KeyFactory keyFactory, String backfillId) {
     return keyFactory.setKind(KIND_BACKFILL).newKey(backfillId);
   }

@@ -556,7 +556,7 @@ public class StyxScheduler implements AppInit {
       }
     } catch (Exception e) {
       LOG.warn("Failed to fetch the submission rate config from storage, "
-          + "skipping RateLimiter update");
+          + "skipping RateLimiter update", e);
     }
   }
 

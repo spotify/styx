@@ -126,7 +126,7 @@ public class QueuedStateManager implements StateManager {
         try {
           storage.deleteActiveState(workflowInstance);
         } catch (IOException e) {
-          LOG.warn("Failed to remove dangling NEW state for: {}", workflowInstance);
+          LOG.warn("Failed to remove dangling NEW state for: {}", workflowInstance, e);
         }
         throw new RuntimeException(isClosedException);
       }
