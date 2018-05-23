@@ -116,11 +116,13 @@
         <groupId>com.google.auto.value</groupId>
         <artifactId>auto-value</artifactId>
         <version>1.5.3</version>
+        <scope>provided</scope>
       </dependency>
       <dependency>
         <groupId>io.norberg</groupId>
         <artifactId>auto-matter</artifactId>
         <version>0.14.1</version>
+        <scope>provided</scope>
       </dependency>
       <dependency>
         <groupId>com.github.sviperll</groupId>
