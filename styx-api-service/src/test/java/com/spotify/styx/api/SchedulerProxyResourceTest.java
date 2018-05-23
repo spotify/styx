@@ -32,8 +32,10 @@ import com.spotify.apollo.Request;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import java.util.Optional;
+import java.util.UUID;
 import okio.ByteString;
 import org.junit.Test;
+import org.slf4j.MDC;
 
 public class SchedulerProxyResourceTest extends VersionedApiTest {
 
@@ -88,14 +90,38 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
         .respond(Response.forStatus(Status.ACCEPTED))
         .to(SCHEDULER_BASE + "/api/v0/trigger");
 
+    final String requestId = UUID.randomUUID().toString();
+
     awaitResponse(serviceHelper.request(Request
         .forUri(path("/trigger"), "POST")
         .withHeader("foo", "bar")
+        .withHeader("X-Request-Id", requestId)
         .withHeader(HttpHeaders.AUTHORIZATION, "decafbad")));
 
     final Request schedulerRequest = Iterables.getOnlyElement(serviceHelper.stubClient().sentRequests());
 
     assertThat(schedulerRequest.header("foo"), is(Optional.of("bar")));
     assertThat(schedulerRequest.header(HttpHeaders.AUTHORIZATION), is(Optional.of("decafbad")));
+    assertThat(schedulerRequest.header("X-Request-Id"), is(Optional.of(requestId)));
+  }
+
+  @Test
+  public void verifyPropagatesContextRequestId() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    serviceHelper.stubClient()
+        .respond(Response.forStatus(Status.ACCEPTED))
+        .to(SCHEDULER_BASE + "/api/v0/trigger");
+
+    final String requestId = UUID.randomUUID().toString();
+
+    MDC.put("request-id", requestId);
+
+    awaitResponse(serviceHelper.request(Request
+        .forUri(path("/trigger"), "POST")));
+
+    final Request schedulerRequest = Iterables.getOnlyElement(serviceHelper.stubClient().sentRequests());
+
+    assertThat(schedulerRequest.header("X-Request-Id"), is(Optional.of(requestId)));
   }
 }
