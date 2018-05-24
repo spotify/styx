@@ -54,6 +54,9 @@ class PrettyCliOutput implements CliOutput {
   private static final String BACKFILL_FORMAT =
       "%28s  %6s  %13s %12s  %-20s  %-20s  %-7s  %-20s  %-<cid-length>s  %-<wid-length>s %s";
 
+  private static final String WORKFLOW_FORMAT =
+      "%-<cid-length>s  %-<wid-length>s";
+
   @Override
   public void printStates(RunStateDataPayload runStateDataPayload) {
     System.out.println(String.format("  %-20s %-12s %-47s %-7s %s",
@@ -131,6 +134,16 @@ class PrettyCliOutput implements CliOutput {
                                      formatDescription(backfill.description(), noTruncate)));
   }
 
+  private void printWorkflow(Workflow workflow, int cidLength, int widLength) {
+    final String format = WORKFLOW_FORMAT
+        .replaceAll("<cid-length>", String.valueOf(cidLength))
+        .replaceAll("<wid-length>", String.valueOf(widLength));
+
+    System.out.println(String.format(format,
+                                     workflow.componentId(),
+                                     workflow.workflowId()));
+  }
+
   private void printBackfillHeader(int cidLength, int widLength) {
     final String format = BACKFILL_FORMAT
         .replaceAll("<cid-length>", String.valueOf(cidLength))
@@ -148,6 +161,16 @@ class PrettyCliOutput implements CliOutput {
                                      "COMPONENT",
                                      "WORKFLOW",
                                      "DESCRIPTION"));
+  }
+
+  private void printWorkflowHeader(int cidLength, int widLength) {
+    final String format = WORKFLOW_FORMAT
+        .replaceAll("<cid-length>", String.valueOf(cidLength))
+        .replaceAll("<wid-length>", String.valueOf(widLength));
+
+    System.out.println(String.format(format,
+                                     "COMPONENT",
+                                     "WORKFLOW"));
   }
 
   @Override
@@ -215,6 +238,22 @@ class PrettyCliOutput implements CliOutput {
     System.out.println("  Enabled: " + state.enabled().map(Object::toString).orElse(""));
     System.out.println("     Trig: " + state.nextNaturalTrigger().map(Object::toString).orElse(""));
     System.out.println("Ofst Trig: " + state.nextNaturalOffsetTrigger().map(Object::toString).orElse(""));
+  }
+
+  @Override
+  public void printWorkflows(List<Workflow> workflows) {
+    final int cidLength = workflows.stream()
+        .map(x -> x.componentId().length())
+        .max(Comparator.naturalOrder())
+        .orElse(1);
+    final int widLength = workflows.stream()
+        .map(x -> x.workflowId().length())
+        .max(Comparator.naturalOrder())
+        .orElse(1);
+
+    printWorkflowHeader(cidLength, widLength);
+
+    workflows.forEach(wf -> printWorkflow(wf, cidLength, widLength));
   }
 
   @Override

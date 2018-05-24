@@ -260,6 +260,9 @@ public final class CliMain {
         case WORKFLOW:
           final WorkflowCommand workflowCommand = namespace.get(SUBCOMMAND_DEST);
           switch (workflowCommand) {
+            case LIST:
+              workflowList();
+              break;
             case SHOW:
               workflowShow();
               break;
@@ -568,6 +571,10 @@ public final class CliMain {
     cliOutput.printWorkflow(tuple._1, tuple._2);
   }
 
+  private void workflowList() throws ExecutionException, InterruptedException {
+    cliOutput.printWorkflows(styxClient.workflows().toCompletableFuture().get());
+  }
+
   private void activeStates() throws ExecutionException, InterruptedException {
     final Optional<String> component =
         Optional.ofNullable(namespace.getString(parser.listComponent.getDest()));
@@ -717,6 +724,8 @@ public final class CliMain {
     final Subparsers workflowParser =
         Command.WORKFLOW.parser(subCommands)
             .addSubparsers().title("commands").metavar(" ");
+
+    final Subparser workflowList = WorkflowCommand.LIST.parser(workflowParser);
 
     final Subparser workflowShow = WorkflowCommand.SHOW.parser(workflowParser);
     final Argument workflowShowComponentId =
@@ -893,6 +902,7 @@ public final class CliMain {
   }
 
   private enum WorkflowCommand {
+    LIST("ls", "List all workflows"),
     SHOW("get", "Show info about a specific workflow"),
     CREATE("", "Create or update workflow(s)"),
     DELETE("", "Delete workflow(s)"),

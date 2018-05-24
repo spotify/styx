@@ -37,6 +37,8 @@ import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
@@ -218,5 +220,23 @@ public class PrettyCliOutputTest {
             + colored(CYAN, "c1") + " " + colored(BLUE, "w1") + "\n"
             + "  2016-09-02           " + colored(CYAN,        "SUBMITTED") + "    e1                                  "
             + "            3       " + colored(YELLOW, "baz") + "\n"));
+  }
+
+  @Test
+  public void shouldPrintWorkflows() {
+    final Workflow foo1 = Workflow.create("foo1", WorkflowConfiguration.builder()
+        .id("bar1")
+        .schedule(Schedule.DAYS)
+        .build());
+    final Workflow foo2 = Workflow.create("foo2", WorkflowConfiguration.builder()
+        .id("bar2")
+        .schedule(Schedule.DAYS)
+        .build());
+    cliOutput.printWorkflows(ImmutableList.of(foo1, foo2));
+    assertThat(outContent.toString(), is(String.format(
+        "COMPONENT  WORKFLOW%n"
+           + "foo1  bar1%n"
+           + "foo2  bar2%n")));
+
   }
 }

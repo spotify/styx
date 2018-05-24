@@ -33,6 +33,8 @@ import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.StateData;
@@ -134,5 +136,21 @@ public class JsonCliOutputTest {
     final Map<String, List<RunStateData>> output = OBJECT_MAPPER.readValue(outContent.toString(),
         new TypeReference<Map<String, List<RunStateData>>>() { });
     assertThat(output, is(expectedOutput));
+  }
+
+  @Test
+  public void shouldPrintWorkflows() throws IOException {
+    final Workflow foo1 = Workflow.create("foo1", WorkflowConfiguration.builder()
+        .id("bar1")
+        .schedule(Schedule.DAYS)
+        .build());
+    final Workflow foo2 = Workflow.create("foo2", WorkflowConfiguration.builder()
+        .id("bar2")
+        .schedule(Schedule.DAYS)
+        .build());
+    final List<Workflow> workflows = ImmutableList.of(foo1, foo2);
+    cliOutput.printWorkflows(workflows);
+    assertThat(OBJECT_MAPPER.readValue(outContent.toString(), new TypeReference<List<Workflow>>() { }),
+        is(workflows));
   }
 }
