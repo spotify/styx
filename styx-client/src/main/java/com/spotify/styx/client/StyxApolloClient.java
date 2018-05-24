@@ -63,6 +63,8 @@ import java.util.concurrent.CompletionStage;
 import okhttp3.HttpUrl;
 import okhttp3.HttpUrl.Builder;
 import okio.ByteString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Styx Apollo Client Implementation. In case of API errors, the {@link Throwable} in the returned
@@ -70,6 +72,8 @@ import okio.ByteString;
  * as {@link RuntimeException} instead.
  */
 class StyxApolloClient implements StyxClient {
+
+  private static final Logger log = LoggerFactory.getLogger(StyxApolloClient.class);
 
   private static final String STYX_API_VERSION = V3.name().toLowerCase();
   private static final String STYX_CLIENT_VERSION =
@@ -445,16 +449,21 @@ class StyxApolloClient implements StyxClient {
       if (e != null) {
         throw new ClientErrorException("Request failed: " + request.method() + " " + request.uri(), e);
       } else {
+        final String effectiveRequestId;
         final String responseRequestId = response.headers().get(X_REQUEST_ID);
         if (responseRequestId != null && !responseRequestId.equals(requestId)) {
-          throw new ClientErrorException("Request ID mismatch: '" + requestId + "' != '" + responseRequestId + "'");
+          // If some proxy etc dropped our request ID header, we might get another one back.
+          effectiveRequestId = responseRequestId;
+          log.warn("Request ID mismatch: '" + requestId + "' != '" + responseRequestId + "'");
+        } else {
+          effectiveRequestId = requestId;
         }
         switch (response.status().family()) {
           case SUCCESSFUL:
             return response;
           default:
             final String message = response.status().code() + " " + response.status().reasonPhrase();
-            throw new ApiErrorException(message, response.status().code(), authToken.isPresent(), responseRequestId);
+            throw new ApiErrorException(message, response.status().code(), authToken.isPresent(), effectiveRequestId);
         }
       }
     });
