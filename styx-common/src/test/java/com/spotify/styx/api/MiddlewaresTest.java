@@ -29,15 +29,21 @@ import static com.spotify.styx.util.StringIsValidUuid.isValidUuid;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.core.Is.is;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.net.HttpHeaders;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
@@ -48,6 +54,7 @@ import com.spotify.apollo.request.RequestContexts;
 import com.spotify.apollo.request.RequestMetadataImpl;
 import com.spotify.apollo.route.AsyncHandler;
 import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -60,14 +67,28 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import okio.ByteString;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.runners.MockitoJUnitRunner;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 /**
  * Tests Middlewares
  */
+@RunWith(MockitoJUnitRunner.class)
 public class MiddlewaresTest {
+
+  @Rule public ExpectedException exception = ExpectedException.none();
+
+  @Mock public Logger log;
+  @Mock public GoogleIdTokenVerifier idTokenVerifier;
+  @Mock public GoogleIdToken idToken;
+  @Mock public GoogleIdToken.Payload idTokenPayload;
 
   private static final TestStruct TEST_STRUCT = new AutoValue_MiddlewaresTest_TestStruct(
       "blah", new AutoValue_MiddlewaresTest_Inner("bloh", TestEnum.ENUM_VALUE));
@@ -448,6 +469,71 @@ public class MiddlewaresTest {
                                                   .apply(mockInnerHandler(requestContext))
                                                   .invoke(requestContext));
     assertThat(response, hasStatus(withCode(Status.UNAUTHORIZED)));
+  }
+
+  @Test
+  public void testHttpLoggerHidesAuthHeader() throws Exception {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = Request.forUri("/", "PUT")
+        .withPayload(ByteString.encodeUtf8("hello"))
+        .withHeader(HttpHeaders.AUTHORIZATION, "Bearer s3cr3tp455w0rd");
+    when(requestContext.request()).thenReturn(request);
+
+    String email = "foo@bar.net";
+
+    when(idTokenVerifier.verify(anyString())).thenReturn(idToken);
+    when(idToken.getPayload()).thenReturn(idTokenPayload);
+    when(idTokenPayload.getEmail()).thenReturn(email);
+
+    awaitResponse(Middlewares.httpLogger(log, idTokenVerifier)
+        .apply(mockInnerHandler(requestContext))
+        .invoke(requestContext));
+
+    verify(log).info("{}{} {} by {} with headers {} parameters {} and payload {}",
+        "[AUDIT] ",
+        request.method(),
+        request.uri(),
+        email,
+        ImmutableMap.of(HttpHeaders.AUTHORIZATION, "<hidden>"),
+        ImmutableMap.of(),
+        request.payload().get().utf8());
+  }
+
+  @Test
+  public void testVerifyIdTokenGeneralSecurityException() throws GeneralSecurityException, IOException {
+    when(idTokenVerifier.verify("foo")).thenThrow(new GeneralSecurityException());
+    assertThat(Middlewares.verifyIdToken("foo", idTokenVerifier), is(nullValue()));
+  }
+
+  @Test
+  public void testVerifyIdTokenIOException() throws GeneralSecurityException, IOException {
+    final IOException cause = new IOException();
+    when(idTokenVerifier.verify("foo")).thenThrow(cause);
+    exception.expect(RuntimeException.class);
+    exception.expectCause(is(cause));
+    Middlewares.verifyIdToken("foo", idTokenVerifier);
+  }
+
+  @Test
+  public void testAuthed() throws Exception {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = Request.forUri("/", "PUT")
+        .withPayload(ByteString.encodeUtf8("hello"))
+        .withHeader(HttpHeaders.AUTHORIZATION, "Bearer s3cr3tp455w0rd");
+    when(requestContext.request()).thenReturn(request);
+
+    when(idTokenVerifier.verify("s3cr3tp455w0rd")).thenReturn(idToken);
+    when(idToken.getPayload()).thenReturn(idTokenPayload);
+
+    final AtomicReference<GoogleIdToken> userHolder = new AtomicReference<>();
+    awaitResponse(Middlewares.authed(idTokenVerifier)
+        .apply(rc -> auth -> {
+          userHolder.set(auth.user().get());
+          return completedFuture(Response.ok());
+        })
+        .invoke(requestContext));
+
+    assertThat(userHolder.get(), is(idToken));
   }
 
   public static <T> Response<T> awaitResponse(CompletionStage<Response<T>> completionStage)
