@@ -51,6 +51,7 @@ import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
+import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
@@ -76,6 +77,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.TriggerInstantSpec;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -90,13 +92,17 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class DatastoreStorageTest {
+
+  @Rule public ExpectedException exception = ExpectedException.none();
 
   static final WorkflowId WORKFLOW_ID1 = WorkflowId.create("component", "endpoint1");
   static final WorkflowId WORKFLOW_ID2 = WorkflowId.create("component", "endpoint2");
@@ -518,6 +524,24 @@ public class DatastoreStorageTest {
     assertThat(storage.workflows(), hasEntry(WORKFLOW_ID1, workflow1));
     assertThat(storage.workflows(), hasEntry(WORKFLOW_ID2, workflow2));
     assertThat(storage.workflows(), hasEntry(WORKFLOW_ID3, workflow3));
+  }
+
+  @Test
+  public void shouldFailToReadCorruptWorkflow() throws Exception {
+    assertThat(storage.workflows().isEmpty(), is(true));
+
+    Workflow workflow1 = workflow(WORKFLOW_ID1);
+    storage.store(workflow1);
+    final Key workflowKey = DatastoreStorage.workflowKey(datastore.newKeyFactory(), workflow1.id());
+
+    final Entity entity = datastore.get(workflowKey);
+    final Entity corrupted = Entity.newBuilder(entity)
+        .set("json", "bork")
+        .build();
+    datastore.put(corrupted);
+
+    exception.expect(IOException.class);
+    storage.workflow(workflow1.id());
   }
 
   @Test
