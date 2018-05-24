@@ -500,13 +500,13 @@ public class MiddlewaresTest {
   }
 
   @Test
-  public void testVerifyIdToken_GeneralSecurityException() throws GeneralSecurityException, IOException {
+  public void testVerifyIdTokenGeneralSecurityException() throws GeneralSecurityException, IOException {
     when(idTokenVerifier.verify("foo")).thenThrow(new GeneralSecurityException());
     assertThat(Middlewares.verifyIdToken("foo", idTokenVerifier), is(nullValue()));
   }
 
   @Test
-  public void testVerifyIdToken_IOException() throws GeneralSecurityException, IOException {
+  public void testVerifyIdTokenIOException() throws GeneralSecurityException, IOException {
     final IOException cause = new IOException();
     when(idTokenVerifier.verify("foo")).thenThrow(cause);
     exception.expect(RuntimeException.class);
@@ -529,7 +529,7 @@ public class MiddlewaresTest {
     awaitResponse(Middlewares.authed(idTokenVerifier)
         .apply(rc -> auth -> {
           userHolder.set(auth.user().get());
-          return CompletableFuture.completedFuture(Response.ok());
+          return completedFuture(Response.ok());
         })
         .invoke(requestContext));
 
