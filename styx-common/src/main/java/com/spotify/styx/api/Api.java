@@ -20,6 +20,7 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.styx.api.Middlewares.authValidator;
 import static com.spotify.styx.api.Middlewares.clientValidator;
 import static com.spotify.styx.api.Middlewares.exceptionAndRequestIdHandler;
 import static com.spotify.styx.api.Middlewares.httpLogger;
@@ -61,6 +62,7 @@ public final class Api {
       Supplier<List<String>> clientBlacklistSupplier) {
     return routes.map(r -> r
         .withMiddleware(httpLogger())
+        .withMiddleware(authValidator())
         .withMiddleware(clientValidator(clientBlacklistSupplier))
         .withMiddleware(exceptionAndRequestIdHandler()));
   }
