@@ -663,7 +663,7 @@ public class DatastoreStorage implements Closeable {
       return OBJECT_MAPPER
           .readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
     } catch (IOException e) {
-      LOG.error("Failed to read workflow for {}, {}", workflowId.componentId(), workflowId.id());
+      LOG.error("Failed to read workflow for {}, {}", workflowId.componentId(), workflowId.id(), e);
       throw e;
     }
   }
