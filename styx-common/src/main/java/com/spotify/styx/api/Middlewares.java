@@ -184,7 +184,7 @@ public final class Middlewares {
     return CharMatcher.anyOf("\n\r").replaceFrom(reason.toString(), ' ');
   }
 
-  public static GoogleIdToken verifyIdToken(String s, GoogleIdTokenVerifier verifier) {
+  static GoogleIdToken verifyIdToken(String s, GoogleIdTokenVerifier verifier) {
     try {
       return verifier.verify(s);
     } catch (GeneralSecurityException e) {
