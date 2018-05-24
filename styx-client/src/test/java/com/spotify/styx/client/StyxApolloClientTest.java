@@ -21,6 +21,7 @@
 package com.spotify.styx.client;
 
 import static com.google.common.collect.Iterables.getLast;
+import static com.spotify.styx.util.StringIsValidUuid.isValidUuid;
 import static java.util.Arrays.asList;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
@@ -33,7 +34,6 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import static com.spotify.styx.util.StringIsValidUuid.isValidUuid;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Client;
@@ -337,22 +337,39 @@ public class StyxApolloClientTest {
   }
 
   @Test
-  public void testErrorOnRequestIdMismatch() throws JsonProcessingException, InterruptedException {
+  public void testUsesServerRequestIdOnMismatch() throws JsonProcessingException, InterruptedException {
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
-    when(client.send(requestCaptor.capture())).thenReturn(CompletableFuture.completedFuture(
-        Response.forStatus(Status.OK)
-            .withHeader("X-Request-Id", "foobar")
+    final String responseRequestId = "foobar";
+    when(client.send(any())).thenReturn(CompletableFuture.completedFuture(
+        Response.forStatus(Status.INTERNAL_SERVER_ERROR)
+            .withHeader("X-Request-Id", responseRequestId)
             .withPayload(Json.serialize(Collections.emptyList()))));
 
     try {
       styx.workflows().toCompletableFuture().get();
       fail();
     } catch (ExecutionException e) {
+      assertThat(e.getCause(), instanceOf(ApiErrorException.class));
+      final ApiErrorException apiError = (ApiErrorException) e.getCause();
+      assertThat(apiError.getRequestId(), is(responseRequestId));
+    }
+  }
+
+  @Test
+  public void testUsesClientRequestIdOnNoResponseRequestId() throws JsonProcessingException, InterruptedException {
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+    when(client.send(requestCaptor.capture())).thenReturn(CompletableFuture.completedFuture(
+        Response.forStatus(Status.INTERNAL_SERVER_ERROR)
+            .withPayload(Json.serialize(Collections.emptyList()))));
+
+    try {
+      styx.workflows().toCompletableFuture().get();
+      fail();
+    } catch (ExecutionException e) {
+      assertThat(e.getCause(), instanceOf(ApiErrorException.class));
+      final ApiErrorException apiError = (ApiErrorException) e.getCause();
       final Request request = requestCaptor.getValue();
-      final String requestId = request.header("X-Request-Id").get();
-      final Throwable cause = e.getCause();
-      assertThat(cause, instanceOf(ClientErrorException.class));
-      assertThat(cause.getMessage(), is("Request ID mismatch: '" + requestId + "' != 'foobar'"));
+      assertThat(apiError.getRequestId(), is(request.header("X-Request-Id").get()));
     }
   }
 }
