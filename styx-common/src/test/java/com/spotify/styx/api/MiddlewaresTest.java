@@ -29,6 +29,7 @@ import static com.spotify.styx.util.StringIsValidUuid.isValidUuid;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.core.Is.is;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -53,6 +54,7 @@ import com.spotify.apollo.request.RequestContexts;
 import com.spotify.apollo.request.RequestMetadataImpl;
 import com.spotify.apollo.route.AsyncHandler;
 import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -65,7 +67,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import okio.ByteString;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
@@ -78,6 +82,8 @@ import org.slf4j.MDC;
  */
 @RunWith(MockitoJUnitRunner.class)
 public class MiddlewaresTest {
+
+  @Rule public ExpectedException exception = ExpectedException.none();
 
   @Mock public Logger log;
   @Mock public GoogleIdTokenVerifier idTokenVerifier;
@@ -491,6 +497,21 @@ public class MiddlewaresTest {
         ImmutableMap.of(HttpHeaders.AUTHORIZATION, "<hidden>"),
         ImmutableMap.of(),
         request.payload().get().utf8());
+  }
+
+  @Test
+  public void testVerifyIdToken_GeneralSecurityException() throws GeneralSecurityException, IOException {
+    when(idTokenVerifier.verify("foo")).thenThrow(new GeneralSecurityException());
+    assertThat(Middlewares.verifyIdToken("foo", idTokenVerifier), is(nullValue()));
+  }
+
+  @Test
+  public void testVerifyIdToken_IOException() throws GeneralSecurityException, IOException {
+    final IOException cause = new IOException();
+    when(idTokenVerifier.verify("foo")).thenThrow(cause);
+    exception.expect(RuntimeException.class);
+    exception.expectCause(is(cause));
+    Middlewares.verifyIdToken("foo", idTokenVerifier);
   }
 
   public static <T> Response<T> awaitResponse(CompletionStage<Response<T>> completionStage)

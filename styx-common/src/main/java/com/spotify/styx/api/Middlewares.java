@@ -188,7 +188,7 @@ public final class Middlewares {
     return verifyIdToken(s, GOOGLE_ID_TOKEN_VERIFIER);
   }
 
-  private static GoogleIdToken verifyIdToken(String s, GoogleIdTokenVerifier verifier) {
+  public static GoogleIdToken verifyIdToken(String s, GoogleIdTokenVerifier verifier) {
     try {
       return verifier.verify(s);
     } catch (GeneralSecurityException e) {
