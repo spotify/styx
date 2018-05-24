@@ -268,11 +268,16 @@ public final class Middlewares {
   interface Authenticated<T> extends Function<AuthContext, T> {}
   interface Requested<T> extends Function<RequestContext, T> {}
 
-  private static <T> Middleware<Requested<Authenticated<T>>, AsyncHandler<Response<ByteString>>> authed() {
+  public static <T> Middleware<Requested<Authenticated<T>>, AsyncHandler<Response<ByteString>>> authed() {
+    return authed(GOOGLE_ID_TOKEN_VERIFIER);
+  }
+
+  public static <T> Middleware<Requested<Authenticated<T>>, AsyncHandler<Response<ByteString>>> authed(
+      GoogleIdTokenVerifier verifier) {
     return ar -> jsonAsync().apply(requestContext -> {
       final T payload = ar
           .apply(requestContext)
-          .apply(auth(requestContext, GOOGLE_ID_TOKEN_VERIFIER));
+          .apply(auth(requestContext, verifier));
       return completedFuture(Response.forPayload(payload));
     });
   }

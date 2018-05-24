@@ -53,6 +53,9 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.request.RequestContexts;
 import com.spotify.apollo.request.RequestMetadataImpl;
 import com.spotify.apollo.route.AsyncHandler;
+import com.spotify.styx.api.Middlewares.AuthContext;
+import com.spotify.styx.api.Middlewares.Authenticated;
+import com.spotify.styx.api.Middlewares.Requested;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
@@ -512,6 +515,28 @@ public class MiddlewaresTest {
     exception.expect(RuntimeException.class);
     exception.expectCause(is(cause));
     Middlewares.verifyIdToken("foo", idTokenVerifier);
+  }
+
+  @Test
+  public void testAuthed() throws Exception {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = Request.forUri("/", "PUT")
+        .withPayload(ByteString.encodeUtf8("hello"))
+        .withHeader(HttpHeaders.AUTHORIZATION, "Bearer s3cr3tp455w0rd");
+    when(requestContext.request()).thenReturn(request);
+
+    when(idTokenVerifier.verify("s3cr3tp455w0rd")).thenReturn(idToken);
+    when(idToken.getPayload()).thenReturn(idTokenPayload);
+
+    final AtomicReference<GoogleIdToken> userHolder = new AtomicReference<>();
+    awaitResponse(Middlewares.authed(idTokenVerifier)
+        .apply(rc -> auth -> {
+          userHolder.set(auth.user().get());
+          return CompletableFuture.completedFuture(Response.ok());
+        })
+        .invoke(requestContext));
+
+    assertThat(userHolder.get(), is(idToken));
   }
 
   public static <T> Response<T> awaitResponse(CompletionStage<Response<T>> completionStage)
