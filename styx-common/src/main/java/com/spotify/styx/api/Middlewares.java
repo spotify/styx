@@ -185,8 +185,12 @@ public final class Middlewares {
   }
 
   private static GoogleIdToken verifyIdToken(String s) {
+    return verifyIdToken(s, GOOGLE_ID_TOKEN_VERIFIER);
+  }
+
+  private static GoogleIdToken verifyIdToken(String s, GoogleIdTokenVerifier verifier) {
     try {
-      return GOOGLE_ID_TOKEN_VERIFIER.verify(s);
+      return verifier.verify(s);
     } catch (GeneralSecurityException e) {
       return null; // will be treated as an invalid token
     } catch (IOException e) {
@@ -195,17 +199,23 @@ public final class Middlewares {
   }
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> httpLogger() {
+    return httpLogger(LOG, GOOGLE_ID_TOKEN_VERIFIER);
+  }
+
+  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> httpLogger(
+      Logger log,
+      GoogleIdTokenVerifier verifier) {
     return innerHandler -> requestContext -> {
       final Request request = requestContext.request();
 
-      LOG.info("{}{} {} by {} with headers {} parameters {} and payload {}",
+      log.info("{}{} {} by {} with headers {} parameters {} and payload {}",
                "GET".equals(request.method()) ? "" : "[AUDIT] ",
                request.method(),
                request.uri(),
-               auth(requestContext).user().map(idToken -> idToken.getPayload()
+               auth(requestContext, verifier).user().map(idToken -> idToken.getPayload()
                    .getEmail())
                    .orElse("anonymous"),
-               filterHeaders(request.headers()),
+               hideSensitiveHeaders(request.headers()),
                request.parameters(),
                request.payload().map(ByteString::utf8).orElse("")
                    .replaceAll("\n", " "));
@@ -219,7 +229,8 @@ public final class Middlewares {
     Optional<GoogleIdToken> user();
   }
 
-  private static AuthContext auth(RequestContext requestContext) {
+  private static AuthContext auth(RequestContext requestContext,
+      GoogleIdTokenVerifier verifier) {
     final Request request = requestContext.request();
     final boolean hasAuthHeader = request.header(HttpHeaders.AUTHORIZATION).isPresent();
 
@@ -236,7 +247,7 @@ public final class Middlewares {
     final GoogleIdToken googleIdToken;
     try {
       final String token = authHeader.substring(BEARER_PREFIX.length());
-      googleIdToken = verifyIdToken(token);
+      googleIdToken = verifyIdToken(token, verifier);
     } catch (IllegalArgumentException e) {
       throw new ResponseException(Response.forStatus(Status.BAD_REQUEST
           .withReasonPhrase("Failed to parse Authorization token")), e);
@@ -250,10 +261,10 @@ public final class Middlewares {
     return () -> Optional.of(googleIdToken);
   }
 
-  private static Map<String, String> filterHeaders(Map<String, String> headers) {
+  private static Map<String, String> hideSensitiveHeaders(Map<String, String> headers) {
     return headers.entrySet().stream()
-        .filter(entry -> !BLACKLISTED_HEADERS.contains(entry.getKey()))
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        .collect(Collectors.toMap(Map.Entry::getKey,
+            entry -> BLACKLISTED_HEADERS.contains(entry.getKey()) ? "<hidden>" : entry.getValue()));
   }
 
   // todo: make use of following middleware where we need to use the auth context in route handlers
@@ -265,14 +276,14 @@ public final class Middlewares {
     return ar -> jsonAsync().apply(requestContext -> {
       final T payload = ar
           .apply(requestContext)
-          .apply(auth(requestContext));
+          .apply(auth(requestContext, GOOGLE_ID_TOKEN_VERIFIER));
       return completedFuture(Response.forPayload(payload));
     });
   }
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authValidator() {
     return h -> rc -> {
-      if (!"GET".equals(rc.request().method()) && !auth(rc).user().isPresent()) {
+      if (!"GET".equals(rc.request().method()) && !auth(rc, GOOGLE_ID_TOKEN_VERIFIER).user().isPresent()) {
         return completedFuture(
             Response.forStatus(Status.UNAUTHORIZED.withReasonPhrase("Unauthorized access")));
       }
