@@ -135,8 +135,7 @@ public class BackfillResourceTest extends VersionedApiTest {
                                    Duration.ZERO);
 
     environment.routingEngine()
-        .registerRoutes(Api.withCommonMiddleware(
-            new BackfillResource(SCHEDULER_BASE, storage, workflowValidator).routes()));
+        .registerRoutes(new BackfillResource(SCHEDULER_BASE, storage, workflowValidator).routes());
   }
 
   @BeforeClass

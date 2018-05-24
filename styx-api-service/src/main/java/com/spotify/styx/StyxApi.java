@@ -20,7 +20,6 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.api.Middlewares.authValidator;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
@@ -177,7 +176,7 @@ public class StyxApi implements AppInit {
         resourceResource.routes(),
         statusResource.routes(),
         schedulerProxyResource.routes()
-    ).map(r -> r.withMiddleware(authValidator()));
+    );
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))

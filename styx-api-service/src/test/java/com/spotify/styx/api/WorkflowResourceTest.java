@@ -135,8 +135,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
         new WorkflowResource(storage, workflowValidator, workflowInitializer, workflowConsumer);
 
     environment.routingEngine()
-        .registerRoutes(Api.withCommonMiddleware(
-            workflowResource.routes()));
+        .registerRoutes(workflowResource.routes());
   }
 
   @BeforeClass

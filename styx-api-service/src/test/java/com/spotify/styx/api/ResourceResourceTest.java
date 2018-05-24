@@ -79,8 +79,7 @@ public class ResourceResourceTest extends VersionedApiTest {
     ResourceResource resourceResource = new ResourceResource(storage, shardedCounter);
 
     environment.routingEngine()
-        .registerRoutes(Api.withCommonMiddleware(
-            resourceResource.routes()));
+        .registerRoutes(resourceResource.routes());
   }
 
   @BeforeClass
