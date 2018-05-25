@@ -430,6 +430,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(postedBackfill.schedule(), equalTo(Schedule.HOURS));
     assertThat(postedBackfill.allTriggered(), equalTo(false));
     assertThat(postedBackfill.halted(), equalTo(false));
+    assertThat(postedBackfill.reverse(), equalTo(false));
   }
 
   @Test
@@ -460,6 +461,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(postedBackfill.schedule(), equalTo(Schedule.HOURS));
     assertThat(postedBackfill.allTriggered(), equalTo(false));
     assertThat(postedBackfill.halted(), equalTo(false));
+    assertThat(postedBackfill.reverse(), equalTo(true));
   }
 
   @Test
