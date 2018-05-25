@@ -231,13 +231,11 @@ class BackfillTriggerManager {
   }
 
   private Instant exclusiveEndTrigger(Backfill backfill) {
-    final Instant exclusiveLastTrigger;
     if (backfill.reverse()) {
-      exclusiveLastTrigger = previousInstant(backfill.start(), backfill.schedule());
+      return previousInstant(backfill.start(), backfill.schedule());
     } else {
-      exclusiveLastTrigger = backfill.end();
+      return backfill.end();
     }
-    return exclusiveLastTrigger;
   }
 
   private void storeBackfill(Backfill backfill) {
@@ -251,9 +249,11 @@ class BackfillTriggerManager {
   private static Instant getNextPartition(Backfill momentBackfill,
                                    Instant momentNextTrigger,
                                    boolean reversed) {
-    return reversed
-        ? previousInstant(momentNextTrigger, momentBackfill.schedule())
-        : nextInstant(momentNextTrigger, momentBackfill.schedule());
+    if (reversed) {
+      return previousInstant(momentNextTrigger, momentBackfill.schedule());
+    } else {
+      return nextInstant(momentNextTrigger, momentBackfill.schedule());
+    }
   }
 
   private static boolean capacityReached(Backfill momentBackfill, Instant initialNextTrigger,
