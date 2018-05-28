@@ -47,6 +47,7 @@ import com.spotify.styx.client.ApiErrorException;
 import com.spotify.styx.client.ClientErrorException;
 import com.spotify.styx.client.StyxClient;
 import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -201,14 +202,57 @@ public class CliMainTest {
         .schedule(Schedule.DAYS)
         .build();
 
-    when(client.backfillCreate(component, "foo", start,
-        end, 1, null))
+    final BackfillInput expectedInput = BackfillInput.newBuilder()
+        .component(backfill.workflowId().componentId())
+        .workflow(backfill.workflowId().id())
+        .start(backfill.start())
+        .end(backfill.end())
+        .reverse(backfill.reverse())
+        .concurrency(backfill.concurrency())
+        .build();
+
+    when(client.backfillCreate(expectedInput))
         .thenReturn(CompletableFuture.completedFuture(backfill));
 
     CliMain.run(cliContext, "backfill", "create", component, "foo", "2017-01-01", "2017-01-30",
         "1");
 
-    verify(client).backfillCreate(component, "foo", start, end, 1, null);
+    verify(client).backfillCreate(expectedInput);
+    verify(cliOutput).printBackfill(backfill, true);
+  }
+
+  @Test
+  public void testBackfillCreateReverse() throws Exception {
+    final String component = "quux";
+    final Instant start = Instant.parse("2017-01-01T00:00:00Z");
+    final Instant end = Instant.parse("2017-01-30T00:00:00Z");
+
+    final Backfill backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(start)
+        .end(end)
+        .reverse(true)
+        .workflowId(WorkflowId.create(component, "foo"))
+        .concurrency(1)
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+
+    final BackfillInput expectedInput = BackfillInput.newBuilder()
+        .component(backfill.workflowId().componentId())
+        .workflow(backfill.workflowId().id())
+        .start(backfill.start())
+        .end(backfill.end())
+        .reverse(backfill.reverse())
+        .concurrency(backfill.concurrency())
+        .build();
+
+    when(client.backfillCreate(expectedInput))
+        .thenReturn(CompletableFuture.completedFuture(backfill));
+
+    CliMain.run(cliContext, "backfill", "create", component, "foo", "2017-01-01", "2017-01-30", "1", "--reverse");
+
+    verify(client).backfillCreate(expectedInput);
     verify(cliOutput).printBackfill(backfill, true);
   }
 
@@ -229,14 +273,22 @@ public class CliMainTest {
         .schedule(Schedule.DAYS)
         .build();
 
-    when(client.backfillCreate(component, "foo", start,
-        end, 1, "Description"))
+    final BackfillInput expectedInput = BackfillInput.newBuilder()
+        .component(backfill.workflowId().componentId())
+        .workflow(backfill.workflowId().id())
+        .start(backfill.start())
+        .end(backfill.end())
+        .concurrency(backfill.concurrency())
+        .description("Description")
+        .build();
+
+    when(client.backfillCreate(expectedInput))
         .thenReturn(CompletableFuture.completedFuture(backfill));
 
-    CliMain.run(cliContext, "backfill", "create", component, "foo", "2017-01-01", "2017-01-30",
-        "1", "-d", "Description");
+    CliMain.run(cliContext, "backfill", "create", component, "foo", "2017-01-01", "2017-01-30", "1",
+        "-d", "Description");
 
-    verify(client).backfillCreate(component, "foo", start, end, 1, "Description");
+    verify(client).backfillCreate(expectedInput);
     verify(cliOutput).printBackfill(backfill, true);
   }
   

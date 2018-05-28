@@ -27,7 +27,6 @@ import static java.time.ZoneOffset.UTC;
 import static java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 import static java.time.temporal.ChronoField.MONTH_OF_YEAR;
 
-import com.google.common.collect.Lists;
 import com.spotify.styx.model.Schedule;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -40,7 +39,6 @@ import java.time.format.ResolverStyle;
 import java.time.format.SignStyle;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -126,31 +124,6 @@ public final class ParameterUtil {
       default:
         return formatDateTime(instant);
     }
-  }
-
-  /**
-   * Generates a list of {@link Instant}s obtained by partitioning a time range defined by a
-   * starting and a ending {@link Instant}s, and based on the provided {@link Schedule}.
-   *
-   * @param startInstant              Defines the start of the time range (inclusive)
-   * @param endInstant                Defines the end of the time range (exclusive)
-   * @param schedule                  The schedule unit to split the time range into
-   * @throws IllegalArgumentException If the starting {@link Instant} is later than the ending
-   *                                  {@link Instant}
-   */
-  public static List<Instant> rangeOfInstants(Instant startInstant, Instant endInstant, Schedule schedule) {
-    if (endInstant.isBefore(startInstant)) {
-      throw new IllegalArgumentException("End time cannot be earlier the start time");
-    }
-    final List<Instant> listOfInstants = Lists.newArrayList();
-
-    Instant instantToProcess = startInstant;
-    while (instantToProcess.isBefore(endInstant)) {
-      listOfInstants.add(instantToProcess);
-      instantToProcess = TimeUtil.nextInstant(instantToProcess, schedule);
-    }
-
-    return listOfInstants;
   }
 
   public static Instant parseAlignedInstant(String dateHour, Schedule schedule) {

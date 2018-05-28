@@ -24,8 +24,10 @@ import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.spotify.styx.util.ExceptionUtil.findCause;
 import static com.spotify.styx.util.GuardedRunnable.guard;
-import static com.spotify.styx.util.TimeUtil.instancesInRange;
+import static com.spotify.styx.util.TimeUtil.instantsInRange;
+import static com.spotify.styx.util.TimeUtil.instantsInReversedRange;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
+import static com.spotify.styx.util.TimeUtil.previousInstant;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.Backfill;
@@ -142,7 +144,7 @@ class BackfillTriggerManager {
       try {
         if (!storage.runInTransaction(tx ->
             triggerNextPartitionAndProgress(tx, backfill.id(), workflow,
-                initialNextTrigger, remainingCapacity))) {
+                initialNextTrigger, remainingCapacity, backfill.reverse()))) {
           break;
         }
       } catch (IOException e) {
@@ -158,7 +160,8 @@ class BackfillTriggerManager {
                                           String id,
                                           Workflow workflow,
                                           Instant initialNextTrigger,
-                                          int remainingCapacity) {
+                                          int remainingCapacity,
+                                          boolean reversed) {
     final Backfill momentBackfill = tx.backfill(id).orElseThrow(() ->
         new RuntimeException("Error while fetching backfill " + id));
 
@@ -169,13 +172,13 @@ class BackfillTriggerManager {
 
     final Instant momentNextTrigger = momentBackfill.nextTrigger();
 
-    if (instancesInRange(initialNextTrigger, momentNextTrigger,
-        momentBackfill.schedule()) >= remainingCapacity) {
+    if (capacityReached(momentBackfill, initialNextTrigger, momentNextTrigger,
+        remainingCapacity, reversed)) {
       LOG.debug("Capacity reached for backfill {}", momentBackfill);
       return false;
     }
 
-    if (momentNextTrigger.equals(momentBackfill.end())) {
+    if (isAllTriggered(momentBackfill, momentNextTrigger)) {
       LOG.debug("Backfill {} all triggered", momentBackfill);
       tx.store(momentBackfill.builder()
           .allTriggered(true)
@@ -207,12 +210,12 @@ class BackfillTriggerManager {
       }
     }
 
-    final Instant nextPartition = nextInstant(momentNextTrigger, momentBackfill.schedule());
+    final Instant nextPartition = getNextPartition(momentBackfill, momentNextTrigger, reversed);
     tx.store(momentBackfill.builder()
                       .nextTrigger(nextPartition)
                       .build());
 
-    if (nextPartition.equals(momentBackfill.end())) {
+    if (isAllTriggered(momentBackfill, nextPartition)) {
       tx.store(momentBackfill.builder()
                            .nextTrigger(momentBackfill.end())
                            .allTriggered(true)
@@ -223,11 +226,45 @@ class BackfillTriggerManager {
     return true;
   }
 
+  private boolean isAllTriggered(Backfill backfill, Instant nextTrigger) {
+    return nextTrigger.equals(exclusiveEndTrigger(backfill));
+  }
+
+  private Instant exclusiveEndTrigger(Backfill backfill) {
+    if (backfill.reverse()) {
+      return previousInstant(backfill.start(), backfill.schedule());
+    } else {
+      return backfill.end();
+    }
+  }
+
   private void storeBackfill(Backfill backfill) {
     try {
       storage.storeBackfill(backfill);
     } catch (IOException e) {
       LOG.warn("Failed to store updated backfill {}", backfill.id(), e);
+    }
+  }
+
+  private static Instant getNextPartition(Backfill momentBackfill,
+                                   Instant momentNextTrigger,
+                                   boolean reversed) {
+    if (reversed) {
+      return previousInstant(momentNextTrigger, momentBackfill.schedule());
+    } else {
+      return nextInstant(momentNextTrigger, momentBackfill.schedule());
+    }
+  }
+
+  private static boolean capacityReached(Backfill momentBackfill, Instant initialNextTrigger,
+                                  Instant momentNextTrigger, int remainingCapacity,
+                                  boolean reversed) {
+    if (reversed) {
+      return instantsInReversedRange(initialNextTrigger, momentNextTrigger,
+          momentBackfill.schedule()).size() >= remainingCapacity;
+    } else {
+      return instantsInRange(initialNextTrigger, momentNextTrigger,
+          momentBackfill.schedule()).size() >= remainingCapacity;
     }
   }
 }

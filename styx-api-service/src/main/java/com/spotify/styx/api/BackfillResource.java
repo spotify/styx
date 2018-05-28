@@ -23,12 +23,14 @@ package com.spotify.styx.api;
 import static com.spotify.apollo.StatusType.Family.SUCCESSFUL;
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.serialization.Json.serialize;
-import static com.spotify.styx.util.ParameterUtil.rangeOfInstants;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 import static com.spotify.styx.util.StreamUtil.cat;
+import static com.spotify.styx.util.TimeUtil.instantsInRange;
+import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.stream.Collectors.toList;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.Iterables;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -271,6 +273,11 @@ public final class BackfillResource {
           + String.join(", ", errors)));
     }
 
+    if (!input.start().isBefore(input.end())) {
+      return Response.forStatus(
+          Status.BAD_REQUEST.withReasonPhrase("start must be before end"));
+    }
+
     if (!TimeUtil.isAligned(input.start(), schedule)) {
       return Response.forStatus(
           Status.BAD_REQUEST.withReasonPhrase("start parameter not aligned with schedule"));
@@ -281,8 +288,9 @@ public final class BackfillResource {
           Status.BAD_REQUEST.withReasonPhrase("end parameter not aligned with schedule"));
     }
 
+    final List<Instant> instants = instantsInRange(input.start(), input.end(), schedule);
     final List<WorkflowInstance> alreadyActive =
-        rangeOfInstants(input.start(), input.end(), schedule).stream()
+        instants.stream()
             .map(instant -> WorkflowInstance.create(workflowId, toParameter(schedule, instant)))
             .filter(activeWorkflowInstances::contains)
             .collect(toList());
@@ -304,8 +312,11 @@ public final class BackfillResource {
         .start(input.start())
         .end(input.end())
         .schedule(schedule)
-        .nextTrigger(input.start())
+        .nextTrigger(input.reverse()
+            ? Iterables.getLast(instants)
+            : input.start())
         .description(input.description())
+        .reverse(input.reverse())
         .halted(false);
 
     final Backfill backfill = builder.build();
@@ -347,8 +358,13 @@ public final class BackfillResource {
       throw new RuntimeException(e);
     }
 
-    final List<Instant> processedInstants = rangeOfInstants(
-        backfill.start(), backfill.nextTrigger(), backfill.schedule());
+    final List<Instant> processedInstants;
+    if (backfill.reverse()) {
+      final Instant firstInstant = nextInstant(backfill.nextTrigger(), backfill.schedule());
+      processedInstants = instantsInRange(firstInstant, backfill.end(), backfill.schedule());
+    } else {
+      processedInstants = instantsInRange(backfill.start(), backfill.nextTrigger(), backfill.schedule());
+    }
     processedStates = processedInstants.parallelStream()
         .map(instant -> {
           final WorkflowInstance wfi = WorkflowInstance
@@ -367,8 +383,13 @@ public final class BackfillResource {
         })
         .collect(toList());
 
-    final List<Instant> waitingInstants = rangeOfInstants(
-        backfill.nextTrigger(), backfill.end(), backfill.schedule());
+    final List<Instant> waitingInstants;
+    if (backfill.reverse()) {
+      final Instant lastInstant = nextInstant(backfill.nextTrigger(), backfill.schedule());
+      waitingInstants = instantsInRange(backfill.start(), lastInstant, backfill.schedule());
+    } else {
+      waitingInstants = instantsInRange(backfill.nextTrigger(), backfill.end(), backfill.schedule());
+    }
     waitingStates = waitingInstants.stream()
         .map(instant -> {
           final WorkflowInstance wfi = WorkflowInstance.create(
@@ -377,6 +398,9 @@ public final class BackfillResource {
         })
         .collect(toList());
 
-    return Stream.concat(processedStates.stream(), waitingStates.stream()).collect(toList());
+    return backfill.reverse()
+        ? Stream.concat(waitingStates.stream(), processedStates.stream()).collect(toList())
+        : Stream.concat(processedStates.stream(), waitingStates.stream()).collect(toList());
   }
+
 }

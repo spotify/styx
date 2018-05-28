@@ -58,6 +58,7 @@ public class JsonCliOutputTest {
       .description("Description")
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
       .schedule(Schedule.DAYS)
+      .reverse(true)
       .build();
   
   private static final String EXPECTED_OUTPUT = "{\"id\":\"backfill-2\"," 
@@ -71,7 +72,8 @@ public class JsonCliOutputTest {
                                                + "\"next_trigger\":\"2017-01-01T00:00:00Z\"," 
                                                + "\"schedule\":\"days\"," 
                                                + "\"all_triggered\":false," 
-                                               + "\"halted\":false}";
+                                               + "\"halted\":false,"
+                                               + "\"reverse\":true}";
 
   private static final String EXPECTED_OUTPUT_WITH_STATUS = "{\"backfill\":"
                                                             + EXPECTED_OUTPUT

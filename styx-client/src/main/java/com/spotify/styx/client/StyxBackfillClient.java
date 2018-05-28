@@ -23,6 +23,7 @@ package com.spotify.styx.client;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.BackfillInput;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
@@ -65,6 +66,14 @@ public interface StyxBackfillClient {
                                            final String end,
                                            final int concurrency,
                                            final String description);
+
+  /**
+   * Create a {@link Backfill}
+   *
+   * @param backfill The backfill configuration.
+   * @return The created {@link Backfill}
+   */
+  CompletionStage<Backfill> backfillCreate(BackfillInput backfill);
 
   /**
    * Edit concurrency value of existing {@link Backfill}
