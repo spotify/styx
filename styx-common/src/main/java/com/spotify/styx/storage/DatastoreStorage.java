@@ -849,8 +849,13 @@ public class DatastoreStorage implements Closeable {
         .nextTrigger(timestampToInstant(entity.getTimestamp(PROPERTY_NEXT_TRIGGER)))
         .schedule(Schedule.parse(entity.getString(PROPERTY_SCHEDULE)))
         .allTriggered(entity.getBoolean(PROPERTY_ALL_TRIGGERED))
-        .halted(entity.getBoolean(PROPERTY_HALTED))
-        .reverse(Optional.ofNullable(entity.getBoolean(PROPERTY_REVERSE)).orElse(false));
+        .halted(entity.getBoolean(PROPERTY_HALTED));
+
+    if (entity.contains(PROPERTY_REVERSE)) {
+      builder.reverse(entity.getBoolean(PROPERTY_REVERSE));
+    } else {
+      builder.reverse(false);
+    }
 
     if (entity.contains(PROPERTY_DESCRIPTION)) {
       builder.description(entity.getString(PROPERTY_DESCRIPTION));

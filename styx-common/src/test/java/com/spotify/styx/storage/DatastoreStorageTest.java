@@ -23,7 +23,19 @@ package com.spotify.styx.storage;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_ALL_TRIGGERED;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_COMPONENT;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONCURRENCY;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_DESCRIPTION;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_END;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_HALTED;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_TRIGGER;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_REVERSE;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_SCHEDULE;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_START;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW;
+import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -633,6 +645,37 @@ public class DatastoreStorageTest {
     final Backfill backfill = builder.build();
 
     storage.storeBackfill(backfill);
+    assertThat(storage.getBackfill(backfill.id()), equalTo(Optional.of(backfill)));
+  }
+
+  @Test
+  public void shouldReadBackfillWithMissingReverseField() throws Exception {
+    final Backfill backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(Instant.parse("2017-01-01T00:00:00Z"))
+        .end(Instant.parse("2017-01-02T00:00:00Z"))
+        .workflowId(WorkflowId.create("component", "workflow2"))
+        .concurrency(2)
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(DAYS).build();
+
+    final Key key = DatastoreStorage.backfillKey(datastore.newKeyFactory(), backfill.id());
+    Entity.Builder builder = Entity.newBuilder(key)
+        .set(PROPERTY_CONCURRENCY, backfill.concurrency())
+        .set(PROPERTY_START, instantToTimestamp(backfill.start()))
+        .set(PROPERTY_END, instantToTimestamp(backfill.end()))
+        .set(PROPERTY_COMPONENT, backfill.workflowId().componentId())
+        .set(PROPERTY_WORKFLOW, backfill.workflowId().id())
+        .set(PROPERTY_SCHEDULE, backfill.schedule().toString())
+        .set(PROPERTY_NEXT_TRIGGER, instantToTimestamp(backfill.nextTrigger()))
+        .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())
+        .set(PROPERTY_HALTED, backfill.halted());
+
+    backfill.description().ifPresent(x -> builder.set(PROPERTY_DESCRIPTION, StringValue
+        .newBuilder(x).setExcludeFromIndexes(true).build()));
+
+    datastore.put(builder.build());
+
     assertThat(storage.getBackfill(backfill.id()), equalTo(Optional.of(backfill)));
   }
 
