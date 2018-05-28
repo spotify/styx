@@ -76,7 +76,7 @@ class PlainCliOutput implements CliOutput {
 
   @Override
   public void printBackfill(Backfill backfill, boolean ignored) {
-    System.out.println(String.format("%s %s %s %s %s %s %s %s %s %s",
+    System.out.println(String.format("%s %s %s %s %s %s %s %s %s %s %s",
                                      backfill.id(),
                                      backfill.workflowId().componentId(),
                                      backfill.workflowId().id(),
@@ -85,6 +85,7 @@ class PlainCliOutput implements CliOutput {
                                      backfill.concurrency(),
                                      backfill.start(),
                                      backfill.end(),
+                                     backfill.reverse(),
                                      backfill.nextTrigger(),
                                      backfill.description().orElse("")));
   }

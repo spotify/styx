@@ -71,6 +71,7 @@ public class PrettyCliOutputTest {
         .end(Instant.parse("2017-01-02T00:00:00Z"))
         .workflowId(WorkflowId.create("component", "workflow2"))
         .concurrency(2)
+        .reverse(false)
         .description(description)
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
