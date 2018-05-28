@@ -217,7 +217,9 @@ class BackfillTriggerManager {
 
     if (isAllTriggered(momentBackfill, nextPartition)) {
       tx.store(momentBackfill.builder()
-                           .nextTrigger(momentBackfill.end())
+                   .nextTrigger(momentBackfill.reverse()
+                                ? previousInstant(momentBackfill.start(), momentBackfill.schedule())
+                                : momentBackfill.end())
                            .allTriggered(true)
                            .build());
       LOG.debug("Backfill {} all triggered", momentBackfill);
