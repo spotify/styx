@@ -52,7 +52,7 @@ import org.fusesource.jansi.Ansi;
 class PrettyCliOutput implements CliOutput {
 
   private static final String BACKFILL_FORMAT =
-      "%28s  %6s  %13s %12s  %-20s  %-20s  %-20s  %-<cid-length>s  %-<wid-length>s %s";
+      "%28s  %6s  %13s %12s  %-20s  %-20s  %-7s  %-20s  %-<cid-length>s  %-<wid-length>s %s";
 
   @Override
   public void printStates(RunStateDataPayload runStateDataPayload) {
@@ -124,6 +124,7 @@ class PrettyCliOutput implements CliOutput {
                                      backfill.concurrency(),
                                      toParameter(schedule, backfill.start()),
                                      toParameter(schedule, backfill.end()),
+                                     backfill.reverse(),
                                      toParameter(schedule, backfill.nextTrigger()),
                                      workflowId.componentId(),
                                      workflowId.id(),
@@ -142,6 +143,7 @@ class PrettyCliOutput implements CliOutput {
                                      "CONCURRENCY",
                                      "START (INCL)",
                                      "END (EXCL)",
+                                     "REVERSE",
                                      "NEXT TRIGGER",
                                      "COMPONENT",
                                      "WORKFLOW",
