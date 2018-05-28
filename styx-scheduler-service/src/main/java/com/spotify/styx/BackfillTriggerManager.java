@@ -162,25 +162,25 @@ class BackfillTriggerManager {
                                           Instant initialNextTrigger,
                                           int remainingCapacity,
                                           boolean reversed) {
-    final Backfill momentBackfill = tx.backfill(id).orElseThrow(() ->
+    final Backfill backfill = tx.backfill(id).orElseThrow(() ->
         new RuntimeException("Error while fetching backfill " + id));
 
-    if (momentBackfill.halted()) {
-      LOG.debug("Backfill {} halted", momentBackfill);
+    if (backfill.halted()) {
+      LOG.debug("Backfill {} halted", backfill);
       return false;
     }
 
-    final Instant momentNextTrigger = momentBackfill.nextTrigger();
+    final Instant nextTrigger = backfill.nextTrigger();
 
-    if (capacityReached(momentBackfill, initialNextTrigger, momentNextTrigger,
+    if (capacityReached(backfill, initialNextTrigger, nextTrigger,
         remainingCapacity, reversed)) {
-      LOG.debug("Capacity reached for backfill {}", momentBackfill);
+      LOG.debug("Capacity reached for backfill {}", backfill);
       return false;
     }
 
-    if (isAllTriggered(momentBackfill, momentNextTrigger)) {
-      LOG.debug("Backfill {} all triggered", momentBackfill);
-      tx.store(momentBackfill.builder()
+    if (isAllTriggered(backfill, nextTrigger)) {
+      LOG.debug("Backfill {} all triggered", backfill);
+      tx.store(backfill.builder()
           .allTriggered(true)
           .build());
       return false;
@@ -194,7 +194,7 @@ class BackfillTriggerManager {
       //     transaction, so it will move on to trigger the same partition again, but we still
       //     don't violate concurrency limit in this case
       final CompletableFuture<Void> processed = triggerListener
-          .event(workflow, Trigger.backfill(momentBackfill.id()), momentNextTrigger)
+          .event(workflow, Trigger.backfill(backfill.id()), nextTrigger)
           .toCompletableFuture();
       // Wait for the trigger execution to complete before proceeding to the next partition
       processed.get();
@@ -202,25 +202,27 @@ class BackfillTriggerManager {
       if (findCause(e, AlreadyInitializedException.class) != null) {
         // just encountered an ad-hoc trigger or it has been triggered by another scheduler instance
         // do not propagate the exception but instead letting transaction decide what to do
-        LOG.debug("{} already triggered for backfill {}", momentNextTrigger, momentBackfill, e);
+        LOG.debug("{} already triggered for backfill {}", nextTrigger, backfill, e);
       } else {
         // can be interrupted, we give up this backfill and retry in next tick
-        LOG.debug("Failed to trigger {} for backfill {}", momentNextTrigger, momentBackfill, e);
+        LOG.debug("Failed to trigger {} for backfill {}", nextTrigger, backfill, e);
         throw new RuntimeException(e);
       }
     }
 
-    final Instant nextPartition = getNextPartition(momentBackfill, momentNextTrigger, reversed);
-    tx.store(momentBackfill.builder()
+    final Instant nextPartition = getNextPartition(backfill, nextTrigger, reversed);
+    tx.store(backfill.builder()
                       .nextTrigger(nextPartition)
                       .build());
 
-    if (isAllTriggered(momentBackfill, nextPartition)) {
-      tx.store(momentBackfill.builder()
-                           .nextTrigger(momentBackfill.end())
+    if (isAllTriggered(backfill, nextPartition)) {
+      tx.store(backfill.builder()
+                   .nextTrigger(backfill.reverse()
+                                ? previousInstant(backfill.start(), backfill.schedule())
+                                : backfill.end())
                            .allTriggered(true)
                            .build());
-      LOG.debug("Backfill {} all triggered", momentBackfill);
+      LOG.debug("Backfill {} all triggered", backfill);
       return false;
     }
     return true;
@@ -246,25 +248,25 @@ class BackfillTriggerManager {
     }
   }
 
-  private static Instant getNextPartition(Backfill momentBackfill,
-                                   Instant momentNextTrigger,
+  private static Instant getNextPartition(Backfill backfill,
+                                   Instant nextTrigger,
                                    boolean reversed) {
     if (reversed) {
-      return previousInstant(momentNextTrigger, momentBackfill.schedule());
+      return previousInstant(nextTrigger, backfill.schedule());
     } else {
-      return nextInstant(momentNextTrigger, momentBackfill.schedule());
+      return nextInstant(nextTrigger, backfill.schedule());
     }
   }
 
-  private static boolean capacityReached(Backfill momentBackfill, Instant initialNextTrigger,
-                                  Instant momentNextTrigger, int remainingCapacity,
+  private static boolean capacityReached(Backfill backfill, Instant initialNextTrigger,
+                                  Instant nextTrigger, int remainingCapacity,
                                   boolean reversed) {
     if (reversed) {
-      return instantsInReversedRange(initialNextTrigger, momentNextTrigger,
-          momentBackfill.schedule()).size() >= remainingCapacity;
+      return instantsInReversedRange(initialNextTrigger, nextTrigger,
+          backfill.schedule()).size() >= remainingCapacity;
     } else {
-      return instantsInRange(initialNextTrigger, momentNextTrigger,
-          momentBackfill.schedule()).size() >= remainingCapacity;
+      return instantsInRange(initialNextTrigger, nextTrigger,
+          backfill.schedule()).size() >= remainingCapacity;
     }
   }
 }

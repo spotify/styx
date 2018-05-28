@@ -133,6 +133,17 @@ public class BackfillResourceTest extends VersionedApiTest {
       .schedule(Schedule.DAYS)
       .build();
 
+  private static final Backfill BACKFILL_5 = Backfill.newBuilder()
+      .id("backfill-5")
+      .start(Instant.parse("2017-01-01T00:00:00Z"))
+      .end(Instant.parse("2017-01-01T06:00:00Z"))
+      .reverse(true)
+      .workflowId(WorkflowId.create("component", "workflow1"))
+      .concurrency(1)
+      .nextTrigger(Instant.parse("2017-01-01T05:00:00Z"))
+      .schedule(Schedule.HOURS)
+      .build();
+
   private final WorkflowValidator workflowValidator = mock(WorkflowValidator.class);
 
   public BackfillResourceTest(Api.Version version) {
@@ -377,6 +388,43 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertJson(response, "statuses.active_states[23].state", equalTo("UNKNOWN"));
     assertJson(response, "statuses.active_states", hasSize(24));
   }
+
+  @Test
+  public void shouldGetFinishedBackfillReversed() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    storage.storeBackfill(BACKFILL_5.builder().nextTrigger(Instant.parse("2016-12-31T23:00:00Z")).allTriggered(true).build());
+
+    storeSucessfulInstance(WorkflowInstance.create(BACKFILL_5.workflowId(), "2017-01-01T05"), BACKFILL_5.id());
+    storeSucessfulInstance(WorkflowInstance.create(BACKFILL_5.workflowId(), "2017-01-01T04"), BACKFILL_5.id());
+    storeSucessfulInstance(WorkflowInstance.create(BACKFILL_5.workflowId(), "2017-01-01T03"), BACKFILL_5.id());
+    storeSucessfulInstance(WorkflowInstance.create(BACKFILL_5.workflowId(), "2017-01-01T02"), BACKFILL_5.id());
+    storeSucessfulInstance(WorkflowInstance.create(BACKFILL_5.workflowId(), "2017-01-01T01"), BACKFILL_5.id());
+    storeSucessfulInstance(WorkflowInstance.create(BACKFILL_5.workflowId(), "2017-01-01T00"), BACKFILL_5.id());
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/" + BACKFILL_5.id())));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfill.id", equalTo(BACKFILL_5.id()));
+    assertJson(response, "statuses.active_states[0].state", equalTo("DONE"));
+    assertJson(response, "statuses.active_states[3].state", equalTo("DONE"));
+    assertJson(response, "statuses.active_states[4].state", equalTo("DONE"));
+    assertJson(response, "statuses.active_states[5].state", equalTo("DONE"));
+    assertJson(response, "statuses.active_states", hasSize(6));
+  }
+
+  private void storeSucessfulInstance(WorkflowInstance wfi, String backfillId) throws IOException {
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(wfi, Trigger.backfill(backfillId)),  1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi, RESOURCE_IDS),                             2L, 2L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"),3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                    4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                           5L, 5L));
+    storage.writeEvent(SequenceEvent.create(Event.terminate(wfi, Optional.of(0)),                         6L, 6L));
+    storage.writeEvent(SequenceEvent.create(Event.success(wfi),                                           7L, 7L));
+    storage.writeActiveState(wfi, RunState.create(wfi, State.DONE, StateData.zero(), Instant.now(),       8L));
+  }
+
 
   @Test
   public void shouldGetBackfillWithoutStatus() throws Exception {

@@ -46,10 +46,11 @@ public class PlainCliOutputTest {
       .description("Description")
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
       .schedule(Schedule.DAYS)
+      .reverse(false)
       .build();
   private static final String EXPECTED_OUTPUT =
       "backfill-2 component workflow2 false false 2 2017-01-01T00:00:00Z"
-        + " 2017-01-02T00:00:00Z 2017-01-01T00:00:00Z Description\n";
+        + " 2017-01-02T00:00:00Z false 2017-01-01T00:00:00Z Description\n";
 
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
 

@@ -309,7 +309,7 @@ public class BackfillTriggerManagerTest {
         inOrder(triggerListener).verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_4.id()), instant));
 
     final Backfill completedBackfill =
-        BACKFILL_4.builder().nextTrigger(BACKFILL_4.end()).allTriggered(true).build();
+        BACKFILL_4.builder().nextTrigger(previousInstant(BACKFILL_4.start(), BACKFILL_4.schedule())).allTriggered(true).build();
     verify(transaction).store(completedBackfill);
   }
 
