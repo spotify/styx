@@ -31,7 +31,6 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_DESCRIPTION;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_END;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_HALTED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_TRIGGER;
-import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_REVERSE;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_SCHEDULE;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_START;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW;
