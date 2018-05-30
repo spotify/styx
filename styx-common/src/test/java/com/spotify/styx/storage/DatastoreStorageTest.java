@@ -27,7 +27,6 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_ALL_TRIGGERED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_COMPONENT;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONCURRENCY;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED;
-import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_DESCRIPTION;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_END;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_HALTED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_TRIGGER;
@@ -669,9 +668,6 @@ public class DatastoreStorageTest {
         .set(PROPERTY_NEXT_TRIGGER, instantToTimestamp(backfill.nextTrigger()))
         .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())
         .set(PROPERTY_HALTED, backfill.halted());
-
-    backfill.description().ifPresent(x -> builder.set(PROPERTY_DESCRIPTION, StringValue
-        .newBuilder(x).setExcludeFromIndexes(true).build()));
 
     datastore.put(builder.build());
 
