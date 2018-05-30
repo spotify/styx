@@ -25,6 +25,7 @@ import static com.spotify.styx.util.TimeUtil.lastInstant;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
@@ -47,15 +48,25 @@ public class WorkflowInitializer {
 
   public Optional<Workflow> store(Workflow workflow)
       throws WorkflowInitializationException {
+    try {
+      return storage.runInTransaction(tx -> store(tx, workflow));
+    } catch (IOException e) {
+      LOG.warn("failed to write workflow {} to storage", workflow.id(), e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  private Optional<Workflow> store(StorageTransaction tx, Workflow workflow)
+      throws WorkflowInitializationException, IOException {
     final Optional<Workflow> previous;
     try {
-      previous = storage.workflow(workflow.id());
+      previous = tx.workflow(workflow.id());
     } catch (IOException e) {
       LOG.warn("failed to read workflow {} from storage", workflow.id(), e);
       throw new RuntimeException(e);
     }
 
-    Optional<TriggerInstantSpec> nextSpec = Optional.empty();
+    final Optional<TriggerInstantSpec> nextSpec;
 
     // either the workflow is completely new, or the schedule/offset has changed
     final Schedule newSchedule = workflow.configuration().schedule();
@@ -69,16 +80,13 @@ public class WorkflowInitializer {
         LOG.info("could not compute next natural trigger for workflow {}", workflow, e);
         throw new WorkflowInitializationException(e);
       }
+    } else {
+      nextSpec = Optional.empty();
     }
 
-    try {
-      storage.storeWorkflow(workflow);
-      if (nextSpec.isPresent()) {
-        storage.updateNextNaturalTrigger(workflow.id(), nextSpec.get());
-      }
-    } catch (IOException e) {
-      LOG.warn("failed to write workflow {} to storage", workflow.id(), e);
-      throw new RuntimeException(e);
+    tx.store(workflow);
+    if (nextSpec.isPresent()) {
+      tx.updateNextNaturalTrigger(workflow.id(), nextSpec.get());
     }
 
     return previous;

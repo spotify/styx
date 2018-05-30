@@ -29,6 +29,8 @@ import static org.mockito.Mockito.when;
 
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.storage.StorageTransaction;
+import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.testdata.TestData;
 import java.io.IOException;
 import java.time.Instant;
@@ -52,18 +54,20 @@ public class WorkflowInitializerTest {
 
   private WorkflowInitializer workflowInitializer;
 
-  @Mock
-  private Storage storage;
+  @Mock private Storage storage;
+  @Mock private StorageTransaction transaction;
 
   @Before
-  public void setUp() {
+  public void setUp() throws IOException {
     workflowInitializer = new WorkflowInitializer(storage,
         () -> Instant.parse("2015-12-31T23:59:10.000Z"));
+    when(storage.runInTransaction(any())).then(a ->
+        a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
   }
 
   @Test
   public void shouldFailToReadWorkflow() throws Exception {
-    when(storage.workflow(HOURLY_WORKFLOW.id())).thenThrow(new IOException("read error"));
+    when(transaction.workflow(HOURLY_WORKFLOW.id())).thenThrow(new IOException("read error"));
 
     try {
       workflowInitializer.store(HOURLY_WORKFLOW);
@@ -75,8 +79,8 @@ public class WorkflowInitializerTest {
 
   @Test
   public void shouldFailToStoreWorkflow() throws Exception {
-    doThrow(new IOException("write error")).when(storage).storeWorkflow(HOURLY_WORKFLOW);
-    when(storage.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
+    doThrow(new IOException("write error")).when(transaction).store(HOURLY_WORKFLOW);
+    when(transaction.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
 
     try {
       workflowInitializer.store(HOURLY_WORKFLOW);
@@ -88,16 +92,16 @@ public class WorkflowInitializerTest {
 
   @Test(expected = WorkflowInitializationException.class)
   public void shouldFailComputeNextTrigger() throws Exception {
-    when(storage.workflow(HOURLY_WORKFLOW.id()))
+    when(transaction.workflow(HOURLY_WORKFLOW.id()))
         .thenReturn(Optional.of(HOURLY_WORKFLOW));
     workflowInitializer.store(HOURLY_WORKFLOW_WITH_INVALID_OFFSET);
   }
 
   @Test
   public void shouldFailToUpdateNextNaturalTrigger() throws Exception {
-    doThrow(new IOException("update error")).when(storage)
+    doThrow(new IOException("update error")).when(transaction)
         .updateNextNaturalTrigger(eq(HOURLY_WORKFLOW.id()), any());
-    when(storage.workflow(HOURLY_WORKFLOW.id()))
+    when(transaction.workflow(HOURLY_WORKFLOW.id()))
         .thenReturn(Optional.of(HOURLY_WORKFLOW));
 
     try {
