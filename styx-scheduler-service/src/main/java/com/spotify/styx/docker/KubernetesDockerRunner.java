@@ -416,7 +416,8 @@ class KubernetesDockerRunner implements DockerRunner {
             .findAny());
   }
 
-  private static boolean isMainContainer(String name, Pod pod) {
+  @VisibleForTesting
+  static boolean isMainContainer(String name, Pod pod) {
     return name.equals(MAIN_CONTAINER_NAME)
         // TODO: Containers used to be named same as the pod (execution id), remove this after deploying
         || name.equals(pod.getMetadata().getName());

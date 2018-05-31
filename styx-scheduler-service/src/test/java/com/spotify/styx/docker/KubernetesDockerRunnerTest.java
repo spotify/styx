@@ -837,6 +837,15 @@ public class KubernetesDockerRunnerTest {
         0);
   }
 
+  @Test
+  public void shouldRecognizeMainContainer() {
+    assertThat(KubernetesDockerRunner.isMainContainer(MAIN_CONTAINER_NAME, createdPod), is(true));
+    assertThat(KubernetesDockerRunner.isMainContainer(KEEPALIVE_CONTAINER_NAME, createdPod), is(false));
+    assertThat(KubernetesDockerRunner.isMainContainer("foobar", createdPod), is(false));
+    // TODO: delete after deploying container name change
+    assertThat(KubernetesDockerRunner.isMainContainer(POD_NAME, createdPod), is(true));
+  }
+
   private void verifyPodNeverDeleted(PodResource<Pod, DoneablePod> pod) {
     verify(k8sClient.pods(), never()).delete(any(Pod.class));
     verify(k8sClient.pods(), never()).delete(any(Pod[].class));
