@@ -850,7 +850,7 @@ public class DatastoreStorage implements Closeable {
         .schedule(Schedule.parse(entity.getString(PROPERTY_SCHEDULE)))
         .allTriggered(entity.getBoolean(PROPERTY_ALL_TRIGGERED))
         .halted(entity.getBoolean(PROPERTY_HALTED))
-        .reverse(Optional.ofNullable(entity.getBoolean(PROPERTY_REVERSE)).orElse(false));
+        .reverse(read(entity, PROPERTY_REVERSE, Boolean.FALSE));
 
     if (entity.contains(PROPERTY_DESCRIPTION)) {
       builder.description(entity.getString(PROPERTY_DESCRIPTION));
@@ -887,8 +887,8 @@ public class DatastoreStorage implements Closeable {
         : Optional.empty();
   }
 
-  private <T> T read(Entity entity, String property, T defaultValue) {
-    return this.<T>readOpt(entity, property).orElse(defaultValue);
+  private static <T> T read(Entity entity, String property, T defaultValue) {
+    return DatastoreStorage.<T>readOpt(entity, property).orElse(defaultValue);
   }
 
   static StringValue jsonValue(Object o) throws JsonProcessingException {

@@ -603,6 +603,31 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldHaltBackfillReversed() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    serviceHelper.stubClient()
+        .respond(Response.forStatus(Status.ACCEPTED))
+        .to(SCHEDULER_BASE + "/api/v0/events");
+
+    WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_5.workflowId(), "2017-01-01T05");
+    WorkflowInstance wfi1 = WorkflowInstance.create(BACKFILL_5.workflowId(), "2017-01-01T04");
+    WorkflowInstance wfi2 = WorkflowInstance.create(BACKFILL_5.workflowId(), "2017-01-01T03");
+    storage.storeBackfill(BACKFILL_5.builder().nextTrigger(Instant.parse("2017-01-01T02:00:00Z")).build());
+    storeRunningWorkflowInstance(wfi, BACKFILL_5.id());
+    storeRunningWorkflowInstance(wfi1, BACKFILL_5.id());
+    storeRunningWorkflowInstance(wfi2, BACKFILL_5.id());
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("DELETE", path("/" + BACKFILL_5.id())));
+    assertThat(response.status().reasonPhrase(),
+        response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+
+    assertThat(storage.backfill(BACKFILL_5.id()).get().halted(), equalTo(true));
+    verify(serviceHelper.stubClient(), times(3)).send(any());
+  }
+
+  @Test
   public void shouldHaltBackfill() throws Exception {
     sinceVersion(Api.Version.V3);
 
@@ -612,13 +637,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
     storage.storeBackfill(BACKFILL_1.builder().nextTrigger(Instant.parse("2017-01-01T02:00:00Z")).build());
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(wfi, Trigger.backfill("backfill-1")), 1L, 1L));
-    storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi, RESOURCE_IDS),                            2L, 2L));
-    storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"),          3L, 3L));
-    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                              4L, 4L));
-    storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                          5L, 5L));
-    storage.writeActiveState(wfi, RunState.create(wfi, State.RUNNING,
-        StateData.zero(), Instant.now(), 5L));
+    storeRunningWorkflowInstance(wfi, BACKFILL_1.id());
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("DELETE", path("/" + BACKFILL_1.id())));
@@ -627,6 +646,15 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     assertThat(storage.backfill(BACKFILL_1.id()).get().halted(), equalTo(true));
     verify(serviceHelper.stubClient(), times(1)).send(any());
+  }
+
+  private void storeRunningWorkflowInstance(WorkflowInstance wfi, String backfillId) throws IOException {
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(wfi, Trigger.backfill(backfillId)), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi, RESOURCE_IDS),                          2L, 2L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"),        3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                            4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                        5L, 5L));
+    storage.writeActiveState(wfi, RunState.create(wfi, State.RUNNING, StateData.zero(), Instant.now(), 5L));
   }
 
   @Test
