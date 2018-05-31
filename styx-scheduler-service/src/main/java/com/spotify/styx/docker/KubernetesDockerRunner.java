@@ -126,6 +126,7 @@ class KubernetesDockerRunner implements DockerRunner {
       .setNameFormat("k8s-scheduler-thread-%d")
       .build();
   static final String KEEPALIVE_CONTAINER_NAME = "keepalive";
+  static final String MAIN_CONTAINER_NAME = "styx-run";
 
   private final ScheduledExecutorService executor;
 
@@ -248,7 +249,7 @@ class KubernetesDockerRunner implements DockerRunner {
     runSpec.memLimit().ifPresent(s -> resourceRequirements.addToLimits("memory", new Quantity(s)));
 
     final ContainerBuilder mainContainerBuilder = new ContainerBuilder()
-        .withName(mainContainerName(executionId))
+        .withName(MAIN_CONTAINER_NAME)
         .withImage(imageWithTag)
         .withArgs(runSpec.args())
         .withEnv(buildEnv(workflowInstance, runSpec))
@@ -297,10 +298,6 @@ class KubernetesDockerRunner implements DockerRunner {
     podBuilder.withSpec(specBuilder.build());
 
     return podBuilder.build();
-  }
-
-  private static String mainContainerName(String executionId) {
-    return executionId;
   }
 
   private static Container keepaliveContainer() {
@@ -415,8 +412,14 @@ class KubernetesDockerRunner implements DockerRunner {
   static Optional<ContainerStatus> getMainContainerStatus(Pod pod) {
     return readPodWorkflowInstance(pod)
         .flatMap(wfi -> pod.getStatus().getContainerStatuses().stream()
-            .filter(status -> mainContainerName(pod.getMetadata().getName()).equals(status.getName()))
+            .filter(status -> isMainContainer(pod.getMetadata().getName(), pod))
             .findAny());
+  }
+
+  private static boolean isMainContainer(String name, Pod pod) {
+    return name.equals(MAIN_CONTAINER_NAME)
+        // TODO: Containers used to be named same as the pod (execution id), remove this after deploying
+        || name.equals(pod.getMetadata().getName());
   }
 
   private boolean isNonDeletePeriodExpired(ContainerStatus cs) {

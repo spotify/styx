@@ -21,6 +21,7 @@
 package com.spotify.styx.docker;
 
 import static com.spotify.styx.docker.KubernetesDockerRunner.KEEPALIVE_CONTAINER_NAME;
+import static com.spotify.styx.docker.KubernetesDockerRunner.MAIN_CONTAINER_NAME;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.podStatusNoContainer;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.setRunning;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.setTerminated;
@@ -236,14 +237,14 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldCreateMainContainerNamedByExecutionIdAndKeepaliveContainer() throws IOException {
+  public void shouldCreateMainContainerAndKeepaliveContainer() throws IOException {
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
     verify(pods).create(podCaptor.capture());
     Pod submittedPod = podCaptor.getValue();
     assertThat(submittedPod.getSpec().getContainers().size(), is(2));
     final Container mainContainer = submittedPod.getSpec().getContainers().get(0);
     final Container keepaliveContainer = submittedPod.getSpec().getContainers().get(1);
-    assertThat(mainContainer.getName(), is(RUN_SPEC.executionId()));
+    assertThat(mainContainer.getName(), is(MAIN_CONTAINER_NAME));
     assertThat(keepaliveContainer.getName(), is(KEEPALIVE_CONTAINER_NAME));
     assertThat(keepaliveContainer.getVolumeMounts(), is(empty()));
   }
@@ -550,7 +551,6 @@ public class KubernetesDockerRunnerTest {
                is(KubernetesDockerRunner.STYX_WORKFLOW_SA_SECRET_NAME));
     assertThat(pod.getSpec().getContainers().size(), is(2));
     final Container mainContainer = pod.getSpec().getContainers().get(0);
-    assertThat(mainContainer.getName(), is(RUN_SPEC_WITH_SA.executionId()));
     assertThat(mainContainer.getEnv().stream()
             .anyMatch(e -> e.getName().equals(KubernetesDockerRunner.STYX_WORKFLOW_SA_ENV_VARIABLE)),
         is(true));
