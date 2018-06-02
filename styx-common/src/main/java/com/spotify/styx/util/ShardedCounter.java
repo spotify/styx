@@ -264,11 +264,15 @@ public class ShardedCounter {
         // when incrementing we want to make sure that the newShardValue is within [0, shardCapacity]
         transaction.store(Shard.create(counterId, shardIndex, (int) newShardValue));
       } else {
-        final String message = String.format("Chosen shard %s-%s has no more capacity.",
-            counterId, shardIndex);
+        final String message = String.format(
+            "Chosen shard %s-%s has no more capacity: capacity=%d, value=%d, delta=%d, newValue=%d",
+            counterId, shardIndex, shardCapacity, shard.get().value(), delta, newShardValue);
         LOG.info(message);
         throw new CounterCapacityException(message);
       }
+      final String operation = delta > 0 ? "increment" : "decrement";
+      LOG.info("Updating counter shard ({}): {}-{}: capacity={}, value={}, delta={}, newValue={}",
+          operation, counterId, shardIndex, shardCapacity, shard.get().value(), delta, newShardValue);
     } else {
       final String message =
           String.format("Could not find shard %s-%s. Unexpected Datastore corruption or our"
