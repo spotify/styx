@@ -20,7 +20,7 @@
 
 package com.spotify.styx.state;
 
-import static com.spotify.styx.state.StateUtil.GLOBAL_RESOURCE_ID;
+import static com.spotify.styx.storage.Storage.GLOBAL_RESOURCE_ID;
 import static com.spotify.styx.testdata.TestData.RESOURCE_IDS;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_ID;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;

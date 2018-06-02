@@ -45,6 +45,12 @@ import java.util.SortedSet;
 public interface Storage extends Closeable {
 
   /**
+   * ID of the global resource that limits global resource usage across
+   * all workflows
+   */
+  String GLOBAL_RESOURCE_ID = "GLOBAL_STYX_CLUSTER";
+
+  /**
    * Returns all {@link SequenceEvent} for a {@link WorkflowInstance} in time order.
    *
    * @param workflowInstance  The workflow instance to get the events for

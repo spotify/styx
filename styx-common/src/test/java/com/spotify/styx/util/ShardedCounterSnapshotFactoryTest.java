@@ -82,8 +82,9 @@ public class ShardedCounterSnapshotFactoryTest {
   }
 
   @Before
-  public void setUp() {
+  public void setUp() throws IOException {
     counterSnapshotFactory = spy(new ShardedCounterSnapshotFactory(storage));
+    storage.updateLimitForCounter(RESOURCE_ID, 10L);
   }
 
   @After
@@ -103,5 +104,4 @@ public class ShardedCounterSnapshotFactoryTest {
     verify(storage, times(NUM_SHARDS / TRANSACTION_GROUP_SIZE + 1)).runInTransaction(any());
     assertEquals(128, storage.shardsForCounter(RESOURCE_ID).size());
   }
-
 }

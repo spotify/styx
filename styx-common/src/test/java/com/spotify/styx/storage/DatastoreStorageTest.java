@@ -33,9 +33,12 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_TRIGGER;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_SCHEDULE;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_START;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW;
+import static com.spotify.styx.storage.DatastoreStorage.globalConfigKey;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
+import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
+import static com.spotify.styx.util.ShardedCounter.PROPERTY_LIMIT;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -840,6 +843,45 @@ public class DatastoreStorageTest {
     assertEquals(2, map.size());
     assertEquals(0, map.get(0).longValue());
     assertEquals(3, map.get(1).longValue());
+  }
+
+  @Test
+  public void shouldReturnCounterLimit() {
+    updateLimitInStorage("foo-resource", 10L);
+
+    assertEquals(10L, storage.getLimitForCounter("foo-resource"));
+  }
+
+  @Test
+  public void shouldReturnDefaultGlobalCounterLimit() {
+    assertEquals(Long.MAX_VALUE, storage.getLimitForCounter("GLOBAL_STYX_CLUSTER"));
+  }
+
+  @Test
+  public void shouldReturnGlobalCounterLimit() {
+    final Key key = globalConfigKey(datastore.newKeyFactory());
+    Entity.Builder builder = Entity.newBuilder(key)
+        .set(PROPERTY_CONCURRENCY, 4000L);
+    datastore.put(builder.build());
+
+    assertEquals(4000L, storage.getLimitForCounter("GLOBAL_STYX_CLUSTER"));
+  }
+
+  @Test
+  public void shouldGetExceptionForUnknownCounter() {
+    updateLimitInStorage("foo-resource", 10L);
+
+    exception.expect(IllegalArgumentException.class);
+    exception.expectMessage("No limit found in Datastore for bar-resource");
+
+    storage.getLimitForCounter("bar-resource");
+  }
+
+  private void updateLimitInStorage(String counterId, long limit) {
+    datastore.put(Entity.newBuilder((datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey
+        (counterId)))
+        .set(PROPERTY_LIMIT, limit)
+        .build());
   }
 
   private static class FooException extends Exception {
