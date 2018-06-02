@@ -30,6 +30,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -198,7 +199,13 @@ public class ResourceResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
 
     assertThat(storage.resource(RESOURCE_1.id()).isPresent(), is(false));
-    assertThat(storage.getLimitForCounter(RESOURCE_1.id()), is(Long.MAX_VALUE));
+
+    try {
+      storage.getLimitForCounter(RESOURCE_1.id());
+      fail();
+    } catch (IllegalArgumentException e) {
+      assertThat(e.getMessage(), is("No limit found in Datastore for resource1"));
+    }
   }
 
   @Test
@@ -255,6 +262,12 @@ public class ResourceResourceTest extends VersionedApiTest {
     assertThat(storage.resource(RESOURCE_1.id()), hasValue(RESOURCE_1));
     assertThat(storage.resource("resource2"), isEmpty());
     assertThat(storage.getLimitForCounter(RESOURCE_1.id()), is(RESOURCE_1.concurrency()));
-    assertThat(storage.getLimitForCounter(RESOURCE_2.id()), is(Long.MAX_VALUE));
+
+    try {
+      storage.getLimitForCounter(RESOURCE_2.id());
+      fail();
+    } catch (IllegalArgumentException e) {
+      assertThat(e.getMessage(), is("No limit found in Datastore for resource2"));
+    }
   }
 }
