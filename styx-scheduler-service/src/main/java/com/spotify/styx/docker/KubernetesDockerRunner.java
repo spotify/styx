@@ -412,7 +412,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static Optional<ContainerStatus> getMainContainerStatus(Pod pod) {
     return readPodWorkflowInstance(pod)
         .flatMap(wfi -> pod.getStatus().getContainerStatuses().stream()
-            .filter(status -> isMainContainer(pod.getMetadata().getName(), pod))
+            .filter(status -> isMainContainer(status.getName(), pod))
             .findAny());
   }
 

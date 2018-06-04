@@ -268,7 +268,7 @@ public class KubernetesDockerRunnerTest {
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
-    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
+    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(keepaliveContainerStatus, containerStatus));
     when(containerStatus.getName()).thenReturn(EXECUTION_ID);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
