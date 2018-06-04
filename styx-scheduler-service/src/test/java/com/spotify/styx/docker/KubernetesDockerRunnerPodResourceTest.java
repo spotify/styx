@@ -25,6 +25,7 @@ import static com.spotify.styx.docker.KubernetesDockerRunner.COMPONENT_ID;
 import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_IMAGE;
 import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_TERMINATION_LOGGING_ANNOTATION;
 import static com.spotify.styx.docker.KubernetesDockerRunner.EXECUTION_ID;
+import static com.spotify.styx.docker.KubernetesDockerRunner.MAIN_CONTAINER_NAME;
 import static com.spotify.styx.docker.KubernetesDockerRunner.PARAMETER;
 import static com.spotify.styx.docker.KubernetesDockerRunner.SERVICE_ACCOUNT;
 import static com.spotify.styx.docker.KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION;
@@ -71,7 +72,7 @@ public class KubernetesDockerRunnerPodResourceTest {
 
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(containers.size(), is(2));
-    assertThat(containers.get(0).getName(), is("eid"));
+    assertThat(containers.get(0).getName(), is(MAIN_CONTAINER_NAME));
 
     Container container = containers.get(0);
     assertThat(container.getImage(), is("busybox:latest"));
@@ -85,7 +86,7 @@ public class KubernetesDockerRunnerPodResourceTest {
 
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(containers.size(), is(2));
-    assertThat(containers.get(0).getName(), is("eid"));
+    assertThat(containers.get(0).getName(), is(MAIN_CONTAINER_NAME));
 
     Container container = containers.get(0);
     assertThat(container.getImage(), is("busybox:v7"));
@@ -99,7 +100,7 @@ public class KubernetesDockerRunnerPodResourceTest {
 
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(containers.size(), is(2));
-    assertThat(containers.get(0).getName(), is("eid"));
+    assertThat(containers.get(0).getName(), is(MAIN_CONTAINER_NAME));
 
     Container container = containers.get(0);
     assertThat(container.getArgs(), contains("echo", "foo", "bar"));
@@ -173,7 +174,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(volumes.size(), is(0));
     assertThat(containers.size(), is(2));
-    assertThat(containers.get(0).getName(), is("eid"));
+    assertThat(containers.get(0).getName(), is(MAIN_CONTAINER_NAME));
 
     Container container = containers.get(0);
     List<VolumeMount> volumeMounts = container.getVolumeMounts();
@@ -199,7 +200,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(volumes.size(), is(1));
     assertThat(containers.size(), is(2));
-    assertThat(containers.get(0).getName(), is("eid"));
+    assertThat(containers.get(0).getName(), is(MAIN_CONTAINER_NAME));
 
     Volume volume = volumes.get(0);
     assertThat(volume.getName(), is("my-secret"));
