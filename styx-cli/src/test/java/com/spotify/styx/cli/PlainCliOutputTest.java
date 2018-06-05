@@ -20,12 +20,16 @@
 
 package com.spotify.styx.cli;
 
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableList;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -91,5 +95,19 @@ public class PlainCliOutputTest {
     cliOutput.printBackfillPayload(BackfillPayload.create(BACKFILL, Optional.empty()), true);
     assertEquals(EXPECTED_OUTPUT,
         outContent.toString());
+  }
+
+  @Test
+  public void shouldPrintWorkflows() {
+    final Workflow foo1 = Workflow.create("foo1", WorkflowConfiguration.builder()
+        .id("bar1")
+        .schedule(Schedule.DAYS)
+        .build());
+    final Workflow foo2 = Workflow.create("foo2", WorkflowConfiguration.builder()
+        .id("bar2")
+        .schedule(Schedule.DAYS)
+        .build());
+    cliOutput.printWorkflows(ImmutableList.of(foo1, foo2));
+    assertThat(outContent.toString(), is(String.format("foo1#bar1%nfoo2#bar2%n")));
   }
 }

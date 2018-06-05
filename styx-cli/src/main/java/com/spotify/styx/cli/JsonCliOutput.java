@@ -91,6 +91,11 @@ class JsonCliOutput implements CliOutput {
   }
 
   @Override
+  public void printWorkflows(List<Workflow> workflows) {
+    printJson(workflows);
+  }
+
+  @Override
   public void printError(String message) {
     System.err.println(message);
   }

@@ -114,6 +114,17 @@ public class CliMainTest {
   }
 
   @Test
+  public void testWorkflowList() {
+    final List<Workflow> payload = mock(List.class);
+    when(client.workflows())
+        .thenReturn(CompletableFuture.completedFuture(payload));
+    CliMain.run(cliContext, "workflow", "ls");
+    verify(client).workflows();
+    verify(cliOutput).printWorkflows(payload);
+
+  }
+
+  @Test
   public void testWorkflowCreate() throws Exception {
     final String component = "quux";
 

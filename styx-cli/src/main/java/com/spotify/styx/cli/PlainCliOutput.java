@@ -136,6 +136,11 @@ class PlainCliOutput implements CliOutput {
   }
 
   @Override
+  public void printWorkflows(List<Workflow> workflows) {
+    workflows.forEach(wf -> System.out.println(wf.id().toKey()));
+  }
+
+  @Override
   public void printError(String message) {
     System.err.println(message);
   }
