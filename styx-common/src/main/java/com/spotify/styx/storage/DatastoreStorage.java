@@ -21,6 +21,7 @@
 package com.spotify.styx.storage;
 
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
+import static com.spotify.styx.storage.Storage.GLOBAL_RESOURCE_ID;
 import static com.spotify.styx.util.MDCUtil.withMDC;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_SHARD;
@@ -942,11 +943,15 @@ public class DatastoreStorage implements Closeable {
   }
 
   long getLimitForCounter(String counterId) {
+    if (GLOBAL_RESOURCE_ID.equals(counterId)) {
+      // missing global resource means free to go
+      return config().globalConcurrency().orElse(Long.MAX_VALUE);
+    }
+
     final Key limitKey = datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId);
     final Entity limitEntity = datastore.get(limitKey);
     if (limitEntity == null) {
-      return Long.MAX_VALUE;
-      // Or IllegalStateException("No limit found in Datastore for " + counterId);?
+      throw new IllegalArgumentException("No limit found in Datastore for " + counterId);
     } else {
       return limitEntity.getLong(PROPERTY_LIMIT);
     }

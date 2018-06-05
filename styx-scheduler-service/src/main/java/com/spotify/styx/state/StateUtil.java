@@ -20,6 +20,7 @@
 
 package com.spotify.styx.state;
 
+import static com.spotify.styx.storage.Storage.GLOBAL_RESOURCE_ID;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingByConcurrent;
 import static java.util.stream.Collectors.toList;
@@ -45,8 +46,6 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 public final class StateUtil {
-
-  public static final String GLOBAL_RESOURCE_ID = "GLOBAL_STYX_CLUSTER";
 
   private StateUtil() {
     throw new UnsupportedOperationException();

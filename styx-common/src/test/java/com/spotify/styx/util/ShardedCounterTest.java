@@ -109,9 +109,11 @@ public class ShardedCounterTest {
   }
 
   @Before
-  public void setUp() {
+  public void setUp() throws IOException {
     counterSnapshotFactory = spy(new ShardedCounterSnapshotFactory(storage));
     shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
+    storage.updateLimitForCounter(COUNTER_ID1, 10L);
+    storage.updateLimitForCounter(COUNTER_ID2, 10L);
   }
 
   @After
@@ -147,6 +149,7 @@ public class ShardedCounterTest {
 
   @Test
   public void shouldCreateLimit() throws IOException {
+    helper.reset();
     assertNull(getLimitFromStorage(COUNTER_ID1));
 
     storage.runInTransaction(transaction -> {
