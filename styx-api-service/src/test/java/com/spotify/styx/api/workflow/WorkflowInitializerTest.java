@@ -24,7 +24,6 @@ import static com.spotify.styx.util.TimeUtil.lastInstant;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -75,13 +74,14 @@ public class WorkflowInitializerTest {
     when(transaction.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.empty());
     when(transaction.store(HOURLY_WORKFLOW)).thenReturn(HOURLY_WORKFLOW.id());
     workflowInitializer.store(HOURLY_WORKFLOW);
-    verify(transaction).store(HOURLY_WORKFLOW);
 
     final Instant nextTrigger = lastInstant(NOW, Schedule.HOURS);
     final Instant nextWithOffset = HOURLY_WORKFLOW.configuration().addOffset(nextTrigger);
     TriggerInstantSpec expectedTriggerInstantSpec = TriggerInstantSpec.create(nextTrigger, nextWithOffset);
 
-    verify(transaction).updateNextNaturalTrigger(HOURLY_WORKFLOW.id(), expectedTriggerInstantSpec);
+    verify(transaction, never()).store(any(Workflow.class));
+    verify(transaction, never()).updateNextNaturalTrigger(any(), any());
+    verify(transaction).storeWorkflowWithNextNaturalTrigger(HOURLY_WORKFLOW, expectedTriggerInstantSpec);
   }
 
   @Test
@@ -92,6 +92,7 @@ public class WorkflowInitializerTest {
     workflowInitializer.store(HOURLY_WORKFLOW);
     verify(transaction).store(HOURLY_WORKFLOW);
     verify(transaction, never()).updateNextNaturalTrigger(any(), any());
+    verify(transaction, never()).storeWorkflowWithNextNaturalTrigger(any(), any());
   }
 
   @Test
@@ -127,9 +128,9 @@ public class WorkflowInitializerTest {
   }
 
   @Test
-  public void shouldFailToUpdateNextNaturalTrigger() throws Exception {
+  public void shouldFailToStoreNextNaturalTrigger() throws Exception {
     doThrow(new IOException("update error")).when(transaction)
-        .updateNextNaturalTrigger(eq(HOURLY_WORKFLOW.id()), any());
+        .storeWorkflowWithNextNaturalTrigger(any(), any());
     when(transaction.workflow(HOURLY_WORKFLOW.id()))
         .thenReturn(Optional.of(HOURLY_WORKFLOW));
 

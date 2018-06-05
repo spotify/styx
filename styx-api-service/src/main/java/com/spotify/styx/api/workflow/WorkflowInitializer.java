@@ -84,9 +84,10 @@ public class WorkflowInitializer {
       nextSpec = Optional.empty();
     }
 
-    tx.store(workflow);
     if (nextSpec.isPresent()) {
-      tx.updateNextNaturalTrigger(workflow.id(), nextSpec.get());
+      tx.storeWorkflowWithNextNaturalTrigger(workflow, nextSpec.get());
+    } else {
+      tx.store(workflow);
     }
 
     return previous;
