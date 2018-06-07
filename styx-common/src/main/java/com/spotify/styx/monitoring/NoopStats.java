@@ -139,7 +139,7 @@ final class NoopStats implements Stats {
   }
 
   @Override
-  public void recordDatastoreLookups(String kind, int n) {
+  public void recordDatastoreEntityReads(String kind, int n) {
     // nop
   }
 
