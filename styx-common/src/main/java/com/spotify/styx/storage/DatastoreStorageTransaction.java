@@ -120,11 +120,11 @@ public class DatastoreStorageTransaction implements StorageTransaction {
     final Key shardKey = tx.getDatastore().newKeyFactory().setKind(KIND_COUNTER_SHARD)
         .newKey(counterId + "-" + shardIndex);
     Entity shardEntity = tx.get(shardKey);
-    stats.recordDatastoreLookups(KIND_COUNTER_SHARD, 1);
+    stats.recordDatastoreEntityReads(KIND_COUNTER_SHARD, 1);
     if (shardEntity == null) {
       return Optional.empty();
     }
-    stats.recordDatastoreLookups(KIND_COUNTER_SHARD, 1);
+    stats.recordDatastoreEntityReads(KIND_COUNTER_SHARD, 1);
     return Optional.of(Shard.create(counterId, shardIndex,
                                     (int) shardEntity.getLong(PROPERTY_SHARD_VALUE)));
   }
@@ -169,7 +169,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
     if (tx.get(componentKey) == null) {
       tx.put(Entity.newBuilder(componentKey).build());
     }
-    stats.recordDatastoreLookups(KIND_COMPONENT, 1);
+    stats.recordDatastoreEntityReads(KIND_COMPONENT, 1);
 
     final String json = OBJECT_MAPPER.writeValueAsString(workflow);
     final Key workflowKey = DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflow.id());
@@ -192,7 +192,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
     if (tx.get(componentKey) == null) {
       tx.put(Entity.newBuilder(componentKey).build());
     }
-    stats.recordDatastoreLookups(KIND_COMPONENT, 1);
+    stats.recordDatastoreEntityReads(KIND_COMPONENT, 1);
 
     final String json = OBJECT_MAPPER.writeValueAsString(workflow);
     final Key workflowKey = DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflow.id());
@@ -261,7 +261,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   @Override
   public Optional<RunState> readActiveState(WorkflowInstance instance) throws IOException {
     final Entity entity = tx.get(activeWorkflowInstanceKey(tx.getDatastore().newKeyFactory(), instance));
-    stats.recordDatastoreLookups(KIND_ACTIVE_WORKFLOW_INSTANCE, 1);
+    stats.recordDatastoreEntityReads(KIND_ACTIVE_WORKFLOW_INSTANCE, 1);
     if (entity == null) {
       return Optional.empty();
     } else {
@@ -321,7 +321,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   public Optional<Backfill> backfill(String id) {
     final Key key = DatastoreStorage.backfillKey(tx.getDatastore().newKeyFactory(), id);
     final Entity entity = tx.get(key);
-    stats.recordDatastoreLookups(KIND_BACKFILL, 1);
+    stats.recordDatastoreEntityReads(KIND_BACKFILL, 1);
     if (entity == null) {
       return Optional.empty();
     }

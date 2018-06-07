@@ -76,7 +76,7 @@ public interface Stats {
 
   void recordTickDuration(String type, long duration);
 
-  void recordDatastoreLookups(String kind, int n);
+  void recordDatastoreEntityReads(String kind, int n);
 
   void recordDatastoreQueries(String kind, int n);
 

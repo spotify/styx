@@ -314,8 +314,8 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
-  public void recordDatastoreLookups(String kind, int n) {
-    recordDatastoreOperations("lookup", kind, n);
+  public void recordDatastoreEntityReads(String kind, int n) {
+    recordDatastoreOperations("read", kind, n);
   }
 
   @Override
