@@ -215,6 +215,23 @@ public class DatastoreStorageTransactionTest {
   }
 
   @Test
+  public void shouldStoreWorkflowWithNextNaturalTrigger() throws IOException {
+    final Instant instant = Instant.parse("2016-03-14T14:00:00Z");
+    final Instant offset = instant.plus(1, ChronoUnit.DAYS);
+    final TriggerInstantSpec spec = TriggerInstantSpec.create(instant, offset);
+
+    final DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    final Workflow workflow = Workflow.create("test", FULL_WORKFLOW_CONFIGURATION);
+    tx.storeWorkflowWithNextNaturalTrigger(workflow, spec);
+    tx.commit();
+
+    final Map<Workflow, TriggerInstantSpec> result = storage.workflowsWithNextNaturalTrigger();
+    assertThat(result.values().size(), is(1));
+    assertThat(result, hasEntry(workflow, spec));
+  }
+
+
+  @Test
   public void shouldStoreShards() throws IOException {
     DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
     Shard shard1 = Shard.create("res1",0, 1);

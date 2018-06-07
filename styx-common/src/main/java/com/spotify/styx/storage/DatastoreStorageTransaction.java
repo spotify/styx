@@ -53,6 +53,7 @@ import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_VALUE;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.Entity;
+import com.google.cloud.datastore.Entity.Builder;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.Transaction;
@@ -171,6 +172,28 @@ public class DatastoreStorageTransaction implements StorageTransaction {
     tx.put(workflowEntity);
 
     return workflow.id();
+  }
+
+  @Override
+  public WorkflowId storeWorkflowWithNextNaturalTrigger(Workflow workflow, TriggerInstantSpec triggerSpec)
+      throws IOException {
+
+    final Key componentKey = DatastoreStorage.componentKey(tx.getDatastore().newKeyFactory(), workflow.componentId());
+    if (tx.get(componentKey) == null) {
+      tx.put(Entity.newBuilder(componentKey).build());
+    }
+
+    final String json = OBJECT_MAPPER.writeValueAsString(workflow);
+    final Key workflowKey = DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflow.id());
+    final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey);
+    final Builder entity = DatastoreStorage.asBuilderOrNew(workflowOpt, workflowKey)
+        .set(PROPERTY_WORKFLOW_JSON, StringValue.newBuilder(json).setExcludeFromIndexes(true).build())
+        .set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToTimestamp(triggerSpec.instant()))
+        .set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, instantToTimestamp(triggerSpec.offsetInstant()));
+    tx.put(entity.build());
+
+    return workflow.id();
+
   }
 
   @Override
