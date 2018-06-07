@@ -21,6 +21,9 @@
 package com.spotify.styx.storage;
 
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
+import static com.spotify.styx.storage.DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE;
+import static com.spotify.styx.storage.DatastoreStorage.KIND_BACKFILL;
+import static com.spotify.styx.storage.DatastoreStorage.KIND_COMPONENT;
 import static com.spotify.styx.storage.DatastoreStorage.KIND_RESOURCE;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_ALL_TRIGGERED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_COMPONENT;
@@ -63,6 +66,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.Shard;
@@ -75,9 +79,11 @@ import java.util.Optional;
 public class DatastoreStorageTransaction implements StorageTransaction {
 
   private final Transaction tx;
+  private final Stats stats;
 
-  public DatastoreStorageTransaction(Transaction transaction) {
+  public DatastoreStorageTransaction(Transaction transaction, Stats stats) {
     this.tx = Objects.requireNonNull(transaction);
+    this.stats = Objects.requireNonNull(stats);
   }
 
   @Override
@@ -114,11 +120,13 @@ public class DatastoreStorageTransaction implements StorageTransaction {
     final Key shardKey = tx.getDatastore().newKeyFactory().setKind(KIND_COUNTER_SHARD)
         .newKey(counterId + "-" + shardIndex);
     Entity shardEntity = tx.get(shardKey);
+    stats.recordDatastoreLookups(KIND_COUNTER_SHARD, 1);
     if (shardEntity == null) {
       return Optional.empty();
     }
+    stats.recordDatastoreLookups(KIND_COUNTER_SHARD, 1);
     return Optional.of(Shard.create(counterId, shardIndex,
-                                    (int) tx.get(shardKey).getLong(PROPERTY_SHARD_VALUE)));
+                                    (int) shardEntity.getLong(PROPERTY_SHARD_VALUE)));
   }
 
   @Override
@@ -156,14 +164,16 @@ public class DatastoreStorageTransaction implements StorageTransaction {
 
   @Override
   public WorkflowId store(Workflow workflow) throws IOException {
+
     final Key componentKey = DatastoreStorage.componentKey(tx.getDatastore().newKeyFactory(), workflow.componentId());
     if (tx.get(componentKey) == null) {
       tx.put(Entity.newBuilder(componentKey).build());
     }
+    stats.recordDatastoreLookups(KIND_COMPONENT, 1);
 
     final String json = OBJECT_MAPPER.writeValueAsString(workflow);
     final Key workflowKey = DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflow.id());
-    final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey);
+    final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey, stats);
     final Entity workflowEntity = DatastoreStorage.asBuilderOrNew(workflowOpt, workflowKey)
         .set(PROPERTY_WORKFLOW_JSON,
             StringValue.newBuilder(json).setExcludeFromIndexes(true).build())
@@ -182,10 +192,11 @@ public class DatastoreStorageTransaction implements StorageTransaction {
     if (tx.get(componentKey) == null) {
       tx.put(Entity.newBuilder(componentKey).build());
     }
+    stats.recordDatastoreLookups(KIND_COMPONENT, 1);
 
     final String json = OBJECT_MAPPER.writeValueAsString(workflow);
     final Key workflowKey = DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflow.id());
-    final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey);
+    final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey, stats);
     final Builder entity = DatastoreStorage.asBuilderOrNew(workflowOpt, workflowKey)
         .set(PROPERTY_WORKFLOW_JSON, StringValue.newBuilder(json).setExcludeFromIndexes(true).build())
         .set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToTimestamp(triggerSpec.instant()))
@@ -199,7 +210,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   @Override
   public Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
     final Optional<Entity> entityOptional =
-        DatastoreStorage.getOpt(tx, DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflowId));
+        DatastoreStorage.getOpt(tx, DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflowId), stats);
     if (entityOptional.isPresent()) {
       return Optional.of(DatastoreStorage.parseWorkflowJson(entityOptional.get(), workflowId));
     } else {
@@ -211,7 +222,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   public WorkflowId updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec triggerSpec) throws IOException {
     final Key workflowKey = DatastoreStorage
         .workflowKey(tx.getDatastore().newKeyFactory(), workflowId);
-    final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey);
+    final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey, stats);
     if (!workflowOpt.isPresent()) {
       throw new ResourceNotFoundException(
           String.format("%s:%s doesn't exist.", workflowId.componentId(), workflowId.id()));
@@ -230,7 +241,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   public WorkflowId patchState(WorkflowId workflowId, WorkflowState state) throws IOException {
     final Key workflowKey = DatastoreStorage
         .workflowKey(tx.getDatastore().newKeyFactory(), workflowId);
-    final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey);
+    final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey, stats);
     if (!workflowOpt.isPresent()) {
       throw new ResourceNotFoundException(
           String.format("%s:%s doesn't exist.", workflowId.componentId(), workflowId.id()));
@@ -250,6 +261,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   @Override
   public Optional<RunState> readActiveState(WorkflowInstance instance) throws IOException {
     final Entity entity = tx.get(activeWorkflowInstanceKey(tx.getDatastore().newKeyFactory(), instance));
+    stats.recordDatastoreLookups(KIND_ACTIVE_WORKFLOW_INSTANCE, 1);
     if (entity == null) {
       return Optional.empty();
     } else {
@@ -309,6 +321,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   public Optional<Backfill> backfill(String id) {
     final Key key = DatastoreStorage.backfillKey(tx.getDatastore().newKeyFactory(), id);
     final Entity entity = tx.get(key);
+    stats.recordDatastoreLookups(KIND_BACKFILL, 1);
     if (entity == null) {
       return Optional.empty();
     }

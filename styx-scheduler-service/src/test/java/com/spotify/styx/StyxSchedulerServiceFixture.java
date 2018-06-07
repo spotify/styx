@@ -114,6 +114,8 @@ public class StyxSchedulerServiceFixture {
   private StyxScheduler styxScheduler;
   private ServiceHelper serviceHelper;
 
+  private final Stats stats = mock(Stats.class);
+
   @BeforeClass
   public static void setUpClass() throws Exception {
     // Schedule a full GC to run every second to mitigate off-heap/direct memory usage.
@@ -139,9 +141,9 @@ public class StyxSchedulerServiceFixture {
       throw new RuntimeException(e);
     }
     datastore = localDatastore.getOptions().getService();
-    storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
+    storage = new AggregateStorage(bigtable, datastore, Duration.ZERO, stats);
 
-    StorageFactory storageFactory = (env) -> storage;
+    StorageFactory storageFactory = (env, stats) -> storage;
     StatsFactory statsFactory = (env) -> Stats.NOOP;
     StyxScheduler.ExecutorFactory executorFactory = (ts, tf) -> executor;
     StyxScheduler.PublisherFactory publisherFactory = (env) -> Publisher.NOOP;

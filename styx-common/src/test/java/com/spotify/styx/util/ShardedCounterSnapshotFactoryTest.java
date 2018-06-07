@@ -24,12 +24,14 @@ import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
 import static com.spotify.styx.util.ShardedCounterSnapshotFactory.TRANSACTION_GROUP_SIZE;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
@@ -56,6 +58,8 @@ public class ShardedCounterSnapshotFactoryTest {
   private static Storage storage;
   private ShardedCounterSnapshotFactory counterSnapshotFactory;
 
+  private static final Stats stats = mock(Stats .class);
+
   @BeforeClass
   public static void setUpClass() throws IOException, InterruptedException {
     final java.util.logging.Logger datastoreEmulatorLogger =
@@ -65,8 +69,8 @@ public class ShardedCounterSnapshotFactoryTest {
     helper = LocalDatastoreHelper.create(1.0);
     helper.start();
     datastore = helper.getOptions().getService();
-    connection = Mockito.mock(Connection.class);
-    storage = spy(new AggregateStorage(connection, datastore, Duration.ZERO));
+    connection = mock(Connection.class);
+    storage = spy(new AggregateStorage(connection, datastore, Duration.ZERO, stats));
   }
 
   @AfterClass

@@ -137,4 +137,19 @@ final class NoopStats implements Stats {
   public void recordTickDuration(String type, long duration) {
     // nop
   }
+
+  @Override
+  public void recordDatastoreLookups(String kind, int n) {
+    // nop
+  }
+
+  @Override
+  public void recordDatastoreQueries(String kind, int n) {
+    // nop
+  }
+
+  @Override
+  public void recordDatastoreOperations(String operation, String kind, int n) {
+    // nop
+  }
 }
