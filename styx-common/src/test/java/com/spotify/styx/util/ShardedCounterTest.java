@@ -53,6 +53,7 @@ import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
@@ -83,6 +84,8 @@ public class ShardedCounterTest {
   private static Storage storage;
   private static Connection connection;
 
+  private static final Stats stats = mock(Stats .class);
+
   @BeforeClass
   public static void setUpClass() throws IOException, InterruptedException {
     final java.util.logging.Logger datastoreEmulatorLogger =
@@ -93,7 +96,7 @@ public class ShardedCounterTest {
     helper.start();
     datastore = helper.getOptions().getService();
     connection = mock(Connection.class);
-    storage = new AggregateStorage(connection, datastore, Duration.ZERO);
+    storage = new AggregateStorage(connection, datastore, Duration.ZERO, stats);
   }
 
   @AfterClass

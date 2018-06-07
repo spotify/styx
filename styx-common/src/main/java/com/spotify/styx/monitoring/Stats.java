@@ -75,4 +75,10 @@ public interface Stats {
   void recordWorkflowConsumerError();
 
   void recordTickDuration(String type, long duration);
+
+  void recordDatastoreLookups(String kind, int n);
+
+  void recordDatastoreQueries(String kind, int n);
+
+  void recordDatastoreOperations(String operation, String kind, int n);
 }

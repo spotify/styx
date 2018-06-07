@@ -46,6 +46,7 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.Shard;
@@ -63,6 +64,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -71,6 +73,8 @@ public class DatastoreStorageTransactionTest {
   private static LocalDatastoreHelper helper;
   private static Datastore datastore;
   private DatastoreStorage storage;
+
+  @Mock Stats stats;
 
   @BeforeClass
   public static void setUpClass() throws Exception {
@@ -97,7 +101,7 @@ public class DatastoreStorageTransactionTest {
   @Before
   public void setUp() throws Exception {
     datastore = helper.getOptions().getService();
-    storage = new DatastoreStorage(datastore, Duration.ZERO);
+    storage = new DatastoreStorage(datastore, Duration.ZERO, stats);
   }
 
   @After
@@ -108,7 +112,7 @@ public class DatastoreStorageTransactionTest {
   @Test
   public void shouldCommitEmptyTransaction() throws IOException {
     final Transaction transaction = datastore.newTransaction();
-    DatastoreStorageTransaction storageTransaction = new DatastoreStorageTransaction(transaction);
+    DatastoreStorageTransaction storageTransaction = new DatastoreStorageTransaction(transaction, stats);
     storageTransaction.commit();
     assertFalse(transaction.isActive());
   }
@@ -116,7 +120,7 @@ public class DatastoreStorageTransactionTest {
   @Test
   public void shouldThrowIfUnexpectedDatastoreError() throws IOException {
     final Transaction transaction = datastore.newTransaction();
-    DatastoreStorageTransaction storageTransaction = new DatastoreStorageTransaction(transaction);
+    DatastoreStorageTransaction storageTransaction = new DatastoreStorageTransaction(transaction, stats);
 
     transaction.rollback();
     try {
@@ -130,7 +134,7 @@ public class DatastoreStorageTransactionTest {
   @Test
   public void shouldThrowIfRollbackFails() throws IOException {
     final Transaction transaction = datastore.newTransaction();
-    DatastoreStorageTransaction storageTransaction = new DatastoreStorageTransaction(transaction);
+    DatastoreStorageTransaction storageTransaction = new DatastoreStorageTransaction(transaction, stats);
 
     storageTransaction.commit();
     try {
@@ -146,9 +150,9 @@ public class DatastoreStorageTransactionTest {
     final Transaction transaction1 = datastore.newTransaction();
     final Transaction transaction2 = datastore.newTransaction();
     final Transaction transaction3 = datastore.newTransaction();
-    DatastoreStorageTransaction storageTransaction1 = new DatastoreStorageTransaction(transaction1);
-    DatastoreStorageTransaction storageTransaction2 = new DatastoreStorageTransaction(transaction2);
-    DatastoreStorageTransaction storageTransaction3 = new DatastoreStorageTransaction(transaction3);
+    DatastoreStorageTransaction storageTransaction1 = new DatastoreStorageTransaction(transaction1, stats);
+    DatastoreStorageTransaction storageTransaction2 = new DatastoreStorageTransaction(transaction2, stats);
+    DatastoreStorageTransaction storageTransaction3 = new DatastoreStorageTransaction(transaction3, stats);
 
     // Store first entity
     KeyFactory keyFactory1 = datastore.newKeyFactory().setKind("MyKind");
@@ -180,10 +184,10 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void insertActiveStateShouldFailIfAlreadyExists() throws Exception {
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     tx.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
     tx.commit();
-    tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     tx.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
     try {
       tx.commit();
@@ -195,7 +199,7 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void updateActiveStateShouldFailIfNotFound() throws Exception {
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     tx.updateActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
     try {
       tx.commit();
@@ -207,7 +211,7 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void shouldStoreWorkflow() throws IOException {
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     Workflow workflow = Workflow.create("test", FULL_WORKFLOW_CONFIGURATION);
     tx.store(workflow);
     tx.commit();
@@ -220,7 +224,7 @@ public class DatastoreStorageTransactionTest {
     final Instant offset = instant.plus(1, ChronoUnit.DAYS);
     final TriggerInstantSpec spec = TriggerInstantSpec.create(instant, offset);
 
-    final DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    final DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     final Workflow workflow = Workflow.create("test", FULL_WORKFLOW_CONFIGURATION);
     tx.storeWorkflowWithNextNaturalTrigger(workflow, spec);
     tx.commit();
@@ -233,7 +237,7 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void shouldStoreShards() throws IOException {
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     Shard shard1 = Shard.create("res1",0, 1);
     Shard shard2 = Shard.create("res1",1, 1);
     tx.store(shard1);
@@ -246,7 +250,7 @@ public class DatastoreStorageTransactionTest {
   public void shouldGetWorkflow() throws IOException {
     Workflow workflow = Workflow.create("test", FULL_WORKFLOW_CONFIGURATION);
     storage.store(workflow);
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     Optional<Workflow> workflowOptional = tx.workflow(workflow.id());
     tx.commit();
     assertThat(workflowOptional, is(Optional.of(workflow)));
@@ -257,10 +261,10 @@ public class DatastoreStorageTransactionTest {
     Instant instant = Instant.parse("2016-03-14T14:00:00Z");
     Instant offset = instant.plus(1, ChronoUnit.DAYS);
     TriggerInstantSpec spec = TriggerInstantSpec.create(instant, offset);
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     tx.store(WORKFLOW);
     tx.commit();
-    tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     tx.updateNextNaturalTrigger(WORKFLOW.id(), spec);
     tx.commit();
 
@@ -279,7 +283,7 @@ public class DatastoreStorageTransactionTest {
         .nextNaturalTrigger(instant)
         .nextNaturalOffsetTrigger(offset)
         .build();
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     tx.patchState(WORKFLOW.id(), state);
     tx.commit();
     WorkflowState retrieved = storage.workflowState(WORKFLOW.id());
@@ -290,7 +294,7 @@ public class DatastoreStorageTransactionTest {
   @Test
   public void shouldReturnAllActiveStateForWFI() throws Exception {
     storage.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     Optional<RunState> activeStates =
         tx.readActiveState(WORKFLOW_INSTANCE1);
     tx.commit();
@@ -300,7 +304,7 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void shouldInsertActiveState() throws Exception {
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     tx.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
     tx.commit();
 
@@ -311,10 +315,10 @@ public class DatastoreStorageTransactionTest {
   public void shouldUpdateActiveState() throws Exception {
     RunState runState = RunState.create(WORKFLOW_INSTANCE1, RunState.State.NEW,
         StateData.zero(), TIMESTAMP, 42L);
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     tx.writeActiveState(WORKFLOW_INSTANCE1, runState);
     tx.commit();
-    tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     RunState newRunState = RunState.create(WORKFLOW_INSTANCE1, RunState.State.NEW,
         StateData.zero(), TIMESTAMP, 43L);
     tx.updateActiveState(WORKFLOW_INSTANCE1, newRunState);
@@ -325,10 +329,10 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void shouldDeleteActiveState() throws Exception {
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     tx.writeActiveState(WORKFLOW_INSTANCE, RUN_STATE1);
     tx.commit();
-    tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     tx.deleteActiveState(WORKFLOW_INSTANCE);
     tx.commit();
 
@@ -337,7 +341,7 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void shouldStoreAndGetBackfill() throws IOException {
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     final Backfill backfill = Backfill.newBuilder()
         .id("backfill-1")
         .start(Instant.parse("2017-01-01T00:00:00Z"))
@@ -351,7 +355,7 @@ public class DatastoreStorageTransactionTest {
     tx.store(backfill);
     tx.commit();
 
-    DatastoreStorageTransaction newTx = new DatastoreStorageTransaction(datastore.newTransaction());
+    DatastoreStorageTransaction newTx = new DatastoreStorageTransaction(datastore.newTransaction(), stats);
     assertThat(newTx.backfill(backfill.id()), is(Optional.of(backfill)));
     newTx.commit();
   }

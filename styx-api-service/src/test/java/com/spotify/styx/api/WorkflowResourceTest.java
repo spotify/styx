@@ -58,6 +58,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
@@ -92,6 +93,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Mock private WorkflowValidator workflowValidator;
   @Mock private WorkflowInitializer workflowInitializer;
   @Mock private BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
+  @Mock private Stats stats;
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
@@ -128,7 +130,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
-    storage = spy(new AggregateStorage(bigtable, datastore, Duration.ZERO));
+    storage = spy(new AggregateStorage(bigtable, datastore, Duration.ZERO, stats));
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
     WorkflowResource workflowResource =

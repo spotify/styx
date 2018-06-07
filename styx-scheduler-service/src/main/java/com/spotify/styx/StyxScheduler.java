@@ -311,7 +311,7 @@ public class StyxScheduler implements AppInit {
     closer.register(executorCloser("event-consumer", eventConsumerExecutor));
 
     final Stats stats = statsFactory.apply(environment);
-    final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment), stats, time);
+    final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment, stats), stats, time);
     closer.register(storage);
 
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
@@ -621,23 +621,23 @@ public class StyxScheduler implements AppInit {
   }
 
   private static StorageFactory storage(StorageFactory storage) {
-    return (environment) -> {
+    return (environment, stats) -> {
       if (isDevMode(environment.config())) {
         LOG.info("Running Styx in development mode, will use InMemStorage");
         return new InMemStorage();
       } else {
-        return storage.apply(environment);
+        return storage.apply(environment, stats);
       }
     };
   }
 
-  private static AggregateStorage storage(Environment environment) {
+  private static AggregateStorage storage(Environment environment, Stats stats) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
 
     final Connection bigTable = closer.register(createBigTableConnection(config));
     final Datastore datastore = createDatastore(config);
-    return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
+    return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT, stats);
   }
 
   private static DockerRunner createDockerRunner(

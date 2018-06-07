@@ -132,6 +132,9 @@ public final class MetricsStats implements Stats {
       .tagged("what", "tick-duration")
       .tagged("unit", UNIT_MILLISECOND);
 
+  static final MetricId DATASTORE_OPERATION_RATE = BASE
+      .tagged("what", "datastore-operation-rate");
+
   private static final String STATUS = "status";
 
   private final SemanticMetricRegistry registry;
@@ -156,6 +159,7 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Meter> eventConsumerMeters;
   private final ConcurrentMap<String, Meter> workflowConsumerMeters;
   private final ConcurrentMap<String, Histogram> tickHistograms;
+  private final ConcurrentMap<Tuple2<String, String>, Meter> datastoreOperationMeters;
 
   /**
    * Submission timestamps (nanotime) keyed on execution id.
@@ -187,6 +191,7 @@ public final class MetricsStats implements Stats {
     this.eventConsumerMeters = new ConcurrentHashMap<>();
     this.workflowConsumerMeters = new ConcurrentHashMap<>();
     this.tickHistograms = new ConcurrentHashMap<>();
+    this.datastoreOperationMeters = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -308,6 +313,21 @@ public final class MetricsStats implements Stats {
     tickHistogram(type).update(duration);
   }
 
+  @Override
+  public void recordDatastoreLookups(String kind, int n) {
+    recordDatastoreOperations("lookup", kind, n);
+  }
+
+  @Override
+  public void recordDatastoreQueries(String kind, int n) {
+    recordDatastoreOperations("query", kind, n);
+  }
+
+  @Override
+  public void recordDatastoreOperations(String operation, String kind, int n) {
+    datastoreOperationMeter(operation, kind).mark(n);
+  }
+
   private Meter exitCodeMeter(WorkflowId workflowId, int exitCode) {
     return exitCodePerWorkflowMeters
         .computeIfAbsent(Tuple.of(workflowId, exitCode), (tuple) ->
@@ -376,5 +396,10 @@ public final class MetricsStats implements Stats {
   private Histogram tickHistogram(String type) {
     return tickHistograms.computeIfAbsent(
         type, (op) -> registry.histogram(TICK_DURATION.tagged("type", type)));
+  }
+
+  private Meter datastoreOperationMeter(String operation, String kind) {
+    return datastoreOperationMeters.computeIfAbsent(Tuple.of(operation, kind),
+        t -> registry.meter(DATASTORE_OPERATION_RATE.tagged("operation", operation, "kind", kind)));
   }
 }
