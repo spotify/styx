@@ -253,9 +253,9 @@ public class DatastoreStorage implements Closeable {
 
     final Set<WorkflowId> enabledWorkflows = Sets.newHashSet();
 
-    int n = 0;
+    int entitiesRead = 0;
     while (result.hasNext()) {
-      n++;
+      entitiesRead++;
       final Entity workflow = result.next();
       final boolean enabled =
           workflow.contains(PROPERTY_WORKFLOW_ENABLED)
@@ -267,7 +267,7 @@ public class DatastoreStorage implements Closeable {
       }
     }
 
-    stats.recordDatastoreEntityReads(KIND_WORKFLOW, n);
+    stats.recordDatastoreEntityReads(KIND_WORKFLOW, entitiesRead);
 
     return enabledWorkflows;
   }
@@ -305,9 +305,9 @@ public class DatastoreStorage implements Closeable {
     final QueryResults<Entity> result = datastore.run(query);
     stats.recordDatastoreQueries(KIND_WORKFLOW, 1);
 
-    int n = 0;
+    int entitiesRead = 0;
     while (result.hasNext()) {
-      n++;
+      entitiesRead++;
       final Entity entity = result.next();
       final Workflow workflow;
       try {
@@ -336,7 +336,7 @@ public class DatastoreStorage implements Closeable {
         map.put(workflow, TriggerInstantSpec.create(instant, triggerInstant));
       }
     }
-    stats.recordDatastoreEntityReads(KIND_WORKFLOW, n);
+    stats.recordDatastoreEntityReads(KIND_WORKFLOW, entitiesRead);
     return map;
   }
 
@@ -346,9 +346,9 @@ public class DatastoreStorage implements Closeable {
     final QueryResults<Entity> result = datastore.run(query);
     stats.recordDatastoreQueries(KIND_WORKFLOW, 1);
 
-    int n = 0;
+    int entitiesRead = 0;
     while (result.hasNext()) {
-      n++;
+      entitiesRead++;
       final Entity entity = result.next();
       final Workflow workflow;
       try {
@@ -359,7 +359,7 @@ public class DatastoreStorage implements Closeable {
       }
       map.put(workflow.id(), workflow);
     }
-    stats.recordDatastoreEntityReads(KIND_WORKFLOW, n);
+    stats.recordDatastoreEntityReads(KIND_WORKFLOW, entitiesRead);
 
     return map;
   }
@@ -405,9 +405,9 @@ public class DatastoreStorage implements Closeable {
     final QueryResults<Entity> result = datastore.run(query);
     stats.recordDatastoreQueries(KIND_WORKFLOW, 1);
 
-    int n = 0;
+    int entitiesRead = 0;
     while (result.hasNext()) {
-      n++;
+      entitiesRead++;
       final Entity entity = result.next();
       final Workflow workflow;
       if (entity.contains(PROPERTY_WORKFLOW_JSON)) {
@@ -420,7 +420,7 @@ public class DatastoreStorage implements Closeable {
         workflows.add(workflow);
       }
     }
-    stats.recordDatastoreEntityReads(KIND_WORKFLOW, n);
+    stats.recordDatastoreEntityReads(KIND_WORKFLOW, entitiesRead);
 
     return workflows;
   }
@@ -1020,9 +1020,9 @@ public class DatastoreStorage implements Closeable {
                                                                     .eq(PROPERTY_COUNTER_ID,
                                                                         counterId))
                                                      .build());
-    int n = 0;
+    int entitiesRead = 0;
     while (results.hasNext()) {
-      n++;
+      entitiesRead++;
       // remove max 25 entities per transaction
       datastore.runInTransaction(transaction -> {
         IntStream.range(0, 25).forEach(i -> {
@@ -1033,7 +1033,7 @@ public class DatastoreStorage implements Closeable {
         return null;
       });
     }
-    stats.recordDatastoreEntityReads(KIND_COUNTER_SHARD, n);
+    stats.recordDatastoreEntityReads(KIND_COUNTER_SHARD, entitiesRead);
   }
 
   void deleteLimitForCounter(String counterId) throws IOException {
