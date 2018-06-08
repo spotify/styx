@@ -36,6 +36,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -539,8 +540,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Test
   public void shouldReturnErrorWhenDeleteNonexistWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
-    
-    when(storage.workflow(WORKFLOW.id())).thenReturn(Optional.empty());
+
+    doReturn(Optional.empty()).when(storage).workflow(WORKFLOW.id());
 
     Response<ByteString> response =
         awaitResponse(
