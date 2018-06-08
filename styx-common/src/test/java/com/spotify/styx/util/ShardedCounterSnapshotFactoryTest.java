@@ -57,7 +57,7 @@ public class ShardedCounterSnapshotFactoryTest {
   private static Storage storage;
   private ShardedCounterSnapshotFactory counterSnapshotFactory;
 
-  private static final Stats stats = mock(Stats .class);
+  private static final Stats stats = mock(Stats.class);
 
   @BeforeClass
   public static void setUpClass() throws IOException, InterruptedException {
