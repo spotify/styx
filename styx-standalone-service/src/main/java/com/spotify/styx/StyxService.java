@@ -26,6 +26,9 @@ import com.spotify.apollo.httpservice.LoadingException;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.StatsFactory;
+import io.opencensus.exporter.trace.stackdriver.StackdriverTraceConfiguration;
+import io.opencensus.exporter.trace.stackdriver.StackdriverTraceExporter;
+import java.io.IOException;
 import java.time.Instant;
 
 public class StyxService {
@@ -34,7 +37,10 @@ public class StyxService {
     throw new UnsupportedOperationException();
   }
 
-  public static void main(String[] args) throws LoadingException {
+  public static void main(String[] args) throws LoadingException, IOException {
+    StackdriverTraceExporter.createAndRegister(
+        StackdriverTraceConfiguration.builder().build());
+
     final AppInit init = (env) -> {
       final MetricsStats stats =
           new MetricsStats(env.resolve(SemanticMetricRegistry.class), Instant::now);
