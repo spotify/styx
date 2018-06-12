@@ -230,7 +230,6 @@ public class DatastoreStorageTransactionTest {
     assertThat(result, hasEntry(workflow, spec));
   }
 
-
   @Test
   public void shouldStoreShards() throws IOException {
     DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
