@@ -31,6 +31,7 @@ import java.util.List;
 
 interface InstrumentedDatastoreBatchWriter
     extends Batch, // XXX: DatastoreBatchWriter is not a public interface, Batch is an almost identical subtype
+                   // https://github.com/GoogleCloudPlatform/google-cloud-java/pull/3387
     InstrumentedDatastoreWriter {
 
   Stats stats();

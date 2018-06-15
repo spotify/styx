@@ -23,18 +23,25 @@ package com.spotify.styx.storage;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.datastore.Batch;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Datastore.TransactionCallable;
+import com.google.cloud.datastore.DatastoreReader;
+import com.google.cloud.datastore.DatastoreReaderWriter;
+import com.google.cloud.datastore.DatastoreWriter;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.Transaction;
 import com.google.common.collect.ImmutableList;
+import com.google.datastore.v1.TransactionOptions;
 import com.spotify.styx.monitoring.Stats;
 import java.util.List;
 import org.junit.Before;
@@ -48,8 +55,14 @@ import org.mockito.runners.MockitoJUnitRunner;
 public class InstrumentedDatastoreTest {
 
   private static final String TEST_KIND = "test-kind";
+  private static final String TEST_KIND_1 = "test-kind-1";
+  private static final String TEST_KIND_2 = "test-kind-2";
   private static final Key TEST_KEY = Key.newBuilder("test-project", TEST_KIND, "test").build();
+  private static final Key TEST_KEY_1 = Key.newBuilder("test-project", TEST_KIND_1, "test-1").build();
+  private static final Key TEST_KEY_2 = Key.newBuilder("test-project", TEST_KIND_2, "test-2").build();
   private static final Entity TEST_ENTITY = Entity.newBuilder(TEST_KEY).build();
+  private static final Entity TEST_ENTITY_1 = Entity.newBuilder(TEST_KEY_1).build();
+  private static final Entity TEST_ENTITY_2 = Entity.newBuilder(TEST_KEY_2).build();
   private static final EntityQuery TEST_ENTITY_QUERY = EntityQuery.newEntityQueryBuilder().setKind(TEST_KIND).build();
 
   private Datastore instrumentedDatastore;
@@ -58,6 +71,7 @@ public class InstrumentedDatastoreTest {
   @Mock Stats stats;
   @Mock QueryResults<Entity> entityQueryResults;
   @Mock Transaction transaction;
+  @Mock Batch batch;
 
   @Before
   public void setUp() throws Exception {
@@ -65,25 +79,25 @@ public class InstrumentedDatastoreTest {
   }
 
   @Test
+  public void testDatastore() {
+    testReaderWriter(instrumentedDatastore, datastore);
+  }
+
+  @Test
   public void newTransaction() {
     when(datastore.newTransaction()).thenReturn(transaction);
-    final Transaction instrumentedTransaction = instrumentedDatastore.newTransaction();
+    when(datastore.newTransaction(any(TransactionOptions.class))).thenReturn(transaction);
+
+    // Transaction newTransaction(TransactionOptions options);
+    final TransactionOptions transactionOptions = TransactionOptions.newBuilder().build();
+    final Transaction instrumented1 = instrumentedDatastore.newTransaction(transactionOptions);
+    verify(datastore).newTransaction(transactionOptions);
+    testTransaction(instrumented1);
+
+    // Transaction newTransaction();
+    final Transaction instrumented2 = instrumentedDatastore.newTransaction();
     verify(datastore).newTransaction();
-
-    instrumentedTransaction.get(TEST_KEY);
-    verify(stats).recordDatastoreEntityReads(TEST_KIND, 1);
-
-    instrumentedTransaction.put(TEST_ENTITY);
-    verify(stats).recordDatastoreEntityWrites(TEST_KIND, 1);
-
-    instrumentedTransaction.delete(TEST_KEY);
-    verify(stats).recordDatastoreEntityDeletes(TEST_KIND, 1);
-
-    instrumentedTransaction.rollback();
-    verify(transaction).rollback();
-
-    instrumentedTransaction.commit();
-    verify(transaction).commit();
+    testTransaction(instrumented2);
   }
 
   @Test
@@ -93,18 +107,7 @@ public class InstrumentedDatastoreTest {
             .run(transaction));
 
     final String foobar = instrumentedDatastore.runInTransaction(tx -> {
-      tx.get(TEST_KEY);
-      verify(stats, times(1)).recordDatastoreEntityReads(TEST_KIND, 1);
-      tx.get(TEST_KEY, TEST_KEY);
-      verify(stats, times(3)).recordDatastoreEntityReads(TEST_KIND, 1);
-      tx.put(TEST_ENTITY);
-      verify(stats, times(1)).recordDatastoreEntityWrites(TEST_KIND, 1);
-      tx.put(TEST_ENTITY, TEST_ENTITY);
-      verify(stats, times(3)).recordDatastoreEntityWrites(TEST_KIND, 1);
-      tx.delete(TEST_KEY);
-      verify(stats, times(1)).recordDatastoreEntityDeletes(TEST_KIND, 1);
-      tx.delete(TEST_KEY, TEST_KEY);
-      verify(stats, times(3)).recordDatastoreEntityDeletes(TEST_KIND, 1);
+      testReaderWriter(tx, transaction);
       return "foobar";
     });
 
@@ -112,29 +115,132 @@ public class InstrumentedDatastoreTest {
   }
 
   @Test
-  public void getSingle() {
-    when(datastore.get(TEST_KEY)).thenReturn(TEST_ENTITY);
-    assertThat(instrumentedDatastore.get(TEST_KEY), is(TEST_ENTITY));
-    verify(datastore).get(TEST_KEY);
+  public void newBatch() {
+    when(datastore.newBatch()).thenReturn(batch);
+    final Batch instrumentedBatch = instrumentedDatastore.newBatch();
+    testBatchWriter(instrumentedBatch, batch);
+
+    instrumentedBatch.submit();
+    verify(batch).submit();
+
+    when(batch.getDatastore()).thenReturn(datastore);
+    assertThat(instrumentedBatch.getDatastore(), is(datastore));
+    verify(batch).getDatastore();
+  }
+
+  private void testTransaction(Transaction instrumented) {
+    testReaderWriter(instrumented, transaction);
+
+    // void putWithDeferredIdAllocation(FullEntity<?>... entities);
+    instrumented.putWithDeferredIdAllocation(TEST_ENTITY_1, TEST_ENTITY_2);
+    verify(transaction).putWithDeferredIdAllocation(TEST_ENTITY_1, TEST_ENTITY_2);
+    verify(stats).recordDatastoreEntityWrites(TEST_KIND_1, 1);
+    verify(stats).recordDatastoreEntityWrites(TEST_KIND_2, 1);
+    verifyNoMoreInteractions(stats);
+    reset(stats);
+
+    // boolean isActive();
+    when(transaction.isActive()).thenReturn(true);
+    assertThat(instrumented.isActive(), is(true));
+    verify(transaction).isActive();
+
+    // void rollback();
+    instrumented.rollback();
+    verify(transaction).rollback();
+
+    // Response commit();
+    instrumented.commit();
+    verify(transaction).commit();
+
+    verifyNoMoreInteractions(transaction);
+    reset(transaction);
+  }
+
+  private void testReaderWriter(DatastoreReaderWriter instrumented, DatastoreReaderWriter delegate) {
+    testReader(instrumented, delegate);
+    testWriter(instrumented, delegate);
+  }
+
+  private void testWriter(DatastoreWriter instrumented, DatastoreWriter delegate) {
+
+    // Entity add(FullEntity<?> entity);
+    instrumented.add(TEST_ENTITY);
+    verify(delegate).add(TEST_ENTITY);
+    verify(stats).recordDatastoreEntityWrites(TEST_KIND, 1);
+    verifyNoMoreInteractions(stats);
+    reset(stats);
+
+    // List<Entity> add(FullEntity<?>... entities);
+    instrumented.add(TEST_ENTITY_1, TEST_ENTITY_2);
+    verify(delegate).add(TEST_ENTITY_1, TEST_ENTITY_2);
+    verify(stats).recordDatastoreEntityWrites(TEST_KIND_1, 1);
+    verify(stats).recordDatastoreEntityWrites(TEST_KIND_2, 1);
+    verifyNoMoreInteractions(stats);
+    reset(stats);
+
+    // void update(Entity... entities);
+    instrumented.update(TEST_ENTITY_1, TEST_ENTITY_2);
+    verify(delegate).update(TEST_ENTITY_1, TEST_ENTITY_2);
+    verify(stats).recordDatastoreEntityWrites(TEST_KIND_1, 1);
+    verify(stats).recordDatastoreEntityWrites(TEST_KIND_2, 1);
+    verifyNoMoreInteractions(stats);
+    reset(stats);
+
+    // Entity put(FullEntity<?> entity);
+    instrumented.put(TEST_ENTITY);
+    verify(delegate).put(TEST_ENTITY);
+    verify(stats).recordDatastoreEntityWrites(TEST_KIND, 1);
+    verifyNoMoreInteractions(stats);
+    reset(stats);
+
+    // List<Entity> put(FullEntity<?>... entities);
+    instrumented.put(TEST_ENTITY_1, TEST_ENTITY_2);
+    verify(delegate).put(TEST_ENTITY_1, TEST_ENTITY_2);
+    verify(stats).recordDatastoreEntityWrites(TEST_KIND_1, 1);
+    verify(stats).recordDatastoreEntityWrites(TEST_KIND_2, 1);
+    verifyNoMoreInteractions(stats);
+    reset(stats);
+
+    // void delete(Key... keys);
+    instrumented.delete(TEST_KEY_1, TEST_KEY_2);
+    verify(delegate).delete(TEST_KEY_1, TEST_KEY_2);
+    verify(stats).recordDatastoreEntityDeletes(TEST_KIND_1, 1);
+    verify(stats).recordDatastoreEntityDeletes(TEST_KIND_2, 1);
+    verifyNoMoreInteractions(stats);
+    reset(stats);
+
+    reset(delegate);
+  }
+
+  private void testReader(DatastoreReader instrumented, DatastoreReader delegate) {
+    // Entity get(Key key);
+    instrumented.get(TEST_KEY);
+    verify(delegate).get(TEST_KEY);
     verify(stats).recordDatastoreEntityReads(TEST_KIND, 1);
-  }
+    verifyNoMoreInteractions(stats);
+    reset(stats);
 
-  @Test
-  public void getMany() {
-    final List<Entity> entities = ImmutableList.of(TEST_ENTITY, TEST_ENTITY, TEST_ENTITY);
-    when(datastore.get(TEST_KEY, TEST_KEY, TEST_KEY)).thenReturn(entities.iterator());
-    assertThat(ImmutableList.copyOf(instrumentedDatastore.get(TEST_KEY, TEST_KEY, TEST_KEY)), is(entities));
-    verify(datastore).get(TEST_KEY, TEST_KEY, TEST_KEY);
-    verify(stats, times(3)).recordDatastoreEntityReads(TEST_KIND, 1);
-  }
+    // Iterator<Entity> get(Key... keys);
+    instrumented.get(TEST_KEY_1, TEST_KEY_2);
+    verify(delegate).get(TEST_KEY_1, TEST_KEY_2);
+    verify(stats).recordDatastoreEntityReads(TEST_KIND_1, 1);
+    verify(stats).recordDatastoreEntityReads(TEST_KIND_2, 1);
+    verifyNoMoreInteractions(stats);
+    reset(stats);
 
-  @Test
-  public void run() {
-    when(datastore.run(TEST_ENTITY_QUERY)).thenReturn(entityQueryResults);
-    final QueryResults<Entity> results = instrumentedDatastore.run(TEST_ENTITY_QUERY);
-    verify(datastore).run(TEST_ENTITY_QUERY);
+    // List<Entity> fetch(Key... keys);
+    instrumented.fetch(TEST_KEY_1, TEST_KEY_2);
+    verify(delegate).fetch(TEST_KEY_1, TEST_KEY_2);
+    verify(stats).recordDatastoreEntityReads(TEST_KIND_1, 1);
+    verify(stats).recordDatastoreEntityReads(TEST_KIND_2, 1);
+    verifyNoMoreInteractions(stats);
+    reset(stats);
+
+    // <T> QueryResults<T> run(Query<T> query);
+    when(delegate.run(TEST_ENTITY_QUERY)).thenReturn(entityQueryResults);
+    final QueryResults<Entity> results = instrumented.run(TEST_ENTITY_QUERY);
+    verify(delegate).run(TEST_ENTITY_QUERY);
     verify(stats).recordDatastoreQueries(TEST_KIND, 1);
-
     when(entityQueryResults.hasNext()).thenReturn(true);
     when(entityQueryResults.next()).thenReturn(TEST_ENTITY);
     assertThat(results.hasNext(), is(true));
@@ -142,19 +248,29 @@ public class InstrumentedDatastoreTest {
     assertThat(results.next(), is(TEST_ENTITY));
     verify(entityQueryResults).next();
     verify(stats).recordDatastoreEntityReads(TEST_KIND, 1);
+    verifyNoMoreInteractions(stats);
+    reset(stats);
+    reset(entityQueryResults);
+
+    reset(delegate);
   }
 
-  @Test
-  public void update() {
-    instrumentedDatastore.update(TEST_ENTITY);
-    verify(datastore).update(TEST_ENTITY);
-    verify(stats).recordDatastoreEntityWrites(TEST_KIND, 1);
-  }
+  private void testBatchWriter(Batch instrumented, Batch delegate) {
+    testWriter(instrumented, delegate);
 
-  @Test
-  public void put() {
-    instrumentedDatastore.put(TEST_ENTITY);
-    verify(datastore).put(TEST_ENTITY);
-    verify(stats).recordDatastoreEntityWrites(TEST_KIND, 1);
+    // void putWithDeferredIdAllocation(FullEntity<?>... entities);
+    instrumented.putWithDeferredIdAllocation(TEST_ENTITY_1, TEST_ENTITY_2);
+    verify(delegate).putWithDeferredIdAllocation(TEST_ENTITY_1, TEST_ENTITY_2);
+    verify(stats).recordDatastoreEntityWrites(TEST_KIND_1, 1);
+    verify(stats).recordDatastoreEntityWrites(TEST_KIND_2, 1);
+    verifyNoMoreInteractions(stats);
+    reset(stats);
+
+    // boolean isActive();
+    when(delegate.isActive()).thenReturn(true);
+    assertThat(instrumented.isActive(), is(true));
+    verify(delegate).isActive();
+
+    reset(delegate);
   }
 }
