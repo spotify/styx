@@ -701,6 +701,7 @@ public class MiddlewaresTest {
     }
   }
 
+  // Span has final methods and cannot be spied/mocked
   private static class MockSpan extends Span {
 
     boolean ended;
@@ -718,14 +719,17 @@ public class MiddlewaresTest {
 
     @Override
     public void addAnnotation(String description, Map<String, AttributeValue> attributes) {
+      // nop
     }
 
     @Override
     public void addAnnotation(Annotation annotation) {
+      // nop
     }
 
     @Override
     public void addLink(Link link) {
+      // nop
     }
 
     @Override
