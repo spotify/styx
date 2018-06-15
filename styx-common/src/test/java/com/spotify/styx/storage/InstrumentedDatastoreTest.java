@@ -22,11 +22,13 @@ package com.spotify.styx.storage;
 
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.datastore.Datastore;
+import com.google.cloud.datastore.Datastore.TransactionCallable;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
@@ -82,6 +84,31 @@ public class InstrumentedDatastoreTest {
 
     instrumentedTransaction.commit();
     verify(transaction).commit();
+  }
+
+  @Test
+  public void runInTransaction() {
+    when(datastore.runInTransaction(any())).then(a ->
+        a.getArgumentAt(0, TransactionCallable.class)
+            .run(transaction));
+
+    final String foobar = instrumentedDatastore.runInTransaction(tx -> {
+      tx.get(TEST_KEY);
+      verify(stats, times(1)).recordDatastoreEntityReads(TEST_KIND, 1);
+      tx.get(TEST_KEY, TEST_KEY);
+      verify(stats, times(3)).recordDatastoreEntityReads(TEST_KIND, 1);
+      tx.put(TEST_ENTITY);
+      verify(stats, times(1)).recordDatastoreEntityWrites(TEST_KIND, 1);
+      tx.put(TEST_ENTITY, TEST_ENTITY);
+      verify(stats, times(3)).recordDatastoreEntityWrites(TEST_KIND, 1);
+      tx.delete(TEST_KEY);
+      verify(stats, times(1)).recordDatastoreEntityDeletes(TEST_KIND, 1);
+      tx.delete(TEST_KEY, TEST_KEY);
+      verify(stats, times(3)).recordDatastoreEntityDeletes(TEST_KIND, 1);
+      return "foobar";
+    });
+
+    assertThat(foobar, is("foobar"));
   }
 
   @Test
