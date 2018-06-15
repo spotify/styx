@@ -195,11 +195,15 @@ public class DatastoreStorage implements Closeable {
   DatastoreStorage(Datastore datastore, Duration retryBaseDelay,
       Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory,
       Stats stats) {
-    this.datastore = Objects.requireNonNull(datastore);
+    this.datastore = instrument(Objects.requireNonNull(datastore));
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
     this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
     this.stats = Objects.requireNonNull(stats);
     this.forkJoinPool = new ForkJoinPool(REQUEST_CONCURRENCY);
+  }
+
+  private Datastore instrument(Datastore datastore) {
+    return new InstrumentedDatastore(datastore, stats);
   }
 
   @Override
