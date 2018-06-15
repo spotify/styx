@@ -21,13 +21,8 @@
 package com.spotify.styx.storage;
 
 import com.google.cloud.datastore.Batch;
-import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreWriter;
-import com.google.cloud.datastore.Entity;
-import com.google.cloud.datastore.FullEntity;
-import com.google.cloud.datastore.Key;
 import com.spotify.styx.monitoring.Stats;
-import java.util.List;
 
 interface InstrumentedBatch extends Batch, InstrumentedDatastoreBatchWriter {
 
