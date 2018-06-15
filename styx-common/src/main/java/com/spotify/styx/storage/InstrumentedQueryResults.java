@@ -49,8 +49,8 @@ class InstrumentedQueryResults<T> implements QueryResults<T> {
       // Key queries do not count as entity reads
       return results;
     }
-    if (query instanceof ProjectionEntityQuery &&
-        ((ProjectionEntityQuery) query).getDistinctOn().isEmpty()) {
+    if (query instanceof ProjectionEntityQuery
+        && ((ProjectionEntityQuery) query).getDistinctOn().isEmpty()) {
       // Projection queries with no distinct on clause do not count as entity reads
       return results;
     }
