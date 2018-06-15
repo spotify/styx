@@ -205,5 +205,4 @@ interface InstrumentedTransaction extends
       }
     };
   }
-
 }

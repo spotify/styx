@@ -152,4 +152,14 @@ final class NoopStats implements Stats {
   public void recordDatastoreOperations(String operation, String kind, int n) {
     // nop
   }
+
+  @Override
+  public void recordDatastoreEntityWrites(String kind, int n) {
+    // nop
+  }
+
+  @Override
+  public void recordDatastoreEntityDeletes(String kind, int n) {
+    // nop
+  }
 }

@@ -84,8 +84,6 @@ public class ShardedCounterTest {
   private static Storage storage;
   private static Connection connection;
 
-  private static final Stats stats = mock(Stats.class);
-
   @BeforeClass
   public static void setUpClass() throws IOException, InterruptedException {
     final java.util.logging.Logger datastoreEmulatorLogger =
@@ -96,7 +94,7 @@ public class ShardedCounterTest {
     helper.start();
     datastore = helper.getOptions().getService();
     connection = mock(Connection.class);
-    storage = new AggregateStorage(connection, datastore, Duration.ZERO, stats);
+    storage = new AggregateStorage(connection, datastore, Duration.ZERO);
   }
 
   @AfterClass

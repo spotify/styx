@@ -56,7 +56,6 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
@@ -90,8 +89,6 @@ public class BackfillResourceTest extends VersionedApiTest {
   private static LocalDatastoreHelper localDatastore;
   private Connection bigtable = setupBigTableMockTable();
   @Mock private ShardedCounter shardedCounter;
-
-  @Mock private Stats stats;
 
   private AggregateStorage storage;
 
@@ -157,7 +154,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   @Override
   protected void init(Environment environment) {
     storage = new AggregateStorage(bigtable, localDatastore.getOptions().getService(),
-                                   Duration.ZERO, stats);
+                                   Duration.ZERO);
 
     environment.routingEngine()
         .registerRoutes(new BackfillResource(SCHEDULER_BASE, storage, workflowValidator).routes());

@@ -42,12 +42,12 @@ import java.util.Objects;
 /**
  * Instrumentation for {@link Datastore} that counts operations according to https://cloud.google.com/datastore/pricing.
  */
-class InstrumentedDatastore implements Datastore, InstrumentedDatastoreReaderWriter {
+public class InstrumentedDatastore implements Datastore, InstrumentedDatastoreReaderWriter {
 
   private final Stats stats;
   private final Datastore delegate;
 
-  InstrumentedDatastore(Datastore delegate, Stats stats) {
+  private InstrumentedDatastore(Datastore delegate, Stats stats) {
     this.delegate = delegate;
     this.stats = Objects.requireNonNull(stats, "stats");
   }
@@ -161,5 +161,9 @@ class InstrumentedDatastore implements Datastore, InstrumentedDatastoreReaderWri
   @Override
   public DatastoreReaderWriter readerWriter() {
     return delegate;
+  }
+
+  public static Datastore of(Datastore delegate, Stats stats) {
+    return new InstrumentedDatastore(delegate, stats);
   }
 }

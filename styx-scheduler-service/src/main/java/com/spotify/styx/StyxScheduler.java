@@ -631,13 +631,13 @@ public class StyxScheduler implements AppInit {
     };
   }
 
-  private static AggregateStorage storage(Environment environment, Stats stats) {
+  private static AggregateStorage storage(Environment environment, Stats stats  ) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
 
     final Connection bigTable = closer.register(createBigTableConnection(config));
-    final Datastore datastore = createDatastore(config);
-    return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT, stats);
+    final Datastore datastore = createDatastore(config, stats);
+    return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
   }
 
   private static DockerRunner createDockerRunner(
