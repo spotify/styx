@@ -83,6 +83,4 @@ public interface Stats {
   void recordDatastoreEntityDeletes(String kind, int n);
 
   void recordDatastoreQueries(String kind, int n);
-
-  void recordDatastoreOperations(String operation, String kind, int n);
 }

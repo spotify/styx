@@ -21,6 +21,7 @@
 package com.spotify.styx.monitoring;
 
 import static com.spotify.styx.monitoring.MetricsStats.ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER;
+import static com.spotify.styx.monitoring.MetricsStats.DATASTORE_OPERATION_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.DOCKER_DURATION;
 import static com.spotify.styx.monitoring.MetricsStats.DOCKER_ERROR_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.DOCKER_RATE;
@@ -264,5 +265,33 @@ public class MetricsStatsTest {
     when(registry.histogram(TICK_DURATION.tagged("type", type))).thenReturn(histogram);
     stats.recordTickDuration(type, 100L);
     verify(histogram).update(100L);
+  }
+
+  @Test
+  public void shouldRecordDatastoreEntityReads() {
+    when(registry.meter(DATASTORE_OPERATION_RATE.tagged("operation", "read", "kind", "foobar"))).thenReturn(meter);
+    stats.recordDatastoreEntityReads("foobar", 17);
+    verify(meter).mark(17);
+  }
+
+  @Test
+  public void shouldRecordDatastoreEntityWrites() {
+    when(registry.meter(DATASTORE_OPERATION_RATE.tagged("operation", "write", "kind", "foobar"))).thenReturn(meter);
+    stats.recordDatastoreEntityWrites("foobar", 17);
+    verify(meter).mark(17);
+  }
+
+  @Test
+  public void shouldRecordDatastoreEntityDeletes() {
+    when(registry.meter(DATASTORE_OPERATION_RATE.tagged("operation", "delete", "kind", "foobar"))).thenReturn(meter);
+    stats.recordDatastoreEntityDeletes("foobar", 17);
+    verify(meter).mark(17);
+  }
+
+  @Test
+  public void shouldRecordDatastoreEntityQueries() {
+    when(registry.meter(DATASTORE_OPERATION_RATE.tagged("operation", "query", "kind", "foobar"))).thenReturn(meter);
+    stats.recordDatastoreQueries("foobar", 17);
+    verify(meter).mark(17);
   }
 }

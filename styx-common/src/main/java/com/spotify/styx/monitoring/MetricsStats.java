@@ -333,8 +333,7 @@ public final class MetricsStats implements Stats {
     recordDatastoreOperations("query", kind, n);
   }
 
-  @Override
-  public void recordDatastoreOperations(String operation, String kind, int n) {
+  private void recordDatastoreOperations(String operation, String kind, int n) {
     datastoreOperationMeter(operation, kind).mark(n);
   }
 
