@@ -70,7 +70,6 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
