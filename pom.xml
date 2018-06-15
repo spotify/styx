@@ -19,6 +19,7 @@
     <checkstyle.config.location>checkstyle.xml</checkstyle.config.location>
     <checkstyle.version>2.17</checkstyle.version>
     <semantic-metrics.version>0.11.2</semantic-metrics.version>
+    <opencensus.version>0.14.0</opencensus.version>
   </properties>
 
   <repositories>
@@ -206,6 +207,24 @@
         <groupId>com.github.kabutz</groupId>
         <artifactId>javaspecialists</artifactId>
         <version>055ddfd5d6d9</version>
+      </dependency>
+
+      <!-- tracing -->
+      <dependency>
+        <groupId>io.opencensus</groupId>
+        <artifactId>opencensus-api</artifactId>
+        <version>${opencensus.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.opencensus</groupId>
+        <artifactId>opencensus-exporter-trace-stackdriver</artifactId>
+        <version>${opencensus.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.opencensus</groupId>
+        <artifactId>opencensus-impl</artifactId>
+        <version>${opencensus.version}</version>
+        <scope>runtime</scope>
       </dependency>
 
       <!-- cli -->
@@ -431,12 +450,22 @@
       <dependency>
         <groupId>io.grpc</groupId>
         <artifactId>grpc-core</artifactId>
-        <version>1.10.1</version>
+        <version>1.12.0</version>
       </dependency>
       <dependency>
-        <groupId>io.opencensus</groupId>
-        <artifactId>opencensus-api</artifactId>
-        <version>0.12.2</version>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-context</artifactId>
+        <version>1.12.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.auth</groupId>
+        <artifactId>google-auth-library-oauth2-http</artifactId>
+        <version>0.9.1</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.auth</groupId>
+        <artifactId>google-auth-library-credentials</artifactId>
+        <version>0.9.1</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
