@@ -22,6 +22,8 @@ package com.spotify.styx.api;
 
 import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
+import static io.opencensus.trace.AttributeValue.stringAttributeValue;
+import static io.opencensus.trace.Status.UNKNOWN;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -43,13 +45,17 @@ import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.SyncHandler;
 import com.spotify.styx.util.MDCUtil;
 import io.norberg.automatter.AutoMatter;
+import io.opencensus.trace.Span;
+import io.opencensus.trace.Tracer;
 import java.io.IOException;
+import java.net.URI;
 import java.security.GeneralSecurityException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -217,6 +223,33 @@ public final class Middlewares {
                    .replaceAll("\n", " "));
 
       return innerHandler.invoke(requestContext);
+    };
+  }
+
+  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> tracer(
+      Tracer tracer, String service) {
+    return innerHandler -> requestContext -> {
+      final Request request = requestContext.request();
+      final URI uri = URI.create(request.uri());
+      final Span span = tracer.spanBuilder(service + '/' + uri.getPath()).startSpan();
+      span.putAttribute("method", stringAttributeValue(request.method()));
+      span.putAttribute("uri", stringAttributeValue(request.uri()));
+      final CompletionStage<Response<T>> response;
+      try  {
+        response = innerHandler.invoke(requestContext);
+      } catch (Exception e) {
+        span.setStatus(UNKNOWN);
+        span.end();
+        Throwables.throwIfUnchecked(e);
+        throw new RuntimeException(e);
+      }
+      response.whenComplete((r, ex) -> {
+        if (ex != null) {
+          span.setStatus(UNKNOWN);
+        }
+        span.end();
+      });
+      return response;
     };
   }
 

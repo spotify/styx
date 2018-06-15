@@ -53,6 +53,9 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
+import io.opencensus.common.Scope;
+import io.opencensus.trace.Tracer;
+import io.opencensus.trace.Tracing;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -91,6 +94,8 @@ public class Scheduler {
 
   private static final int SCHEDULING_BATCH_SIZE = 16;
 
+  private static final Tracer tracer = Tracing.getTracer();
+
   private final Time time;
   private final TimeoutConfig ttls;
   private final StateManager stateManager;
@@ -115,6 +120,12 @@ public class Scheduler {
   }
 
   void tick() {
+    try (Scope ss = tracer.spanBuilder("Styx.Scheduler.tick").startScopedSpan()) {
+      tick0();
+    }
+  }
+
+  void tick0() {
     final Instant t0 = time.get();
 
     final Map<String, Resource> resources;
