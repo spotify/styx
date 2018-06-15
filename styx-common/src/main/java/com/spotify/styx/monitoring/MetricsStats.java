@@ -319,6 +319,16 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
+  public void recordDatastoreEntityWrites(String kind, int n) {
+    recordDatastoreOperations("write", kind, n);
+  }
+
+  @Override
+  public void recordDatastoreEntityDeletes(String kind, int n) {
+    recordDatastoreOperations("delete", kind, n);
+  }
+
+  @Override
   public void recordDatastoreQueries(String kind, int n) {
     recordDatastoreOperations("query", kind, n);
   }
