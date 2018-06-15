@@ -41,7 +41,6 @@ import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.StatusType;
 import com.spotify.styx.model.Resource;
-import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.util.ShardedCounter;
 import java.time.Duration;
@@ -66,8 +65,6 @@ public class ResourceResourceTest extends VersionedApiTest {
   private static final Resource RESOURCE_1 = Resource.create("resource1", 1);
   private static final Resource RESOURCE_2 = Resource.create("resource2", 2);
 
-  @Mock private Stats stats;
-
   public ResourceResourceTest(Api.Version version) {
     super(ResourceResource.BASE, version, "resource-test");
     MockitoAnnotations.initMocks(this);
@@ -78,7 +75,7 @@ public class ResourceResourceTest extends VersionedApiTest {
     storage = spy(new AggregateStorage(
         mock(Connection.class),
         localDatastore.getOptions().getService(),
-        Duration.ZERO, stats));
+        Duration.ZERO));
 
     ResourceResource resourceResource = new ResourceResource(storage, shardedCounter);
 

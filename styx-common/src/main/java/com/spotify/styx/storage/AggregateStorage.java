@@ -30,7 +30,6 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
-import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
@@ -51,9 +50,9 @@ public class AggregateStorage implements Storage {
   private final BigtableStorage bigtableStorage;
   private final DatastoreStorage datastoreStorage;
 
-  public AggregateStorage(Connection connection, Datastore datastore, Duration retryBaseDelay, Stats stats) {
+  public AggregateStorage(Connection connection, Datastore datastore, Duration retryBaseDelay) {
     this(new BigtableStorage(connection, retryBaseDelay),
-         new DatastoreStorage(datastore, retryBaseDelay, stats));
+        new DatastoreStorage(datastore, retryBaseDelay));
   }
 
   AggregateStorage(BigtableStorage bigtableStorage, DatastoreStorage datastoreStorage) {

@@ -83,7 +83,6 @@ import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Message.MessageLevel;
 import com.spotify.styx.state.RunState;
@@ -188,7 +187,6 @@ public class DatastoreStorageTest {
 
   @Mock TransactionFunction<String, FooException> transactionFunction;
   @Mock Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory;
-  @Mock Stats stats;
 
   @BeforeClass
   public static void setUpClass() throws Exception {
@@ -216,7 +214,7 @@ public class DatastoreStorageTest {
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
     datastore = helper.getOptions().getService();
-    storage = new DatastoreStorage(datastore, Duration.ZERO, stats);
+    storage = new DatastoreStorage(datastore, Duration.ZERO);
   }
 
   @After
@@ -707,9 +705,9 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndCommit() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, stats);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
     final Transaction transaction = datastore.newTransaction();
-    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction, stats));
+    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
 
     when(transactionFunction.apply(any())).thenReturn("foo");
@@ -724,9 +722,9 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnFailure() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, stats);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
     final Transaction transaction = datastore.newTransaction();
-    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction, stats));
+    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
 
     final Exception expectedException = new FooException();
@@ -748,9 +746,9 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnPreCommitConflict() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, stats);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
     final Transaction transaction = datastore.newTransaction();
-    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction, stats));
+    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
 
     final Exception expectedException = new DatastoreException(10, "", "");
@@ -770,9 +768,9 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnCommitConflict() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, stats);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
     final Transaction transaction = datastore.newTransaction();
-    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction, stats));
+    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
 
     final DatastoreException datastoreException = new DatastoreException(1, "", "");
@@ -793,9 +791,9 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldThrowIfRollbackFailsAfterConflict() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, stats);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
     final Transaction transaction = datastore.newTransaction();
-    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction, stats));
+    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
 
     when(transactionFunction.apply(any())).thenReturn("");
@@ -819,7 +817,7 @@ public class DatastoreStorageTest {
   @Test
   public void runInTransactionShouldThrowIfDatastoreNewTransactionFails() throws Exception {
     Datastore datastore = mock(Datastore.class);
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, stats);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
     when(datastore.newTransaction()).thenThrow(new DatastoreException(1, "", ""));
 
     when(transactionFunction.apply(any())).thenReturn("");

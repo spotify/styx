@@ -24,6 +24,7 @@ import com.spotify.apollo.Environment;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.storage.Storage;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 public interface StorageFactory extends BiFunction<Environment, Stats, Storage> {
 }
