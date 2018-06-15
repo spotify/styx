@@ -43,6 +43,7 @@ import com.spotify.styx.util.TriggerInstantSpec;
 import io.opencensus.common.Scope;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
+import io.opencensus.trace.samplers.Samplers;
 import java.io.Closeable;
 import java.io.IOException;
 import java.time.Instant;
@@ -87,7 +88,10 @@ class TriggerManager implements Closeable {
   }
 
   void tick() {
-    try (Scope ss = tracer.spanBuilder("Styx.TriggerManager.tick").startScopedSpan()) {
+    try (Scope ss = tracer.spanBuilder("Styx.TriggerManager.tick")
+        .setRecordEvents(true)
+        .setSampler(Samplers.alwaysSample())
+        .startScopedSpan()) {
       tick0();
     }
   }

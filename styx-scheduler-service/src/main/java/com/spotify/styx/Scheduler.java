@@ -56,6 +56,7 @@ import com.spotify.styx.util.Time;
 import io.opencensus.common.Scope;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
+import io.opencensus.trace.samplers.Samplers;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -120,7 +121,10 @@ public class Scheduler {
   }
 
   void tick() {
-    try (Scope ss = tracer.spanBuilder("Styx.Scheduler.tick").startScopedSpan()) {
+    try (Scope ss = tracer.spanBuilder("Styx.Scheduler.tick")
+        .setRecordEvents(true)
+        .setSampler(Samplers.alwaysSample())
+        .startScopedSpan()) {
       tick0();
     }
   }

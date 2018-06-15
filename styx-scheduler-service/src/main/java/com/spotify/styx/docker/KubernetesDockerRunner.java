@@ -81,6 +81,7 @@ import io.norberg.automatter.AutoMatter;
 import io.opencensus.common.Scope;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
+import io.opencensus.trace.samplers.Samplers;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -541,7 +542,10 @@ class KubernetesDockerRunner implements DockerRunner {
 
   private void pollPods() {
     try {
-      try (Scope ss = tracer.spanBuilder("Styx.KubernetesDockerRunner.pollPods").startScopedSpan()) {
+      try (Scope ss = tracer.spanBuilder("Styx.KubernetesDockerRunner.pollPods")
+          .setRecordEvents(true)
+          .setSampler(Samplers.alwaysSample())
+          .startScopedSpan()) {
         tryPollPods();
       }
     } catch (Throwable t) {
