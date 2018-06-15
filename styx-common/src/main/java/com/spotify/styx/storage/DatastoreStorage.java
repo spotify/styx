@@ -446,14 +446,12 @@ public class DatastoreStorage implements Closeable {
     stats.recordDatastoreEntityReads(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY, keys.size());
 
     // Strongly consistently read values for the above keys
-    final Map<WorkflowInstance, RunState> states = Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ)
+    return Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ)
         .stream()
         .map(batch -> forkJoinPool.submit(withMDC(() -> this.readRunStateBatch(batch))))
         .collect(toList()).stream() // collect here to execute batch reads in parallel
         .flatMap(task -> task.join().stream())
         .collect(toMap(RunState::workflowInstance, Function.identity()));
-    return states;
-
   }
 
   /**
