@@ -28,6 +28,7 @@ import com.google.cloud.datastore.FullEntity;
 import com.google.cloud.datastore.Key;
 import com.spotify.styx.monitoring.Stats;
 import java.util.List;
+import java.util.Objects;
 
 interface InstrumentedDatastoreBatchWriter
     // XXX: DatastoreBatchWriter is not a public interface, Batch is an almost identical subtype
@@ -101,6 +102,8 @@ interface InstrumentedDatastoreBatchWriter
   }
 
   static InstrumentedDatastoreBatchWriter of(Stats stats, Batch batch) {
+    Objects.requireNonNull(stats, "stats");
+    Objects.requireNonNull(batch, "batch");
     return new InstrumentedDatastoreBatchWriter() {
       @Override
       public Stats stats() {

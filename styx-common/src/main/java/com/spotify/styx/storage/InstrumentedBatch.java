@@ -23,10 +23,13 @@ package com.spotify.styx.storage;
 import com.google.cloud.datastore.Batch;
 import com.google.cloud.datastore.DatastoreWriter;
 import com.spotify.styx.monitoring.Stats;
+import java.util.Objects;
 
 interface InstrumentedBatch extends Batch, InstrumentedDatastoreBatchWriter {
 
   static InstrumentedBatch of(Stats stats, Batch batch) {
+    Objects.requireNonNull(stats, "stats");
+    Objects.requireNonNull(batch, "batch");
     return new InstrumentedBatch() {
       @Override
       public Stats stats() {

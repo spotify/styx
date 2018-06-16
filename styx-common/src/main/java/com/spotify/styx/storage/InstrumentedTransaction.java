@@ -33,13 +33,14 @@ import com.google.protobuf.ByteString;
 import com.spotify.styx.monitoring.Stats;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 
 interface InstrumentedTransaction extends
     Transaction,
     InstrumentedDatastoreBatchWriter,
     InstrumentedDatastoreReaderWriter {
 
-  Transaction tx();
+  Transaction transaction();
 
   @Override
   default Entity get(Key key) {
@@ -103,12 +104,12 @@ interface InstrumentedTransaction extends
 
   @Override
   default Transaction.Response commit() {
-    return tx().commit();
+    return transaction().commit();
   }
 
   @Override
   default void rollback() {
-    tx().rollback();
+    transaction().rollback();
   }
 
   @Override
@@ -123,7 +124,7 @@ interface InstrumentedTransaction extends
 
   @Override
   default ByteString getTransactionId() {
-    return tx().getTransactionId();
+    return transaction().getTransactionId();
   }
 
   @Override
@@ -132,12 +133,12 @@ interface InstrumentedTransaction extends
     return new Batch() {
       @Override
       public Entity add(FullEntity<?> entity) {
-        return tx().add(entity);
+        return transaction().add(entity);
       }
 
       @Override
       public List<Entity> add(FullEntity<?>... entities) {
-        return tx().add();
+        return transaction().add();
       }
 
       @Override
@@ -147,56 +148,58 @@ interface InstrumentedTransaction extends
 
       @Override
       public Datastore getDatastore() {
-        return tx().getDatastore();
+        return transaction().getDatastore();
       }
 
       @Override
       public void addWithDeferredIdAllocation(FullEntity<?>... entities) {
-        tx().addWithDeferredIdAllocation(entities);
+        transaction().addWithDeferredIdAllocation(entities);
       }
 
       @Override
       public void update(Entity... entities) {
-        tx().update(entities);
+        transaction().update(entities);
       }
 
       @Override
       public void delete(Key... keys) {
-        tx().delete(keys);
+        transaction().delete(keys);
       }
 
       @Override
       public void putWithDeferredIdAllocation(FullEntity<?>... entities) {
-        tx().putWithDeferredIdAllocation(entities);
+        transaction().putWithDeferredIdAllocation(entities);
       }
 
       @Override
       public Entity put(FullEntity<?> entity) {
-        return tx().put(entity);
+        return transaction().put(entity);
       }
 
       @Override
       public List<Entity> put(FullEntity<?>... entities) {
-        return tx().put();
+        return transaction().put();
       }
 
       @Override
       public boolean isActive() {
-        return tx().isActive();
+        return transaction().isActive();
       }
     };
   }
 
   @Override
   default DatastoreReaderWriter readerWriter() {
-    return tx();
+    return transaction();
   }
 
-  static InstrumentedTransaction of(Stats stats, Transaction tx) {
+  static InstrumentedTransaction of(Stats stats, Transaction transaction) {
+    Objects.requireNonNull(stats, "stats");
+    Objects.requireNonNull(transaction, "transaction");
     return new InstrumentedTransaction() {
       @Override
-      public Transaction tx() {
-        return tx;
+      public Transaction transaction() {
+        return transaction;
       }
 
       @Override
