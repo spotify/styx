@@ -163,7 +163,11 @@ public class InstrumentedDatastore implements Datastore, InstrumentedDatastoreRe
     return delegate;
   }
 
-  public static Datastore of(Datastore delegate, Stats stats) {
+  public Datastore delegate() {
+    return delegate;
+  }
+
+  public static InstrumentedDatastore of(Datastore delegate, Stats stats) {
     return new InstrumentedDatastore(delegate, stats);
   }
 }

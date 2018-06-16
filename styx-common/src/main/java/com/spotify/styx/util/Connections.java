@@ -46,7 +46,7 @@ public final class Connections {
   private Connections() {
   }
 
-  public static Datastore createDatastore(Config config, Stats stats) {
+  public static InstrumentedDatastore createDatastore(Config config, Stats stats) {
     final String projectId = config.getString(DATASTORE_PROJECT);
     final String namespace = config.getString(DATASTORE_NAMESPACE);
 
