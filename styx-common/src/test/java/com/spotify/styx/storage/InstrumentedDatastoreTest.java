@@ -23,15 +23,16 @@ package com.spotify.styx.storage;
 import static java.util.Arrays.asList;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.datastore.BaseEntity;
 import com.google.cloud.datastore.Batch;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Datastore.TransactionCallable;
@@ -44,6 +45,9 @@ import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.IncompleteKey;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.KeyFactory;
+import com.google.cloud.datastore.KeyQuery;
+import com.google.cloud.datastore.ProjectionEntity;
+import com.google.cloud.datastore.ProjectionEntityQuery;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.ReadOption;
 import com.google.cloud.datastore.Transaction;
@@ -70,6 +74,11 @@ public class InstrumentedDatastoreTest {
   private static final Entity TEST_ENTITY_1 = Entity.newBuilder(TEST_KEY_1).build();
   private static final Entity TEST_ENTITY_2 = Entity.newBuilder(TEST_KEY_2).build();
   private static final EntityQuery TEST_ENTITY_QUERY = EntityQuery.newEntityQueryBuilder().setKind(TEST_KIND).build();
+  private static final KeyQuery TEST_KEY_QUERY = EntityQuery.newKeyQueryBuilder().setKind(TEST_KIND).build();
+  private static final ProjectionEntityQuery TEST_PROJECTION_QUERY_WITHOUT_DISTINCT =
+      EntityQuery.newProjectionEntityQueryBuilder().setKind(TEST_KIND).build();
+  private static final ProjectionEntityQuery TEST_PROJECTION_QUERY_WITH_DISTINCT =
+      EntityQuery.newProjectionEntityQueryBuilder().setKind(TEST_KIND).addDistinctOn("foo", "bar").build();
   private static final KeyFactory KEY_FACTORY = new KeyFactory(TEST_PROJECT);
 
   private Datastore instrumentedDatastore;
@@ -77,6 +86,8 @@ public class InstrumentedDatastoreTest {
   @Mock Datastore datastore;
   @Mock Stats stats;
   @Mock QueryResults<Entity> entityQueryResults;
+  @Mock QueryResults<Key> keyQueryResults;
+  @Mock QueryResults<ProjectionEntity> projectionQueryResults;
   @Mock Transaction transaction;
   @Mock Batch batch;
   @Mock ReadOption readOption1;
@@ -84,6 +95,7 @@ public class InstrumentedDatastoreTest {
   @Mock IncompleteKey incompleteKey1;
   @Mock IncompleteKey incompleteKey2;
   @Mock DatastoreOptions options;
+  @Mock BaseEntity<?> entity;
 
   @Before
   public void setUp() throws Exception {
@@ -118,19 +130,45 @@ public class InstrumentedDatastoreTest {
     reset(stats, datastore);
 
     // <T> QueryResults<T> run(Query<T> query, ReadOption... options);
+
+    // Entity Query
     when(datastore.run(TEST_ENTITY_QUERY, readOption1, readOption2)).thenReturn(entityQueryResults);
-    final QueryResults<Entity> results = instrumentedDatastore.run(TEST_ENTITY_QUERY, readOption1, readOption2);
+    final QueryResults<Entity> instrumentedEntityQueryResults =
+        instrumentedDatastore.run(TEST_ENTITY_QUERY, readOption1, readOption2);
     verify(datastore).run(TEST_ENTITY_QUERY, readOption1, readOption2);
     verify(stats).recordDatastoreQueries(TEST_KIND, 1);
-    when(entityQueryResults.hasNext()).thenReturn(true);
-    when(entityQueryResults.next()).thenReturn(TEST_ENTITY);
-    assertThat(results.hasNext(), is(true));
-    verify(entityQueryResults).hasNext();
-    assertThat(results.next(), is(TEST_ENTITY));
-    verify(entityQueryResults).next();
-    verify(stats).recordDatastoreEntityReads(TEST_KIND, 1);
-    verifyNoMoreInteractions(stats, entityQueryResults, datastore);
-    reset(stats, entityQueryResults, datastore);
+    testInstrumentedQueryResults(instrumentedEntityQueryResults, entityQueryResults);
+    verifyNoMoreInteractions(stats, datastore, entityQueryResults);
+    reset(stats, datastore, entityQueryResults);
+
+    // Key Query
+    when(datastore.run(TEST_KEY_QUERY, readOption1, readOption2)).thenReturn(keyQueryResults);
+    assertThat(instrumentedDatastore.run(TEST_KEY_QUERY, readOption1, readOption2), sameInstance(keyQueryResults));
+    verify(datastore).run(TEST_KEY_QUERY, readOption1, readOption2);
+    verify(stats).recordDatastoreQueries(TEST_KIND, 1);
+    verifyNoMoreInteractions(stats, datastore, keyQueryResults);
+    reset(stats, datastore, keyQueryResults);
+
+    // Projection Query - With Distinct
+    when(datastore.run(TEST_PROJECTION_QUERY_WITH_DISTINCT, readOption1, readOption2))
+        .thenReturn(projectionQueryResults);
+    final QueryResults<ProjectionEntity> instrumentedProjectionQueryResults =
+        instrumentedDatastore.run(TEST_PROJECTION_QUERY_WITH_DISTINCT, readOption1, readOption2);
+    verify(datastore).run(TEST_PROJECTION_QUERY_WITH_DISTINCT, readOption1, readOption2);
+    verify(stats).recordDatastoreQueries(TEST_KIND, 1);
+    testInstrumentedQueryResults(instrumentedProjectionQueryResults, projectionQueryResults);
+    verifyNoMoreInteractions(stats, datastore);
+    reset(stats, datastore, projectionQueryResults);
+
+    // Project Query - Without Distinct
+    when(datastore.run(TEST_PROJECTION_QUERY_WITHOUT_DISTINCT, readOption1, readOption2))
+        .thenReturn(projectionQueryResults);
+    assertThat(instrumentedDatastore.run(TEST_PROJECTION_QUERY_WITHOUT_DISTINCT, readOption1, readOption2),
+        is(sameInstance(projectionQueryResults)));
+    verify(stats).recordDatastoreQueries(TEST_KIND, 1);
+    verify(datastore).run(TEST_PROJECTION_QUERY_WITHOUT_DISTINCT, readOption1, readOption2);
+    verifyNoMoreInteractions(stats, datastore);
+    reset(stats, datastore);
 
     // Key allocateId(IncompleteKey key);
     when(instrumentedDatastore.allocateId(incompleteKey1)).thenReturn(TEST_KEY_1);
@@ -344,20 +382,52 @@ public class InstrumentedDatastoreTest {
     reset(stats, delegate);
 
     // <T> QueryResults<T> run(Query<T> query);
+
+    // Entity Query
     when(delegate.run(TEST_ENTITY_QUERY)).thenReturn(entityQueryResults);
-    final QueryResults<Entity> results = instrumented.run(TEST_ENTITY_QUERY);
+    final QueryResults<Entity> instrumentedEntityQueryResults = instrumented.run(TEST_ENTITY_QUERY);
     verify(delegate).run(TEST_ENTITY_QUERY);
     verify(stats).recordDatastoreQueries(TEST_KIND, 1);
-    when(entityQueryResults.hasNext()).thenReturn(true);
-    when(entityQueryResults.next()).thenReturn(TEST_ENTITY);
-    assertThat(results.hasNext(), is(true));
-    verify(entityQueryResults).hasNext();
-    assertThat(results.next(), is(TEST_ENTITY));
-    verify(entityQueryResults).next();
-    verify(stats).recordDatastoreEntityReads(TEST_KIND, 1);
-    verifyNoMoreInteractions(stats);
+    testInstrumentedQueryResults(instrumentedEntityQueryResults, entityQueryResults);
     verifyNoMoreInteractions(stats, delegate, entityQueryResults);
     reset(stats, delegate, entityQueryResults);
+
+    // Key Query
+    when(delegate.run(TEST_KEY_QUERY)).thenReturn(keyQueryResults);
+    assertThat(instrumented.run(TEST_KEY_QUERY), sameInstance(keyQueryResults));
+    verify(delegate).run(TEST_KEY_QUERY);
+    verify(stats).recordDatastoreQueries(TEST_KIND, 1);
+    verifyNoMoreInteractions(stats, delegate, keyQueryResults);
+    reset(stats, delegate, keyQueryResults);
+
+    // Projection Query - With Distinct
+    when(delegate.run(TEST_PROJECTION_QUERY_WITH_DISTINCT)).thenReturn(projectionQueryResults);
+    final QueryResults<ProjectionEntity> instrumentedProjectionQueryResults =
+        instrumented.run(TEST_PROJECTION_QUERY_WITH_DISTINCT);
+    verify(delegate).run(TEST_PROJECTION_QUERY_WITH_DISTINCT);
+    verify(stats).recordDatastoreQueries(TEST_KIND, 1);
+    testInstrumentedQueryResults(instrumentedProjectionQueryResults, projectionQueryResults);
+    verifyNoMoreInteractions(stats, delegate);
+    reset(stats, delegate, projectionQueryResults);
+
+    // Project Query - Without Distinct
+    when(delegate.run(TEST_PROJECTION_QUERY_WITHOUT_DISTINCT)).thenReturn(projectionQueryResults);
+    assertThat(instrumented.run(TEST_PROJECTION_QUERY_WITHOUT_DISTINCT), is(sameInstance(projectionQueryResults)));
+    verify(stats).recordDatastoreQueries(TEST_KIND, 1);
+    verify(delegate).run(TEST_PROJECTION_QUERY_WITHOUT_DISTINCT);
+    verifyNoMoreInteractions(stats, delegate);
+    reset(stats, delegate);
+  }
+
+  private <T extends BaseEntity<?>> void testInstrumentedQueryResults(QueryResults<T> instrumented,
+      QueryResults<T> delegate) {
+    when(delegate.hasNext()).thenReturn(true);
+    when(delegate.next()).thenReturn((T) entity);
+    assertThat(instrumented.hasNext(), is(true));
+    verify(delegate).hasNext();
+    assertThat(instrumented.next(), is(entity));
+    verify(delegate).next();
+    verify(stats).recordDatastoreEntityReads(TEST_KIND, 1);
   }
 
   private void testBatchWriter(Batch instrumented, Batch delegate) {
