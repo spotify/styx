@@ -433,6 +433,14 @@ public class InstrumentedDatastoreTest {
   private void testBatchWriter(Batch instrumented, Batch delegate) {
     testWriter(instrumented, delegate);
 
+    // void addWithDeferredIdAllocation(FullEntity<?>... entities);
+    instrumented.addWithDeferredIdAllocation(TEST_ENTITY_1, TEST_ENTITY_2);
+    verify(delegate).addWithDeferredIdAllocation(TEST_ENTITY_1, TEST_ENTITY_2);
+    verify(stats).recordDatastoreEntityWrites(TEST_KIND_1, 1);
+    verify(stats).recordDatastoreEntityWrites(TEST_KIND_2, 1);
+    verifyNoMoreInteractions(stats, delegate);
+    reset(stats, delegate);
+
     // void putWithDeferredIdAllocation(FullEntity<?>... entities);
     instrumented.putWithDeferredIdAllocation(TEST_ENTITY_1, TEST_ENTITY_2);
     verify(delegate).putWithDeferredIdAllocation(TEST_ENTITY_1, TEST_ENTITY_2);
