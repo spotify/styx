@@ -527,6 +527,7 @@
             <exclude>**/*$*.class</exclude>
             <exclude>com/spotify/styx/model/Event.class</exclude>
             <exclude>com/spotify/styx/state/Trigger.class</exclude>
+            <exclude>com/spotify/styx/monitoring/NoopStats.class</exclude>
           </excludes>
         </configuration>
         <executions>
