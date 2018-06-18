@@ -42,6 +42,7 @@ public interface StyxBackfillClient {
    * @param concurrency maximum number of concurrent active states for the backfill
    * @return The created {@link Backfill}
    */
+  @Deprecated
   CompletionStage<Backfill> backfillCreate(final String componentId,
                                            final String workflowId,
                                            final String start,
@@ -60,6 +61,7 @@ public interface StyxBackfillClient {
    * @param description descriptive message of backfill purpose
    * @return The created {@link Backfill}
    */
+  @Deprecated
   CompletionStage<Backfill> backfillCreate(final String componentId,
                                            final String workflowId,
                                            final String start,

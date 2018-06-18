@@ -41,6 +41,7 @@ import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.client.auth.GoogleIdTokenAuth;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
+import com.spotify.styx.model.EditableBackfillInput;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
@@ -347,9 +348,14 @@ class StyxApolloClient implements StyxClient {
                                                   String start, String end,
                                                   int concurrency,
                                                   String description) {
-    final BackfillInput backfill = BackfillInput.create(
-        Instant.parse(start), Instant.parse(end), componentId, workflowId, concurrency,
-        Optional.ofNullable(description));
+    final BackfillInput backfill = BackfillInput.newBuilder()
+        .start(Instant.parse(start))
+        .end(Instant.parse(end))
+        .component(componentId)
+        .workflow(workflowId)
+        .concurrency(concurrency)
+        .description(Optional.ofNullable(description))
+        .build();
     return backfillCreate(backfill);
   }
 
@@ -367,21 +373,20 @@ class StyxApolloClient implements StyxClient {
 
   @Override
   public CompletionStage<Backfill> backfillEditConcurrency(String backfillId, int concurrency) {
-    return backfill(backfillId, false).thenCompose(backfillPayload -> {
-      final Backfill editedBackfill = backfillPayload.backfill().builder()
-          .concurrency(concurrency)
-          .build();
-      final HttpUrl.Builder urlBuilder = getUrlBuilder()
-          .addPathSegment("backfills")
-          .addPathSegment(backfillId);
-      try {
-        final ByteString payload = serialize(editedBackfill);
-        return executeRequest(Request.forUri(urlBuilder.build().toString(), "PUT")
-            .withPayload(payload), Backfill.class);
-      } catch (JsonProcessingException e) {
-        return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
-      }
-    });
+    final EditableBackfillInput editableBackfillInput = EditableBackfillInput.newBuilder()
+        .id(backfillId)
+        .concurrency(concurrency)
+        .build();
+    final HttpUrl.Builder urlBuilder = getUrlBuilder()
+        .addPathSegment("backfills")
+        .addPathSegment(backfillId);
+    try {
+      final ByteString payload = serialize(editableBackfillInput);
+      return executeRequest(Request.forUri(urlBuilder.build().toString(), "PUT")
+          .withPayload(payload), Backfill.class);
+    } catch (JsonProcessingException e) {
+      return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
+    }
   }
 
   @Override
@@ -390,7 +395,7 @@ class StyxApolloClient implements StyxClient {
         .addPathSegment("backfills")
         .addPathSegment(backfillId);
     return executeRequest(Request.forUri(urlBuilder.build().toString(), "DELETE"))
-        .thenApply(response -> (Void) null);
+        .thenApply(response -> null);
   }
 
   @Override

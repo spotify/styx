@@ -49,6 +49,7 @@ import com.spotify.apollo.test.response.ResponseWithDelay;
 import com.spotify.apollo.test.response.Responses;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
+import com.spotify.styx.model.EditableBackfillInput;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.SequenceEvent;
@@ -562,13 +563,14 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldFailOnAlreadyActiveWithinRange() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    final BackfillInput backfillInput = BackfillInput.create(
-        BACKFILL_1.start(),
-        BACKFILL_1.end(),
-        BACKFILL_1.workflowId().componentId(),
-        BACKFILL_1.workflowId().id(),
-        BACKFILL_1.concurrency(),
-        BACKFILL_1.description());
+    final BackfillInput backfillInput = BackfillInput.newBuilder()
+        .start(BACKFILL_1.start())
+        .end(BACKFILL_1.end())
+        .component(BACKFILL_1.workflowId().componentId())
+        .workflow(BACKFILL_1.workflowId().id())
+        .concurrency(BACKFILL_1.concurrency())
+        .description(BACKFILL_1.description())
+        .build();
 
     WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_1.workflowId(),"2017-01-01T01");
     storage.writeActiveState(wfi, RunState.create(wfi, State.RUNNING,
@@ -587,19 +589,66 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     assertThat(storage.backfill(BACKFILL_1.id()).get().concurrency(), equalTo(1));
 
-    final Backfill updatedBackfill = BACKFILL_1.builder().concurrency(4).build();
-    final String json = Json.OBJECT_MAPPER.writeValueAsString(updatedBackfill);
+    final EditableBackfillInput backfillInput = EditableBackfillInput.newBuilder()
+        .id(BACKFILL_1.id())
+        .concurrency(4)
+        .description("foobar")
+        .build();
+    final String json = Json.OBJECT_MAPPER.writeValueAsString(backfillInput);
 
-    Response<ByteString> response =
+    final Response<ByteString> response =
         awaitResponse(serviceHelper.request("PUT", path("/" + BACKFILL_1.id()),
-                                            ByteString.encodeUtf8(json)));
+            ByteString.encodeUtf8(json)));
 
     assertThat(response.status().reasonPhrase(),
                response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
     assertJson(response, "id", equalTo(BACKFILL_1.id()));
     assertJson(response, "concurrency", equalTo(4));
+    assertJson(response, "description", is("foobar"));
 
-    assertThat(storage.backfill(BACKFILL_1.id()).get().concurrency(), equalTo(4));
+    assertThat(storage.backfill(BACKFILL_1.id()).get(), is(BACKFILL_1.builder()
+        .concurrency(4)
+        .description("foobar")
+        .build()));
+  }
+
+  @Test
+  public void shouldFailToUpdateNonexistentBackfill() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    assertThat(storage.backfill("foo"), is(Optional.empty()));
+
+    final EditableBackfillInput backfillInput = EditableBackfillInput.newBuilder()
+        .id("foo")
+        .concurrency(4)
+        .build();
+    final String json = Json.OBJECT_MAPPER.writeValueAsString(backfillInput);
+
+    final Response<ByteString> response =
+        awaitResponse(serviceHelper.request("PUT", path("/foo"),
+            ByteString.encodeUtf8(json)));
+
+    assertThat(response.status(), is(Status.NOT_FOUND.withReasonPhrase("Backfill foo not found.")));
+
+    assertThat(storage.backfill("foo"), is(Optional.empty()));
+  }
+
+  @Test
+  public void shouldFailToUpdateBackfillDueToMismatchId() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final EditableBackfillInput backfillInput = EditableBackfillInput.newBuilder()
+        .id("bar")
+        .concurrency(4)
+        .build();
+    final String json = Json.OBJECT_MAPPER.writeValueAsString(backfillInput);
+
+    final Response<ByteString> response =
+        awaitResponse(serviceHelper.request("PUT", path("/foo"),
+            ByteString.encodeUtf8(json)));
+
+    assertThat(response.status(), is(Status.BAD_REQUEST
+        .withReasonPhrase("ID of payload does not match ID in uri.")));
   }
 
   @Test
