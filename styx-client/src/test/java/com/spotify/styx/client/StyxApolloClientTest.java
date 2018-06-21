@@ -44,6 +44,7 @@ import com.spotify.styx.api.Api;
 import com.spotify.styx.client.auth.GoogleIdTokenAuth;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
+import com.spotify.styx.model.EditableBackfillInput;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -257,6 +258,27 @@ public class StyxApolloClientTest {
     assertThat(Json.deserialize(request.payload().get(), BackfillInput.class),
                equalTo(backfillInput));
     assertThat(request.method(), is("POST"));
+  }
+
+  @Test
+  public void shouldUpdateBackfillConcurrency() throws IOException {
+    final EditableBackfillInput backfillInput = EditableBackfillInput.newBuilder()
+        .id(BACKFILL.id())
+        .concurrency(4)
+        .build();
+    when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
+        Response.forStatus(Status.OK).withPayload(Json.serialize(
+            BACKFILL.builder().concurrency(4).build()))));
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+    final CompletableFuture<Backfill> r = styx.backfillEditConcurrency(BACKFILL.id(), 4)
+        .toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    assertThat(request.uri(), is(API_URL + "/backfills/" + BACKFILL.id()));
+    assertThat(Json.deserialize(request.payload().get(), EditableBackfillInput.class),
+        equalTo(backfillInput));
+    assertThat(request.method(), is("PUT"));
   }
 
   @Test

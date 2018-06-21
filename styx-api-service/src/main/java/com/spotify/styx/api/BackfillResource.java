@@ -46,6 +46,7 @@ import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.BackfillInput;
+import com.spotify.styx.model.EditableBackfillInput;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
@@ -57,6 +58,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.ReplayEvents;
+import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
@@ -110,7 +112,7 @@ public final class BackfillResource {
             "GET", BASE + "/<bid>",
             rc -> getBackfill(rc, rc.pathArgs().get("bid"))),
         Route.with(
-            em.response(Backfill.class),
+            em.response(EditableBackfillInput.class, Backfill.class),
             "PUT", BASE + "/<bid>",
             rc -> payload -> updateBackfill(rc.pathArgs().get("bid"), payload))
     )
@@ -330,18 +332,30 @@ public final class BackfillResource {
     return Response.forPayload(backfill);
   }
 
-  public Response<Backfill> updateBackfill(String id, Backfill backfill) {
-    if (!backfill.id().equals(id)) {
+  private Response<Backfill> updateBackfill(String id, EditableBackfillInput backfillInput) {
+    if (!backfillInput.id().equals(id)) {
       return Response.forStatus(
           Status.BAD_REQUEST.withReasonPhrase("ID of payload does not match ID in uri."));
     }
 
+    final Backfill backfill;
     try {
-      storage.storeBackfill(backfill);
+      backfill = storage.runInTransaction(tx -> {
+        final Optional<Backfill> oldBackfill = tx.backfill(id);
+        if (!oldBackfill.isPresent()) {
+          throw new ResourceNotFoundException(String.format("Backfill %s not found.", id));
+        } else {
+          final BackfillBuilder backfillBuilder = oldBackfill.get().builder();
+          backfillInput.concurrency().ifPresent(backfillBuilder::concurrency);
+          backfillInput.description().ifPresent(backfillBuilder::description);
+          return tx.store(backfillBuilder.build());
+        }
+      });
+    } catch (ResourceNotFoundException e) {
+      return Response.forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
-      return Response
-          .forStatus(
-              Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Failed to store backfill."));
+      return Response.forStatus(
+          Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Failed to store backfill."));
     }
 
     return Response.forStatus(Status.OK).withPayload(backfill);
