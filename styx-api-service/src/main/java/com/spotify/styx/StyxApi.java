@@ -142,7 +142,7 @@ public class StyxApi implements AppInit {
                                            : DEFAULT_SCHEDULER_SERVICE_BASE_URL;
 
     final Stats stats = statsFactory.apply(environment);
-    final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment), stats, time);
+    final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment, stats), stats, time);
     final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer =
         workflowConsumerFactory.apply(environment, stats);
     
@@ -183,12 +183,12 @@ public class StyxApi implements AppInit {
         .registerRoutes(Api.withCommonMiddleware(routes, clientBlacklistSupplier));
   }
 
-  private static AggregateStorage storage(Environment environment) {
+  private static AggregateStorage storage(Environment environment, Stats stats) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
 
     final Connection bigTable = closer.register(createBigTableConnection(config));
-    final Datastore datastore = createDatastore(config);
+    final Datastore datastore = createDatastore(config, stats);
     return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
   }
 

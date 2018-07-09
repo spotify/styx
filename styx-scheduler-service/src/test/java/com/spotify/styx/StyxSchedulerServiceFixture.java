@@ -141,7 +141,7 @@ public class StyxSchedulerServiceFixture {
     datastore = localDatastore.getOptions().getService();
     storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
 
-    StorageFactory storageFactory = (env) -> storage;
+    StorageFactory storageFactory = (env, stats) -> storage;
     StatsFactory statsFactory = (env) -> Stats.NOOP;
     StyxScheduler.ExecutorFactory executorFactory = (ts, tf) -> executor;
     StyxScheduler.PublisherFactory publisherFactory = (env) -> Publisher.NOOP;

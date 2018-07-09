@@ -23,6 +23,8 @@ package com.spotify.styx.util;
 import com.google.cloud.bigtable.hbase.BigtableConfiguration;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreOptions;
+import com.spotify.styx.monitoring.Stats;
+import com.spotify.styx.storage.InstrumentedDatastore;
 import com.typesafe.config.Config;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Connection;
@@ -44,18 +46,20 @@ public final class Connections {
   private Connections() {
   }
 
-  public static Datastore createDatastore(Config config) {
+  public static InstrumentedDatastore createDatastore(Config config, Stats stats) {
     final String projectId = config.getString(DATASTORE_PROJECT);
     final String namespace = config.getString(DATASTORE_NAMESPACE);
 
     LOG.info("Creating Datastore connection for project:{}, namespace:{}",
              projectId, namespace);
 
-    return DatastoreOptions.newBuilder()
+    final Datastore datastore = DatastoreOptions.newBuilder()
         .setNamespace(namespace)
         .setProjectId(projectId)
         .build()
         .getService();
+
+    return InstrumentedDatastore.of(datastore, stats);
   }
 
   public static Connection createBigTableConnection(Config config) {

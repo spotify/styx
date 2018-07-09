@@ -40,9 +40,9 @@ import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
@@ -374,7 +374,8 @@ public class ShardedCounterTest {
 
   @Test(expected = ShardNotFoundException.class)
   public void shouldThrowExceptionOnUninitializedShards() {
-    when(counterSnapshotFactory.create(COUNTER_ID1)).thenReturn(new ShardedCounter.Snapshot(COUNTER_ID1, 100, new HashMap<>()));
+    doReturn(new ShardedCounter.Snapshot(COUNTER_ID1, 100, new HashMap<>()))
+        .when(counterSnapshotFactory).create(COUNTER_ID1);
     updateCounterInTransaction(COUNTER_ID1, -1L);
   }
 
