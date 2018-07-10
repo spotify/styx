@@ -101,6 +101,10 @@ import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorServic
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
+import io.opencensus.common.Scope;
+import io.opencensus.trace.Tracer;
+import io.opencensus.trace.Tracing;
+import io.opencensus.trace.samplers.Samplers;
 import java.io.Closeable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -155,6 +159,9 @@ public class StyxScheduler implements AppInit {
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxScheduler.class);
 
+  private static final Tracer tracer = Tracing.getTracer();
+
+  private final String serviceName;
   private final Time time;
   private final StorageFactory storageFactory;
   private final DockerRunnerFactory dockerRunnerFactory;
@@ -196,6 +203,7 @@ public class StyxScheduler implements AppInit {
 
   public static class Builder {
 
+    private String serviceName = "styx-scheduler";
     private Time time = Instant::now;
     private StorageFactory storageFactory = storage(StyxScheduler::storage);
     private DockerRunnerFactory dockerRunnerFactory = StyxScheduler::createDockerRunner;
@@ -206,6 +214,11 @@ public class StyxScheduler implements AppInit {
     private WorkflowResourceDecorator resourceDecorator = WorkflowResourceDecorator.NOOP;
     private EventConsumerFactory eventConsumerFactory = (env, stats) -> (event, state) -> { };
     private WorkflowExecutionGateFactory executionGateFactory = (env, storage) -> WorkflowExecutionGate.NOOP;
+
+    public Builder setServiceName(String serviceName) {
+      this.serviceName = serviceName;
+      return this;
+    }
 
     public Builder setTime(Time time) {
       this.time = time;
@@ -273,6 +286,7 @@ public class StyxScheduler implements AppInit {
   // ==============================================================================================
 
   private StyxScheduler(Builder builder) {
+    this.serviceName = requireNonNull(builder.serviceName);
     this.time = requireNonNull(builder.time);
     this.storageFactory = requireNonNull(builder.storageFactory);
     this.dockerRunnerFactory = requireNonNull(builder.dockerRunnerFactory);
@@ -380,7 +394,7 @@ public class StyxScheduler implements AppInit {
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
-        .registerRoutes(Api.withCommonMiddleware(schedulerResource.routes()));
+        .registerRoutes(Api.withCommonMiddleware(schedulerResource.routes(), serviceName));
 
     this.stateManager = stateManager;
     this.scheduler = scheduler;
@@ -546,6 +560,15 @@ public class StyxScheduler implements AppInit {
   }
 
   private static void updateRuntimeConfig(Supplier<StyxConfig> config, RateLimiter rateLimiter) {
+    try (Scope ss = tracer.spanBuilder("Styx.StyxScheduler.updateRuntimeConfig")
+        .setRecordEvents(true)
+        .setSampler(Samplers.alwaysSample())
+        .startScopedSpan()) {
+      updateRuntimeConfig0(config, rateLimiter);
+    }
+  }
+
+  private static void updateRuntimeConfig0(Supplier<StyxConfig> config, RateLimiter rateLimiter) {
     try {
       double currentRate = rateLimiter.getRate();
       Double updatedRate = config.get().submissionRateLimit().orElse(

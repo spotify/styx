@@ -24,10 +24,13 @@ import static com.spotify.styx.api.Middlewares.authValidator;
 import static com.spotify.styx.api.Middlewares.clientValidator;
 import static com.spotify.styx.api.Middlewares.exceptionAndRequestIdHandler;
 import static com.spotify.styx.api.Middlewares.httpLogger;
+import static com.spotify.styx.api.Middlewares.tracer;
 
 import com.spotify.apollo.Response;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
+import io.opencensus.trace.Tracer;
+import io.opencensus.trace.Tracing;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -36,6 +39,8 @@ import java.util.stream.Stream;
 import okio.ByteString;
 
 public final class Api {
+
+  private static final Tracer tracer = Tracing.getTracer();
 
   public enum Version {
     V3;
@@ -53,18 +58,19 @@ public final class Api {
   }
 
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
-      Stream<Route<AsyncHandler<Response<ByteString>>>> routes) {
-    return withCommonMiddleware(routes, Collections::emptyList);
+      Stream<Route<AsyncHandler<Response<ByteString>>>> routes, String service) {
+    return withCommonMiddleware(routes, Collections::emptyList, service);
   }
 
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
       Stream<Route<AsyncHandler<Response<ByteString>>>> routes,
-      Supplier<List<String>> clientBlacklistSupplier) {
+      Supplier<List<String>> clientBlacklistSupplier, String service) {
     return routes.map(r -> r
         .withMiddleware(httpLogger())
         .withMiddleware(authValidator())
         .withMiddleware(clientValidator(clientBlacklistSupplier))
-        .withMiddleware(exceptionAndRequestIdHandler()));
+        .withMiddleware(exceptionAndRequestIdHandler())
+        .withMiddleware(tracer(tracer, service)));
   }
   private Api() {
   }

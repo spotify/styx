@@ -40,6 +40,10 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerInstantSpec;
+import io.opencensus.common.Scope;
+import io.opencensus.trace.Tracer;
+import io.opencensus.trace.Tracing;
+import io.opencensus.trace.samplers.Samplers;
 import java.io.Closeable;
 import java.io.IOException;
 import java.time.Instant;
@@ -64,6 +68,8 @@ class TriggerManager implements Closeable {
                                                          TriggerManager.class.getSimpleName());
   private static final int TRIGGER_CONCURRENCY = 32;
 
+  private static final Tracer tracer = Tracing.getTracer();
+
   private final TriggerListener triggerListener;
   private final Time time;
   private final Storage storage;
@@ -82,6 +88,15 @@ class TriggerManager implements Closeable {
   }
 
   void tick() {
+    try (Scope ss = tracer.spanBuilder("Styx.TriggerManager.tick")
+        .setRecordEvents(true)
+        .setSampler(Samplers.alwaysSample())
+        .startScopedSpan()) {
+      tick0();
+    }
+  }
+
+  void tick0() {
     final Instant t0 = time.get();
 
     try {

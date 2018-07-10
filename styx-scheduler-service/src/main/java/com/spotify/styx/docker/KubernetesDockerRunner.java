@@ -78,6 +78,10 @@ import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import io.norberg.automatter.AutoMatter;
+import io.opencensus.common.Scope;
+import io.opencensus.trace.Tracer;
+import io.opencensus.trace.Tracing;
+import io.opencensus.trace.samplers.Samplers;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -98,6 +102,8 @@ import java.util.concurrent.TimeUnit;
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
  */
 class KubernetesDockerRunner implements DockerRunner {
+
+  private static final Tracer tracer = Tracing.getTracer();
 
   static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
   static final String DOCKER_TERMINATION_LOGGING_ANNOTATION = "styx-docker-termination-logging";
@@ -536,7 +542,12 @@ class KubernetesDockerRunner implements DockerRunner {
 
   private void pollPods() {
     try {
-      tryPollPods();
+      try (Scope ss = tracer.spanBuilder("Styx.KubernetesDockerRunner.pollPods")
+          .setRecordEvents(true)
+          .setSampler(Samplers.alwaysSample())
+          .startScopedSpan()) {
+        tryPollPods();
+      }
     } catch (Throwable t) {
       LOG.warn("Error while polling pods", t);
     }

@@ -21,6 +21,10 @@
 package com.spotify.styx;
 
 import com.spotify.styx.docker.DockerRunner;
+import io.opencensus.common.Scope;
+import io.opencensus.trace.Tracer;
+import io.opencensus.trace.Tracing;
+import io.opencensus.trace.samplers.Samplers;
 import java.io.IOException;
 import java.util.Objects;
 import org.slf4j.Logger;
@@ -30,6 +34,8 @@ class Cleaner {
 
   private static final Logger logger = LoggerFactory.getLogger(Cleaner.class);
 
+  private static final Tracer tracer = Tracing.getTracer();
+
   private final DockerRunner dockerRunner;
 
   Cleaner(DockerRunner dockerRunner) {
@@ -37,6 +43,15 @@ class Cleaner {
   }
 
   void tick() {
+    try (Scope ss = tracer.spanBuilder("Styx.Cleaner.tick")
+        .setRecordEvents(true)
+        .setSampler(Samplers.alwaysSample())
+        .startScopedSpan()) {
+      tick0();
+    }
+  }
+
+  void tick0() {
     try {
       dockerRunner.cleanup();
     } catch (IOException e) {

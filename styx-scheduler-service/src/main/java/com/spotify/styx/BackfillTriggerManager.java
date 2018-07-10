@@ -39,6 +39,10 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
+import io.opencensus.common.Scope;
+import io.opencensus.trace.Tracer;
+import io.opencensus.trace.Tracing;
+import io.opencensus.trace.samplers.Samplers;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -62,6 +66,8 @@ class BackfillTriggerManager {
       LOWER_UNDERSCORE, BackfillTriggerManager.class.getSimpleName());
 
   private static Consumer<List<Backfill>> DEFAULT_SHUFFLER = Collections::shuffle;
+
+  private static final Tracer tracer = Tracing.getTracer();
 
   private final TriggerListener triggerListener;
   private final Storage storage;
@@ -94,6 +100,15 @@ class BackfillTriggerManager {
   }
 
   void tick() {
+    try (Scope ss = tracer.spanBuilder("Styx.BackfillTriggerManager.tick")
+        .setRecordEvents(true)
+        .setSampler(Samplers.alwaysSample())
+        .startScopedSpan()) {
+      tick0();
+    }
+  }
+
+  void tick0() {
     final Instant t0 = time.get();
 
     final List<Backfill> backfills;

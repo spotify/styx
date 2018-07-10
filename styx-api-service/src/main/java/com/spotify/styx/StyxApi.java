@@ -79,6 +79,7 @@ public class StyxApi implements AppInit {
 
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
 
+  private final String serviceName;
   private final StorageFactory storageFactory;
   private final WorkflowConsumerFactory workflowConsumerFactory;
   private final StatsFactory statsFactory;
@@ -89,10 +90,16 @@ public class StyxApi implements AppInit {
 
   public static class Builder {
 
+    private String serviceName = "styx-api";
     private StorageFactory storageFactory = StyxApi::storage;
     private WorkflowConsumerFactory workflowConsumerFactory = (env, stats) -> (oldWorkflow, newWorkflow) -> { };
     private StatsFactory statsFactory = StyxApi::stats;
     private Time time = Instant::now;
+
+    public Builder setServiceName(String serviceName) {
+      this.serviceName = serviceName;
+      return this;
+    }
 
     public Builder setStorageFactory(StorageFactory storageFactory) {
       this.storageFactory = storageFactory;
@@ -128,6 +135,7 @@ public class StyxApi implements AppInit {
   }
 
   private StyxApi(Builder builder) {
+    this.serviceName = requireNonNull(builder.serviceName);
     this.storageFactory = requireNonNull(builder.storageFactory);
     this.workflowConsumerFactory = requireNonNull(builder.workflowConsumerFactory);
     this.statsFactory = requireNonNull(builder.statsFactory);
@@ -180,7 +188,7 @@ public class StyxApi implements AppInit {
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
-        .registerRoutes(Api.withCommonMiddleware(routes, clientBlacklistSupplier));
+        .registerRoutes(Api.withCommonMiddleware(routes, clientBlacklistSupplier, serviceName));
   }
 
   private static AggregateStorage storage(Environment environment, Stats stats) {

@@ -26,11 +26,13 @@ import static com.spotify.apollo.test.unit.StatusTypeMatchers.belongsToFamily;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
 import static com.spotify.styx.util.StringIsValidUuid.isValidUuid;
+import static io.opencensus.trace.AttributeValue.stringAttributeValue;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.fail;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -53,11 +55,22 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.request.RequestContexts;
 import com.spotify.apollo.request.RequestMetadataImpl;
 import com.spotify.apollo.route.AsyncHandler;
+import io.opencensus.trace.Annotation;
+import io.opencensus.trace.AttributeValue;
+import io.opencensus.trace.EndSpanOptions;
+import io.opencensus.trace.Link;
+import io.opencensus.trace.Span;
+import io.opencensus.trace.SpanBuilder;
+import io.opencensus.trace.SpanContext;
+import io.opencensus.trace.Tracer;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -89,6 +102,8 @@ public class MiddlewaresTest {
   @Mock public GoogleIdTokenVerifier idTokenVerifier;
   @Mock public GoogleIdToken idToken;
   @Mock public GoogleIdToken.Payload idTokenPayload;
+  @Mock Tracer tracer;
+  @Mock SpanBuilder spanBuilder;
 
   private static final TestStruct TEST_STRUCT = new AutoValue_MiddlewaresTest_TestStruct(
       "blah", new AutoValue_MiddlewaresTest_Inner("bloh", TestEnum.ENUM_VALUE));
@@ -536,6 +551,117 @@ public class MiddlewaresTest {
     assertThat(userHolder.get(), is(idToken));
   }
 
+  @Test
+  public void testTracingSync() throws Exception {
+    final RequestContext requestContext = mock(RequestContext.class);
+    final Request request = Request.forUri("/bar", "GET");
+    final MockSpan span = new MockSpan();
+
+    when(requestContext.request()).thenReturn(request);
+    when(tracer.spanBuilder("foo-service//bar")).thenReturn(spanBuilder);
+    when(spanBuilder.startSpan()).thenReturn(span);
+
+    awaitResponse(Middlewares.tracer(tracer, "foo-service")
+        .apply(rc -> completedFuture(Response.ok()))
+        .invoke(requestContext));
+
+    verify(tracer).spanBuilder("foo-service//bar");
+    verify(spanBuilder).startSpan();
+
+    assertThat(span.attributes.get("method"), is(stringAttributeValue("GET")));
+    assertThat(span.attributes.get("uri"), is(stringAttributeValue("/bar")));
+
+    assertThat(span.ended, is(true));
+    assertThat(span.status, is(nullValue()));
+  }
+
+  @Test
+  public void testTracingSyncError() {
+    final RequestContext requestContext = mock(RequestContext.class);
+    final Request request = Request.forUri("/bar", "GET");
+    final MockSpan span = new MockSpan();
+
+    when(requestContext.request()).thenReturn(request);
+    when(tracer.spanBuilder("foo-service//bar")).thenReturn(spanBuilder);
+    when(spanBuilder.startSpan()).thenReturn(span);
+
+    try {
+      awaitResponse(Middlewares.tracer(tracer, "foo-service")
+          .apply(rc -> {
+            throw new RuntimeException();
+          })
+          .invoke(requestContext));
+      fail();
+    } catch (Exception ignore) {
+    }
+
+    assertThat(span.ended, is(true));
+    assertThat(span.status, is(io.opencensus.trace.Status.UNKNOWN));
+  }
+
+  @Test
+  public void testTracingAsync() throws ExecutionException, InterruptedException {
+    final RequestContext requestContext = mock(RequestContext.class);
+    final Request request = Request.forUri("/bar", "GET");
+    final MockSpan span = new MockSpan();
+
+    when(requestContext.request()).thenReturn(request);
+
+    when(tracer.spanBuilder("foo-service//bar")).thenReturn(spanBuilder);
+    when(spanBuilder.startSpan()).thenReturn(span);
+
+    final CompletableFuture<Response<Object>> handlerFuture = new CompletableFuture<>();
+
+    final CompletableFuture<Response<Object>> responseFuture = Middlewares.tracer(tracer, "foo-service")
+        .apply(rc -> handlerFuture)
+        .invoke(requestContext)
+        .toCompletableFuture();
+
+    // Request handling is not complete, span should not be ended
+    assertThat(span.ended, is(false));
+
+    // Complete request handling future and wait for response
+    handlerFuture.complete(Response.ok());
+    responseFuture.get();
+
+    // Span should now be ended
+    assertThat(span.ended, is(true));
+    assertThat(span.status, is(nullValue()));
+  }
+
+  @Test
+  public void testTracingAsyncError() throws InterruptedException {
+    final RequestContext requestContext = mock(RequestContext.class);
+    final Request request = Request.forUri("/bar", "GET");
+    final MockSpan span = new MockSpan();
+
+    when(requestContext.request()).thenReturn(request);
+
+    when(tracer.spanBuilder("foo-service//bar")).thenReturn(spanBuilder);
+    when(spanBuilder.startSpan()).thenReturn(span);
+
+    final CompletableFuture<Response<Object>> handlerFuture = new CompletableFuture<>();
+
+    final CompletableFuture<Response<Object>> responseFuture = Middlewares.tracer(tracer, "foo-service")
+        .apply(rc -> handlerFuture)
+        .invoke(requestContext)
+        .toCompletableFuture();
+
+    // Request handling is not complete, span should not be ended
+    assertThat(span.ended, is(false));
+
+    // Fail request handling future and wait for response
+    handlerFuture.completeExceptionally(new RuntimeException());
+    try {
+      responseFuture.get();
+    } catch (ExecutionException ignore) {
+    }
+
+    // Span should now be ended
+    assertThat(span.ended, is(true));
+    assertThat(span.status, is(io.opencensus.trace.Status.UNKNOWN));
+  }
+
   public static <T> Response<T> awaitResponse(CompletionStage<Response<T>> completionStage)
       throws Exception {
     return completionStage.toCompletableFuture().get(5, SECONDS);
@@ -572,6 +698,48 @@ public class MiddlewaresTest {
     @JsonCreator
     public static TestEnum fromJson(String json) {
       return valueOf(json.toUpperCase());
+    }
+  }
+
+  // Span has final methods and cannot be spied/mocked
+  private static class MockSpan extends Span {
+
+    boolean ended;
+    final Map<String, AttributeValue> attributes = new HashMap<>();
+    io.opencensus.trace.Status status;
+
+    MockSpan() {
+      super(SpanContext.INVALID, EnumSet.noneOf(Options.class));
+    }
+
+    @Override
+    public void putAttribute(String key, AttributeValue value) {
+      attributes.put(key, value);
+    }
+
+    @Override
+    public void addAnnotation(String description, Map<String, AttributeValue> attributes) {
+      // nop
+    }
+
+    @Override
+    public void addAnnotation(Annotation annotation) {
+      // nop
+    }
+
+    @Override
+    public void addLink(Link link) {
+      // nop
+    }
+
+    @Override
+    public void setStatus(io.opencensus.trace.Status status) {
+      this.status = status;
+    }
+
+    @Override
+    public void end(EndSpanOptions options) {
+      this.ended = true;
     }
   }
 }

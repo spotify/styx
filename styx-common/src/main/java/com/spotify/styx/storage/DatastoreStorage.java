@@ -22,7 +22,6 @@ package com.spotify.styx.storage;
 
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.storage.Storage.GLOBAL_RESOURCE_ID;
-import static com.spotify.styx.util.MDCUtil.withMDC;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_SHARD;
 import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
@@ -75,11 +74,13 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.FnWithException;
+import com.spotify.styx.util.MDCUtil;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.StreamUtil;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.TriggerInstantSpec;
 import com.spotify.styx.util.TriggerUtil;
+import io.grpc.Context;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -95,6 +96,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -183,6 +186,7 @@ public class DatastoreStorage implements Closeable {
   private final Duration retryBaseDelay;
   private final Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory;
   private final ForkJoinPool forkJoinPool;
+  private final Executor executor;
 
   DatastoreStorage(Datastore datastore, Duration retryBaseDelay) {
     this(datastore, retryBaseDelay, DatastoreStorageTransaction::new);
@@ -195,6 +199,7 @@ public class DatastoreStorage implements Closeable {
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
     this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
     this.forkJoinPool = new ForkJoinPool(REQUEST_CONCURRENCY);
+    this.executor = MDCUtil.withMDC(Context.currentContextExecutor(forkJoinPool));
   }
 
   @Override
@@ -349,7 +354,7 @@ public class DatastoreStorage implements Closeable {
     final Iterable<List<WorkflowId>> batches = Iterables.partition(workflowIds,
         MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ);
     return StreamSupport.stream(batches.spliterator(), false)
-        .map(batch -> forkJoinPool.submit(withMDC(() -> this.getBatchOfWorkflows(batch))))
+        .map(batch -> CompletableFuture.supplyAsync(() -> this.getBatchOfWorkflows(batch), executor))
         // `collect and stream` is crucial to make tasks running in parallel, otherwise they will
         // be processed sequentially. Without `collect`, it will try to submit and wait for each task
         // while iterating through the stream. This is somewhat subtle, so think twice.
@@ -407,11 +412,11 @@ public class DatastoreStorage implements Closeable {
   Map<WorkflowInstance, RunState> readActiveStates() throws IOException {
     // Strongly read active state keys from index shards
     final List<Key> keys = activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
-        .map(key -> forkJoinPool.submit(withMDC(() ->
+        .map(key -> CompletableFuture.supplyAsync(() ->
             datastore.run(Query.newEntityQueryBuilder()
                 .setFilter(PropertyFilter.hasAncestor(key))
                 .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
-                .build()))))
+                .build()), executor))
         .collect(toList()).stream() // collect here to execute batch reads in parallel
         .flatMap(task -> StreamUtil.stream(task.join()))
         .map(entity -> entity.getKey().getName())
@@ -420,7 +425,7 @@ public class DatastoreStorage implements Closeable {
 
     // Strongly consistently read values for the above keys
     return Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ).stream()
-        .map(batch -> forkJoinPool.submit(withMDC(() -> this.readRunStateBatch(batch))))
+        .map(batch -> CompletableFuture.supplyAsync(() -> this.readRunStateBatch(batch), executor))
         .collect(toList()).stream() // collect here to execute batch reads in parallel
         .flatMap(task -> task.join().stream())
         .collect(toMap(RunState::workflowInstance, Function.identity()));
@@ -429,13 +434,18 @@ public class DatastoreStorage implements Closeable {
   /**
    * Strongly consistently read a batch of {@link RunState}s.
    */
-  private List<RunState> readRunStateBatch(List<Key> keys) throws IOException {
+  private List<RunState> readRunStateBatch(List<Key> keys) {
     assert keys.size() <= MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ;
     final List<RunState> runStates = new ArrayList<>();
     final Iterator<Entity> entities = datastore.get(keys);
     while (entities.hasNext()) {
       final Entity entity = entities.next();
-      final RunState runState = entityToRunState(entity, parseWorkflowInstance(entity));
+      final RunState runState;
+      try {
+        runState = entityToRunState(entity, parseWorkflowInstance(entity));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
       runStates.add(runState);
     }
     return runStates;

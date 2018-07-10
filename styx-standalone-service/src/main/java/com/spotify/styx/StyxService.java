@@ -33,6 +33,8 @@ import java.time.Instant;
 
 public class StyxService {
 
+  private static final String SERVICE_NAME = "styx-standalone";
+
   private StyxService() {
     throw new UnsupportedOperationException();
   }
@@ -47,9 +49,11 @@ public class StyxService {
       final StatsFactory statsFactory = (ignored) -> stats;
 
       final StyxScheduler scheduler = StyxScheduler.newBuilder()
+          .setServiceName(SERVICE_NAME)
           .setStatsFactory(statsFactory)
           .build();
       final StyxApi api = StyxApi.newBuilder()
+          .setServiceName(SERVICE_NAME)
           .setStatsFactory(statsFactory)
           .build();
 
@@ -57,6 +61,6 @@ public class StyxService {
       api.create(env);
     };
 
-    HttpService.boot(init, "styx-standalone", args);
+    HttpService.boot(init, SERVICE_NAME, args);
   }
 }
