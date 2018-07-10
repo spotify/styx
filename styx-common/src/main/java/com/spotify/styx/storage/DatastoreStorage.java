@@ -425,7 +425,7 @@ public class DatastoreStorage implements Closeable {
 
     // Strongly consistently read values for the above keys
     return Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ).stream()
-        .map(batch -> CompletableFuture.supplyAsync(() -> this.readRunStateBatch(batch), forkJoinPool))
+        .map(batch -> CompletableFuture.supplyAsync(() -> this.readRunStateBatch(batch), executor))
         .collect(toList()).stream() // collect here to execute batch reads in parallel
         .flatMap(task -> task.join().stream())
         .collect(toMap(RunState::workflowInstance, Function.identity()));
