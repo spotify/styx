@@ -530,7 +530,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     // we must stagger the time progression here in order not to no trigger tons of retries
     timePasses(TerminationHandler.MISSING_DEPS_RETRY_DELAY_MINUTES - 1, MINUTES);
     timePasses(59, SECONDS);
-    timePasses(StyxScheduler.SCHEDULER_TICK_INTERVAL_SECONDS, SECONDS);
+    timePasses(StyxScheduler.DEFAULT_SCHEDULER_TICK_INTERVAL.getSeconds(), SECONDS);
 
     awaitNumberOfDockerRuns(2);
 

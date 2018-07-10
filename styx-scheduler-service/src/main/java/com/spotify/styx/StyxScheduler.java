@@ -139,10 +139,12 @@ public class StyxScheduler implements AppInit {
   public static final String STYX_MODE = "styx.mode";
   public static final String STYX_MODE_DEVELOPMENT = "development";
   public static final String STYX_EVENT_PROCESSING_THREADS = "styx.event-processing-threads";
+  public static final String STYX_SCHEDULER_TICK_INTERVAL = "styx.scheduler.tick-interval";
+  public static final String STYX_TRIGGER_TICK_INTERVAL = "styx.trigger.tick-interval";
 
   public static final int DEFAULT_STYX_EVENT_PROCESSING_THREADS = 32;
-  public static final int SCHEDULER_TICK_INTERVAL_SECONDS = 2;
-  public static final int TRIGGER_MANAGER_TICK_INTERVAL_SECONDS = 1;
+  public static final Duration DEFAULT_SCHEDULER_TICK_INTERVAL = Duration.ofSeconds(2);
+  public static final Duration DEFAULT_TRIGGER_MANAGER_TICK_INTERVAL = Duration.ofSeconds(1);
   public static final long CLEANER_TICK_INTERVAL_SECONDS = MINUTES.toSeconds(30);
   public static final long CONCURRENT_WORKFLOW_INSTANCE_INDEXING_INTERVAL_SECONDS = MINUTES.toSeconds(30);
   public static final int RUNTIME_CONFIG_UPDATE_INTERVAL_SECONDS = 5;
@@ -365,10 +367,18 @@ public class StyxScheduler implements AppInit {
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
+    final Duration schedulerTickInterval = config.hasPath(STYX_SCHEDULER_TICK_INTERVAL)
+        ? config.getDuration(STYX_SCHEDULER_TICK_INTERVAL)
+        : DEFAULT_SCHEDULER_TICK_INTERVAL;
+
+    final Duration triggerTickInterval = config.hasPath(STYX_TRIGGER_TICK_INTERVAL)
+        ? config.getDuration(STYX_TRIGGER_TICK_INTERVAL)
+        : DEFAULT_TRIGGER_MANAGER_TICK_INTERVAL;
+
     dockerRunner.restore();
-    startTriggerManager(triggerManager, executor);
-    startBackfillTriggerManager(backfillTriggerManager, executor);
-    startScheduler(scheduler, executor);
+    startTriggerManager(triggerManager, executor, schedulerTickInterval);
+    startBackfillTriggerManager(backfillTriggerManager, executor, triggerTickInterval);
+    startScheduler(scheduler, executor, triggerTickInterval);
     startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
     startCleaner(cleaner, executor);
 
@@ -511,28 +521,29 @@ public class StyxScheduler implements AppInit {
         SECONDS);
   }
 
-  private static void startTriggerManager(TriggerManager triggerManager, ScheduledExecutorService exec) {
+  private static void startTriggerManager(TriggerManager triggerManager, ScheduledExecutorService exec,
+      Duration tickInterval) {
     exec.scheduleWithFixedDelay(
         guard(triggerManager::tick),
-        TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
-        TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
+        tickInterval.getSeconds(),
+        tickInterval.getSeconds(),
         SECONDS);
   }
 
   private static void startBackfillTriggerManager(BackfillTriggerManager backfillTriggerManager,
-                                                  ScheduledExecutorService exec) {
+      ScheduledExecutorService exec, Duration tickInterval) {
     exec.scheduleWithFixedDelay(
         guard(backfillTriggerManager::tick),
-        TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
-        TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
+        tickInterval.getSeconds(),
+        tickInterval.getSeconds(),
         SECONDS);
   }
 
-  private static void startScheduler(Scheduler scheduler, ScheduledExecutorService exec) {
+  private static void startScheduler(Scheduler scheduler, ScheduledExecutorService exec, Duration tickInterval) {
     exec.scheduleAtFixedRate(
         guard(scheduler::tick),
-        SCHEDULER_TICK_INTERVAL_SECONDS,
-        SCHEDULER_TICK_INTERVAL_SECONDS,
+        tickInterval.getSeconds(),
+        tickInterval.getSeconds(),
         SECONDS);
   }
 
