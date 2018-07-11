@@ -54,6 +54,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
 import javaslang.Tuple;
@@ -74,6 +75,8 @@ import org.slf4j.LoggerFactory;
  * {@link Executor}.
  */
 public class QueuedStateManager implements StateManager {
+
+  private static final long RESOURCE_LIMITED_RETRY_DELAY_MILLIS = TimeUnit.MINUTES.toMillis(1);
 
   private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(QueuedStateManager.class);
   private final Logger log;
@@ -312,6 +315,7 @@ public class QueuedStateManager implements StateManager {
           String.format("Resource limit reached for: %s", depletedResources));
       if (!runState.data().message().map(message::equals).orElse(false)) {
         receiveIgnoreClosed(Event.info(runState.workflowInstance(), message), runState.counter());
+        receiveIgnoreClosed(Event.retryAfter(runState.workflowInstance(), RESOURCE_LIMITED_RETRY_DELAY_MILLIS));
       }
     }
 
