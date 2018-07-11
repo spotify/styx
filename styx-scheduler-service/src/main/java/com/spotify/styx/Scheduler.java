@@ -129,7 +129,7 @@ public class Scheduler {
     }
   }
 
-  void tick0() {
+  private void tick0() {
     final Instant t0 = time.get();
 
     final Map<String, Resource> resources;
