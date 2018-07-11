@@ -55,22 +55,14 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.request.RequestContexts;
 import com.spotify.apollo.request.RequestMetadataImpl;
 import com.spotify.apollo.route.AsyncHandler;
-import io.opencensus.trace.Annotation;
-import io.opencensus.trace.AttributeValue;
-import io.opencensus.trace.EndSpanOptions;
-import io.opencensus.trace.Link;
-import io.opencensus.trace.Span;
+import com.spotify.styx.util.MockSpan;
 import io.opencensus.trace.SpanBuilder;
-import io.opencensus.trace.SpanContext;
 import io.opencensus.trace.Tracer;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -701,45 +693,4 @@ public class MiddlewaresTest {
     }
   }
 
-  // Span has final methods and cannot be spied/mocked
-  private static class MockSpan extends Span {
-
-    boolean ended;
-    final Map<String, AttributeValue> attributes = new HashMap<>();
-    io.opencensus.trace.Status status;
-
-    MockSpan() {
-      super(SpanContext.INVALID, EnumSet.noneOf(Options.class));
-    }
-
-    @Override
-    public void putAttribute(String key, AttributeValue value) {
-      attributes.put(key, value);
-    }
-
-    @Override
-    public void addAnnotation(String description, Map<String, AttributeValue> attributes) {
-      // nop
-    }
-
-    @Override
-    public void addAnnotation(Annotation annotation) {
-      // nop
-    }
-
-    @Override
-    public void addLink(Link link) {
-      // nop
-    }
-
-    @Override
-    public void setStatus(io.opencensus.trace.Status status) {
-      this.status = status;
-    }
-
-    @Override
-    public void end(EndSpanOptions options) {
-      this.ended = true;
-    }
-  }
 }

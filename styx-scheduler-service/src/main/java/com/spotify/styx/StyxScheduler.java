@@ -69,6 +69,7 @@ import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.MonitoringHandler;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.monitoring.StatsFactory;
+import com.spotify.styx.monitoring.TracingProxy;
 import com.spotify.styx.publisher.Publisher;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.QueuedStateManager;
@@ -325,7 +326,9 @@ public class StyxScheduler implements AppInit {
     closer.register(executorCloser("event-consumer", eventConsumerExecutor));
 
     final Stats stats = statsFactory.apply(environment);
-    final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment, stats), stats, time);
+    final Storage storage = MeteredStorageProxy.instrument(
+        TracingProxy.instrument(Storage.class,
+            storageFactory.apply(environment, stats)), stats, time);
     closer.register(storage);
 
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
@@ -341,10 +344,11 @@ public class StyxScheduler implements AppInit {
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
     //       take StateManager as argument instead?
     final List<OutputHandler> outputHandlers = new ArrayList<>();
-    final QueuedStateManager stateManager = closer.register(
-        new QueuedStateManager(time, eventProcessingExecutor, storage,
-            eventConsumerFactory.apply(environment, stats), eventConsumerExecutor,
-            fanOutput(outputHandlers), shardedCounter));
+    final StateManager stateManager = closer.register(
+        TracingProxy.instrument(StateManager.class,
+            new QueuedStateManager(time, eventProcessingExecutor, storage,
+                eventConsumerFactory.apply(environment, stats), eventConsumerExecutor,
+                fanOutput(outputHandlers), shardedCounter)));
 
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
     final Supplier<String> dockerId = () -> styxConfig.get().globalDockerRunnerId();
@@ -352,7 +356,8 @@ public class StyxScheduler implements AppInit {
     final DockerRunner routingDockerRunner = DockerRunner.routing(
         id -> dockerRunnerFactory.create(id, environment, stateManager, executor, stats, debug),
         dockerId);
-    final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(routingDockerRunner, stats, time);
+    final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
+        TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
 
     final RateLimiter dequeueRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
 
