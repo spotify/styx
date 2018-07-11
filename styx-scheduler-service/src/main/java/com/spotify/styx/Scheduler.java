@@ -212,6 +212,13 @@ public class Scheduler {
       Map<WorkflowId, Set<String>> workflowResourceReferences,
       Map<WorkflowId, Workflow> workflows,
       List<InstanceState> eligibleInstances) {
+    tracer.spanBuilder("gateAndDequeueInstances").startSpanAndRun(() ->
+        gateAndDequeueInstances0(config, resources, workflowResourceReferences, workflows, eligibleInstances));
+  }
+
+  private void gateAndDequeueInstances0(StyxConfig config, Map<String, Resource> resources,
+      Map<WorkflowId, Set<String>> workflowResourceReferences, Map<WorkflowId, Workflow> workflows,
+      List<InstanceState> eligibleInstances) {
     // Enable gating unless disabled in runtime config
     final WorkflowExecutionGate gate = config.executionGatingEnabled() ? this.gate : NOOP;
 
@@ -219,10 +226,7 @@ public class Scheduler {
     for (List<InstanceState> batch : Lists.partition(eligibleInstances, SCHEDULING_BATCH_SIZE)) {
 
       // Asynchronously look up execution blockers for a batch of instances
-      final List<CompletionStage<Optional<ExecutionBlocker>>> blockers = batch.stream()
-          .map(InstanceState::workflowInstance)
-          .map(gate::executionBlocker)
-          .collect(toList());
+      final List<CompletionStage<Optional<ExecutionBlocker>>> blockers = lookupExecutionBlockers(gate, batch);
 
       // Evaluate each instance in the batch for dequeuing
       for (int i = 0; i < batch.size(); i++) {
@@ -234,12 +238,28 @@ public class Scheduler {
     }
   }
 
+  private List<CompletionStage<Optional<ExecutionBlocker>>> lookupExecutionBlockers(WorkflowExecutionGate gate,
+      List<InstanceState> batch) {
+    try (final Scope ss = tracer.spanBuilder("lookupExecutionBlockers").startScopedSpan()) {
+      return batch.stream()
+          .map(InstanceState::workflowInstance)
+          .map(gate::executionBlocker)
+          .collect(toList());
+    }
+  }
+
   private void dequeueInstance(Map<String, Resource> resources,
                                Map<WorkflowId, Set<String>> workflowResourceReferences,
                                Optional<Workflow> workflowOpt,
                                InstanceState instanceState,
                                CompletionStage<Optional<ExecutionBlocker>> executionBlockerFuture) {
+    tracer.spanBuilder("dequeueInstance").startSpanAndRun(() ->
+        dequeueInstance0(resources, workflowResourceReferences, workflowOpt, instanceState, executionBlockerFuture));
+  }
 
+  private void dequeueInstance0(Map<String, Resource> resources,
+      Map<WorkflowId, Set<String>> workflowResourceReferences, Optional<Workflow> workflowOpt,
+      InstanceState instanceState, CompletionStage<Optional<ExecutionBlocker>> executionBlockerFuture) {
     // Check for execution blocker
     Optional<ExecutionBlocker> blocker = Optional.empty();
     try {
@@ -278,9 +298,12 @@ public class Scheduler {
               String.format("Referenced resources not found: %s", unknownResources)),
           instanceState.runState().counter());
     } else {
-      double sleepingTime = dequeueRateLimiter.acquire();
-      if (sleepingTime > 0.0001) {
-        LOG.debug("Dequeue rate limited and slept for {} ms", sleepingTime * 1000);
+      double sleepingTimeSeconds = dequeueRateLimiter.acquire();
+      if (sleepingTimeSeconds > 0.0001) {
+        final double sleepingTimeMillis = sleepingTimeSeconds * 1000;
+        final String message = "Dequeue rate limited and slept for " + sleepingTimeMillis + " ms";
+        LOG.debug(message, sleepingTimeMillis);
+        tracer.getCurrentSpan().addAnnotation(message);
       }
 
       // Racy: some resources may have been removed (become unknown) by now; in that case the
