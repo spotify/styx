@@ -36,7 +36,6 @@ import io.opencensus.trace.Annotation;
 import io.opencensus.trace.SpanBuilder;
 import io.opencensus.trace.Tracer;
 import java.time.Instant;
-import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
