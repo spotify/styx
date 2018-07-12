@@ -106,6 +106,7 @@ public class TracingProxyTest {
 
     @Override
     public void bar() {
+      // nop
     }
   }
 
