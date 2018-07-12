@@ -316,9 +316,11 @@ public class QueuedStateManager implements StateManager {
     }
 
     if (!failedTries.isEmpty()) {
-      throw new RuntimeException(
-          String.format("Failed to update resource counter for workflow instance %s",
-          runState.workflowInstance()));
+      final List<Resource> failedResources = failedTries.stream()
+          .map(x -> Resource.create(x._1, shardedCounter.getCounterSnapshot(x._1).getLimit()))
+          .collect(toList());
+      throw new RuntimeException("Failed to update resource counter for workflow instance " +
+          runState.workflowInstance() + ": " + failedResources);
     }
   }
 
