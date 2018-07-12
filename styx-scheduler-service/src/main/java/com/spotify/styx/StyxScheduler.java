@@ -344,11 +344,10 @@ public class StyxScheduler implements AppInit {
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
     //       take StateManager as argument instead?
     final List<OutputHandler> outputHandlers = new ArrayList<>();
-    final StateManager stateManager = closer.register(
-        TracingProxy.instrument(StateManager.class,
-            new QueuedStateManager(time, eventProcessingExecutor, storage,
-                eventConsumerFactory.apply(environment, stats), eventConsumerExecutor,
-                fanOutput(outputHandlers), shardedCounter)));
+    final QueuedStateManager queuedStateManager = closer.register(new QueuedStateManager(time, eventProcessingExecutor, storage,
+        eventConsumerFactory.apply(environment, stats), eventConsumerExecutor, fanOutput(outputHandlers),
+        shardedCounter));
+    final StateManager stateManager = TracingProxy.instrument(StateManager.class, queuedStateManager);
 
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
     final Supplier<String> dockerId = () -> styxConfig.get().globalDockerRunnerId();
@@ -391,7 +390,7 @@ public class StyxScheduler implements AppInit {
     startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
     startCleaner(cleaner, executor);
 
-    setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats);
+    setupMetrics(queuedStateManager, workflowCache, storage, dequeueRateLimiter, stats);
 
     final SchedulerResource schedulerResource =
         new SchedulerResource(stateManager, trigger, storage, time,
