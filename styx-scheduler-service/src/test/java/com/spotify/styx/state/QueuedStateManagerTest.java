@@ -20,11 +20,15 @@
 
 package com.spotify.styx.state;
 
+import static com.spotify.styx.state.QueuedStateManager.RESOURCE_LIMITED_RETRY_MAX_DELAY;
+import static com.spotify.styx.state.QueuedStateManager.RESOURCE_LIMITED_RETRY_MIN_DELAY;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.stream.Collectors.toSet;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -65,12 +69,14 @@ import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.CounterSnapshot;
+import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -720,7 +726,7 @@ public class QueuedStateManagerTest {
 
   @Test
   public void shouldFailToUpdateResourceCountersOnDequeueDueToCapacity() throws Exception {
-    givenState(INSTANCE, State.QUEUED);
+    final RunState runState = givenState(INSTANCE, State.QUEUED);
     doThrow(new CounterCapacityException("foo"))
         .when(transaction).updateCounter(shardedCounter, "resource1", 1);
     final CounterSnapshot counterSnapshot = mock(CounterSnapshot.class);
@@ -732,8 +738,9 @@ public class QueuedStateManagerTest {
         resources.stream().map(Resource::id).collect(toSet()));
     final Event infoEvent = Event.info(INSTANCE,
         Message.info(String.format("Resource limit reached for: %s", resources)));
+    final Event retryEvent = Event.retryAfter(INSTANCE, QueuedStateManager.RESOURCE_LIMITED_RETRY_MIN_DELAY.toMillis());
     final QueuedStateManager spied = spy(stateManager);
-    doNothing().when(spied).receiveIgnoreClosed(eq(infoEvent), anyLong());
+    doNothing().when(spied).receiveIgnoreClosed(any(), anyLong());
 
     try {
       spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
@@ -742,7 +749,8 @@ public class QueuedStateManagerTest {
       // expected exception
     }
 
-    verify(spied).receiveIgnoreClosed(eq(infoEvent), anyLong());
+    verify(spied).receiveIgnoreClosed(infoEvent, runState.counter());
+    verify(spied).receiveIgnoreClosed(retryEvent, runState.counter() + 1);
   }
 
   @Test
@@ -913,10 +921,22 @@ public class QueuedStateManagerTest {
     verifyNoMoreInteractions(storage);
   }
 
-  public void givenState(WorkflowInstance instance, State state) throws IOException {
+  @Test
+  public void testResourceLimitedRetryBackoff() {
+    long delayMillis = QueuedStateManager.nextResourceLimitedRetryDelay(Optional.empty());
+    assertThat(delayMillis, is(RESOURCE_LIMITED_RETRY_MIN_DELAY.toMillis()));
+    for (int i = 0; i < 1000; i++) {
+      delayMillis = QueuedStateManager.nextResourceLimitedRetryDelay(Optional.of(delayMillis));
+      assertThat(delayMillis, lessThanOrEqualTo(RESOURCE_LIMITED_RETRY_MAX_DELAY.toMillis()));
+      assertThat(delayMillis, greaterThanOrEqualTo(RESOURCE_LIMITED_RETRY_MIN_DELAY.toMillis()));
+    }
+  }
+
+  public RunState givenState(WorkflowInstance instance, State state) throws IOException {
     final RunState runState = RunState.create(instance, state, STATE_DATA_1, NOW.minusMillis(1), 17);
     when(transaction.readActiveState(instance)).thenReturn(Optional.of(runState));
     when(storage.readActiveState(INSTANCE)).thenReturn(Optional.of(runState));
+    return runState;
   }
 
   public void receiveEvent(Event event) throws Exception {
