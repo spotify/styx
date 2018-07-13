@@ -21,7 +21,9 @@
 package com.spotify.styx.state;
 
 import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
+import static org.hamcrest.Matchers.arrayContaining;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
@@ -738,7 +740,7 @@ public class QueuedStateManagerTest {
     try {
       spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
       fail();
-    } catch (Exception e) {
+    } catch (ExecutionException e) {
       // expected exception
     }
 
@@ -765,7 +767,7 @@ public class QueuedStateManagerTest {
     try {
       spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
       fail();
-    } catch (Exception e) {
+    } catch (ExecutionException e) {
       // expected exception
     }
 
@@ -775,7 +777,8 @@ public class QueuedStateManagerTest {
   @Test
   public void shouldFailToUpdateResourceCountersOnDequeueDueToConflict() throws Exception {
     givenState(INSTANCE, State.QUEUED);
-    doThrow(new RuntimeException())
+    final RuntimeException rootCause = new RuntimeException("conflict!");
+    doThrow(rootCause)
         .when(transaction).updateCounter(shardedCounter, "resource1", 1);
 
     final Set<Resource> resources = ImmutableSet.of(Resource.create("resource1", 1));
@@ -788,8 +791,12 @@ public class QueuedStateManagerTest {
     try {
       spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
       fail();
-    } catch (Exception e) {
-      // expected exception
+    } catch (ExecutionException e) {
+      final Throwable cause = e.getCause();
+      assertThat(cause, instanceOf(RuntimeException.class));
+      assertThat(cause.getMessage(), is("Failed to update resource counter for workflow instance: "
+          + INSTANCE + ": [resource1]"));
+      assertThat(cause.getSuppressed(), is(arrayContaining(rootCause)));
     }
 
     verify(spied, never()).receiveIgnoreClosed(eq(infoEvent), anyLong());

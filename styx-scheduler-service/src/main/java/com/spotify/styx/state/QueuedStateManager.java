@@ -46,6 +46,7 @@ import com.spotify.styx.util.Time;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -316,11 +317,17 @@ public class QueuedStateManager implements StateManager {
     }
 
     if (!failedTries.isEmpty()) {
-      final List<Resource> failedResources = failedTries.stream()
-          .map(x -> Resource.create(x._1, shardedCounter.getCounterSnapshot(x._1).getLimit()))
+      final List<String> failedResources = failedTries.stream()
+          .map(x -> x._1)
+          .sorted()
           .collect(toList());
-      throw new RuntimeException("Failed to update resource counter for workflow instance "
-          + runState.workflowInstance() + ": " + failedResources);
+      final RuntimeException exception = new RuntimeException(
+          "Failed to update resource counter for workflow instance: "
+              + runState.workflowInstance() + ": " + failedResources);
+      failedTries.stream()
+          .map(x -> x._2.getCause())
+          .forEach(exception::addSuppressed);
+      throw exception;
     }
   }
 
