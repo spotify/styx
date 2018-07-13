@@ -143,8 +143,10 @@ public class StyxScheduler implements AppInit {
   public static final String STYX_MODE = "styx.mode";
   public static final String STYX_MODE_DEVELOPMENT = "development";
   public static final String STYX_EVENT_PROCESSING_THREADS = "styx.event-processing-threads";
+  public static final String STYX_SCHEDULER_THREADS = "styx.scheduler-threads";
 
   public static final int DEFAULT_STYX_EVENT_PROCESSING_THREADS = 32;
+  public static final int DEFAULT_STYX_SCHEDULER_THREADS = 32;
   public static final int SCHEDULER_TICK_INTERVAL_SECONDS = 2;
   public static final int TRIGGER_MANAGER_TICK_INTERVAL_SECONDS = 1;
   public static final long CLEANER_TICK_INTERVAL_SECONDS = MINUTES.toSeconds(30);
@@ -317,12 +319,15 @@ public class StyxScheduler implements AppInit {
     closer.register(publisher);
 
     final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
-    closer.register(executorCloser("scheduler", executor));
+    closer.register(executorCloser("scheduled-executor", executor));
     final StripedExecutorService eventProcessingExecutor = new StripedExecutorService(
         optionalInt(config, STYX_EVENT_PROCESSING_THREADS).orElse(DEFAULT_STYX_EVENT_PROCESSING_THREADS));
     closer.register(executorCloser("event-processing", eventProcessingExecutor));
     final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
     closer.register(executorCloser("event-consumer", eventConsumerExecutor));
+    final ExecutorService schedulerExecutor = Executors.newWorkStealingPool(
+        optionalInt(config, STYX_SCHEDULER_THREADS).orElse(DEFAULT_STYX_SCHEDULER_THREADS));
+    closer.register(executorCloser("scheduler", schedulerExecutor));
 
     final Stats stats = statsFactory.apply(environment);
     final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment, stats), stats, time);
@@ -373,9 +378,8 @@ public class StyxScheduler implements AppInit {
     final BackfillTriggerManager backfillTriggerManager =
         new BackfillTriggerManager(stateManager, storage, trigger, stats, time);
 
-    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager,
-                                              storage, resourceDecorator, stats, dequeueRateLimiter,
-                                              executionGateFactory.apply(environment, storage));
+    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, storage, resourceDecorator, stats,
+        dequeueRateLimiter, executionGateFactory.apply(environment, storage), shardedCounter, schedulerExecutor);
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 

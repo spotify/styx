@@ -27,9 +27,10 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anySetOf;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
@@ -58,6 +59,8 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.CounterSnapshot;
+import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
 import java.time.Duration;
@@ -78,7 +81,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.InOrder;
 import org.mockito.Matchers;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
@@ -110,12 +112,16 @@ public class SchedulerTest {
   @Mock WorkflowExecutionGate gate;
   @Mock StateManager stateManager;
   @Mock Storage storage;
+  @Mock ShardedCounter shardedCounter;
+  @Mock CounterSnapshot counterSnapshot;
 
   @Before
   public void setUp() {
     workflows = new HashMap<>();
     when(gate.executionBlocker(any()))
         .thenReturn(WorkflowExecutionGate.NO_BLOCKER);
+    when(shardedCounter.getCounterSnapshot(anyString())).thenReturn(counterSnapshot);
+    when(counterSnapshot.pickShardWithSpareCapacity(anyLong())).thenReturn(0);
   }
 
   @After
@@ -137,7 +143,7 @@ public class SchedulerTest {
     when(storage.workflows(anySetOf(WorkflowId.class))).thenReturn(workflows);
 
     scheduler = new Scheduler(time, timeoutConfig, stateManager, storage, resourceDecorator,
-        stats, rateLimiter, gate);
+        stats, rateLimiter, gate, shardedCounter, executor);
   }
 
   private void setResourceLimit(String resourceId, long limit) {
@@ -295,12 +301,10 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    InOrder inOrder = inOrder(stateManager);
-
     Lists.reverse(workflowInstances)
-        .forEach(x -> inOrder.verify(stateManager)
+        .forEach(x -> verify(stateManager)
             .receiveIgnoreClosed(eq(Event.dequeue(x, ImmutableSet.of())), anyLong()));
-    inOrder.verify(stateManager).receiveIgnoreClosed(eq(
+    verify(stateManager).receiveIgnoreClosed(eq(
         Event.dequeue(INSTANCE_1, ImmutableSet.of())), anyLong());
   }
 
@@ -326,12 +330,10 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    InOrder inOrder = inOrder(stateManager);
-
     Lists.reverse(workflowInstances)
-        .forEach(x -> inOrder.verify(stateManager)
+        .forEach(x -> verify(stateManager, timeout(30_000))
             .receiveIgnoreClosed(eq(Event.dequeue(x, ImmutableSet.of())), anyLong()));
-    inOrder.verify(stateManager).receiveIgnoreClosed(eq(
+    verify(stateManager, timeout(30_000)).receiveIgnoreClosed(eq(
         Event.dequeue(INSTANCE_1, ImmutableSet.of())), anyLong());
   }
 
