@@ -268,7 +268,7 @@ public class Scheduler {
     final List<String> exhaustedResources = instanceResourceRefs.stream()
         .filter(this::limitReached)
         .sorted()
-        .collect(Collectors.toList());
+        .collect(toList());
     if (!exhaustedResources.isEmpty()) {
       LOG.debug("Resource limit reached for instance, not dequeueing: {}: exhausted resources={}",
           instanceState.workflowInstance(), exhaustedResources );
