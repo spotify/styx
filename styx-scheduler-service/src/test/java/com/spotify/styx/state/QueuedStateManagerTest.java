@@ -793,7 +793,8 @@ public class QueuedStateManagerTest {
     } catch (ExecutionException e) {
       final Throwable cause = e.getCause();
       assertThat(cause, instanceOf(RuntimeException.class));
-      assertThat(cause.getMessage(), is("Failed to update resource counter for workflow instance: " + INSTANCE));
+      assertThat(cause.getMessage(), is("Failed to update resource counter for workflow instance: "
+          + INSTANCE + ": [resource1]"));
       assertThat(cause.getSuppressed(), is(arrayContaining(rootCause)));
     }
 
