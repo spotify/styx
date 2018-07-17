@@ -199,6 +199,24 @@ public class ShardedCounter {
   }
 
   /**
+   * Check if a resource counter has capacity to spare. Can be used as a cheaper check before starting an expensive
+   * operation, e.g. workflow instance dequeue. Note that even if this method returns true,
+   * {@link #updateCounter(StorageTransaction, String, long)} might throw {@link CounterCapacityException}.
+   *
+   * @throws RuntimeException if the resource does not exist or reading from storage fails.
+   * @todo Throw checked exceptions for expected failures like resource not existing.
+   */
+  public boolean counterHasSpareCapacity(String resourceId) {
+    try {
+      final CounterSnapshot counterSnapshot = getCounterSnapshot(resourceId);
+      counterSnapshot.pickShardWithSpareCapacity(1);
+      return true;
+    } catch (CounterCapacityException e) {
+      return false;
+    }
+  }
+
+  /**
    * Must be called within a TransactionCallable. (?)
    *
    * <p>Augments the transaction with operations to persist the given limit in Datastore. So long as

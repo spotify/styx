@@ -50,8 +50,6 @@ import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.CounterCapacityException;
-import com.spotify.styx.util.CounterSnapshot;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
 import io.opencensus.common.Scope;
@@ -309,11 +307,7 @@ public class Scheduler {
 
   private boolean limitReached(final String resourceId) {
     try {
-      final CounterSnapshot counterSnapshot = shardedCounter.getCounterSnapshot(resourceId);
-      counterSnapshot.pickShardWithSpareCapacity(1);
-      return false;
-    } catch (CounterCapacityException e) {
-      return true;
+      return !shardedCounter.counterHasSpareCapacity(resourceId);
     } catch (RuntimeException e) {
       LOG.warn("Failed to check resource counter limit", e);
       return false;
