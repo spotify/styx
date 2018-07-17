@@ -309,17 +309,17 @@ public class StyxScheduler implements AppInit {
     final Thread.UncaughtExceptionHandler uncaughtExceptionHandler =
         (thread, throwable) -> LOG.error("Thread {} threw {}", thread, throwable);
 
-    final ThreadFactory schedulerTf = new ThreadFactoryBuilder()
+    final ThreadFactory tickTf = new ThreadFactoryBuilder()
         .setDaemon(true)
-        .setNameFormat("styx-scheduler-%d")
+        .setNameFormat("styx-tick-%d")
         .setUncaughtExceptionHandler(uncaughtExceptionHandler)
         .build();
 
     final Publisher publisher = publisherFactory.apply(environment);
     closer.register(publisher);
 
-    final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
-    closer.register(executorCloser("scheduled-executor", executor));
+    final ScheduledExecutorService tickExecutor = executorFactory.create(3, tickTf);
+    closer.register(executorCloser("tick-executor", tickExecutor));
     final StripedExecutorService eventProcessingExecutor = new StripedExecutorService(
         optionalInt(config, STYX_EVENT_PROCESSING_THREADS).orElse(DEFAULT_STYX_EVENT_PROCESSING_THREADS));
     closer.register(executorCloser("event-processing", eventProcessingExecutor));
@@ -355,7 +355,7 @@ public class StyxScheduler implements AppInit {
     final Supplier<String> dockerId = () -> styxConfig.get().globalDockerRunnerId();
     final Debug debug = () -> styxConfig.get().debugEnabled();
     final DockerRunner routingDockerRunner = DockerRunner.routing(
-        id -> dockerRunnerFactory.create(id, environment, stateManager, executor, stats, debug),
+        id -> dockerRunnerFactory.create(id, environment, stateManager, tickExecutor, stats, debug),
         dockerId);
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(routingDockerRunner, stats, time);
 
@@ -384,11 +384,11 @@ public class StyxScheduler implements AppInit {
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
     dockerRunner.restore();
-    startTriggerManager(triggerManager, executor);
-    startBackfillTriggerManager(backfillTriggerManager, executor);
-    startScheduler(scheduler, executor);
-    startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
-    startCleaner(cleaner, executor);
+    startTriggerManager(triggerManager, tickExecutor);
+    startBackfillTriggerManager(backfillTriggerManager, tickExecutor);
+    startScheduler(scheduler, tickExecutor);
+    startRuntimeConfigUpdate(styxConfig, tickExecutor, dequeueRateLimiter);
+    startCleaner(cleaner, tickExecutor);
 
     setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats);
 
