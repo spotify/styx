@@ -145,7 +145,7 @@ public class StyxScheduler implements AppInit {
 
   public static final int DEFAULT_STYX_EVENT_PROCESSING_THREADS = 32;
   public static final Duration DEFAULT_SCHEDULER_TICK_INTERVAL = Duration.ofSeconds(2);
-  public static final Duration DEFAULT_TRIGGER_MANAGER_TICK_INTERVAL = Duration.ofSeconds(1);
+  public static final Duration DEFAULT_TRIGGER_TICK_INTERVAL = Duration.ofSeconds(1);
   public static final Duration CLEANER_TICK_INTERVAL = Duration.ofMinutes(30);
   public static final Duration RUNTIME_CONFIG_UPDATE_INTERVAL = Duration.ofSeconds(5);
   public static final Duration DEFAULT_RETRY_BASE_DELAY = Duration.ofMinutes(3);
@@ -373,7 +373,7 @@ public class StyxScheduler implements AppInit {
 
     final Duration triggerTickInterval = config.hasPath(STYX_TRIGGER_TICK_INTERVAL)
         ? config.getDuration(STYX_TRIGGER_TICK_INTERVAL)
-        : DEFAULT_TRIGGER_MANAGER_TICK_INTERVAL;
+        : DEFAULT_TRIGGER_TICK_INTERVAL;
 
     dockerRunner.restore();
     startTriggerManager(triggerManager, executor, schedulerTickInterval);
