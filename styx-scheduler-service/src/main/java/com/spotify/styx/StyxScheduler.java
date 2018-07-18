@@ -376,9 +376,9 @@ public class StyxScheduler implements AppInit {
         : DEFAULT_TRIGGER_TICK_INTERVAL;
 
     dockerRunner.restore();
-    startTriggerManager(triggerManager, executor, schedulerTickInterval);
+    startTriggerManager(triggerManager, executor, triggerTickInterval);
     startBackfillTriggerManager(backfillTriggerManager, executor, triggerTickInterval);
-    startScheduler(scheduler, executor, triggerTickInterval);
+    startScheduler(scheduler, executor, schedulerTickInterval);
     startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
     startCleaner(cleaner, executor);
 
