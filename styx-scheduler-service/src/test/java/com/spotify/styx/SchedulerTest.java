@@ -24,11 +24,13 @@ import static com.spotify.styx.state.TimeoutConfig.createWithDefaultTtl;
 import static java.time.Duration.ofSeconds;
 import static org.hamcrest.Matchers.either;
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anySetOf;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
@@ -59,7 +61,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.CounterSnapshot;
+import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
@@ -81,6 +83,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Matchers;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
@@ -114,12 +118,18 @@ public class SchedulerTest {
   @Mock Storage storage;
   @Mock ShardedCounter shardedCounter;
 
+  @Captor ArgumentCaptor<Event> eventCaptor = ArgumentCaptor.forClass(Event.class);
+
   @Before
-  public void setUp() {
+  public void setUp() throws Exception {
     workflows = new HashMap<>();
     when(gate.executionBlocker(any()))
         .thenReturn(WorkflowExecutionGate.NO_BLOCKER);
     when(shardedCounter.counterHasSpareCapacity(anyString())).thenReturn(true);
+    doNothing().when(stateManager).receiveIgnoreClosed(eventCaptor.capture(), anyLong());
+    doNothing().when(stateManager).receiveIgnoreClosed(eventCaptor.capture());
+    when(stateManager.receive(eventCaptor.capture(), anyLong())).thenReturn(CompletableFuture.completedFuture(null));
+    when(stateManager.receive(eventCaptor.capture())).thenReturn(CompletableFuture.completedFuture(null));
   }
 
   @After
@@ -406,10 +416,15 @@ public class SchedulerTest {
     setUp(20);
     setResourceLimit("r1", 3);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
+    when(shardedCounter.counterHasSpareCapacity("r1")).thenReturn(false);
 
     // do not consume resources
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i0"), State.NEW, time.get()));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i1"), State.QUEUED, time.get()));
+    final WorkflowInstance i0 = instance(WORKFLOW_ID1, "i0");
+    final WorkflowInstance i1 = instance(WORKFLOW_ID1, "i1");
+    final RunState rs0 = RunState.create(i0, State.NEW, time.get(), 17);
+    final RunState rs1 = RunState.create(i1, State.QUEUED, time.get(), 4711);
+    populateActiveStates(rs0);
+    populateActiveStates(rs1);
 
     // consume resources
     populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i2"), State.PREPARE, time.get()));
@@ -418,16 +433,17 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    verify(stateManager, never()).receiveIgnoreClosed(
-        eq(Event.dequeue(INSTANCE_1, ImmutableSet.of("r1"))),
-        anyLong());
+    verify(shardedCounter, times(1)).counterHasSpareCapacity("r1");
+    assertThat(eventCaptor.getAllValues().stream()
+        .anyMatch(e -> EventUtil.name(e).equals("dequeue")), is(false));
     verify(stats).recordResourceUsed("r1", 3L);
 
     scheduler.tick();
 
-    verify(stateManager, never()).receiveIgnoreClosed(
-        eq(Event.dequeue(INSTANCE_1, ImmutableSet.of("r1"))),
-        anyLong());
+    verify(stateManager, times(2)).getActiveStates();
+    verify(shardedCounter, times(2)).counterHasSpareCapacity("r1");
+    assertThat(eventCaptor.getAllValues().stream()
+        .anyMatch(e -> EventUtil.name(e).equals("dequeue")), is(false));
     verify(stats, times(2)).recordResourceUsed("r1", 3L);
   }
 
