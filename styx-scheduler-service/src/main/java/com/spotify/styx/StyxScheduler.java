@@ -146,8 +146,10 @@ public class StyxScheduler implements AppInit {
   public static final String STYX_EVENT_PROCESSING_THREADS = "styx.event-processing-threads";
   public static final String STYX_SCHEDULER_TICK_INTERVAL = "styx.scheduler.tick-interval";
   public static final String STYX_TRIGGER_TICK_INTERVAL = "styx.trigger.tick-interval";
+  public static final String STYX_SCHEDULER_THREADS = "styx.scheduler-threads";
 
   public static final int DEFAULT_STYX_EVENT_PROCESSING_THREADS = 32;
+  public static final int DEFAULT_STYX_SCHEDULER_THREADS = 32;
   public static final Duration DEFAULT_SCHEDULER_TICK_INTERVAL = Duration.ofSeconds(2);
   public static final Duration DEFAULT_TRIGGER_TICK_INTERVAL = Duration.ofSeconds(1);
   public static final Duration CLEANER_TICK_INTERVAL = Duration.ofMinutes(30);
@@ -309,22 +311,25 @@ public class StyxScheduler implements AppInit {
     final Thread.UncaughtExceptionHandler uncaughtExceptionHandler =
         (thread, throwable) -> LOG.error("Thread {} threw {}", thread, throwable);
 
-    final ThreadFactory schedulerTf = new ThreadFactoryBuilder()
+    final ThreadFactory tickTf = new ThreadFactoryBuilder()
         .setDaemon(true)
-        .setNameFormat("styx-scheduler-%d")
+        .setNameFormat("styx-tick-%d")
         .setUncaughtExceptionHandler(uncaughtExceptionHandler)
         .build();
 
     final Publisher publisher = publisherFactory.apply(environment);
     closer.register(publisher);
 
-    final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
-    closer.register(executorCloser("scheduler", executor));
+    final ScheduledExecutorService tickExecutor = executorFactory.create(3, tickTf);
+    closer.register(executorCloser("tick-executor", tickExecutor));
     final StripedExecutorService eventProcessingExecutor = new StripedExecutorService(
         optionalInt(config, STYX_EVENT_PROCESSING_THREADS).orElse(DEFAULT_STYX_EVENT_PROCESSING_THREADS));
     closer.register(executorCloser("event-processing", eventProcessingExecutor));
     final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
     closer.register(executorCloser("event-consumer", eventConsumerExecutor));
+    final ExecutorService schedulerExecutor = Executors.newWorkStealingPool(
+        optionalInt(config, STYX_SCHEDULER_THREADS).orElse(DEFAULT_STYX_SCHEDULER_THREADS));
+    closer.register(executorCloser("scheduler", schedulerExecutor));
 
     final Stats stats = statsFactory.apply(environment);
     final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment, stats), stats, time);
@@ -352,7 +357,7 @@ public class StyxScheduler implements AppInit {
     final Supplier<String> dockerId = () -> styxConfig.get().globalDockerRunnerId();
     final Debug debug = () -> styxConfig.get().debugEnabled();
     final DockerRunner routingDockerRunner = DockerRunner.routing(
-        id -> dockerRunnerFactory.create(id, environment, stateManager, executor, stats, debug),
+        id -> dockerRunnerFactory.create(id, environment, stateManager, tickExecutor, stats, debug),
         dockerId);
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(routingDockerRunner, stats, time);
 
@@ -375,9 +380,8 @@ public class StyxScheduler implements AppInit {
     final BackfillTriggerManager backfillTriggerManager =
         new BackfillTriggerManager(stateManager, storage, trigger, stats, time);
 
-    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager,
-                                              storage, resourceDecorator, stats, dequeueRateLimiter,
-                                              executionGateFactory.apply(environment, storage));
+    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, storage, resourceDecorator, stats,
+        dequeueRateLimiter, executionGateFactory.apply(environment, storage), shardedCounter, schedulerExecutor);
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
@@ -390,11 +394,11 @@ public class StyxScheduler implements AppInit {
         : DEFAULT_TRIGGER_TICK_INTERVAL;
 
     dockerRunner.restore();
-    startTriggerManager(triggerManager, executor, triggerTickInterval);
-    startBackfillTriggerManager(backfillTriggerManager, executor, triggerTickInterval);
-    startScheduler(scheduler, executor, schedulerTickInterval);
-    startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
-    startCleaner(cleaner, executor);
+    startTriggerManager(triggerManager, tickExecutor, triggerTickInterval);
+    startBackfillTriggerManager(backfillTriggerManager, tickExecutor, triggerTickInterval);
+    startScheduler(scheduler, tickExecutor, schedulerTickInterval);
+    startRuntimeConfigUpdate(styxConfig, tickExecutor, dequeueRateLimiter);
+    startCleaner(cleaner, tickExecutor);
 
     setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats);
 
