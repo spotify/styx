@@ -54,6 +54,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
 import javaslang.Tuple;
@@ -74,6 +75,9 @@ import org.slf4j.LoggerFactory;
  * {@link Executor}.
  */
 public class QueuedStateManager implements StateManager {
+
+  static final Duration RESOURCE_LIMITED_RETRY_MIN_DELAY = Duration.ofMinutes(1);
+  static final Duration RESOURCE_LIMITED_RETRY_MAX_DELAY = Duration.ofMinutes(10);
 
   private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(QueuedStateManager.class);
   private final Logger log;
@@ -312,6 +316,9 @@ public class QueuedStateManager implements StateManager {
           String.format("Resource limit reached for: %s", depletedResources));
       if (!runState.data().message().map(message::equals).orElse(false)) {
         receiveIgnoreClosed(Event.info(runState.workflowInstance(), message), runState.counter());
+        final long delayMillis = nextResourceLimitedRetryDelay(runState.data().retryDelayMillis());
+        // TODO: avoid faking counter values
+        receiveIgnoreClosed(Event.retryAfter(runState.workflowInstance(), delayMillis), runState.counter() + 1);
       }
     }
 
@@ -327,6 +334,17 @@ public class QueuedStateManager implements StateManager {
           .map(x -> x._2.getCause())
           .forEach(exception::addSuppressed);
       throw exception;
+    }
+  }
+
+  @VisibleForTesting
+  static long nextResourceLimitedRetryDelay(Optional<Long> lastDelayMillis) {
+    if (!lastDelayMillis.isPresent()) {
+      return RESOURCE_LIMITED_RETRY_MIN_DELAY.toMillis();
+    } else {
+      // Values empirically chosen to give rapid growth of delay with good spread
+      final double jitter = ThreadLocalRandom.current().nextDouble(0.35, 1.0);
+      return (long) (jitter * Math.min(RESOURCE_LIMITED_RETRY_MAX_DELAY.toMillis(), lastDelayMillis.get() * 2));
     }
   }
 
