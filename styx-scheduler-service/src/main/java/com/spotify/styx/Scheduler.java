@@ -45,6 +45,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.InstanceState;
+import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
@@ -262,13 +263,19 @@ public class Scheduler {
 
     // Check resource limits. This is racy and can give false positives but the transactional
     // checking happens later. This is just intended to avoid spinning on exhausted resources.
-    final List<String> exhaustedResources = instanceResourceRefs.stream()
+    final List<String> depletedResources = instanceResourceRefs.stream()
         .filter(this::limitReached)
         .sorted()
         .collect(toList());
-    if (!exhaustedResources.isEmpty()) {
+    if (!depletedResources.isEmpty()) {
       LOG.debug("Resource limit reached for instance, not dequeueing: {}: exhausted resources={}",
-          instanceState.workflowInstance(), exhaustedResources );
+          instanceState.workflowInstance(), depletedResources );
+      final Message message = Message.info(
+          String.format("Resource limit reached for: %s", depletedResources));
+      final RunState runState = instanceState.runState();
+      if (!runState.data().message().map(message::equals).orElse(false)) {
+        stateManager.receiveIgnoreClosed(Event.info(runState.workflowInstance(), message), runState.counter());
+      }
       return;
     }
 
