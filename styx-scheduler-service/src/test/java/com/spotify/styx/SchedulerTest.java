@@ -85,8 +85,10 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.Matchers;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.runners.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -378,17 +380,32 @@ public class SchedulerTest {
     setUp(20);
     setResourceLimit("r1", 0);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
-    StateData stateData = StateData.newBuilder()
-        .addMessage(Message.info("Resource limit reached for: [Resource{id=r1, concurrency=0}]"))
+    when(shardedCounter.counterHasSpareCapacity("r1")).thenReturn(false);
+
+    InOrder inOrder = Mockito.inOrder(stateManager);
+
+    StateData stateDataWithoutInfo = StateData.newBuilder()
         .build();
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get()));
+    RunState rsWithoutInfo = RunState.create(INSTANCE_1, State.QUEUED, stateDataWithoutInfo, time.get(), 17);
+    when(stateManager.getActiveStates()).thenReturn(ImmutableMap.of(INSTANCE_1, rsWithoutInfo));
 
     scheduler.tick();
 
-    verify(stateManager, times(0)).receiveIgnoreClosed(
-        eq(Event.info(INSTANCE_1,
-            Message.info("Resource limit reached for: [Resource{id=r1, concurrency=0}]"))),
-        anyLong());
+    inOrder.verify(stateManager).getActiveStates();
+    inOrder.verify(stateManager).receiveIgnoreClosed(
+        Event.info(INSTANCE_1, Message.info("Resource limit reached for: [r1]")),
+        rsWithoutInfo.counter());
+
+    StateData stateDataWithInfo = StateData.newBuilder()
+        .addMessage(Message.info("Resource limit reached for: [r1]"))
+        .build();
+    when(stateManager.getActiveStates()).thenReturn(
+        ImmutableMap.of(INSTANCE_1, RunState.create(INSTANCE_1, State.QUEUED, stateDataWithInfo, time.get())));
+
+    scheduler.tick();
+
+    inOrder.verify(stateManager).getActiveStates();
+    inOrder.verifyNoMoreInteractions();
   }
 
   @Test
