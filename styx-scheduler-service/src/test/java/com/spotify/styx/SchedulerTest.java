@@ -113,15 +113,13 @@ public class SchedulerTest {
   @Mock StateManager stateManager;
   @Mock Storage storage;
   @Mock ShardedCounter shardedCounter;
-  @Mock CounterSnapshot counterSnapshot;
 
   @Before
   public void setUp() {
     workflows = new HashMap<>();
     when(gate.executionBlocker(any()))
         .thenReturn(WorkflowExecutionGate.NO_BLOCKER);
-    when(shardedCounter.getCounterSnapshot(anyString())).thenReturn(counterSnapshot);
-    when(counterSnapshot.pickShardWithSpareCapacity(anyLong())).thenReturn(0);
+    when(shardedCounter.counterHasSpareCapacity(anyString())).thenReturn(true);
   }
 
   @After
