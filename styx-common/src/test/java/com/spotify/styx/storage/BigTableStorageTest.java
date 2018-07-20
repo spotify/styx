@@ -81,7 +81,7 @@ public class BigTableStorageTest {
   public void shouldReturnExecutionDataForWorkflowInstance() throws Exception {
     setUp(0);
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER), 0L, 0L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId", "img"), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId", "img", "commitsha"), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI1), 2L, 2L));
 
     WorkflowInstanceExecutionData workflowInstanceExecutionData = storage.executionData(WFI1);
@@ -98,11 +98,11 @@ public class BigTableStorageTest {
   public void shouldReturnExecutionDataForWorkflow() throws Exception {
     setUp(0);
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1), 0L, 0L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId1", "img1"), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId1", "img1", "commitsha1"), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI1), 2L, 2L));
 
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2), 0L, 3L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI2, "execId2", "img2"), 1L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.created(WFI2, "execId2", "img2", "commitsha2"), 1L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI2), 2L, 5L));
 
     List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =
@@ -158,11 +158,11 @@ public class BigTableStorageTest {
   public void shouldReturnRangeOfExecutionDataForWorkflow() throws Exception {
     setUp(0);
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1), 0L, 0L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId1", "img1"), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId1", "img1", "commitsha1"), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI1), 2L, 2L));
 
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2), 0L, 3L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI2, "execId2", "img2"), 1L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.created(WFI2, "execId2", "img2", "commitsha2"), 1L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI2), 2L, 5L));
 
     List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =
@@ -190,11 +190,11 @@ public class BigTableStorageTest {
   public void shouldReturnExecutionDataForOneWorkflow() throws Exception {
     setUp(0);
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1), 0L, 0L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId1", "img1"), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId1", "img1", "commitsha1"), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI1), 2L, 2L));
 
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2), 0L, 3L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI2, "execId2", "img2"), 1L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.created(WFI2, "execId2", "img2", "commitsha2"), 1L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI2), 2L, 5L));
 
     List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =
