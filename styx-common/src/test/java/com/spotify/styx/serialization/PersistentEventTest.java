@@ -117,7 +117,7 @@ public class PersistentEventTest {
         deserializeEvent(json("submitted", "\"execution_id\":\"" + POD_NAME + "\"")),
         is(Event.submitted(INSTANCE1, POD_NAME)));
     assertThat(
-        deserializeEvent(json("created", "\"execution_id\":\"" + POD_NAME + "\",\"docker_image\":\"" + DOCKER_IMAGE + "\""
+        deserializeEvent(json("created", "\"execution_id\":\"" + POD_NAME + "\",\"docker_image\":\"" + DOCKER_IMAGE
             + "\",\"commit_sha\":\"" + COMMIT_SHA + "\"")),
         is(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE, COMMIT_SHA)));
     assertThat(
@@ -150,7 +150,7 @@ public class PersistentEventTest {
         is(Event.started(INSTANCE1))); // for backwards compatibility
     assertThat(
         deserializeEvent(json("created", "\"execution_id\":\"" + POD_NAME + "\"")),
-        is(Event.created(INSTANCE1, POD_NAME, "UNKNOWN", COMMIT_SHA)));
+        is(Event.created(INSTANCE1, POD_NAME, "UNKNOWN", "UNKNOWN")));
     assertThat(
         deserializeEvent(json("triggerExecution")),
         is(Event.triggerExecution(INSTANCE1, TRIGGER_UNKNOWN)));

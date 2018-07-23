@@ -43,7 +43,7 @@ public class WorkflowInstanceExecutionDataTest {
 
   @Test
   public void shouldDeserializeExecution() throws Exception {
-    String json = executionJson("exec-id", "busybox:1.0", "commitSha", "09", "SUCCESS", Optional.empty());
+    String json = executionJson("exec-id", "busybox:1.0", "commit-sha", "09", "SUCCESS", Optional.empty());
 
     Execution execution = OBJECT_MAPPER.readValue(json, Execution.class);
     Execution expected = Execution.create(
@@ -80,8 +80,8 @@ public class WorkflowInstanceExecutionDataTest {
 
   @Test
   public void shouldDeserializeTrigger() throws Exception {
-    String jsonExec0 = executionJson("exec-id-0", "busybox:1.0","commitSha1","09", "FAILED", Optional.of("Exit code 1"));
-    String jsonExec1 = executionJson("exec-id-1", "busybox:1.1","commitSha2", "10", "SUCCESS", Optional.empty());
+    String jsonExec0 = executionJson("exec-id-0", "busybox:1.0","commit-sha0","09", "FAILED", Optional.of("Exit code 1"));
+    String jsonExec1 = executionJson("exec-id-1", "busybox:1.1","commit-sha1", "10", "SUCCESS", Optional.empty());
 
     String json =
         "{"
@@ -125,8 +125,8 @@ public class WorkflowInstanceExecutionDataTest {
 
   @Test
   public void shouldDeserializeExecutionData() throws Exception {
-    String jsonExec00 = executionJson("exec-id-00", "busybox:1.0","commitSha0", "07", "FAILED", Optional.of("Exit code 1"));
-    String jsonExec01 = executionJson("exec-id-01", "busybox:1.1","commitSha1", "08", "SUCCESS", Optional.empty());
+    String jsonExec00 = executionJson("exec-id-00", "busybox:1.0","commit-sha0", "07", "FAILED", Optional.of("Exit code 1"));
+    String jsonExec01 = executionJson("exec-id-01", "busybox:1.1","commit-sha1", "08", "SUCCESS", Optional.empty());
 
     String jsonTrigger0 =
         "{"
@@ -137,8 +137,8 @@ public class WorkflowInstanceExecutionDataTest {
         + jsonExec00 + "," + jsonExec01
         + "]}";
 
-    String jsonExec10 = executionJson("exec-id-10", "busybox:1.2","commitSha10", "09", "FAILED", Optional.of("Exit code 1"));
-    String jsonExec11 = executionJson("exec-id-11", "busybox:1.3","commitSha11", "10", "SUCCESS", Optional.empty());
+    String jsonExec10 = executionJson("exec-id-10", "busybox:1.2","commit-sha2", "09", "FAILED", Optional.of("Exit code 1"));
+    String jsonExec11 = executionJson("exec-id-11", "busybox:1.3","commit-sha3", "10", "SUCCESS", Optional.empty());
 
     String jsonTrigger1 =
         "{"
@@ -202,7 +202,7 @@ public class WorkflowInstanceExecutionDataTest {
                     Execution.create(
                         Optional.of("exec-id-10"),
                         Optional.of("busybox:1.2"),
-                        Optional.of("commit-sha12"),
+                        Optional.of("commit-sha2"),
                         Arrays.asList(
                             ExecStatus.create(Instant.parse("2016-08-03T09:56:03.607Z"), "STARTED", Optional.empty()),
                             ExecStatus.create(Instant.parse("2016-08-03T09:57:03.607Z"), "RUNNING", Optional.empty()),
@@ -212,7 +212,7 @@ public class WorkflowInstanceExecutionDataTest {
                     Execution.create(
                         Optional.of("exec-id-11"),
                         Optional.of("busybox:1.3"),
-                        Optional.of("commit-sha13"),
+                        Optional.of("commit-sha3"),
                         Arrays.asList(
                             ExecStatus.create(Instant.parse("2016-08-03T10:56:03.607Z"), "STARTED", Optional.empty()),
                             ExecStatus.create(Instant.parse("2016-08-03T10:57:03.607Z"), "RUNNING", Optional.empty()),
