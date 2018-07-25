@@ -46,6 +46,7 @@ public interface StateData {
   Optional<Trigger> trigger();
   Optional<String> triggerId(); //for backwards compatibility
   Optional<String> executionId();
+  Optional<String> commitSha();
   Optional<ExecutionDescription> executionDescription();
   Optional<Set<String>> resourceIds(); // resources referenced in the workflow configuration at the time of dequeue
 

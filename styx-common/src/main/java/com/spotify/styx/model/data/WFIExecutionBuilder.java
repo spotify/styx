@@ -44,6 +44,7 @@ class WFIExecutionBuilder {
   @Nullable private String currExecutionId;
   @Nullable private String currTriggerId = "UNKNOWN";
   @Nullable private String currDockerImg;
+  @Nullable private String currCommitSha;
 
   private boolean completed;
 
@@ -56,12 +57,14 @@ class WFIExecutionBuilder {
     final Execution execution = Execution.create(
         Optional.ofNullable(currExecutionId),
         Optional.ofNullable(currDockerImg),
+        Optional.ofNullable(currCommitSha),
         executionStatusList);
     executionList.add(execution);
 
     executionStatusList = new ArrayList<>();
     currExecutionId = null;
     currDockerImg = null;
+    currCommitSha = null;
   }
 
   private void closeTrigger() {
@@ -109,10 +112,11 @@ class WFIExecutionBuilder {
     }
 
     @Override
-    public Void created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
+    public Void created(WorkflowInstance workflowInstance, String executionId, String dockerImage, String commitSha) {
       currWorkflowInstance = workflowInstance;
       currExecutionId = executionId;
       currDockerImg = dockerImage;
+      currCommitSha = commitSha;
 
       executionStatusList.add(ExecStatus.create(eventTs, "SUBMITTED", Optional.empty()));
       return null;
@@ -123,6 +127,7 @@ class WFIExecutionBuilder {
         String executionId) {
       currWorkflowInstance = workflowInstance;
       currDockerImg = executionDescription.dockerImage();
+      currCommitSha = executionDescription.commitSha().get();
       currExecutionId = executionId;
 
       return null;
