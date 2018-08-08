@@ -83,7 +83,7 @@ public class StatusResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI, TRIGGER), 0L, 0L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI, "exec0", "img0", "commitSha0"), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.created(WFI, "exec0", "img0"), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI), 2L, 2L));
 
     Response<ByteString> response =

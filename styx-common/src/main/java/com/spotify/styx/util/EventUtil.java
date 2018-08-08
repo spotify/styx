@@ -69,8 +69,8 @@ public final class EventUtil {
     }
 
     @Override
-    public String created(WorkflowInstance workflowInstance, String executionId, String dockerImage, String commitSha) {
-      return String.format("Execution id: %s, Docker image: %s,  Commit sha: %s ", executionId, dockerImage, commitSha);
+    public String created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
+      return String.format("Execution id: %s, Docker image: %s", executionId, dockerImage);
     }
 
     @Override
@@ -163,7 +163,7 @@ public final class EventUtil {
 
     @Override
     public String created(WorkflowInstance workflowInstance, String executionId,
-        String dockerImage, String commitSha) {
+        String dockerImage) {
       return "created";
     }
 
