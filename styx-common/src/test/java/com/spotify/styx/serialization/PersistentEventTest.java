@@ -118,7 +118,7 @@ public class PersistentEventTest {
         is(Event.submitted(INSTANCE1, POD_NAME)));
     assertThat(
         deserializeEvent(json("created", "\"execution_id\":\"" + POD_NAME + "\",\"docker_image\":\"" + DOCKER_IMAGE
-            + "\",\"commit_sha\":\"" + COMMIT_SHA + "\"")),
+            + "\"")),
         is(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE)));
     assertThat(
         deserializeEvent(json("runError", "\"message\":\"ErrorMessage\"")),
