@@ -39,13 +39,17 @@ public abstract class Execution {
   public abstract Optional<String> dockerImage();
 
   @JsonProperty
+  public abstract Optional<String> commitSha();
+
+  @JsonProperty
   public abstract List<ExecStatus> statuses();
 
   @JsonCreator
   public static Execution create(
       @JsonProperty("execution_id") Optional<String> executionId,
       @JsonProperty("docker_image") Optional<String> dockerImage,
+      @JsonProperty("commit_sha") Optional<String> commitSha,
       @JsonProperty("statuses") List<ExecStatus> statuses) {
-    return new AutoValue_Execution(executionId, dockerImage, statuses);
+    return new AutoValue_Execution(executionId, dockerImage, commitSha, statuses);
   }
 }

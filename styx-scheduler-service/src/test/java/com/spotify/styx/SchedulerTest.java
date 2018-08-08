@@ -24,12 +24,15 @@ import static com.spotify.styx.state.TimeoutConfig.createWithDefaultTtl;
 import static java.time.Duration.ofSeconds;
 import static org.hamcrest.Matchers.either;
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anySetOf;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
@@ -58,6 +61,8 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.EventUtil;
+import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
 import java.time.Duration;
@@ -78,9 +83,12 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InOrder;
 import org.mockito.Matchers;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.runners.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -110,12 +118,20 @@ public class SchedulerTest {
   @Mock WorkflowExecutionGate gate;
   @Mock StateManager stateManager;
   @Mock Storage storage;
+  @Mock ShardedCounter shardedCounter;
+
+  @Captor ArgumentCaptor<Event> eventCaptor = ArgumentCaptor.forClass(Event.class);
 
   @Before
-  public void setUp() {
+  public void setUp() throws Exception {
     workflows = new HashMap<>();
     when(gate.executionBlocker(any()))
         .thenReturn(WorkflowExecutionGate.NO_BLOCKER);
+    when(shardedCounter.counterHasSpareCapacity(anyString())).thenReturn(true);
+    doNothing().when(stateManager).receiveIgnoreClosed(eventCaptor.capture(), anyLong());
+    doNothing().when(stateManager).receiveIgnoreClosed(eventCaptor.capture());
+    when(stateManager.receive(eventCaptor.capture(), anyLong())).thenReturn(CompletableFuture.completedFuture(null));
+    when(stateManager.receive(eventCaptor.capture())).thenReturn(CompletableFuture.completedFuture(null));
   }
 
   @After
@@ -137,7 +153,7 @@ public class SchedulerTest {
     when(storage.workflows(anySetOf(WorkflowId.class))).thenReturn(workflows);
 
     scheduler = new Scheduler(time, timeoutConfig, stateManager, storage, resourceDecorator,
-        stats, rateLimiter, gate);
+        stats, rateLimiter, gate, shardedCounter, executor);
   }
 
   private void setResourceLimit(String resourceId, long limit) {
@@ -295,12 +311,10 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    InOrder inOrder = inOrder(stateManager);
-
     Lists.reverse(workflowInstances)
-        .forEach(x -> inOrder.verify(stateManager)
+        .forEach(x -> verify(stateManager)
             .receiveIgnoreClosed(eq(Event.dequeue(x, ImmutableSet.of())), anyLong()));
-    inOrder.verify(stateManager).receiveIgnoreClosed(eq(
+    verify(stateManager).receiveIgnoreClosed(eq(
         Event.dequeue(INSTANCE_1, ImmutableSet.of())), anyLong());
   }
 
@@ -326,12 +340,10 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    InOrder inOrder = inOrder(stateManager);
-
     Lists.reverse(workflowInstances)
-        .forEach(x -> inOrder.verify(stateManager)
+        .forEach(x -> verify(stateManager, timeout(30_000))
             .receiveIgnoreClosed(eq(Event.dequeue(x, ImmutableSet.of())), anyLong()));
-    inOrder.verify(stateManager).receiveIgnoreClosed(eq(
+    verify(stateManager, timeout(30_000)).receiveIgnoreClosed(eq(
         Event.dequeue(INSTANCE_1, ImmutableSet.of())), anyLong());
   }
 
@@ -368,17 +380,32 @@ public class SchedulerTest {
     setUp(20);
     setResourceLimit("r1", 0);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
-    StateData stateData = StateData.newBuilder()
-        .addMessage(Message.info("Resource limit reached for: [Resource{id=r1, concurrency=0}]"))
+    when(shardedCounter.counterHasSpareCapacity("r1")).thenReturn(false);
+
+    InOrder inOrder = Mockito.inOrder(stateManager);
+
+    StateData stateDataWithoutInfo = StateData.newBuilder()
         .build();
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get()));
+    RunState rsWithoutInfo = RunState.create(INSTANCE_1, State.QUEUED, stateDataWithoutInfo, time.get(), 17);
+    when(stateManager.getActiveStates()).thenReturn(ImmutableMap.of(INSTANCE_1, rsWithoutInfo));
 
     scheduler.tick();
 
-    verify(stateManager, times(0)).receiveIgnoreClosed(
-        eq(Event.info(INSTANCE_1,
-            Message.info("Resource limit reached for: [Resource{id=r1, concurrency=0}]"))),
-        anyLong());
+    inOrder.verify(stateManager).getActiveStates();
+    inOrder.verify(stateManager).receiveIgnoreClosed(
+        Event.info(INSTANCE_1, Message.info("Resource limit reached for: [r1]")),
+        rsWithoutInfo.counter());
+
+    StateData stateDataWithInfo = StateData.newBuilder()
+        .addMessage(Message.info("Resource limit reached for: [r1]"))
+        .build();
+    when(stateManager.getActiveStates()).thenReturn(
+        ImmutableMap.of(INSTANCE_1, RunState.create(INSTANCE_1, State.QUEUED, stateDataWithInfo, time.get())));
+
+    scheduler.tick();
+
+    inOrder.verify(stateManager).getActiveStates();
+    inOrder.verifyNoMoreInteractions();
   }
 
   @Test
@@ -406,10 +433,15 @@ public class SchedulerTest {
     setUp(20);
     setResourceLimit("r1", 3);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
+    when(shardedCounter.counterHasSpareCapacity("r1")).thenReturn(false);
 
     // do not consume resources
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i0"), State.NEW, time.get()));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i1"), State.QUEUED, time.get()));
+    final WorkflowInstance i0 = instance(WORKFLOW_ID1, "i0");
+    final WorkflowInstance i1 = instance(WORKFLOW_ID1, "i1");
+    final RunState rs0 = RunState.create(i0, State.NEW, time.get(), 17);
+    final RunState rs1 = RunState.create(i1, State.QUEUED, time.get(), 4711);
+    populateActiveStates(rs0);
+    populateActiveStates(rs1);
 
     // consume resources
     populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i2"), State.PREPARE, time.get()));
@@ -418,16 +450,17 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    verify(stateManager, never()).receiveIgnoreClosed(
-        eq(Event.dequeue(INSTANCE_1, ImmutableSet.of("r1"))),
-        anyLong());
+    verify(shardedCounter, times(1)).counterHasSpareCapacity("r1");
+    assertThat(eventCaptor.getAllValues().stream()
+        .anyMatch(e -> EventUtil.name(e).equals("dequeue")), is(false));
     verify(stats).recordResourceUsed("r1", 3L);
 
     scheduler.tick();
 
-    verify(stateManager, never()).receiveIgnoreClosed(
-        eq(Event.dequeue(INSTANCE_1, ImmutableSet.of("r1"))),
-        anyLong());
+    verify(stateManager, times(2)).getActiveStates();
+    verify(shardedCounter, times(2)).counterHasSpareCapacity("r1");
+    assertThat(eventCaptor.getAllValues().stream()
+        .anyMatch(e -> EventUtil.name(e).equals("dequeue")), is(false));
     verify(stats, times(2)).recordResourceUsed("r1", 3L);
   }
 

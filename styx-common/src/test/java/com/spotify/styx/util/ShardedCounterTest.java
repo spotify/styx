@@ -410,6 +410,62 @@ public class ShardedCounterTest {
   }
 
   @Test
+  public void testCounterHasSpareCapacity() throws IOException {
+    assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
+    storage.runInTransaction(transaction -> {
+      shardedCounter.updateLimit(transaction, COUNTER_ID1, 2);
+      return null;
+    });
+
+    //invalidate cache so that the new limit value gets picked up
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+
+    // Check that counter is reported to have spare capacity
+    assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(true));
+
+    // Increment and verify that the counter still has capacity
+    updateCounterInTransaction(COUNTER_ID1, 1L);
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(true));
+
+    // Increment again and verify that the counter is now out of capacity
+    updateCounterInTransaction(COUNTER_ID1, 1L);
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(false));
+
+    // Raise limit and check that the counter again has capacity
+    storage.runInTransaction(transaction -> {
+      shardedCounter.updateLimit(transaction, COUNTER_ID1, 3);
+      return null;
+    });
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(true));
+
+    // Increment and verify that the counter is again out of capacity
+    updateCounterInTransaction(COUNTER_ID1, 1L);
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(false));
+
+    // Lower limit and verify that the counter is still out of capacity
+    storage.runInTransaction(transaction -> {
+      shardedCounter.updateLimit(transaction, COUNTER_ID1, 2);
+      return null;
+    });
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(false));
+
+    // Decrement and verify that the counter is still out of capacity
+    updateCounterInTransaction(COUNTER_ID1, -1L);
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(false));
+
+    // Decrement again and verify that the counter now has capacity
+    updateCounterInTransaction(COUNTER_ID1, -1L);
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(true));
+  }
+
+  @Test
   public void shouldDeleteCounterAndLimit() throws IOException {
     //init counter
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));

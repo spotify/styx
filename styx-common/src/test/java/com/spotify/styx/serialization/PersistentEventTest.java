@@ -63,7 +63,7 @@ public class PersistentEventTest {
     assertRoundtrip(Event.timeTrigger(INSTANCE1));
     assertRoundtrip(Event.triggerExecution(INSTANCE1, UNKNOWN_TRIGGER));
     assertRoundtrip(Event.info(INSTANCE1, Message.info("InfoMessage")));
-    assertRoundtrip(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE));
+    assertRoundtrip(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE, COMMIT_SHA));
     assertRoundtrip(Event.dequeue(INSTANCE1, ImmutableSet.of("some-resource")));
     assertRoundtrip(Event.dequeue(INSTANCE1, ImmutableSet.of()));
     assertRoundtrip(Event.started(INSTANCE1));
@@ -117,8 +117,9 @@ public class PersistentEventTest {
         deserializeEvent(json("submitted", "\"execution_id\":\"" + POD_NAME + "\"")),
         is(Event.submitted(INSTANCE1, POD_NAME)));
     assertThat(
-        deserializeEvent(json("created", "\"execution_id\":\"" + POD_NAME + "\",\"docker_image\":\"" + DOCKER_IMAGE + "\"")),
-        is(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE)));
+        deserializeEvent(json("created", "\"execution_id\":\"" + POD_NAME + "\",\"docker_image\":\"" + DOCKER_IMAGE
+            + "\",\"commit_sha\":\"" + COMMIT_SHA + "\"")),
+        is(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE, COMMIT_SHA)));
     assertThat(
         deserializeEvent(json("runError", "\"message\":\"ErrorMessage\"")),
         is(Event.runError(INSTANCE1, "ErrorMessage")));
@@ -149,7 +150,7 @@ public class PersistentEventTest {
         is(Event.started(INSTANCE1))); // for backwards compatibility
     assertThat(
         deserializeEvent(json("created", "\"execution_id\":\"" + POD_NAME + "\"")),
-        is(Event.created(INSTANCE1, POD_NAME, "UNKNOWN")));
+        is(Event.created(INSTANCE1, POD_NAME, "UNKNOWN", "UNKNOWN")));
     assertThat(
         deserializeEvent(json("triggerExecution")),
         is(Event.triggerExecution(INSTANCE1, TRIGGER_UNKNOWN)));

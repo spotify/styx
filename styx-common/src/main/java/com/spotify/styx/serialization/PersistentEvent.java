@@ -86,8 +86,9 @@ class PersistentEvent {
     }
 
     @Override
-    public PersistentEvent created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
-      return new Created(workflowInstance.toKey(), executionId, Optional.of(dockerImage));
+    public PersistentEvent created(WorkflowInstance workflowInstance, String executionId,
+        String dockerImage, String commitSha) {
+      return new Created(workflowInstance.toKey(), executionId, Optional.of(dockerImage), Optional.of(commitSha));
     }
 
     @Override
@@ -234,20 +235,23 @@ class PersistentEvent {
 
     public final String executionId;
     public final String dockerImage;
+    public final String commitSha;
 
     @JsonCreator
     public Created(
         @JsonProperty("workflow_instance") String workflowInstance,
         @JsonProperty("execution_id") String executionId,
-        @JsonProperty("docker_image") Optional<String> dockerImage) {
+        @JsonProperty("docker_image") Optional<String> dockerImage,
+        @JsonProperty("commit_sha") Optional<String> commitSha ) {
       super("created", workflowInstance);
       this.executionId = executionId;
       this.dockerImage = dockerImage.orElse("UNKNOWN");
+      this.commitSha = commitSha.orElse("UNKNOWN");
     }
 
     @Override
     public Event toEvent() {
-      return Event.created(WorkflowInstance.parseKey(workflowInstance), executionId, dockerImage);
+      return Event.created(WorkflowInstance.parseKey(workflowInstance), executionId, dockerImage, commitSha);
     }
   }
 

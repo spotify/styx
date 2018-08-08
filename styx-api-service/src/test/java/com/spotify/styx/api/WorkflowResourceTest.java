@@ -313,7 +313,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
     storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER), 0L, ms("07:00:00")));
-    storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
+    storage.writeEvent(create(Event.created(wfi, "exec", "img", "commitSha"), 1L, ms("07:00:01")));
     storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
 
     Response<ByteString> response =
@@ -342,7 +342,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
     storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER), 0L, ms("07:00:00")));
-    storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
+    storage.writeEvent(create(Event.created(wfi, "exec", "img", "commitSha"), 1L, ms("07:00:01")));
     storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
 
     Response<ByteString> response =
@@ -371,7 +371,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
     storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER), 0L, ms("07:00:00")));
-    storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
+    storage.writeEvent(create(Event.created(wfi, "exec", "img", "commitSha"), 1L, ms("07:00:01")));
     storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
 
     Response<ByteString> response =

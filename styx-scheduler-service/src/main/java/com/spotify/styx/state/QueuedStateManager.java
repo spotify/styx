@@ -234,15 +234,15 @@ public class QueuedStateManager implements StateManager {
           throw e;
         }
 
+        // Resource limiting occurs by throwing here, or by failing the commit with a conflict.
+        updateResourceCounters(tx, event, currentRunState.get(), nextRunState);
+
         // Write new state to datastore (or remove it if terminal)
         if (nextRunState.state().isTerminal()) {
           tx.deleteActiveState(event.workflowInstance());
         } else {
           tx.updateActiveState(event.workflowInstance(), nextRunState);
         }
-
-        // Resource limiting occurs by throwing here, or by failing the commit with a conflict.
-        updateResourceCounters(tx, event, currentRunState.get(), nextRunState);
 
         final SequenceEvent sequenceEvent =
             SequenceEvent.create(event, nextRunState.counter(), nextRunState.timestamp());
@@ -316,9 +316,17 @@ public class QueuedStateManager implements StateManager {
     }
 
     if (!failedTries.isEmpty()) {
-      throw new RuntimeException(
-          String.format("Failed to update resource counter for workflow instance %s",
-          runState.workflowInstance()));
+      final List<String> failedResources = failedTries.stream()
+          .map(x -> x._1)
+          .sorted()
+          .collect(toList());
+      final RuntimeException exception = new RuntimeException(
+          "Failed to update resource counter for workflow instance: "
+              + runState.workflowInstance() + ": " + failedResources);
+      failedTries.stream()
+          .map(x -> x._2.getCause())
+          .forEach(exception::addSuppressed);
+      throw exception;
     }
   }
 

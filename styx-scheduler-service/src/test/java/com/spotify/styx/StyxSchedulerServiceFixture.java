@@ -323,7 +323,7 @@ public class StyxSchedulerServiceFixture {
   /**
    * Fast forwards the time by executing all tasks in-between according to the executor's delay.
    */
-  void timePasses(int n, TimeUnit unit) {
+  void timePasses(long n, TimeUnit unit) {
     LOG.info("{} {} passes", n, unit);
     now = now.plusMillis(unit.toMillis(n));
     executor.tick(n, unit);
