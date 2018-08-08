@@ -97,6 +97,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
@@ -122,6 +124,9 @@ class KubernetesDockerRunner implements DockerRunner {
   private static final int DEFAULT_POD_DELETION_DELAY_SECONDS = 120;
   private static final Time DEFAULT_TIME = Instant::now;
   static final String STYX_WORKFLOW_SA_ENV_VARIABLE = "GOOGLE_APPLICATION_CREDENTIALS";
+  static final String STYX_WORKFLOW_PROJECT_ENV_VARIABLE = "GOOGLE_CLOUD_PROJECT";
+  private static final Pattern SERVICE_ACCOUNT_EMAIL =
+      Pattern.compile(".+@(?<project>[\\w\\-]+)\\.iam.gserviceaccount.com");
   static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
   private static final String STYX_WORKFLOW_SA_JSON_KEY = "styx-wf-sa.json";
   static final String STYX_WORKFLOW_SA_SECRET_MOUNT_PATH =
@@ -279,6 +284,11 @@ class KubernetesDockerRunner implements DockerRunner {
       mainContainerBuilder.addToVolumeMounts(saMount);
       mainContainerBuilder.addToEnv(envVar(STYX_WORKFLOW_SA_ENV_VARIABLE,
                                        saMount.getMountPath() + STYX_WORKFLOW_SA_JSON_KEY));
+      runSpec.serviceAccount()
+          .map(SERVICE_ACCOUNT_EMAIL::matcher)
+          .filter(Matcher::matches)
+          .map(matcher -> matcher.group("project"))
+          .ifPresent(project -> mainContainerBuilder.addToEnv(envVar(STYX_WORKFLOW_PROJECT_ENV_VARIABLE, project)));
     });
 
     secretSpec.customSecret().ifPresent(secret -> {

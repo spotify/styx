@@ -65,6 +65,7 @@ import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.ContainerStatusBuilder;
 import io.fabric8.kubernetes.api.model.DoneablePod;
 import io.fabric8.kubernetes.api.model.DoneableSecret;
+import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.ListMeta;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
@@ -112,7 +113,7 @@ public class KubernetesDockerRunnerTest {
 
   private static final String EXECUTION_ID = "badf00d";
   private static final String POD_NAME = EXECUTION_ID;
-  private static final String SERVICE_ACCOUNT = "sa@example.com";
+  private static final String SERVICE_ACCOUNT = "sa@example-project-4711.iam.gserviceaccount.com";
   private static final String SERVICE_ACCOUNT_SECRET = "sa-secret";
   private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(TestData.WORKFLOW_ID, "foo");
   private static final RunSpec RUN_SPEC = RunSpec.simple("eid0", "busybox");
@@ -553,6 +554,17 @@ public class KubernetesDockerRunnerTest {
     final Container mainContainer = pod.getSpec().getContainers().get(0);
     assertThat(mainContainer.getEnv().stream()
             .anyMatch(e -> e.getName().equals(KubernetesDockerRunner.STYX_WORKFLOW_SA_ENV_VARIABLE)),
+        is(true));
+  }
+
+  @Test
+  public void shouldSetGoogleCloudProjectFromServiceAccount() {
+    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, SECRET_SPEC_WITH_SA);
+    final Container mainContainer = pod.getSpec().getContainers().get(0);
+    assertThat(mainContainer.getEnv().stream()
+            .filter(e -> e.getName().equals("GOOGLE_CLOUD_PROJECT"))
+            .map(EnvVar::getValue)
+            .allMatch("example-project-4711"::equals),
         is(true));
   }
 
