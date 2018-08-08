@@ -158,7 +158,7 @@ public abstract class RunState {
     @Deprecated
     @Override
     public RunState created(WorkflowInstance workflowInstance, String executionId,
-        String dockerImage, String commitSha) {
+        String dockerImage) {
       switch (state()) {
         case PREPARE:
         case QUEUED:
@@ -167,7 +167,6 @@ public abstract class RunState {
               data().builder()
                   .executionId(executionId)
                   .executionDescription(ExecutionDescription.forImage(dockerImage))
-                  .commitSha(commitSha)
                   .tries(data().tries() + 1)
                   .build());
 

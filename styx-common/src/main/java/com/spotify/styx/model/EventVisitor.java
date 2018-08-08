@@ -51,11 +51,11 @@ public interface EventVisitor<R> {
   R timeout(@Getter WorkflowInstance workflowInstance);
   R halt(@Getter WorkflowInstance workflowInstance);
 
+  // Note: Do not make changes to these deprecated event method signatures
   @Deprecated
   R timeTrigger(@Getter WorkflowInstance workflowInstance);
   @Deprecated
-  R created(@Getter WorkflowInstance workflowInstance, String executionId, String dockerImage,
-      @Nullable String commitSha);
+  R created(@Getter WorkflowInstance workflowInstance, String executionId, String dockerImage);
   @Deprecated
   R retry(@Getter WorkflowInstance workflowInstance);
 }
