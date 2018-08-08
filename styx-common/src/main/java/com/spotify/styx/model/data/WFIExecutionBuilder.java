@@ -127,7 +127,9 @@ class WFIExecutionBuilder {
         String executionId) {
       currWorkflowInstance = workflowInstance;
       currDockerImg = executionDescription.dockerImage();
-      currCommitSha = executionDescription.commitSha().get();
+      if (executionDescription.commitSha().isPresent()) {
+        currCommitSha = executionDescription.commitSha().get();
+      }
       currExecutionId = executionId;
 
       return null;

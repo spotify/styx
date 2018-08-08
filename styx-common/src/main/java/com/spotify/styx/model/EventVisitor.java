@@ -54,7 +54,8 @@ public interface EventVisitor<R> {
   @Deprecated
   R timeTrigger(@Getter WorkflowInstance workflowInstance);
   @Deprecated
-  R created(@Getter WorkflowInstance workflowInstance, String executionId, String dockerImage, String commitSha);
+  R created(@Getter WorkflowInstance workflowInstance, String executionId, String dockerImage,
+      @Nullable String commitSha);
   @Deprecated
   R retry(@Getter WorkflowInstance workflowInstance);
 }

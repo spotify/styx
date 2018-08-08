@@ -58,6 +58,12 @@ public class WFIExecutionBuilderTest {
         .build();
   }
 
+  private ExecutionDescription desc(String dockerImage) {
+    return ExecutionDescription.builder()
+        .dockerImage(dockerImage)
+        .build();
+  }
+
   @Test
   public void testHaltEventAfterTriggerEvent() {
     long c = 0L;
@@ -141,7 +147,7 @@ public class WFIExecutionBuilderTest {
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
         SequenceEvent.create(E.retry(), c++, ts("08:56")),
-        SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-01"), c++, ts("08:55")),
+        SequenceEvent.create(E.submit(desc("img2"), "exec-id-01"), c++, ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57")),
         SequenceEvent.create(E.terminate(0), c++, ts("08:58")),
@@ -186,7 +192,7 @@ public class WFIExecutionBuilderTest {
                         Execution.create(
                             Optional.of("exec-id-01"),
                             Optional.of("img2"),
-                            Optional.of("sha2"),
+                            Optional.empty(),
                             Arrays.asList(
                                 ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("08:57"), "STARTED", Optional.empty()),
