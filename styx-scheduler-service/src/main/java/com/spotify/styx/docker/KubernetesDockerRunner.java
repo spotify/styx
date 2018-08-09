@@ -118,7 +118,8 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String TERMINATION_LOG = "STYX_TERMINATION_LOG";
   static final String TRIGGER_ID = "STYX_TRIGGER_ID";
   static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
-  static final String RUNNING_ON_STYX = "__STYX_RUNNING_ON_STYX";
+  static final String ENVIRONMENT = "STYX_ENVIRONMENT";
+  static final String LOGGING = "STYX_LOGGING";
   private static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
   private static final int DEFAULT_POD_DELETION_DELAY_SECONDS = 120;
   private static final Time DEFAULT_TIME = Instant::now;
@@ -143,6 +144,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private final Stats stats;
   private final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
   private final Debug debug;
+  private final String styxEnvironment;
   private final int pollPodsIntervalSeconds;
   private final int podDeletionDelaySeconds;
   private final Time time;
@@ -151,13 +153,15 @@ class KubernetesDockerRunner implements DockerRunner {
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
-                         Debug debug, int pollPodsIntervalSeconds, int podDeletionDelaySeconds,
+                         Debug debug, String styxEnvironment,
+                         int pollPodsIntervalSeconds, int podDeletionDelaySeconds,
                          Time time, ScheduledExecutorService executor) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client);
     this.stats = Objects.requireNonNull(stats);
     this.serviceAccountSecretManager = Objects.requireNonNull(serviceAccountSecretManager);
     this.debug = debug;
+    this.styxEnvironment = styxEnvironment;
     this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
     this.podDeletionDelaySeconds = podDeletionDelaySeconds;
     this.time = Objects.requireNonNull(time);
@@ -166,8 +170,8 @@ class KubernetesDockerRunner implements DockerRunner {
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
-                         Debug debug) {
-    this(client, stateManager, stats, serviceAccountSecretManager, debug,
+                         Debug debug, String styxEnvironment) {
+    this(client, stateManager, stats, serviceAccountSecretManager, debug, styxEnvironment,
         DEFAULT_POLL_PODS_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_TIME,
         Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY));
   }
@@ -177,7 +181,7 @@ class KubernetesDockerRunner implements DockerRunner {
     final KubernetesSecretSpec secretSpec = ensureSecrets(workflowInstance, runSpec);
     stats.recordSubmission(runSpec.executionId());
     try {
-      client.pods().create(createPod(workflowInstance, runSpec, secretSpec));
+      client.pods().create(createPod(workflowInstance, runSpec, secretSpec, styxEnvironment));
     } catch (KubernetesClientException kce) {
       throw new IOException("Failed to create Kubernetes pod", kce);
     }
@@ -234,7 +238,10 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   @VisibleForTesting
-  static Pod createPod(WorkflowInstance workflowInstance, RunSpec runSpec, KubernetesSecretSpec secretSpec) {
+  static Pod createPod(WorkflowInstance workflowInstance,
+                       RunSpec runSpec,
+                       KubernetesSecretSpec secretSpec,
+                       String styxEnvironment) {
     final String imageWithTag = runSpec.imageName().contains(":")
         ? runSpec.imageName()
         : runSpec.imageName() + ":latest";
@@ -259,7 +266,7 @@ class KubernetesDockerRunner implements DockerRunner {
         .withName(MAIN_CONTAINER_NAME)
         .withImage(imageWithTag)
         .withArgs(runSpec.args())
-        .withEnv(buildEnv(workflowInstance, runSpec))
+        .withEnv(buildEnv(workflowInstance, runSpec, styxEnvironment))
         .withResources(resourceRequirements.build());
 
     secretSpec.serviceAccountSecret().ifPresent(serviceAccountSecret -> {
@@ -329,7 +336,8 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   private static List<EnvVar> buildEnv(WorkflowInstance workflowInstance,
-                                       RunSpec runSpec) {
+                                       RunSpec runSpec,
+                                       String styxEnvironment) {
     return Arrays.asList(
         envVar(COMPONENT_ID,    workflowInstance.workflowId().componentId()),
         envVar(WORKFLOW_ID,     workflowInstance.workflowId().id()),
@@ -342,7 +350,8 @@ class KubernetesDockerRunner implements DockerRunner {
         envVar(TERMINATION_LOG, "/dev/termination-log"),
         envVar(TRIGGER_ID,      runSpec.trigger().map(TriggerUtil::triggerId).orElse(null)),
         envVar(TRIGGER_TYPE,    runSpec.trigger().map(TriggerUtil::triggerType).orElse(null)),
-        envVar(RUNNING_ON_STYX, "")
+        envVar(ENVIRONMENT,     styxEnvironment),
+        envVar(LOGGING,         "structured")
     );
   }
 
