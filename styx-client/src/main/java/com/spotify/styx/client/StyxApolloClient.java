@@ -50,6 +50,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.EventInfo;
+import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.util.EventUtil;
 import java.io.IOException;
 import java.net.URI;
@@ -216,6 +217,20 @@ class StyxApolloClient implements StyxClient {
         .addPathSegment(workflowId)
         .addPathSegment("state");
     return executeRequest(Request.forUri(urlBuilder.build().toString()), WorkflowState.class);
+  }
+
+  @Override
+  public CompletionStage<WorkflowInstanceExecutionData> workflowInstanceExecutions(final String componentId,
+                                                                                   final String workflowId,
+                                                                                   final String parameter) {
+    final HttpUrl.Builder urlBuilder = getUrlBuilder()
+        .addPathSegment("workflows")
+        .addPathSegment(componentId)
+        .addPathSegment(workflowId)
+        .addPathSegment("instances")
+        .addPathSegment(parameter);
+    return executeRequest(Request.forUri(urlBuilder.build().toString()),
+        WorkflowInstanceExecutionData.class);
   }
 
   @Override

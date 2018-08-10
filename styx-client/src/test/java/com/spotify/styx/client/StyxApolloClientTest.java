@@ -49,7 +49,9 @@ import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.serialization.Json;
 import java.io.IOException;
 import java.time.Instant;
@@ -169,6 +171,29 @@ public class StyxApolloClientTest {
     assertThat(request.uri(), is(API_URL + "/workflows"));
     assertThat(request.method(), is("GET"));
     assertThat(r.get(), is(workflows));
+  }
+
+  @Test
+  public void shouldGetWorkflowInstance() throws Exception {
+    final WorkflowInstanceExecutionData workflowInstanceExecutionData =
+        WorkflowInstanceExecutionData.create(
+            WorkflowInstance.create(
+                WorkflowId.create("component", "workflow"),
+                "2017-01-01T00"),
+            Collections.emptyList());
+    when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
+        Response.forStatus(Status.OK).withPayload(Json.serialize(workflowInstanceExecutionData))));
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+    final CompletableFuture<WorkflowInstanceExecutionData> r =
+        styx.workflowInstanceExecutions("component", "workflow", "2017-01-01T00")
+            .toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    assertThat(request.uri(),
+        is(API_URL + "/workflows/component/workflow/instances/2017-01-01T00"));
+    assertThat(request.method(), is("GET"));
+    assertThat(r.get(), is(workflowInstanceExecutionData));
   }
 
   @Test
