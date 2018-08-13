@@ -148,7 +148,7 @@ public class StyxScheduler implements AppInit {
   public static final String STYX_TRIGGER_TICK_INTERVAL = "styx.trigger.tick-interval";
   public static final String STYX_SCHEDULER_THREADS = "styx.scheduler-threads";
   private static final String STYX_ENVIRONMENT = "styx.environment";
-  private static final String STYX_ENVIRONMENT_PRODUCTION = "production";
+  private static final String STYX_ENVIRONMENT_UNDEFINED = "undefined";
 
   public static final int DEFAULT_STYX_EVENT_PROCESSING_THREADS = 32;
   public static final int DEFAULT_STYX_SCHEDULER_THREADS = 32;
@@ -685,7 +685,7 @@ public class StyxScheduler implements AppInit {
     } else {
       final String styxEnvironment;
       if (!config.hasPath(STYX_ENVIRONMENT)) {
-        styxEnvironment = STYX_ENVIRONMENT_PRODUCTION;
+        styxEnvironment = STYX_ENVIRONMENT_UNDEFINED;
       } else {
         styxEnvironment = config.getString(STYX_ENVIRONMENT);
       }
