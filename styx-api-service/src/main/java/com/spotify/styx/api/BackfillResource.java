@@ -61,6 +61,7 @@ import com.spotify.styx.util.ReplayEvents;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.WorkflowValidator;
+import java.io.Closeable;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collection;
@@ -72,26 +73,33 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
 
-public final class BackfillResource {
+public final class BackfillResource implements Closeable {
 
   static final String BASE = "/backfills";
   private static final String SCHEDULER_BASE_PATH = "/api/v0";
   private static final String UNKNOWN = "UNKNOWN";
   private static final String WAITING = "WAITING";
+  private static final int CONCURRENCY = 64;
 
   private final Storage storage;
   private final String schedulerServiceBaseUrl;
   private final WorkflowValidator workflowValidator;
+
+  private final ForkJoinPool forkJoinPool;
 
   public BackfillResource(String schedulerServiceBaseUrl, Storage storage,
       WorkflowValidator workflowValidator) {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
     this.storage = Objects.requireNonNull(storage);
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
+    this.forkJoinPool = new ForkJoinPool(CONCURRENCY);
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -131,7 +139,17 @@ public final class BackfillResource {
     );
   }
 
-  public BackfillsPayload getBackfills(RequestContext rc) {
+  @Override
+  public void close() {
+    forkJoinPool.shutdownNow();
+    try {
+      forkJoinPool.awaitTermination(30, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  private BackfillsPayload getBackfills(RequestContext rc) {
     final Optional<String> componentOpt = rc.request().parameter("component");
     final Optional<String> workflowOpt = rc.request().parameter("workflow");
     final boolean includeStatuses = rc.request().parameter("status").orElse("false").equals("true");
@@ -155,18 +173,21 @@ public final class BackfillResource {
       throw new RuntimeException(e);
     }
 
-    final List<BackfillPayload> backfillPayloads = backfills.parallel()
-        .map(backfill -> BackfillPayload.create(
+    final List<BackfillPayload> backfillPayloads = backfills
+        .map(backfill -> forkJoinPool.submit(() -> BackfillPayload.create(
             backfill,
             includeStatuses
             ? Optional.of(RunStateDataPayload.create(retrieveBackfillStatuses(backfill)))
-            : Optional.empty()))
+            : Optional.empty())))
+        .collect(toList())
+        .stream()
+        .map(ForkJoinTask::join)
         .collect(toList());
 
     return BackfillsPayload.create(backfillPayloads);
   }
 
-  public Response<BackfillPayload> getBackfill(RequestContext rc, String id) {
+  private Response<BackfillPayload> getBackfill(RequestContext rc, String id) {
     final boolean includeStatuses = rc.request().parameter("status").orElse("true").equals("true");
     final Optional<Backfill> backfillOpt = storage.backfill(id);
     if (!backfillOpt.isPresent()) {
@@ -186,7 +207,7 @@ public final class BackfillResource {
     return schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + "/" + String.join("/", parts);
   }
 
-  public CompletionStage<Response<ByteString>> haltBackfill(String id, RequestContext rc) {
+  private CompletionStage<Response<ByteString>> haltBackfill(String id, RequestContext rc) {
     try {
       final Optional<Backfill> backfillOptional = storage.backfill(id);
       if (backfillOptional.isPresent()) {
@@ -245,7 +266,7 @@ public final class BackfillResource {
     }
   }
 
-  public Response<Backfill> postBackfill(BackfillInput input) {
+  private Response<Backfill> postBackfill(BackfillInput input) {
     final BackfillBuilder builder = Backfill.newBuilder();
 
     final String id = RandomGenerator.DEFAULT.generateUniqueId("backfill");
@@ -365,9 +386,9 @@ public final class BackfillResource {
     final List<RunStateData> processedStates;
     final List<RunStateData> waitingStates;
 
-    Map<WorkflowInstance, RunState> activeWorkflowInstances;
+   final Map<WorkflowInstance, RunState> activeWorkflowInstances;
     try {
-      activeWorkflowInstances = storage.readActiveStates();
+      activeWorkflowInstances = storage.readActiveStatesByTriggerId(backfill.id());
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -379,22 +400,12 @@ public final class BackfillResource {
     } else {
       processedInstants = instantsInRange(backfill.start(), backfill.nextTrigger(), backfill.schedule());
     }
-    processedStates = processedInstants.parallelStream()
-        .map(instant -> {
-          final WorkflowInstance wfi = WorkflowInstance
-              .create(backfill.workflowId(), toParameter(backfill.schedule(), instant));
-          Optional<RunState> restoredStateOpt = ReplayEvents.getBackfillRunState(
-              wfi,
-              activeWorkflowInstances,
-              storage,
-              backfill.id());
-          if (restoredStateOpt.isPresent()) {
-            RunState state = restoredStateOpt.get();
-            return RunStateData.create(state.workflowInstance(), state.state().name(), state.data());
-          } else {
-            return RunStateData.create(wfi, UNKNOWN, StateData.zero());
-          }
-        })
+    processedStates = processedInstants.stream()
+        .map(instant -> forkJoinPool.submit(() ->
+            getRunStateData(backfill, activeWorkflowInstances, instant)))
+        .collect(toList())
+        .stream()
+        .map(ForkJoinTask::join)
         .collect(toList());
 
     final List<Instant> waitingInstants;
@@ -417,4 +428,24 @@ public final class BackfillResource {
         : Stream.concat(processedStates.stream(), waitingStates.stream()).collect(toList());
   }
 
+  private RunStateData getRunStateData(Backfill backfill,
+      Map<WorkflowInstance, RunState> activeWorkflowInstances, Instant instant) {
+    final WorkflowInstance wfi = WorkflowInstance
+        .create(backfill.workflowId(), toParameter(backfill.schedule(), instant));
+    if (activeWorkflowInstances.containsKey(wfi)) {
+      RunState state = activeWorkflowInstances.get(wfi);
+      return RunStateData
+          .create(state.workflowInstance(), state.state().name(), state.data());
+    }
+
+    Optional<RunState> restoredStateOpt =
+        ReplayEvents.getBackfillRunState(wfi, storage, backfill.id());
+    if (restoredStateOpt.isPresent()) {
+      RunState state = restoredStateOpt.get();
+      return RunStateData
+          .create(state.workflowInstance(), state.state().name(), state.data());
+    } else {
+      return RunStateData.create(wfi, UNKNOWN, StateData.zero());
+    }
+  }
 }

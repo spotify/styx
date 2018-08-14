@@ -27,7 +27,6 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Map;
 import java.util.Optional;
 import java.util.SortedSet;
 
@@ -40,7 +39,6 @@ public final class ReplayEvents {
   // TODO: fix NPath complexity
   public static Optional<RunState> getBackfillRunState(
       WorkflowInstance workflowInstance,
-      Map<WorkflowInstance, RunState> activeWorkflowInstances,
       Storage storage,
       String backfillId) {
     final SettableTime time = new SettableTime();
@@ -59,10 +57,7 @@ public final class ReplayEvents {
 
     RunState restoredState = RunState.fresh(workflowInstance, time);
 
-    final long lastConsumedEvent =
-        Optional.ofNullable(activeWorkflowInstances.get(workflowInstance))
-            .map(RunState::counter)
-            .orElse(sequenceEvents.last().counter());
+    final long lastConsumedEvent = sequenceEvents.last().counter();
 
     for (SequenceEvent sequenceEvent : sequenceEvents) {
       // The active state event counters are read before the events themselves and styx is 

@@ -32,16 +32,12 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.state.RunState.State;
-import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.Optional;
 import java.util.SortedSet;
 import junitparams.JUnitParamsRunner;
@@ -73,7 +69,6 @@ public class ReplayEventsTest {
 
     RunState restoredRunState = ReplayEvents.getBackfillRunState(
         WORKFLOW_INSTANCE,
-        ImmutableMap.of(WORKFLOW_INSTANCE, RunState.create(WORKFLOW_INSTANCE, State.RUNNING, StateData.zero(), Instant.now(), 6L)),
         storage, "bf-1").get();
 
     assertThat(restoredRunState.state(), is(RUNNING));
@@ -98,7 +93,7 @@ public class ReplayEventsTest {
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
 
     RunState restoredRunState =
-        ReplayEvents.getBackfillRunState(WORKFLOW_INSTANCE, ImmutableMap.of(), storage, "bf-1").get();
+        ReplayEvents.getBackfillRunState(WORKFLOW_INSTANCE, storage, "bf-1").get();
 
     assertThat(restoredRunState.state(), is(DONE));
     assertThat(restoredRunState.data().lastExit(), isPresent());
@@ -115,7 +110,6 @@ public class ReplayEventsTest {
 
     Optional<RunState> restoredRunState = ReplayEvents.getBackfillRunState(
         WORKFLOW_INSTANCE,
-        ImmutableMap.of(WORKFLOW_INSTANCE, RunState.create(WORKFLOW_INSTANCE, State.PREPARE, StateData.zero(), Instant.now(), 2L)),
         storage, "erroneous-id");
 
     assertThat(restoredRunState, is(Optional.empty()));
