@@ -113,6 +113,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
       .serviceAccount(SERVICE_ACCOUNT)
       .build();
 
+  private static final String STYX_ENVIRONMENT = "testing";
+
   private ExecutorService executor;
 
   @Mock NamespacedKubernetesClient k8sClient;
@@ -307,7 +309,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     final KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
         .serviceAccountSecret(secret.getMetadata().getName())
         .build();
-    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
+    final Pod pod = createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
 
     final PodStatus podStatus = podStatus(phase);
     pod.setStatus(podStatus);
@@ -364,7 +366,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     final KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
         .serviceAccountSecret(secret.getMetadata().getName())
         .build();
-    final Pod pod = KubernetesDockerRunner.createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
+    final Pod pod = createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
     pod.setStatus(podStatus("Running"));
     when(podList.getItems()).thenReturn(ImmutableList.of(pod));
     sut.cleanup();
@@ -562,5 +564,12 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     final PodStatus podStatus = new PodStatus();
     podStatus.setPhase(phase);
     return podStatus;
+  }
+
+  private static Pod createPod(WorkflowInstance workflowInstance,
+                               DockerRunner.RunSpec runSpec,
+                               KubernetesSecretSpec secretSpec) {
+    return KubernetesDockerRunner
+        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT);
   }
 }
