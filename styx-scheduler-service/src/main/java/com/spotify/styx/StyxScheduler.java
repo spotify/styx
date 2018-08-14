@@ -148,7 +148,6 @@ public class StyxScheduler implements AppInit {
   public static final String STYX_TRIGGER_TICK_INTERVAL = "styx.trigger.tick-interval";
   public static final String STYX_SCHEDULER_THREADS = "styx.scheduler-threads";
   private static final String STYX_ENVIRONMENT = "styx.environment";
-  private static final String STYX_ENVIRONMENT_UNDEFINED = "undefined";
 
   public static final int DEFAULT_STYX_EVENT_PROCESSING_THREADS = 32;
   public static final int DEFAULT_STYX_SCHEDULER_THREADS = 32;
@@ -683,12 +682,7 @@ public class StyxScheduler implements AppInit {
       LOG.info("Creating LocalDockerRunner");
       return closer.register(DockerRunner.local(scheduler, stateManager));
     } else {
-      final String styxEnvironment;
-      if (!config.hasPath(STYX_ENVIRONMENT)) {
-        styxEnvironment = STYX_ENVIRONMENT_UNDEFINED;
-      } else {
-        styxEnvironment = config.getString(STYX_ENVIRONMENT);
-      }
+      final String styxEnvironment = config.getString(STYX_ENVIRONMENT);
       final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(
           config, id, createGkeClient(), DefaultKubernetesClient::new));
       final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();

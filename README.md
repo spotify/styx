@@ -230,7 +230,7 @@ For each execution, Styx will inject a set of environment variables into the Doc
 | `STYX_TRIGGER_TYPE` | The type of the trigger. Possible values are: `natural`, `adhoc`, `backfill` and `unknown` |
 | `STYX_EXECUTION_ID` | A unique identifier for the execution. This is the execution id used to identify execution attempts of a trigger. |
 | `STYX_LOGGING`  | Container logging format, `text` or `structured`. |
-| `STYX_ENVIRONMENT`  | Styx environment, `staging`, `production`, `testing`, etc. Can be defined in [`styx-standalone.conf`](./styx-standalone-service/src/main/resources/styx-standalone.conf) and by default is `undefined`. |
+| `STYX_ENVIRONMENT`  | Styx environment, `staging`, `production`, `testing`, etc. Should be defined in [`styx-standalone.conf`](./styx-standalone-service/src/main/resources/styx-standalone.conf). |
 | `STYX_EXECUTION_COUNTER` | **to be implemented** - A counter indicating which execution this is. Goes from 0..N per trigger. |
 
 
