@@ -386,7 +386,7 @@ public final class BackfillResource implements Closeable {
     final List<RunStateData> processedStates;
     final List<RunStateData> waitingStates;
 
-   final Map<WorkflowInstance, RunState> activeWorkflowInstances;
+    final Map<WorkflowInstance, RunState> activeWorkflowInstances;
     try {
       activeWorkflowInstances = storage.readActiveStatesByTriggerId(backfill.id());
     } catch (IOException e) {
