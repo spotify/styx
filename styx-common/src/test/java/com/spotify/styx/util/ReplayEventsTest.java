@@ -28,6 +28,7 @@ import static com.spotify.styx.testdata.TestData.RESOURCE_IDS;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -111,6 +112,7 @@ public class ReplayEventsTest {
 
     try {
       ReplayEvents.getBackfillRunState(WORKFLOW_INSTANCE, storage, "bf-1");
+      fail();
     } catch (RuntimeException e) {
       assertThat(e.getCause().getMessage(), is("forced failure"));
     }
