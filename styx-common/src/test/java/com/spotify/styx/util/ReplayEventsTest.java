@@ -107,14 +107,14 @@ public class ReplayEventsTest {
 
   @Test
   public void throwExceptionWhenFailedToReadEvents() throws Exception {
-    IOException exception = new IOException("forced failure");
+    IOException exception = new IOException();
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenThrow(exception);
 
     try {
       ReplayEvents.getBackfillRunState(WORKFLOW_INSTANCE, storage, "bf-1");
       fail();
     } catch (RuntimeException e) {
-      assertThat(e.getCause().getMessage(), is("forced failure"));
+      assertThat(e.getCause(), is(exception));
     }
   }
 }
