@@ -20,7 +20,6 @@
 
 package com.spotify.styx.util;
 
-import com.google.common.base.Throwables;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
@@ -48,7 +47,7 @@ public final class ReplayEvents {
     try {
       sequenceEvents = storage.readEvents(workflowInstance);
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
 
     if (sequenceEvents.isEmpty()) {
@@ -57,18 +56,10 @@ public final class ReplayEvents {
 
     RunState restoredState = RunState.fresh(workflowInstance, time);
 
-    final long lastConsumedEvent = sequenceEvents.last().counter();
-
+    // events are written after the datastore transition transaction is successfully
+    // committed, so we can trust the sequence of events faithfully reflect the state
+    // transition if they have all been successfully written to bigtable
     for (SequenceEvent sequenceEvent : sequenceEvents) {
-      // The active state event counters are read before the events themselves and styx is 
-      // concurrently storing events, thus we might encounter an event with a counter value that is
-      // later than the earlier read active state event counter. Events _after_ the active state
-      // event counter might be dropped in some circumstances, hence we stop processing here to
-      // avoid returning phantom data.
-      if (sequenceEvent.counter() > lastConsumedEvent) {
-        break;
-      }
-
       time.set(Instant.ofEpochMilli(sequenceEvent.timestamp()));
       if ("triggerExecution".equals(EventUtil.name(sequenceEvent.event()))) {
         if (backfillFound) {
