@@ -32,6 +32,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -151,8 +152,8 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
-    storage = new AggregateStorage(bigtable, localDatastore.getOptions().getService(),
-                                   Duration.ZERO);
+    storage = spy(new AggregateStorage(bigtable, localDatastore.getOptions().getService(),
+        Duration.ZERO));
 
     environment.routingEngine()
         .registerRoutes(new BackfillResource(SCHEDULER_BASE, storage, workflowValidator).routes());
@@ -365,6 +366,8 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertJson(response, "statuses.active_states[2].state", equalTo("WAITING"));
     assertJson(response, "statuses.active_states[23].state", equalTo("WAITING"));
     assertJson(response, "statuses.active_states", hasSize(24));
+
+    verify(storage, never()).readEvents(wfi);
   }
 
   @Test
@@ -380,7 +383,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                          5L, 5L));
     storage.writeActiveState(wfi, RunState.create(wfi, State.RUNNING,
         StateData.newBuilder()
-            .trigger(Trigger.backfill(BACKFILL_1.id()))
+            .trigger(Trigger.backfill(BACKFILL_2.id()))
             .executionId("exec-1")
             .executionDescription(EXECUTION_DESCRIPTION)
             .tries(0)
@@ -397,6 +400,8 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertJson(response, "statuses.active_states[22].state", equalTo("RUNNING"));
     assertJson(response, "statuses.active_states[23].state", equalTo("UNKNOWN"));
     assertJson(response, "statuses.active_states", hasSize(24));
+    
+    verify(storage, never()).readEvents(wfi);
   }
 
   @Test
