@@ -312,10 +312,10 @@ public class Scheduler {
 
     double sleepingTimeSeconds = dequeueRateLimiter.acquire();
     if (sleepingTimeSeconds > 0.0001) {
-        final double sleepingTimeMillis = sleepingTimeSeconds * 1000;
-        final String message = "Dequeue rate limited and slept for " + sleepingTimeMillis + " ms";
-        LOG.debug(message, sleepingTimeMillis);
-        tracer.getCurrentSpan().addAnnotation(message);
+      final double sleepingTimeMillis = sleepingTimeSeconds * 1000;
+      final String message = "Dequeue rate limited and slept for " + sleepingTimeMillis + " ms";
+      LOG.debug(message, sleepingTimeMillis);
+      tracer.getCurrentSpan().addAnnotation(message);
     }
 
     // Racy: some resources may have been removed (become unknown) by now; in that case the
