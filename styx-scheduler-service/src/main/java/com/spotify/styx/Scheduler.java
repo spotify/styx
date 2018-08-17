@@ -241,7 +241,7 @@ public class Scheduler {
       Map<WorkflowId, Set<String>> workflowResourceReferences,
       Optional<Workflow> workflowOpt, InstanceState instanceState) {
     tracer.spanBuilder("dequeueInstance").startSpanAndRun(() ->
-        dequeueInstance0(config, resources, workflowResourceReferences, workflowOpt, instanceState);
+        dequeueInstance0(config, resources, workflowResourceReferences, workflowOpt, instanceState));
   }
 
   private void dequeueInstance0(final StyxConfig config, Map<String, Resource> resources,
