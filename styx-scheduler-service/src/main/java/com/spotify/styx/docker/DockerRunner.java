@@ -117,12 +117,16 @@ public interface DockerRunner extends Closeable {
     return new LocalDockerRunner(executorService, stateManager);
   }
 
-  static DockerRunner kubernetes(NamespacedKubernetesClient kubernetesClient, StateManager stateManager,
-      Stats stats, ServiceAccountKeyManager serviceAccountKeyManager, Debug debug) {
+  static DockerRunner kubernetes(NamespacedKubernetesClient kubernetesClient,
+                                 StateManager stateManager,
+                                 Stats stats, ServiceAccountKeyManager serviceAccountKeyManager,
+                                 Debug debug,
+                                 String styxEnvironment) {
     final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager =
         new KubernetesGCPServiceAccountSecretManager(kubernetesClient, serviceAccountKeyManager);
     final KubernetesDockerRunner dockerRunner =
-        new KubernetesDockerRunner(kubernetesClient, stateManager, stats, serviceAccountSecretManager, debug);
+        new KubernetesDockerRunner(kubernetesClient, stateManager, stats,
+            serviceAccountSecretManager, debug, styxEnvironment);
 
     dockerRunner.init();
 

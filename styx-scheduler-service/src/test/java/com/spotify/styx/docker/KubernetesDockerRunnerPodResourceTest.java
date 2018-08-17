@@ -22,9 +22,12 @@ package com.spotify.styx.docker;
 
 import static com.spotify.styx.docker.KubernetesDockerRunner.COMMIT_SHA;
 import static com.spotify.styx.docker.KubernetesDockerRunner.COMPONENT_ID;
+import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_ARGS;
 import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_IMAGE;
 import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_TERMINATION_LOGGING_ANNOTATION;
+import static com.spotify.styx.docker.KubernetesDockerRunner.ENVIRONMENT;
 import static com.spotify.styx.docker.KubernetesDockerRunner.EXECUTION_ID;
+import static com.spotify.styx.docker.KubernetesDockerRunner.LOGGING;
 import static com.spotify.styx.docker.KubernetesDockerRunner.MAIN_CONTAINER_NAME;
 import static com.spotify.styx.docker.KubernetesDockerRunner.PARAMETER;
 import static com.spotify.styx.docker.KubernetesDockerRunner.SERVICE_ACCOUNT;
@@ -64,9 +67,11 @@ public class KubernetesDockerRunnerPodResourceTest {
 
   private static final String TEST_EXECUTION_ID = "execution_1";
 
+  private static final String STYX_ENVIRONMENT = "testing";
+
   @Test
-  public void shouldAddLatestTag() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+  public void shouldAddLatestTag() {
+    Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
@@ -79,8 +84,8 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldUseConfiguredTag() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+  public void shouldUseConfiguredTag() {
+    Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox:v7"), EMPTY_SECRET_SPEC);
 
@@ -93,8 +98,8 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldAddArgs() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+  public void shouldAddArgs() {
+    Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox", "echo", "foo", "bar"), EMPTY_SECRET_SPEC);
 
@@ -107,8 +112,8 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldAddWorkflowInstanceAnnotation() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+  public void shouldAddWorkflowInstanceAnnotation() {
+    Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
@@ -121,8 +126,8 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldDisableTerminationLoggingWhenFalse() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+  public void shouldDisableTerminationLoggingWhenFalse() {
+    Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
@@ -136,8 +141,8 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldEnableTerminationLoggingWhenTrue() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+  public void shouldEnableTerminationLoggingWhenTrue() {
+    Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.builder()
             .executionId("eid")
@@ -156,8 +161,8 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldHaveRestartPolicyNever() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+  public void shouldHaveRestartPolicyNever() {
+    Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
@@ -165,8 +170,8 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldNotHaveSecretsMountIfNoSecret() throws Exception {
-    Pod pod = KubernetesDockerRunner.createPod(
+  public void shouldNotHaveSecretsMountIfNoSecret() {
+    Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
@@ -182,12 +187,12 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldConfigureSecretsMount() throws Exception {
+  public void shouldConfigureSecretsMount() {
     WorkflowConfiguration.Secret secret = WorkflowConfiguration.Secret.create("my-secret", "/etc/secrets");
     KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
         .customSecret(secret)
         .build();
-    Pod pod = KubernetesDockerRunner.createPod(
+    Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.builder()
             .executionId("eid")
@@ -217,11 +222,12 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldConfigureEnvironmentVariables() throws Exception {
-    final Pod pod = KubernetesDockerRunner.createPod(
+  public void shouldConfigureEnvironmentVariables() {
+    final Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.builder()
             .executionId(TEST_EXECUTION_ID)
+            .args("hello", "world")
             .imageName("busybox")
             .trigger(Trigger.unknown("trigger-id"))
             .commitSha("abc123")
@@ -239,5 +245,15 @@ public class KubernetesDockerRunnerPodResourceTest {
     assertThat(envVars, hasItem(envVar(TRIGGER_TYPE, "unknown")));
     assertThat(envVars, hasItem(envVar(COMMIT_SHA, "abc123")));
     assertThat(envVars, hasItem(envVar(EXECUTION_ID, TEST_EXECUTION_ID)));
+    assertThat(envVars, hasItem(envVar(DOCKER_ARGS, "hello world")));
+    assertThat(envVars, hasItem(envVar(ENVIRONMENT, STYX_ENVIRONMENT)));
+    assertThat(envVars, hasItem(envVar(LOGGING, "structured")));
+  }
+
+  private static Pod createPod(WorkflowInstance workflowInstance,
+                               DockerRunner.RunSpec runSpec,
+                               KubernetesSecretSpec secretSpec) {
+    return KubernetesDockerRunner
+        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT);
   }
 }

@@ -32,6 +32,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -65,7 +66,6 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
-import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.time.Duration;
@@ -80,7 +80,6 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 public class BackfillResourceTest extends VersionedApiTest {
@@ -89,7 +88,6 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   private static LocalDatastoreHelper localDatastore;
   private Connection bigtable = setupBigTableMockTable();
-  @Mock private ShardedCounter shardedCounter;
 
   private AggregateStorage storage;
 
@@ -154,8 +152,8 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
-    storage = new AggregateStorage(bigtable, localDatastore.getOptions().getService(),
-                                   Duration.ZERO);
+    storage = spy(new AggregateStorage(bigtable, localDatastore.getOptions().getService(),
+        Duration.ZERO));
 
     environment.routingEngine()
         .registerRoutes(new BackfillResource(SCHEDULER_BASE, storage, workflowValidator).routes());
@@ -350,7 +348,13 @@ public class BackfillResourceTest extends VersionedApiTest {
     storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                              4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                          5L, 5L));
     storage.writeActiveState(wfi, RunState.create(wfi, State.RUNNING,
-        StateData.zero(), Instant.now(), 5L));
+        StateData.newBuilder()
+            .trigger(Trigger.backfill(BACKFILL_1.id()))
+            .executionId("exec-1")
+            .executionDescription(EXECUTION_DESCRIPTION)
+            .tries(0)
+            .resourceIds(RESOURCE_IDS)
+            .build(), Instant.now(), 5L));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/" + BACKFILL_1.id())));
@@ -362,6 +366,8 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertJson(response, "statuses.active_states[2].state", equalTo("WAITING"));
     assertJson(response, "statuses.active_states[23].state", equalTo("WAITING"));
     assertJson(response, "statuses.active_states", hasSize(24));
+
+    verify(storage, never()).readEvents(wfi);
   }
 
   @Test
@@ -376,7 +382,13 @@ public class BackfillResourceTest extends VersionedApiTest {
     storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                              4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                          5L, 5L));
     storage.writeActiveState(wfi, RunState.create(wfi, State.RUNNING,
-        StateData.zero(), Instant.now(), 5L));
+        StateData.newBuilder()
+            .trigger(Trigger.backfill(BACKFILL_2.id()))
+            .executionId("exec-1")
+            .executionDescription(EXECUTION_DESCRIPTION)
+            .tries(0)
+            .resourceIds(RESOURCE_IDS)
+            .build(), Instant.now(), 5L));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/" + BACKFILL_2.id())));
@@ -388,6 +400,43 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertJson(response, "statuses.active_states[22].state", equalTo("RUNNING"));
     assertJson(response, "statuses.active_states[23].state", equalTo("UNKNOWN"));
     assertJson(response, "statuses.active_states", hasSize(24));
+    
+    verify(storage, never()).readEvents(wfi);
+  }
+
+  @Test
+  public void shouldReplayIfNotMatchingTriggerId() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_2.workflowId(), "2017-01-01T22");
+    storage.storeBackfill(BACKFILL_2.builder().nextTrigger(Instant.parse("2017-01-01T21:00:00Z")).build());
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(wfi, Trigger.backfill("backfill-2")), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi, RESOURCE_IDS),                            2L, 2L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"),          3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                              4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                          5L, 5L));
+    storage.writeActiveState(wfi, RunState.create(wfi, State.RUNNING,
+        StateData.newBuilder()
+            .trigger(Trigger.backfill(BACKFILL_1.id())) // BACKFILL_1 has active state, not BACKFILL_2
+            .executionId("exec-1")
+            .executionDescription(EXECUTION_DESCRIPTION)
+            .tries(0)
+            .resourceIds(RESOURCE_IDS)
+            .build(), Instant.now(), 5L));
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/" + BACKFILL_2.id())));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfill.id", equalTo(BACKFILL_2.id()));
+    assertJson(response, "statuses.active_states[0].state", equalTo("WAITING"));
+    assertJson(response, "statuses.active_states[21].state", equalTo("WAITING"));
+    assertJson(response, "statuses.active_states[22].state", equalTo("RUNNING"));
+    assertJson(response, "statuses.active_states[23].state", equalTo("UNKNOWN"));
+    assertJson(response, "statuses.active_states", hasSize(24));
+
+    // verify we replay for instance belonging to BACKFILL_2
+    verify(storage).readEvents(wfi);
   }
 
   @Test
@@ -425,7 +474,6 @@ public class BackfillResourceTest extends VersionedApiTest {
     storage.writeEvent(SequenceEvent.create(Event.success(wfi),                                           7L, 7L));
     storage.writeActiveState(wfi, RunState.create(wfi, State.DONE, StateData.zero(), Instant.now(),       8L));
   }
-
 
   @Test
   public void shouldGetBackfillWithoutStatus() throws Exception {

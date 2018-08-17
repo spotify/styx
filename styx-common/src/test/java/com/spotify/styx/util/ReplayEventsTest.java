@@ -23,25 +23,21 @@ package com.spotify.styx.util;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresent;
 import static com.google.common.collect.Sets.newTreeSet;
 import static com.spotify.styx.state.RunState.State.DONE;
-import static com.spotify.styx.state.RunState.State.RUNNING;
 import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.RESOURCE_IDS;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.state.RunState.State;
-import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.Optional;
 import java.util.SortedSet;
 import junitparams.JUnitParamsRunner;
@@ -56,29 +52,6 @@ public class ReplayEventsTest {
   @Before
   public void setUp() throws IOException {
     storage = mock(Storage.class);
-  }
-
-  @Test
-  public void restoreRunStateForActiveBackfill() throws Exception {
-    SortedSet<SequenceEvent> events = newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
-    events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.natural()),        0L, 0L));
-    events.add(SequenceEvent.create(Event.halt(WORKFLOW_INSTANCE),                                       1L, 1L));
-    events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.backfill("bf-1")), 2L, 2L));
-    events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE, RESOURCE_IDS),                      3L, 3L));
-    events.add(SequenceEvent.create(Event.submit(WORKFLOW_INSTANCE, EXECUTION_DESCRIPTION, "exec-1"),    4L, 4L));
-    events.add(SequenceEvent.create(Event.submitted(WORKFLOW_INSTANCE, "exec-1"),                        5L, 5L));
-    events.add(SequenceEvent.create(Event.started(WORKFLOW_INSTANCE),                                    6L, 6L));
-
-    when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
-
-    RunState restoredRunState = ReplayEvents.getBackfillRunState(
-        WORKFLOW_INSTANCE,
-        ImmutableMap.of(WORKFLOW_INSTANCE, RunState.create(WORKFLOW_INSTANCE, State.RUNNING, StateData.zero(), Instant.now(), 6L)),
-        storage, "bf-1").get();
-
-    assertThat(restoredRunState.state(), is(RUNNING));
-    assertThat(restoredRunState.data().trigger(), isPresent());
-    assertThat(restoredRunState.data().trigger().get(), is(Trigger.backfill("bf-1")));
   }
 
   @Test
@@ -98,7 +71,7 @@ public class ReplayEventsTest {
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
 
     RunState restoredRunState =
-        ReplayEvents.getBackfillRunState(WORKFLOW_INSTANCE, ImmutableMap.of(), storage, "bf-1").get();
+        ReplayEvents.getBackfillRunState(WORKFLOW_INSTANCE, storage, "bf-1").get();
 
     assertThat(restoredRunState.state(), is(DONE));
     assertThat(restoredRunState.data().lastExit(), isPresent());
@@ -115,9 +88,33 @@ public class ReplayEventsTest {
 
     Optional<RunState> restoredRunState = ReplayEvents.getBackfillRunState(
         WORKFLOW_INSTANCE,
-        ImmutableMap.of(WORKFLOW_INSTANCE, RunState.create(WORKFLOW_INSTANCE, State.PREPARE, StateData.zero(), Instant.now(), 2L)),
         storage, "erroneous-id");
 
     assertThat(restoredRunState, is(Optional.empty()));
+  }
+
+  @Test
+  public void returnsEmptyIfNoEvent() throws Exception {
+    SortedSet<SequenceEvent> events = newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
+    when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
+
+    Optional<RunState> restoredRunState = ReplayEvents.getBackfillRunState(
+        WORKFLOW_INSTANCE,
+        storage, "bf-1");
+
+    assertThat(restoredRunState, is(Optional.empty()));
+  }
+
+  @Test
+  public void throwExceptionWhenFailedToReadEvents() throws Exception {
+    IOException exception = new IOException();
+    when(storage.readEvents(WORKFLOW_INSTANCE)).thenThrow(exception);
+
+    try {
+      ReplayEvents.getBackfillRunState(WORKFLOW_INSTANCE, storage, "bf-1");
+      fail();
+    } catch (RuntimeException e) {
+      assertThat(e.getCause(), is(exception));
+    }
   }
 }

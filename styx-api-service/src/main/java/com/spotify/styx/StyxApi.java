@@ -164,9 +164,12 @@ public class StyxApi implements AppInit {
         new WorkflowValidator(new DockerImageValidator()),
         new WorkflowInitializer(storage, time),
         workflowConsumer);
+
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
         storage,
         new WorkflowValidator(new DockerImageValidator()));
+    environment.closer().register(backfillResource);
+
     final ShardedCounter shardedCounter = new ShardedCounter(storage, new ShardedCounterSnapshotFactory(storage));
     final ResourceResource resourceResource = new ResourceResource(storage, shardedCounter);
     final StatusResource statusResource = new StatusResource(storage);

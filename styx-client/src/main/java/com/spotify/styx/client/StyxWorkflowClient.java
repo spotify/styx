@@ -23,6 +23,7 @@ package com.spotify.styx.client;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 
@@ -73,6 +74,20 @@ public interface StyxWorkflowClient {
    * @return the {@link WorkflowState}
    */
   CompletionStage<WorkflowState> workflowState(final String componentId, final String workflowId);
+
+  /**
+   * Get execution data of an instance of a {@link Workflow}
+   *
+   * @param componentId component id
+   * @param workflowId  workflow id
+   * @param parameter   parameter
+   * @return the {@link WorkflowInstanceExecutionData}
+   */
+  CompletionStage<WorkflowInstanceExecutionData> workflowInstanceExecutions(
+      final String componentId,
+      final String workflowId,
+      final String parameter
+  );
 
   /**
    * Update {@link WorkflowState}
