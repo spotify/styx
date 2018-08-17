@@ -383,6 +383,12 @@ public final class BackfillResource implements Closeable {
   }
 
   private List<RunStateData> retrieveBackfillStatuses(Backfill backfill) {
+    // try to read from a fixed size LRU cache
+    final List<RunStateData> cached = readFromCache(backfill);
+    if (cached != null) {
+      return cached;
+    }
+
     final List<RunStateData> processedStates;
     final List<RunStateData> waitingStates;
 
@@ -409,6 +415,11 @@ public final class BackfillResource implements Closeable {
         .stream()
         .map(ForkJoinTask::join)
         .collect(toList());
+
+    // if all done, save it to cache
+    if (backfill.allTriggered() && activeWorkflowInstances.isEmpty()) {
+      saveToCache(backfill, processedStates);
+    }
 
     final List<Instant> waitingInstants;
     if (backfill.reverse()) {
