@@ -53,6 +53,7 @@ import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
+import io.grpc.Context;
 import io.opencensus.common.Scope;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
@@ -119,7 +120,7 @@ public class Scheduler {
     this.dequeueRateLimiter = Objects.requireNonNull(dequeueRateLimiter, "dequeueRateLimiter");
     this.gate = Objects.requireNonNull(gate, "gate");
     this.shardedCounter = Objects.requireNonNull(shardedCounter, "shardedCounter");
-    this.executor = Objects.requireNonNull(executor, "executor");
+    this.executor = Context.currentContextExecutor(Objects.requireNonNull(executor, "executor"));
   }
 
   void tick() {
@@ -131,7 +132,7 @@ public class Scheduler {
     }
   }
 
-  void tick0() {
+  private void tick0() {
     final Instant t0 = time.get();
 
     final Map<String, Resource> resources;
@@ -236,7 +237,14 @@ public class Scheduler {
     });
   }
 
-  private void dequeueInstance(final StyxConfig config, Map<String, Resource> resources,
+  private void dequeueInstance(StyxConfig config, Map<String, Resource> resources,
+      Map<WorkflowId, Set<String>> workflowResourceReferences,
+      Optional<Workflow> workflowOpt, InstanceState instanceState) {
+    tracer.spanBuilder("dequeueInstance").startSpanAndRun(() ->
+        dequeueInstance0(config, resources, workflowResourceReferences, workflowOpt, instanceState));
+  }
+
+  private void dequeueInstance0(final StyxConfig config, Map<String, Resource> resources,
       Map<WorkflowId, Set<String>> workflowResourceReferences,
       Optional<Workflow> workflowOpt,
       InstanceState instanceState) {
@@ -302,9 +310,12 @@ public class Scheduler {
       }
     }
 
-    double sleepingTime = dequeueRateLimiter.acquire();
-    if (sleepingTime > 0.0001) {
-      LOG.debug("Dequeue rate limited and slept for {} ms", sleepingTime * 1000);
+    double sleepingTimeSeconds = dequeueRateLimiter.acquire();
+    if (sleepingTimeSeconds > 0.0001) {
+      final double sleepingTimeMillis = sleepingTimeSeconds * 1000;
+      final String message = "Dequeue rate limited and slept for " + sleepingTimeMillis + " ms";
+      LOG.debug(message, sleepingTimeMillis);
+      tracer.getCurrentSpan().addAnnotation(message);
     }
 
     // Racy: some resources may have been removed (become unknown) by now; in that case the
