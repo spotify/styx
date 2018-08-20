@@ -435,9 +435,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @VisibleForTesting
   static boolean isMainContainer(String name, Pod pod) {
-    return name.equals(MAIN_CONTAINER_NAME)
-        // TODO: Containers used to be named same as the pod (execution id), remove this after deploying
-        || name.equals(pod.getMetadata().getName());
+    return name.equals(MAIN_CONTAINER_NAME);
   }
 
   private boolean isNonDeletePeriodExpired(ContainerStatus cs) {
