@@ -405,7 +405,7 @@ public class StyxScheduler implements AppInit {
     startRuntimeConfigUpdate(styxConfig, tickExecutor, dequeueRateLimiter);
     startCleaner(cleaner, tickExecutor);
 
-    setupMetrics(queuedStateManager, workflowCache, storage, dequeueRateLimiter, stats);
+    setupMetrics(queuedStateManager, workflowCache, storage, dequeueRateLimiter, stats, time);
 
     final SchedulerResource schedulerResource =
         new SchedulerResource(stateManager, trigger, storage, time,
@@ -592,12 +592,14 @@ public class StyxScheduler implements AppInit {
     }, delayMillis, MILLISECONDS);
   }
 
-  private void setupMetrics(
+  @VisibleForTesting
+  static void setupMetrics(
       QueuedStateManager stateManager,
       Supplier<Map<WorkflowId, Workflow>> workflowCache,
       Storage storage,
       RateLimiter submissionRateLimiter,
-      Stats stats) {
+      Stats stats,
+      Time time) {
 
     stats.registerQueuedEventsMetric(stateManager::queuedEvents);
 

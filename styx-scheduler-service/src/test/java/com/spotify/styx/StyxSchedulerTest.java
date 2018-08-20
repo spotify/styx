@@ -26,6 +26,7 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,17 +35,28 @@ import com.google.api.services.container.v1beta1.Container;
 import com.google.api.services.container.v1beta1.model.Cluster;
 import com.google.api.services.container.v1beta1.model.MasterAuth;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.StyxScheduler.KubernetesClientFactory;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.monitoring.Stats;
+import com.spotify.styx.state.QueuedStateManager;
+import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.util.Shard;
+import com.spotify.styx.util.Time;
+import com.spotify.styx.util.TriggerUtil;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import java.io.IOException;
+import java.time.Instant;
+import java.util.Collections;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -65,6 +77,11 @@ public class StyxSchedulerTest {
   @Mock private Container.Projects.Locations.Clusters.Get gkeClusterGet;
   @Mock private Storage storage;
   @Mock private StorageTransaction transaction;
+  @Mock private QueuedStateManager stateManager;
+  @Mock private Supplier<Map<WorkflowId, Workflow>> workflowCache;
+  @Mock private RateLimiter submissionRateLimiter;
+  @Mock private Stats stats;
+  @Mock private Time time;
 
   private StyxScheduler styxScheduler;
 
@@ -170,6 +187,29 @@ public class StyxSchedulerTest {
     } catch (Exception e) {
       assertThat(e.getCause(), is(exception));
     }
+  }
+
+  @Test
+  public void testSetupMetrics() {
+    when(time.get()).thenReturn(Instant.now());
+    when(stateManager.getActiveStates()).thenReturn(Collections.emptyMap());
+
+    StyxScheduler.setupMetrics(stateManager, workflowCache, storage, submissionRateLimiter, stats, time);
+
+    verify(stats).registerQueuedEventsMetric(any());
+    verify(stats).registerWorkflowCountMetric(eq("all"), any());
+    verify(stats).registerWorkflowCountMetric(eq("configured"), any());
+    verify(stats).registerWorkflowCountMetric(eq("enabled"), any());
+    verify(stats).registerWorkflowCountMetric(eq("docker_termination_logging_enabled"), any());
+
+    for (State state : State.values()) {
+      for (String triggerType : TriggerUtil.triggerTypesList()) {
+        verify(stats).registerActiveStatesMetric(eq(state), eq(triggerType), any());
+      }
+      verify(stats).registerActiveStatesMetric(eq(state), eq("none"), any());
+    }
+
+    verify(stats).registerSubmissionRateLimitMetric(any());
   }
 
   private void shardsWithValue(ArgumentCaptor<Shard> shardArgumentCaptor, long value, long times) {
