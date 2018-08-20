@@ -152,9 +152,12 @@ public class Scheduler {
             resources.put(GLOBAL_RESOURCE_ID,
                 Resource.create(GLOBAL_RESOURCE_ID, concurrency)));
 
-    final Map<WorkflowInstance, RunState> activeStatesMap = stateManager.getActiveStates();
+    // TODO: have a separate less-frequent tick move instances from cold to hot queue
+    final List<WorkflowInstance> activeInstances = storage.readActiveWorkflowInstanceQueue(HOT);
+    final Map<WorkflowInstance, RunState> activeStatesMap = storage.readActiveStates(activeInstances);
     final List<InstanceState> activeStates = getActiveInstanceStates(activeStatesMap);
 
+    // TODO: handle timed out instances on a separate less-frequent tick
     final Set<WorkflowInstance> timedOutInstances = getTimedOutInstances(activeStates, time.get(), ttls);
 
     final Map<WorkflowId, Workflow> workflows = getWorkflows(activeStates);
@@ -277,12 +280,14 @@ public class Scheduler {
         .collect(toList());
     if (!depletedResources.isEmpty()) {
       LOG.debug("Resource limit reached for instance, not dequeueing: {}: exhausted resources={}",
-          instanceState.workflowInstance(), depletedResources );
+          instanceState.workflowInstance(), depletedResources);
+      final RunState runState = instanceState.runState();
+      stateManager.receiveIgnoreClosed(
+          Event.retryAfter(runState.workflowInstance(), TimeUnit.MINUTES.toMillis(5)), runState.counter());
       final Message message = Message.info(
           String.format("Resource limit reached for: %s", depletedResources));
-      final RunState runState = instanceState.runState();
       if (!runState.data().message().map(message::equals).orElse(false)) {
-        stateManager.receiveIgnoreClosed(Event.info(runState.workflowInstance(), message), runState.counter());
+        stateManager.receiveIgnoreClosed(Event.info(runState.workflowInstance(), message), runState.counter() + 1);
       }
       return;
     }

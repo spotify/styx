@@ -54,6 +54,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
 import javaslang.Tuple;
@@ -240,8 +241,26 @@ public class QueuedStateManager implements StateManager {
         // Write new state to datastore (or remove it if terminal)
         if (nextRunState.state().isTerminal()) {
           tx.deleteActiveState(event.workflowInstance());
+          tx.removeActiveWorkflowInstanceQueue(HOT, event.workflowInstance());
+          tx.removeActiveWorkflowInstanceQueue(COLD, event.workflowInstance());
         } else {
           tx.updateActiveState(event.workflowInstance(), nextRunState);
+
+          if (currentRunState.get().state() != State.QUEUED &&
+              nextRunState.state() == State.QUEUED) {
+            final Optional<Long> retryDelayMillis = nextRunState.data().retryDelayMillis();
+            if (retryDelayMillis.isPresent() && retryDelayMillis.get() > TimeUnit.MINUTES.toMillis(1)) {
+              // Add entry in cold queue
+              tx.writeActiveWorkflowInstanceQueue(COLD, event.workflowInstance());
+            } else {
+              // Add entry in hot queue
+              tx.writeActiveWorkflowInstanceQueue(HOT, event.workflowInstance());
+            }
+          } else if (currentRunState.get().state() == State.QUEUED &&
+              nextRunState.state() != State.QUEUED) {
+            tx.removeActiveWorkflowInstanceQueue(HOT, event.workflowInstance());
+            tx.removeActiveWorkflowInstanceQueue(COLD, event.workflowInstance());
+          }
         }
 
         final SequenceEvent sequenceEvent =
