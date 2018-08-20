@@ -626,6 +626,7 @@ public class StyxScheduler implements AppInit {
             .filter(workflow -> workflow.configuration().dockerTerminationLogging())
             .count());
 
+    // Calling stateManager.getActiveStates() can be quite expensive, so cache it for the gauges below
     final CachedSupplier<Map<WorkflowInstance, RunState>> cachedActiveStates =
         new CachedSupplier<>(stateManager::getActiveStates, time);
 
