@@ -185,6 +185,9 @@ public class Scheduler {
             .sorted(comparingLong(i -> i.runState().timestamp()))
             .collect(toList());
 
+    LOG.info("scheduler tick: instances: active={}, eligible={}, timedOut={}",
+        activeStates.size(), eligibleInstances.size(), timedOutInstances.size());
+
     timedOutInstances.forEach(wfi -> this.sendTimeout(wfi, activeStatesMap.get(wfi)));
 
     dequeueInstances(config, resources, workflowResourceReferences,
@@ -248,6 +251,8 @@ public class Scheduler {
       Map<WorkflowId, Set<String>> workflowResourceReferences,
       Optional<Workflow> workflowOpt,
       InstanceState instanceState) {
+
+    LOG.debug("Evaluating instance for dequeue: {}", instanceState.workflowInstance());
 
     final Set<String> workflowResourceRefs =
         workflowResourceReferences.getOrDefault(instanceState.workflowInstance().workflowId(), emptySet());
