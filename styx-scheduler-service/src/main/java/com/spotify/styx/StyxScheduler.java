@@ -626,12 +626,15 @@ public class StyxScheduler implements AppInit {
             .filter(workflow -> workflow.configuration().dockerTerminationLogging())
             .count());
 
+    final CachedSupplier<Map<WorkflowInstance, RunState>> cachedActiveStates =
+        new CachedSupplier<>(stateManager::getActiveStates, time);
+
     Arrays.stream(RunState.State.values()).forEach(state -> {
       TriggerUtil.triggerTypesList().forEach(triggerType ->
           stats.registerActiveStatesMetric(
               state,
               triggerType,
-              () -> stateManager.getActiveStates().values().stream()
+              () -> cachedActiveStates.get().values().stream()
                   .filter(runState -> runState.state().equals(state))
                   .filter(runState -> runState.data().trigger().isPresent() && triggerType
                       .equals(TriggerUtil.triggerType(runState.data().trigger().get())))
@@ -639,7 +642,7 @@ public class StyxScheduler implements AppInit {
       stats.registerActiveStatesMetric(
           state,
           "none",
-          () -> stateManager.getActiveStates().values().stream()
+          () -> cachedActiveStates.get().values().stream()
               .filter(runState -> runState.state().equals(state))
               .filter(runState -> !runState.data().trigger().isPresent())
               .count());
