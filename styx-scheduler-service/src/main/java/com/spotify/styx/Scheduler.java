@@ -185,8 +185,10 @@ public class Scheduler {
             .sorted(comparingLong(i -> i.runState().timestamp()))
             .collect(toList());
 
-    LOG.info("scheduler tick: instances: active={}, eligible={}, timedOut={}",
+    final String message = String.format("Instances: active=%d, eligible=%d, timedOut=%d",
         activeStates.size(), eligibleInstances.size(), timedOutInstances.size());
+    LOG.info(message);
+    tracer.getCurrentSpan().addAnnotation(message);
 
     timedOutInstances.forEach(wfi -> this.sendTimeout(wfi, activeStatesMap.get(wfi)));
 
