@@ -271,7 +271,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(keepaliveContainerStatus, containerStatus));
-    when(containerStatus.getName()).thenReturn(EXECUTION_ID);
+    when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
     when(containerStateTerminated.getFinishedAt())
@@ -291,7 +291,7 @@ public class KubernetesDockerRunnerTest {
 
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
-    when(containerStatus.getName()).thenReturn(EXECUTION_ID);
+    when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
     when(containerStateTerminated.getFinishedAt())
@@ -310,7 +310,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
-    when(containerStatus.getName()).thenReturn(EXECUTION_ID);
+    when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
 
@@ -355,7 +355,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
-    when(containerStatus.getName()).thenReturn(EXECUTION_ID);
+    when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
     when(containerStateTerminated.getFinishedAt())
@@ -374,7 +374,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
-    when(containerStatus.getName()).thenReturn(EXECUTION_ID);
+    when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
 
     kdr.cleanupWithRunState(WORKFLOW_INSTANCE, createdPod, RunState.create(WORKFLOW_INSTANCE, State.TERMINATED));
@@ -428,7 +428,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
-    when(containerStatus.getName()).thenReturn(EXECUTION_ID);
+    when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
 
     kdr.cleanupWithoutRunState(WORKFLOW_INSTANCE, createdPod);
@@ -444,7 +444,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
-    when(containerStatus.getName()).thenReturn(EXECUTION_ID);
+    when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
     when(containerStateTerminated.getFinishedAt())
@@ -459,12 +459,12 @@ public class KubernetesDockerRunnerTest {
     final String name = createdPod.getMetadata().getName();
 
     final ContainerStatus runningMainContainer = new ContainerStatusBuilder()
-        .withName(EXECUTION_ID)
+        .withName(MAIN_CONTAINER_NAME)
         .withNewState().withNewRunning().endRunning().endState()
         .build();
 
     final ContainerStatus terminatedMainContainer = new ContainerStatusBuilder()
-        .withName(EXECUTION_ID)
+        .withName(MAIN_CONTAINER_NAME)
         .withNewState()
         .withNewTerminated()
         .withFinishedAt(FIXED_INSTANT.minus(Duration.ofDays(1)).toString())
@@ -504,7 +504,7 @@ public class KubernetesDockerRunnerTest {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
-    when(containerStatus.getName()).thenReturn(EXECUTION_ID);
+    when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
     when(containerStateTerminated.getFinishedAt())
@@ -674,7 +674,7 @@ public class KubernetesDockerRunnerTest {
     podStatus.getContainerStatuses()
         .add(new ContainerStatusBuilder()
             .withState(terminatedContainerState(code, ""))
-            .withName(executionId)
+            .withName(MAIN_CONTAINER_NAME)
             .build());
 
     // Verify that old pods without a keepalive container are also correctly handled
@@ -822,7 +822,7 @@ public class KubernetesDockerRunnerTest {
 
     // Change the pod status to terminated without notifying the runner through the pod watcher
     final Pod terminatedPod = new PodBuilder(createdPod)
-        .withStatus(terminated("Succeeded", 20, null, createdPod.getMetadata().getName()))
+        .withStatus(terminated("Succeeded", 20, null))
         .build();
     when(podList.getItems()).thenReturn(ImmutableList.of(terminatedPod));
 
@@ -843,8 +843,6 @@ public class KubernetesDockerRunnerTest {
     assertThat(KubernetesDockerRunner.isMainContainer(MAIN_CONTAINER_NAME, createdPod), is(true));
     assertThat(KubernetesDockerRunner.isMainContainer(KEEPALIVE_CONTAINER_NAME, createdPod), is(false));
     assertThat(KubernetesDockerRunner.isMainContainer("foobar", createdPod), is(false));
-    // TODO: delete after deploying container name change
-    assertThat(KubernetesDockerRunner.isMainContainer(POD_NAME, createdPod), is(true));
   }
 
   private void verifyPodNeverDeleted(PodResource<Pod, DoneablePod> pod) {

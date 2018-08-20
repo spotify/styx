@@ -21,6 +21,7 @@
 package com.spotify.styx.docker;
 
 import static com.spotify.styx.docker.KubernetesDockerRunner.KEEPALIVE_CONTAINER_NAME;
+import static com.spotify.styx.docker.KubernetesDockerRunner.MAIN_CONTAINER_NAME;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
 import static java.util.Collections.emptyList;
 import static org.hamcrest.Matchers.contains;
@@ -266,7 +267,7 @@ public class KubernetesPodEventTranslatorTest {
 
   @Test
   public void zeroExitCodeFailedPhaseWithoutTerminationLog() {
-    pod.setStatus(terminated("Failed", 0, null, pod.getMetadata().getName()));
+    pod.setStatus(terminated("Failed", 0, null));
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -276,7 +277,7 @@ public class KubernetesPodEventTranslatorTest {
   
   @Test
   public void nonZeroExitCodeFailedPhaseWithoutTerminationLog() {
-    pod.setStatus(terminated("Failed", 2, null, pod.getMetadata().getName()));
+    pod.setStatus(terminated("Failed", 2, null));
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -333,11 +334,11 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   static void setRunning(Pod pod, boolean ready) {
-    pod.setStatus(running(ready, pod.getMetadata().getName()));
+    pod.setStatus(running(ready));
   }
 
-  static PodStatus running(boolean ready, String containerName) {
-    return podStatus("Running", ready, containerName, runningContainerState());
+  static PodStatus running(boolean ready) {
+    return podStatus("Running", ready, runningContainerState());
   }
 
   private static ContainerState runningContainerState() {
@@ -345,11 +346,11 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   static void setTerminated(Pod pod, String phase, Integer exitCode, String message) {
-    pod.setStatus(terminated(phase, exitCode, message, pod.getMetadata().getName()));
+    pod.setStatus(terminated(phase, exitCode, message));
   }
 
-  static PodStatus terminated(String phase, Integer exitCode, String message, String containerName) {
-    return podStatus(phase, true, containerName, terminatedContainerState(exitCode, message));
+  static PodStatus terminated(String phase, Integer exitCode, String message) {
+    return podStatus(phase, true, terminatedContainerState(exitCode, message));
   }
 
   static ContainerState terminatedContainerState(Integer exitCode, String message) {
@@ -357,22 +358,22 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   static void setWaiting(Pod pod, String phase, String reason) {
-    pod.setStatus(waiting(phase, reason, pod.getMetadata().getName()));
+    pod.setStatus(waiting(phase, reason));
   }
 
-  static PodStatus waiting(String phase, String reason, String containerName) {
-    return podStatus(phase, true, containerName, waitingContainerState(reason));
+  static PodStatus waiting(String phase, String reason) {
+    return podStatus(phase, true, waitingContainerState(reason));
   }
 
   private static ContainerState waitingContainerState(String reason) {
     return new ContainerState(null, null, new ContainerStateWaiting("", reason));
   }
 
-  static PodStatus podStatus(String phase, boolean ready, String containerName, ContainerState containerState) {
+  static PodStatus podStatus(String phase, boolean ready, ContainerState containerState) {
     PodStatus podStatus = podStatusNoContainer(phase);
     podStatus.getContainerStatuses()
         .add(new ContainerStatus("foo", "", "", containerState,
-                                 containerName, ready, 0, containerState));
+                                 MAIN_CONTAINER_NAME, ready, 0, containerState));
     podStatus.getContainerStatuses()
         .add(new ContainerStatusBuilder().withName(KEEPALIVE_CONTAINER_NAME)
             .withNewState().withNewRunning().endRunning().endState()
