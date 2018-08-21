@@ -177,7 +177,7 @@ public class ShardedCounter {
 
   public ShardedCounter(Storage storage, Stats stats, CounterSnapshotFactory counterSnapshotFactory) {
     this.storage = Objects.requireNonNull(storage);
-    this.stats = stats;
+    this.stats = Objects.requireNonNull(stats);
     this.counterSnapshotFactory = Objects.requireNonNull(counterSnapshotFactory);
   }
 
