@@ -34,7 +34,6 @@ import com.spotify.apollo.route.Route;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.ShardedCounter;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
