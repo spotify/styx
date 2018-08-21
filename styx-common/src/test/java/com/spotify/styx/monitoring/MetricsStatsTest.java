@@ -21,6 +21,7 @@
 package com.spotify.styx.monitoring;
 
 import static com.spotify.styx.monitoring.MetricsStats.ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER;
+import static com.spotify.styx.monitoring.MetricsStats.COUNTER_CACHE_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.DATASTORE_OPERATION_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.DOCKER_DURATION;
 import static com.spotify.styx.monitoring.MetricsStats.DOCKER_ERROR_RATE;
@@ -98,6 +99,8 @@ public class MetricsStatsTest {
     when(registry.meter(EXIT_CODE_MISMATCH)).thenReturn(meter);
     when(registry.meter(WORKFLOW_CONSUMER_ERROR_RATE)).thenReturn(meter);
     when(registry.histogram(TICK_DURATION)).thenReturn(histogram);
+    when(registry.meter(COUNTER_CACHE_RATE.tagged("result", "miss"))).thenReturn(meter);
+    when(registry.meter(COUNTER_CACHE_RATE.tagged("result", "hit"))).thenReturn(meter);
     stats = new MetricsStats(registry, time);
   }
 
@@ -293,5 +296,17 @@ public class MetricsStatsTest {
     when(registry.meter(DATASTORE_OPERATION_RATE.tagged("operation", "query", "kind", "foobar"))).thenReturn(meter);
     stats.recordDatastoreQueries("foobar", 17);
     verify(meter).mark(17);
+  }
+
+  @Test
+  public void shouldRecordCounterCacheHit() {
+    stats.recordCounterCacheHit();
+    verify(meter).mark();
+  }
+
+  @Test
+  public void shouldRecordCounterCacheMiss() {
+    stats.recordCounterCacheMiss();
+    verify(meter).mark();
   }
 }

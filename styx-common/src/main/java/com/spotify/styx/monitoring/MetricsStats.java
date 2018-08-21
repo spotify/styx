@@ -135,7 +135,13 @@ public final class MetricsStats implements Stats {
   static final MetricId DATASTORE_OPERATION_RATE = BASE
       .tagged("what", "datastore-operation-rate");
 
+  static final MetricId COUNTER_CACHE_RATE = BASE
+      .tagged("what", "counter-cache-rate");
+
   private static final String STATUS = "status";
+  private static final String COUNTER_CACHE_RESULT = "result";
+  private static final String COUNTER_CACHE_HIT = "hit";
+  private static final String COUNTER_CACHE_MISS = "miss";
 
   private final SemanticMetricRegistry registry;
   private final Time time;
@@ -160,6 +166,8 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Meter> workflowConsumerMeters;
   private final ConcurrentMap<String, Histogram> tickHistograms;
   private final ConcurrentMap<Tuple2<String, String>, Meter> datastoreOperationMeters;
+  private final Meter counterCacheHitMeter;
+  private final Meter counterCacheMissMeter;
 
   /**
    * Submission timestamps (nanotime) keyed on execution id.
@@ -192,6 +200,8 @@ public final class MetricsStats implements Stats {
     this.workflowConsumerMeters = new ConcurrentHashMap<>();
     this.tickHistograms = new ConcurrentHashMap<>();
     this.datastoreOperationMeters = new ConcurrentHashMap<>();
+    this.counterCacheHitMeter = registry.meter(COUNTER_CACHE_RATE.tagged(COUNTER_CACHE_RESULT, COUNTER_CACHE_HIT));
+    this.counterCacheMissMeter = registry.meter(COUNTER_CACHE_RATE.tagged(COUNTER_CACHE_RESULT, COUNTER_CACHE_MISS));
   }
 
   @Override
@@ -331,6 +341,16 @@ public final class MetricsStats implements Stats {
   @Override
   public void recordDatastoreQueries(String kind, int n) {
     recordDatastoreOperations("query", kind, n);
+  }
+
+  @Override
+  public void recordCounterCacheHit() {
+    counterCacheHitMeter.mark();
+  }
+
+  @Override
+  public void recordCounterCacheMiss() {
+    counterCacheMissMeter.mark();
   }
 
   private void recordDatastoreOperations(String operation, String kind, int n) {

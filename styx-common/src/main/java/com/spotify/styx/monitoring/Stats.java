@@ -83,4 +83,8 @@ public interface Stats {
   void recordDatastoreEntityDeletes(String kind, int n);
 
   void recordDatastoreQueries(String kind, int n);
+
+  void recordCounterCacheHit();
+
+  void recordCounterCacheMiss();
 }

@@ -157,4 +157,14 @@ final class NoopStats implements Stats {
   public void recordDatastoreEntityDeletes(String kind, int n) {
     // nop
   }
+
+  @Override
+  public void recordCounterCacheHit() {
+    // nop
+  }
+
+  @Override
+  public void recordCounterCacheMiss() {
+    // nop
+  }
 }
