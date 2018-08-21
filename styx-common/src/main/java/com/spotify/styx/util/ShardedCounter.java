@@ -35,7 +35,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +58,7 @@ public class ShardedCounter {
 
   // Ought to be enough (parallelism) for everyone. We could make it dynamic with extra effort.
   public static final int NUM_SHARDS = 128;
-  private static final Duration CACHE_EXPIRY_DURATION = Duration.ofMillis(1000);
+  private static final Duration CACHE_EXPIRY_DURATION = Duration.ofSeconds(30);
 
   public static final String KIND_COUNTER_LIMIT = "CounterLimit";
   public static final String PROPERTY_LIMIT = "limit";
@@ -80,9 +82,9 @@ public class ShardedCounter {
 
     private final String counterId;
     private final Long limit;
-    private final Map<Integer, Long> shards;
+    private final Map<Integer, AtomicLong> shards;
 
-    Snapshot(String counterId, long limit, Map<Integer, Long> shards) {
+    Snapshot(String counterId, long limit, Map<Integer, AtomicLong> shards) {
       this.counterId = Objects.requireNonNull(counterId);
       this.limit = limit;
       this.shards = Objects.requireNonNull(shards);
@@ -113,7 +115,7 @@ public class ShardedCounter {
      */
     @Override
     public long getTotalUsage() {
-      return shards.values().stream().mapToLong(i -> i).sum();
+      return shards.values().stream().mapToLong(AtomicLong::longValue).sum();
     }
 
     /**
@@ -122,8 +124,8 @@ public class ShardedCounter {
     @Override
     public Optional<Integer> pickShardWithExcessUsage(long delta) {
       final List<Integer> candidates = shards.keySet().stream()
-          .filter(index -> shards.get(index) > shardCapacity(index))
-          .filter(index -> shards.get(index) + delta >= 0)
+          .filter(index -> shards.get(index).longValue() > shardCapacity(index))
+          .filter(index -> shards.get(index).longValue() + delta >= 0)
           .collect(toList());
 
       if (candidates.isEmpty()) {
@@ -134,8 +136,13 @@ public class ShardedCounter {
     }
 
     @Override
-    public Map<Integer, Long> getShards() {
-      return shards;
+    public void updateShard(int shardIndex, long delta) {
+      shards.get(shardIndex).addAndGet(delta);
+    }
+
+    @Override
+    public Set<Integer> getShards() {
+      return shards.keySet();
     }
 
     /**
@@ -151,7 +158,7 @@ public class ShardedCounter {
       }
 
       List<Integer> candidates = shards.keySet().stream()
-          .filter(index -> Range.closed(0L, shardCapacity(index)).contains(shards.get(index) + delta))
+          .filter(index -> Range.closed(0L, shardCapacity(index)).contains(shards.get(index).longValue() + delta))
           .collect(toList());
 
       if (candidates.isEmpty()) {
@@ -245,6 +252,22 @@ public class ShardedCounter {
    * exceeding its limit. Failures are certain when delta >= limit / NUM_SHARDS + 1.
    */
   public void updateCounter(StorageTransaction transaction, String counterId, long delta) {
+    for (int attempt = 0; ; attempt++) {
+      try {
+        updateCounter0(transaction, counterId, delta);
+        return;
+      } catch (StaleSnapshotException e) {
+        // Stale snapshot, try again?
+        if (attempt >= 3) {
+          throw new CounterCapacityException(e.getMessage());
+        }
+        inMemSnapshot.invalidate(counterId);
+      }
+    }
+  }
+
+  private void updateCounter0(StorageTransaction transaction, String counterId, long delta)
+      throws StaleSnapshotException {
     CounterSnapshot snapshot = getCounterSnapshot(counterId);
 
     // If delta is negative, try to update shards with excess usage first
@@ -253,17 +276,23 @@ public class ShardedCounter {
       if (shardIndex.isPresent()) {
         updateCounterShard(transaction, counterId, delta, shardIndex.get(),
             snapshot.shardCapacity(shardIndex.get()));
+        // Optimistically keep snapshot up to date
+        // TODO: handle transaction rollbacks
+        snapshot.updateShard(shardIndex.get(), delta);
         return;
       }
     }
 
     int shardIndex = snapshot.pickShardWithSpareCapacity(delta);
     updateCounterShard(transaction, counterId, delta, shardIndex, snapshot.shardCapacity(shardIndex));
+    // Optimistically keep snapshot up to date
+    // TODO: handle transaction rollbacks
+    snapshot.updateShard(shardIndex, delta);
   }
 
   @VisibleForTesting
   void updateCounterShard(StorageTransaction transaction, String counterId, long delta,
-                          int shardIndex, long shardCapacity) {
+                          int shardIndex, long shardCapacity) throws StaleSnapshotException {
     final Optional<Shard> shard = transaction.shard(counterId, shardIndex);
 
     if (shard.isPresent()) {
@@ -286,7 +315,7 @@ public class ShardedCounter {
             "Chosen shard %s-%s has no more capacity: capacity=%d, value=%d, delta=%d, newValue=%d",
             counterId, shardIndex, shardCapacity, shard.get().value(), delta, newShardValue);
         LOG.info(message);
-        throw new CounterCapacityException(message);
+        throw new StaleSnapshotException(message);
       }
       final String operation = delta > 0 ? "increment" : "decrement";
       LOG.info("Updating counter shard ({}): {}-{}: capacity={}, value={}, delta={}, newValue={}",
@@ -327,5 +356,12 @@ public class ShardedCounter {
   public void deleteCounter(String counterId) throws IOException {
     storage.deleteShardsForCounter(counterId);
     storage.deleteLimitForCounter(counterId);
+  }
+
+  class StaleSnapshotException extends Exception {
+
+    public StaleSnapshotException(String message) {
+      super(message);
+    }
   }
 }
