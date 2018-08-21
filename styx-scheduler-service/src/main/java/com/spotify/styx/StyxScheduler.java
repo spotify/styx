@@ -405,7 +405,7 @@ public class StyxScheduler implements AppInit {
     startRuntimeConfigUpdate(styxConfig, tickExecutor, dequeueRateLimiter);
     startCleaner(cleaner, tickExecutor);
 
-    setupMetrics(queuedStateManager, workflowCache, storage, dequeueRateLimiter, stats);
+    setupMetrics(queuedStateManager, workflowCache, storage, dequeueRateLimiter, stats, time);
 
     final SchedulerResource schedulerResource =
         new SchedulerResource(stateManager, trigger, storage, time,
@@ -592,12 +592,14 @@ public class StyxScheduler implements AppInit {
     }, delayMillis, MILLISECONDS);
   }
 
-  private void setupMetrics(
+  @VisibleForTesting
+  static void setupMetrics(
       QueuedStateManager stateManager,
       Supplier<Map<WorkflowId, Workflow>> workflowCache,
       Storage storage,
       RateLimiter submissionRateLimiter,
-      Stats stats) {
+      Stats stats,
+      Time time) {
 
     stats.registerQueuedEventsMetric(stateManager::queuedEvents);
 
@@ -626,12 +628,16 @@ public class StyxScheduler implements AppInit {
             .filter(workflow -> workflow.configuration().dockerTerminationLogging())
             .count());
 
+    // Calling stateManager.getActiveStates() can be quite expensive, so cache it for the gauges below
+    final CachedSupplier<Map<WorkflowInstance, RunState>> cachedActiveStates =
+        new CachedSupplier<>(stateManager::getActiveStates, time);
+
     Arrays.stream(RunState.State.values()).forEach(state -> {
       TriggerUtil.triggerTypesList().forEach(triggerType ->
           stats.registerActiveStatesMetric(
               state,
               triggerType,
-              () -> stateManager.getActiveStates().values().stream()
+              () -> cachedActiveStates.get().values().stream()
                   .filter(runState -> runState.state().equals(state))
                   .filter(runState -> runState.data().trigger().isPresent() && triggerType
                       .equals(TriggerUtil.triggerType(runState.data().trigger().get())))
@@ -639,7 +645,7 @@ public class StyxScheduler implements AppInit {
       stats.registerActiveStatesMetric(
           state,
           "none",
-          () -> stateManager.getActiveStates().values().stream()
+          () -> cachedActiveStates.get().values().stream()
               .filter(runState -> runState.state().equals(state))
               .filter(runState -> !runState.data().trigger().isPresent())
               .count());
