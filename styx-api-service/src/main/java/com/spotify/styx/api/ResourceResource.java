@@ -46,11 +46,9 @@ public final class ResourceResource {
   static final String BASE = "/resources";
 
   private final Storage storage;
-  private ShardedCounter shardedCounter;
 
-  public ResourceResource(Storage storage, ShardedCounter shardedCounter) {
+  public ResourceResource(Storage storage) {
     this.storage = Objects.requireNonNull(storage);
-    this.shardedCounter = shardedCounter;
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {

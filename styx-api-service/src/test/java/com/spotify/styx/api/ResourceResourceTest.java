@@ -77,7 +77,7 @@ public class ResourceResourceTest extends VersionedApiTest {
         localDatastore.getOptions().getService(),
         Duration.ZERO));
 
-    ResourceResource resourceResource = new ResourceResource(storage, shardedCounter);
+    ResourceResource resourceResource = new ResourceResource(storage);
 
     environment.routingEngine()
         .registerRoutes(resourceResource.routes());
