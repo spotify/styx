@@ -35,6 +35,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyListOf;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
@@ -81,6 +82,7 @@ import io.fabric8.kubernetes.api.model.Volume;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
+import io.fabric8.kubernetes.client.Watcher.Action;
 import io.fabric8.kubernetes.client.dsl.MixedOperation;
 import io.fabric8.kubernetes.client.dsl.PodResource;
 import io.fabric8.kubernetes.client.dsl.Resource;
@@ -104,7 +106,6 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnitParamsRunner.class)
@@ -174,7 +175,7 @@ public class KubernetesDockerRunnerTest {
   @Rule public ExpectedException exception = ExpectedException.none();
 
   private Pod createdPod = createPod(WORKFLOW_INSTANCE, RUN_SPEC, EMPTY_SECRET_SPEC);
-  private Stats stats = Mockito.mock(Stats.class);
+  private Stats stats = mock(Stats.class);
 
   private KubernetesDockerRunner kdr;
   private Watcher<Pod> podWatcher;
@@ -687,7 +688,7 @@ public class KubernetesDockerRunnerTest {
     }
 
     createdPod.setStatus(podStatus);
-    podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
+    receiveAndProcessEvent(Watcher.Action.MODIFIED, createdPod);
 
     verify(stateManager).receive(Event.started(WORKFLOW_INSTANCE), -1);
     verify(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(code)), 0);
@@ -696,7 +697,7 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldFailOnErrImagePull() throws Exception {
     setWaiting(createdPod, "Pending", "ErrImagePull");
-    podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
+    receiveAndProcessEvent(Watcher.Action.MODIFIED, createdPod);
 
     verify(stateManager).receive(
         Event.runError(WORKFLOW_INSTANCE, "One or more containers failed to pull their image"),
@@ -706,7 +707,7 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldSendStatsOnErrImagePull() throws Exception {
     setWaiting(createdPod, "Pending", "ErrImagePull");
-    podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
+    receiveAndProcessEvent(Watcher.Action.MODIFIED, createdPod);
 
     verify(stats, times(1)).recordPullImageError();
     verify(stateManager).receive(
@@ -717,7 +718,7 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldNotSendStatsOnOtherError() {
     createdPod.setStatus(podStatusNoContainer("Succeeded"));
-    podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
+    receiveAndProcessEvent(Watcher.Action.MODIFIED, createdPod);
 
     verifyNoMoreInteractions(stats);
   }
@@ -725,8 +726,7 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldFailOnUnknownPhaseEntered() throws Exception {
     createdPod.setStatus(podStatusNoContainer("Unknown"));
-    podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
-
+    receiveAndProcessEvent(Watcher.Action.MODIFIED, createdPod);
     verify(stateManager).receive(Event.runError(WORKFLOW_INSTANCE, "Pod entered Unknown phase"),
         -1);
   }
@@ -734,7 +734,7 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldIgnoreDeletedEvents() throws Exception {
     createdPod.setStatus(podStatusNoContainer("Succeeded"));
-    podWatcher.eventReceived(Watcher.Action.DELETED, createdPod);
+    receiveAndProcessEvent(Watcher.Action.DELETED, createdPod);
 
     verify(stateManager, never()).receive(any(), anyLong());
   }
@@ -742,7 +742,7 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldFailOnMissingContainer() throws Exception {
     createdPod.setStatus(podStatusNoContainer("Succeeded"));
-    podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
+    receiveAndProcessEvent(Watcher.Action.MODIFIED, createdPod);
 
     verify(stateManager).receive(
         Event.runError(WORKFLOW_INSTANCE, "Could not find our container in pod"),
@@ -752,7 +752,7 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldFailOnUnexpectedTerminatedStatus() throws Exception {
     setWaiting(createdPod, "Failed", "");
-    podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
+    receiveAndProcessEvent(Watcher.Action.MODIFIED, createdPod);
 
     verify(stateManager).receive(
         Event.runError(WORKFLOW_INSTANCE, "Unexpected null terminated status"),
@@ -769,12 +769,12 @@ public class KubernetesDockerRunnerTest {
 
     when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(19));
     setRunning(createdPod, /* ready= */ false);
-    podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
+    receiveAndProcessEvent(Watcher.Action.MODIFIED, createdPod);
     verify(stateManager, never()).receive(Event.started(WORKFLOW_INSTANCE), -1);
 
     when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(4711));
     setRunning(createdPod, /* ready= */ true);
-    podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
+    receiveAndProcessEvent(Watcher.Action.MODIFIED, createdPod);
     verify(stateManager).receive(Event.started(WORKFLOW_INSTANCE), -1);
 
     verify(stats).recordRunning(POD_NAME);
@@ -788,7 +788,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.getMetadata().setName(POD_NAME + "-other");
     setTerminated(createdPod, "Succeeded", 20, null);
 
-    podWatcher.eventReceived(Watcher.Action.MODIFIED, createdPod);
+    receiveAndProcessEvent(Watcher.Action.MODIFIED, createdPod);
 
     verify(stateManager, never()).receive(any(), anyLong());
   }
@@ -851,6 +851,17 @@ public class KubernetesDockerRunnerTest {
     verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
     verify(k8sClient.pods(), never()).delete();
     verify(pod, never()).delete();
+  }
+
+  /**
+   * Helper to deal with asynchronous pod even handling
+   */
+  private void receiveAndProcessEvent(Action action, Pod pod) {
+    @SuppressWarnings("unchecked") PodResource<Pod, DoneablePod> namedPod = mock(PodResource.class);
+    when(namedPod.get()).thenReturn(pod);
+    when(pods.withName(pod.getMetadata().getName())).thenReturn(namedPod);
+    podWatcher.eventReceived(action, pod);
+    executor.tick(10, TimeUnit.SECONDS);
   }
 
   private static Pod createPod(WorkflowInstance workflowInstance,
