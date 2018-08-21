@@ -31,7 +31,6 @@ import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-import com.codahale.metrics.Gauge;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.util.Utils;
@@ -74,6 +73,7 @@ import com.spotify.styx.publisher.Publisher;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.QueuedStateManager;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.state.handlers.DockerRunnerHandler;
@@ -112,7 +112,6 @@ import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -601,6 +600,12 @@ public class StyxScheduler implements AppInit {
       Stats stats,
       Time time) {
 
+    // Cache expensive methods
+    final Supplier<Set<WorkflowId>> enabledWorkflowCache =
+        new CachedSupplier<>(storage::enabled, Instant::now);
+    final CachedSupplier<Map<WorkflowInstance, RunState>> activeStatesCache =
+        new CachedSupplier<>(stateManager::getActiveStates, time);
+
     stats.registerQueuedEventsMetric(stateManager::queuedEvents);
 
     stats.registerWorkflowCountMetric("all", () -> (long) workflowCache.get().size());
@@ -610,16 +615,11 @@ public class StyxScheduler implements AppInit {
         .filter(workflow -> workflow.configuration().dockerImage().isPresent())
         .count());
 
-    final Supplier<Gauge<Long>> configuredEnabledWorkflowsCountGaugeSupplier = () -> {
-      final Supplier<Set<WorkflowId>> enabledWorkflowSupplier =
-          new CachedSupplier<>(storage::enabled, Instant::now);
-      return () -> workflowCache.get().values()
-          .stream()
-          .filter(workflow -> workflow.configuration().dockerImage().isPresent())
-          .filter(workflow -> enabledWorkflowSupplier.get().contains(WorkflowId.ofWorkflow(workflow)))
-          .count();
-    };
-    stats.registerWorkflowCountMetric("enabled", configuredEnabledWorkflowsCountGaugeSupplier.get());
+    stats.registerWorkflowCountMetric("enabled", () -> workflowCache.get().values()
+        .stream()
+        .filter(workflow1 -> workflow1.configuration().dockerImage().isPresent())
+        .filter(workflow1 -> enabledWorkflowCache.get().contains(WorkflowId.ofWorkflow(workflow1)))
+        .count());
 
     stats.registerWorkflowCountMetric("docker_termination_logging_enabled", () ->
         workflowCache.get().values()
@@ -628,28 +628,23 @@ public class StyxScheduler implements AppInit {
             .filter(workflow -> workflow.configuration().dockerTerminationLogging())
             .count());
 
-    // Calling stateManager.getActiveStates() can be quite expensive, so cache it for the gauges below
-    final CachedSupplier<Map<WorkflowInstance, RunState>> cachedActiveStates =
-        new CachedSupplier<>(stateManager::getActiveStates, time);
-
-    Arrays.stream(RunState.State.values()).forEach(state -> {
-      TriggerUtil.triggerTypesList().forEach(triggerType ->
-          stats.registerActiveStatesMetric(
-              state,
-              triggerType,
-              () -> cachedActiveStates.get().values().stream()
-                  .filter(runState -> runState.state().equals(state))
-                  .filter(runState -> runState.data().trigger().isPresent() && triggerType
-                      .equals(TriggerUtil.triggerType(runState.data().trigger().get())))
-                  .count()));
-      stats.registerActiveStatesMetric(
-          state,
-          "none",
-          () -> cachedActiveStates.get().values().stream()
+    for (State state : State.values()) {
+      for (String triggerType : TriggerUtil.triggerTypesList()) {
+        stats.registerActiveStatesMetric(state, triggerType, () ->
+            activeStatesCache.get().values().stream()
+                .filter(runState -> runState.state().equals(state))
+                .filter(runState -> runState.data().trigger()
+                    .map(TriggerUtil::triggerType)
+                    .map(triggerType::equals)
+                    .orElse(false))
+                .count());
+      }
+      stats.registerActiveStatesMetric(state, "none", () ->
+          activeStatesCache.get().values().stream()
               .filter(runState -> runState.state().equals(state))
               .filter(runState -> !runState.data().trigger().isPresent())
               .count());
-    });
+    }
 
     stats.registerSubmissionRateLimitMetric(submissionRateLimiter::getRate);
   }
