@@ -53,6 +53,7 @@ import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
@@ -68,6 +69,9 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.InOrder;
+import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.runners.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -82,6 +86,8 @@ public class ShardedCounterTest {
   private static Datastore datastore;
   private static Storage storage;
   private static Connection connection;
+
+  @Mock private Stats stats;
 
   @BeforeClass
   public static void setUpClass() throws IOException, InterruptedException {
@@ -111,7 +117,7 @@ public class ShardedCounterTest {
   @Before
   public void setUp() throws IOException {
     counterSnapshotFactory = spy(new ShardedCounterSnapshotFactory(storage));
-    shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
+    shardedCounter = new ShardedCounter(storage, stats, counterSnapshotFactory);
     storage.updateLimitForCounter(COUNTER_ID1, 10L);
     storage.updateLimitForCounter(COUNTER_ID2, 10L);
   }
@@ -515,6 +521,32 @@ public class ShardedCounterTest {
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
     assertFalse(results.hasNext());
     assertNull(getLimitFromStorage(COUNTER_ID1));
+  }
+
+  @Test
+  public void shouldReportCacheHitMissMetrics() {
+    InOrder inOrder = Mockito.inOrder(stats, counterSnapshotFactory);
+
+    // Verify we get a miss first time
+    shardedCounter.getCounterSnapshot(COUNTER_ID1);
+    inOrder.verify(stats).recordCounterCacheMiss();
+    inOrder.verify(counterSnapshotFactory).create(COUNTER_ID1);
+
+    // Snapshot should be cached now
+    shardedCounter.getCounterSnapshot(COUNTER_ID1);
+    inOrder.verify(stats).recordCounterCacheHit();
+
+    // Snapshot should still be cached
+    shardedCounter.getCounterSnapshot(COUNTER_ID1);
+    inOrder.verify(stats).recordCounterCacheHit();
+
+    // Invalidate the cache and verify we get a miss
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    shardedCounter.getCounterSnapshot(COUNTER_ID1);
+    inOrder.verify(stats).recordCounterCacheMiss();
+    inOrder.verify(counterSnapshotFactory).create(COUNTER_ID1);
+
+    inOrder.verifyNoMoreInteractions();
   }
 
   private void updateCounterInTransaction(String counterId, long delta) {

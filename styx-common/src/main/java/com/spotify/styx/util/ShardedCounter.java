@@ -26,6 +26,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Range;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import java.io.IOException;
@@ -67,6 +68,7 @@ public class ShardedCounter {
   public static final String PROPERTY_COUNTER_ID = "counterId";
 
   private final Storage storage;
+  private final Stats stats;
   /**
    * A weakly consistent view of the state in Datastore, refreshed by ShardedCounter on demand.
    */
@@ -173,8 +175,9 @@ public class ShardedCounter {
     }
   }
 
-  public ShardedCounter(Storage storage, CounterSnapshotFactory counterSnapshotFactory) {
+  public ShardedCounter(Storage storage, Stats stats, CounterSnapshotFactory counterSnapshotFactory) {
     this.storage = Objects.requireNonNull(storage);
+    this.stats = Objects.requireNonNull(stats);
     this.counterSnapshotFactory = Objects.requireNonNull(counterSnapshotFactory);
   }
 
@@ -184,8 +187,10 @@ public class ShardedCounter {
   public CounterSnapshot getCounterSnapshot(String counterId) {
     final CounterSnapshot snapshot = inMemSnapshot.getIfPresent(counterId);
     if (snapshot != null) {
+      stats.recordCounterCacheHit();
       return snapshot;
     }
+    stats.recordCounterCacheMiss();
     return refreshCounterSnapshot(counterId);
   }
 

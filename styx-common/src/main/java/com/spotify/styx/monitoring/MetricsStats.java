@@ -135,7 +135,13 @@ public final class MetricsStats implements Stats {
   static final MetricId DATASTORE_OPERATION_RATE = BASE
       .tagged("what", "datastore-operation-rate");
 
+  static final MetricId COUNTER_CACHE_RATE = BASE
+      .tagged("what", "counter-cache-rate");
+
   private static final String STATUS = "status";
+  private static final String COUNTER_CACHE_RESULT = "result";
+  private static final String COUNTER_CACHE_HIT = "hit";
+  private static final String COUNTER_CACHE_MISS = "miss";
 
   private final SemanticMetricRegistry registry;
   private final Time time;
@@ -147,6 +153,8 @@ public final class MetricsStats implements Stats {
   private final Meter terminationLogInvalid;
   private final Meter exitCodeMismatch;
   private final Meter workflowConsumerErrorMeter;
+  private final Meter counterCacheHitMeter;
+  private final Meter counterCacheMissMeter;
   private final ConcurrentMap<String, Histogram> storageOperationHistograms;
   private final ConcurrentMap<String, Meter> storageOperationMeters;
   private final ConcurrentMap<String, Histogram> dockerOperationHistograms;
@@ -179,6 +187,8 @@ public final class MetricsStats implements Stats {
     this.terminationLogInvalid = registry.meter(TERMINATION_LOG_INVALID);
     this.exitCodeMismatch = registry.meter(EXIT_CODE_MISMATCH);
     this.workflowConsumerErrorMeter = registry.meter(WORKFLOW_CONSUMER_ERROR_RATE);
+    this.counterCacheHitMeter = registry.meter(COUNTER_CACHE_RATE.tagged(COUNTER_CACHE_RESULT, COUNTER_CACHE_HIT));
+    this.counterCacheMissMeter = registry.meter(COUNTER_CACHE_RATE.tagged(COUNTER_CACHE_RESULT, COUNTER_CACHE_MISS));
     this.storageOperationHistograms = new ConcurrentHashMap<>();
     this.storageOperationMeters = new ConcurrentHashMap<>();
     this.dockerOperationHistograms = new ConcurrentHashMap<>();
@@ -331,6 +341,16 @@ public final class MetricsStats implements Stats {
   @Override
   public void recordDatastoreQueries(String kind, int n) {
     recordDatastoreOperations("query", kind, n);
+  }
+
+  @Override
+  public void recordCounterCacheHit() {
+    counterCacheHitMeter.mark();
+  }
+
+  @Override
+  public void recordCounterCacheMiss() {
+    counterCacheMissMeter.mark();
   }
 
   private void recordDatastoreOperations(String operation, String kind, int n) {

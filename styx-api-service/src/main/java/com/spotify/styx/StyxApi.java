@@ -49,8 +49,6 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.DockerImageValidator;
-import com.spotify.styx.util.ShardedCounter;
-import com.spotify.styx.util.ShardedCounterSnapshotFactory;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.StreamUtil;
 import com.spotify.styx.util.Time;
@@ -170,8 +168,7 @@ public class StyxApi implements AppInit {
         new WorkflowValidator(new DockerImageValidator()));
     environment.closer().register(backfillResource);
 
-    final ShardedCounter shardedCounter = new ShardedCounter(storage, new ShardedCounterSnapshotFactory(storage));
-    final ResourceResource resourceResource = new ResourceResource(storage, shardedCounter);
+    final ResourceResource resourceResource = new ResourceResource(storage);
     final StatusResource statusResource = new StatusResource(storage);
     final SchedulerProxyResource schedulerProxyResource = new SchedulerProxyResource(
         schedulerServiceBaseUrl, environment.client());
