@@ -153,6 +153,8 @@ public final class MetricsStats implements Stats {
   private final Meter terminationLogInvalid;
   private final Meter exitCodeMismatch;
   private final Meter workflowConsumerErrorMeter;
+  private final Meter counterCacheHitMeter;
+  private final Meter counterCacheMissMeter;
   private final ConcurrentMap<String, Histogram> storageOperationHistograms;
   private final ConcurrentMap<String, Meter> storageOperationMeters;
   private final ConcurrentMap<String, Histogram> dockerOperationHistograms;
@@ -166,8 +168,6 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Meter> workflowConsumerMeters;
   private final ConcurrentMap<String, Histogram> tickHistograms;
   private final ConcurrentMap<Tuple2<String, String>, Meter> datastoreOperationMeters;
-  private final Meter counterCacheHitMeter;
-  private final Meter counterCacheMissMeter;
 
   /**
    * Submission timestamps (nanotime) keyed on execution id.
@@ -187,6 +187,8 @@ public final class MetricsStats implements Stats {
     this.terminationLogInvalid = registry.meter(TERMINATION_LOG_INVALID);
     this.exitCodeMismatch = registry.meter(EXIT_CODE_MISMATCH);
     this.workflowConsumerErrorMeter = registry.meter(WORKFLOW_CONSUMER_ERROR_RATE);
+    this.counterCacheHitMeter = registry.meter(COUNTER_CACHE_RATE.tagged(COUNTER_CACHE_RESULT, COUNTER_CACHE_HIT));
+    this.counterCacheMissMeter = registry.meter(COUNTER_CACHE_RATE.tagged(COUNTER_CACHE_RESULT, COUNTER_CACHE_MISS));
     this.storageOperationHistograms = new ConcurrentHashMap<>();
     this.storageOperationMeters = new ConcurrentHashMap<>();
     this.dockerOperationHistograms = new ConcurrentHashMap<>();
@@ -200,8 +202,6 @@ public final class MetricsStats implements Stats {
     this.workflowConsumerMeters = new ConcurrentHashMap<>();
     this.tickHistograms = new ConcurrentHashMap<>();
     this.datastoreOperationMeters = new ConcurrentHashMap<>();
-    this.counterCacheHitMeter = registry.meter(COUNTER_CACHE_RATE.tagged(COUNTER_CACHE_RESULT, COUNTER_CACHE_HIT));
-    this.counterCacheMissMeter = registry.meter(COUNTER_CACHE_RATE.tagged(COUNTER_CACHE_RESULT, COUNTER_CACHE_MISS));
   }
 
   @Override
