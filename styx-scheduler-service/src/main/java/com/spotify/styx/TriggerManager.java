@@ -40,6 +40,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerInstantSpec;
+import io.grpc.Context;
 import io.opencensus.common.Scope;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
@@ -50,9 +51,10 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,6 +77,7 @@ class TriggerManager implements Closeable {
   private final Storage storage;
   private final Stats stats;
   private final ForkJoinPool forkJoinPool;
+  private final Executor executor;
 
   TriggerManager(TriggerListener triggerListener,
                  Time time,
@@ -85,6 +88,7 @@ class TriggerManager implements Closeable {
     this.storage = requireNonNull(storage);
     this.stats = requireNonNull(stats);
     this.forkJoinPool = new ForkJoinPool(TRIGGER_CONCURRENCY);
+    this.executor = Context.currentContextExecutor(forkJoinPool);
   }
 
   void tick() {
@@ -122,10 +126,10 @@ class TriggerManager implements Closeable {
     final Instant now = time.get();
     canBeTriggeredWorkflows.entrySet().stream()
         .filter(entry -> now.isAfter(entry.getValue().offsetInstant()))
-        .map(entry -> forkJoinPool
-            .submit(tryTriggering(entry.getKey(), entry.getValue(), enabledWorkflows)))
+        .map(entry -> CompletableFuture.runAsync(
+            tryTriggering(entry.getKey(), entry.getValue(), enabledWorkflows), executor))
         .collect(toList()) // collect here to trigger in parallel
-        .forEach(ForkJoinTask::join);
+        .forEach(CompletableFuture::join);
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
     stats.recordTickDuration(TICK_TYPE, durationMillis);
