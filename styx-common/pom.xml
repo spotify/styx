@@ -33,6 +33,7 @@
     <dependency>
       <groupId>com.github.sviperll</groupId>
       <artifactId>adt4j</artifactId>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>com.squareup.okio</groupId>
