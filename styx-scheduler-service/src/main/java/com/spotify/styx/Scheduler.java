@@ -67,6 +67,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -221,13 +223,15 @@ public class Scheduler {
       Map<WorkflowId, Workflow> workflows,
       List<InstanceState> eligibleInstances) {
 
+    final ConcurrentMap<String, Boolean> resourceExhaustedCache = new ConcurrentHashMap<>();
+
     final Map<WorkflowInstance, CompletableFuture<Void>> futures = eligibleInstances.stream()
         .collect(toMap(
             InstanceState::workflowInstance,
             instanceState -> CompletableFuture.runAsync(() ->
                 dequeueInstance(config, resources, workflowResourceReferences,
                     Optional.ofNullable(workflows.get(instanceState.workflowInstance().workflowId())),
-                    instanceState), executor)));
+                    instanceState, resourceExhaustedCache), executor)));
 
     futures.forEach((instance, future) -> {
       try {
@@ -244,15 +248,18 @@ public class Scheduler {
 
   private void dequeueInstance(StyxConfig config, Map<String, Resource> resources,
       Map<WorkflowId, Set<String>> workflowResourceReferences,
-      Optional<Workflow> workflowOpt, InstanceState instanceState) {
+      Optional<Workflow> workflowOpt, InstanceState instanceState,
+      ConcurrentMap<String, Boolean> resourceExhaustedCache) {
     tracer.spanBuilder("dequeueInstance").startSpanAndRun(() ->
-        dequeueInstance0(config, resources, workflowResourceReferences, workflowOpt, instanceState));
+        dequeueInstance0(config, resources, workflowResourceReferences, workflowOpt, instanceState,
+            resourceExhaustedCache));
   }
 
   private void dequeueInstance0(final StyxConfig config, Map<String, Resource> resources,
       Map<WorkflowId, Set<String>> workflowResourceReferences,
       Optional<Workflow> workflowOpt,
-      InstanceState instanceState) {
+      InstanceState instanceState,
+      ConcurrentMap<String, Boolean> resourceExhaustedCache) {
 
     LOG.debug("Evaluating instance for dequeue: {}", instanceState.workflowInstance());
 
@@ -279,7 +286,7 @@ public class Scheduler {
     // Check resource limits. This is racy and can give false positives but the transactional
     // checking happens later. This is just intended to avoid spinning on exhausted resources.
     final List<String> depletedResources = instanceResourceRefs.stream()
-        .filter(this::limitReached)
+        .filter(resourceId -> limitReached(resourceId, resourceExhaustedCache))
         .sorted()
         .collect(toList());
     if (!depletedResources.isEmpty()) {
@@ -330,13 +337,15 @@ public class Scheduler {
     sendDequeue(instanceState, instanceResourceRefs);
   }
 
-  private boolean limitReached(final String resourceId) {
-    try {
-      return !shardedCounter.counterHasSpareCapacity(resourceId);
-    } catch (RuntimeException e) {
-      LOG.warn("Failed to check resource counter limit", e);
-      return false;
-    }
+  private boolean limitReached(final String resourceId, ConcurrentMap<String, Boolean> resourceExhaustedCache) {
+    return resourceExhaustedCache.computeIfAbsent(resourceId, k -> {
+      try {
+        return !shardedCounter.counterHasSpareCapacity(resourceId);
+      } catch (RuntimeException e) {
+        LOG.warn("Failed to check resource counter limit", e);
+        return false;
+      }
+    });
   }
 
   private boolean shouldExecute(RunState runState) {
