@@ -28,8 +28,8 @@ import static java.util.stream.Collectors.toSet;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
+import com.spotify.styx.MessageUtil;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
@@ -305,14 +305,7 @@ public class QueuedStateManager implements StateManager {
         .collect(toList());
 
     if (!depletedResourceIds.isEmpty()) {
-      final List<Resource> depletedResources = depletedResourceIds.stream().map(x ->
-          Resource.create(x, shardedCounter.getCounterSnapshot(x).getLimit()))
-          .collect(toList());
-      final Message message = Message.info(
-          String.format("Resource limit reached for: %s", depletedResources));
-      if (!runState.data().message().map(message::equals).orElse(false)) {
-        receiveIgnoreClosed(Event.info(runState.workflowInstance(), message), runState.counter());
-      }
+      MessageUtil.emitResourceLimitReachedMessage(this, runState, depletedResourceIds);
     }
 
     if (!failedTries.isEmpty()) {
