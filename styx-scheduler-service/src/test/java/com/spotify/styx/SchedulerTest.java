@@ -35,6 +35,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
@@ -462,6 +463,43 @@ public class SchedulerTest {
     assertThat(eventCaptor.getAllValues().stream()
         .anyMatch(e -> EventUtil.name(e).equals("dequeue")), is(false));
     verify(stats, times(2)).recordResourceUsed("r1", 3L);
+  }
+
+  @Test
+  public void shouldCacheResourceUsageExceededLookup() throws Exception {
+    setUp(20);
+    setResourceLimit("r1", 2);
+    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
+    when(shardedCounter.counterHasSpareCapacity("r1")).thenReturn(false);
+
+    final WorkflowInstance i0 = instance(WORKFLOW_ID1, "i0");
+    final WorkflowInstance i1 = instance(WORKFLOW_ID1, "i1");
+    final RunState rs0 = RunState.create(i0, State.QUEUED, time.get(), 17);
+    final RunState rs1 = RunState.create(i1, State.QUEUED, time.get(), 4711);
+    populateActiveStates(rs0);
+    populateActiveStates(rs1);
+
+    scheduler.tick();
+
+    verify(shardedCounter, times(1)).counterHasSpareCapacity("r1");
+    verifyNoMoreInteractions(shardedCounter);
+  }
+
+  @Test
+  public void shouldHandleResourceUsageExceededLookupFailure() throws Exception {
+    setUp(20);
+    setResourceLimit("r1", 2);
+    initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
+    when(shardedCounter.counterHasSpareCapacity("r1")).thenThrow(new RuntimeException("error!"));
+
+    final WorkflowInstance i0 = instance(WORKFLOW_ID1, "i0");
+    final RunState rs0 = RunState.create(i0, State.QUEUED, time.get(), 17);
+    populateActiveStates(rs0);
+
+    scheduler.tick();
+
+    verify(shardedCounter, times(1)).counterHasSpareCapacity("r1");
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(i0, ImmutableSet.of("r1")), 17);
   }
 
   @Test
