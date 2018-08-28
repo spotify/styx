@@ -21,6 +21,7 @@
 package com.spotify.styx.state;
 
 import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.hamcrest.Matchers.arrayContaining;
 import static org.hamcrest.Matchers.equalTo;
@@ -72,6 +73,7 @@ import com.spotify.styx.util.Time;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -729,10 +731,10 @@ public class QueuedStateManagerTest {
     when(shardedCounter.getCounterSnapshot("resource1")).thenReturn(counterSnapshot);
 
     final Set<Resource> resources = ImmutableSet.of(Resource.create("resource1", 1));
-    final Event dequeueEvent = Event.dequeue(INSTANCE,
-        resources.stream().map(Resource::id).collect(toSet()));
+    final List<String> resourceIds = resources.stream().map(Resource::id).sorted().collect(toList());
+    final Event dequeueEvent = Event.dequeue(INSTANCE, ImmutableSet.copyOf(resourceIds));
     final Event infoEvent = Event.info(INSTANCE,
-        Message.info(String.format("Resource limit reached for: %s", resources)));
+        Message.info(String.format("Resource limit reached for: %s", resourceIds)));
     final QueuedStateManager spied = spy(stateManager);
     doNothing().when(spied).receiveIgnoreClosed(eq(infoEvent), anyLong());
 
@@ -749,7 +751,8 @@ public class QueuedStateManagerTest {
   @Test
   public void shouldFailToUpdateResourceCountersOnDequeueDueToCapacityAndNoInfoEventSent() throws Exception {
     final Set<Resource> resources = ImmutableSet.of(Resource.create("resource1", 1));
-    final Message message = Message.info(String.format("Resource limit reached for: %s", resources));
+    final List<String> resourceIds = resources.stream().map(Resource::id).sorted().collect(toList());
+    final Message message = Message.info(String.format("Resource limit reached for: %s", resourceIds));
     final RunState runState = RunState.create(INSTANCE, State.QUEUED,
         STATE_DATA_1.builder().messages(message).build(),
         NOW.minusMillis(1), 17);
@@ -781,10 +784,11 @@ public class QueuedStateManagerTest {
         .when(transaction).updateCounter(shardedCounter, "resource1", 1);
 
     final Set<Resource> resources = ImmutableSet.of(Resource.create("resource1", 1));
+    final List<String> resourceIds = resources.stream().map(Resource::id).sorted().collect(toList());
     final Event dequeueEvent = Event.dequeue(INSTANCE,
         resources.stream().map(Resource::id).collect(toSet()));
     final Event infoEvent = Event.info(INSTANCE,
-        Message.info(String.format("Resource limit reached for: %s", resources)));
+        Message.info(String.format("Resource limit reached for: %s", resourceIds)));
     final QueuedStateManager spied = spy(stateManager);
 
     try {
