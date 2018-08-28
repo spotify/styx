@@ -43,6 +43,9 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
@@ -57,9 +60,11 @@ import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
+import com.spotify.styx.util.ShardedCounter.StaleSnapshotException;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hbase.client.Connection;
@@ -294,7 +299,7 @@ public class ShardedCounterTest {
   }
 
   @Test(expected = CounterCapacityException.class)
-  public void shouldFailWhenIncreasingIfChosenShardIsFilledConcurrently() {
+  public void shouldFailWhenIncreasingIfChosenShardIsFilledConcurrently() throws StaleSnapshotException {
     // init counter and limit
     updateLimitInStorage(COUNTER_ID1, 1);
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
@@ -316,7 +321,7 @@ public class ShardedCounterTest {
   }
 
   @Test(expected = ShardNotFoundException.class)
-  public void shouldFailWhenIncreasingIfChosenShardIsMissing() {
+  public void shouldFailWhenIncreasingIfChosenShardIsMissing() throws StaleSnapshotException {
     // init counter and limit
     updateLimitInStorage(COUNTER_ID1, 1);
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
@@ -358,21 +363,21 @@ public class ShardedCounterTest {
     updateCounterInTransaction(COUNTER_ID1, -1L);
   }
 
-  @Test(expected = CounterCapacityException.class)
-  public void shouldFailIncrementingFullShard() throws IOException {
+  @Test(expected = StaleSnapshotException.class)
+  public void shouldFailIncrementingFullShard() throws IOException, StaleSnapshotException {
     shardedCounter.getCounter(COUNTER_ID1);
     updateShard(COUNTER_ID1, 0, 10);
-    storage.runInTransaction(tx -> {
+    storage.<Void, StaleSnapshotException>runInTransaction(tx -> {
       shardedCounter.updateCounterShard(tx, COUNTER_ID1, 1, 0, 10);
       return null;
     });
   }
 
-  @Test(expected = CounterCapacityException.class)
-  public void shouldFailDecrementingEmptyShard() throws IOException {
+  @Test(expected = StaleSnapshotException.class)
+  public void shouldFailDecrementingEmptyShard() throws IOException, StaleSnapshotException {
     shardedCounter.getCounter(COUNTER_ID1);
 
-    storage.runInTransaction(tx -> {
+    storage.<Void, StaleSnapshotException>runInTransaction(tx -> {
       shardedCounter.updateCounterShard(tx, COUNTER_ID1, -1, 0, 10);
       return null;
     });
@@ -598,5 +603,40 @@ public class ShardedCounterTest {
     return datastore.run(EntityQuery.newEntityQueryBuilder()
         .setKind(KIND_COUNTER_SHARD)
         .setFilter(PropertyFilter.eq(PROPERTY_COUNTER_ID, counterId)).build());
+  }
+
+  @Test
+  public void shouldBePossibleToUpdateCounterSnapshot() {
+    final CounterSnapshot counterSnapshot = shardedCounter.getCounterSnapshot(COUNTER_ID1);
+    final int index = counterSnapshot.pickShardWithSpareCapacity(1);
+    final long before = counterSnapshot.getTotalUsage();
+    counterSnapshot.updateShard(index, 1);
+    final long afterIncrement = counterSnapshot.getTotalUsage();
+    assertThat(afterIncrement, is(before + 1));
+    counterSnapshot.updateShard(index, -1);
+    final long afterDecrement = counterSnapshot.getTotalUsage();
+    assertThat(afterDecrement, is(before));
+  }
+
+  @Test
+  public void retriesOnStaleCounter() {
+    counterSnapshotFactory = mock(CounterSnapshotFactory.class);
+    CounterSnapshot counterSnapshot = mock(CounterSnapshot.class);
+    storage = mock(Storage.class);
+    StorageTransaction transaction = mock(StorageTransaction.class);
+
+    final int shardIndex = 17;
+    when(counterSnapshotFactory.create(COUNTER_ID1)).thenReturn(counterSnapshot);
+    when(counterSnapshot.pickShardWithSpareCapacity(1)).thenReturn(shardIndex);
+    when(counterSnapshot.shardCapacity(shardIndex)).thenReturn(1L);
+    when(transaction.shard(COUNTER_ID1, shardIndex)).thenReturn(
+        // First claim the shard is already at capacity
+        Optional.of(Shard.create(COUNTER_ID1, shardIndex, 1)),
+        // And then claim it has capacity to spare
+        Optional.of(Shard.create(COUNTER_ID1, shardIndex, 0)));
+    shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
+    shardedCounter.updateCounter(transaction, COUNTER_ID1, 1);
+    verify(transaction, times(2)).shard(COUNTER_ID1, shardIndex);
+    verify(counterSnapshot).updateShard(shardIndex, 1);
   }
 }

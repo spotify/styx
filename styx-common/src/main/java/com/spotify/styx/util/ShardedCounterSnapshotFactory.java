@@ -25,8 +25,11 @@ import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,8 +52,9 @@ public class ShardedCounterSnapshotFactory implements CounterSnapshotFactory {
   }
 
   public ShardedCounter.Snapshot create(String counterId) {
-    return new ShardedCounter.Snapshot(counterId, ShardedCounter.getLimit(storage, counterId),
-        getShards(storage, counterId));
+    final Map<Integer, AtomicLong> shards = getShards(storage, counterId).entrySet().stream()
+        .collect(Collectors.toMap(Entry::getKey, e -> new AtomicLong(e.getValue())));
+    return new ShardedCounter.Snapshot(counterId, ShardedCounter.getLimit(storage, counterId), shards);
   }
 
   private static Map<Integer, Long> getShards(Storage storage, String counterId) {
