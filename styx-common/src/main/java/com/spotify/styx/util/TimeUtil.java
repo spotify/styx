@@ -34,12 +34,15 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.Period;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
 import java.time.temporal.UnsupportedTemporalTypeException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Static utility functions for manipulating time based on {@link Schedule} and offsets.
@@ -209,34 +212,34 @@ public class TimeUtil {
    * @return A zoned date time with the offset applied
    */
   public static ZonedDateTime addOffset(ZonedDateTime time, String offset) {
-    final int tPos = offset.indexOf('T');
-    final String periodOffset;
-    final String durationOffset;
+    final Pattern pattern = Pattern.compile("([-+]?)P([-+0-9YMWD]+)?(T([-+0-9HMS.,]+)?)?",
+        Pattern.CASE_INSENSITIVE);
+    Matcher matcher = pattern.matcher(offset);
 
-    switch (tPos) {
-      case -1:
-        periodOffset = offset;
-        break;
-
-      case 1:
-        periodOffset = "P0D";
-        break;
-
-      default:
-        periodOffset = offset.substring(0, tPos);
-        break;
+    if (!matcher.matches()) {
+      throw new DateTimeParseException("Unable to parse offset period", offset, 0);
     }
+    final String sign = matcher.group(1);
 
-    if (tPos == -1) {
-      durationOffset = "PT0S";
-    } else {
-      durationOffset = "P" + offset.substring(tPos);
-    }
+    final String periodOffset = sign + "P" + Optional.ofNullable(matcher.group(2)).orElse("0D");
+    final String durationOffset = sign + "PT" + Optional.ofNullable(matcher.group(4)).orElse("0S");
 
     final TemporalAmount dateAmount = Period.parse(periodOffset);
     final TemporalAmount timeAmount = Duration.parse(durationOffset);
 
     return time.plus(dateAmount).plus(timeAmount);
+  }
+
+  public static ZonedDateTime subtractOffset(ZonedDateTime time, String offset) {
+    // Change sign of offset string and add
+    offset = offset.trim();
+    if (offset.startsWith("-")) {
+      offset = offset.substring(1);
+    } else {
+      offset = "-" + offset;
+    }
+    System.out.println(offset);
+    return addOffset(time, offset);
   }
 
   public static Cron cron(Schedule schedule) {

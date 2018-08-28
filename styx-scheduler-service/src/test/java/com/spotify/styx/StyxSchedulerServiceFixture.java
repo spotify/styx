@@ -21,7 +21,7 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
-import static com.spotify.styx.util.TimeUtil.lastInstant;
+import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.time.temporal.ChronoUnit.HOURS;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -309,9 +309,9 @@ public class StyxSchedulerServiceFixture {
   private TriggerInstantSpec initializeNaturalTrigger(Workflow workflow) {
     final Instant now = time.get();
     final Schedule schedule = workflow.configuration().schedule();
-    final Instant nextTrigger = lastInstant(now, schedule);
-    final Instant nextWithOffset = workflow.configuration().addOffset(nextTrigger);
-    return TriggerInstantSpec.create(nextTrigger, nextWithOffset);
+    final Instant nextTrigger = nextInstant(now, schedule);
+    final Instant nextWithOffset = workflow.configuration().subtractOffset(nextTrigger);
+    return TriggerInstantSpec.create(nextWithOffset, nextTrigger);
   }
 
   /**

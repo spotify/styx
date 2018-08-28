@@ -169,8 +169,8 @@ class TriggerManager implements Closeable {
 
       final Schedule schedule = workflow.configuration().schedule();
       final Instant nextTrigger = nextInstant(instantSpec.instant(), schedule);
-      final Instant nextWithOffset = workflow.configuration().addOffset(nextTrigger);
-      final TriggerInstantSpec nextSpec = TriggerInstantSpec.create(nextTrigger, nextWithOffset);
+      final Instant nextWithOffset = workflow.configuration().subtractOffset(nextTrigger);
+      final TriggerInstantSpec nextSpec = TriggerInstantSpec.create(nextWithOffset, nextTrigger);
 
       try {
         storage.updateNextNaturalTrigger(workflow.id(), nextSpec);

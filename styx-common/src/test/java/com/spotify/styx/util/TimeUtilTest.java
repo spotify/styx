@@ -27,6 +27,7 @@ import static com.spotify.styx.util.TimeUtil.isAligned;
 import static com.spotify.styx.util.TimeUtil.lastInstant;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static com.spotify.styx.util.TimeUtil.offsetInstant;
+import static com.spotify.styx.util.TimeUtil.subtractOffset;
 import static java.time.Instant.parse;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
@@ -198,6 +199,42 @@ public class TimeUtilTest {
     ZonedDateTime offsetTime = addOffset(time, offset);
 
     assertThat(offsetTime, is(ZonedDateTime.parse("2017-02-05T08:07:11.22Z")));
+  }
+
+  @Test
+  public void shouldAddNegativeOffset() {
+    String offset = "-P1M3DT1H7M5S";
+    ZonedDateTime time = ZonedDateTime.parse("2017-02-25T09:14:16.22Z");
+    ZonedDateTime offsetTime = addOffset(time, offset);
+
+    assertThat(offsetTime, is(ZonedDateTime.parse("2017-01-22T08:07:11.22Z")));
+  }
+
+  @Test
+  public void shouldAddNegativeOffsetWithNoPeriod() {
+    String offset = "-PT1H7M5S";
+    ZonedDateTime time = ZonedDateTime.parse("2017-01-22T09:14:16.22Z");
+    ZonedDateTime offsetTime = addOffset(time, offset);
+
+    assertThat(offsetTime, is(ZonedDateTime.parse("2017-01-22T08:07:11.22Z")));
+  }
+
+  @Test
+  public void shouldSubtractOffsetWithNoTime() {
+    String offset = "P1M3D";
+    ZonedDateTime time = ZonedDateTime.parse("2017-02-25T08:07:11.22Z");
+    ZonedDateTime offsetTime = subtractOffset(time, offset);
+
+    assertThat(offsetTime, is(ZonedDateTime.parse("2017-01-22T08:07:11.22Z")));
+  }
+
+  @Test
+  public void shouldSubtractOffsetWithWeek() {
+    String offset = "P2W";
+    ZonedDateTime time = ZonedDateTime.parse("2017-02-05T08:07:11.22Z");
+    ZonedDateTime offsetTime = subtractOffset(time, offset);
+
+    assertThat(offsetTime, is(ZonedDateTime.parse("2017-01-22T08:07:11.22Z")));
   }
 
   @Test
