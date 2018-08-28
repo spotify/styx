@@ -69,6 +69,12 @@ public interface WorkflowConfiguration {
     return TimeUtil.addOffset(next.atZone(ZoneOffset.UTC), offset).toInstant();
   }
 
+  default Instant subtractOffset(Instant next) {
+    final String offset = offset().orElseGet(this::defaultOffset);
+
+    return TimeUtil.subtractOffset(next.atZone(ZoneOffset.UTC), offset).toInstant();
+  }
+
   default String defaultOffset() {
     return defaultOffset(schedule());
   }
