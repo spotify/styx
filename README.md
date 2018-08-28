@@ -3,7 +3,7 @@
 [![CircleCI](https://circleci.com/gh/spotify/styx/tree/master.svg?style=shield)](https://circleci.com/gh/spotify/styx)
 [![Coverage Status](https://codecov.io/gh/spotify/styx/branch/master/graph/badge.svg)](https://codecov.io/gh/spotify/styx)
 [![License](https://img.shields.io/github/license/spotify/styx.svg)](LICENSE)
-[![Release](https://jitpack.io/v/spotify/styx.svg)](https://jitpack.io/#spotify/styx)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.spotify/styx/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.spotify/styx)
 
 A batch job scheduler for Kubernetes
 
