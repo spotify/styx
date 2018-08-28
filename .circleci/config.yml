@@ -8,7 +8,7 @@ jobs:
       - checkout
       - restore_cache:
           key: v1-deps-{{ checksum "pom.xml" }}
-      - run: mvn dependency:go-offline compile
+      - run: mvn -B dependency:go-offline compile
       - save_cache:
           key: v1-deps-{{ checksum "pom.xml" }}
           paths:
@@ -19,7 +19,7 @@ jobs:
             JAVA: java -Xmx512m -Xms512m
             # Maven heap size
             MAVEN_OPTS: -Xmx256m -Xms256m
-          command: mvn verify
+          command: mvn -B verify
       - run: bash <(curl -s https://codecov.io/bash) -f '!**/jacoco-aggregate/**'
       - run: |
           mkdir test-reports
@@ -38,12 +38,12 @@ jobs:
       - checkout
       - restore_cache:
           key: v1-deps-jdk10-{{ checksum "pom.xml" }}
-      - run: mvn dependency:go-offline compile
+      - run: mvn -B dependency:go-offline compile
       - save_cache:
           key: v1-deps-jdk10-{{ checksum "pom.xml" }}
           paths:
             - ~/.m2
-      - run: mvn verify
+      - run: mvn -B verify
 
 
 workflows:
