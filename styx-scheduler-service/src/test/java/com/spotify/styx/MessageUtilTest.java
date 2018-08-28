@@ -35,6 +35,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
@@ -77,5 +78,10 @@ public class MessageUtilTest {
   public void shouldEmitResourceLimitReachedMessage() {
     MessageUtil.emitResourceLimitReachedMessage(stateManager, RUNSTATE_WITH_STALE_MESSAGE, DEPLETED_RESOURCES);
     verify(stateManager).receiveIgnoreClosed(INFO, RUNSTATE_WITH_MESSAGE.counter());
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void shouldFailIfNoResources() {
+    MessageUtil.emitResourceLimitReachedMessage(stateManager, RUNSTATE_WITH_STALE_MESSAGE, Collections.emptyList());
   }
 }
