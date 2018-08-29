@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,12 +47,12 @@ public class ShardedCounterSnapshotFactory implements CounterSnapshotFactory {
     this.storage = Objects.requireNonNull(storage);
   }
 
-  public ShardedCounter.Snapshot create(String counterId) {
+  public ShardedCounter.Snapshot create(String counterId) throws IOException {
     return new ShardedCounter.Snapshot(counterId, ShardedCounter.getLimit(storage, counterId),
         getShards(storage, counterId));
   }
 
-  private static Map<Integer, Long> getShards(Storage storage, String counterId) {
+  private static Map<Integer, Long> getShards(Storage storage, String counterId) throws IOException {
     Map<Integer, Long> fetchedShards = storage.shardsForCounter(counterId);
     if (fetchedShards.size() < NUM_SHARDS) {
       // The counter probably has not been initialized (so we have empty QueryResults). Also
@@ -82,12 +81,12 @@ public class ShardedCounterSnapshotFactory implements CounterSnapshotFactory {
                                      int endIndex) {
     try {
       storage.runInTransaction(tx -> {
-        IntStream.range(startIndex, endIndex).forEach(index -> {
+        for (int index = startIndex; index < endIndex; index++) {
           final Optional<Shard> shard = tx.shard(counterId, index);
           if (!shard.isPresent()) {
             tx.store(Shard.create(counterId, index, 0));
           }
-        });
+        }
         return null;
       });
     } catch (IOException e) {

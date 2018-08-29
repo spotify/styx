@@ -31,6 +31,8 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyBoolean;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -489,6 +491,22 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
     assertJson(response, "backfill.id", equalTo(BACKFILL_1.id()));
     assertNoJson(response, "statuses");
+  }
+
+  @Test
+  public void shouldHandleGetBackfillFailure() throws Exception {
+    sinceVersion(Api.Version.V3);
+    doThrow(new IOException("error!")).when(storage).backfill(BACKFILL_1.id());
+    final Response<ByteString> response = awaitResponse(serviceHelper.request("GET", path("/" + BACKFILL_1.id())));
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SERVER_ERROR)));
+  }
+
+  @Test
+  public void shouldHandleListBackfillsFailure() throws Exception {
+    sinceVersion(Api.Version.V3);
+    doThrow(new IOException("error!")).when(storage).backfills(anyBoolean());
+    final Response<ByteString> response = awaitResponse(serviceHelper.request("GET", path("")));
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SERVER_ERROR)));
   }
 
   @Test

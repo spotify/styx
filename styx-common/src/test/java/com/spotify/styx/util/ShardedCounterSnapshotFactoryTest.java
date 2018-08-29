@@ -93,7 +93,7 @@ public class ShardedCounterSnapshotFactoryTest {
   }
 
   @Test
-  public void testCreate() {
+  public void testCreate() throws IOException {
     counterSnapshotFactory.create(RESOURCE_ID);
     assertEquals(128, storage.shardsForCounter(RESOURCE_ID).size());
   }

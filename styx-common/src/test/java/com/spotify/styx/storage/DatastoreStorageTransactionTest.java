@@ -36,11 +36,9 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.KeyFactory;
-import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Workflow;
@@ -69,7 +67,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 public class DatastoreStorageTransactionTest {
 
   private static LocalDatastoreHelper helper;
-  private static Datastore datastore;
+  private static CheckedDatastore datastore;
   private DatastoreStorage storage;
 
   @BeforeClass
@@ -96,7 +94,7 @@ public class DatastoreStorageTransactionTest {
 
   @Before
   public void setUp() throws Exception {
-    datastore = helper.getOptions().getService();
+    datastore = new CheckedDatastore(helper.getOptions().getService());
     storage = new DatastoreStorage(datastore, Duration.ZERO);
   }
 
@@ -107,7 +105,7 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void shouldCommitEmptyTransaction() throws IOException {
-    final Transaction transaction = datastore.newTransaction();
+    final CheckedDatastoreTransaction transaction = datastore.newTransaction();
     DatastoreStorageTransaction storageTransaction = new DatastoreStorageTransaction(transaction);
     storageTransaction.commit();
     assertFalse(transaction.isActive());
@@ -115,7 +113,7 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void shouldThrowIfUnexpectedDatastoreError() throws IOException {
-    final Transaction transaction = datastore.newTransaction();
+    final CheckedDatastoreTransaction transaction = datastore.newTransaction();
     DatastoreStorageTransaction storageTransaction = new DatastoreStorageTransaction(transaction);
 
     transaction.rollback();
@@ -129,7 +127,7 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void shouldThrowIfRollbackFails() throws IOException {
-    final Transaction transaction = datastore.newTransaction();
+    final CheckedDatastoreTransaction transaction = datastore.newTransaction();
     DatastoreStorageTransaction storageTransaction = new DatastoreStorageTransaction(transaction);
 
     storageTransaction.commit();
@@ -143,9 +141,9 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void shouldThrowIfTransactionFailed() throws IOException, InterruptedException {
-    final Transaction transaction1 = datastore.newTransaction();
-    final Transaction transaction2 = datastore.newTransaction();
-    final Transaction transaction3 = datastore.newTransaction();
+    final CheckedDatastoreTransaction transaction1 = datastore.newTransaction();
+    final CheckedDatastoreTransaction transaction2 = datastore.newTransaction();
+    final CheckedDatastoreTransaction transaction3 = datastore.newTransaction();
     DatastoreStorageTransaction storageTransaction1 = new DatastoreStorageTransaction(transaction1);
     DatastoreStorageTransaction storageTransaction2 = new DatastoreStorageTransaction(transaction2);
     DatastoreStorageTransaction storageTransaction3 = new DatastoreStorageTransaction(transaction3);

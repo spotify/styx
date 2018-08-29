@@ -335,7 +335,7 @@ public class Scheduler {
     return resourceExhaustedCache.computeIfAbsent(resourceId, k -> {
       try {
         return !shardedCounter.counterHasSpareCapacity(resourceId);
-      } catch (RuntimeException e) {
+      } catch (RuntimeException | IOException e) {
         LOG.warn("Failed to check resource counter limit", e);
         return false;
       }

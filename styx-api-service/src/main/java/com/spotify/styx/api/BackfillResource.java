@@ -80,8 +80,12 @@ import java.util.concurrent.ForkJoinTask;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class BackfillResource implements Closeable {
+
+  private static final Logger log = LoggerFactory.getLogger(WorkflowResource.class);
 
   static final String BASE = "/backfills";
   private static final String SCHEDULER_BASE_PATH = "/api/v0";
@@ -187,7 +191,14 @@ public final class BackfillResource implements Closeable {
 
   private Response<BackfillPayload> getBackfill(RequestContext rc, String id) {
     final boolean includeStatuses = rc.request().parameter("status").orElse("true").equals("true");
-    final Optional<Backfill> backfillOpt = storage.backfill(id);
+    final Optional<Backfill> backfillOpt;
+    try {
+      backfillOpt = storage.backfill(id);
+    } catch (IOException e) {
+      final String message = String.format("Couldn't read backfill %s. ", id);
+      log.warn(message, e);
+      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Error in internal storage"));
+    }
     if (!backfillOpt.isPresent()) {
       return Response.forStatus(Status.NOT_FOUND);
     }

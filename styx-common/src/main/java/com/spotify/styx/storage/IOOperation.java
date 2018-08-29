@@ -1,8 +1,8 @@
-/*-
+/*
  * -\-\-
- * Spotify Styx Common
+ * Spotify Styx Scheduler Service
  * --
- * Copyright (C) 2016 - 2018 Spotify AB
+ * Copyright (C) 2018 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +18,28 @@
  * -/-/-
  */
 
-package com.spotify.styx.util;
+package com.spotify.styx.storage;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
 
 /**
- * Factory for creating counter snapshot instances
+ * An operation that can throw {@link IOException}.
  */
-public interface CounterSnapshotFactory {
+@FunctionalInterface
+interface IOOperation<T> {
 
-  CounterSnapshot create(String counterId) throws IOException;
+  T execute() throws IOException;
+
+  default CompletableFuture<T> executeAsync(Executor executor) {
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        return execute();
+      } catch (IOException e) {
+        throw new CompletionException(e);
+      }
+    }, executor);
+  }
 }

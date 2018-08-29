@@ -1,8 +1,8 @@
-/*-
+/*
  * -\-\-
- * Spotify Styx Common
+ * Spotify Styx Scheduler Service
  * --
- * Copyright (C) 2016 - 2018 Spotify AB
+ * Copyright (C) 2018 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +18,26 @@
  * -/-/-
  */
 
-package com.spotify.styx.util;
+package com.spotify.styx.storage;
 
 import java.io.IOException;
+import java.util.function.Consumer;
 
 /**
- * Factory for creating counter snapshot instances
+ * A variant of {@link Consumer} that can throw {@link IOException}.
  */
-public interface CounterSnapshotFactory {
+@FunctionalInterface
+public interface IOConsumer<T> {
 
-  CounterSnapshot create(String counterId) throws IOException;
+  void accept(T t) throws IOException;
+
+  static <T> Consumer<T> unchecked(IOConsumer<T> f) {
+    return t -> {
+      try {
+        f.accept(t);
+      } catch (IOException e) {
+        throw new RuntimeIOException(e);
+      }
+    };
+  }
 }

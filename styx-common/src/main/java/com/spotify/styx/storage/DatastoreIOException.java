@@ -1,8 +1,8 @@
-/*-
+/*
  * -\-\-
- * Spotify Styx Common
+ * Spotify Styx Scheduler Service
  * --
- * Copyright (C) 2016 - 2018 Spotify AB
+ * Copyright (C) 2018 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +18,26 @@
  * -/-/-
  */
 
-package com.spotify.styx.util;
+package com.spotify.styx.storage;
 
+import com.google.cloud.datastore.DatastoreException;
 import java.io.IOException;
+import java.util.Objects;
 
 /**
- * Factory for creating counter snapshot instances
+ * A checked version of {@link DatastoreException} that is used to force callers to handle errors.
  */
-public interface CounterSnapshotFactory {
+public class DatastoreIOException extends IOException {
 
-  CounterSnapshot create(String counterId) throws IOException;
+  private final DatastoreException cause;
+
+  public DatastoreIOException(DatastoreException cause) {
+    super(cause);
+    this.cause = Objects.requireNonNull(cause);
+  }
+
+  @Override
+  public synchronized DatastoreException getCause() {
+    return cause;
+  }
 }
