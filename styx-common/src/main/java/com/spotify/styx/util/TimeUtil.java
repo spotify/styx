@@ -232,14 +232,11 @@ public class TimeUtil {
 
   public static ZonedDateTime subtractOffset(ZonedDateTime time, String offset) {
     // Change sign of offset string and add
-    offset = offset.trim();
     if (offset.startsWith("-")) {
-      offset = offset.substring(1);
+      return addOffset(time, offset.substring(1));
     } else {
-      offset = "-" + offset;
+      return addOffset(time, "-" + offset);
     }
-    System.out.println(offset);
-    return addOffset(time, offset);
   }
 
   public static Cron cron(Schedule schedule) {
