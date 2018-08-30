@@ -197,7 +197,7 @@ public class StyxApi implements AppInit {
 
     final Connection bigTable = closer.register(createBigTableConnection(config));
     final Datastore datastore = createDatastore(config, stats);
-    return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
+    return closer.register(new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT));
   }
 
   private static Stats stats(Environment environment) {
