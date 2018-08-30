@@ -22,7 +22,6 @@ package com.spotify.styx.state;
 
 import static com.spotify.styx.state.StateUtil.isConsumingResources;
 import static com.spotify.styx.util.MDCUtil.withMDC;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
@@ -45,7 +44,6 @@ import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
