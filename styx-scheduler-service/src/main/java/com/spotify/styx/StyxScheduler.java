@@ -755,7 +755,8 @@ public class StyxScheduler implements AppInit {
     }
   }
 
-  private static boolean isDevMode(Config config) {
+  @VisibleForTesting
+  static boolean isDevMode(Config config) {
     return STYX_MODE_DEVELOPMENT.equals(config.getString(STYX_MODE));
   }
 
