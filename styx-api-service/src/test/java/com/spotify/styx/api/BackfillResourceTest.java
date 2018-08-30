@@ -155,8 +155,10 @@ public class BackfillResourceTest extends VersionedApiTest {
     storage = spy(new AggregateStorage(bigtable, localDatastore.getOptions().getService(),
         Duration.ZERO));
 
+    final BackfillResource backfillResource = closer.register(
+        new BackfillResource(SCHEDULER_BASE, storage, workflowValidator));
     environment.routingEngine()
-        .registerRoutes(new BackfillResource(SCHEDULER_BASE, storage, workflowValidator).routes());
+        .registerRoutes(backfillResource.routes());
   }
 
   @BeforeClass
