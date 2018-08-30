@@ -25,13 +25,13 @@ import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.util.CloserUtil.register;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
-import static com.spotify.styx.util.StreamUtil.cat;
 import static com.spotify.styx.util.TimeUtil.instantsInRange;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.stream.Collectors.toList;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Streams;
 import com.google.common.io.Closer;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
@@ -136,7 +136,7 @@ public final class BackfillResource implements Closeable {
             rc -> haltBackfill(rc.pathArgs().get("bid"), rc))
     );
 
-    return cat(
+    return Streams.concat(
         Api.prefixRoutes(entityRoutes, V3),
         Api.prefixRoutes(routes, V3)
     );

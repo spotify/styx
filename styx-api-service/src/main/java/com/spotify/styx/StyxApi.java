@@ -25,6 +25,7 @@ import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
 
 import com.google.cloud.datastore.Datastore;
+import com.google.common.collect.Streams;
 import com.google.common.io.Closer;
 import com.spotify.apollo.AppInit;
 import com.spotify.apollo.Environment;
@@ -50,7 +51,6 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.StorageFactory;
-import com.spotify.styx.util.StreamUtil;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.WorkflowValidator;
 import com.typesafe.config.Config;
@@ -178,7 +178,7 @@ public class StyxApi implements AppInit {
     final Supplier<List<String>> clientBlacklistSupplier =
         () -> configSupplier.get().clientBlacklist();
 
-    final Stream<Route<AsyncHandler<Response<ByteString>>>> routes = StreamUtil.cat(
+    final Stream<Route<AsyncHandler<Response<ByteString>>>> routes = Streams.concat(
         workflowResource.routes(),
         backfillResource.routes(),
         resourceResource.routes(),

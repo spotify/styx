@@ -59,6 +59,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.collect.Streams;
 import com.google.common.hash.Hashing;
 import com.google.common.io.Closer;
 import com.spotify.styx.model.Backfill;
@@ -78,7 +79,6 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.FnWithException;
 import com.spotify.styx.util.MDCUtil;
 import com.spotify.styx.util.ResourceNotFoundException;
-import com.spotify.styx.util.StreamUtil;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.TriggerInstantSpec;
 import com.spotify.styx.util.TriggerUtil;
@@ -415,7 +415,7 @@ public class DatastoreStorage implements Closeable {
                 .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
                 .build()), executor))
         .collect(toList()).stream() // collect here to execute batch reads in parallel
-        .flatMap(task -> StreamUtil.stream(task.join()))
+        .flatMap(task -> Streams.stream(task.join()))
         .map(entity -> entity.getKey().getName())
         .map(name -> activeWorkflowInstanceKey(datastore.newKeyFactory(), name))
         .collect(toList());
