@@ -32,13 +32,13 @@ import org.slf4j.LoggerFactory;
 
 public class CloserUtil {
 
+  private static final Logger log = LoggerFactory.getLogger(CloserUtil.class);
+
   static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
 
   private CloserUtil() {
     throw new UnsupportedOperationException();
   }
-
-  private static final Logger log = LoggerFactory.getLogger(CloserUtil.class);
 
   public static <T extends ExecutorService> T register(Closer closer, T executorService, String name) {
     return register(closer, executorService, name, DEFAULT_TIMEOUT);
