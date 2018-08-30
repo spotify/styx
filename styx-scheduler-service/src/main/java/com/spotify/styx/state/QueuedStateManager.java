@@ -80,8 +80,6 @@ public class QueuedStateManager implements StateManager {
 
   private static final long NO_EVENTS_PROCESSED = -1L;
 
-  private static final Duration SHUTDOWN_GRACE_PERIOD = Duration.ofSeconds(5);
-
   private final LongAdder queuedEvents = new LongAdder();
 
   private final Time time;
@@ -400,18 +398,6 @@ public class QueuedStateManager implements StateManager {
       return;
     }
     running = false;
-
-    eventProcessingExecutor.shutdown();
-    try {
-      if (!eventProcessingExecutor
-          .awaitTermination(SHUTDOWN_GRACE_PERIOD.toMillis(), MILLISECONDS)) {
-        throw new IOException(
-            "Graceful shutdown failed, event loop did not finish within grace period");
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IOException(e);
-    }
   }
 
   @VisibleForTesting
