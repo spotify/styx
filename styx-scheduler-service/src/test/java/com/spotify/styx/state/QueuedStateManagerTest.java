@@ -138,10 +138,9 @@ public class QueuedStateManagerTest {
   }
 
   @After
-  public void tearDown() throws Exception {
-    if (stateManager != null) {
-      stateManager.close();
-    }
+  public void tearDown() {
+    eventTransitionExecutor.shutdownNow();
+    eventConsumerExecutor.shutdownNow();
   }
 
   @Test

@@ -23,6 +23,7 @@ package com.spotify.styx.api;
 import static com.spotify.apollo.StatusType.Family.SUCCESSFUL;
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.serialization.Json.serialize;
+import static com.spotify.styx.util.CloserUtil.register;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 import static com.spotify.styx.util.StreamUtil.cat;
 import static com.spotify.styx.util.TimeUtil.instantsInRange;
@@ -31,6 +32,7 @@ import static java.util.stream.Collectors.toList;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Iterables;
+import com.google.common.io.Closer;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -75,7 +77,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
@@ -88,6 +89,8 @@ public final class BackfillResource implements Closeable {
   private static final String WAITING = "WAITING";
   private static final int CONCURRENCY = 64;
 
+  private final Closer closer = Closer.create();
+
   private final Storage storage;
   private final String schedulerServiceBaseUrl;
   private final WorkflowValidator workflowValidator;
@@ -99,7 +102,7 @@ public final class BackfillResource implements Closeable {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
     this.storage = Objects.requireNonNull(storage);
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
-    this.forkJoinPool = new ForkJoinPool(CONCURRENCY);
+    this.forkJoinPool = register(closer, new ForkJoinPool(CONCURRENCY), "backfill-resource");
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -140,13 +143,8 @@ public final class BackfillResource implements Closeable {
   }
 
   @Override
-  public void close() {
-    forkJoinPool.shutdownNow();
-    try {
-      forkJoinPool.awaitTermination(30, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
+  public void close() throws IOException {
+    closer.close();
   }
 
   private BackfillsPayload getBackfills(RequestContext rc) {

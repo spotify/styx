@@ -220,6 +220,7 @@ public class DatastoreStorageTest {
   @After
   public void tearDown() throws Exception {
     helper.reset();
+    storage.close();
   }
 
   @Test

@@ -22,6 +22,7 @@ package com.spotify.styx.storage;
 
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.storage.Storage.GLOBAL_RESOURCE_ID;
+import static com.spotify.styx.util.CloserUtil.register;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_SHARD;
 import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
@@ -59,6 +60,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.hash.Hashing;
+import com.google.common.io.Closer;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.ExecutionDescription;
@@ -99,7 +101,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -182,10 +183,11 @@ public class DatastoreStorage implements Closeable {
 
   private static final int REQUEST_CONCURRENCY = 32;
 
+  private final Closer closer = Closer.create();
+
   private final Datastore datastore;
   private final Duration retryBaseDelay;
   private final Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory;
-  private final ForkJoinPool forkJoinPool;
   private final Executor executor;
 
   DatastoreStorage(Datastore datastore, Duration retryBaseDelay) {
@@ -198,18 +200,13 @@ public class DatastoreStorage implements Closeable {
     this.datastore = Objects.requireNonNull(datastore);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
     this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
-    this.forkJoinPool = new ForkJoinPool(REQUEST_CONCURRENCY);
+    final ForkJoinPool forkJoinPool = register(closer, new ForkJoinPool(REQUEST_CONCURRENCY), "datastore-storage");
     this.executor = MDCUtil.withMDC(Context.currentContextExecutor(forkJoinPool));
   }
 
   @Override
-  public void close() {
-    forkJoinPool.shutdownNow();
-    try {
-      forkJoinPool.awaitTermination(30, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
+  public void close() throws IOException {
+    closer.close();
   }
 
   StyxConfig config() {

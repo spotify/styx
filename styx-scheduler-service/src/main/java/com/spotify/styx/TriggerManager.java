@@ -22,6 +22,7 @@ package com.spotify.styx;
 
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
+import static com.spotify.styx.util.CloserUtil.register;
 import static com.spotify.styx.util.ExceptionUtil.findCause;
 import static com.spotify.styx.util.GuardedRunnable.guard;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
@@ -30,6 +31,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 import com.google.common.base.Throwables;
+import com.google.common.io.Closer;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
@@ -55,7 +57,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,11 +73,12 @@ class TriggerManager implements Closeable {
 
   private static final Tracer tracer = Tracing.getTracer();
 
+  private final Closer closer = Closer.create();
+
   private final TriggerListener triggerListener;
   private final Time time;
   private final Storage storage;
   private final Stats stats;
-  private final ForkJoinPool forkJoinPool;
   private final Executor executor;
 
   TriggerManager(TriggerListener triggerListener,
@@ -87,7 +89,7 @@ class TriggerManager implements Closeable {
     this.time = requireNonNull(time);
     this.storage = requireNonNull(storage);
     this.stats = requireNonNull(stats);
-    this.forkJoinPool = new ForkJoinPool(TRIGGER_CONCURRENCY);
+    final ForkJoinPool forkJoinPool = register(closer, new ForkJoinPool(TRIGGER_CONCURRENCY), "trigger-manager");
     this.executor = Context.currentContextExecutor(forkJoinPool);
   }
 
@@ -180,12 +182,7 @@ class TriggerManager implements Closeable {
   }
 
   @Override
-  public void close() {
-    forkJoinPool.shutdownNow();
-    try {
-      forkJoinPool.awaitTermination(30, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
+  public void close() throws IOException {
+    closer.close();
   }
 }

@@ -25,6 +25,7 @@ import static com.spotify.styx.docker.KubernetesPodEventTranslator.isTerminated;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.state.RunState.State.RUNNING;
+import static com.spotify.styx.util.CloserUtil.register;
 import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -36,6 +37,7 @@ import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.WaitStrategies;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
+import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
@@ -136,8 +138,9 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String KEEPALIVE_CONTAINER_NAME = "keepalive";
   static final String MAIN_CONTAINER_NAME = "styx-run";
 
-  private final ScheduledExecutorService executor;
+  private final Closer closer = Closer.create();
 
+  private final ScheduledExecutorService executor;
 
   private final KubernetesClient client;
   private final StateManager stateManager;
@@ -165,7 +168,7 @@ class KubernetesDockerRunner implements DockerRunner {
     this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
     this.podDeletionDelaySeconds = podDeletionDelaySeconds;
     this.time = Objects.requireNonNull(time);
-    this.executor = Objects.requireNonNull(executor);
+    this.executor = register(closer, Objects.requireNonNull(executor), "kubernetes-docker-runner");
   }
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
@@ -470,12 +473,7 @@ class KubernetesDockerRunner implements DockerRunner {
     if (watch != null) {
       watch.close();
     }
-    executor.shutdown();
-    try {
-      executor.awaitTermination(30, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      LOG.warn("Failed to terminate executor", e);
-    }
+    closer.close();
   }
 
   @Override
