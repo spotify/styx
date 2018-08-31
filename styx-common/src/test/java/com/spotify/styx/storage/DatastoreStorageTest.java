@@ -212,7 +212,7 @@ public class DatastoreStorageTest {
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
-    datastore = new CheckedDatastore(helper.getOptions().getService());
+    datastore = spy(new CheckedDatastore(helper.getOptions().getService()));
     storage = new DatastoreStorage(datastore, Duration.ZERO);
   }
 
@@ -414,6 +414,14 @@ public class DatastoreStorageTest {
         storage.readActiveStates(WORKFLOW_ID1.componentId());
 
     assertThat(activeStates, is(ImmutableMap.of(WORKFLOW_INSTANCE2, RUN_STATE2)));
+  }
+
+  @Test
+  public void readActiveStatesShouldPropagateIOException() throws Exception {
+    final IOException cause = new IOException("foobar");
+    doThrow(cause).when(datastore).query(any());
+    exception.expect(is(cause));
+    storage.readActiveStates();
   }
 
   @Test

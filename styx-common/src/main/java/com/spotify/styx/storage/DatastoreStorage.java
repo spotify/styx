@@ -23,6 +23,7 @@ package com.spotify.styx.storage;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.storage.Storage.GLOBAL_RESOURCE_ID;
 import static com.spotify.styx.util.CloserUtil.register;
+import static com.spotify.styx.util.FutureUtil.gatherIO;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_SHARD;
 import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
@@ -85,6 +86,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -96,6 +98,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -390,23 +393,25 @@ public class DatastoreStorage implements Closeable {
    * Strongly consistently read all active states
    */
   Map<WorkflowInstance, RunState> readActiveStates() throws IOException {
-    // Strongly read active state keys from index shards
-    final List<Key> keys = activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
+    // Strongly read active state keys from index shards in parallel
+    final List<Key> keys = gatherIO(activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
         .map(key -> asyncIO(() -> datastore.query(Query.newEntityQueryBuilder()
             .setFilter(PropertyFilter.hasAncestor(key))
             .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
             .build())))
-        .collect(toList()).stream() // collect here to execute batch reads in parallel
-        .flatMap(task -> task.join().stream())
+        .collect(toList()), 30, TimeUnit.SECONDS)
+        .stream()
+        .flatMap(Collection::stream)
         .map(entity -> entity.getKey().getName())
         .map(name -> activeWorkflowInstanceKey(datastore.newKeyFactory(), name))
         .collect(toList());
 
-    // Strongly consistently read values for the above keys
-    return Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ).stream()
+    // Strongly consistently read values for the above keys in parallel
+    return gatherIO(Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ).stream()
         .map(batch -> asyncIO(() -> this.readRunStateBatch(batch)))
-        .collect(toList()).stream() // collect here to execute batch reads in parallel
-        .flatMap(task -> task.join().stream())
+        .collect(toList()), 30, TimeUnit.SECONDS)
+        .stream()
+        .flatMap(Collection::stream)
         .collect(toMap(RunState::workflowInstance, Function.identity()));
   }
 
