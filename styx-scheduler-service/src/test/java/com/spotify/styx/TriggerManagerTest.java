@@ -100,7 +100,7 @@ public class TriggerManagerTest {
     triggerExecutionFuture.complete(null);
     verify(storage, timeout(60_000)).updateNextNaturalTrigger(
         WORKFLOW_DAILY.id(),
-        TriggerInstantSpec.create(parse("2016-10-01T00:00:00Z"), parse("2016-10-02T00:00:00Z")));
+        TriggerInstantSpec.create(parse("2016-10-02T00:00:00Z"), parse("2016-10-03T00:00:00Z")));
   }
 
   @Test
@@ -122,7 +122,7 @@ public class TriggerManagerTest {
     verify(triggerListener).event(WORKFLOW_DAILY, NATURAL_TRIGGER, parse("2016-10-01T00:00:00Z"));
     verify(storage).updateNextNaturalTrigger(
         WORKFLOW_DAILY.id(),
-        TriggerInstantSpec.create(parse("2016-10-01T00:00:00Z"), parse("2016-10-02T00:00:00Z")));
+        TriggerInstantSpec.create(parse("2016-10-02T00:00:00Z"), parse("2016-10-03T00:00:00Z")));
   }
 
   @Test
@@ -133,7 +133,7 @@ public class TriggerManagerTest {
     verify(triggerListener, never()).event(any(), any(), any());
     verify(storage).updateNextNaturalTrigger(
         WORKFLOW_DAILY.id(),
-        TriggerInstantSpec.create(parse("2016-10-09T00:00:00Z"), parse("2016-10-10T00:00:00Z")));
+        TriggerInstantSpec.create(parse("2016-10-10T00:00:00Z"), parse("2016-10-11T00:00:00Z")));
   }
 
   @Test
@@ -171,7 +171,7 @@ public class TriggerManagerTest {
 
     verify(storage).updateNextNaturalTrigger(
         WORKFLOW_DAILY.id(),
-        TriggerInstantSpec.create(parse("2016-10-01T00:00:00Z"), parse("2016-10-02T00:00:00Z")));
+        TriggerInstantSpec.create(parse("2016-10-02T00:00:00Z"), parse("2016-10-03T00:00:00Z")));
   }
 
   @Test

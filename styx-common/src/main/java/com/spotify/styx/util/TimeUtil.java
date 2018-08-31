@@ -53,6 +53,9 @@ public class TimeUtil {
   private static final String MONTHLY_CRON = "0 0 1 * *";
   private static final String YEARLY_CRON = "0 0 1 1 *";
 
+  private static final Pattern OFFSET_PATTERN = Pattern.compile(
+      "([-+]?)P([-+0-9YMWD]+)?(T([-+0-9HMS.,]+)?)?", Pattern.CASE_INSENSITIVE);
+
   private TimeUtil() {
     throw new UnsupportedOperationException();
   }
@@ -214,9 +217,7 @@ public class TimeUtil {
    * @return A zoned date time with the offset applied
    */
   public static ZonedDateTime addOffset(ZonedDateTime time, String offset) {
-    final Pattern pattern = Pattern.compile("([-+]?)P([-+0-9YMWD]+)?(T([-+0-9HMS.,]+)?)?",
-        Pattern.CASE_INSENSITIVE);
-    Matcher matcher = pattern.matcher(offset);
+    final Matcher matcher = OFFSET_PATTERN.matcher(offset);
 
     if (!matcher.matches()) {
       throw new DateTimeParseException("Unable to parse offset period", offset, 0);
