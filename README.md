@@ -150,8 +150,8 @@ An [ISO 8601 Duration] specification for offsetting the cron schedule.
 This is useful for when setting up a schedule that needs to be offset in time relative to the
 schedule timestamps. For instance, an hourly schedule that needs to process a bucket of data
 for each hour will not be able to run until at the end of that hour. We can then use an offset
-value of `PT1H`. The injected placeholder would reflect the logical time of the schedule (00,
-01, 02, ...), but it would actually run one hour later (01, 02, 03, ...). This is specially
+value of `PT1H`. The injected placeholder would reflect a logical time of the schedule
+(00, 01, 02, ...) one hour earlier than the actual run time (01, 02, 03, ...). This is specially
 useful for irregular schedules.
 
 In fact, it is so common that we need to use a "last hour" parameter in jobs that we've set the
