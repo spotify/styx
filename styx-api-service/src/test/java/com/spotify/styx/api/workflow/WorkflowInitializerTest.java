@@ -72,7 +72,6 @@ public class WorkflowInitializerTest {
   @Test
   public void shouldStoreNewWorkflowAndUpdateNextNaturalTrigger() throws IOException, WorkflowInitializationException {
     when(transaction.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.empty());
-    when(transaction.store(HOURLY_WORKFLOW)).thenReturn(HOURLY_WORKFLOW.id());
     workflowInitializer.store(HOURLY_WORKFLOW);
 
     final Instant nextTrigger = lastInstant(NOW, Schedule.HOURS);
