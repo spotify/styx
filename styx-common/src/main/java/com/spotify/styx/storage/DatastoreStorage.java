@@ -408,7 +408,7 @@ public class DatastoreStorage implements Closeable {
 
     // Strongly consistently read values for the above keys in parallel
     return gatherIO(Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ).stream()
-        .map(batch -> asyncIO(() -> this.readRunStateBatch(batch)))
+        .map(batch -> asyncIO(() -> readRunStateBatch(batch)))
         .collect(toList()), 30, TimeUnit.SECONDS)
         .stream()
         .flatMap(Collection::stream)
