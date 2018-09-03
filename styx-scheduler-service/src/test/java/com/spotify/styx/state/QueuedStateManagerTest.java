@@ -90,7 +90,7 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 import org.slf4j.Logger;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -130,7 +130,7 @@ public class QueuedStateManagerTest {
   public void setUp() throws Exception {
     when(time.get()).thenReturn(NOW);
     when(storage.runInTransaction(any())).thenAnswer(
-        a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
+        a -> a.<TransactionFunction>getArgument(0).apply(transaction));
     doNothing().when(outputHandler).transitionInto(runStateCaptor.capture());
     stateManager = new QueuedStateManager(
         time, eventTransitionExecutor, storage, eventConsumer,
@@ -219,7 +219,7 @@ public class QueuedStateManagerTest {
     when(transactionException.isAlreadyExists()).thenReturn(true);
     doThrow(transactionException).when(transaction).writeActiveState(any(), any());
     when(storage.runInTransaction(any())).thenAnswer(a ->
-        a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
+        a.<TransactionFunction>getArgument(0).apply(transaction));
 
     try {
       stateManager.trigger(INSTANCE, TRIGGER1)
@@ -239,7 +239,7 @@ public class QueuedStateManagerTest {
     final TransactionException transactionException = spy(new TransactionException(datastoreException));
     when(transactionException.isConflict()).thenReturn(true);
     when(storage.runInTransaction(any())).thenAnswer(a -> {
-      a.getArgumentAt(0, TransactionFunction.class)
+      a.<TransactionFunction>getArgument(0)
           .apply(transaction);
       throw transactionException;
     });
@@ -363,7 +363,7 @@ public class QueuedStateManagerTest {
     when(storage.readActiveState(INSTANCE)).thenReturn(runState);
     when(storage.runInTransaction(any())).thenAnswer(a -> {
       barrier.get();
-      return a.getArgumentAt(0, TransactionFunction.class).apply(transaction);
+      return a.<TransactionFunction>getArgument(0).apply(transaction);
     });
 
     CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()))

@@ -43,7 +43,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class WorkflowInitializerTest {
@@ -66,7 +66,7 @@ public class WorkflowInitializerTest {
   public void setUp() throws IOException {
     workflowInitializer = new WorkflowInitializer(storage, () -> NOW);
     when(storage.runInTransaction(any())).then(a ->
-        a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
+        a.<TransactionFunction>getArgument(0).apply(transaction));
   }
 
   @Test

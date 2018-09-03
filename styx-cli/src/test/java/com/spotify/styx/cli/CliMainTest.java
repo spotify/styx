@@ -136,8 +136,8 @@ public class CliMainTest {
     assertThat(expected, is(not(Matchers.empty())));
 
     when(client.createOrUpdateWorkflow(any(), any())).thenAnswer(a -> {
-      final String comp = a.getArgumentAt(0, String.class);
-      final WorkflowConfiguration wfConfig = a.getArgumentAt(1, WorkflowConfiguration.class);
+      final String comp = a.getArgument(0);
+      final WorkflowConfiguration wfConfig = a.getArgument(1);
       return CompletableFuture.completedFuture(Workflow.create(comp, wfConfig));
     });
 
