@@ -735,11 +735,9 @@ public class DatastoreStorage implements Closeable {
 
   List<Resource> getResources() throws IOException {
     final EntityQuery query = Query.newEntityQueryBuilder().setKind(KIND_RESOURCE).build();
-    final List<Entity> results = datastore.query(query);
     final List<Resource> resources = Lists.newArrayList();
-    for (Entity result : results) {
-      resources.add(entityToResource(result));
-    }
+    datastore.query(query, entity ->
+        resources.add(entityToResource(entity)));
     return resources;
   }
 
