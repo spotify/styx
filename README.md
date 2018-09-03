@@ -254,7 +254,6 @@ Stable features and APIs:
 
 All other APIs are considered unstable and can change at any time. E.g. the `StyxScheduler` class offers some plugin APIs for customizing functionality but they might change at any time. This should only affect engineers that link against and customize the Styx services.
 
-
 ### Code Coverage
 
 An aggregate code coverage report for the entire project is created by the `report` submodule.
