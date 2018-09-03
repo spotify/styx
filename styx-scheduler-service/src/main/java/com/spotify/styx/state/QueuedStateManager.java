@@ -264,7 +264,7 @@ public class QueuedStateManager implements StateManager {
   }
 
   private void updateResourceCounters(StorageTransaction tx, Event event,
-                                      RunState currentRunState, RunState nextRunState) {
+                                      RunState currentRunState, RunState nextRunState) throws IOException {
     // increment counters if event is dequeue
     if (isDequeue(event) && nextRunState.data().resourceIds().isPresent()) {
       tryUpdatingCounter(currentRunState, tx, nextRunState.data().resourceIds().get());

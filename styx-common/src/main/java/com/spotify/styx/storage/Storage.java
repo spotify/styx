@@ -279,15 +279,15 @@ public interface Storage extends Closeable {
 
   List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId) throws IOException;
 
-  Optional<Backfill> backfill(String id);
+  Optional<Backfill> backfill(String id) throws IOException;
 
   void storeBackfill(Backfill backfill) throws IOException;
 
-  Map<Integer, Long> shardsForCounter(String counterId);
+  Map<Integer, Long> shardsForCounter(String counterId) throws IOException;
 
-  void deleteShardsForCounter(String counterId);
+  void deleteShardsForCounter(String counterId) throws IOException;
 
-  long getLimitForCounter(String counterId);
+  long getLimitForCounter(String counterId) throws IOException;
 
   /**
    * Run a function in a transaction that is committed if successful. Any exception thrown by the

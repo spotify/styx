@@ -453,8 +453,8 @@ public class StyxScheduler implements AppInit {
       // Initialize resources
       storage.resources().parallelStream().forEach(
           resource -> {
-            counterSnapshotFactory.create(resource.id());
             try {
+              counterSnapshotFactory.create(resource.id());
               storage.runInTransaction(tx -> {
                 shardedCounter.updateLimit(tx, resource.id(), resource.concurrency());
                 return null;

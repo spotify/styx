@@ -176,7 +176,7 @@ class BackfillTriggerManager {
                                           Workflow workflow,
                                           Instant initialNextTrigger,
                                           int remainingCapacity,
-                                          boolean reversed) {
+                                          boolean reversed) throws IOException {
     final Backfill backfill = tx.backfill(id).orElseThrow(() ->
         new RuntimeException("Error while fetching backfill " + id));
 
