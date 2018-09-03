@@ -169,10 +169,6 @@ public class BackfillTriggerManagerTest {
 
     when(stateManager.getActiveStatesByTriggerId(anyString())).thenReturn(activeStates);
 
-    when(storage.resources()).thenReturn(resourceLimits);
-    when(config.globalConcurrency()).thenReturn(Optional.empty());
-    when(storage.config()).thenReturn(config);
-
     ArgumentCaptor<Backfill> backfillArgumentCaptor = ArgumentCaptor.forClass(Backfill.class);
     when(transaction.store(backfillArgumentCaptor.capture())).then(answer -> {
       backfills.put(backfillArgumentCaptor.getValue().id(), backfillArgumentCaptor.getValue());

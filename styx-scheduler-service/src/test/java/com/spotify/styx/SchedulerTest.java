@@ -129,9 +129,6 @@ public class SchedulerTest {
         .thenReturn(WorkflowExecutionGate.NO_BLOCKER);
     when(shardedCounter.counterHasSpareCapacity(anyString())).thenReturn(true);
     doNothing().when(stateManager).receiveIgnoreClosed(eventCaptor.capture(), anyLong());
-    doNothing().when(stateManager).receiveIgnoreClosed(eventCaptor.capture());
-    when(stateManager.receive(eventCaptor.capture(), anyLong())).thenReturn(CompletableFuture.completedFuture(null));
-    when(stateManager.receive(eventCaptor.capture())).thenReturn(CompletableFuture.completedFuture(null));
   }
 
   @After
