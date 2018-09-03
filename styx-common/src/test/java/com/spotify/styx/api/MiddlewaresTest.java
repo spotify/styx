@@ -530,7 +530,6 @@ public class MiddlewaresTest {
     when(requestContext.request()).thenReturn(request);
 
     when(idTokenVerifier.verify("s3cr3tp455w0rd")).thenReturn(idToken);
-    when(idToken.getPayload()).thenReturn(idTokenPayload);
 
     final AtomicReference<GoogleIdToken> userHolder = new AtomicReference<>();
     awaitResponse(Middlewares.authed(idTokenVerifier)
