@@ -110,16 +110,16 @@ public class CheckedDatastoreReaderWriterTest {
 
   @Test
   public void updateShouldThrowCheckedException() throws IOException {
-    doThrow(CAUSE).when(rw).update(entity1);
+    doThrow(CAUSE).when(rw).update(entity1, entity2);
     exception.expect(IOException.class);
     exception.expectCause(is((Throwable) CAUSE));
-    sut.update(entity1);
+    sut.update(entity1, entity2);
   }
 
   @Test
   public void update() throws IOException {
-    sut.update(entity1);
-    verify(rw).update(entity1);
+    sut.update(entity1, entity2);
+    verify(rw).update(entity1, entity2);
   }
 
   @Test

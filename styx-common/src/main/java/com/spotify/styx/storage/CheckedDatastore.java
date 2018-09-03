@@ -36,15 +36,25 @@ class CheckedDatastore extends CheckedDatastoreReaderWriter {
 
   private final Datastore datastore;
 
+  /**
+   * Create a new {@link CheckedDatastore} wrapping a {@link Datastore}.
+   */
   CheckedDatastore(Datastore datastore) {
     super(datastore);
     this.datastore = Objects.requireNonNull(datastore);
   }
 
+  /**
+   * @see Datastore#newKeyFactory()
+   */
   KeyFactory newKeyFactory() {
     return datastore.newKeyFactory();
   }
 
+  /**
+   * @see Datastore#newTransaction()
+   * @throws DatastoreIOException if the underlying client throws {@link DatastoreException}
+   */
   CheckedDatastoreTransaction newTransaction() throws DatastoreIOException {
     try {
       return new CheckedDatastoreTransaction(this, datastore.newTransaction());
@@ -53,6 +63,10 @@ class CheckedDatastore extends CheckedDatastoreReaderWriter {
     }
   }
 
+  /**
+   * @see Datastore#allocateId(IncompleteKey)
+   * @throws IOException if the underlying client throws {@link DatastoreException}
+   */
   Key allocateId(IncompleteKey newKey) throws IOException {
     return call(() -> datastore.allocateId(newKey));
   }

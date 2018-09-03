@@ -34,12 +34,19 @@ class CheckedDatastoreTransaction extends CheckedDatastoreReaderWriter {
   private final CheckedDatastore datastore;
   final Transaction tx;
 
+  /**
+   * Create a new {@link CheckedDatastoreTransaction} wrapping a {@link Transaction}.
+   */
   CheckedDatastoreTransaction(CheckedDatastore datastore, Transaction tx) {
     super(tx);
     this.datastore = Objects.requireNonNull(datastore);
     this.tx = Objects.requireNonNull(tx);
   }
 
+  /**
+   * @see Transaction#commit()
+   * @throws DatastoreIOException if the underlying client throws {@link DatastoreException}
+   */
   Response commit() throws DatastoreIOException {
     try {
       return tx.commit();
@@ -48,6 +55,10 @@ class CheckedDatastoreTransaction extends CheckedDatastoreReaderWriter {
     }
   }
 
+  /**
+   * @see Transaction#rollback()
+   * @throws DatastoreIOException if the underlying client throws {@link DatastoreException}
+   */
   void rollback() throws DatastoreIOException {
     try {
       tx.rollback();
@@ -56,10 +67,16 @@ class CheckedDatastoreTransaction extends CheckedDatastoreReaderWriter {
     }
   }
 
+  /**
+   * @see Transaction#isActive()
+   */
   boolean isActive() {
     return tx.isActive();
   }
 
+  /**
+   * @see Transaction#getDatastore()
+   */
   CheckedDatastore getDatastore() {
     return datastore;
   }
