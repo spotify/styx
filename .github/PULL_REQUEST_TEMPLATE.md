@@ -19,7 +19,7 @@
 - [ ] Error handling is tested
 - [ ] Errors are handled at the appropriate layer
 - [ ] Errors that cannot be handled where they occur must be propagated
-- [ ] (optional) Changes are covered by integration test
+- [ ] (optional) Changes are covered by system test
 - [ ] Relevant documentation updated
 - [ ] This PR has NO breaking change to public API
 - [ ] This PR has breaking change to public API and it is documented
