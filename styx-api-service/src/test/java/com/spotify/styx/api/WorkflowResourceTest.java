@@ -86,7 +86,8 @@ import org.mockito.MockitoAnnotations;
 public class WorkflowResourceTest extends VersionedApiTest {
 
   private static final TriggerParameters TRIGGER_PARAMETERS = TriggerParameters.builder()
-      .env("FOO", "foo", "BAR", "bar")
+      .env("FOO", "foo",
+          "BAR", "bar")
       .build();
 
   private static LocalDatastoreHelper localDatastore;

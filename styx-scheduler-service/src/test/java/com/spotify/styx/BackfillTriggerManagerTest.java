@@ -87,7 +87,8 @@ import org.mockito.junit.MockitoJUnitRunner;
 public class BackfillTriggerManagerTest {
 
   private static final TriggerParameters TRIGGER_PARAMETERS = TriggerParameters.builder()
-      .env("FOO", "foo", "BAR", "bar")
+      .env("FOO", "foo",
+          "BAR", "bar")
       .build();
 
   private static final WorkflowId WORKFLOW_ID1 =
