@@ -25,6 +25,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockito.Answers.CALLS_REAL_METHODS;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -48,8 +49,7 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class CheckedDatastoreReaderWriterTest {
@@ -157,18 +157,18 @@ public class CheckedDatastoreReaderWriterTest {
   @Test
   public void getAndConsumeShouldPropagateIOException() throws IOException {
     final IOException cause = new IOException("foo");
-    doReturn(Stream.of(entity1, entity2).iterator()).when(rw).get(Mockito.any(Key[].class));
+    doReturn(Stream.of(entity1, entity2).iterator()).when(rw).get(key1, key2);
     exception.expect(is(cause));
-    sut.get(ImmutableList.of(key1), entity -> { throw cause; });
+    sut.get(ImmutableList.of(key1, key2), entity -> { throw cause; });
   }
 
   @Test
   public void getAndConsumeShouldHandleForEachRemainingThrowing() throws IOException {
     doThrow(CAUSE).when(entityIterator).forEachRemaining(any());
-    doReturn(entityIterator).when(rw).get(Mockito.any(Key[].class));
+    doReturn(entityIterator).when(rw).get(key1, key2);
     exception.expect(IOException.class);
     exception.expectCause(is((Throwable) CAUSE));
-    sut.get(ImmutableList.of(key1), entity -> fail());
+    sut.get(ImmutableList.of(key1, key2), entity -> fail());
   }
 
   @Test
