@@ -133,12 +133,23 @@ public class PersistentEventTest {
         is(Event.retryAfter(INSTANCE1, 12345)));
     assertThat(
         deserializeEvent(json("triggerExecution", "\"trigger\":{\"@type\":\"natural\"}")),
+        is(Event.triggerExecution(INSTANCE1, NATURAL_TRIGGER1, TriggerParameters.zero())));
+    assertThat(
+        deserializeEvent(json("triggerExecution", "\"trigger\":{\"@type\":\"natural\"},"
+                                                  + "\"parameters\":{\"env\":{\"FOO\":\"foo\","
+                                                  + "\"BAR\":\"bar\"}}")),
         is(Event.triggerExecution(INSTANCE1, NATURAL_TRIGGER1, TRIGGER_PARAMETERS)));
     assertThat(
-        deserializeEvent(json("triggerExecution", "\"trigger\":{\"@type\":\"adhoc\",\"trigger_id\":\"trig2\"}")),
+        deserializeEvent(json("triggerExecution", "\"trigger\":{\"@type\":\"adhoc\","
+                                                  + "\"trigger_id\":\"trig2\"},"
+                                                  + "\"parameters\":{\"env\":{\"FOO\":\"foo\","
+                                                  + "\"BAR\":\"bar\"}}")),
         is(Event.triggerExecution(INSTANCE1, ADHOC_TRIGGER2, TRIGGER_PARAMETERS)));
     assertThat(
-        deserializeEvent(json("triggerExecution", "\"trigger\":{\"@type\":\"backfill\",\"trigger_id\":\"trig3\"}")),
+        deserializeEvent(json("triggerExecution", "\"trigger\":{\"@type\":\"backfill\","
+                                                  + "\"trigger_id\":\"trig3\"},"
+                                                  + "\"parameters\":{\"env\":{\"FOO\":\"foo\","
+                                                  + "\"BAR\":\"bar\"}}")),
         is(Event.triggerExecution(INSTANCE1, BACKFILL_TRIGGER3, TRIGGER_PARAMETERS)));
     assertThat(
         deserializeEvent(json("terminate", "\"exit_code\":20")),
@@ -148,7 +159,9 @@ public class PersistentEventTest {
   @Test
   public void testDeserializeFromJsonWhenTransformationRequired() throws Exception {
     assertThat(
-        deserializeEvent(json("triggerExecution", "\"trigger_id\":\"trig\"")),
+        deserializeEvent(json("triggerExecution", "\"trigger_id\":\"trig\","
+                                                  + "\"parameters\":{\"env\":{\"BAR\":\"bar\","
+                                                  + "\"FOO\":\"foo\"}}")),
         is(Event.triggerExecution(INSTANCE1, UNKNOWN_TRIGGER, TRIGGER_PARAMETERS)));
     assertThat(
         deserializeEvent(json("started", "\"pod_name\":\"" + POD_NAME + "\"")),
@@ -158,7 +171,7 @@ public class PersistentEventTest {
         is(Event.created(INSTANCE1, POD_NAME, "UNKNOWN")));
     assertThat(
         deserializeEvent(json("triggerExecution")),
-        is(Event.triggerExecution(INSTANCE1, TRIGGER_UNKNOWN, TRIGGER_PARAMETERS)));
+        is(Event.triggerExecution(INSTANCE1, TRIGGER_UNKNOWN, TriggerParameters.zero())));
   }
 
   private void assertRoundtrip(Event event) throws Exception {

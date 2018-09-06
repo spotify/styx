@@ -543,7 +543,7 @@ public class BackfillTriggerManagerTest {
 
     doReturn(CompletableFutures.exceptionallyCompletedFuture(new RuntimeException()))
         .when(triggerListener)
-        .event(any(), any(), eq(Instant.parse("2016-12-02T22:00:00Z")), TRIGGER_PARAMETERS);
+        .event(any(), any(), eq(Instant.parse("2016-12-02T22:00:00Z")), eq(TRIGGER_PARAMETERS));
 
     backfillTriggerManager.tick();
 
@@ -570,7 +570,7 @@ public class BackfillTriggerManagerTest {
 
     doThrow(new RuntimeException())
         .when(triggerListener)
-        .event(any(), any(), eq(Instant.parse("2016-12-02T22:00:00Z")), TRIGGER_PARAMETERS);
+        .event(any(), any(), eq(Instant.parse("2016-12-02T22:00:00Z")), eq(TRIGGER_PARAMETERS));
 
     backfillTriggerManager.tick();
 
@@ -598,7 +598,7 @@ public class BackfillTriggerManagerTest {
     doReturn(CompletableFutures
                  .exceptionallyCompletedFuture(new AlreadyInitializedException("")))
         .when(triggerListener)
-        .event(any(), any(), eq(Instant.parse("2016-12-02T22:00:00Z")), TRIGGER_PARAMETERS);
+        .event(any(), any(), eq(Instant.parse("2016-12-02T22:00:00Z")), eq(TRIGGER_PARAMETERS));
 
     backfillTriggerManager.tick();
 
