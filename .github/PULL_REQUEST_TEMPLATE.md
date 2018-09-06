@@ -18,7 +18,7 @@
 - [ ] Code coverage check passes
 - [ ] Error handling is tested
 - [ ] Errors are handled at the appropriate layer
-- [ ] Errors that cannot be handled where they occur must be propagated
+- [ ] Errors that cannot be handled where they occur are propagated
 - [ ] (optional) Changes are covered by system test
 - [ ] Relevant documentation updated
 - [ ] This PR has NO breaking change to public API
@@ -26,7 +26,7 @@
 
 ## Checklist for PR reviewer(s)
 <!--- Put an `x` in all the boxes that apply: -->
-- [ ] This PR has been incoporated in release note for the coming version
+- [ ] This PR has been incorporated in release note for the coming version
 - [ ] Risky changes introduced by this PR have been all considered
 
 <!---
