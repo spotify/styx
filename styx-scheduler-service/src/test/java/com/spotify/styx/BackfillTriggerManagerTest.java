@@ -80,7 +80,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class BackfillTriggerManagerTest {
@@ -155,8 +155,8 @@ public class BackfillTriggerManagerTest {
 
     when(triggerListener.event(any(Workflow.class), any(Trigger.class), any(Instant.class)))
         .then(a -> {
-          Workflow workflow = a.getArgumentAt(0, Workflow.class);
-          Instant instant = a.getArgumentAt(2, Instant.class);
+          Workflow workflow = a.getArgument(0);
+          Instant instant = a.getArgument(2);
 
           final String parameter = toParameter(workflow.configuration().schedule(), instant);
           final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(),
@@ -168,10 +168,6 @@ public class BackfillTriggerManagerTest {
         });
 
     when(stateManager.getActiveStatesByTriggerId(anyString())).thenReturn(activeStates);
-
-    when(storage.resources()).thenReturn(resourceLimits);
-    when(config.globalConcurrency()).thenReturn(Optional.empty());
-    when(storage.config()).thenReturn(config);
 
     ArgumentCaptor<Backfill> backfillArgumentCaptor = ArgumentCaptor.forClass(Backfill.class);
     when(transaction.store(backfillArgumentCaptor.capture())).then(answer -> {
@@ -185,7 +181,7 @@ public class BackfillTriggerManagerTest {
     when(storage.backfills(anyBoolean())).then(a -> new ArrayList<>(backfills.values()));
 
     when(storage.runInTransaction(any())).then(
-        a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
+        a -> a.<TransactionFunction>getArgument(0).apply(transaction));
 
     backfillTriggerManager = new BackfillTriggerManager(stateManager, storage,
                                                         triggerListener, Stats.NOOP, TIME,
@@ -486,8 +482,8 @@ public class BackfillTriggerManagerTest {
 
     doAnswer(a -> {
       CompletableFuture<Void> processed = new CompletableFuture<>();
-      Workflow workflow1 = a.getArgumentAt(0, Workflow.class);
-      Instant instant = a.getArgumentAt(2, Instant.class);
+      Workflow workflow1 = a.getArgument(0);
+      Instant instant = a.getArgument(2);
 
       final String parameter = toParameter(workflow1.configuration().schedule(), instant);
       final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow1.id(),

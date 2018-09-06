@@ -77,7 +77,7 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -530,7 +530,6 @@ public class MiddlewaresTest {
     when(requestContext.request()).thenReturn(request);
 
     when(idTokenVerifier.verify("s3cr3tp455w0rd")).thenReturn(idToken);
-    when(idToken.getPayload()).thenReturn(idTokenPayload);
 
     final AtomicReference<GoogleIdToken> userHolder = new AtomicReference<>();
     awaitResponse(Middlewares.authed(idTokenVerifier)

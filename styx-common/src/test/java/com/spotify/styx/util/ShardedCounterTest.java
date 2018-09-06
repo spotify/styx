@@ -72,7 +72,7 @@ import org.junit.runner.RunWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Mockito;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class ShardedCounterTest {
@@ -302,8 +302,8 @@ public class ShardedCounterTest {
     shardedCounter = spy(shardedCounter);
 
     doAnswer(invocation -> {
-      final Integer shardIndex = invocation.getArgumentAt(3, Integer.class);
-      final String counterId = invocation.getArgumentAt(1, String.class);
+      final Integer shardIndex = invocation.getArgument(3);
+      final String counterId = invocation.getArgument(1);
       // Fill the chosen shard just before attempting to increment in storage
       updateShard(counterId, shardIndex, 1L);
       invocation.callRealMethod();
@@ -324,7 +324,7 @@ public class ShardedCounterTest {
     shardedCounter = spy(shardedCounter);
 
     doAnswer(invocation -> {
-      final Integer shardIndex = invocation.getArgumentAt(3, Integer.class);
+      final Integer shardIndex = invocation.getArgument(3);
       datastore.delete(getKey(COUNTER_ID1, shardIndex));
       invocation.callRealMethod();
       return null;

@@ -30,7 +30,6 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.startsWith;
 import static org.hamcrest.core.Is.is;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,7 +45,6 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.util.Arrays;
@@ -59,7 +57,7 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class ExecutionDescriptionHandlerTest {
@@ -71,7 +69,6 @@ public class ExecutionDescriptionHandlerTest {
 
   @Mock Storage storage;
   @Mock StateManager stateManager;
-  @Mock DockerImageValidator dockerImageValidator;
   @Mock EventVisitor<Void> eventVisitor;
 
   @Captor ArgumentCaptor<WorkflowInstance> workflowInstanceCaptor;
@@ -86,9 +83,7 @@ public class ExecutionDescriptionHandlerTest {
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
 
     when(stateManager.receive(any())).thenReturn(CompletableFuture.completedFuture(null));
-    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Collections.emptyList());
     toTest = new ExecutionDescriptionHandler(storage, stateManager, workflowValidator);
-
   }
 
   @Test
