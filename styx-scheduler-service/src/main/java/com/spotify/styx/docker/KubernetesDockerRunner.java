@@ -42,6 +42,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
@@ -88,7 +89,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
-import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -99,6 +100,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
@@ -341,21 +343,23 @@ class KubernetesDockerRunner implements DockerRunner {
   private static List<EnvVar> buildEnv(WorkflowInstance workflowInstance,
                                        RunSpec runSpec,
                                        String styxEnvironment) {
-    return Arrays.asList(
-        envVar(COMPONENT_ID,    workflowInstance.workflowId().componentId()),
-        envVar(WORKFLOW_ID,     workflowInstance.workflowId().id()),
-        envVar(PARAMETER,       workflowInstance.parameter()),
-        envVar(COMMIT_SHA,      runSpec.commitSha().orElse("")),
-        envVar(SERVICE_ACCOUNT, runSpec.serviceAccount().orElse("")),
-        envVar(DOCKER_ARGS,     String.join(" ", runSpec.args())),
-        envVar(DOCKER_IMAGE,    runSpec.imageName()),
-        envVar(EXECUTION_ID,    runSpec.executionId()),
-        envVar(TERMINATION_LOG, "/dev/termination-log"),
-        envVar(TRIGGER_ID,      runSpec.trigger().map(TriggerUtil::triggerId).orElse(null)),
-        envVar(TRIGGER_TYPE,    runSpec.trigger().map(TriggerUtil::triggerType).orElse(null)),
-        envVar(ENVIRONMENT,     styxEnvironment),
-        envVar(LOGGING,         "structured")
-    );
+    final Map<String, String> env = new HashMap<>(runSpec.env());
+    env.put(COMPONENT_ID, workflowInstance.workflowId().componentId());
+    env.put(WORKFLOW_ID, workflowInstance.workflowId().id());
+    env.put(PARAMETER, workflowInstance.parameter());
+    env.put(COMMIT_SHA, runSpec.commitSha().orElse(""));
+    env.put(SERVICE_ACCOUNT, runSpec.serviceAccount().orElse(""));
+    env.put(DOCKER_ARGS, String.join(" ", runSpec.args()));
+    env.put(DOCKER_IMAGE, runSpec.imageName());
+    env.put(EXECUTION_ID, runSpec.executionId());
+    env.put(TERMINATION_LOG, "/dev/termination-log");
+    env.put(TRIGGER_ID, runSpec.trigger().map(TriggerUtil::triggerId).orElse(null));
+    env.put(TRIGGER_TYPE, runSpec.trigger().map(TriggerUtil::triggerType).orElse(null));
+    env.put(ENVIRONMENT, styxEnvironment);
+    env.put(LOGGING, "structured");
+    return env.entrySet().stream()
+        .map(entry -> envVar(entry.getKey(), entry.getValue()))
+        .collect(Collectors.toList());
   }
 
   @Override
@@ -719,7 +723,8 @@ class KubernetesDockerRunner implements DockerRunner {
     }
 
     @Override
-    public Boolean triggerExecution(WorkflowInstance workflowInstance, Trigger trigger) {
+    public Boolean triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
+        TriggerParameters parameters) {
       return false;
     }
 

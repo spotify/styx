@@ -21,6 +21,7 @@
 package com.spotify.styx.state;
 
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.util.IsClosedException;
 import java.io.Closeable;
@@ -42,7 +43,8 @@ public interface StateManager extends Closeable {
    *
    * @throws IsClosedException if the state receiver is closed and can not handle events
    */
-  CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger) throws IsClosedException;
+  CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger,
+      TriggerParameters parameters) throws IsClosedException;
 
   /**
    * Receive an {@link Event} and route it to the corresponding active {@link RunState} based on

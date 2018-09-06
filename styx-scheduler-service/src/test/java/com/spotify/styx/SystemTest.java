@@ -39,6 +39,7 @@ import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -206,7 +207,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     final SequenceEvent expectedEvent =
         SequenceEvent.create(
-            Event.triggerExecution(wfi, Trigger.natural()),
+            Event.triggerExecution(wfi, Trigger.natural(), TriggerParameters.zero()),
             0,
             Instant.parse("2016-03-14T15:30:00Z").toEpochMilli());
 

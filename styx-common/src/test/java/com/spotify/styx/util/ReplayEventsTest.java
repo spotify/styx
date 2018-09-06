@@ -34,6 +34,7 @@ import static org.mockito.Mockito.when;
 
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
@@ -47,6 +48,12 @@ import org.junit.runner.RunWith;
 
 @RunWith(JUnitParamsRunner.class)
 public class ReplayEventsTest {
+
+  private static final TriggerParameters TRIGGER_PARAMETERS = TriggerParameters.builder()
+      .env("FOO", "foo",
+          "BAR", "bar")
+      .build();
+
   Storage storage;
 
   @Before
@@ -57,14 +64,16 @@ public class ReplayEventsTest {
   @Test
   public void restoreRunStateForInactiveBackfill() throws Exception {
     SortedSet<SequenceEvent> events = newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
-    events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.backfill("bf-1")), 1L, 1L));
+    events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.backfill("bf-1"),
+        TRIGGER_PARAMETERS), 1L, 1L));
     events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE, RESOURCE_IDS),                      2L, 2L));
     events.add(SequenceEvent.create(Event.submit(WORKFLOW_INSTANCE, EXECUTION_DESCRIPTION, "exec-1"),    3L, 3L));
     events.add(SequenceEvent.create(Event.submitted(WORKFLOW_INSTANCE, "exec-1"),                        4L, 4L));
     events.add(SequenceEvent.create(Event.started(WORKFLOW_INSTANCE),                                    5L, 5L));
     events.add(SequenceEvent.create(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)),                  6L, 6L));
     events.add(SequenceEvent.create(Event.success(WORKFLOW_INSTANCE),                                    7L, 7L));
-    events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.adhoc("ad-hoc")),  8L, 8L));
+    events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.adhoc("ad-hoc"),
+        TRIGGER_PARAMETERS),  8L, 8L));
     events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE, RESOURCE_IDS),                      9L, 9L));
     events.add(SequenceEvent.create(Event.halt(WORKFLOW_INSTANCE),                                     10L, 10L));
 
@@ -81,7 +90,8 @@ public class ReplayEventsTest {
   @Test
   public void returnsEmptyWithMissingBackfill() throws Exception {
     SortedSet<SequenceEvent> events = newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
-    events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.backfill("bf-1")), 1L, 1L));
+    events.add(SequenceEvent.create(Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.backfill("bf-1"),
+        TRIGGER_PARAMETERS), 1L, 1L));
     events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE, RESOURCE_IDS),                      2L, 2L));
 
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);

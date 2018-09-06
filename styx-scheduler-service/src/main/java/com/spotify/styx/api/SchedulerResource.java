@@ -37,6 +37,7 @@ import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.TriggerListener;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
@@ -95,7 +96,7 @@ public class SchedulerResource {
             "POST", BASE + "/events",
             rc -> this::injectEvent),
         Route.with(
-            em.response(WorkflowInstance.class),
+            em.response(TriggerRequest.class, WorkflowInstance.class),
             "POST", BASE + "/trigger",
             rc -> this::triggerWorkflowInstance),
         Route.with(
@@ -163,7 +164,9 @@ public class SchedulerResource {
     return OK;
   }
 
-  private Response<WorkflowInstance> triggerWorkflowInstance(WorkflowInstance workflowInstance) {
+  private Response<WorkflowInstance> triggerWorkflowInstance(TriggerRequest triggerRequest) {
+    final WorkflowInstance workflowInstance = WorkflowInstance.create(
+        triggerRequest.workflowId(), triggerRequest.parameter());
     final Workflow workflow;
     final Instant instant;
 
@@ -205,8 +208,10 @@ public class SchedulerResource {
           "Cannot trigger an instance of the future"));
     }
 
+    final TriggerParameters parameters = triggerRequest.parameters().orElse(TriggerParameters.zero());
     final String triggerId = randomGenerator.generateUniqueId(AD_HOC_CLI_TRIGGER_PREFIX);
-    final CompletionStage<Void> triggered = triggerListener.event(workflow, Trigger.adhoc(triggerId), instant);
+    final CompletionStage<Void> triggered = triggerListener.event(
+        workflow, Trigger.adhoc(triggerId), instant, parameters);
 
     // TODO: return future instead of blocking
     try {

@@ -34,6 +34,7 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_TRIGGER;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_REVERSE;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_SCHEDULE;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_START;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_TRIGGER_PARAMETERS;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_ENABLED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_JSON;
@@ -296,6 +297,12 @@ public class DatastoreStorageTransaction implements StorageTransaction {
 
     backfill.description().ifPresent(x -> builder.set(PROPERTY_DESCRIPTION, StringValue
         .newBuilder(x).setExcludeFromIndexes(true).build()));
+
+    if (backfill.triggerParameters().isPresent()) {
+      final String json = OBJECT_MAPPER.writeValueAsString(backfill.triggerParameters().get());
+      builder.set(PROPERTY_TRIGGER_PARAMETERS,
+          StringValue.newBuilder(json).setExcludeFromIndexes(true).build());
+    }
 
     tx.put(builder.build());
 

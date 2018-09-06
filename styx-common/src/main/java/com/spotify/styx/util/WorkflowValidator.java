@@ -32,14 +32,16 @@ import java.util.Optional;
 
 public class WorkflowValidator {
 
-  static final int MAX_ID_LENGTH = 256;
-  static final int MAX_DOCKER_ARGS_TOTAL = 1000000;
-  static final int MAX_RESOURCES = 5;
-  static final int MAX_RESOURCE_LENGTH = 256;
-  static final int MAX_COMMIT_SHA_LENGTH = 256;
-  static final int MAX_SECRET_NAME_LENGTH = 253;
-  static final int MAX_SECRET_MOUNT_PATH_LENGTH = 1024;
-  static final int MAX_SERVICE_ACCOUNT_LENGTH = 256;
+  static final long MAX_ID_LENGTH = 256;
+  static final long MAX_DOCKER_ARGS_TOTAL = 1000000;
+  static final long MAX_RESOURCES = 5;
+  static final long MAX_RESOURCE_LENGTH = 256;
+  static final long MAX_COMMIT_SHA_LENGTH = 256;
+  static final long MAX_SECRET_NAME_LENGTH = 253;
+  static final long MAX_SECRET_MOUNT_PATH_LENGTH = 1024;
+  static final long MAX_SERVICE_ACCOUNT_LENGTH = 256;
+  static final long MAX_ENV_VARS = 128;
+  static final long MAX_ENV_SIZE = 16 * 1024;
 
   private final DockerImageValidator dockerImageValidator;
 
@@ -57,12 +59,23 @@ public class WorkflowValidator {
 
     // TODO: validate more of the contents
 
-    limit(e, cfg.id().length(), MAX_ID_LENGTH, "id too long");
-    limit(e, cfg.commitSha().map(String::length), MAX_COMMIT_SHA_LENGTH, "commitSha too long");
-    limit(e, cfg.secret().map(s -> s.name().length()), MAX_SECRET_NAME_LENGTH, "secret name too long");
-    limit(e, cfg.secret().map(s -> s.mountPath().length()), MAX_SECRET_MOUNT_PATH_LENGTH, "secret mount path too long");
-    limit(e, cfg.serviceAccount().map(String::length), MAX_SERVICE_ACCOUNT_LENGTH, "service account too long");
-    limit(e, cfg.resources().size(), MAX_RESOURCES, "too many resources");
+    limit(e, cfg.id().length(),
+        MAX_ID_LENGTH, "id too long");
+    limit(e, cfg.commitSha().map(String::length).orElse(0),
+        MAX_COMMIT_SHA_LENGTH, "commitSha too long");
+    limit(e, cfg.secret().map(s -> s.name().length()).orElse(0),
+        MAX_SECRET_NAME_LENGTH, "secret name too long");
+    limit(e, cfg.secret().map(s -> s.mountPath().length()).orElse(0),
+        MAX_SECRET_MOUNT_PATH_LENGTH, "secret mount path too long");
+    limit(e, cfg.serviceAccount().map(String::length).orElse(0),
+        MAX_SERVICE_ACCOUNT_LENGTH, "service account too long");
+    limit(e, cfg.resources().size(),
+        MAX_RESOURCES, "too many resources");
+    limit(e, cfg.env().size(),
+        MAX_ENV_VARS, "too many env vars");
+    limit(e, cfg.env().entrySet().stream()
+            .mapToLong(entry -> entry.getKey().length() + entry.getValue().length()).sum(),
+        MAX_ENV_SIZE, "env too big");
 
     cfg.dockerImage().ifPresent(image ->
         dockerImageValidator.validateImageReference(image).stream()
@@ -72,7 +85,7 @@ public class WorkflowValidator {
     cfg.resources().stream().map(String::length).forEach(v ->
         limit(e, v, MAX_RESOURCE_LENGTH, "resource name too long"));
 
-    limit(e, cfg.dockerArgs().map(args -> args.size() + args.stream().mapToInt(String::length).sum()),
+    limit(e, cfg.dockerArgs().map(args -> args.size() + args.stream().mapToLong(String::length).sum()),
         MAX_DOCKER_ARGS_TOTAL, "docker args is too large");
 
     cfg.offset().ifPresent(offset -> {
@@ -92,11 +105,11 @@ public class WorkflowValidator {
     return e;
   }
 
-  private void limit(List<String> errors, Optional<Integer> value, int limit, String message) {
+  private void limit(List<String> errors, Optional<Long> value, long limit, String message) {
     value.ifPresent(v -> limit(errors, v, limit, message));
   }
 
-  private void limit(List<String> errors, int value, int limit, String message) {
+  private void limit(List<String> errors, long value, long limit, String message) {
     if (value > limit) {
       errors.add(message + ": " + value + ", limit = " + limit);
     }

@@ -36,7 +36,7 @@ import javax.annotation.Nullable;
 @Visitor(resultVariableName = "R")
 public interface EventVisitor<R> {
 
-  R triggerExecution(@Getter WorkflowInstance workflowInstance, Trigger trigger);
+  R triggerExecution(@Getter WorkflowInstance workflowInstance, Trigger trigger, TriggerParameters parameters);
   R info(@Getter WorkflowInstance workflowInstance, Message message);
   R dequeue(@Getter WorkflowInstance workflowInstance, Set<String> resourceIds);
   R submit(@Getter WorkflowInstance workflowInstance, ExecutionDescription executionDescription,

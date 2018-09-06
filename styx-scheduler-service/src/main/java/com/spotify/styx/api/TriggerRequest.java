@@ -1,8 +1,8 @@
 /*-
  * -\-\-
- * Spotify Styx Common
+ * Spotify Styx Scheduler Service
  * --
- * Copyright (C) 2017 Spotify AB
+ * Copyright (C) 2016 - 2018 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,44 +18,34 @@
  * -/-/-
  */
 
-package com.spotify.styx.model;
+package com.spotify.styx.api;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.spotify.styx.model.TriggerParameters;
+import com.spotify.styx.model.WorkflowId;
 import io.norberg.automatter.AutoMatter;
-import java.time.Instant;
 import java.util.Optional;
 
 @AutoMatter
-@JsonIgnoreProperties(ignoreUnknown = true)
-public interface Backfill {
+public interface TriggerRequest {
 
-  String id();
-
-  Instant start();
-
-  Instant end();
-
+  @JsonProperty("workflow_id")
   WorkflowId workflowId();
 
-  int concurrency();
+  @JsonProperty("parameter")
+  String parameter();
 
-  Optional<String> description();
+  @JsonProperty("parameters")
+  Optional<TriggerParameters> parameters();
 
-  Instant nextTrigger();
+  static TriggerRequestBuilder builder() {
+    return new TriggerRequestBuilder();
+  }
 
-  Schedule schedule();
-
-  boolean allTriggered();
-
-  boolean halted();
-
-  boolean reverse();
-
-  Optional<TriggerParameters> triggerParameters();
-
-  BackfillBuilder builder();
-
-  static BackfillBuilder newBuilder() {
-    return new BackfillBuilder();
+  static TriggerRequest of(WorkflowId workflowId, String parameter) {
+    return builder()
+        .workflowId(workflowId)
+        .parameter(parameter)
+        .build();
   }
 }

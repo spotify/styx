@@ -23,6 +23,7 @@ package com.spotify.styx;
 import static com.spotify.styx.util.FutureUtil.exceptionallyCompletedFuture;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
@@ -50,7 +51,8 @@ final class StateInitializingTrigger implements TriggerListener {
   }
 
   @Override
-  public CompletionStage<Void> event(Workflow workflow, Trigger trigger, Instant instant) {
+  public CompletionStage<Void> event(Workflow workflow, Trigger trigger, Instant instant,
+      TriggerParameters parameters) {
     if (!workflow.configuration().dockerImage().isPresent()) {
       LOG.warn("{} has no docker image, skipping", workflow.id());
       return CompletableFuture.completedFuture(null);
@@ -60,7 +62,7 @@ final class StateInitializingTrigger implements TriggerListener {
     final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), parameter);
 
     try {
-      return stateManager.trigger(workflowInstance, trigger);
+      return stateManager.trigger(workflowInstance, trigger, parameters);
     } catch (IsClosedException isClosedException) {
       LOG.warn("State receiver is closed when processing workflow {} for trigger {} at {}",
                workflow, trigger, instant, isClosedException);
