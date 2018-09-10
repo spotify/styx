@@ -343,6 +343,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private static List<EnvVar> buildEnv(WorkflowInstance workflowInstance,
                                        RunSpec runSpec,
                                        String styxEnvironment) {
+    // store user provided env first to prevent accidentally/intentionally overwriting system ones
     final Map<String, String> env = new HashMap<>(runSpec.env());
     env.put(COMPONENT_ID, workflowInstance.workflowId().componentId());
     env.put(WORKFLOW_ID, workflowInstance.workflowId().id());
