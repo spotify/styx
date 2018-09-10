@@ -46,6 +46,7 @@ public interface StyxSchedulerClient {
    * @param componentId component id
    * @param workflowId  workflow id
    * @param parameter   parameter
+   * @param triggerParameters additional parameters for the {@link WorkflowInstance} 
    */
   CompletionStage<Void> triggerWorkflowInstance(final String componentId,
                                                 final String workflowId,
