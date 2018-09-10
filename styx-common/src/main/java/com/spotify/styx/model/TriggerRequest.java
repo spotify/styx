@@ -18,12 +18,10 @@
  * -/-/-
  */
 
-package com.spotify.styx.api;
+package com.spotify.styx.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.spotify.styx.model.TriggerParameters;
-import com.spotify.styx.model.WorkflowId;
 import io.norberg.automatter.AutoMatter;
 import java.util.Optional;
 
@@ -48,6 +46,15 @@ public interface TriggerRequest {
     return builder()
         .workflowId(workflowId)
         .parameter(parameter)
+        .build();
+  }
+
+  static TriggerRequest of(WorkflowId workflowId, String parameter,
+                           TriggerParameters triggerParameters) {
+    return builder()
+        .workflowId(workflowId)
+        .parameter(parameter)
+        .parameters(triggerParameters)
         .build();
   }
 }

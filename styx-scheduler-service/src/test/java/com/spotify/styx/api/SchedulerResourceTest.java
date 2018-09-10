@@ -48,6 +48,7 @@ import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.TriggerListener;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.TriggerParameters;
+import com.spotify.styx.model.TriggerRequest;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfigurationBuilder;
