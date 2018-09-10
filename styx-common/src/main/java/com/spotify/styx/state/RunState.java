@@ -150,6 +150,7 @@ public abstract class RunState {
               data().builder()
                   .trigger(trigger)
                   .triggerId(TriggerUtil.triggerId(trigger)) // for backwards compatibility
+                  .triggerParameters(parameters)
                   .build());
 
         default:

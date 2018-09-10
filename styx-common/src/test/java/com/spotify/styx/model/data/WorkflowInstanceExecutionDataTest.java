@@ -24,6 +24,7 @@ import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
 import java.time.Instant;
 import java.util.Arrays;
@@ -96,6 +97,57 @@ public class WorkflowInstanceExecutionDataTest {
     Trigger expected = Trigger.create(
         "trig-0",
         time("07:55"),
+        TriggerParameters.zero(),
+        true,
+        Arrays.asList(
+            Execution.create(
+                Optional.of("exec-id-0"),
+                Optional.of("busybox:1.0"),
+                Optional.of("commit-sha0"),
+                Arrays.asList(
+                    ExecStatus.create(Instant.parse("2016-08-03T09:56:03.607Z"), "STARTED", Optional.empty()),
+                    ExecStatus.create(Instant.parse("2016-08-03T09:57:03.607Z"), "RUNNING", Optional.empty()),
+                    ExecStatus.create(Instant.parse("2016-08-03T09:58:03.607Z"), "FAILED", Optional.of("Exit code 1"))
+                )
+            ),
+            Execution.create(
+                Optional.of("exec-id-1"),
+                Optional.of("busybox:1.1"),
+                Optional.of("commit-sha1"),
+                Arrays.asList(
+                    ExecStatus.create(Instant.parse("2016-08-03T10:56:03.607Z"), "STARTED", Optional.empty()),
+                    ExecStatus.create(Instant.parse("2016-08-03T10:57:03.607Z"), "RUNNING", Optional.empty()),
+                    ExecStatus.create(Instant.parse("2016-08-03T10:58:03.607Z"), "SUCCESS", Optional.empty())
+                )
+            )
+        )
+    );
+    assertThat(trigger, is(expected));
+  }
+
+  @Test
+  public void shouldDeserializeTriggerWithParameters() throws Exception {
+    String jsonExec0 = executionJson("exec-id-0", "busybox:1.0","commit-sha0","09", "FAILED", Optional.of("Exit code 1"));
+    String jsonExec1 = executionJson("exec-id-1", "busybox:1.1","commit-sha1", "10", "SUCCESS", Optional.empty());
+
+    String json =
+        "{"
+        + "\"trigger_id\":\"trig-0\","
+        + "\"timestamp\":\"" + time("07:55") + "\","
+        + "\"parameters\":{\"env\":{\"FOO\":\"foo\",\"BAR\":\"bar\"}},"
+        + "\"complete\":true,"
+        + "\"executions\":["
+        + jsonExec0 + "," + jsonExec1
+        + "]}";
+
+    Trigger trigger = OBJECT_MAPPER.readValue(json, Trigger.class);
+    Trigger expected = Trigger.create(
+        "trig-0",
+        time("07:55"),
+        TriggerParameters.builder()
+            .env("FOO", "foo",
+                "BAR", "bar")
+            .build(),
         true,
         Arrays.asList(
             Execution.create(
@@ -170,6 +222,7 @@ public class WorkflowInstanceExecutionDataTest {
             Trigger.create(
                 "trig-0",
                 time("07:55"),
+                TriggerParameters.zero(),
                 true,
                 Arrays.asList(
                     Execution.create(
@@ -197,6 +250,7 @@ public class WorkflowInstanceExecutionDataTest {
             Trigger.create(
                 "trig-1",
                 time("09:55"),
+                TriggerParameters.zero(),
                 false,
                 Arrays.asList(
                     Execution.create(

@@ -76,6 +76,14 @@ public final class Json {
     return ByteString.of(OBJECT_MAPPER.writeValueAsBytes(value));
   }
 
+  public static String toStringUnchecked(Object value) {
+    try {
+      return OBJECT_MAPPER.writeValueAsString(value);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public static <T> T deserialize(ByteString json, Class<T> clazz) throws IOException {
     return OBJECT_MAPPER.readValue(json.toByteArray(), clazz);
   }
