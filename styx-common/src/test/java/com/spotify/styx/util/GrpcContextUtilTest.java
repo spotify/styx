@@ -21,15 +21,12 @@
 package com.spotify.styx.util;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableList;
 import io.grpc.Context;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -157,10 +154,6 @@ public class GrpcContextUtilTest {
 
   @Test
   public void shouldNotBeConstructable() throws ReflectiveOperationException {
-    final Constructor<GrpcContextUtil> constructor = GrpcContextUtil.class.getDeclaredConstructor();
-    constructor.setAccessible(true);
-    exception.expect(InvocationTargetException.class);
-    exception.expectCause(instanceOf(UnsupportedOperationException.class));
-    constructor.newInstance();
+    assertThat(ClassEnforcer.verifyNotInstantiable(GrpcContextUtil.class), is(true));
   }
 }
