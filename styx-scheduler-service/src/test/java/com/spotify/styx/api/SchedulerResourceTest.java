@@ -470,7 +470,6 @@ public class SchedulerResourceTest {
 
   void failtriggeringOnException(Workflow wf, Exception e, StatusType preferredStatusType) throws Exception {
     when(storage.workflow(wf.id())).thenReturn(Optional.of(wf));
-    TriggerParameters expectedParameters = TriggerParameters.zero();
     TriggerRequest toTrigger = TriggerRequest.of(wf.id(), "2015-12-31");
 
     when(triggerListener.event(any(), any(), any(), any())).thenReturn(
