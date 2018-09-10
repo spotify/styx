@@ -235,7 +235,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testBackfillCreateWithEnv() throws Exception {
+  public void testBackfillCreateWithEnv() {
     final String component = "quux";
     final String start = "2017-01-01T00:00:00Z";
     final String end = "2017-01-30T00:00:00Z";
@@ -243,7 +243,8 @@ public class CliMainTest {
     final TriggerParameters expectedTriggerParameters = TriggerParameters.builder()
         .env("FOO", "foo",
             "BAR", "bar",
-            "BAZ", "baz")
+            "BAZ", "baz",
+            "FOOBAR", "")
         .build();
     final Backfill backfill = Backfill.newBuilder()
         .id("backfill-2")
@@ -270,10 +271,23 @@ public class CliMainTest {
         .thenReturn(CompletableFuture.completedFuture(backfill));
 
     CliMain.run(cliContext, "backfill", "create", component, "foo", "2017-01-01", "2017-01-30",
-        "1", "-e", "FOO=foo", "BAR=bar", "--env", "BAZ=baz");
+        "1", "-e", "FOO=foo", "BAR=bar", "--env", "BAZ=baz", "-e", "FOOBAR=");
 
     verify(client).backfillCreate(expectedInput);
     verify(cliOutput).printBackfill(backfill, true);
+  }
+
+  @Test
+  public void testBackfillCreateWithInvalidEnv() {
+    final String component = "quux";
+
+    try {
+      CliMain.run(cliContext, "backfill", "create", component, "foo", "2017-01-01", "2017-01-30",
+          "1", "-e", "FOO=foo", "BAR=bar", "--env", "BAZ=baz", "-e", "FOOBAR");
+      fail();
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.UnknownError));
+    }
   }
 
   @Test
