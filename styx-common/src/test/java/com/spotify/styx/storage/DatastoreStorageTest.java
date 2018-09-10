@@ -76,6 +76,7 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.StyxConfig;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
@@ -635,9 +636,12 @@ public class DatastoreStorageTest {
     assertThat(storage.config(), is(expectedConfig));
   }
 
-  @Parameters({"true", "false", ""})
+  @Parameters({
+      "true, true",
+      "false, false",
+      "_, true"})
   @Test
-  public void shouldStoreAndReadBackfill(String reverse) throws Exception {
+  public void shouldStoreAndReadBackfill(String reverse, boolean withTriggerParameters) throws Exception {
     final BackfillBuilder builder = Backfill.newBuilder()
         .id("backfill-2")
         .start(Instant.parse("2017-01-01T00:00:00Z"))
@@ -647,8 +651,15 @@ public class DatastoreStorageTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(DAYS);
 
-    if (!reverse.isEmpty()) {
+    if (!reverse.trim().equals("_")) {
       builder.reverse(Boolean.parseBoolean(reverse));
+    }
+
+    if (withTriggerParameters) {
+      builder.triggerParameters(TriggerParameters.builder()
+          .env("FOO", "foo",
+              "BAR", "bar")
+          .build());
     }
 
     final Backfill backfill = builder.build();
