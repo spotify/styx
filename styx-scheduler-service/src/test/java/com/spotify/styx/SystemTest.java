@@ -28,6 +28,7 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
@@ -51,6 +52,7 @@ import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import junitparams.JUnitParamsRunner;
@@ -292,7 +294,9 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, false);
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
     final Backfill singleHourBackfill = ONE_DAY_HOURLY_BACKFILL.builder()
-        .end(ONE_DAY_HOURLY_BACKFILL.start().plus(1, ChronoUnit.HOURS)).build();
+        .end(ONE_DAY_HOURLY_BACKFILL.start().plus(1, ChronoUnit.HOURS))
+        .triggerParameters(TriggerParameters.builder().env("FOO", "BAR").build())
+        .build();
     givenBackfill(singleHourBackfill);
 
     styxStarts();
@@ -303,6 +307,9 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
     awaitNumberOfDockerRuns(1);
     WorkflowInstance workflowInstance = getDockerRuns().get(0)._1;
+    RunSpec runSpec = getDockerRuns().get(0)._2;
+
+    assertThat(runSpec.env(), equalTo(Collections.singletonMap("FOO", "BAR")));
 
     injectEvent(Event.started(workflowInstance));
     injectEvent(Event.terminate(workflowInstance, Optional.of(0)));
