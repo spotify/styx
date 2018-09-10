@@ -691,11 +691,12 @@ class KubernetesDockerRunner implements DockerRunner {
 
     private final ConcurrentMap<String, WorkflowInstance> podUpdates = new ConcurrentHashMap<>();
 
+    /**
+     * @implNote In order to be able to keep up with the stream of events from k8s, this method should
+     *           not perform any expensive processing or blocking IO.
+     */
     @Override
     public void eventReceived(Action action, Pod pod) {
-
-      // NOTE: In order to be able to keep up with the stream of events from k8s, this method should
-      //       not perform any expensive processing or blocking IO.
 
       if (pod == null) {
         return;
