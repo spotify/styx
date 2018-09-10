@@ -20,6 +20,7 @@
 
 package com.spotify.styx.api;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowId;
@@ -27,6 +28,7 @@ import io.norberg.automatter.AutoMatter;
 import java.util.Optional;
 
 @AutoMatter
+@JsonIgnoreProperties(ignoreUnknown = true)
 public interface TriggerRequest {
 
   @JsonProperty("workflow_id")
