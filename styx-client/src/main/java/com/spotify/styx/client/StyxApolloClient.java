@@ -44,6 +44,7 @@ import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.EditableBackfillInput;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -252,9 +253,16 @@ class StyxApolloClient implements StyxClient {
   }
 
   @Override
+  public CompletionStage<Void> triggerWorkflowInstance(String componentId, String workflowId,
+      String parameter) {
+    return triggerWorkflowInstance(componentId, workflowId, parameter, TriggerParameters.zero());
+  }
+
+  @Override
   public CompletionStage<Void> triggerWorkflowInstance(String componentId,
                                                        String workflowId,
-                                                       String parameter) {
+                                                       String parameter,
+                                                       TriggerParameters triggerParameters) {
     final HttpUrl.Builder urlBuilder = getUrlBuilder()
         .addPathSegment("scheduler")
         .addPathSegment("trigger");
