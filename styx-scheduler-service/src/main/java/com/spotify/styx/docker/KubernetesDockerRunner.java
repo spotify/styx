@@ -134,6 +134,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
   private static final int DEFAULT_POD_DELETION_DELAY_SECONDS = 120;
   private static final long PROCESS_POD_UPDATE_INTERVAL_SECONDS = 5;
+  private static final int K8S_EVENT_PROCESSING_THREADS = 32;
   private static final Time DEFAULT_TIME = Instant::now;
   static final String STYX_WORKFLOW_SA_ENV_VARIABLE = "GOOGLE_APPLICATION_CREDENTIALS";
   static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
@@ -180,7 +181,8 @@ class KubernetesDockerRunner implements DockerRunner {
     this.podDeletionDelaySeconds = podDeletionDelaySeconds;
     this.time = Objects.requireNonNull(time);
     this.executor = register(closer, Objects.requireNonNull(executor), "kubernetes-poll");
-    this.eventExecutor = currentContextExecutorService(register(closer, new ForkJoinPool(32), "kubernetes-event"));
+    this.eventExecutor = currentContextExecutorService(
+        register(closer, new ForkJoinPool(K8S_EVENT_PROCESSING_THREADS), "kubernetes-event"));
   }
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
