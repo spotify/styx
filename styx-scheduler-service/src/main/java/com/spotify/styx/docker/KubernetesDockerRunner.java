@@ -133,6 +133,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String LOGGING = "STYX_LOGGING";
   private static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
   private static final int DEFAULT_POD_DELETION_DELAY_SECONDS = 120;
+  private static final long PROCESS_POD_UPDATE_INTERVAL_SECONDS = 5;
   private static final Time DEFAULT_TIME = Instant::now;
   static final String STYX_WORKFLOW_SA_ENV_VARIABLE = "GOOGLE_APPLICATION_CREDENTIALS";
   static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
@@ -519,7 +520,8 @@ class KubernetesDockerRunner implements DockerRunner {
         TimeUnit.SECONDS);
 
     final PodWatcher watcher = new PodWatcher();
-    executor.scheduleWithFixedDelay(guard(watcher::processPodUpdates), 0, 5, TimeUnit.SECONDS);
+    executor.scheduleWithFixedDelay(guard(watcher::processPodUpdates),
+        PROCESS_POD_UPDATE_INTERVAL_SECONDS, PROCESS_POD_UPDATE_INTERVAL_SECONDS, TimeUnit.SECONDS);
 
     watch = client.pods().watch(watcher);
   }
