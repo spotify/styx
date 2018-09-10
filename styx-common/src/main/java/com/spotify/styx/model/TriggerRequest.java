@@ -21,7 +21,6 @@
 package com.spotify.styx.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import io.norberg.automatter.AutoMatter;
 import java.util.Optional;
 
@@ -29,14 +28,11 @@ import java.util.Optional;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public interface TriggerRequest {
 
-  @JsonProperty("workflow_id")
   WorkflowId workflowId();
 
-  @JsonProperty("parameter")
   String parameter();
 
-  @JsonProperty("parameters")
-  Optional<TriggerParameters> parameters();
+  Optional<TriggerParameters> triggerParameters();
 
   static TriggerRequestBuilder builder() {
     return new TriggerRequestBuilder();
@@ -54,7 +50,7 @@ public interface TriggerRequest {
     return builder()
         .workflowId(workflowId)
         .parameter(parameter)
-        .parameters(triggerParameters)
+        .triggerParameters(triggerParameters)
         .build();
   }
 }

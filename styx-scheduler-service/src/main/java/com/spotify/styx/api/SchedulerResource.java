@@ -209,7 +209,8 @@ public class SchedulerResource {
           "Cannot trigger an instance of the future"));
     }
 
-    final TriggerParameters parameters = triggerRequest.parameters().orElse(TriggerParameters.zero());
+    final TriggerParameters parameters =
+        triggerRequest.triggerParameters().orElse(TriggerParameters.zero());
     final String triggerId = randomGenerator.generateUniqueId(AD_HOC_CLI_TRIGGER_PREFIX);
     final CompletionStage<Void> triggered = triggerListener.event(
         workflow, Trigger.adhoc(triggerId), instant, parameters);
