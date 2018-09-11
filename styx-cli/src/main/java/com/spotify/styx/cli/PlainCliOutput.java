@@ -20,6 +20,7 @@
 
 package com.spotify.styx.cli;
 
+import static com.spotify.styx.cli.CliUtil.formatMap;
 import static com.spotify.styx.cli.CliUtil.formatTimestamp;
 
 import com.google.common.base.Joiner;
@@ -76,18 +77,20 @@ class PlainCliOutput implements CliOutput {
 
   @Override
   public void printBackfill(Backfill backfill, boolean ignored) {
-    System.out.println(String.format("%s %s %s %s %s %s %s %s %s %s %s",
-                                     backfill.id(),
-                                     backfill.workflowId().componentId(),
-                                     backfill.workflowId().id(),
-                                     backfill.halted(),
-                                     backfill.allTriggered(),
-                                     backfill.concurrency(),
-                                     backfill.start(),
-                                     backfill.end(),
-                                     backfill.reverse(),
-                                     backfill.nextTrigger(),
-                                     backfill.description().orElse("")));
+    System.out.println(String.format("%s %s %s %s %s %s %s %s %s %s %s %s",
+        backfill.id(),
+        backfill.workflowId().componentId(),
+        backfill.workflowId().id(),
+        backfill.halted(),
+        backfill.allTriggered(),
+        backfill.concurrency(),
+        backfill.start(),
+        backfill.end(),
+        backfill.reverse(),
+        backfill.nextTrigger(),
+        backfill.description().orElse(""),
+        backfill.triggerParameters().map(triggerParameters -> formatMap(
+            triggerParameters.env())).orElse("")));
   }
 
   @Override

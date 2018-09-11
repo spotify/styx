@@ -28,6 +28,7 @@ import com.google.common.collect.ImmutableList;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -51,10 +52,11 @@ public class PlainCliOutputTest {
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
       .schedule(Schedule.DAYS)
       .reverse(false)
+      .triggerParameters(TriggerParameters.builder().env("FOO", "bar").build())
       .build();
   private static final String EXPECTED_OUTPUT =
       "backfill-2 component workflow2 false false 2 2017-01-01T00:00:00Z"
-        + " 2017-01-02T00:00:00Z false 2017-01-01T00:00:00Z Description\n";
+        + " 2017-01-02T00:00:00Z false 2017-01-01T00:00:00Z Description FOO=bar\n";
 
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
 

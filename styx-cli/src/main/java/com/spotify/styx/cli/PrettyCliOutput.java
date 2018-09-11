@@ -22,6 +22,7 @@ package com.spotify.styx.cli;
 
 import static com.spotify.styx.cli.CliUtil.colored;
 import static com.spotify.styx.cli.CliUtil.coloredBright;
+import static com.spotify.styx.cli.CliUtil.formatMap;
 import static com.spotify.styx.cli.CliUtil.formatTimestamp;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 import static org.fusesource.jansi.Ansi.Color.BLACK;
@@ -52,10 +53,22 @@ import org.fusesource.jansi.Ansi;
 class PrettyCliOutput implements CliOutput {
 
   private static final String BACKFILL_FORMAT =
-      "%28s  %6s  %13s %12s  %-20s  %-20s  %-7s  %-20s  %-<cid-length>s  %-<wid-length>s %s";
+      "%28s  %6s  %13s %12s  %-20s  %-20s  %-7s  %-20s  %-<cid-length>s  %-<wid-length>s %-<description-length>s %s";
 
   private static final String WORKFLOW_FORMAT =
       "%-<cid-length>s  %-<wid-length>s";
+
+  private static final String NA_VALUE = "N/A";
+
+  private static final int TRUNCATED_LENGTH = 20;
+
+  private static final String ELLIPSIS = "...";
+
+  private static final String COMPONENT_HEADER = "COMPONENT";
+
+  private static final String WORKFLOW_HEADER = "WORKFLOW";
+
+  private static final String DESCRIPTION_HEADER = "DESCRIPTION";
 
   @Override
   public void printStates(RunStateDataPayload runStateDataPayload) {
@@ -107,31 +120,40 @@ class PrettyCliOutput implements CliOutput {
   @Override
   public void printBackfill(Backfill backfill, boolean noTruncate) {
     printBackfill(backfill,
-                  backfill.workflowId().componentId().length(),
-                  backfill.workflowId().id().length(),
-                  noTruncate);
+        effectiveLongFieldLength(
+            Optional.ofNullable(backfill.workflowId().componentId()), COMPONENT_HEADER, true),
+        effectiveLongFieldLength(
+            Optional.ofNullable(backfill.workflowId().id()), WORKFLOW_HEADER, true),
+        effectiveLongFieldLength(
+            backfill.description(), DESCRIPTION_HEADER, noTruncate),
+        noTruncate);
   }
 
-  private void printBackfill(Backfill backfill, int cidLength, int widLength, boolean noTruncate) {
+  private void printBackfill(Backfill backfill, int cidLength, int widLength,
+                             int descriptionLength, boolean noTruncate) {
     final Schedule schedule = backfill.schedule();
     final WorkflowId workflowId = backfill.workflowId();
 
     final String format = BACKFILL_FORMAT
         .replaceAll("<cid-length>", String.valueOf(cidLength))
-        .replaceAll("<wid-length>", String.valueOf(widLength));
+        .replaceAll("<wid-length>", String.valueOf(widLength))
+        .replaceAll("<description-length>", String.valueOf(descriptionLength));
 
     System.out.println(String.format(format,
-                                     backfill.id(),
-                                     backfill.halted(),
-                                     backfill.allTriggered(),
-                                     backfill.concurrency(),
-                                     toParameter(schedule, backfill.start()),
-                                     toParameter(schedule, backfill.end()),
-                                     backfill.reverse(),
-                                     toParameter(schedule, backfill.nextTrigger()),
-                                     workflowId.componentId(),
-                                     workflowId.id(),
-                                     formatDescription(backfill.description(), noTruncate)));
+        backfill.id(),
+        backfill.halted(),
+        backfill.allTriggered(),
+        backfill.concurrency(),
+        toParameter(schedule, backfill.start()),
+        toParameter(schedule, backfill.end()),
+        backfill.reverse(),
+        toParameter(schedule, backfill.nextTrigger()),
+        workflowId.componentId(),
+        workflowId.id(),
+        formatLongField(backfill.description(), noTruncate),
+        formatLongField(backfill.triggerParameters()
+                .map(triggerParameters -> formatMap(triggerParameters.env())),
+            noTruncate)));
   }
 
   private void printWorkflow(Workflow workflow, int cidLength, int widLength) {
@@ -144,23 +166,25 @@ class PrettyCliOutput implements CliOutput {
                                      workflow.workflowId()));
   }
 
-  private void printBackfillHeader(int cidLength, int widLength) {
+  private void printBackfillHeader(int cidLength, int widLength, int descriptionLength) {
     final String format = BACKFILL_FORMAT
         .replaceAll("<cid-length>", String.valueOf(cidLength))
-        .replaceAll("<wid-length>", String.valueOf(widLength));
+        .replaceAll("<wid-length>", String.valueOf(widLength))
+        .replaceAll("<description-length>", String.valueOf(descriptionLength));
 
     System.out.println(String.format(format,
-                                     "BACKFILL ID",
-                                     "HALTED",
-                                     "ALL TRIGGERED",
-                                     "CONCURRENCY",
-                                     "START (INCL)",
-                                     "END (EXCL)",
-                                     "REVERSE",
-                                     "NEXT TRIGGER",
-                                     "COMPONENT",
-                                     "WORKFLOW",
-                                     "DESCRIPTION"));
+        "BACKFILL ID",
+        "HALTED",
+        "ALL TRIGGERED",
+        "CONCURRENCY",
+        "START (INCL)",
+        "END (EXCL)",
+        "REVERSE",
+        "NEXT TRIGGER",
+        COMPONENT_HEADER,
+        WORKFLOW_HEADER,
+        DESCRIPTION_HEADER,
+        "TRIGGER ENV"));
   }
 
   private void printWorkflowHeader(int cidLength, int widLength) {
@@ -175,8 +199,14 @@ class PrettyCliOutput implements CliOutput {
 
   @Override
   public void printBackfillPayload(BackfillPayload backfillPayload, boolean noTruncate) {
-    printBackfillHeader(backfillPayload.backfill().workflowId().componentId().length(),
-                        backfillPayload.backfill().workflowId().id().length());
+    printBackfillHeader(
+        effectiveLongFieldLength(
+            Optional.ofNullable(backfillPayload.backfill().workflowId().componentId()),
+            COMPONENT_HEADER, true),
+        effectiveLongFieldLength(Optional.ofNullable(backfillPayload.backfill().workflowId().id()),
+            WORKFLOW_HEADER, true),
+        effectiveLongFieldLength(backfillPayload.backfill().description(), DESCRIPTION_HEADER,
+            noTruncate));
 
     printBackfill(backfillPayload.backfill(), noTruncate);
     if (backfillPayload.statuses().isPresent()) {
@@ -189,18 +219,25 @@ class PrettyCliOutput implements CliOutput {
   @Override
   public void printBackfills(List<BackfillPayload> backfills, boolean noTruncate) {
     final int cidLength = backfills.stream()
-        .map(x -> x.backfill().workflowId().componentId().length())
+        .map(x -> effectiveLongFieldLength(
+            Optional.of(x.backfill().workflowId().componentId()), COMPONENT_HEADER, true))
         .max(Comparator.naturalOrder())
         .orElse(1);
     final int widLength = backfills.stream()
-        .map(x -> x.backfill().workflowId().id().length())
+        .map(x -> effectiveLongFieldLength(
+            Optional.of(x.backfill().workflowId().id()), WORKFLOW_HEADER, true))
+        .max(Comparator.naturalOrder())
+        .orElse(1);
+    final int descriptionLength = backfills.stream()
+        .map(x -> effectiveLongFieldLength(
+            x.backfill().description(), DESCRIPTION_HEADER, noTruncate))
         .max(Comparator.naturalOrder())
         .orElse(1);
 
-    printBackfillHeader(cidLength, widLength);
+    printBackfillHeader(cidLength, widLength, descriptionLength);
 
     for (BackfillPayload backfillPayload : backfills) {
-      printBackfill(backfillPayload.backfill(), cidLength, widLength, noTruncate);
+      printBackfill(backfillPayload.backfill(), cidLength, widLength, descriptionLength, noTruncate);
       if (backfillPayload.statuses().isPresent()) {
         System.out.println();
         System.out.println();
@@ -261,14 +298,27 @@ class PrettyCliOutput implements CliOutput {
     System.err.println(message);
   }
 
-  private String formatDescription(Optional<String> description, boolean noTruncate) {
-    return description.map(x -> {
-      if (noTruncate || x.length() <= 20) {
+  private String formatLongField(Optional<String> value, boolean noTruncate) {
+    return value.map(x -> {
+      if (noTruncate || x.length() <= TRUNCATED_LENGTH) {
         return x;
       } else {
-        return x.substring(0, 20) + "...";
+        return x.substring(0, TRUNCATED_LENGTH) + ELLIPSIS;
       }
-    }).orElse("N/A");
+    }).orElse(NA_VALUE);
+  }
+
+  private int effectiveLongFieldLength(Optional<String> value, String header, boolean noTruncate) {
+    final int length = value.orElse(NA_VALUE).length();
+    if (length <= header.length()) {
+      return header.length();
+    }
+
+    if (!noTruncate & length > (TRUNCATED_LENGTH + ELLIPSIS.length())) {
+      return TRUNCATED_LENGTH + ELLIPSIS.length();
+    } else {
+      return length;
+    }
   }
 
   private Ansi getAnsiForState(RunStateDataPayload.RunStateData RunStateData) {
