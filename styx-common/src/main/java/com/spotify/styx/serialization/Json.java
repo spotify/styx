@@ -32,7 +32,6 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.TypeWrapperModule;
 import io.norberg.automatter.jackson.AutoMatterModule;
