@@ -27,11 +27,11 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static net.sourceforge.argparse4j.impl.Arguments.fileType;
 
-import com.google.common.util.concurrent.ListenableFuture;
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.core.Service;
 import com.spotify.apollo.core.Services;
