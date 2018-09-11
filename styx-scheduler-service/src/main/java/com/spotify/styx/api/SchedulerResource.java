@@ -97,7 +97,7 @@ public class SchedulerResource {
             "POST", BASE + "/events",
             rc -> this::injectEvent),
         Route.with(
-            em.response(TriggerRequest.class, WorkflowInstance.class),
+            em.response(TriggerRequest.class),
             "POST", BASE + "/trigger",
             rc -> this::triggerWorkflowInstance),
         Route.with(
@@ -165,7 +165,7 @@ public class SchedulerResource {
     return OK;
   }
 
-  private Response<WorkflowInstance> triggerWorkflowInstance(TriggerRequest triggerRequest) {
+  private Response<TriggerRequest> triggerWorkflowInstance(TriggerRequest triggerRequest) {
     final WorkflowInstance workflowInstance = WorkflowInstance.create(
         triggerRequest.workflowId(), triggerRequest.parameter());
     final Workflow workflow;
@@ -236,6 +236,6 @@ public class SchedulerResource {
     }
 
     // todo: change payload to a struct returning the triggerId as well so the user can refer to it
-    return Response.forPayload(workflowInstance);
+    return Response.forPayload(triggerRequest);
   }
 }
