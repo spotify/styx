@@ -54,6 +54,7 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.serialization.Json;
 import java.io.IOException;
+import java.net.URI;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -208,6 +209,20 @@ public class StyxApolloClientTest {
     final Request request = requestCaptor.getValue();
     assertThat(request.uri(), is(API_URL + "/workflows/foo-comp/bar-wf"));
     assertThat(request.method(), is("DELETE"));
+  }
+
+  @Test
+  public void componentAndWorkflowAreEncoded() {
+    when(client.send(any(Request.class))).thenReturn(
+        CompletableFuture.completedFuture(Response.forStatus(Status.OK)));
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+    styx.workflow("foo-comp[strange characters]", "bar-wf[strange characters]")
+        .toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    final Request request = requestCaptor.getValue();
+    final URI expected = URI.create(
+        API_URL + "/workflows/foo-comp%5Bstrange%20characters%5D/bar-wf%5Bstrange%20characters%5D");
+    assertThat(request.uri(), is(expected.toString()));
   }
 
   @Test
