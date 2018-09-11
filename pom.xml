@@ -566,7 +566,7 @@
           <showWarnings>true</showWarnings>
           <compilerArgs>
             <arg>-Xlint:all</arg>
-            <arg>-Xep:RemoveUnusedImports:ERROR</arg>
+            <arg>-Xep:RemoveUnusedImports:WARN</arg>
             <arg>-Xep:PrivateConstructorForUtilityClass:ERROR</arg>
             <arg>-Xep:FieldMissingNullable:ERROR</arg>
             <arg>-Xep:MultipleTopLevelClasses:ERROR</arg>
