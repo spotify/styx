@@ -505,8 +505,10 @@ Workflow Instance belonging to a Backfill entity.
             "start": "2017-01-01T00:00:00Z",
             "end": "2017-01-02T00:00:00Z",
             "component": "styx-canary",
-            "workflow": "StyxCanary",
             "concurrency": "10",
+            "description": "fixed bug and reproduce data",
+            "trigger_parameters": {"FOO": "bar"},
+            "workflow": "StyxCanary",
         }
 
 + Response 200 (application/json)
@@ -515,11 +517,13 @@ Workflow Instance belonging to a Backfill entity.
             "all_triggered": false,
             "concurrency": 10,
             "end": "2017-02-00T00:00:00Z",
+            "description": "fixed bug and reproduce data",
             "halted": false,
             "id": "backfill-1489054446085-52684",
             "next_trigger": "2017-01-01T00:00:00Z",
             "schedule": "hours",
             "start": "2017-01-01T00:00:00Z",
+            "trigger_parameters": {"FOO": "bar"},
             "workflow_id": {
                 "component_id": "styx-canary",
                 "id": "StyxCanary"
@@ -546,12 +550,14 @@ Workflow Instance belonging to a Backfill entity.
             "backfill": {
                 "all_triggered": true,
                 "concurrency": 10,
+                "description": "fixed bug and reproduce data",
                 "end": "2017-01-01T01:00:00Z",
                 "halted": false,
                 "id": "backfill-1489054446085-53384",
                 "next_trigger": "2017-01-01T01:00:00Z",
                 "schedule": "hours",
                 "start": "2017-01-01T00:00:00Z",
+                "trigger_parameters": {"FOO": "bar"},
                 "workflow_id": {
                     "component_id": "styx-canary",
                     "id": "StyxCanary"
@@ -608,18 +614,10 @@ Workflow Instance belonging to a Backfill entity.
 + Request (application/json)
 
         {
-            "all_triggered": false,
             "concurrency": 20,
-            "end": "2017-02-00T00:00:00Z",
-            "halted": false,
+            "description": "fixed bug and reproduce data",
             "id": "backfill-1489054446085-52684",
-            "next_trigger": "2017-01-01T00:00:00Z",
-            "schedule": "hours",
-            "start": "2017-01-01T00:00:00Z",
-            "workflow_id": {
-                "component_id": "styx-canary",
-                "id": "StyxCanary"
-            }
+            "trigger_parameters": {"FOO": "bar"},
         }
 
 + Response 200 (application/json)
@@ -628,11 +626,13 @@ Workflow Instance belonging to a Backfill entity.
             "all_triggered": false,
             "concurrency": 20,
             "end": "2017-02-00T00:00:00Z",
+            "description": "fixed bug and reproduce data",
             "halted": false,
             "id": "backfill-1489054446085-52684",
             "next_trigger": "2017-01-01T00:00:00Z",
             "schedule": "hours",
             "start": "2017-01-01T00:00:00Z",
+            "trigger_parameters": {"FOO": "bar"},
             "workflow_id": {
                 "component_id": "styx-canary",
                 "id": "StyxCanary"
@@ -798,6 +798,7 @@ Resources related to operations that act on the current state of the scheduler.
 
         {
             "parameter": "2017-01-01T01",
+            "trigger_parameters": {"FOO": "bar"},
             "workflow_id": {
                 "component_id": "styx-canary",
                 "id": "StyxCanary"
@@ -808,6 +809,7 @@ Resources related to operations that act on the current state of the scheduler.
 
         {
             "parameter": "2017-01-01T01",
+            "trigger_parameters": {"FOO": "bar"},
             "workflow_id": {
                 "component_id": "styx-canary",
                 "id": "StyxCanary"
