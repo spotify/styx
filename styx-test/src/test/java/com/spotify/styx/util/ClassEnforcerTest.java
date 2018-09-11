@@ -34,6 +34,13 @@ public class ClassEnforcerTest {
   }
 
   @Test
+  public void shouldAssertNotInstantiableConstructorThrowsUnsupportedOperationException() throws ReflectiveOperationException {
+    exception.expect(AssertionError.class);
+    exception.expectMessage("Class should not be instantiable: " + FailingInstantiable.class.getName());
+    ClassEnforcer.assertNotInstantiable(FailingInstantiable.class);
+  }
+
+  @Test
   public void shouldAssertInstantiable() throws ReflectiveOperationException {
     exception.expect(AssertionError.class);
     exception.expectMessage("Class should not be instantiable: " + String.class.getName());
@@ -45,5 +52,12 @@ public class ClassEnforcerTest {
       throws ReflectiveOperationException {
     exception.expect(NoSuchMethodException.class);
     ClassEnforcer.assertNotInstantiable(Class.class);
+  }
+
+  private static class FailingInstantiable {
+
+    public FailingInstantiable() {
+      throw new NullPointerException();
+    }
   }
 }
