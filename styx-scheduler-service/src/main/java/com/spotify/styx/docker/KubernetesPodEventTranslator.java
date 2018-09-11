@@ -23,7 +23,6 @@ package com.spotify.styx.docker;
 import static com.spotify.styx.docker.DockerRunner.LOG;
 import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_TERMINATION_LOGGING_ANNOTATION;
 import static com.spotify.styx.docker.KubernetesDockerRunner.getMainContainerStatus;
-import static java.util.Collections.emptyList;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -40,8 +39,6 @@ import io.fabric8.kubernetes.api.model.ContainerStateWaiting;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodStatus;
-import io.fabric8.kubernetes.client.Watcher;
-import io.fabric8.kubernetes.client.Watcher.Action;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
@@ -140,13 +137,8 @@ final class KubernetesPodEventTranslator {
   static List<Event> translate(
       WorkflowInstance workflowInstance,
       RunState state,
-      Action action,
       Pod pod,
       Stats stats) {
-
-    if (action == Watcher.Action.DELETED) {
-      return emptyList();
-    }
 
     final List<Event> generatedEvents = Lists.newArrayList();
     final Optional<Event> hasError = isInErrorState(workflowInstance, pod);

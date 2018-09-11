@@ -72,7 +72,7 @@ import org.junit.runner.RunWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Mockito;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class ShardedCounterTest {
@@ -128,7 +128,7 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shouldCreateCounterEmpty() {
+  public void shouldCreateCounterEmpty() throws IOException {
     assertEquals(shardedCounter.getCounter(COUNTER_ID1), 0L);
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
 
@@ -167,7 +167,7 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shouldIncrementCounter() {
+  public void shouldIncrementCounter() throws IOException {
     // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
@@ -189,7 +189,7 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shouldDecrementCounter() {
+  public void shouldDecrementCounter() throws IOException {
     // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
@@ -212,7 +212,7 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shouldDecrementShardWithExcessUsage() {
+  public void shouldDecrementShardWithExcessUsage() throws IOException {
     // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
@@ -240,7 +240,7 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shouldDecrementShardWithALotOfExcessUsage() {
+  public void shouldDecrementShardWithALotOfExcessUsage() throws IOException {
     // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
@@ -268,7 +268,7 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shouldDecrementShardWithNoExcessUsage() {
+  public void shouldDecrementShardWithNoExcessUsage() throws IOException {
     // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
@@ -294,7 +294,7 @@ public class ShardedCounterTest {
   }
 
   @Test(expected = CounterCapacityException.class)
-  public void shouldFailWhenIncreasingIfChosenShardIsFilledConcurrently() {
+  public void shouldFailWhenIncreasingIfChosenShardIsFilledConcurrently() throws IOException {
     // init counter and limit
     updateLimitInStorage(COUNTER_ID1, 1);
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
@@ -302,8 +302,8 @@ public class ShardedCounterTest {
     shardedCounter = spy(shardedCounter);
 
     doAnswer(invocation -> {
-      final Integer shardIndex = invocation.getArgumentAt(3, Integer.class);
-      final String counterId = invocation.getArgumentAt(1, String.class);
+      final Integer shardIndex = invocation.getArgument(3);
+      final String counterId = invocation.getArgument(1);
       // Fill the chosen shard just before attempting to increment in storage
       updateShard(counterId, shardIndex, 1L);
       invocation.callRealMethod();
@@ -316,7 +316,7 @@ public class ShardedCounterTest {
   }
 
   @Test(expected = ShardNotFoundException.class)
-  public void shouldFailWhenIncreasingIfChosenShardIsMissing() {
+  public void shouldFailWhenIncreasingIfChosenShardIsMissing() throws IOException {
     // init counter and limit
     updateLimitInStorage(COUNTER_ID1, 1);
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
@@ -324,7 +324,7 @@ public class ShardedCounterTest {
     shardedCounter = spy(shardedCounter);
 
     doAnswer(invocation -> {
-      final Integer shardIndex = invocation.getArgumentAt(3, Integer.class);
+      final Integer shardIndex = invocation.getArgument(3);
       datastore.delete(getKey(COUNTER_ID1, shardIndex));
       invocation.callRealMethod();
       return null;
@@ -336,7 +336,7 @@ public class ShardedCounterTest {
   }
 
   @Test(expected = CounterCapacityException.class)
-  public void shouldNotIncrementIfUsageIsAboveLimitAndShardsHaveExcessUsage() {
+  public void shouldNotIncrementIfUsageIsAboveLimitAndShardsHaveExcessUsage() throws IOException {
     // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
@@ -379,7 +379,7 @@ public class ShardedCounterTest {
   }
 
   @Test(expected = ShardNotFoundException.class)
-  public void shouldThrowExceptionOnUninitializedShards() {
+  public void shouldThrowExceptionOnUninitializedShards() throws IOException {
     doReturn(new ShardedCounter.Snapshot(COUNTER_ID1, 100, new HashMap<>()))
         .when(counterSnapshotFactory).create(COUNTER_ID1);
     updateCounterInTransaction(COUNTER_ID1, -1L);
@@ -524,7 +524,7 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shouldReportCacheHitMissMetrics() {
+  public void shouldReportCacheHitMissMetrics() throws IOException {
     InOrder inOrder = Mockito.inOrder(stats, counterSnapshotFactory);
 
     // Verify we get a miss first time

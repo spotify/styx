@@ -23,13 +23,13 @@ package com.spotify.styx;
 import static com.spotify.apollo.environment.ConfigUtil.optionalInt;
 import static com.spotify.styx.state.OutputHandler.fanOutput;
 import static com.spotify.styx.state.StateUtil.getResourcesUsageMap;
+import static com.spotify.styx.util.CloserUtil.closeable;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.GuardedRunnable.runGuarded;
 import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
@@ -106,7 +106,6 @@ import io.opencensus.common.Scope;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
 import io.opencensus.trace.samplers.Samplers;
-import java.io.Closeable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
@@ -321,16 +320,17 @@ public class StyxScheduler implements AppInit {
     final Publisher publisher = publisherFactory.apply(environment);
     closer.register(publisher);
 
+    // TODO: is the shutdown timeout of 1 second here sane?
     final ScheduledExecutorService tickExecutor = executorFactory.create(3, tickTf);
-    closer.register(executorCloser("tick-executor", tickExecutor));
+    closer.register(closeable(tickExecutor, "tick-executor", Duration.ofSeconds(1)));
     final StripedExecutorService eventProcessingExecutor = new StripedExecutorService(
         optionalInt(config, STYX_EVENT_PROCESSING_THREADS).orElse(DEFAULT_STYX_EVENT_PROCESSING_THREADS));
-    closer.register(executorCloser("event-processing", eventProcessingExecutor));
+    closer.register(closeable(eventProcessingExecutor, "event-processing", Duration.ofSeconds(1)));
     final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
-    closer.register(executorCloser("event-consumer", eventConsumerExecutor));
+    closer.register(closeable(eventConsumerExecutor, "event-consumer", Duration.ofSeconds(1)));
     final ExecutorService schedulerExecutor = Executors.newWorkStealingPool(
         optionalInt(config, STYX_SCHEDULER_THREADS).orElse(DEFAULT_STYX_SCHEDULER_THREADS));
-    closer.register(executorCloser("scheduler", schedulerExecutor));
+    closer.register(closeable(schedulerExecutor, "scheduler", Duration.ofSeconds(1)));
 
     final Stats stats = statsFactory.apply(environment);
     final Storage storage = MeteredStorageProxy.instrument(
@@ -453,8 +453,8 @@ public class StyxScheduler implements AppInit {
       // Initialize resources
       storage.resources().parallelStream().forEach(
           resource -> {
-            counterSnapshotFactory.create(resource.id());
             try {
+              counterSnapshotFactory.create(resource.id());
               storage.runInTransaction(tx -> {
                 shardedCounter.updateLimit(tx, resource.id(), resource.concurrency());
                 return null;
@@ -755,22 +755,8 @@ public class StyxScheduler implements AppInit {
     }
   }
 
-  private static Closeable executorCloser(String name, ExecutorService executor) {
-    return () -> {
-      LOG.info("Shutting down executor: {}", name);
-      executor.shutdown();
-      try {
-        executor.awaitTermination(1, SECONDS);
-      } catch (InterruptedException ignored) {
-      }
-      final List<Runnable> runnables = executor.shutdownNow();
-      if (!runnables.isEmpty()) {
-        LOG.warn("{} task(s) in {} did not execute", runnables.size(), name);
-      }
-    };
-  }
-
-  private static boolean isDevMode(Config config) {
+  @VisibleForTesting
+  static boolean isDevMode(Config config) {
     return STYX_MODE_DEVELOPMENT.equals(config.getString(STYX_MODE));
   }
 

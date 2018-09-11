@@ -51,6 +51,8 @@ public interface Backfill {
 
   boolean reverse();
 
+  Optional<TriggerParameters> triggerParameters();
+
   BackfillBuilder builder();
 
   static BackfillBuilder newBuilder() {

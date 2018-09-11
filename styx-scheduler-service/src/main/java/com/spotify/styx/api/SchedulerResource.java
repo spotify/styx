@@ -37,6 +37,8 @@ import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.TriggerListener;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.TriggerParameters;
+import com.spotify.styx.model.TriggerRequest;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
@@ -95,7 +97,7 @@ public class SchedulerResource {
             "POST", BASE + "/events",
             rc -> this::injectEvent),
         Route.with(
-            em.response(WorkflowInstance.class),
+            em.response(TriggerRequest.class),
             "POST", BASE + "/trigger",
             rc -> this::triggerWorkflowInstance),
         Route.with(
@@ -163,7 +165,9 @@ public class SchedulerResource {
     return OK;
   }
 
-  private Response<WorkflowInstance> triggerWorkflowInstance(WorkflowInstance workflowInstance) {
+  private Response<TriggerRequest> triggerWorkflowInstance(TriggerRequest triggerRequest) {
+    final WorkflowInstance workflowInstance = WorkflowInstance.create(
+        triggerRequest.workflowId(), triggerRequest.parameter());
     final Workflow workflow;
     final Instant instant;
 
@@ -205,8 +209,11 @@ public class SchedulerResource {
           "Cannot trigger an instance of the future"));
     }
 
+    final TriggerParameters parameters =
+        triggerRequest.triggerParameters().orElse(TriggerParameters.zero());
     final String triggerId = randomGenerator.generateUniqueId(AD_HOC_CLI_TRIGGER_PREFIX);
-    final CompletionStage<Void> triggered = triggerListener.event(workflow, Trigger.adhoc(triggerId), instant);
+    final CompletionStage<Void> triggered = triggerListener.event(
+        workflow, Trigger.adhoc(triggerId), instant, parameters);
 
     // TODO: return future instead of blocking
     try {
@@ -215,20 +222,24 @@ public class SchedulerResource {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
     } catch (ExecutionException e) {
-      Throwable cause;
-      if ((cause = findCause(e, IllegalStateException.class)) != null
-          || (cause = findCause(e, IllegalArgumentException.class)) != null) {
-        // TODO: propagate error information using a more specific exception type
-        return Response.forStatus(CONFLICT.withReasonPhrase(cause.getMessage()));
-      } else if (findCause(e, AlreadyInitializedException.class) != null) {
-        return Response.forStatus(CONFLICT.withReasonPhrase(
-            "This workflow instance is already triggered. Did you want to `retry` running it instead?"));
-      } else {
-        return Response.forStatus(INTERNAL_SERVER_ERROR.withReasonPhrase(e.getCause().getMessage()));
-      }
+      return handleException(e);
     }
 
     // todo: change payload to a struct returning the triggerId as well so the user can refer to it
-    return Response.forPayload(workflowInstance);
+    return Response.forPayload(triggerRequest);
+  }
+
+  private Response<TriggerRequest> handleException(final ExecutionException e) {
+    Throwable cause;
+    if ((cause = findCause(e, IllegalStateException.class)) != null
+        || (cause = findCause(e, IllegalArgumentException.class)) != null) {
+      // TODO: propagate error information using a more specific exception type
+      return Response.forStatus(CONFLICT.withReasonPhrase(cause.getMessage()));
+    } else if (findCause(e, AlreadyInitializedException.class) != null) {
+      return Response.forStatus(CONFLICT.withReasonPhrase(
+          "This workflow instance is already triggered. Did you want to `retry` running it instead?"));
+    } else {
+      return Response.forStatus(INTERNAL_SERVER_ERROR.withReasonPhrase(e.getCause().getMessage()));
+    }
   }
 }

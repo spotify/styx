@@ -54,12 +54,11 @@ import io.fabric8.kubernetes.client.dsl.PodResource;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class KubernetesDockerRunnerPodPollerTest {
@@ -107,7 +106,6 @@ public class KubernetesDockerRunnerPodPollerTest {
   public void setUp() {
     when(debug.get()).thenReturn(false);
 
-    when(k8sClient.inNamespace(any(String.class))).thenReturn(k8sClient);
     when(k8sClient.pods()).thenReturn(pods);
 
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
@@ -124,9 +122,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     createdPod.setStatus(podStatus1);
     when(podStatus1.getPhase()).thenReturn("Pending");
     when(k8sClient.pods().list()).thenReturn(podList);
-    when(namedPod1.get()).thenReturn(createdPod);
     when(namedPod2.get()).thenReturn(null);
-    when(k8sClient.pods().withName(POD_NAME)).thenReturn(namedPod1);
     when(k8sClient.pods().withName(POD_NAME_2)).thenReturn(namedPod2);
     setupActiveInstances(RunState.State.RUNNING, POD_NAME, POD_NAME_2);
 
@@ -147,9 +143,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     podList.setItems(Arrays.asList(createdPod, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
     when(namedPod1.get()).thenReturn(createdPod);
-    when(namedPod2.get()).thenReturn(createdPod2);
     when(k8sClient.pods().withName(POD_NAME)).thenReturn(namedPod1);
-    when(k8sClient.pods().withName(POD_NAME_2)).thenReturn(namedPod2);
     setupActiveInstances(RunState.State.RUNNING, POD_NAME, POD_NAME_2);
 
     kdr.tryPollPods();
@@ -195,7 +189,6 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(k8sClient.pods().withName(RUN_SPEC_2.executionId())).thenReturn(namedPod2);
     when(namedPod1.get()).thenReturn(createdPod1);
     when(namedPod2.get()).thenReturn(createdPod2);
-    when(stateManager.getActiveState(any())).thenReturn(Optional.empty());
 
     createdPod1.setStatus(podStatus1);
     when(podStatus1.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus1));
@@ -247,8 +240,6 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     podList.setItems(Arrays.asList(createdPod1, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
-    when(k8sClient.pods().withName(RUN_SPEC.executionId())).thenReturn(namedPod1);
-    when(k8sClient.pods().withName(RUN_SPEC_2.executionId())).thenReturn(namedPod2);
 
     kdr.tryPollPods();
 
@@ -268,7 +259,6 @@ public class KubernetesDockerRunnerPodPollerTest {
     podList.setItems(Arrays.asList(createdPod1, createdPod2));
     when(k8sClient.pods().list()).thenReturn(podList);
     when(k8sClient.pods().withName(RUN_SPEC.executionId())).thenReturn(namedPod1);
-    when(k8sClient.pods().withName(RUN_SPEC_2.executionId())).thenReturn(namedPod2);
     when(namedPod1.get()).thenReturn(createdPod1);
     when(namedPod1.get()).thenReturn(createdPod2);
 
@@ -290,8 +280,6 @@ public class KubernetesDockerRunnerPodPollerTest {
     RunState runState2 = RunState.create(WORKFLOW_INSTANCE_2, state, stateData2);
     map.put(WORKFLOW_INSTANCE, runState);
     map.put(WORKFLOW_INSTANCE_2, runState2);
-    when(stateManager.getActiveState(WORKFLOW_INSTANCE)).thenReturn(Optional.of(runState));
-    when(stateManager.getActiveState(WORKFLOW_INSTANCE_2)).thenReturn(Optional.of(runState2));
     when(stateManager.getActiveStates()).thenReturn(map);
   }
 

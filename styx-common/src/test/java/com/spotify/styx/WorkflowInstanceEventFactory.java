@@ -22,6 +22,7 @@ package com.spotify.styx;
 
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
@@ -41,7 +42,11 @@ public class WorkflowInstanceEventFactory {
   }
 
   public Event triggerExecution(Trigger trigger) {
-    return Event.triggerExecution(workflowInstance, trigger);
+    return triggerExecution(trigger, TriggerParameters.zero());
+  }
+
+  public Event triggerExecution(Trigger trigger, TriggerParameters parameters) {
+    return Event.triggerExecution(workflowInstance, trigger, parameters);
   }
 
   public Event info(Message message) {

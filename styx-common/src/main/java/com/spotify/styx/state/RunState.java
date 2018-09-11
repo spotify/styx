@@ -36,6 +36,7 @@ import com.google.auto.value.AutoValue;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message.MessageLevel;
 import com.spotify.styx.util.Time;
@@ -140,7 +141,8 @@ public abstract class RunState {
     }
 
     @Override
-    public RunState triggerExecution(WorkflowInstance workflowInstance, Trigger trigger) {
+    public RunState triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
+        TriggerParameters parameters) {
       switch (state()) {
         case NEW:
           return state(
@@ -148,6 +150,7 @@ public abstract class RunState {
               data().builder()
                   .trigger(trigger)
                   .triggerId(TriggerUtil.triggerId(trigger)) // for backwards compatibility
+                  .triggerParameters(parameters)
                   .build());
 
         default:

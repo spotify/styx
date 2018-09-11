@@ -23,7 +23,9 @@ package com.spotify.styx.util;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
 import java.util.Optional;
@@ -59,8 +61,10 @@ public final class EventUtil {
     }
 
     @Override
-    public String triggerExecution(WorkflowInstance workflowInstance, Trigger trigger) {
-      return String.format("Trigger id: %s", TriggerUtil.triggerId(trigger));
+    public String triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
+        TriggerParameters parameters) {
+      return String.format("Trigger id: %s, Parameters: %s", TriggerUtil.triggerId(trigger),
+          Json.deterministicStringUnchecked(parameters));
     }
 
     @Override
@@ -147,7 +151,8 @@ public final class EventUtil {
     }
 
     @Override
-    public String triggerExecution(WorkflowInstance workflowInstance, Trigger trigger) {
+    public String triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
+        TriggerParameters parameters) {
       return "triggerExecution";
     }
 

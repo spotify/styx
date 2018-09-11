@@ -71,7 +71,7 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class StyxSchedulerTest {
@@ -151,7 +151,7 @@ public class StyxSchedulerTest {
   @Test
   public void shouldUpdateShardsAccordingToUsedResources() throws IOException {
     when(storage.runInTransaction(any())).thenAnswer(
-        a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
+        a -> a.<TransactionFunction>getArgument(0).apply(transaction));
     final Map<String, Long> resourcesUsageMap = ImmutableMap.of("res1", 257L);
 
     styxScheduler.updateShards(storage, resourcesUsageMap);
@@ -178,7 +178,7 @@ public class StyxSchedulerTest {
   @Test
   public void shouldResetShardsOfResource() throws IOException {
     when(storage.runInTransaction(any())).thenAnswer(
-        a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
+        a -> a.<TransactionFunction>getArgument(0).apply(transaction));
 
     styxScheduler.resetShards(storage, Resource.create("res1", 300));
 
@@ -257,6 +257,14 @@ public class StyxSchedulerTest {
 
     verifyNoMoreInteractions(storage);
     verifyNoMoreInteractions(stateManager);
+  }
+
+  @Test
+  public void shouldReflectDevMode() {
+    final Config devConfig = ConfigFactory.parseMap(ImmutableMap.of("styx.mode", "development"));
+    final Config prodConfig = ConfigFactory.parseMap(ImmutableMap.of("styx.mode", "production"));
+    assertThat(StyxScheduler.isDevMode(devConfig), is(true));
+    assertThat(StyxScheduler.isDevMode(prodConfig), is(false));
   }
 
   private void shardsWithValue(ArgumentCaptor<Shard> shardArgumentCaptor, long value, long times) {

@@ -43,6 +43,8 @@ public interface BackfillInput {
 
   Optional<String> description();
 
+  Optional<TriggerParameters> triggerParameters();
+
   BackfillInputBuilder builder();
 
   static BackfillInputBuilder newBuilder() {

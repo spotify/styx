@@ -28,13 +28,15 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
+import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class AggregateStorageTest {
@@ -51,6 +53,17 @@ public class AggregateStorageTest {
   @Before
   public void setUp() throws Exception {
     sut = new AggregateStorage(bigtable, datastore);
+  }
+
+  @After
+  public void tearDown() throws Exception {
+    sut.close();
+  }
+
+  @Test
+  public void shouldCloseDatastore() throws IOException {
+    sut.close();
+    verify(datastore).close();
   }
 
   @Test

@@ -98,21 +98,21 @@ public class BigtableMocker {
       when(bigtable.getTable(tableName)).thenReturn(table);
 
       when(table.get(any(Get.class)))
-          .thenAnswer(invocation -> resultOfGet(cells, invocation.getArgumentAt(0, Get.class)));
+          .thenAnswer(invocation -> resultOfGet(cells, invocation.getArgument(0)));
 
       when(table.getScanner(any(byte[].class), any(byte[].class)))
           .thenAnswer(invocation -> resultOfFullScan(
               cells,
-              invocation.getArgumentAt(0, byte[].class),
-              invocation.getArgumentAt(1, byte[].class)));
+              invocation.getArgument(0),
+              invocation.getArgument(1)));
       when(table.getScanner(any(Scan.class)))
-          .thenAnswer(invocation -> resultOfScan(cells, invocation.getArgumentAt(0, Scan.class)));
+          .thenAnswer(invocation -> resultOfScan(cells, invocation.getArgument(0)));
       doAnswer(invocation -> {
         if (numFailures > 0) {
           numFailures--;
           throw new IOException("Something went wrong in performing put operation");
         }
-        Put put = invocation.getArgumentAt(0, Put.class);
+        Put put = invocation.getArgument(0);
         List<Cell> list = Lists.newArrayList();
 
         put.getFamilyCellMap()
@@ -129,7 +129,7 @@ public class BigtableMocker {
           numFailures--;
           throw new IOException("Something went wrong in performing delete operation");
         }
-        Delete delete = invocation.getArgumentAt(0, Delete.class);
+        Delete delete = invocation.getArgument(0);
         List<Cell> list = Lists.newArrayList();
 
         delete.getFamilyCellMap()

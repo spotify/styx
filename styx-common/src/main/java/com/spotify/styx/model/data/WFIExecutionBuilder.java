@@ -23,6 +23,7 @@ package com.spotify.styx.model.data;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
@@ -43,6 +44,7 @@ class WFIExecutionBuilder {
   @Nullable private WorkflowInstance currWorkflowInstance;
   @Nullable private String currExecutionId;
   @Nullable private String currTriggerId = "UNKNOWN";
+  private TriggerParameters currTriggerParameters = TriggerParameters.zero();
   @Nullable private String currDockerImg;
   @Nullable private String currCommitSha;
 
@@ -52,6 +54,16 @@ class WFIExecutionBuilder {
   @Nullable private Instant eventTs;
 
   private final EventVisitor visitor = new Reducer();
+
+  private enum Status {
+    FAILED,
+    HALTED,
+    MISSING_DEPS,
+    STARTED,
+    SUBMITTED,
+    SUCCESS,
+    TIMEOUT
+  }
 
   private void closeExecution() {
     final Execution execution = Execution.create(
@@ -72,8 +84,10 @@ class WFIExecutionBuilder {
       closeExecution();
     }
 
-    final Trigger trigger = Trigger.create(currTriggerId, triggerTs, completed, executionList);
+    final Trigger trigger = Trigger.create(currTriggerId, triggerTs, currTriggerParameters, completed, executionList);
 
+    currTriggerId = "UNKNOWN";
+    currTriggerParameters = TriggerParameters.zero();
     triggerList.add(trigger);
     executionList = new ArrayList<>();
   }
@@ -90,11 +104,13 @@ class WFIExecutionBuilder {
     }
 
     @Override
-    public Void triggerExecution(WorkflowInstance workflowInstance, com.spotify.styx.state.Trigger trigger) {
+    public Void triggerExecution(WorkflowInstance workflowInstance, com.spotify.styx.state.Trigger trigger,
+        TriggerParameters parameters) {
       currWorkflowInstance = workflowInstance;
       completed = false;
 
       currTriggerId = TriggerUtil.triggerId(trigger);
+      currTriggerParameters = parameters;
       triggerTs = eventTs;
       return null;
     }
@@ -117,7 +133,8 @@ class WFIExecutionBuilder {
       currExecutionId = executionId;
       currDockerImg = dockerImage;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "SUBMITTED", Optional.empty()));
+      executionStatusList.add(ExecStatus.create(eventTs, Status.SUBMITTED.toString(),
+          Optional.empty()));
       return null;
     }
 
@@ -139,7 +156,8 @@ class WFIExecutionBuilder {
       currWorkflowInstance = workflowInstance;
       currExecutionId = executionId;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "SUBMITTED", Optional.empty()));
+      executionStatusList.add(ExecStatus.create(eventTs, Status.SUBMITTED.toString(),
+          Optional.empty()));
       return null;
     }
 
@@ -147,7 +165,8 @@ class WFIExecutionBuilder {
     public Void started(WorkflowInstance workflowInstance) {
       currWorkflowInstance = workflowInstance;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "STARTED", Optional.empty()));
+      executionStatusList.add(ExecStatus.create(eventTs, Status.STARTED.toString(),
+          Optional.empty()));
       return null;
     }
 
@@ -155,18 +174,18 @@ class WFIExecutionBuilder {
     public Void terminate(WorkflowInstance workflowInstance, Optional<Integer> exitCode) {
       currWorkflowInstance = workflowInstance;
 
-      final String status = exitCode.map(c -> {
+      final Status status = exitCode.map(c -> {
         if (c == 0) {
-          return "SUCCESS";
+          return Status.SUCCESS;
         } else if (c == RunState.MISSING_DEPS_EXIT_CODE) {
-          return "MISSING_DEPS";
+          return Status.MISSING_DEPS;
         } else {
-          return "FAILED";
+          return Status.FAILED;
         }
-      }).orElse("FAILED");
+      }).orElse(Status.FAILED);
 
       final Optional<String> message;
-      if ("FAILED".equals(status)) {
+      if (Status.FAILED == status) {
         message = exitCode
             .map(c -> Optional.of("Exit code: " + c))
             .orElse(Optional.of("Exit code unknown"));
@@ -174,7 +193,7 @@ class WFIExecutionBuilder {
         message = Optional.empty();
       }
 
-      executionStatusList.add(ExecStatus.create(eventTs, status, message));
+      executionStatusList.add(ExecStatus.create(eventTs, status.toString(), message));
 
       closeExecution();
       return null;
@@ -184,7 +203,8 @@ class WFIExecutionBuilder {
     public Void runError(WorkflowInstance workflowInstance, String message) {
       currWorkflowInstance = workflowInstance;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "FAILED", Optional.ofNullable(message)));
+      executionStatusList.add(ExecStatus.create(eventTs, Status.FAILED.toString(),
+          Optional.ofNullable(message)));
 
       closeExecution();
       return null;
@@ -231,7 +251,8 @@ class WFIExecutionBuilder {
         return null;
       }
 
-      executionStatusList.add(ExecStatus.create(eventTs, "TIMEOUT", Optional.empty()));
+      executionStatusList.add(ExecStatus.create(eventTs, Status.TIMEOUT.toString(),
+          Optional.empty()));
 
       closeExecution();
       return null;
@@ -242,7 +263,8 @@ class WFIExecutionBuilder {
       currWorkflowInstance = workflowInstance;
       completed = true;
 
-      executionStatusList.add(ExecStatus.create(eventTs, "HALTED", Optional.empty()));
+      executionStatusList.add(ExecStatus.create(eventTs, Status.HALTED.toString(),
+          Optional.empty()));
 
       closeTrigger();
       return null;

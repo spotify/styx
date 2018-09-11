@@ -30,6 +30,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.IsClosedException;
@@ -39,7 +40,9 @@ import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,7 +74,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
       case PREPARE:
         try {
           final Event submitEvent = Event.submit(
-              state.workflowInstance(), getExecDescription(workflowInstance), createExecutionId());
+              state.workflowInstance(), getExecDescription(workflowInstance, state.data()), createExecutionId());
           try {
             stateManager.receive(submitEvent);
           } catch (IsClosedException isClosedException) {
@@ -98,7 +101,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
     }
   }
 
-  private ExecutionDescription getExecDescription(WorkflowInstance workflowInstance)
+  private ExecutionDescription getExecDescription(WorkflowInstance workflowInstance, StateData data)
       throws IOException, MissingRequiredPropertyException {
     final WorkflowId workflowId = workflowInstance.workflowId();
 
@@ -122,6 +125,9 @@ public class ExecutionDescriptionHandler implements OutputHandler {
     final List<String> dockerArgs = workflow.configuration().dockerArgs()
         .orElse(Collections.emptyList());
 
+    final Map<String, String> env = new HashMap<>(workflow.configuration().env());
+    data.triggerParameters().ifPresent(p -> env.putAll(p.env()));
+
     return ExecutionDescription.builder()
         .dockerImage(dockerImage)
         .dockerArgs(dockerArgs)
@@ -129,6 +135,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         .secret(workflow.configuration().secret())
         .serviceAccount(workflow.configuration().serviceAccount())
         .commitSha(workflow.configuration().commitSha())
+        .env(env)
         .build();
   }
 

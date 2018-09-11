@@ -56,6 +56,7 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState.State;
@@ -90,7 +91,7 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 import org.slf4j.Logger;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -104,6 +105,10 @@ public class QueuedStateManagerTest {
   private static final Workflow WORKFLOW =
       Workflow.create("foo", TestData.FULL_WORKFLOW_CONFIGURATION);
   private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
+  private static final TriggerParameters PARAMETERS = TriggerParameters.builder()
+      .env("FOO", "foo",
+          "BAR", "bar")
+      .build();
   private static final StateData STATE_DATA_1 =
       StateData.newBuilder().resourceIds(ImmutableSet.of("resource1")).build();
   private static final BiConsumer<SequenceEvent, RunState> eventConsumer = (e, s) -> {};
@@ -130,7 +135,7 @@ public class QueuedStateManagerTest {
   public void setUp() throws Exception {
     when(time.get()).thenReturn(NOW);
     when(storage.runInTransaction(any())).thenAnswer(
-        a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
+        a -> a.<TransactionFunction>getArgument(0).apply(transaction));
     doNothing().when(outputHandler).transitionInto(runStateCaptor.capture());
     stateManager = new QueuedStateManager(
         time, eventTransitionExecutor, storage, eventConsumer,
@@ -138,10 +143,9 @@ public class QueuedStateManagerTest {
   }
 
   @After
-  public void tearDown() throws Exception {
-    if (stateManager != null) {
-      stateManager.close();
-    }
+  public void tearDown() {
+    eventTransitionExecutor.shutdownNow();
+    eventConsumerExecutor.shutdownNow();
   }
 
   @Test
@@ -149,32 +153,29 @@ public class QueuedStateManagerTest {
     final RunState instanceStateFresh =
         RunState.create(INSTANCE, State.NEW, StateData.zero(), NOW, -1);
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
-    when(storage.readActiveState(INSTANCE))
-        .thenReturn(Optional.of(RunState.create(INSTANCE, State.NEW, NOW, -1)));
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
     when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.of(instanceStateFresh));
 
-    stateManager.trigger(INSTANCE, TRIGGER1)
+    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
         .toCompletableFuture().get(1, MINUTES);
 
     verify(transaction).writeActiveState(INSTANCE, instanceStateFresh);
     verify(storage).writeEvent(SequenceEvent.create(
-        Event.triggerExecution(INSTANCE, TRIGGER1), 0, NOW.toEpochMilli()));
+        Event.triggerExecution(INSTANCE, TRIGGER1, PARAMETERS), 0, NOW.toEpochMilli()));
   }
 
   @Test
   public void shouldReInitializeWFInstanceFromNextCounter() throws Exception {
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.of(INSTANCE_NEW_STATE.counter()));
-    when(storage.readActiveState(INSTANCE)).thenReturn(Optional.of(INSTANCE_NEW_STATE));
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
     when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.of(INSTANCE_NEW_STATE));
 
-    stateManager.trigger(INSTANCE, TRIGGER1)
+    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
         .toCompletableFuture().get(1, MINUTES);
 
     verify(transaction).writeActiveState(INSTANCE, INSTANCE_NEW_STATE);
     verify(storage).writeEvent(SequenceEvent.create(
-        Event.triggerExecution(INSTANCE, TRIGGER1), INSTANCE_NEW_STATE.counter() + 1, NOW.toEpochMilli()));
+        Event.triggerExecution(INSTANCE, TRIGGER1, PARAMETERS), INSTANCE_NEW_STATE.counter() + 1, NOW.toEpochMilli()));
   }
 
   @Test
@@ -183,7 +184,6 @@ public class QueuedStateManagerTest {
         RunState.create(INSTANCE, State.PREPARE,
             StateData.newBuilder().resourceIds(ImmutableSet.of()).build(), NOW, 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
-    when(storage.readActiveState(INSTANCE)).thenReturn(runState);
 
     Event event = Event.halt(INSTANCE);
     stateManager.receive(event)
@@ -199,7 +199,6 @@ public class QueuedStateManagerTest {
     Optional<RunState> runState = Optional.of(
         RunState.create(INSTANCE, State.PREPARE, StateData.zero(), NOW, 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
-    when(storage.readActiveState(INSTANCE)).thenReturn(runState);
 
     Event event = Event.halt(INSTANCE);
     stateManager.receive(event)
@@ -220,10 +219,10 @@ public class QueuedStateManagerTest {
     when(transactionException.isAlreadyExists()).thenReturn(true);
     doThrow(transactionException).when(transaction).writeActiveState(any(), any());
     when(storage.runInTransaction(any())).thenAnswer(a ->
-        a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
+        a.<TransactionFunction>getArgument(0).apply(transaction));
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1)
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
@@ -240,13 +239,13 @@ public class QueuedStateManagerTest {
     final TransactionException transactionException = spy(new TransactionException(datastoreException));
     when(transactionException.isConflict()).thenReturn(true);
     when(storage.runInTransaction(any())).thenAnswer(a -> {
-      a.getArgumentAt(0, TransactionFunction.class)
+      a.<TransactionFunction>getArgument(0)
           .apply(transaction);
       throw transactionException;
     });
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1)
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
@@ -261,7 +260,7 @@ public class QueuedStateManagerTest {
     when(storage.getLatestStoredCounter(any())).thenThrow(new IOException());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1)
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
@@ -275,7 +274,7 @@ public class QueuedStateManagerTest {
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1)
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
@@ -287,11 +286,10 @@ public class QueuedStateManagerTest {
   public void shouldFailTriggerIfIOExceptionFromTransaction() throws Exception {
     reset(storage);
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
-    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
     when(storage.runInTransaction(any())).thenThrow(new IOException());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1)
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
@@ -306,11 +304,10 @@ public class QueuedStateManagerTest {
         time, eventTransitionExecutor, storage, eventConsumer,
         eventConsumerExecutor, outputHandler, shardedCounter));
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
-    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
     doThrow(new IsClosedException()).when(stateManager).receive(any());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1)
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
@@ -326,11 +323,10 @@ public class QueuedStateManagerTest {
         eventConsumerExecutor, outputHandler, shardedCounter));
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     doThrow(new IOException()).when(storage).deleteActiveState(any());
-    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
     doThrow(new IsClosedException()).when(stateManager).receive(any());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1)
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
@@ -341,13 +337,11 @@ public class QueuedStateManagerTest {
   @Test(expected = IsClosedException.class)
   public void shouldRejectTriggertIfClosed() throws Exception {
     stateManager.close();
-    stateManager.trigger(INSTANCE, TRIGGER1);
+    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
   }
 
   @Test(expected = IsClosedException.class)
   public void shouldRejectEventIfClosed() throws Exception {
-    when(storage.readActiveState(INSTANCE))
-        .thenReturn(Optional.of(RunState.create(INSTANCE, State.NEW, NOW, -1)));
     stateManager.close();
     stateManager.receive(Event.timeTrigger(INSTANCE));
   }
@@ -361,10 +355,9 @@ public class QueuedStateManagerTest {
     CompletableFuture<Void> barrier = new CompletableFuture<>();
 
     reset(storage);
-    when(storage.readActiveState(INSTANCE)).thenReturn(runState);
     when(storage.runInTransaction(any())).thenAnswer(a -> {
       barrier.get();
-      return a.getArgumentAt(0, TransactionFunction.class).apply(transaction);
+      return a.<TransactionFunction>getArgument(0).apply(transaction);
     });
 
     CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()))
@@ -394,7 +387,6 @@ public class QueuedStateManagerTest {
     Optional<RunState> runState = Optional.of(
         RunState.create(INSTANCE, State.SUBMITTED, StateData.zero(), NOW, 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
-    when(storage.readActiveState(INSTANCE)).thenReturn(runState);
 
     stateManager.receive(event)
         .toCompletableFuture().get(1, MINUTES);
@@ -408,7 +400,6 @@ public class QueuedStateManagerTest {
 
     when(transaction.readActiveState(INSTANCE)).thenReturn(
         Optional.of(RunState.create(INSTANCE, State.SUBMITTED, StateData.zero(), NOW, 17)));
-    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.of(17L));
 
     try {
       stateManager.receive(event, 16)
@@ -427,7 +418,6 @@ public class QueuedStateManagerTest {
     Optional<RunState> runState = Optional.of(
         RunState.create(INSTANCE, State.SUBMITTED, StateData.zero(), NOW.minusMillis(1), 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
-    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.of(17L));
 
     try {
       stateManager.receive(event, 18)
@@ -448,7 +438,6 @@ public class QueuedStateManagerTest {
         RunState.create(INSTANCE, State.TERMINATED, StateData.zero(),
             NOW, 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
-    when(storage.readActiveState(INSTANCE)).thenReturn(runState);
 
     Event event = Event.success(INSTANCE);
     stateManager.receive(event)
@@ -464,7 +453,6 @@ public class QueuedStateManagerTest {
         RunState.create(INSTANCE, State.TERMINATED, StateData.zero(), NOW, 17L));
     when(transaction.readActiveState(INSTANCE)).thenReturn(
         runState);
-    when(storage.readActiveState(INSTANCE)).thenReturn(runState);
 
     assertThat(stateManager.queuedEvents(), is(0L));
 
@@ -482,7 +470,6 @@ public class QueuedStateManagerTest {
     Optional<RunState> runState = Optional.of(
         RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW, 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
-    when(storage.readActiveState(INSTANCE)).thenReturn(runState);
 
     stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()))
         .toCompletableFuture().get(1, MINUTES);
@@ -496,7 +483,6 @@ public class QueuedStateManagerTest {
     Optional<RunState> runState = Optional.of(
         RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW.minusMillis(1), 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
-    when(storage.readActiveState(INSTANCE)).thenReturn(runState);
 
     CompletableFuture<Void> f = stateManager.receive(Event.terminate(INSTANCE, Optional.empty()))
         .toCompletableFuture();
@@ -514,7 +500,6 @@ public class QueuedStateManagerTest {
   @Test
   public void shouldFailReceiveForUnknownActiveWFInstance() throws Exception {
     when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.empty());
-    when(storage.readActiveState(INSTANCE)).thenReturn(Optional.empty());
 
     try {
       stateManager.receive(Event.terminate(INSTANCE, Optional.empty())).toCompletableFuture().get();
@@ -568,13 +553,12 @@ public class QueuedStateManagerTest {
   @Test
   public void triggerShouldHandleThrowingOutputHandler() throws Exception {
     Optional<RunState> runState = Optional.of(RunState.create(INSTANCE, State.NEW, NOW, -1));
-    when(storage.readActiveState(INSTANCE)).thenReturn(runState);
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.of(-1L));
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
     final RuntimeException rootCause = new RuntimeException("foo!");
     doThrow(rootCause).when(outputHandler).transitionInto(any());
-    CompletableFuture<Void> f = stateManager.trigger(INSTANCE, TRIGGER1).toCompletableFuture();
+    CompletableFuture<Void> f = stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS).toCompletableFuture();
     try {
       f.get(1, MINUTES);
       fail();
@@ -588,8 +572,6 @@ public class QueuedStateManagerTest {
     Optional<RunState> runState = Optional.of(
         RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW.minusMillis(1), 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
-    when(storage.readActiveState(INSTANCE)).thenReturn(runState);
-    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.of(17L));
 
     final RuntimeException rootCause = new RuntimeException("foo!");
     doThrow(rootCause).when(outputHandler).transitionInto(any());
@@ -660,7 +642,7 @@ public class QueuedStateManagerTest {
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransaction(any())).thenThrow(cause);
     try {
-      stateManager.trigger(INSTANCE, Trigger.natural()).toCompletableFuture().get();
+      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS).toCompletableFuture().get();
       fail();
     } catch (ExecutionException ignore) {
     }
@@ -676,7 +658,7 @@ public class QueuedStateManagerTest {
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransaction(any())).thenThrow(cause);
     try {
-      stateManager.trigger(INSTANCE, Trigger.natural()).toCompletableFuture().get();
+      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS).toCompletableFuture().get();
       fail();
     } catch (ExecutionException ignore) {
     }
@@ -691,7 +673,7 @@ public class QueuedStateManagerTest {
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransaction(any())).thenThrow(cause);
     try {
-      stateManager.trigger(INSTANCE, Trigger.natural()).toCompletableFuture().get();
+      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS).toCompletableFuture().get();
       fail();
     } catch (ExecutionException ignore) {
     }
@@ -703,7 +685,6 @@ public class QueuedStateManagerTest {
   public void shouldThrowRuntimeException() throws Exception {
     final IOException exception = new IOException();
     Optional<RunState> runState = Optional.of(RunState.create(INSTANCE, State.NEW, NOW, -1));
-    when(storage.readActiveState(INSTANCE)).thenReturn(runState);
     doThrow(exception).when(storage).runInTransaction(any());
     CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of())).toCompletableFuture();
     try {
@@ -727,8 +708,6 @@ public class QueuedStateManagerTest {
     doThrow(new CounterCapacityException("foo"))
         .when(transaction).updateCounter(shardedCounter, "resource1", 1);
     final CounterSnapshot counterSnapshot = mock(CounterSnapshot.class);
-    when(counterSnapshot.getLimit()).thenReturn(1L);
-    when(shardedCounter.getCounterSnapshot("resource1")).thenReturn(counterSnapshot);
 
     final Set<Resource> resources = ImmutableSet.of(Resource.create("resource1", 1));
     final List<String> resourceIds = resources.stream().map(Resource::id).sorted().collect(toList());
@@ -757,7 +736,6 @@ public class QueuedStateManagerTest {
         STATE_DATA_1.builder().messages(message).build(),
         NOW.minusMillis(1), 17);
     when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.of(runState));
-    when(storage.readActiveState(INSTANCE)).thenReturn(Optional.of(runState));
 
     doThrow(new CounterCapacityException("foo"))
         .when(transaction).updateCounter(shardedCounter, "resource1", 1);
@@ -926,7 +904,6 @@ public class QueuedStateManagerTest {
   public void givenState(WorkflowInstance instance, State state) throws IOException {
     final RunState runState = RunState.create(instance, state, STATE_DATA_1, NOW.minusMillis(1), 17);
     when(transaction.readActiveState(instance)).thenReturn(Optional.of(runState));
-    when(storage.readActiveState(INSTANCE)).thenReturn(Optional.of(runState));
   }
 
   public void receiveEvent(Event event) throws Exception {

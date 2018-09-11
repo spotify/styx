@@ -20,8 +20,15 @@
 
 package com.spotify.styx.util;
 
+import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
+import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public class FutureUtil {
 
@@ -29,9 +36,34 @@ public class FutureUtil {
     throw new UnsupportedOperationException();
   }
 
-  public static <T> CompletionStage<T> exceptionallyCompletedFuture(final Throwable t) {
+  public static <T> CompletableFuture<T> exceptionallyCompletedFuture(final Throwable t) {
     CompletableFuture<T> future = new CompletableFuture<>();
     future.completeExceptionally(t);
     return future;
+  }
+
+  /**
+   * Gathers results from futures that may fail with IOExceptions.
+   * @return The values of all futures, in the same order.
+   * @throws IOException if interrupted or any of the futures timed out or failed with an {@link IOException}.
+   */
+  public static <T> List<T> gatherIO(final List<Future<T>> futures, long timeout, TimeUnit timeUnit)
+      throws IOException {
+    final ImmutableList.Builder<T> values = ImmutableList.builder();
+    for (Future<T> future : futures) {
+      try {
+        values.add(future.get(timeout, timeUnit));
+      } catch (TimeoutException e) {
+        throw new IOException(e);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException(e);
+      } catch (ExecutionException e) {
+        final Throwable cause = e.getCause();
+        Throwables.propagateIfPossible(cause, IOException.class);
+        throw new RuntimeException(cause);
+      }
+    }
+    return values.build();
   }
 }

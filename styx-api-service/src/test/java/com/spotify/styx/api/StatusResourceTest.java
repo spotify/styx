@@ -33,6 +33,7 @@ import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
@@ -82,7 +83,7 @@ public class StatusResourceTest extends VersionedApiTest {
   public void testEventsRoundtrip() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI, TRIGGER), 0L, 0L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI, TRIGGER, TriggerParameters.zero()), 0L, 0L));
     storage.writeEvent(SequenceEvent.create(Event.created(WFI, "exec0", "img0"), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI), 2L, 2L));
 

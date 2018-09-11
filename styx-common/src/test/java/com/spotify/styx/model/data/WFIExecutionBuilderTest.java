@@ -28,7 +28,9 @@ import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.WorkflowInstanceEventFactory;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.EventUtil;
 import java.time.Instant;
@@ -81,6 +83,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig0",
                     time("07:55"),
+                    TriggerParameters.zero(),
                     true,
                     Arrays.asList(
                         Execution.create(
@@ -116,6 +119,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig0",
                     time("07:55"),
+                    TriggerParameters.zero(),
                     false,
                     Arrays.asList(
                         Execution.create(
@@ -137,8 +141,13 @@ public class WFIExecutionBuilderTest {
   @Test
   public void testGeneralExample() {
     long c = 0L;
+    TriggerParameters triggerParameters = TriggerParameters.builder()
+        .env("FOO", "foo",
+            "BAR", "bar")
+        .build();
     List<SequenceEvent> events = Arrays.asList(
-        SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
+        SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0, triggerParameters), c++, ts("07:55")),
+        SequenceEvent.create(E.info(Message.info("foo bar")), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
         SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
@@ -177,6 +186,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig0",
                     time("07:55"),
+                    triggerParameters,
                     true,
                     Arrays.asList(
                         Execution.create(
@@ -204,6 +214,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig1",
                     time("09:55"),
+                    TriggerParameters.zero(),
                     false,
                     Arrays.asList(
                         Execution.create(
@@ -255,6 +266,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig0",
                     time("07:55"),
+                    TriggerParameters.zero(),
                     false,
                     Arrays.asList(
                         Execution.create(
@@ -303,6 +315,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig0",
                     time("07:55"),
+                    TriggerParameters.zero(),
                     false,
                     Arrays.asList(
                         Execution.create(
@@ -352,6 +365,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "UNKNOWN",
                     time("07:54"),
+                    TriggerParameters.zero(),
                     false,
                     Collections.singletonList(
                         Execution.create(
@@ -398,6 +412,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig0",
                     time("07:55"),
+                    TriggerParameters.zero(),
                     false,
                     Arrays.asList(
                         Execution.create(
@@ -453,6 +468,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig0",
                     time("07:55"),
+                    TriggerParameters.zero(),
                     true,
                     Collections.singletonList(
                         Execution.create(
@@ -469,6 +485,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig1",
                     time("08:56"),
+                    TriggerParameters.zero(),
                     false,
                     Collections.singletonList(
                         Execution.create(
@@ -478,6 +495,63 @@ public class WFIExecutionBuilderTest {
                             Arrays.asList(
                                 ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("08:57"), "STARTED", Optional.empty())
+                            )
+                        )
+                    )
+                )
+            )
+        );
+
+    assertThat(workflowInstanceExecutionData, is(expected));
+  }
+
+  @Test
+  public void testStop() {
+    long c = 0L;
+    List<SequenceEvent> events = Arrays.asList(
+        SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
+        SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.runError("First failure"), c++, ts("07:58")),
+        SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
+
+        SequenceEvent.create(E.retry(), c++, ts("08:56")),
+        SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-01"), c++, ts("08:55")),
+        SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
+        SequenceEvent.create(E.started(), c++, ts("08:57")),
+        SequenceEvent.create(E.runError("Second failure"), c++, ts("08:59")),
+        SequenceEvent.create(E.stop(), c++, ts("08:59"))
+    );
+    assertValidTransitionSequence(events);
+
+    WorkflowInstanceExecutionData workflowInstanceExecutionData =
+        new WFIExecutionBuilder().executionInfo(events);
+    WorkflowInstanceExecutionData expected =
+        WorkflowInstanceExecutionData.create(
+            WORKFLOW_INSTANCE,
+            Collections.singletonList(
+                Trigger.create(
+                    "trig0",
+                    time("07:55"),
+                    TriggerParameters.zero(),
+                    true,
+                    Arrays.asList(
+                        Execution.create(
+                            Optional.of("exec-id-00"),
+                            Optional.of("img1"),
+                            Optional.of("sha1"),
+                            Arrays.asList(
+                                ExecStatus.create(time("07:58"), "FAILED", Optional.of("First failure"))
+                            )
+                        ),
+                        Execution.create(
+                            Optional.of("exec-id-01"),
+                            Optional.of("img2"),
+                            Optional.of("sha2"),
+                            Arrays.asList(
+                                ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
+                                ExecStatus.create(time("08:57"), "STARTED", Optional.empty()),
+                                ExecStatus.create(time("08:59"), "FAILED", Optional.of("Second failure"))
                             )
                         )
                     )

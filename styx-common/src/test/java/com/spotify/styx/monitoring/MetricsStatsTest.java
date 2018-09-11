@@ -56,17 +56,17 @@ import com.codahale.metrics.Meter;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Time;
-import java.time.Instant;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class MetricsStatsTest {
@@ -90,7 +90,6 @@ public class MetricsStatsTest {
   @Before
   public void setUp() {
     when(time.nanoTime()).then(a -> System.nanoTime());
-    when(time.get()).then(a -> Instant.now());
     when(registry.histogram(TRANSITIONING_DURATION)).thenReturn(histogram);
     when(registry.meter(PULL_IMAGE_ERROR_RATE)).thenReturn(meter);
     when(registry.meter(NATURAL_TRIGGER_RATE)).thenReturn(meter);
@@ -98,7 +97,6 @@ public class MetricsStatsTest {
     when(registry.meter(TERMINATION_LOG_INVALID)).thenReturn(meter);
     when(registry.meter(EXIT_CODE_MISMATCH)).thenReturn(meter);
     when(registry.meter(WORKFLOW_CONSUMER_ERROR_RATE)).thenReturn(meter);
-    when(registry.histogram(TICK_DURATION)).thenReturn(histogram);
     when(registry.meter(COUNTER_CACHE_RATE.tagged("result", "miss"))).thenReturn(meter);
     when(registry.meter(COUNTER_CACHE_RATE.tagged("result", "hit"))).thenReturn(meter);
     stats = new MetricsStats(registry, time);
@@ -233,8 +231,8 @@ public class MetricsStatsTest {
 
   @Test
   public void shouldRecordEventConsumer() {
-    final SequenceEvent event = SequenceEvent
-        .create(Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural()), 0L, 0L);
+    final SequenceEvent event = SequenceEvent.create(
+        Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural(), TriggerParameters.zero()), 0L, 0L);
     when(registry.meter(EVENT_CONSUMER_RATE.tagged("event-type", "triggerExecution"))).thenReturn(meter);
     stats.recordEventConsumer(event);
     verify(meter).mark();
@@ -242,8 +240,8 @@ public class MetricsStatsTest {
 
   @Test
   public void shouldRecordEventConsumerError() {
-    final SequenceEvent event = SequenceEvent
-        .create(Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural()), 0L, 0L);
+    final SequenceEvent event = SequenceEvent.create(
+        Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural(), TriggerParameters.zero()), 0L, 0L);
     when(registry.meter(EVENT_CONSUMER_ERROR_RATE.tagged("event-type", "triggerExecution"))).thenReturn(meter);
     stats.recordEventConsumerError(event);
     verify(meter).mark();

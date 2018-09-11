@@ -38,6 +38,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.hamcrest.MockitoHamcrest.argThat;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -74,7 +75,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
@@ -87,10 +87,9 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InOrder;
-import org.mockito.Matchers;
 import org.mockito.Mock;
 import org.mockito.Mockito;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class SchedulerTest {
@@ -130,9 +129,6 @@ public class SchedulerTest {
         .thenReturn(WorkflowExecutionGate.NO_BLOCKER);
     when(shardedCounter.counterHasSpareCapacity(anyString())).thenReturn(true);
     doNothing().when(stateManager).receiveIgnoreClosed(eventCaptor.capture(), anyLong());
-    doNothing().when(stateManager).receiveIgnoreClosed(eventCaptor.capture());
-    when(stateManager.receive(eventCaptor.capture(), anyLong())).thenReturn(CompletableFuture.completedFuture(null));
-    when(stateManager.receive(eventCaptor.capture())).thenReturn(CompletableFuture.completedFuture(null));
   }
 
   @After
@@ -149,7 +145,7 @@ public class SchedulerTest {
 
     when(resourceDecorator.decorateResources(
         any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
-        .thenAnswer(a -> a.getArgumentAt(2, Set.class));
+        .thenAnswer(a -> a.getArgument(2));
     
     when(storage.workflows(anySetOf(WorkflowId.class))).thenReturn(workflows);
 
@@ -560,7 +556,7 @@ public class SchedulerTest {
     verify(resourceDecorator, times(2 + 2)).decorateResources(any(RunState.class), eq(workflow.configuration()),
         eq(ImmutableSet.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
 
-    verify(stateManager, times(2)).receiveIgnoreClosed(Matchers.argThat(
+    verify(stateManager, times(2)).receiveIgnoreClosed(argThat(
         either(is(Event.dequeue(i0, ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"))))
             .or(is(Event.dequeue(i4, ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"))))),
         anyLong());

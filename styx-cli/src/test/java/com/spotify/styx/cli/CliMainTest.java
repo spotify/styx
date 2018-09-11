@@ -49,6 +49,7 @@ import com.spotify.styx.client.StyxClient;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -136,8 +137,8 @@ public class CliMainTest {
     assertThat(expected, is(not(Matchers.empty())));
 
     when(client.createOrUpdateWorkflow(any(), any())).thenAnswer(a -> {
-      final String comp = a.getArgumentAt(0, String.class);
-      final WorkflowConfiguration wfConfig = a.getArgumentAt(1, WorkflowConfiguration.class);
+      final String comp = a.getArgument(0);
+      final WorkflowConfiguration wfConfig = a.getArgument(1);
       return CompletableFuture.completedFuture(Workflow.create(comp, wfConfig));
     });
 
@@ -220,6 +221,7 @@ public class CliMainTest {
         .end(backfill.end())
         .reverse(backfill.reverse())
         .concurrency(backfill.concurrency())
+        .triggerParameters(TriggerParameters.zero())
         .build();
 
     when(client.backfillCreate(expectedInput))
@@ -230,6 +232,62 @@ public class CliMainTest {
 
     verify(client).backfillCreate(expectedInput);
     verify(cliOutput).printBackfill(backfill, true);
+  }
+
+  @Test
+  public void testBackfillCreateWithEnv() {
+    final String component = "quux";
+    final String start = "2017-01-01T00:00:00Z";
+    final String end = "2017-01-30T00:00:00Z";
+
+    final TriggerParameters expectedTriggerParameters = TriggerParameters.builder()
+        .env("FOO", "foo",
+            "BAR", "bar",
+            "BAZ", "baz",
+            "FOOBAR", "")
+        .build();
+    final Backfill backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(Instant.parse(start))
+        .end(Instant.parse(end))
+        .workflowId(WorkflowId.create(component, "foo"))
+        .concurrency(1)
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .triggerParameters(expectedTriggerParameters)
+        .build();
+
+    final BackfillInput expectedInput = BackfillInput.newBuilder()
+        .component(backfill.workflowId().componentId())
+        .workflow(backfill.workflowId().id())
+        .start(backfill.start())
+        .end(backfill.end())
+        .reverse(backfill.reverse())
+        .concurrency(backfill.concurrency())
+        .triggerParameters(expectedTriggerParameters)
+        .build();
+
+    when(client.backfillCreate(expectedInput))
+        .thenReturn(CompletableFuture.completedFuture(backfill));
+
+    CliMain.run(cliContext, "backfill", "create", component, "foo", "2017-01-01", "2017-01-30",
+        "1", "-e", "FOO=foo", "BAR=bar", "--env", "BAZ=baz", "-e", "FOOBAR=");
+
+    verify(client).backfillCreate(expectedInput);
+    verify(cliOutput).printBackfill(backfill, true);
+  }
+
+  @Test
+  public void testBackfillCreateWithInvalidEnv() {
+    final String component = "quux";
+
+    try {
+      CliMain.run(cliContext, "backfill", "create", component, "foo", "2017-01-01", "2017-01-30",
+          "1", "-e", "FOO=foo", "BAR=bar", "--env", "BAZ=baz", "-e", "FOOBAR");
+      fail();
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.UnknownError));
+    }
   }
 
   @Test
@@ -256,6 +314,7 @@ public class CliMainTest {
         .end(backfill.end())
         .reverse(backfill.reverse())
         .concurrency(backfill.concurrency())
+        .triggerParameters(TriggerParameters.zero())
         .build();
 
     when(client.backfillCreate(expectedInput))
@@ -291,6 +350,7 @@ public class CliMainTest {
         .end(backfill.end())
         .concurrency(backfill.concurrency())
         .description("Description")
+        .triggerParameters(TriggerParameters.zero())
         .build();
 
     when(client.backfillCreate(expectedInput))
@@ -581,7 +641,7 @@ public class CliMainTest {
 
   @Test
   public void testClientError() {
-    when(client.triggerWorkflowInstance(any(), any(), any()))
+    when(client.triggerWorkflowInstance(any(), any(), any(), any()))
         .thenReturn(exceptionallyCompletedFuture(
             new ClientErrorException("foo failure",
                 new IOException("bar failure",
@@ -602,7 +662,7 @@ public class CliMainTest {
     final Throwable cause = new ClientErrorException("foo failure",
         new IOException("bar failure",
             new ConnectException("failed to connect to baz")));
-    when(client.triggerWorkflowInstance(any(), any(), any()))
+    when(client.triggerWorkflowInstance(any(), any(), any(), any()))
         .thenReturn(exceptionallyCompletedFuture(cause));
 
     try {
@@ -619,7 +679,7 @@ public class CliMainTest {
   @Test
   public void testApiError() {
     final ApiErrorException exception = new ApiErrorException("bar failure", 500, true, requestId);
-    when(client.triggerWorkflowInstance(any(), any(), any()))
+    when(client.triggerWorkflowInstance(any(), any(), any(), any()))
         .thenReturn(exceptionallyCompletedFuture(exception));
 
     try {
@@ -635,7 +695,7 @@ public class CliMainTest {
   @Test
   public void testClientUnknownError() {
     final Exception exception = new UnsupportedOperationException();
-    when(client.triggerWorkflowInstance(any(), any(), any()))
+    when(client.triggerWorkflowInstance(any(), any(), any(), any()))
         .thenReturn(exceptionallyCompletedFuture(exception));
 
     try {
@@ -652,7 +712,7 @@ public class CliMainTest {
   @Test
   public void testUnknownError() {
     final Exception exception = new UnsupportedOperationException();
-    when(client.triggerWorkflowInstance(any(), any(), any()))
+    when(client.triggerWorkflowInstance(any(), any(), any(), any()))
         .thenThrow(exception);
 
     try {
@@ -668,7 +728,7 @@ public class CliMainTest {
   @Test
   public void testMissingCredentialsHelpMessage() {
     final ApiErrorException apiError = new ApiErrorException("foo", 401, false, requestId);
-    when(client.triggerWorkflowInstance(any(), any(), any()))
+    when(client.triggerWorkflowInstance(any(), any(), any(), any()))
         .thenReturn(exceptionallyCompletedFuture(apiError));
 
     try {
@@ -685,7 +745,7 @@ public class CliMainTest {
   @Test
   public void testUnauthorizedMessage() {
     final ApiErrorException apiError = new ApiErrorException("foo", 401, true, requestId);
-    when(client.triggerWorkflowInstance(any(), any(), any()))
+    when(client.triggerWorkflowInstance(any(), any(), any(), any()))
         .thenReturn(exceptionallyCompletedFuture(apiError));
 
     try {
@@ -727,6 +787,32 @@ public class CliMainTest {
     }
 
     verifyZeroInteractions(client);
+  }
+
+  @Test
+  public void testTrigger() {
+    final TriggerParameters expectedParameters = TriggerParameters.zero();
+    when(client.triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters))
+        .thenReturn(CompletableFuture.completedFuture(null));
+
+    CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02");
+
+    verify(client).triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters);
+  }
+
+  @Test
+  public void testTriggerWithEnv() {
+    final TriggerParameters expectedParameters = TriggerParameters.builder()
+        .env("FOO", "foo",
+            "BAR", "bar",
+            "BAZ", "baz")
+        .build();
+    when(client.triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters))
+        .thenReturn(CompletableFuture.completedFuture(null));
+
+    CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02", "-e", "FOO=foo", "BAR=bar", "--env", "BAZ=baz");
+
+    verify(client).triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters);
   }
 
   private Path fileFromResource(String name) throws IOException {

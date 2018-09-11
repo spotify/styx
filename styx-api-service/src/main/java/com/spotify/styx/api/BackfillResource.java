@@ -23,14 +23,16 @@ package com.spotify.styx.api;
 import static com.spotify.apollo.StatusType.Family.SUCCESSFUL;
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.serialization.Json.serialize;
+import static com.spotify.styx.util.CloserUtil.register;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
-import static com.spotify.styx.util.StreamUtil.cat;
 import static com.spotify.styx.util.TimeUtil.instantsInRange;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.stream.Collectors.toList;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Streams;
+import com.google.common.io.Closer;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -75,18 +77,23 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class BackfillResource implements Closeable {
+
+  private static final Logger log = LoggerFactory.getLogger(WorkflowResource.class);
 
   static final String BASE = "/backfills";
   private static final String SCHEDULER_BASE_PATH = "/api/v0";
   private static final String UNKNOWN = "UNKNOWN";
   private static final String WAITING = "WAITING";
   private static final int CONCURRENCY = 64;
+
+  private final Closer closer = Closer.create();
 
   private final Storage storage;
   private final String schedulerServiceBaseUrl;
@@ -99,7 +106,7 @@ public final class BackfillResource implements Closeable {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
     this.storage = Objects.requireNonNull(storage);
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
-    this.forkJoinPool = new ForkJoinPool(CONCURRENCY);
+    this.forkJoinPool = register(closer, new ForkJoinPool(CONCURRENCY), "backfill-resource");
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -133,20 +140,15 @@ public final class BackfillResource implements Closeable {
             rc -> haltBackfill(rc.pathArgs().get("bid"), rc))
     );
 
-    return cat(
+    return Streams.concat(
         Api.prefixRoutes(entityRoutes, V3),
         Api.prefixRoutes(routes, V3)
     );
   }
 
   @Override
-  public void close() {
-    forkJoinPool.shutdownNow();
-    try {
-      forkJoinPool.awaitTermination(30, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
+  public void close() throws IOException {
+    closer.close();
   }
 
   private BackfillsPayload getBackfills(RequestContext rc) {
@@ -189,7 +191,14 @@ public final class BackfillResource implements Closeable {
 
   private Response<BackfillPayload> getBackfill(RequestContext rc, String id) {
     final boolean includeStatuses = rc.request().parameter("status").orElse("true").equals("true");
-    final Optional<Backfill> backfillOpt = storage.backfill(id);
+    final Optional<Backfill> backfillOpt;
+    try {
+      backfillOpt = storage.backfill(id);
+    } catch (IOException e) {
+      final String message = String.format("Couldn't read backfill %s. ", id);
+      log.warn(message, e);
+      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Error in internal storage"));
+    }
     if (!backfillOpt.isPresent()) {
       return Response.forStatus(Status.NOT_FOUND);
     }
@@ -340,6 +349,7 @@ public final class BackfillResource implements Closeable {
             : input.start())
         .description(input.description())
         .reverse(input.reverse())
+        .triggerParameters(input.triggerParameters())
         .halted(false);
 
     final Backfill backfill = builder.build();

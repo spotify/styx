@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.StyxConfig;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.monitoring.Stats;
@@ -52,7 +53,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class TriggerManagerTest {
@@ -72,7 +73,7 @@ public class TriggerManagerTest {
   private final ExecutorService executor = Executors.newCachedThreadPool();
 
   @After
-  public void tearDown() {
+  public void tearDown() throws IOException {
     executor.shutdownNow();
     triggerManager.close();
   }
@@ -81,7 +82,7 @@ public class TriggerManagerTest {
   public void setUp() throws IOException {
     when(storage.config()).thenReturn(config);
     triggerManager = new TriggerManager(triggerListener, MANAGER_TIME, storage, Stats.NOOP);
-    when(triggerListener.event(any(Workflow.class), any(Trigger.class), any(Instant.class)))
+    when(triggerListener.event(any(), any(), any(), any()))
         .thenReturn(CompletableFuture.completedFuture(null));
   }
 
@@ -89,11 +90,11 @@ public class TriggerManagerTest {
   public void shouldNotUpdateNextNaturalTriggerUntilTriggerExecutionIsComplete() throws Exception {
     setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"));
     final CompletableFuture<Void> triggerExecutionFuture = new CompletableFuture<>();
-    when(triggerListener.event(any(Workflow.class), any(Trigger.class), any(Instant.class)))
+    when(triggerListener.event(any(), any(), any(), any()))
         .thenReturn(triggerExecutionFuture);
     executor.execute(triggerManager::tick);
     verify(triggerListener, timeout(60_000)).event(
-        WORKFLOW_DAILY, NATURAL_TRIGGER, parse("2016-10-01T00:00:00Z"));
+        WORKFLOW_DAILY, NATURAL_TRIGGER, parse("2016-10-01T00:00:00Z"), TriggerParameters.zero());
     // HACK: Sleep to avoid racily missing an undesired invocation of updateNextNaturalTrigger
     Thread.sleep(5000);
     verify(storage, never()).updateNextNaturalTrigger(any(WorkflowId.class), any(TriggerInstantSpec.class));
@@ -106,11 +107,12 @@ public class TriggerManagerTest {
   @Test
   public void shouldNotUpdateNextNaturalTriggerIfTriggerExecutionFails() throws Exception {
     setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"));
-    when(triggerListener.event(any(Workflow.class), any(Trigger.class), any(Instant.class)))
+    when(triggerListener.event(any(), any(), any(), any()))
         .thenReturn(FutureUtil.exceptionallyCompletedFuture(
             new RuntimeException("trigger execution failure!")));
     triggerManager.tick();
-    verify(triggerListener).event(WORKFLOW_DAILY, NATURAL_TRIGGER, parse("2016-10-01T00:00:00Z"));
+    verify(triggerListener).event(WORKFLOW_DAILY, NATURAL_TRIGGER, parse("2016-10-01T00:00:00Z"),
+        TriggerParameters.zero());
     verify(storage, never()).updateNextNaturalTrigger(any(WorkflowId.class), any(TriggerInstantSpec.class));
   }
 
@@ -119,7 +121,8 @@ public class TriggerManagerTest {
     setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"));
     triggerManager.tick();
 
-    verify(triggerListener).event(WORKFLOW_DAILY, NATURAL_TRIGGER, parse("2016-10-01T00:00:00Z"));
+    verify(triggerListener).event(WORKFLOW_DAILY, NATURAL_TRIGGER, parse("2016-10-01T00:00:00Z"),
+        TriggerParameters.zero());
     verify(storage).updateNextNaturalTrigger(
         WORKFLOW_DAILY.id(),
         TriggerInstantSpec.create(parse("2016-10-02T00:00:00Z"), parse("2016-10-03T00:00:00Z")));
@@ -130,7 +133,7 @@ public class TriggerManagerTest {
     setupWithNextNaturalTrigger(false, parse("2016-10-09T00:00:00Z"));
     triggerManager.tick();
 
-    verify(triggerListener, never()).event(any(), any(), any());
+    verify(triggerListener, never()).event(any(), any(), any(), any());
     verify(storage).updateNextNaturalTrigger(
         WORKFLOW_DAILY.id(),
         TriggerInstantSpec.create(parse("2016-10-10T00:00:00Z"), parse("2016-10-11T00:00:00Z")));
@@ -141,7 +144,7 @@ public class TriggerManagerTest {
     setupWithNextNaturalTrigger(true, parse("2016-10-11T00:00:00Z"));
     triggerManager.tick();
 
-    verify(triggerListener, never()).event(any(), any(), any());
+    verify(triggerListener, never()).event(any(), any(), any(), any());
     verify(storage, never()).updateNextNaturalTrigger(any(), any());
   }
 
@@ -149,14 +152,14 @@ public class TriggerManagerTest {
   public void shouldNotTriggerExecutionOnDisabledGlobally() throws IOException {
     when(config.globalEnabled()).thenReturn(false);
     triggerManager.tick();
-    verify(triggerListener, never()).event(any(), any(), any());
+    verify(triggerListener, never()).event(any(), any(), any(), any());
     verify(storage, never()).updateNextNaturalTrigger(any(), any());
   }
 
   @Test
   public void shouldNotUpdateNextNaturalTriggerIfTriggerListenerThrows() throws Exception {
     setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"));
-    doThrow(new RuntimeException()).when(triggerListener).event(any(), any(), any());
+    doThrow(new RuntimeException()).when(triggerListener).event(any(), any(), any(), any());
     triggerManager.tick();
 
     verify(storage, never()).updateNextNaturalTrigger(any(), any());
@@ -165,7 +168,7 @@ public class TriggerManagerTest {
   @Test
   public void shouldUpdateNextNaturalTriggerIfAlreadyInitialized() throws Exception {
     setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"));
-    when(triggerListener.event(any(), any(), any()))
+    when(triggerListener.event(any(), any(), any(), any()))
         .thenReturn(exceptionallyCompletedFuture(new AlreadyInitializedException("")));
     triggerManager.tick();
 
@@ -177,7 +180,7 @@ public class TriggerManagerTest {
   @Test
   public void shouldNotUpdateNextNaturalTriggerIfOtherException() throws Exception {
     setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"));
-    when(triggerListener.event(any(), any(), any()))
+    when(triggerListener.event(any(), any(), any(), any()))
         .thenReturn(exceptionallyCompletedFuture(new RuntimeException()));
     triggerManager.tick();
 

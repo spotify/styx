@@ -57,7 +57,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @SuppressWarnings({"ResultOfMethodCallIgnored", "unchecked"})
 @RunWith(MockitoJUnitRunner.class)
@@ -222,7 +222,7 @@ public class InstrumentedDatastoreTest {
   @Test
   public void runInTransaction() {
     when(datastore.runInTransaction(any())).then(a ->
-        a.getArgumentAt(0, TransactionCallable.class)
+        a.<TransactionCallable>getArgument(0)
             .run(transaction));
 
     final String foobar = instrumentedDatastore.runInTransaction(tx -> {
@@ -239,7 +239,7 @@ public class InstrumentedDatastoreTest {
   @Test
   public void runInTransactionWithOptions() {
     when(datastore.runInTransaction(any(), any())).then(a ->
-        a.getArgumentAt(0, TransactionCallable.class)
+        a.<TransactionCallable>getArgument(0)
             .run(transaction));
 
     final TransactionOptions transactionOptions = TransactionOptions.newBuilder().build();

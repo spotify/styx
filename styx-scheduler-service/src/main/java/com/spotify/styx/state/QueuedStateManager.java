@@ -22,7 +22,6 @@ package com.spotify.styx.state;
 
 import static com.spotify.styx.state.StateUtil.isConsumingResources;
 import static com.spotify.styx.util.MDCUtil.withMDC;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
@@ -31,6 +30,7 @@ import com.google.common.base.Throwables;
 import com.spotify.styx.MessageUtil;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState.State;
@@ -45,7 +45,6 @@ import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -79,8 +78,6 @@ public class QueuedStateManager implements StateManager {
   private final Logger log;
 
   private static final long NO_EVENTS_PROCESSED = -1L;
-
-  private static final Duration SHUTDOWN_GRACE_PERIOD = Duration.ofSeconds(5);
 
   private final LongAdder queuedEvents = new LongAdder();
 
@@ -126,7 +123,7 @@ public class QueuedStateManager implements StateManager {
   }
 
   @Override
-  public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger)
+  public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger, TriggerParameters parameters)
       throws IsClosedException {
     ensureRunning();
     log.debug("Trigger {}", workflowInstance);
@@ -134,7 +131,7 @@ public class QueuedStateManager implements StateManager {
     // TODO: optional retry on transaction conflict
 
     return CompletableFuture.runAsync(() -> initialize(workflowInstance), withMDC()).thenCompose((ignore) -> {
-      final Event event = Event.triggerExecution(workflowInstance, trigger);
+      final Event event = Event.triggerExecution(workflowInstance, trigger, parameters);
       try {
         return receive(event);
       } catch (IsClosedException isClosedException) {
@@ -268,7 +265,7 @@ public class QueuedStateManager implements StateManager {
   }
 
   private void updateResourceCounters(StorageTransaction tx, Event event,
-                                      RunState currentRunState, RunState nextRunState) {
+                                      RunState currentRunState, RunState nextRunState) throws IOException {
     // increment counters if event is dequeue
     if (isDequeue(event) && nextRunState.data().resourceIds().isPresent()) {
       tryUpdatingCounter(currentRunState, tx, nextRunState.data().resourceIds().get());
@@ -400,18 +397,6 @@ public class QueuedStateManager implements StateManager {
       return;
     }
     running = false;
-
-    eventProcessingExecutor.shutdown();
-    try {
-      if (!eventProcessingExecutor
-          .awaitTermination(SHUTDOWN_GRACE_PERIOD.toMillis(), MILLISECONDS)) {
-        throw new IOException(
-            "Graceful shutdown failed, event loop did not finish within grace period");
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IOException(e);
-    }
   }
 
   @VisibleForTesting

@@ -47,6 +47,7 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.StyxConfig;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -80,10 +81,15 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class BackfillTriggerManagerTest {
+
+  private static final TriggerParameters TRIGGER_PARAMETERS = TriggerParameters.builder()
+      .env("FOO", "foo",
+          "BAR", "bar")
+      .build();
 
   private static final WorkflowId WORKFLOW_ID1 =
       WorkflowId.create("styx1", "example1");
@@ -96,6 +102,7 @@ public class BackfillTriggerManagerTest {
       .concurrency(2)
       .schedule(Schedule.HOURS)
       .nextTrigger(Instant.parse("2016-12-02T22:00:00Z"))
+      .triggerParameters(TRIGGER_PARAMETERS)
       .build();
 
   private static final Backfill BACKFILL_2 = Backfill.newBuilder()
@@ -107,6 +114,7 @@ public class BackfillTriggerManagerTest {
       .concurrency(2)
       .schedule(Schedule.HOURS)
       .nextTrigger(Instant.parse("2016-12-05T21:00:00Z"))
+      .triggerParameters(TRIGGER_PARAMETERS)
       .build();
 
   private static final Backfill BACKFILL_3 = Backfill.newBuilder()
@@ -117,6 +125,7 @@ public class BackfillTriggerManagerTest {
       .concurrency(3)
       .schedule(Schedule.HOURS)
       .nextTrigger(Instant.parse("2016-12-02T00:00:00Z"))
+      .triggerParameters(TRIGGER_PARAMETERS)
       .build();
 
   private static final Backfill BACKFILL_4 = Backfill.newBuilder()
@@ -128,6 +137,7 @@ public class BackfillTriggerManagerTest {
       .schedule(Schedule.HOURS)
       .reverse(true)
       .nextTrigger(Instant.parse("2016-12-02T02:00:00Z"))
+      .triggerParameters(TRIGGER_PARAMETERS)
       .build();
 
   private static final Time TIME =  () -> Instant.parse("2016-12-02T22:00:00Z");
@@ -153,10 +163,10 @@ public class BackfillTriggerManagerTest {
     backfills = new LinkedHashMap<>(); // we need to keep entry order
     activeStates = new HashMap<>();
 
-    when(triggerListener.event(any(Workflow.class), any(Trigger.class), any(Instant.class)))
+    when(triggerListener.event(any(), any(), any(), any()))
         .then(a -> {
-          Workflow workflow = a.getArgumentAt(0, Workflow.class);
-          Instant instant = a.getArgumentAt(2, Instant.class);
+          Workflow workflow = a.getArgument(0);
+          Instant instant = a.getArgument(2);
 
           final String parameter = toParameter(workflow.configuration().schedule(), instant);
           final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(),
@@ -168,10 +178,6 @@ public class BackfillTriggerManagerTest {
         });
 
     when(stateManager.getActiveStatesByTriggerId(anyString())).thenReturn(activeStates);
-
-    when(storage.resources()).thenReturn(resourceLimits);
-    when(config.globalConcurrency()).thenReturn(Optional.empty());
-    when(storage.config()).thenReturn(config);
 
     ArgumentCaptor<Backfill> backfillArgumentCaptor = ArgumentCaptor.forClass(Backfill.class);
     when(transaction.store(backfillArgumentCaptor.capture())).then(answer -> {
@@ -185,7 +191,7 @@ public class BackfillTriggerManagerTest {
     when(storage.backfills(anyBoolean())).then(a -> new ArrayList<>(backfills.values()));
 
     when(storage.runInTransaction(any())).then(
-        a -> a.getArgumentAt(0, TransactionFunction.class).apply(transaction));
+        a -> a.<TransactionFunction>getArgument(0).apply(transaction));
 
     backfillTriggerManager = new BackfillTriggerManager(stateManager, storage,
                                                         triggerListener, Stats.NOOP, TIME,
@@ -212,7 +218,7 @@ public class BackfillTriggerManagerTest {
         workflow.configuration().schedule());
 
     instants.stream().limit(concurrency).forEach(instant ->
-            verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_1.id()), instant));
+            verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_1.id()), instant, TRIGGER_PARAMETERS));
 
     verify(transaction)
         .store(BACKFILL_1.builder().nextTrigger(instants.get(concurrency)).build());
@@ -233,7 +239,7 @@ public class BackfillTriggerManagerTest {
             workflow.configuration().schedule()));
 
     instants.stream().limit(concurrency).forEach(instant ->
-        verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_2.id()), instant));
+        verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_2.id()), instant, TRIGGER_PARAMETERS));
 
     verify(transaction)
         .store(BACKFILL_2.builder().nextTrigger(instants.get(concurrency)).build());
@@ -254,7 +260,7 @@ public class BackfillTriggerManagerTest {
 
     verify(triggerListener, only()).event(
         workflow,
-        Trigger.backfill(BACKFILL_1.id()), Instant.parse("2016-12-03T00:00:00Z"));
+        Trigger.backfill(BACKFILL_1.id()), Instant.parse("2016-12-03T00:00:00Z"), TRIGGER_PARAMETERS);
   }
 
   @Test
@@ -272,7 +278,7 @@ public class BackfillTriggerManagerTest {
 
     verify(triggerListener, only()).event(
         workflow,
-        Trigger.backfill(BACKFILL_2.id()), Instant.parse("2016-12-03T00:00:00Z"));
+        Trigger.backfill(BACKFILL_2.id()), Instant.parse("2016-12-03T00:00:00Z"), TRIGGER_PARAMETERS);
   }
 
   @Test
@@ -286,8 +292,8 @@ public class BackfillTriggerManagerTest {
 
     List<Instant> instants =
         instantsInRange(BACKFILL_3.start(), BACKFILL_3.end(), BACKFILL_3.schedule());
-    instants.forEach(instant ->
-        inOrder(triggerListener).verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_3.id()), instant));
+    instants.forEach(instant -> inOrder(triggerListener).verify(triggerListener)
+        .event(workflow, Trigger.backfill(BACKFILL_3.id()), instant, TRIGGER_PARAMETERS));
 
     final Backfill completedBackfill =
         BACKFILL_3.builder().nextTrigger(BACKFILL_3.end()).allTriggered(true).build();
@@ -305,8 +311,8 @@ public class BackfillTriggerManagerTest {
 
     List<Instant> instants =
         Lists.reverse(instantsInRange(BACKFILL_4.start(), BACKFILL_4.end(), BACKFILL_4.schedule()));
-    instants.forEach(instant ->
-        inOrder(triggerListener).verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_4.id()), instant));
+    instants.forEach(instant -> inOrder(triggerListener).verify(triggerListener)
+        .event(workflow, Trigger.backfill(BACKFILL_4.id()), instant, TRIGGER_PARAMETERS));
 
     final Backfill completedBackfill =
         BACKFILL_4.builder().nextTrigger(previousInstant(BACKFILL_4.start(), BACKFILL_4.schedule())).allTriggered(true).build();
@@ -486,8 +492,8 @@ public class BackfillTriggerManagerTest {
 
     doAnswer(a -> {
       CompletableFuture<Void> processed = new CompletableFuture<>();
-      Workflow workflow1 = a.getArgumentAt(0, Workflow.class);
-      Instant instant = a.getArgumentAt(2, Instant.class);
+      Workflow workflow1 = a.getArgument(0);
+      Instant instant = a.getArgument(2);
 
       final String parameter = toParameter(workflow1.configuration().schedule(), instant);
       final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow1.id(),
@@ -498,7 +504,7 @@ public class BackfillTriggerManagerTest {
       triggerProcessingFutures.add(processed);
       return processed;
     }).when(triggerListener)
-        .event(any(Workflow.class), any(Trigger.class), any(Instant.class));
+        .event(any(), any(), any(), any());
 
     // Run a single tick of the backfillTriggerManager
     executor.execute(backfillTriggerManager::tick);
@@ -516,7 +522,7 @@ public class BackfillTriggerManagerTest {
       assertThat(triggerProcessingFutures.isEmpty(), is(true));
 
       verify(triggerListener, timeout(60_000))
-          .event(any(Workflow.class), any(Trigger.class), eq(instant));
+          .event(any(), any(), eq(instant), any());
 
       triggerProcessed.complete(null);
       verify(transaction, timeout(60_000))
@@ -537,7 +543,7 @@ public class BackfillTriggerManagerTest {
 
     doReturn(CompletableFutures.exceptionallyCompletedFuture(new RuntimeException()))
         .when(triggerListener)
-        .event(any(Workflow.class), any(Trigger.class), eq(Instant.parse("2016-12-02T22:00:00Z")));
+        .event(any(), any(), eq(Instant.parse("2016-12-02T22:00:00Z")), eq(TRIGGER_PARAMETERS));
 
     backfillTriggerManager.tick();
 
@@ -545,7 +551,7 @@ public class BackfillTriggerManagerTest {
         workflow.configuration().schedule());
 
     instants.stream().limit(concurrency).forEach(instant ->
-            verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_3.id()), instant));
+            verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_3.id()), instant, TRIGGER_PARAMETERS));
 
     final Backfill completedBackfill =
         BACKFILL_3.builder().nextTrigger(BACKFILL_3.end()).allTriggered(true).build();
@@ -564,7 +570,7 @@ public class BackfillTriggerManagerTest {
 
     doThrow(new RuntimeException())
         .when(triggerListener)
-        .event(any(Workflow.class), any(Trigger.class), eq(Instant.parse("2016-12-02T22:00:00Z")));
+        .event(any(), any(), eq(Instant.parse("2016-12-02T22:00:00Z")), eq(TRIGGER_PARAMETERS));
 
     backfillTriggerManager.tick();
 
@@ -573,7 +579,7 @@ public class BackfillTriggerManagerTest {
 
     instants.stream().limit(concurrency).forEach(instant ->
                                                      verify(triggerListener).event(workflow, Trigger.backfill(
-                                                         BACKFILL_3.id()), instant));
+                                                         BACKFILL_3.id()), instant, TRIGGER_PARAMETERS));
 
     final Backfill completedBackfill =
         BACKFILL_3.builder().nextTrigger(BACKFILL_3.end()).allTriggered(true).build();
@@ -592,7 +598,7 @@ public class BackfillTriggerManagerTest {
     doReturn(CompletableFutures
                  .exceptionallyCompletedFuture(new AlreadyInitializedException("")))
         .when(triggerListener)
-        .event(any(Workflow.class), any(Trigger.class), eq(Instant.parse("2016-12-02T22:00:00Z")));
+        .event(any(), any(), eq(Instant.parse("2016-12-02T22:00:00Z")), eq(TRIGGER_PARAMETERS));
 
     backfillTriggerManager.tick();
 
@@ -600,7 +606,7 @@ public class BackfillTriggerManagerTest {
         workflow.configuration().schedule());
 
     instants.stream().limit(concurrency).forEach(instant ->
-            verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_1.id()), instant));
+            verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_1.id()), instant, TRIGGER_PARAMETERS));
 
     verify(transaction)
         .store(BACKFILL_1.builder().nextTrigger(instants.get(concurrency)).build());

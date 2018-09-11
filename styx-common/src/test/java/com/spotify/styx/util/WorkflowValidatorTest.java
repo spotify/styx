@@ -21,6 +21,8 @@
 package com.spotify.styx.util;
 
 import static com.spotify.styx.util.WorkflowValidator.MAX_COMMIT_SHA_LENGTH;
+import static com.spotify.styx.util.WorkflowValidator.MAX_ENV_SIZE;
+import static com.spotify.styx.util.WorkflowValidator.MAX_ENV_VARS;
 import static com.spotify.styx.util.WorkflowValidator.MAX_ID_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_RESOURCES;
 import static com.spotify.styx.util.WorkflowValidator.MAX_RESOURCE_LENGTH;
@@ -28,6 +30,7 @@ import static com.spotify.styx.util.WorkflowValidator.MAX_SECRET_MOUNT_PATH_LENG
 import static com.spotify.styx.util.WorkflowValidator.MAX_SECRET_NAME_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_SERVICE_ACCOUNT_LENGTH;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
@@ -47,6 +50,7 @@ import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.testdata.TestData;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.IntStream;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -121,6 +125,9 @@ public class WorkflowValidatorTest {
     final String serviceAccount = Strings.repeat("account", 1024);
     final List<String> resources = IntStream.range(0, 10)
         .mapToObj(i -> Strings.repeat("res-" + i, 100)).collect(toList());
+    final Map<String, String> env = IntStream.range(0, 2000).boxed()
+        .collect(toMap(i -> "env-var-" + i, i -> "env-val-" + i));
+    final long envSize = env.entrySet().stream().mapToLong(e -> e.getKey().length() + e.getValue().length()).sum();
 
     final WorkflowConfiguration invalidConfiguration = WorkflowConfiguration.builder()
         .id(id)
@@ -132,6 +139,7 @@ public class WorkflowValidatorTest {
         .serviceAccount(serviceAccount)
         .resources(resources)
         .serviceAccount(serviceAccount)
+        .env(env)
         .build();
 
     final List<String> errors = sut.validateWorkflowConfiguration(invalidConfiguration);
@@ -146,13 +154,15 @@ public class WorkflowValidatorTest {
         .add(limit("too many resources", resources.size(), MAX_RESOURCES))
         .add(resources.stream().map(r ->
             limit("resource name too long", r.length(), MAX_RESOURCE_LENGTH)).toArray(String[]::new))
+        .add(limit("too many env vars", env.size(), MAX_ENV_VARS))
+        .add(limit("env too big", envSize, MAX_ENV_SIZE))
         .add("invalid offset: Unable to parse offset period")
         .build();
 
     assertThat(errors, containsInAnyOrder(expectedErrors.toArray()));
   }
 
-  private String limit(String msg, int value, int limit) {
+  private String limit(String msg, long value, long limit) {
     return msg + ": " + value + ", limit = " + limit;
   }
 }

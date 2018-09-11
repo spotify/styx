@@ -28,6 +28,7 @@ import static org.hamcrest.Matchers.is;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -57,11 +58,15 @@ public class PersistentEventTest {
       .secret(WorkflowConfiguration.Secret.create("secret", "/dev/null"))
       .commitSha(COMMIT_SHA)
       .build();
+  private static final TriggerParameters TRIGGER_PARAMETERS = TriggerParameters.builder()
+      .env("FOO", "foo",
+          "BAR", "bar")
+      .build();
 
   @Test
   public void testRoundtripAllEvents() throws Exception {
     assertRoundtrip(Event.timeTrigger(INSTANCE1));
-    assertRoundtrip(Event.triggerExecution(INSTANCE1, UNKNOWN_TRIGGER));
+    assertRoundtrip(Event.triggerExecution(INSTANCE1, UNKNOWN_TRIGGER, TRIGGER_PARAMETERS));
     assertRoundtrip(Event.info(INSTANCE1, Message.info("InfoMessage")));
     assertRoundtrip(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE));
     assertRoundtrip(Event.dequeue(INSTANCE1, ImmutableSet.of("some-resource")));
@@ -128,13 +133,24 @@ public class PersistentEventTest {
         is(Event.retryAfter(INSTANCE1, 12345)));
     assertThat(
         deserializeEvent(json("triggerExecution", "\"trigger\":{\"@type\":\"natural\"}")),
-        is(Event.triggerExecution(INSTANCE1, NATURAL_TRIGGER1)));
+        is(Event.triggerExecution(INSTANCE1, NATURAL_TRIGGER1, TriggerParameters.zero())));
     assertThat(
-        deserializeEvent(json("triggerExecution", "\"trigger\":{\"@type\":\"adhoc\",\"trigger_id\":\"trig2\"}")),
-        is(Event.triggerExecution(INSTANCE1, ADHOC_TRIGGER2)));
+        deserializeEvent(json("triggerExecution", "\"trigger\":{\"@type\":\"natural\"},"
+                                                  + "\"parameters\":{\"env\":{\"FOO\":\"foo\","
+                                                  + "\"BAR\":\"bar\"}}")),
+        is(Event.triggerExecution(INSTANCE1, NATURAL_TRIGGER1, TRIGGER_PARAMETERS)));
     assertThat(
-        deserializeEvent(json("triggerExecution", "\"trigger\":{\"@type\":\"backfill\",\"trigger_id\":\"trig3\"}")),
-        is(Event.triggerExecution(INSTANCE1, BACKFILL_TRIGGER3)));
+        deserializeEvent(json("triggerExecution", "\"trigger\":{\"@type\":\"adhoc\","
+                                                  + "\"trigger_id\":\"trig2\"},"
+                                                  + "\"parameters\":{\"env\":{\"FOO\":\"foo\","
+                                                  + "\"BAR\":\"bar\"}}")),
+        is(Event.triggerExecution(INSTANCE1, ADHOC_TRIGGER2, TRIGGER_PARAMETERS)));
+    assertThat(
+        deserializeEvent(json("triggerExecution", "\"trigger\":{\"@type\":\"backfill\","
+                                                  + "\"trigger_id\":\"trig3\"},"
+                                                  + "\"parameters\":{\"env\":{\"FOO\":\"foo\","
+                                                  + "\"BAR\":\"bar\"}}")),
+        is(Event.triggerExecution(INSTANCE1, BACKFILL_TRIGGER3, TRIGGER_PARAMETERS)));
     assertThat(
         deserializeEvent(json("terminate", "\"exit_code\":20")),
         is(Event.terminate(INSTANCE1, Optional.of(20))));
@@ -143,8 +159,10 @@ public class PersistentEventTest {
   @Test
   public void testDeserializeFromJsonWhenTransformationRequired() throws Exception {
     assertThat(
-        deserializeEvent(json("triggerExecution", "\"trigger_id\":\"trig\"")),
-        is(Event.triggerExecution(INSTANCE1, UNKNOWN_TRIGGER)));
+        deserializeEvent(json("triggerExecution", "\"trigger_id\":\"trig\","
+                                                  + "\"parameters\":{\"env\":{\"BAR\":\"bar\","
+                                                  + "\"FOO\":\"foo\"}}")),
+        is(Event.triggerExecution(INSTANCE1, UNKNOWN_TRIGGER, TRIGGER_PARAMETERS)));
     assertThat(
         deserializeEvent(json("started", "\"pod_name\":\"" + POD_NAME + "\"")),
         is(Event.started(INSTANCE1))); // for backwards compatibility
@@ -153,7 +171,7 @@ public class PersistentEventTest {
         is(Event.created(INSTANCE1, POD_NAME, "UNKNOWN")));
     assertThat(
         deserializeEvent(json("triggerExecution")),
-        is(Event.triggerExecution(INSTANCE1, TRIGGER_UNKNOWN)));
+        is(Event.triggerExecution(INSTANCE1, TRIGGER_UNKNOWN, TriggerParameters.zero())));
   }
 
   private void assertRoundtrip(Event event) throws Exception {

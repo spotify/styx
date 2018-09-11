@@ -35,6 +35,7 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_START;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW;
 import static com.spotify.styx.storage.DatastoreStorage.globalConfigKey;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
+import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
@@ -68,7 +69,6 @@ import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
-import com.google.cloud.datastore.Transaction;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -77,6 +77,7 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.StyxConfig;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
@@ -131,17 +132,37 @@ public class DatastoreStorageTest {
   static final Instant TIMESTAMP = Instant.parse("2017-01-01T00:00:00Z");
 
 
+  static final TriggerParameters TRIGGER_PARAMETERS = TriggerParameters.builder()
+      .env("FOO", "foo",
+          "BAR", "bar")
+      .build();
+
+  static final StateData STATE_DATA = StateData.newBuilder()
+      .tries(17)
+      .consecutiveFailures(13)
+      .retryCost(472893)
+      .retryDelayMillis(4711L)
+      .lastExit(13)
+      .trigger(Trigger.backfill("backfill-4711"))
+      .executionId("deadbeef")
+      .executionDescription(EXECUTION_DESCRIPTION)
+//      .commitSha("8843d7f92416211de9ebb963ff4ce28125932878") // TODO: remove unused commitSha field?
+      .resourceIds(ImmutableSet.of("foo", "bar"))
+      .triggerParameters(TRIGGER_PARAMETERS)
+      .addMessage(Message.create(MessageLevel.INFO, "foo the bar"))
+      .build();
+
   static final RunState RUN_STATE = RunState.create(WORKFLOW_INSTANCE1, State.NEW,
-      StateData.zero(), TIMESTAMP, 42L);
+      STATE_DATA, TIMESTAMP, 42L);
 
   static final RunState RUN_STATE1 = RunState.create(WORKFLOW_INSTANCE1, State.NEW,
-      StateData.zero(), TIMESTAMP, 43L);
+      STATE_DATA, TIMESTAMP, 43L);
 
   static final RunState RUN_STATE2 = RunState.create(WORKFLOW_INSTANCE2, State.NEW,
-      StateData.zero(), TIMESTAMP, 84L);
+      STATE_DATA, TIMESTAMP, 84L);
 
   static final RunState RUN_STATE3 = RunState.create(WORKFLOW_INSTANCE3, State.NEW,
-      StateData.zero(), TIMESTAMP, 17L);
+      STATE_DATA, TIMESTAMP, 17L);
 
 
   static final RunState FULLY_POPULATED_RUNSTATE = RunState.create(WORKFLOW_INSTANCE, State.QUEUED,
@@ -183,10 +204,10 @@ public class DatastoreStorageTest {
 
   private static LocalDatastoreHelper helper;
   private DatastoreStorage storage;
-  private Datastore datastore;
+  private CheckedDatastore datastore;
 
   @Mock TransactionFunction<String, FooException> transactionFunction;
-  @Mock Function<Transaction, DatastoreStorageTransaction> storageTransactionFactory;
+  @Mock Function<CheckedDatastoreTransaction, DatastoreStorageTransaction> storageTransactionFactory;
 
   @BeforeClass
   public static void setUpClass() throws Exception {
@@ -213,13 +234,14 @@ public class DatastoreStorageTest {
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
-    datastore = helper.getOptions().getService();
+    datastore = spy(new CheckedDatastore(helper.getOptions().getService()));
     storage = new DatastoreStorage(datastore, Duration.ZERO);
   }
 
   @After
   public void tearDown() throws Exception {
     helper.reset();
+    storage.close();
   }
 
   @Test
@@ -417,6 +439,14 @@ public class DatastoreStorageTest {
   }
 
   @Test
+  public void readActiveStatesShouldPropagateIOException() throws Exception {
+    final IOException cause = new IOException("foobar");
+    doThrow(cause).when(datastore).query(any());
+    exception.expect(is(cause));
+    storage.readActiveStates();
+  }
+
+  @Test
   public void shouldReturnAllActiveStatesForATriggerId() throws Exception {
     storage.writeActiveState(WORKFLOW_INSTANCE, FULLY_POPULATED_RUNSTATE);
 
@@ -489,7 +519,7 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void getsResourcesSyncEnabled() {
+  public void getsResourcesSyncEnabled() throws IOException {
     Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
         .set(PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED, true)
         .build();
@@ -499,7 +529,7 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldReturnEmptyClientBlacklist() {
+  public void shouldReturnEmptyClientBlacklist() throws IOException {
     Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
             ImmutableList.of()).build();
@@ -508,7 +538,7 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldReturnClientBlacklist() {
+  public void shouldReturnClientBlacklist() throws IOException {
     Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
             ImmutableList.of(StringValue.of("v1"), StringValue.of("v2"), StringValue.of("v3")))
@@ -615,7 +645,7 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void testDefaultConfig() {
+  public void testDefaultConfig() throws IOException {
     final StyxConfig expectedConfig = StyxConfig.newBuilder()
         .globalDockerRunnerId("default")
         .globalEnabled(true)
@@ -627,9 +657,12 @@ public class DatastoreStorageTest {
     assertThat(storage.config(), is(expectedConfig));
   }
 
-  @Parameters({"true", "false", ""})
+  @Parameters({
+      "true, true",
+      "false, false",
+      "_, true"})
   @Test
-  public void shouldStoreAndReadBackfill(String reverse) throws Exception {
+  public void shouldStoreAndReadBackfill(String reverse, boolean withTriggerParameters) throws Exception {
     final BackfillBuilder builder = Backfill.newBuilder()
         .id("backfill-2")
         .start(Instant.parse("2017-01-01T00:00:00Z"))
@@ -639,8 +672,15 @@ public class DatastoreStorageTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(DAYS);
 
-    if (!reverse.isEmpty()) {
+    if (!reverse.trim().equals("_")) {
       builder.reverse(Boolean.parseBoolean(reverse));
+    }
+
+    if (withTriggerParameters) {
+      builder.triggerParameters(TriggerParameters.builder()
+          .env("FOO", "foo",
+              "BAR", "bar")
+          .build());
     }
 
     final Backfill backfill = builder.build();
@@ -706,7 +746,7 @@ public class DatastoreStorageTest {
   @Test
   public void runInTransactionShouldCallFunctionAndCommit() throws Exception {
     final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
-    final Transaction transaction = datastore.newTransaction();
+    final CheckedDatastoreTransaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
 
@@ -723,7 +763,7 @@ public class DatastoreStorageTest {
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnFailure() throws Exception {
     final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
-    final Transaction transaction = datastore.newTransaction();
+    final CheckedDatastoreTransaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
 
@@ -747,7 +787,7 @@ public class DatastoreStorageTest {
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnPreCommitConflict() throws Exception {
     final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
-    final Transaction transaction = datastore.newTransaction();
+    final CheckedDatastoreTransaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
 
@@ -769,7 +809,7 @@ public class DatastoreStorageTest {
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnCommitConflict() throws Exception {
     final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
-    final Transaction transaction = datastore.newTransaction();
+    final CheckedDatastoreTransaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
 
@@ -792,7 +832,7 @@ public class DatastoreStorageTest {
   @Test
   public void runInTransactionShouldThrowIfRollbackFailsAfterConflict() throws Exception {
     final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
-    final Transaction transaction = datastore.newTransaction();
+    final CheckedDatastoreTransaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
 
@@ -816,9 +856,9 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldThrowIfDatastoreNewTransactionFails() throws Exception {
-    Datastore datastore = mock(Datastore.class);
+    CheckedDatastore datastore = mock(CheckedDatastore.class);
     final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
-    when(datastore.newTransaction()).thenThrow(new DatastoreException(1, "", ""));
+    when(datastore.newTransaction()).thenThrow(new DatastoreIOException(new DatastoreException(1, "", "")));
 
     when(transactionFunction.apply(any())).thenReturn("");
 
@@ -846,19 +886,19 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldReturnCounterLimit() {
+  public void shouldReturnCounterLimit() throws IOException {
     updateLimitInStorage("foo-resource", 10L);
 
     assertEquals(10L, storage.getLimitForCounter("foo-resource"));
   }
 
   @Test
-  public void shouldReturnDefaultGlobalCounterLimit() {
+  public void shouldReturnDefaultGlobalCounterLimit() throws IOException {
     assertEquals(Long.MAX_VALUE, storage.getLimitForCounter("GLOBAL_STYX_CLUSTER"));
   }
 
   @Test
-  public void shouldReturnGlobalCounterLimit() {
+  public void shouldReturnGlobalCounterLimit() throws IOException {
     final Key key = globalConfigKey(datastore.newKeyFactory());
     Entity.Builder builder = Entity.newBuilder(key)
         .set(PROPERTY_CONCURRENCY, 4000L);
@@ -868,7 +908,7 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldGetExceptionForUnknownCounter() {
+  public void shouldGetExceptionForUnknownCounter() throws IOException {
     updateLimitInStorage("foo-resource", 10L);
 
     exception.expect(IllegalArgumentException.class);
@@ -877,7 +917,7 @@ public class DatastoreStorageTest {
     storage.getLimitForCounter("bar-resource");
   }
 
-  private void updateLimitInStorage(String counterId, long limit) {
+  private void updateLimitInStorage(String counterId, long limit) throws IOException {
     datastore.put(Entity.newBuilder((datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey
         (counterId)))
         .set(PROPERTY_LIMIT, limit)

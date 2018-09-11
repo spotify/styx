@@ -52,7 +52,7 @@ public class AggregateStorage implements Storage {
 
   public AggregateStorage(Connection connection, Datastore datastore, Duration retryBaseDelay) {
     this(new BigtableStorage(connection, retryBaseDelay),
-         new DatastoreStorage(datastore, retryBaseDelay));
+         new DatastoreStorage(new CheckedDatastore(datastore), retryBaseDelay));
   }
 
   AggregateStorage(BigtableStorage bigtableStorage, DatastoreStorage datastoreStorage) {
@@ -61,7 +61,7 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     datastoreStorage.close();
   }
 
@@ -219,17 +219,17 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public Map<Integer, Long> shardsForCounter(String counterId) {
+  public Map<Integer, Long> shardsForCounter(String counterId) throws IOException {
     return datastoreStorage.shardsForCounter(counterId);
   }
 
   @Override
-  public void deleteShardsForCounter(String counterId) {
+  public void deleteShardsForCounter(String counterId) throws IOException {
     datastoreStorage.deleteShardsForCounter(counterId);
   }
 
   @Override
-  public long getLimitForCounter(String counterId) {
+  public long getLimitForCounter(String counterId) throws IOException {
     return datastoreStorage.getLimitForCounter(counterId);
   }
 
@@ -259,7 +259,7 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public Optional<Backfill> backfill(String id) {
+  public Optional<Backfill> backfill(String id) throws IOException {
     return datastoreStorage.getBackfill(id);
   }
 

@@ -31,28 +31,19 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.spotify.styx.util.MockSpan;
-import com.spotify.styx.util.Time;
 import io.opencensus.trace.Annotation;
 import io.opencensus.trace.SpanBuilder;
 import io.opencensus.trace.Tracer;
-import java.time.Instant;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class TracingProxyTest {
 
   @Mock Tracer tracer;
   @Mock SpanBuilder spanBuilder;
-  @Mock Time time;
-
-  @Before
-  public void setUp() throws Exception {
-    when(time.get()).then(a -> Instant.now());
-  }
 
   @Test
   public void testTracingSuccess() {

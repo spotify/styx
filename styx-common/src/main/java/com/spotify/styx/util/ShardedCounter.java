@@ -184,7 +184,7 @@ public class ShardedCounter {
   /**
    * Returns a recent snapshot, possibly read from inMemSnapshot.
    */
-  public CounterSnapshot getCounterSnapshot(String counterId) {
+  public CounterSnapshot getCounterSnapshot(String counterId) throws IOException {
     final CounterSnapshot snapshot = inMemSnapshot.getIfPresent(counterId);
     if (snapshot != null) {
       stats.recordCounterCacheHit();
@@ -197,7 +197,7 @@ public class ShardedCounter {
   /**
    * Update cached snapshot with most recent state of counter in Datastore.
    */
-  private CounterSnapshot refreshCounterSnapshot(String counterId) {
+  private CounterSnapshot refreshCounterSnapshot(String counterId) throws IOException {
     final CounterSnapshot newSnapshot = counterSnapshotFactory.create(counterId);
     inMemSnapshot.put(counterId, newSnapshot);
     return newSnapshot;
@@ -211,7 +211,7 @@ public class ShardedCounter {
    * @throws RuntimeException if the resource does not exist or reading from storage fails.
    * @todo Throw checked exceptions for expected failures like resource not existing.
    */
-  public boolean counterHasSpareCapacity(String resourceId) {
+  public boolean counterHasSpareCapacity(String resourceId) throws IOException {
     try {
       final CounterSnapshot counterSnapshot = getCounterSnapshot(resourceId);
       counterSnapshot.pickShardWithSpareCapacity(1);
@@ -228,14 +228,14 @@ public class ShardedCounter {
    * there has been no preceding successful updateLimit operation, no limit is applied in
    * updateCounter operations on this counter.
    */
-  public void updateLimit(StorageTransaction tx, String counterId, long limit) {
+  public void updateLimit(StorageTransaction tx, String counterId, long limit) throws IOException {
     tx.updateLimitForCounter(counterId, limit);
   }
 
   /**
    * Reads the latest limit value from Datastore, for the specified {@param counterId}
    */
-  static long getLimit(Storage storage, String counterId) {
+  static long getLimit(Storage storage, String counterId) throws IOException {
     return storage.getLimitForCounter(counterId);
   }
 
@@ -249,7 +249,7 @@ public class ShardedCounter {
    * Updates with a larger delta are prone to spuriously fail even when the counter is not near to
    * exceeding its limit. Failures are certain when delta >= limit / NUM_SHARDS + 1.
    */
-  public void updateCounter(StorageTransaction transaction, String counterId, long delta) {
+  public void updateCounter(StorageTransaction transaction, String counterId, long delta) throws IOException {
     CounterSnapshot snapshot = getCounterSnapshot(counterId);
 
     // If delta is negative, try to update shards with excess usage first
@@ -268,7 +268,7 @@ public class ShardedCounter {
 
   @VisibleForTesting
   void updateCounterShard(StorageTransaction transaction, String counterId, long delta,
-                          int shardIndex, long shardCapacity) {
+                          int shardIndex, long shardCapacity) throws IOException {
     final Optional<Shard> shard = transaction.shard(counterId, shardIndex);
 
     if (shard.isPresent()) {
@@ -313,7 +313,7 @@ public class ShardedCounter {
    * estimate. (May have not truly been the counter value at any point in time. Even a return value
    * larger than the corresponding limit might be possible without error.)
    */
-  public long getCounter(String counterId) {
+  public long getCounter(String counterId) throws IOException {
     return getCounterSnapshot(counterId).getTotalUsage();
   }
 
