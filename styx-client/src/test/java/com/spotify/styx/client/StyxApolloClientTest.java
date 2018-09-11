@@ -60,7 +60,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CompletionException;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import okhttp3.HttpUrl;
@@ -90,9 +90,9 @@ public class StyxApolloClientTest {
       .schedule(Schedule.DAYS)
       .build();
 
-  private static final Workflow WORKFLOW_1 = Workflow.create("foo-comp", WORKFLOW_CONFIGURATION_1);
+  private static final Workflow WORKFLOW_1 = Workflow.create("f[ ]o-cmp", WORKFLOW_CONFIGURATION_1);
 
-  private static final Workflow WORKFLOW_2 = Workflow.create("foo-comp", WORKFLOW_CONFIGURATION_2);
+  private static final Workflow WORKFLOW_2 = Workflow.create("f[ ]o-cmp", WORKFLOW_CONFIGURATION_2);
 
   private static final Instant START = Instant.parse("2017-01-01T00:00:00Z");
   private static final Instant END = Instant.parse("2017-01-30T00:00:00Z");
@@ -101,8 +101,8 @@ public class StyxApolloClientTest {
       BackfillInput.newBuilder()
       .start(START)
       .end(END)
-      .component("foo-comp")
-      .workflow("bar-wf")
+      .component("f[ ]o-cmp")
+      .workflow("bar-w[f]")
       .concurrency(1)
       .build();
 
@@ -110,7 +110,7 @@ public class StyxApolloClientTest {
       .id("backfill-2")
       .start(START)
       .end(END)
-      .workflowId(WorkflowId.create("foo-comp", "bar-wf"))
+      .workflowId(WorkflowId.create("f[ ]o-cmp", "bar-w[f]"))
       .concurrency(1)
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
       .schedule(Schedule.DAYS)
@@ -169,9 +169,10 @@ public class StyxApolloClientTest {
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
-    assertThat(request.uri(), is(API_URL + "/workflows"));
+    final URI uri = URI.create(API_URL + "/workflows");
+    assertThat(request.uri(), is(uri.toString()));
     assertThat(request.method(), is("GET"));
-    assertThat(r.get(), is(workflows));
+    assertThat(r.join(), is(workflows));
   }
 
   @Test
@@ -191,10 +192,10 @@ public class StyxApolloClientTest {
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
-    assertThat(request.uri(),
-        is(API_URL + "/workflows/component/workflow/instances/2017-01-01T00"));
+    final URI uri = URI.create(API_URL + "/workflows/component/workflow/instances/2017-01-01T00");
+    assertThat(request.uri(), is(uri.toString()));
     assertThat(request.method(), is("GET"));
-    assertThat(r.get(), is(workflowInstanceExecutionData));
+    assertThat(r.join(), is(workflowInstanceExecutionData));
   }
 
   @Test
@@ -202,12 +203,14 @@ public class StyxApolloClientTest {
     when(client.send(any(Request.class))).thenReturn(
         CompletableFuture.completedFuture(Response.forStatus(Status.NO_CONTENT)));
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
-    final CompletableFuture<Void> r = styx.deleteWorkflow("foo-comp", "bar-wf").toCompletableFuture();
+    final CompletableFuture<Void> r = styx.deleteWorkflow("f[ ]o-cmp", "bar-w[f]")
+        .toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     assertThat(r.isCompletedExceptionally(), is(false));
     final Request request = requestCaptor.getValue();
-    assertThat(request.uri(), is(API_URL + "/workflows/foo-comp/bar-wf"));
+    final URI uri = URI.create(API_URL + "/workflows/f%5B%20%5Do-cmp/bar-w%5Bf%5D");
+    assertThat(request.uri(), is(uri.toString()));
     assertThat(request.method(), is("DELETE"));
   }
 
@@ -220,46 +223,48 @@ public class StyxApolloClientTest {
         .toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     final Request request = requestCaptor.getValue();
-    final URI expected = URI.create(
+    final URI uri = URI.create(
         API_URL + "/workflows/foo-comp%5Bstrange%20characters%5D/bar-wf%5Bstrange%20characters%5D");
-    assertThat(request.uri(), is(expected.toString()));
+    assertThat(request.uri(), is(uri.toString()));
   }
 
   @Test
-  public void createOrUpdateWorkflow() throws Exception {
+  public void createOrUpdateWorkflow() throws IOException {
     when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
         Response.forStatus(Status.OK).withPayload(Json.serialize(WORKFLOW_1))));
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
-    final CompletableFuture<Workflow> r = styx.createOrUpdateWorkflow("foo-comp",
+    final CompletableFuture<Workflow> r = styx.createOrUpdateWorkflow("f[ ]o-cmp",
         WORKFLOW_CONFIGURATION_1).toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
-    assertThat(request.uri(), is(API_URL + "/workflows/foo-comp"));
+    final URI uri = URI.create(API_URL + "/workflows/f%5B%20%5Do-cmp");
+    assertThat(request.uri(), is(uri.toString()));
     assertThat(Json.deserialize(request.payload().get(), WorkflowConfiguration.class),
         is(WORKFLOW_CONFIGURATION_1));
     assertThat(request.method(), is("POST"));
   }
 
   @Test
-  public void shouldCreateBackfill() throws Exception {
+  public void shouldCreateBackfill() throws IOException {
     when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
         Response.forStatus(Status.OK).withPayload(Json.serialize(BACKFILL))));
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
-    final CompletableFuture<Backfill> r = styx.backfillCreate("foo-comp", "bar-wf",
+    final CompletableFuture<Backfill> r = styx.backfillCreate("f[ ]o-cmp", "bar-w[f]",
         "2017-01-01T00:00:00Z", "2017-01-30T00:00:00Z", 1)
         .toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
-    assertThat(request.uri(), is(API_URL + "/backfills"));
+    final URI uri = URI.create(API_URL + "/backfills");
+    assertThat(request.uri(), is(uri.toString()));
     assertThat(Json.deserialize(request.payload().get(), BackfillInput.class),
         equalTo(BACKFILL_INPUT));
     assertThat(request.method(), is("POST"));
   }
 
   @Test
-  public void shouldCreateBackfillFromInput() throws Exception {
+  public void shouldCreateBackfillFromInput() throws IOException {
     final BackfillInput backfillInput = BACKFILL_INPUT.builder()
         .reverse(true)
         .build();
@@ -279,14 +284,14 @@ public class StyxApolloClientTest {
   }
 
   @Test
-  public void shouldCreateBackfillWithDescription() throws Exception {
+  public void shouldCreateBackfillWithDescription() throws IOException {
     final BackfillInput backfillInput = BACKFILL_INPUT.builder()
         .description("Description")
         .build();
     when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
         Response.forStatus(Status.OK).withPayload(Json.serialize(BACKFILL))));
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
-    final CompletableFuture<Backfill> r = styx.backfillCreate("foo-comp", "bar-wf",
+    final CompletableFuture<Backfill> r = styx.backfillCreate("f[ ]o-cmp", "bar-w[f]",
                                                               "2017-01-01T00:00:00Z",
                                                               "2017-01-30T00:00:00Z", 1,
                                                               "Description")
@@ -322,7 +327,7 @@ public class StyxApolloClientTest {
   }
 
   @Test
-  public void shouldUpdateWorkflowState() throws Exception {
+  public void shouldUpdateWorkflowState() throws IOException {
     final WorkflowState workflowState = WorkflowState.builder()
         .enabled(true)
         .nextNaturalTrigger(Instant.parse("2017-01-03T21:00:00Z"))
@@ -332,11 +337,11 @@ public class StyxApolloClientTest {
         Response.forStatus(Status.OK).withPayload(Json.serialize(workflowState))));
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
     final CompletableFuture<WorkflowState> r =
-        styx.updateWorkflowState("foo-comp", "bar-wf", workflowState).toCompletableFuture();
+        styx.updateWorkflowState("f[ ]o-cmp", "bar-w[f]", workflowState).toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
-    assertThat(request.uri(), is(API_URL + "/workflows/foo-comp/bar-wf/state"));
+    assertThat(request.uri(), is(API_URL + "/workflows/f%5B%20%5Do-cmp/bar-w%5Bf%5D/state"));
     assertThat(Json.deserialize(request.payload().get(), WorkflowState.class), is(workflowState));
     assertThat(request.method(), is("PATCH"));
   }
@@ -355,16 +360,16 @@ public class StyxApolloClientTest {
   }
 
   @Test
-  public void testTokenFailure() throws Exception {
+  public void testTokenFailure() throws IOException, java.security.GeneralSecurityException {
     final IOException rootCause = new IOException("netsplit!");
     when(auth.getToken(any())).thenThrow(rootCause);
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
     final CompletableFuture<Void> f = styx.triggerWorkflowInstance("foo", "bar", "baz")
         .toCompletableFuture();
     try {
-      f.get();
+      f.join();
       fail();
-    } catch (ExecutionException e) {
+    } catch (CompletionException e) {
       assertThat(e.getCause(), instanceOf(ClientErrorException.class));
       assertThat(e.getCause().getMessage(), is("Authentication failure: " + rootCause.getMessage()));
       assertThat(e.getCause().getCause(), is(rootCause));
@@ -379,9 +384,9 @@ public class StyxApolloClientTest {
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
 
     try {
-      styx.triggerWorkflowInstance("foo", "bar", "baz").toCompletableFuture().get();
+      styx.triggerWorkflowInstance("foo", "bar", "baz").toCompletableFuture().join();
       fail();
-    } catch (ExecutionException e) {
+    } catch (CompletionException e) {
       assertThat(e.getCause(), instanceOf(ApiErrorException.class));
       ApiErrorException apiErrorException = (ApiErrorException) e.getCause();
       assertThat(apiErrorException.isAuthenticated(), is(false));
@@ -389,15 +394,15 @@ public class StyxApolloClientTest {
   }
 
   @Test
-  public void testUnauthorizedWithCredentialsApiError() throws Exception {
+  public void testUnauthorizedWithCredentialsApiError() {
     when(client.send(any()))
         .thenReturn(CompletableFuture.completedFuture(Response.forStatus(Status.UNAUTHORIZED)));
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
 
     try {
-      styx.triggerWorkflowInstance("foo", "bar", "baz").toCompletableFuture().get();
+      styx.triggerWorkflowInstance("foo", "bar", "baz").toCompletableFuture().join();
       fail();
-    } catch (ExecutionException e) {
+    } catch (CompletionException e) {
       assertThat(e.getCause(), instanceOf(ApiErrorException.class));
       ApiErrorException apiErrorException = (ApiErrorException) e.getCause();
       assertThat(apiErrorException.isAuthenticated(), is(true));
@@ -424,9 +429,9 @@ public class StyxApolloClientTest {
             .withPayload(Json.serialize(Collections.emptyList()))));
 
     try {
-      styx.workflows().toCompletableFuture().get();
+      styx.workflows().toCompletableFuture().join();
       fail();
-    } catch (ExecutionException e) {
+    } catch (CompletionException e) {
       assertThat(e.getCause(), instanceOf(ApiErrorException.class));
       final ApiErrorException apiError = (ApiErrorException) e.getCause();
       assertThat(apiError.getRequestId(), is(responseRequestId));
@@ -441,9 +446,9 @@ public class StyxApolloClientTest {
             .withPayload(Json.serialize(Collections.emptyList()))));
 
     try {
-      styx.workflows().toCompletableFuture().get();
+      styx.workflows().toCompletableFuture().join();
       fail();
-    } catch (ExecutionException e) {
+    } catch (CompletionException e) {
       assertThat(e.getCause(), instanceOf(ApiErrorException.class));
       final ApiErrorException apiError = (ApiErrorException) e.getCause();
       final Request request = requestCaptor.getValue();
