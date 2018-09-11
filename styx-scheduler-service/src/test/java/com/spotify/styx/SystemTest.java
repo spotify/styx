@@ -539,6 +539,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
         .schedule(Schedule.HOURS)
         .dockerImage("busybox:v777")
         .dockerArgs(asList("other", "args"))
+        .env("QUUX", "quux")
         .build();
 
     Workflow changedWorkflow = Workflow.create(
@@ -558,7 +559,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     RunSpec runSpec2 = getDockerRuns().get(1)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec2, is(naturalRunSpec(runSpec2.executionId(), "busybox:v777", ImmutableList.of("other", "args"),
-        ImmutableMap.of("FOO", "foo", "BAR", "bar"))));
+        ImmutableMap.of("QUUX", "quux"))));
   }
   }
 
