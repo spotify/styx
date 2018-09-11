@@ -22,14 +22,17 @@ package com.spotify.styx.serialization;
 
 import static com.fasterxml.jackson.databind.DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY;
 import static com.fasterxml.jackson.databind.PropertyNamingStrategy.SNAKE_CASE;
+import static com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS;
 import static com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.TypeWrapperModule;
 import io.norberg.automatter.jackson.AutoMatterModule;
@@ -76,14 +79,6 @@ public final class Json {
     return ByteString.of(OBJECT_MAPPER.writeValueAsBytes(value));
   }
 
-  public static String toStringUnchecked(Object value) {
-    try {
-      return OBJECT_MAPPER.writeValueAsString(value);
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   public static <T> T deserialize(ByteString json, Class<T> clazz) throws IOException {
     return OBJECT_MAPPER.readValue(json.toByteArray(), clazz);
   }
@@ -94,5 +89,14 @@ public final class Json {
 
   public static Trigger deserializeTrigger(ByteString json) throws IOException {
     return OBJECT_MAPPER.readValue(json.toByteArray(), Trigger.class);
+  }
+
+  public static String deterministicStringUnchecked(Object value) {
+    final ObjectWriter writer = Json.OBJECT_MAPPER.writer().with(ORDER_MAP_ENTRIES_BY_KEYS);
+    try {
+      return writer.writeValueAsString(value);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
   }
 }

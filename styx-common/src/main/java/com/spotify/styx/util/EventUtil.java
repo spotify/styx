@@ -64,7 +64,7 @@ public final class EventUtil {
     public String triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
         TriggerParameters parameters) {
       return String.format("Trigger id: %s, Parameters: %s", TriggerUtil.triggerId(trigger),
-          Json.toStringUnchecked(parameters));
+          Json.deterministicStringUnchecked(parameters));
     }
 
     @Override

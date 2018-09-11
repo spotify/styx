@@ -32,14 +32,15 @@ import org.junit.Test;
 public class EventUtilTest {
 
   private static final TriggerParameters TRIGGER_PARAMETERS = TriggerParameters.builder()
-      .env("FOO", "foo")
+      .env("FOO", "foo",
+          "BAR", "bar")
       .build();
 
   @Test
   public void infoTriggerExecution() {
     assertThat(
         EventUtil.info(Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.adhoc("foobar"), TRIGGER_PARAMETERS)),
-        is("Trigger id: foobar, Parameters: {\"env\":{\"FOO\":\"foo\"}}"));
+        is("Trigger id: foobar, Parameters: {\"env\":{\"BAR\":\"bar\",\"FOO\":\"foo\"}}"));
   }
 
   // TODO: test the rest of EventUtil
