@@ -28,11 +28,11 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
@@ -52,8 +52,8 @@ import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import junitparams.JUnitParamsRunner;
 import org.junit.Test;
@@ -68,6 +68,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
           .schedule(Schedule.HOURS)
           .dockerImage("busybox")
           .dockerArgs(asList("--hour", "{}"))
+          .env("FOO", "foo", "BAR", "bar")
           .build();
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_HOURLY_WITH_ZERO_OFFSET =
       WorkflowConfiguration.builder()
@@ -122,22 +123,25 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   private static final Resource RESOURCE_4 = Resource.create(RESOURCE_ID4, 3);
   private static final Resource RESOURCE_5 = Resource.create(RESOURCE_ID5, 1);
 
-  private static RunSpec naturalRunSpec(String executionId, String imageName, List<String> args) {
+  private static RunSpec naturalRunSpec(String executionId, String imageName, List<String> args,
+      Map<String, String> env) {
     return RunSpec.builder()
         .executionId(executionId)
         .imageName(imageName)
         .args(args)
         .trigger(Trigger.natural())
+        .env(env)
         .build();
   }
 
-  private static RunSpec unknownRunSpec(String executionId, String imageName, List<String> args, String triggerId) {
-    return RunSpec
-        .builder()
+  private static RunSpec unknownRunSpec(String executionId, String imageName, List<String> args, String triggerId,
+      Map<String, String> env) {
+    return RunSpec.builder()
         .executionId(executionId)
         .imageName(imageName)
         .args(args)
         .trigger(Trigger.unknown(triggerId))
+        .env(env)
         .build();
   }
 
@@ -295,7 +299,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
     final Backfill singleHourBackfill = ONE_DAY_HOURLY_BACKFILL.builder()
         .end(ONE_DAY_HOURLY_BACKFILL.start().plus(1, ChronoUnit.HOURS))
-        .triggerParameters(TriggerParameters.builder().env("FOO", "BAR").build())
+        .triggerParameters(TriggerParameters.builder()
+            .env("BAR", "overridden-bar",
+                "BAZ", "baz")
+            .build())
         .build();
     givenBackfill(singleHourBackfill);
 
@@ -309,7 +316,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance = getDockerRuns().get(0)._1;
     RunSpec runSpec = getDockerRuns().get(0)._2;
 
-    assertThat(runSpec.env(), equalTo(Collections.singletonMap("FOO", "BAR")));
+    assertThat(runSpec.env(), is(ImmutableMap.of(
+        "FOO", "foo",
+        "BAR", "overridden-bar",
+        "BAZ", "baz")));
 
     injectEvent(Event.started(workflowInstance));
     injectEvent(Event.terminate(workflowInstance, Optional.of(0)));
@@ -483,7 +493,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   @RunWith(JUnitParamsRunner.class)
   public static class RunsDockerImageWithArgsTemplateTest extends SystemTest {
   @Test
-  public void runsDockerImageWithArgsTemplate() throws Exception {
+  public void runsDockerImageWithArgsTemplateAndEnv() throws Exception {
     givenTheTimeIs("2016-03-14T15:59:01Z");
     givenWorkflow(HOURLY_WORKFLOW);
     givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
@@ -496,7 +506,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance = getDockerRuns().get(0)._1;
     RunSpec runSpec = getDockerRuns().get(0)._2;
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
-    assertThat(runSpec, is(naturalRunSpec(runSpec.executionId(), "busybox", ImmutableList.of("--hour", "2016-03-14T15"))));
+    assertThat(runSpec, is(naturalRunSpec(runSpec.executionId(), "busybox", ImmutableList.of("--hour", "2016-03-14T15"),
+        ImmutableMap.of("FOO", "foo", "BAR", "bar"))));
   }
   }
 
@@ -516,7 +527,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance = getDockerRuns().get(0)._1;
     RunSpec runSpec = getDockerRuns().get(0)._2;
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
-    assertThat(runSpec, is(naturalRunSpec(runSpec.executionId(), "busybox", ImmutableList.of("--hour", "2016-03-14T15"))));
+    assertThat(runSpec, is(naturalRunSpec(runSpec.executionId(), "busybox", ImmutableList.of("--hour", "2016-03-14T15"),
+        ImmutableMap.of("FOO", "foo", "BAR", "bar"))));
 
     injectEvent(Event.started(workflowInstance));
     injectEvent(Event.terminate(workflowInstance, Optional.of(20)));
@@ -545,7 +557,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     WorkflowInstance workflowInstance2 = getDockerRuns().get(1)._1;
     RunSpec runSpec2 = getDockerRuns().get(1)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
-    assertThat(runSpec2, is(naturalRunSpec(runSpec2.executionId(), "busybox:v777", ImmutableList.of("other", "args"))));
+    assertThat(runSpec2, is(naturalRunSpec(runSpec2.executionId(), "busybox:v777", ImmutableList.of("other", "args"),
+        ImmutableMap.of("FOO", "foo", "BAR", "bar"))));
   }
   }
 
@@ -645,7 +658,8 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     RunSpec runSpec = getDockerRuns().get(0)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(
-        unknownRunSpec(runSpec.executionId(), "busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig1")));
+        unknownRunSpec(runSpec.executionId(), "busybox", ImmutableList.of("--hour", "2016-03-14T14"), "trig1",
+            ImmutableMap.of("FOO", "foo", "BAR", "bar"))));
   }
   }
 
