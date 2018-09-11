@@ -154,6 +154,6 @@ public class GrpcContextUtilTest {
 
   @Test
   public void shouldNotBeConstructable() throws ReflectiveOperationException {
-    assertThat(ClassEnforcer.assertNotInstantiable(GrpcContextUtil.class), is(true));
+    ClassEnforcer.assertNotInstantiable(GrpcContextUtil.class);
   }
 }
