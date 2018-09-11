@@ -726,6 +726,8 @@ class KubernetesDockerRunner implements DockerRunner {
       // Get a batch of pods to process
       final Set<String> podNames = ImmutableSet.copyOf(podUpdates.keySet());
 
+      LOG.debug("Processing pod updates: {}", podNames.size());
+
       // Process the batch in parallel
       podNames.stream()
           .map(podName -> {
@@ -738,6 +740,8 @@ class KubernetesDockerRunner implements DockerRunner {
     }
 
     private void processPodUpdate(String podName, WorkflowInstance instance) {
+      LOG.debug("Processing pod update: {}: {}", podName, instance);
+
       final Pod pod = client.pods().withName(podName).get();
       if (pod == null) {
         return;
