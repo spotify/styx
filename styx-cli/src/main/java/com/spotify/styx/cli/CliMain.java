@@ -121,7 +121,7 @@ public final class CliMain {
     this.cliService = Objects.requireNonNull(cliService);
     this.cliOutput = Objects.requireNonNull(cliOutput);
     this.cliContext = Objects.requireNonNull(cliContext);
-    this.debug = debug; 
+    this.debug = debug;
   }
 
   public static void main(String... args) {
