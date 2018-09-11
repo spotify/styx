@@ -34,7 +34,6 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
@@ -219,17 +218,17 @@ public class StyxApolloClientTest {
     when(client.send(any(Request.class))).thenReturn(
         CompletableFuture.completedFuture(Response.forStatus(Status.OK)));
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
-    styx.workflow("foo-comp[strange characters]", "bar-wf[strange characters]")
+    styx.workflow("f[ ]o-cmp", "bar-w[f]")
         .toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     final Request request = requestCaptor.getValue();
     final URI uri = URI.create(
-        API_URL + "/workflows/foo-comp%5Bstrange%20characters%5D/bar-wf%5Bstrange%20characters%5D");
+        API_URL + "/workflows/f%5B%20%5Do-cmp/bar-w%5Bf%5D");
     assertThat(request.uri(), is(uri.toString()));
   }
 
   @Test
-  public void createOrUpdateWorkflow() throws IOException {
+  public void createOrUpdateWorkflow() throws Exception {
     when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
         Response.forStatus(Status.OK).withPayload(Json.serialize(WORKFLOW_1))));
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
@@ -246,7 +245,7 @@ public class StyxApolloClientTest {
   }
 
   @Test
-  public void shouldCreateBackfill() throws IOException {
+  public void shouldCreateBackfill() throws Exception {
     when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
         Response.forStatus(Status.OK).withPayload(Json.serialize(BACKFILL))));
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
@@ -264,7 +263,7 @@ public class StyxApolloClientTest {
   }
 
   @Test
-  public void shouldCreateBackfillFromInput() throws IOException {
+  public void shouldCreateBackfillFromInput() throws Exception {
     final BackfillInput backfillInput = BACKFILL_INPUT.builder()
         .reverse(true)
         .build();
@@ -284,7 +283,7 @@ public class StyxApolloClientTest {
   }
 
   @Test
-  public void shouldCreateBackfillWithDescription() throws IOException {
+  public void shouldCreateBackfillWithDescription() throws Exception {
     final BackfillInput backfillInput = BACKFILL_INPUT.builder()
         .description("Description")
         .build();
@@ -306,7 +305,7 @@ public class StyxApolloClientTest {
   }
 
   @Test
-  public void shouldUpdateBackfillConcurrency() throws IOException {
+  public void shouldUpdateBackfillConcurrency() throws Exception {
     final EditableBackfillInput backfillInput = EditableBackfillInput.newBuilder()
         .id(BACKFILL.id())
         .concurrency(4)
@@ -327,7 +326,7 @@ public class StyxApolloClientTest {
   }
 
   @Test
-  public void shouldUpdateWorkflowState() throws IOException {
+  public void shouldUpdateWorkflowState() throws Exception {
     final WorkflowState workflowState = WorkflowState.builder()
         .enabled(true)
         .nextNaturalTrigger(Instant.parse("2017-01-03T21:00:00Z"))
@@ -360,7 +359,7 @@ public class StyxApolloClientTest {
   }
 
   @Test
-  public void testTokenFailure() throws IOException, java.security.GeneralSecurityException {
+  public void testTokenFailure() throws Exception {
     final IOException rootCause = new IOException("netsplit!");
     when(auth.getToken(any())).thenThrow(rootCause);
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
@@ -410,7 +409,7 @@ public class StyxApolloClientTest {
   }
 
   @Test
-  public void testSendsRequestId() throws JsonProcessingException {
+  public void testSendsRequestId() throws Exception {
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
     when(client.send(requestCaptor.capture())).thenReturn(CompletableFuture.completedFuture(
         Response.forStatus(Status.OK).withPayload(Json.serialize(Collections.emptyList()))));
@@ -420,7 +419,7 @@ public class StyxApolloClientTest {
   }
 
   @Test
-  public void testUsesServerRequestIdOnMismatch() throws JsonProcessingException, InterruptedException {
+  public void testUsesServerRequestIdOnMismatch() throws Exception {
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
     final String responseRequestId = "foobar";
     when(client.send(any())).thenReturn(CompletableFuture.completedFuture(
@@ -439,7 +438,7 @@ public class StyxApolloClientTest {
   }
 
   @Test
-  public void testUsesClientRequestIdOnNoResponseRequestId() throws JsonProcessingException, InterruptedException {
+  public void testUsesClientRequestIdOnNoResponseRequestId() throws Exception {
     final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
     when(client.send(requestCaptor.capture())).thenReturn(CompletableFuture.completedFuture(
         Response.forStatus(Status.INTERNAL_SERVER_ERROR)
