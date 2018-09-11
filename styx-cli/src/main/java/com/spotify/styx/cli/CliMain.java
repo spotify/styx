@@ -21,8 +21,8 @@
 package com.spotify.styx.cli;
 
 import static com.google.common.base.Throwables.getStackTraceAsString;
-import static com.spotify.apollo.Status.NOT_FOUND;
-import static com.spotify.apollo.Status.UNAUTHORIZED;
+import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static java.net.HttpURLConnection.HTTP_UNAUTHORIZED;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
@@ -35,11 +35,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-import com.spotify.apollo.Client;
-import com.spotify.apollo.core.Service;
-import com.spotify.apollo.core.Services;
-import com.spotify.apollo.environment.ApolloEnvironmentModule;
-import com.spotify.apollo.http.client.HttpClientModule;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.ResourcesPayload;
@@ -48,6 +43,7 @@ import com.spotify.styx.cli.CliExitException.ExitStatus;
 import com.spotify.styx.cli.CliMain.CliContext.Output;
 import com.spotify.styx.client.ApiErrorException;
 import com.spotify.styx.client.ClientErrorException;
+import com.spotify.styx.client.FutureOkHttpClient;
 import com.spotify.styx.client.StyxClient;
 import com.spotify.styx.client.StyxClientFactory;
 import com.spotify.styx.model.Backfill;
@@ -105,7 +101,6 @@ public final class CliMain {
   private final StyxCliParser parser;
   private final Namespace namespace;
   private final String apiHost;
-  private final Service cliService;
   private final CliOutput cliOutput;
   private final CliContext cliContext;
   private final boolean debug;
@@ -115,14 +110,12 @@ public final class CliMain {
       StyxCliParser parser,
       Namespace namespace,
       String apiHost,
-      Service cliService,
       CliOutput cliOutput,
       CliContext cliContext,
       boolean debug) {
     this.parser = Objects.requireNonNull(parser);
     this.namespace = Objects.requireNonNull(namespace);
     this.apiHost = Objects.requireNonNull(apiHost);
-    this.cliService = Objects.requireNonNull(cliService);
     this.cliOutput = Objects.requireNonNull(cliOutput);
     this.cliContext = Objects.requireNonNull(cliContext);
     this.debug = debug;
@@ -163,12 +156,6 @@ public final class CliMain {
       throw CliExitException.of(ExitStatus.ArgumentError);
     }
 
-    final Service cliService = Services.usingName("styx-cli")
-        .withEnvVarPrefix(ENV_VAR_PREFIX)
-        .withModule(ApolloEnvironmentModule.create())
-        .withModule(HttpClientModule.create())
-        .build();
-
     final boolean plainOutput = namespace.getBoolean(parser.plain.getDest());
     final boolean jsonOutput = namespace.getBoolean(parser.json.getDest());
     final CliOutput cliOutput;
@@ -182,15 +169,14 @@ public final class CliMain {
 
     final boolean debug = namespace.getBoolean(parser.debug.getDest());
 
-    new CliMain(parser, namespace, apiHost, cliService, cliOutput, cliContext, debug).run();
+    new CliMain(parser, namespace, apiHost, cliOutput, cliContext, debug).run();
   }
 
   private void run() {
     final Command command = namespace.get(COMMAND_DEST);
 
-    try (Service.Instance instance = cliService.start()) {
-      final Client client = ApolloEnvironmentModule.environment(instance).environment().client();
-      styxClient = cliContext.createClient(client, apiHost);
+    try (final FutureOkHttpClient futureOkHttpClient = FutureOkHttpClient.createDefault()) {
+      styxClient = cliContext.createClient(futureOkHttpClient, apiHost);
 
       switch (command) {
         case LIST:
@@ -305,7 +291,7 @@ public final class CliMain {
       }
       if (cause instanceof ApiErrorException) {
         final ApiErrorException apiError = (ApiErrorException) cause;
-        if (apiError.getCode() == UNAUTHORIZED.code()) {
+        if (apiError.getCode() == HTTP_UNAUTHORIZED) {
           if (!apiError.isAuthenticated()) {
             cliOutput.printError(
                 "API error: Unauthorized: " + apiError.getMessage() + "\n"
@@ -458,7 +444,7 @@ public final class CliMain {
     final Throwable cause = e.getCause();
     if (cause instanceof ApiErrorException) {
       final ApiErrorException apiError = (ApiErrorException) cause;
-      if (apiError.getCode() == NOT_FOUND.code()) {
+      if (apiError.getCode() == HTTP_NOT_FOUND) {
         cliOutput.printMessage("Workflow " + workflow + " in component " + component + " not found.");
       } else {
         throw e;
@@ -1012,7 +998,7 @@ public final class CliMain {
 
     Map<String, String> env();
 
-    StyxClient createClient(Client client, String host);
+    StyxClient createClient(FutureOkHttpClient client, String host);
 
     boolean hasConsole();
 
@@ -1022,7 +1008,7 @@ public final class CliMain {
 
     CliContext DEFAULT = new CliContext() {
       @Override
-      public StyxClient createClient(Client client, String host) {
+      public StyxClient createClient(FutureOkHttpClient client, String host) {
         return StyxClientFactory.create(client, host);
       }
 

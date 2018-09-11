@@ -21,6 +21,7 @@
 package com.spotify.styx.client;
 
 import static com.spotify.styx.api.Api.Version.V3;
+import static com.spotify.styx.client.FutureOkHttpClient.forUri;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.serialization.Json.serialize;
 
@@ -29,10 +30,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.spotify.apollo.Client;
-import com.spotify.apollo.Request;
-import com.spotify.apollo.Response;
 import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
@@ -59,44 +56,40 @@ import java.net.URI;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
-import okhttp3.HttpUrl;
 import okhttp3.HttpUrl.Builder;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 import okio.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Styx Apollo Client Implementation. In case of API errors, the {@link Throwable} in the returned
+ * Styx OkHttp Client Implementation. In case of API errors, the {@link Throwable} in the returned
  * {@link CompletionStage} will be of kind {@link ApiErrorException}. Other errors will be treated
  * as {@link RuntimeException} instead.
  */
-class StyxApolloClient implements StyxClient {
+class StyxOkHttpClient implements StyxClient {
 
-  private static final Logger log = LoggerFactory.getLogger(StyxApolloClient.class);
+  private static final Logger log = LoggerFactory.getLogger(StyxOkHttpClient.class);
 
   private static final String STYX_API_VERSION = V3.name().toLowerCase();
   private static final String STYX_CLIENT_VERSION =
-      "Styx Client " + StyxApolloClient.class.getPackage().getImplementationVersion();
+      "Styx Client " + StyxOkHttpClient.class.getPackage().getImplementationVersion();
   private static final Duration TTL = Duration.ofSeconds(90);
   private static final String X_REQUEST_ID = "X-Request-Id";
 
   private final URI apiHost;
-  private final Client client;
+  private final FutureOkHttpClient client;
   private final GoogleIdTokenAuth auth;
 
-  StyxApolloClient(final Client client,
-                   final String apiHost) {
-    this(client, apiHost, GoogleIdTokenAuth.ofDefaultCredential());
-  }
-
-  StyxApolloClient(final Client client,
-                   final String apiHost,
-                   final GoogleIdTokenAuth auth) {
+  private StyxOkHttpClient(String apiHost, FutureOkHttpClient client, GoogleIdTokenAuth auth) {
     if (apiHost.contains("://")) {
       this.apiHost = URI.create(apiHost);
     } else {
@@ -106,36 +99,31 @@ class StyxApolloClient implements StyxClient {
     this.auth = Objects.requireNonNull(auth, "auth");
   }
 
+  public static StyxClient create(String apiHost, FutureOkHttpClient client) {
+    return new StyxOkHttpClient(apiHost, client, GoogleIdTokenAuth.ofDefaultCredential());
+  }
+
+  public static StyxClient create(String apiHost, FutureOkHttpClient client, GoogleIdTokenAuth auth) {
+    return new StyxOkHttpClient(apiHost, client, auth);
+  }
+
   @Override
   public CompletionStage<RunStateDataPayload> activeStates(Optional<String> componentId) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("status")
-        .addPathSegment("activeStates");
-    componentId.ifPresent(id -> urlBuilder.addQueryParameter("component", id));
-    return executeRequest(
-        Request.forUri(urlBuilder.build().toString()),
-        RunStateDataPayload.class);
+    final Builder url = urlBuilder("status", "activeStates");
+    componentId.ifPresent(id -> url.addQueryParameter("component", id));
+    return executeRequest(forUri(url.build()), RunStateDataPayload.class);
   }
 
   @Override
   public CompletionStage<List<EventInfo>> eventsForWorkflowInstance(String componentId,
                                                                     String workflowId,
                                                                     String parameter) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("status")
-        .addPathSegment("events")
-        .addPathSegment(componentId)
-        .addPathSegment(workflowId)
-        .addPathSegment(parameter);
-    return executeRequest(
-        Request.forUri(urlBuilder.build().toString()))
+    final Builder url = urlBuilder("status", "events", componentId, workflowId, parameter);
+    return executeRequest(forUri(url.build()))
         .thenApply(response -> {
           final JsonNode jsonNode;
-          try {
-            if (!response.payload().isPresent()) {
-              throw new RuntimeException("No json returned from API");
-            }
-            jsonNode = OBJECT_MAPPER.readTree(response.payload().get().toByteArray());
+          try (final ResponseBody responseBody = response.body()) {
+            jsonNode = OBJECT_MAPPER.readTree(responseBody.bytes());
           } catch (IOException e) {
             throw new RuntimeException("Invalid json returned from API", e);
           }
@@ -171,86 +159,59 @@ class StyxApolloClient implements StyxClient {
 
   @Override
   public CompletionStage<Workflow> workflow(String componentId, String workflowId) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("workflows")
-        .addPathSegment(componentId)
-        .addPathSegment(workflowId);
-    return executeRequest(Request.forUri(urlBuilder.build().toString()), Workflow.class);
+    final Builder url = urlBuilder("workflows", componentId, workflowId);
+    return executeRequest(forUri(url.build()), Workflow.class);
   }
 
   @Override
   public CompletionStage<List<Workflow>> workflows() {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("workflows");
-    return executeRequest(Request.forUri(urlBuilder.build().toString()), Workflow[].class)
+    final Builder url = urlBuilder("workflows");
+    return executeRequest(forUri(url.build()), Workflow[].class)
         .thenApply(ImmutableList::copyOf);
   }
 
   @Override
   public CompletionStage<Workflow> createOrUpdateWorkflow(String componentId, WorkflowConfiguration workflowConfig) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("workflows")
-        .addPathSegment(componentId);
-    final ByteString payload;
+    final Builder url = urlBuilder("workflows", componentId);
     try {
-      payload = serialize(workflowConfig);
+      final Request request = forUri(url.build(), "POST", serialize(workflowConfig));
+      return executeRequest(request, Workflow.class);
     } catch (JsonProcessingException e) {
       return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
     }
-    final Request request = Request.forUri(urlBuilder.build().toString(), "POST").withPayload(payload);
-    return executeRequest(request, Workflow.class);
   }
 
   @Override
   public CompletionStage<Void> deleteWorkflow(String componentId, String workflowId) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("workflows")
-        .addPathSegment(componentId)
-        .addPathSegment(workflowId);
-    return executeRequest(Request.forUri(urlBuilder.build().toString(), "DELETE"))
+    final Builder url = urlBuilder("workflows", componentId, workflowId);
+    return executeRequest(forUri(url.build(), "DELETE"))
         .thenApply(response -> null);
   }
 
   @Override
   public CompletionStage<WorkflowState> workflowState(String componentId, String workflowId) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("workflows")
-        .addPathSegment(componentId)
-        .addPathSegment(workflowId)
-        .addPathSegment("state");
-    return executeRequest(Request.forUri(urlBuilder.build().toString()), WorkflowState.class);
+    final Builder url = urlBuilder("workflows", componentId, workflowId, "state");
+    return executeRequest(forUri(url.build()), WorkflowState.class);
   }
 
   @Override
-  public CompletionStage<WorkflowInstanceExecutionData> workflowInstanceExecutions(final String componentId,
-                                                                                   final String workflowId,
-                                                                                   final String parameter) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("workflows")
-        .addPathSegment(componentId)
-        .addPathSegment(workflowId)
-        .addPathSegment("instances")
-        .addPathSegment(parameter);
-    return executeRequest(Request.forUri(urlBuilder.build().toString()),
+  public CompletionStage<WorkflowInstanceExecutionData> workflowInstanceExecutions(String componentId,
+                                                                                   String workflowId,
+                                                                                   String parameter) {
+    final Builder url = urlBuilder("workflows", componentId, workflowId, "instances", parameter);
+    return executeRequest(forUri(url.build()),
         WorkflowInstanceExecutionData.class);
   }
 
   @Override
   public CompletionStage<WorkflowState> updateWorkflowState(String componentId, String workflowId,
                                                             WorkflowState workflowState) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("workflows")
-        .addPathSegment(componentId)
-        .addPathSegment(workflowId)
-        .addPathSegment("state");
-    final ByteString payload;
+    final Builder url = urlBuilder("workflows", componentId, workflowId, "state");
     try {
-      payload = serialize(workflowState);
+      return executeRequest(forUri(url.build(), "PATCH", serialize(workflowState)), WorkflowState.class);
     } catch (JsonProcessingException e) {
       return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
     }
-    return executeRequest(Request.forUri(urlBuilder.build().toString(), "PATCH")
-                              .withPayload(payload), WorkflowState.class);
   }
 
   @Override
@@ -264,15 +225,12 @@ class StyxApolloClient implements StyxClient {
                                                        String workflowId,
                                                        String parameter,
                                                        TriggerParameters triggerParameters) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("scheduler")
-        .addPathSegment("trigger");
+    final Builder url = urlBuilder( "scheduler", "trigger");
     final TriggerRequest triggerRequest =
         TriggerRequest.of(WorkflowId.create(componentId, workflowId), parameter, triggerParameters);
     try {
       final ByteString payload = serialize(triggerRequest);
-      return executeRequest(
-          Request.forUri(urlBuilder.build().toString(), "POST").withPayload(payload))
+      return executeRequest(forUri(url.build(), "POST", payload))
           .thenApply(response -> null);
     } catch (JsonProcessingException e) {
       return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
@@ -283,17 +241,14 @@ class StyxApolloClient implements StyxClient {
   public CompletionStage<Void> haltWorkflowInstance(String componentId,
                                                     String workflowId,
                                                     String parameter) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("scheduler")
-        .addPathSegment("halt");
+    final Builder url = urlBuilder("scheduler", "halt");
     final WorkflowInstance workflowInstance = WorkflowInstance.create(
         WorkflowId.create(componentId, workflowId),
         parameter);
     try {
       final ByteString payload = serialize(workflowInstance);
-      return executeRequest(
-          Request.forUri(urlBuilder.build().toString(), "POST").withPayload(payload))
-          .thenApply(response -> (Void) null);
+      return executeRequest(forUri(url.build(), "POST", payload))
+          .thenApply(response -> null);
     } catch (JsonProcessingException e) {
       return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
     }
@@ -303,17 +258,14 @@ class StyxApolloClient implements StyxClient {
   public CompletionStage<Void> retryWorkflowInstance(String componentId,
                                                      String workflowId,
                                                      String parameter) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("scheduler")
-        .addPathSegment("retry");
+    final Builder url = urlBuilder("scheduler", "retry");
     final WorkflowInstance workflowInstance = WorkflowInstance.create(
         WorkflowId.create(componentId, workflowId),
         parameter);
     try {
       final ByteString payload = serialize(workflowInstance);
-      return executeRequest(
-          Request.forUri(urlBuilder.build().toString(), "POST").withPayload(payload))
-          .thenApply(response -> (Void) null);
+      return executeRequest(forUri(url.build(), "POST", payload))
+          .thenApply(response -> null);
     } catch (JsonProcessingException e) {
       return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
     }
@@ -321,11 +273,10 @@ class StyxApolloClient implements StyxClient {
 
   @Override
   public CompletionStage<Resource> resourceCreate(String resourceId, int concurrency) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder().addPathSegment("resources");
+    final Builder url = urlBuilder("resources");
     try {
       final ByteString payload = serialize(Resource.create(resourceId, concurrency));
-      return executeRequest(Request.forUri(urlBuilder.build().toString(), "POST")
-          .withPayload(payload), Resource.class);
+      return executeRequest(forUri(url.build(), "POST", payload), Resource.class);
     } catch (JsonProcessingException e) {
       return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
     }
@@ -333,13 +284,10 @@ class StyxApolloClient implements StyxClient {
 
   @Override
   public CompletionStage<Resource> resourceEdit(String resourceId, int concurrency) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("resources")
-        .addPathSegment(resourceId);
+    final Builder url = urlBuilder("resources", resourceId);
     try {
       final ByteString payload = serialize(Resource.create(resourceId, concurrency));
-      return executeRequest(Request.forUri(urlBuilder.build().toString(), "PUT")
-          .withPayload(payload), Resource.class);
+      return executeRequest(forUri(url.build(), "PUT", payload), Resource.class);
     } catch (JsonProcessingException e) {
       return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
     }
@@ -347,16 +295,14 @@ class StyxApolloClient implements StyxClient {
 
   @Override
   public CompletionStage<Resource> resource(String resourceId) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("resources")
-        .addPathSegment(resourceId);
-    return executeRequest(Request.forUri(urlBuilder.build().toString()), Resource.class);
+    final Builder url = urlBuilder("resources", resourceId);
+    return executeRequest(forUri(url.build()), Resource.class);
   }
 
   @Override
   public CompletionStage<ResourcesPayload> resourceList() {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder().addPathSegment("resources");
-    return executeRequest(Request.forUri(urlBuilder.build().toString()), ResourcesPayload.class);
+    final Builder url = urlBuilder("resources");
+    return executeRequest(forUri(url.build()), ResourcesPayload.class);
   }
 
   @Override
@@ -384,11 +330,10 @@ class StyxApolloClient implements StyxClient {
 
   @Override
   public CompletionStage<Backfill> backfillCreate(BackfillInput backfill) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder().addPathSegment("backfills");
+    final Builder url = urlBuilder("backfills");
     try {
       final ByteString payload = serialize(backfill);
-      return executeRequest(Request.forUri(urlBuilder.build().toString(), "POST")
-          .withPayload(payload), Backfill.class);
+      return executeRequest(forUri(url.build(), "POST", payload), Backfill.class);
     } catch (JsonProcessingException e) {
       return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
     }
@@ -400,13 +345,10 @@ class StyxApolloClient implements StyxClient {
         .id(backfillId)
         .concurrency(concurrency)
         .build();
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("backfills")
-        .addPathSegment(backfillId);
+    final Builder url = urlBuilder("backfills", backfillId);
     try {
       final ByteString payload = serialize(editableBackfillInput);
-      return executeRequest(Request.forUri(urlBuilder.build().toString(), "PUT")
-          .withPayload(payload), Backfill.class);
+      return executeRequest(forUri(url.build(), "PUT", payload), Backfill.class);
     } catch (JsonProcessingException e) {
       return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
     }
@@ -414,20 +356,16 @@ class StyxApolloClient implements StyxClient {
 
   @Override
   public CompletionStage<Void> backfillHalt(String backfillId) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("backfills")
-        .addPathSegment(backfillId);
-    return executeRequest(Request.forUri(urlBuilder.build().toString(), "DELETE"))
+    final Builder url = urlBuilder("backfills", backfillId);
+    return executeRequest(forUri(url.build(), "DELETE"))
         .thenApply(response -> null);
   }
 
   @Override
   public CompletionStage<BackfillPayload> backfill(String backfillId, boolean includeStatus) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder()
-        .addPathSegment("backfills")
-        .addPathSegment(backfillId);
-    urlBuilder.addQueryParameter("status", Boolean.toString(includeStatus));
-    return executeRequest(Request.forUri(urlBuilder.build().toString()), BackfillPayload.class);
+    final Builder url = urlBuilder("backfills", backfillId);
+    url.addQueryParameter("status", Boolean.toString(includeStatus));
+    return executeRequest(forUri(url.build()), BackfillPayload.class);
   }
 
   @Override
@@ -435,44 +373,37 @@ class StyxApolloClient implements StyxClient {
                                                         Optional<String> workflowId,
                                                         boolean showAll,
                                                         boolean includeStatus) {
-    final HttpUrl.Builder urlBuilder = getUrlBuilder().addPathSegment("backfills");
-    componentId.ifPresent(c -> urlBuilder.addQueryParameter("component", c));
-    workflowId.ifPresent(w -> urlBuilder.addQueryParameter("workflow", w));
-    urlBuilder.addQueryParameter("showAll", Boolean.toString(showAll));
-    urlBuilder.addQueryParameter("status", Boolean.toString(includeStatus));
-    return executeRequest(Request.forUri(urlBuilder.build().toString()), BackfillsPayload.class);
+    final Builder url = urlBuilder("backfills");
+    componentId.ifPresent(c -> url.addQueryParameter("component", c));
+    workflowId.ifPresent(w -> url.addQueryParameter("workflow", w));
+    url.addQueryParameter("showAll", Boolean.toString(showAll));
+    url.addQueryParameter("status", Boolean.toString(includeStatus));
+    return executeRequest(forUri(url.build()), BackfillsPayload.class);
   }
 
-  private <T> CompletionStage<T> executeRequest(final Request request,
-                                                final Class<T> tClass) {
+  private <T> CompletionStage<T> executeRequest(Request request, Class<T> tClass) {
     return executeRequest(request).thenApply(response -> {
-      if (!response.payload().isPresent()) {
-        throw new RuntimeException("Expected payload not found");
-      } else {
-        try {
-          return OBJECT_MAPPER.readValue(response.payload().get().toByteArray(), tClass);
-        } catch (IOException e) {
-          throw new RuntimeException("Error while reading the received payload: " + e);
-        }
+      try (final ResponseBody responseBody = response.body()) {
+        return OBJECT_MAPPER.readValue(responseBody.bytes(), tClass);
+      } catch (IOException e) {
+        throw new RuntimeException("Error while reading the received payload: " + e);
       }
     });
   }
 
-  private Request decorateRequest(
-      final Request request, String requestId, final Optional<String> authToken) {
-    return request
-        .withHeader("User-Agent", STYX_CLIENT_VERSION)
-        .withHeader("X-Request-Id", requestId)
-        .withTtl(TTL)
-        .withHeaders(authToken
-            .map(t -> ImmutableMap.of("Authorization", "Bearer " + t))
-            .orElse(ImmutableMap.of()));
+  private Request decorateRequest(Request request, String requestId, Optional<String> authToken) {
+    final Request.Builder builder = request
+        .newBuilder()
+        .addHeader("User-Agent", STYX_CLIENT_VERSION)
+        .addHeader("X-Request-Id", requestId);
+    authToken.ifPresent(t -> builder.addHeader("Authorization", "Bearer " + t));
+    return builder.build();
   }
 
-  private CompletionStage<Response<ByteString>> executeRequest(final Request request) {
+  private CompletionStage<Response> executeRequest(Request request) {
     final Optional<String> authToken;
     try {
-      authToken = auth.getToken(this.apiHost.toString());
+      authToken = auth.getToken(apiHost.toString());
     } catch (IOException | GeneralSecurityException e) {
       // Credential probably invalid, configured wrongly or the token request failed.
       return CompletableFutures.exceptionallyCompletedFuture(
@@ -481,7 +412,7 @@ class StyxApolloClient implements StyxClient {
     final String requestId = UUID.randomUUID().toString().replace("-", "");  // UUID with no dashes, easier to deal with
     return client.send(decorateRequest(request, requestId, authToken)).handle((response, e) -> {
       if (e != null) {
-        throw new ClientErrorException("Request failed: " + request.method() + " " + request.uri(), e);
+        throw new ClientErrorException("Request failed: " + request.method() + " " + request.url(), e);
       } else {
         final String effectiveRequestId;
         final String responseRequestId = response.headers().get(X_REQUEST_ID);
@@ -492,23 +423,22 @@ class StyxApolloClient implements StyxClient {
         } else {
           effectiveRequestId = requestId;
         }
-        switch (response.status().family()) {
-          case SUCCESSFUL:
-            return response;
-          default:
-            final String message = response.status().code() + " " + response.status().reasonPhrase();
-            throw new ApiErrorException(message, response.status().code(), authToken.isPresent(), effectiveRequestId);
+        if (!response.isSuccessful()) {
+          throw new ApiErrorException(response.code() + " " + response.message(), response.code(),
+                                      authToken.isPresent(), effectiveRequestId);
         }
+        return response;
       }
     });
   }
 
-  private HttpUrl.Builder getUrlBuilder() {
+  private Builder urlBuilder(String... pathSegments) {
     final Builder builder = new Builder()
         .scheme(apiHost.getScheme())
         .host(apiHost.getHost())
         .addPathSegment("api")
         .addPathSegment(STYX_API_VERSION);
+    Arrays.stream(pathSegments).forEach(builder::addPathSegment);
     if (apiHost.getPort() != -1) {
       builder.port(apiHost.getPort());
     }
