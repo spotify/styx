@@ -507,7 +507,7 @@ Workflow Instance belonging to a Backfill entity.
             "component": "styx-canary",
             "concurrency": "10",
             "description": "fixed bug and reproduce data",
-            "trigger_parameters": {"FOO": "bar"},
+            "trigger_parameters": {"env": {"FOO": "bar"}},
             "workflow": "StyxCanary",
         }
 
@@ -523,7 +523,7 @@ Workflow Instance belonging to a Backfill entity.
             "next_trigger": "2017-01-01T00:00:00Z",
             "schedule": "hours",
             "start": "2017-01-01T00:00:00Z",
-            "trigger_parameters": {"FOO": "bar"},
+            "trigger_parameters": {"env": {"FOO": "bar"}},
             "workflow_id": {
                 "component_id": "styx-canary",
                 "id": "StyxCanary"
@@ -557,7 +557,7 @@ Workflow Instance belonging to a Backfill entity.
                 "next_trigger": "2017-01-01T01:00:00Z",
                 "schedule": "hours",
                 "start": "2017-01-01T00:00:00Z",
-                "trigger_parameters": {"FOO": "bar"},
+                "trigger_parameters": {"env": {"FOO": "bar"}},
                 "workflow_id": {
                     "component_id": "styx-canary",
                     "id": "StyxCanary"
@@ -617,7 +617,7 @@ Workflow Instance belonging to a Backfill entity.
             "concurrency": 20,
             "description": "fixed bug and reproduce data",
             "id": "backfill-1489054446085-52684",
-            "trigger_parameters": {"FOO": "bar"},
+            "trigger_parameters": {"env": {"FOO": "bar"}},
         }
 
 + Response 200 (application/json)
@@ -632,7 +632,7 @@ Workflow Instance belonging to a Backfill entity.
             "next_trigger": "2017-01-01T00:00:00Z",
             "schedule": "hours",
             "start": "2017-01-01T00:00:00Z",
-            "trigger_parameters": {"FOO": "bar"},
+            "trigger_parameters": {"env": {"FOO": "bar"}},
             "workflow_id": {
                 "component_id": "styx-canary",
                 "id": "StyxCanary"
@@ -798,7 +798,7 @@ Resources related to operations that act on the current state of the scheduler.
 
         {
             "parameter": "2017-01-01T01",
-            "trigger_parameters": {"FOO": "bar"},
+            "trigger_parameters": {"env": {"FOO": "bar"}},
             "workflow_id": {
                 "component_id": "styx-canary",
                 "id": "StyxCanary"
@@ -809,7 +809,7 @@ Resources related to operations that act on the current state of the scheduler.
 
         {
             "parameter": "2017-01-01T01",
-            "trigger_parameters": {"FOO": "bar"},
+            "trigger_parameters": {"env": {"FOO": "bar"}},
             "workflow_id": {
                 "component_id": "styx-canary",
                 "id": "StyxCanary"
