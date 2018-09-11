@@ -222,20 +222,24 @@ public class SchedulerResource {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
     } catch (ExecutionException e) {
-      Throwable cause;
-      if ((cause = findCause(e, IllegalStateException.class)) != null
-          || (cause = findCause(e, IllegalArgumentException.class)) != null) {
-        // TODO: propagate error information using a more specific exception type
-        return Response.forStatus(CONFLICT.withReasonPhrase(cause.getMessage()));
-      } else if (findCause(e, AlreadyInitializedException.class) != null) {
-        return Response.forStatus(CONFLICT.withReasonPhrase(
-            "This workflow instance is already triggered. Did you want to `retry` running it instead?"));
-      } else {
-        return Response.forStatus(INTERNAL_SERVER_ERROR.withReasonPhrase(e.getCause().getMessage()));
-      }
+      return handleException(e);
     }
 
     // todo: change payload to a struct returning the triggerId as well so the user can refer to it
     return Response.forPayload(triggerRequest);
+  }
+
+  private Response<TriggerRequest> handleException(final ExecutionException e) {
+    Throwable cause;
+    if ((cause = findCause(e, IllegalStateException.class)) != null
+        || (cause = findCause(e, IllegalArgumentException.class)) != null) {
+      // TODO: propagate error information using a more specific exception type
+      return Response.forStatus(CONFLICT.withReasonPhrase(cause.getMessage()));
+    } else if (findCause(e, AlreadyInitializedException.class) != null) {
+      return Response.forStatus(CONFLICT.withReasonPhrase(
+          "This workflow instance is already triggered. Did you want to `retry` running it instead?"));
+    } else {
+      return Response.forStatus(INTERNAL_SERVER_ERROR.withReasonPhrase(e.getCause().getMessage()));
+    }
   }
 }
