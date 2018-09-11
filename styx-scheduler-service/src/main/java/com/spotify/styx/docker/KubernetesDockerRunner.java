@@ -26,6 +26,8 @@ import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.state.RunState.State.RUNNING;
 import static com.spotify.styx.util.CloserUtil.register;
+import static com.spotify.styx.util.GrpcContextUtil.currentContextExecutorService;
+import static com.spotify.styx.util.GuardedRunnable.guard;
 import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -36,6 +38,7 @@ import com.github.rholder.retry.RetryerBuilder;
 import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.WaitStrategies;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -94,11 +97,17 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
@@ -124,6 +133,8 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String LOGGING = "STYX_LOGGING";
   private static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
   private static final int DEFAULT_POD_DELETION_DELAY_SECONDS = 120;
+  private static final long PROCESS_POD_UPDATE_INTERVAL_SECONDS = 5;
+  private static final int K8S_EVENT_PROCESSING_THREADS = 32;
   private static final Time DEFAULT_TIME = Instant::now;
   static final String STYX_WORKFLOW_SA_ENV_VARIABLE = "GOOGLE_APPLICATION_CREDENTIALS";
   static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
@@ -151,6 +162,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private final int pollPodsIntervalSeconds;
   private final int podDeletionDelaySeconds;
   private final Time time;
+  private final ExecutorService eventExecutor;
 
   private Watch watch;
 
@@ -168,7 +180,9 @@ class KubernetesDockerRunner implements DockerRunner {
     this.pollPodsIntervalSeconds = pollPodsIntervalSeconds;
     this.podDeletionDelaySeconds = podDeletionDelaySeconds;
     this.time = Objects.requireNonNull(time);
-    this.executor = register(closer, Objects.requireNonNull(executor), "kubernetes-docker-runner");
+    this.executor = register(closer, Objects.requireNonNull(executor), "kubernetes-poll");
+    this.eventExecutor = currentContextExecutorService(
+        register(closer, new ForkJoinPool(K8S_EVENT_PROCESSING_THREADS), "kubernetes-event"));
   }
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
@@ -507,8 +521,11 @@ class KubernetesDockerRunner implements DockerRunner {
         pollPodsIntervalSeconds,
         TimeUnit.SECONDS);
 
-    watch = client.pods()
-        .watch(new PodWatcher());
+    final PodWatcher watcher = new PodWatcher();
+    executor.scheduleWithFixedDelay(guard(watcher::processPodUpdates),
+        PROCESS_POD_UPDATE_INTERVAL_SECONDS, PROCESS_POD_UPDATE_INTERVAL_SECONDS, TimeUnit.SECONDS);
+
+    watch = client.pods().watch(watcher);
   }
 
   private void examineRunningWFISandAssociatedPods(Map<WorkflowInstance, RunState> activeStates,
@@ -576,7 +593,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
       final RunState runState = activeStates.get(workflowInstance.get());
       if (runState != null && isPodRunState(pod, runState)) {
-        emitPodEvents(Watcher.Action.MODIFIED, pod, runState);
+        emitPodEvents(pod, runState);
         cleanupWithRunState(workflowInstance.get(), pod, runState);
       } else {
         // The pod is stale as we fetched the active states _after_ listing all pods.
@@ -627,8 +644,8 @@ class KubernetesDockerRunner implements DockerRunner {
     return true;
   }
 
-  private void emitPodEvents(Watcher.Action action, Pod pod, RunState runState) {
-    final List<Event> events = translate(runState.workflowInstance(), runState, action, pod, stats);
+  private void emitPodEvents(Pod pod, RunState runState) {
+    final List<Event> events = translate(runState.workflowInstance(), runState, pod, stats);
 
     for (int i = 0; i < events.size(); ++i) {
       final Event event = events.get(i);
@@ -674,17 +691,64 @@ class KubernetesDockerRunner implements DockerRunner {
 
     private static final int RECONNECT_DELAY_SECONDS = 1;
 
+    private final ConcurrentMap<String, WorkflowInstance> podUpdates = new ConcurrentHashMap<>();
+
+    /**
+     * @implNote In order to be able to keep up with the stream of events from k8s, this method should
+     *           not perform any expensive processing or blocking IO.
+     */
     @Override
     public void eventReceived(Action action, Pod pod) {
+
       if (pod == null) {
         return;
       }
 
       logEvent(action, pod, pod.getMetadata().getResourceVersion(), false);
 
-      readPodWorkflowInstance(pod)
-          .flatMap(workflowInstance -> lookupPodRunState(pod, workflowInstance))
-          .ifPresent(runState -> emitPodEvents(action, pod, runState));
+      // Ignore pod deletions
+      if (action == Action.DELETED) {
+        return;
+      }
+
+      // Ignore non-styx pods
+      final Optional<WorkflowInstance> workflowInstance = readPodWorkflowInstance(pod);
+      if (!workflowInstance.isPresent()) {
+        return;
+      }
+
+      // Flag this pod for later processing. Note that instead of storing the received pod status here,
+      // a new status is fetched later, in order to avoid observing pod statuses out-of-order.
+      podUpdates.put(pod.getMetadata().getName(), workflowInstance.get());
+    }
+
+    void processPodUpdates() {
+      // Get a batch of pods to process
+      final Set<String> podNames = ImmutableSet.copyOf(podUpdates.keySet());
+
+      // Process the batch in parallel
+      podNames.stream()
+          .map(podName -> {
+            // Remove from change set before processing in order to not lose updates
+            final WorkflowInstance instance = podUpdates.remove(podName);
+            return CompletableFuture.runAsync(() -> processPodUpdate(podName, instance), eventExecutor);
+          })
+          .collect(Collectors.toList())
+          .forEach(CompletableFuture::join);
+    }
+
+    private void processPodUpdate(String podName, WorkflowInstance instance) {
+      final Pod pod = client.pods().withName(podName).get();
+      if (pod == null) {
+        return;
+      }
+
+      final Optional<RunState> runState = lookupPodRunState(pod, instance);
+      if (!runState.isPresent()) {
+        return;
+      }
+
+      emitPodEvents(pod, runState.get());
     }
 
     private void reconnect() {

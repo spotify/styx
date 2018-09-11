@@ -44,7 +44,6 @@ import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.ContainerStatusBuilder;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodStatus;
-import io.fabric8.kubernetes.client.Watcher;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -299,22 +298,13 @@ public class KubernetesPodEventTranslatorTest {
     assertGeneratesNoEvents(RunState.State.FAILED, pod);
   }
 
-  @Test
-  public void shouldIgnoreDeletedEvents() {
-    setTerminated(pod, "Succeeded", 0, null);
-    RunState state = RunState.create(WFI, RunState.State.TERMINATED);
-
-    List<Event> events = translate(WFI, state, Watcher.Action.DELETED, pod, Stats.NOOP);
-    assertThat(events, empty());
-  }
-
   private void assertGeneratesEventsAndTransitions(
       RunState.State initialState,
       Pod pod,
       Event... expectedEvents) {
 
     RunState state = RunState.create(WFI, initialState);
-    List<Event> events = translate(WFI, state, Watcher.Action.MODIFIED, pod, Stats.NOOP);
+    List<Event> events = translate(WFI, state, pod, Stats.NOOP);
     assertThat(events, contains(expectedEvents));
 
     // ensure no exceptions are thrown when transitioning
@@ -328,7 +318,7 @@ public class KubernetesPodEventTranslatorTest {
       Pod pod) {
 
     RunState state = RunState.create(WFI, initialState);
-    List<Event> events = translate(WFI, state, Watcher.Action.MODIFIED, pod, Stats.NOOP);
+    List<Event> events = translate(WFI, state, pod, Stats.NOOP);
 
     assertThat(events, empty());
   }
