@@ -164,6 +164,7 @@ public class DatastoreStorage implements Closeable {
   public static final String PROPERTY_STATE_EXECUTION_ID = "executionId";
   public static final String PROPERTY_STATE_EXECUTION_DESCRIPTION = "executionDescription";
   public static final String PROPERTY_STATE_RESOURCE_IDS = "resourceIds";
+  public static final String PROPERTY_STATE_TRIGGER_PARAMETERS = "triggerParameters";
 
   public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
 
@@ -487,6 +488,7 @@ public class DatastoreStorage implements Closeable {
             ExecutionDescription.class))
         .resourceIds(readOptJson(entity, PROPERTY_STATE_RESOURCE_IDS,
             new TypeReference<Set<String>>() { }))
+        .triggerParameters(readOptJson(entity, PROPERTY_STATE_TRIGGER_PARAMETERS, TriggerParameters.class))
         .build();
     return RunState.create(instance, state, data, Instant.ofEpochMilli(timestamp), counter);
   }
@@ -550,6 +552,9 @@ public class DatastoreStorage implements Closeable {
       entity.set(PROPERTY_STATE_TRIGGER_ID, TriggerUtil.triggerId(trigger));
     });
     state.data().executionId().ifPresent(v -> entity.set(PROPERTY_STATE_EXECUTION_ID, v));
+    if (state.data().triggerParameters().isPresent()) {
+      entity.set(PROPERTY_STATE_TRIGGER_PARAMETERS, jsonValue(state.data().triggerParameters().get()));
+    }
 
     if (state.data().executionDescription().isPresent()) {
       entity.set(PROPERTY_STATE_EXECUTION_DESCRIPTION, jsonValue(state.data().executionDescription().get()));
