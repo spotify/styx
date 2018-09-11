@@ -36,15 +36,25 @@ public class ClassEnforcerTest {
   @Test
   public void shouldAssertNotInstantiableConstructorThrowsUnsupportedOperationException() throws ReflectiveOperationException {
     exception.expect(AssertionError.class);
-    exception.expectMessage("Class should not be instantiable: " + FailingInstantiable.class.getName());
+    exception.expectMessage("Constructor should throw UnsupportedOperationException: " +
+        FailingInstantiable.class.getName());
     ClassEnforcer.assertNotInstantiable(FailingInstantiable.class);
   }
 
   @Test
-  public void shouldAssertInstantiable() throws ReflectiveOperationException {
+  public void shouldAssertNotInstantiableConstructorIsPrivate() throws ReflectiveOperationException {
     exception.expect(AssertionError.class);
-    exception.expectMessage("Class should not be instantiable: " + String.class.getName());
-    ClassEnforcer.assertNotInstantiable(String.class);
+    exception.expectMessage("Default constructor should be private: " +
+        PublicConstructorUninstantiable.class.getName());
+    ClassEnforcer.assertNotInstantiable(PublicConstructorUninstantiable.class);
+  }
+
+  @Test
+  public void shouldFailInstantiable() throws ReflectiveOperationException {
+    exception.expect(AssertionError.class);
+    exception.expectMessage("Constructor should throw UnsupportedOperationException: " +
+        Instantiable.class.getName());
+    ClassEnforcer.assertNotInstantiable(Instantiable.class);
   }
 
   @Test
@@ -54,10 +64,40 @@ public class ClassEnforcerTest {
     ClassEnforcer.assertNotInstantiable(Class.class);
   }
 
+  @Test
+  public void shouldAssertNotInstantiablWithArgs()
+      throws ReflectiveOperationException {
+    exception.expect(AssertionError.class);
+    exception.expectMessage("Class should only have a single private constructor: " +
+        InstantiableWithArgs.class.getName());
+    ClassEnforcer.assertNotInstantiable(InstantiableWithArgs.class);
+  }
+
+  private static class Instantiable {
+
+  }
+
   private static class FailingInstantiable {
 
-    public FailingInstantiable() {
+    private FailingInstantiable() {
       throw new NullPointerException();
+    }
+  }
+
+  private static class PublicConstructorUninstantiable {
+
+    public PublicConstructorUninstantiable() {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  private static class InstantiableWithArgs {
+
+    private InstantiableWithArgs() {
+      throw new UnsupportedOperationException();
+    }
+
+    public InstantiableWithArgs(String arg) {
     }
   }
 }

@@ -20,10 +20,9 @@
 
 package com.spotify.styx.util;
 
-import static org.junit.Assert.fail;
-
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Modifier;
 
 public class ClassEnforcer {
 
@@ -36,20 +35,25 @@ public class ClassEnforcer {
    *
    * @param cls the class to verify
    *
-   * @return true is the class is not instantiable with default constructor
-   *
-   * @throws ReflectiveOperationException if cls has not default constructor
+   * @throws ReflectiveOperationException if cls does not have a default constructor
+   * @throws AssertionError if
    */
   public static void assertNotInstantiable(Class<?> cls) throws ReflectiveOperationException {
+    if (cls.getDeclaredConstructors().length != 1) {
+      throw new AssertionError("Class should only have a single private constructor: " + cls.getName());
+    }
+    final Constructor<?> constructor = cls.getDeclaredConstructor();
+    if (!Modifier.isPrivate(constructor.getModifiers())) {
+      throw new AssertionError("Default constructor should be private: " + cls.getName());
+    }
+    constructor.setAccessible(true);
     try {
-      final Constructor<?> constructor = cls.getDeclaredConstructor();
-      constructor.setAccessible(true);
       constructor.newInstance();
     } catch (InvocationTargetException e) {
       if (e.getCause() instanceof UnsupportedOperationException) {
         return;
       }
     }
-    fail("Class should not be instantiable: " + cls.getName());
+    throw new AssertionError("Constructor should throw UnsupportedOperationException: " + cls.getName());
   }
 }
