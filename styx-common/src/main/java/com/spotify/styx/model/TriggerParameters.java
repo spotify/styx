@@ -2,7 +2,7 @@
  * -\-\-
  * Spotify Styx Common
  * --
- * Copyright (C) 2017 Spotify AB
+ * Copyright (C) 2016 - 2018 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,34 +20,19 @@
 
 package com.spotify.styx.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.norberg.automatter.AutoMatter;
-import java.time.Instant;
-import java.util.Optional;
+import java.util.Map;
 
 @AutoMatter
-@JsonIgnoreProperties(ignoreUnknown = true)
-public interface BackfillInput {
+public interface TriggerParameters {
 
-  Instant start();
+  Map<String, String> env();
 
-  Instant end();
+  static TriggerParametersBuilder builder() {
+    return new TriggerParametersBuilder();
+  }
 
-  String component();
-
-  String workflow();
-
-  int concurrency();
-
-  boolean reverse();
-
-  Optional<String> description();
-
-  Optional<TriggerParameters> triggerParameters();
-
-  BackfillInputBuilder builder();
-
-  static BackfillInputBuilder newBuilder() {
-    return new BackfillInputBuilder();
+  static TriggerParameters zero() {
+    return builder().build();
   }
 }

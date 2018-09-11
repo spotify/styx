@@ -23,8 +23,11 @@ package com.spotify.styx.model.data;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
+import com.spotify.styx.model.TriggerParameters;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
+import javax.annotation.Nullable;
 
 /**
  * Value representing a {@link com.spotify.styx.model.WorkflowInstance} trigger
@@ -39,6 +42,9 @@ public abstract class Trigger {
   public abstract Instant timestamp();
 
   @JsonProperty
+  public abstract TriggerParameters parameters();
+
+  @JsonProperty
   public abstract boolean complete();
 
   @JsonProperty
@@ -48,8 +54,14 @@ public abstract class Trigger {
   public static Trigger create(
       @JsonProperty("trigger_id") String triggerId,
       @JsonProperty("timestamp") Instant timestamp,
+      @JsonProperty("parameters") @Nullable TriggerParameters parameters,
       @JsonProperty("complete") boolean complete,
       @JsonProperty("executions") List<Execution> executions) {
-    return new AutoValue_Trigger(triggerId, timestamp, complete, executions);
+    return new AutoValue_Trigger(
+        triggerId,
+        timestamp,
+        Optional.ofNullable(parameters).orElse(TriggerParameters.zero()),
+        complete,
+        executions);
   }
 }

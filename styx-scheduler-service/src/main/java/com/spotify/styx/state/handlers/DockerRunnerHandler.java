@@ -138,6 +138,7 @@ public class DockerRunnerHandler implements OutputHandler {
         .serviceAccount(executionDescription.serviceAccount())
         .trigger(state.data().trigger())
         .commitSha(state.data().executionDescription().flatMap(ExecutionDescription::commitSha))
+        .env(executionDescription.env())
         .build();
   }
 

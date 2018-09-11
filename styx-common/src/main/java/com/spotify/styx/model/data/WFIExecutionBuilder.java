@@ -23,6 +23,7 @@ package com.spotify.styx.model.data;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
@@ -43,6 +44,7 @@ class WFIExecutionBuilder {
   @Nullable private WorkflowInstance currWorkflowInstance;
   @Nullable private String currExecutionId;
   @Nullable private String currTriggerId = "UNKNOWN";
+  private TriggerParameters currTriggerParameters = TriggerParameters.zero();
   @Nullable private String currDockerImg;
   @Nullable private String currCommitSha;
 
@@ -82,8 +84,10 @@ class WFIExecutionBuilder {
       closeExecution();
     }
 
-    final Trigger trigger = Trigger.create(currTriggerId, triggerTs, completed, executionList);
+    final Trigger trigger = Trigger.create(currTriggerId, triggerTs, currTriggerParameters, completed, executionList);
 
+    currTriggerId = "UNKNOWN";
+    currTriggerParameters = TriggerParameters.zero();
     triggerList.add(trigger);
     executionList = new ArrayList<>();
   }
@@ -100,11 +104,13 @@ class WFIExecutionBuilder {
     }
 
     @Override
-    public Void triggerExecution(WorkflowInstance workflowInstance, com.spotify.styx.state.Trigger trigger) {
+    public Void triggerExecution(WorkflowInstance workflowInstance, com.spotify.styx.state.Trigger trigger,
+        TriggerParameters parameters) {
       currWorkflowInstance = workflowInstance;
       completed = false;
 
       currTriggerId = TriggerUtil.triggerId(trigger);
+      currTriggerParameters = parameters;
       triggerTs = eventTs;
       return null;
     }

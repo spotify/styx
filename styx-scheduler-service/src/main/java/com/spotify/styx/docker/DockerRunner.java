@@ -32,6 +32,7 @@ import io.norberg.automatter.AutoMatter;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
@@ -94,6 +95,8 @@ public interface DockerRunner extends Closeable {
     Optional<String> memRequest();
 
     Optional<String> memLimit();
+
+    Map<String, String> env();
 
     static RunSpecBuilder builder() {
       return new RunSpecBuilder();

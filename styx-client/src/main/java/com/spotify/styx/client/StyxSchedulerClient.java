@@ -20,6 +20,7 @@
 
 package com.spotify.styx.client;
 
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
 import java.util.concurrent.CompletionStage;
 
@@ -38,6 +39,19 @@ public interface StyxSchedulerClient {
   CompletionStage<Void> triggerWorkflowInstance(final String componentId,
                                                 final String workflowId,
                                                 final String parameter);
+
+  /**
+   * Trigger a {@link WorkflowInstance}
+   *
+   * @param componentId component id
+   * @param workflowId  workflow id
+   * @param parameter   parameter
+   * @param triggerParameters additional parameters for the {@link WorkflowInstance} 
+   */
+  CompletionStage<Void> triggerWorkflowInstance(final String componentId,
+                                                final String workflowId,
+                                                final String parameter,
+                                                final TriggerParameters triggerParameters);
 
   /**
    * Halt a {@link WorkflowInstance}

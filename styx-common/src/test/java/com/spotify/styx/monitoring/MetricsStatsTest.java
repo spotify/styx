@@ -56,6 +56,7 @@ import com.codahale.metrics.Meter;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.Trigger;
@@ -230,8 +231,8 @@ public class MetricsStatsTest {
 
   @Test
   public void shouldRecordEventConsumer() {
-    final SequenceEvent event = SequenceEvent
-        .create(Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural()), 0L, 0L);
+    final SequenceEvent event = SequenceEvent.create(
+        Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural(), TriggerParameters.zero()), 0L, 0L);
     when(registry.meter(EVENT_CONSUMER_RATE.tagged("event-type", "triggerExecution"))).thenReturn(meter);
     stats.recordEventConsumer(event);
     verify(meter).mark();
@@ -239,8 +240,8 @@ public class MetricsStatsTest {
 
   @Test
   public void shouldRecordEventConsumerError() {
-    final SequenceEvent event = SequenceEvent
-        .create(Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural()), 0L, 0L);
+    final SequenceEvent event = SequenceEvent.create(
+        Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural(), TriggerParameters.zero()), 0L, 0L);
     when(registry.meter(EVENT_CONSUMER_ERROR_RATE.tagged("event-type", "triggerExecution"))).thenReturn(meter);
     stats.recordEventConsumerError(event);
     verify(meter).mark();

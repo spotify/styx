@@ -56,6 +56,7 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState.State;
@@ -104,6 +105,10 @@ public class QueuedStateManagerTest {
   private static final Workflow WORKFLOW =
       Workflow.create("foo", TestData.FULL_WORKFLOW_CONFIGURATION);
   private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
+  private static final TriggerParameters PARAMETERS = TriggerParameters.builder()
+      .env("FOO", "foo",
+          "BAR", "bar")
+      .build();
   private static final StateData STATE_DATA_1 =
       StateData.newBuilder().resourceIds(ImmutableSet.of("resource1")).build();
   private static final BiConsumer<SequenceEvent, RunState> eventConsumer = (e, s) -> {};
@@ -151,12 +156,12 @@ public class QueuedStateManagerTest {
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
     when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.of(instanceStateFresh));
 
-    stateManager.trigger(INSTANCE, TRIGGER1)
+    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
         .toCompletableFuture().get(1, MINUTES);
 
     verify(transaction).writeActiveState(INSTANCE, instanceStateFresh);
     verify(storage).writeEvent(SequenceEvent.create(
-        Event.triggerExecution(INSTANCE, TRIGGER1), 0, NOW.toEpochMilli()));
+        Event.triggerExecution(INSTANCE, TRIGGER1, PARAMETERS), 0, NOW.toEpochMilli()));
   }
 
   @Test
@@ -165,12 +170,12 @@ public class QueuedStateManagerTest {
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
     when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.of(INSTANCE_NEW_STATE));
 
-    stateManager.trigger(INSTANCE, TRIGGER1)
+    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
         .toCompletableFuture().get(1, MINUTES);
 
     verify(transaction).writeActiveState(INSTANCE, INSTANCE_NEW_STATE);
     verify(storage).writeEvent(SequenceEvent.create(
-        Event.triggerExecution(INSTANCE, TRIGGER1), INSTANCE_NEW_STATE.counter() + 1, NOW.toEpochMilli()));
+        Event.triggerExecution(INSTANCE, TRIGGER1, PARAMETERS), INSTANCE_NEW_STATE.counter() + 1, NOW.toEpochMilli()));
   }
 
   @Test
@@ -217,7 +222,7 @@ public class QueuedStateManagerTest {
         a.<TransactionFunction>getArgument(0).apply(transaction));
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1)
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
@@ -240,7 +245,7 @@ public class QueuedStateManagerTest {
     });
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1)
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
@@ -255,7 +260,7 @@ public class QueuedStateManagerTest {
     when(storage.getLatestStoredCounter(any())).thenThrow(new IOException());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1)
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
@@ -269,7 +274,7 @@ public class QueuedStateManagerTest {
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1)
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
@@ -284,7 +289,7 @@ public class QueuedStateManagerTest {
     when(storage.runInTransaction(any())).thenThrow(new IOException());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1)
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
@@ -302,7 +307,7 @@ public class QueuedStateManagerTest {
     doThrow(new IsClosedException()).when(stateManager).receive(any());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1)
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
@@ -321,7 +326,7 @@ public class QueuedStateManagerTest {
     doThrow(new IsClosedException()).when(stateManager).receive(any());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1)
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
           .toCompletableFuture().get(1, MINUTES);
       fail();
     } catch (ExecutionException e) {
@@ -332,7 +337,7 @@ public class QueuedStateManagerTest {
   @Test(expected = IsClosedException.class)
   public void shouldRejectTriggertIfClosed() throws Exception {
     stateManager.close();
-    stateManager.trigger(INSTANCE, TRIGGER1);
+    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
   }
 
   @Test(expected = IsClosedException.class)
@@ -553,7 +558,7 @@ public class QueuedStateManagerTest {
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
     final RuntimeException rootCause = new RuntimeException("foo!");
     doThrow(rootCause).when(outputHandler).transitionInto(any());
-    CompletableFuture<Void> f = stateManager.trigger(INSTANCE, TRIGGER1).toCompletableFuture();
+    CompletableFuture<Void> f = stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS).toCompletableFuture();
     try {
       f.get(1, MINUTES);
       fail();
@@ -637,7 +642,7 @@ public class QueuedStateManagerTest {
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransaction(any())).thenThrow(cause);
     try {
-      stateManager.trigger(INSTANCE, Trigger.natural()).toCompletableFuture().get();
+      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS).toCompletableFuture().get();
       fail();
     } catch (ExecutionException ignore) {
     }
@@ -653,7 +658,7 @@ public class QueuedStateManagerTest {
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransaction(any())).thenThrow(cause);
     try {
-      stateManager.trigger(INSTANCE, Trigger.natural()).toCompletableFuture().get();
+      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS).toCompletableFuture().get();
       fail();
     } catch (ExecutionException ignore) {
     }
@@ -668,7 +673,7 @@ public class QueuedStateManagerTest {
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransaction(any())).thenThrow(cause);
     try {
-      stateManager.trigger(INSTANCE, Trigger.natural()).toCompletableFuture().get();
+      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS).toCompletableFuture().get();
       fail();
     } catch (ExecutionException ignore) {
     }

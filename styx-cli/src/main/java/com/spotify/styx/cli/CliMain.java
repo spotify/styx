@@ -25,10 +25,14 @@ import static com.spotify.apollo.Status.NOT_FOUND;
 import static com.spotify.apollo.Status.UNAUTHORIZED;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
+import static net.sourceforge.argparse4j.impl.Arguments.append;
 import static net.sourceforge.argparse4j.impl.Arguments.fileType;
 
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectReader;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Client;
@@ -49,6 +53,7 @@ import com.spotify.styx.client.StyxClientFactory;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowState;
@@ -471,6 +476,9 @@ public final class CliMain {
     final boolean reverse = namespace.getBoolean(parser.backfillCreateReverse.getDest());
     final int concurrency = namespace.getInt(parser.backfillCreateConcurrency.getDest());
     final String description = namespace.getString(parser.backfillCreateDescription.getDest());
+    final TriggerParameters triggerParameters = TriggerParameters.builder()
+        .env(parser.getEnvVars(namespace, parser.backfillCreateEnv))
+        .build();
     final BackfillInput configuration = BackfillInput.newBuilder()
         .component(component)
         .workflow(workflow)
@@ -479,6 +487,7 @@ public final class CliMain {
         .reverse(reverse)
         .concurrency(concurrency)
         .description(description)
+        .triggerParameters(triggerParameters)
         .build();
     final Backfill backfill = styxClient.backfillCreate(configuration).toCompletableFuture().get();
     cliOutput.printBackfill(backfill, true);
@@ -599,8 +608,11 @@ public final class CliMain {
     final String component = namespace.getString(COMPONENT_DEST);
     final String workflow = namespace.getString(WORKFLOW_DEST);
     final String parameter = namespace.getString(PARAMETER_DEST);
+    final TriggerParameters parameters = TriggerParameters.builder()
+        .env(parser.getEnvVars(namespace, parser.triggerEnv))
+        .build();
 
-    styxClient.triggerWorkflowInstance(component, workflow, parameter).toCompletableFuture().get();
+    styxClient.triggerWorkflowInstance(component, workflow, parameter, parameters).toCompletableFuture().get();
     cliOutput.printMessage("Triggered! Use `styx ls -c " + component
                            + "` to check active workflow instances.");
   }
@@ -694,6 +706,7 @@ public final class CliMain {
     final Argument backfillCreateDescription =
         backfillCreate.addArgument("-d", "--description")
             .help("a description of the backfill");
+    final Argument backfillCreateEnv = addEnvVarArgument(backfillCreate, "-e", "--env");
 
     final Subparsers resourceParser =
         Command.RESOURCE.parser(subCommands)
@@ -770,6 +783,8 @@ public final class CliMain {
 
     final Subparser events = addWorkflowInstanceArguments(Command.EVENTS.parser(subCommands));
     final Subparser trigger = addWorkflowInstanceArguments(Command.TRIGGER.parser(subCommands));
+    final Argument triggerEnv = addEnvVarArgument(trigger, "-e", "--env");
+
     final Subparser halt = addWorkflowInstanceArguments(Command.HALT.parser(subCommands));
     final Subparser retry = addWorkflowInstanceArguments(Command.RETRY.parser(subCommands));
 
@@ -806,6 +821,25 @@ public final class CliMain {
       subparser.addArgument(PARAMETER_DEST)
           .help("Parameter identifying the workflow instance, e.g. '2016-09-14' or '2016-09-14T17'");
       return subparser;
+    }
+
+    private Argument addEnvVarArgument(ArgumentParser parser, String... flags) {
+      return parser.addArgument(flags).type(String.class)
+          .help("Environment variables")
+          .action(append())
+          .setDefault(new ArrayList<>())
+          .nargs("*");
+    }
+
+    private Map<String, String> getEnvVars(Namespace namespace, Argument argument) {
+      final List<List<String>> args = namespace.getList(argument.getDest());
+      return args == null
+          ? Collections.emptyMap()
+          : args.stream()
+                .flatMap(Collection::stream)
+                .map(s -> Splitter.on('=').splitToList(s))
+                .peek(kv -> Preconditions.checkArgument(kv.size() == 2))
+                .collect(toMap(kv -> kv.get(0), kv -> kv.get(1)));
     }
   }
 

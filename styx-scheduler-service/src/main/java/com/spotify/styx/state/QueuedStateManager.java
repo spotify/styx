@@ -30,6 +30,7 @@ import com.google.common.base.Throwables;
 import com.spotify.styx.MessageUtil;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState.State;
@@ -122,7 +123,7 @@ public class QueuedStateManager implements StateManager {
   }
 
   @Override
-  public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger)
+  public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger, TriggerParameters parameters)
       throws IsClosedException {
     ensureRunning();
     log.debug("Trigger {}", workflowInstance);
@@ -130,7 +131,7 @@ public class QueuedStateManager implements StateManager {
     // TODO: optional retry on transaction conflict
 
     return CompletableFuture.runAsync(() -> initialize(workflowInstance), withMDC()).thenCompose((ignore) -> {
-      final Event event = Event.triggerExecution(workflowInstance, trigger);
+      final Event event = Event.triggerExecution(workflowInstance, trigger, parameters);
       try {
         return receive(event);
       } catch (IsClosedException isClosedException) {

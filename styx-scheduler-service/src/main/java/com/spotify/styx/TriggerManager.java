@@ -33,6 +33,7 @@ import static java.util.stream.Collectors.toList;
 import com.google.common.base.Throwables;
 import com.google.common.io.Closer;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -146,7 +147,8 @@ class TriggerManager implements Closeable {
           final CompletionStage<Void> processed = triggerListener.event(
               workflow,
               Trigger.natural(),
-              instantSpec.instant());
+              instantSpec.instant(),
+              TriggerParameters.zero());
           // Wait for the event to be processed before proceeding to the next trigger
           processed.toCompletableFuture().get();
         } catch (Exception e) {

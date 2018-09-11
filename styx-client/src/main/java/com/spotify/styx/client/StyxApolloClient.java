@@ -44,6 +44,8 @@ import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.EditableBackfillInput;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.TriggerParameters;
+import com.spotify.styx.model.TriggerRequest;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -252,20 +254,26 @@ class StyxApolloClient implements StyxClient {
   }
 
   @Override
+  public CompletionStage<Void> triggerWorkflowInstance(String componentId, String workflowId,
+      String parameter) {
+    return triggerWorkflowInstance(componentId, workflowId, parameter, TriggerParameters.zero());
+  }
+
+  @Override
   public CompletionStage<Void> triggerWorkflowInstance(String componentId,
                                                        String workflowId,
-                                                       String parameter) {
+                                                       String parameter,
+                                                       TriggerParameters triggerParameters) {
     final HttpUrl.Builder urlBuilder = getUrlBuilder()
         .addPathSegment("scheduler")
         .addPathSegment("trigger");
-    final WorkflowInstance workflowInstance = WorkflowInstance.create(
-        WorkflowId.create(componentId, workflowId),
-        parameter);
+    final TriggerRequest triggerRequest =
+        TriggerRequest.of(WorkflowId.create(componentId, workflowId), parameter, triggerParameters);
     try {
-      final ByteString payload = serialize(workflowInstance);
+      final ByteString payload = serialize(triggerRequest);
       return executeRequest(
           Request.forUri(urlBuilder.build().toString(), "POST").withPayload(payload))
-          .thenApply(response -> (Void) null);
+          .thenApply(response -> null);
     } catch (JsonProcessingException e) {
       return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
     }

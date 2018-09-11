@@ -27,6 +27,7 @@ import io.norberg.automatter.AutoMatter;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -62,6 +63,8 @@ public interface WorkflowConfiguration {
   Optional<String> serviceAccount();
 
   List<String> resources();
+
+  Map<String, String> env();
 
   default Instant addOffset(Instant next) {
     final String offset = offset().orElseGet(this::defaultOffset);

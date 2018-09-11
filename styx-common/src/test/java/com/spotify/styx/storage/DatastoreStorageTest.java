@@ -35,6 +35,7 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_START;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW;
 import static com.spotify.styx.storage.DatastoreStorage.globalConfigKey;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
+import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
@@ -76,6 +77,7 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.StyxConfig;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
@@ -130,17 +132,37 @@ public class DatastoreStorageTest {
   static final Instant TIMESTAMP = Instant.parse("2017-01-01T00:00:00Z");
 
 
+  static final TriggerParameters TRIGGER_PARAMETERS = TriggerParameters.builder()
+      .env("FOO", "foo",
+          "BAR", "bar")
+      .build();
+
+  static final StateData STATE_DATA = StateData.newBuilder()
+      .tries(17)
+      .consecutiveFailures(13)
+      .retryCost(472893)
+      .retryDelayMillis(4711L)
+      .lastExit(13)
+      .trigger(Trigger.backfill("backfill-4711"))
+      .executionId("deadbeef")
+      .executionDescription(EXECUTION_DESCRIPTION)
+//      .commitSha("8843d7f92416211de9ebb963ff4ce28125932878") // TODO: remove unused commitSha field?
+      .resourceIds(ImmutableSet.of("foo", "bar"))
+      .triggerParameters(TRIGGER_PARAMETERS)
+      .addMessage(Message.create(MessageLevel.INFO, "foo the bar"))
+      .build();
+
   static final RunState RUN_STATE = RunState.create(WORKFLOW_INSTANCE1, State.NEW,
-      StateData.zero(), TIMESTAMP, 42L);
+      STATE_DATA, TIMESTAMP, 42L);
 
   static final RunState RUN_STATE1 = RunState.create(WORKFLOW_INSTANCE1, State.NEW,
-      StateData.zero(), TIMESTAMP, 43L);
+      STATE_DATA, TIMESTAMP, 43L);
 
   static final RunState RUN_STATE2 = RunState.create(WORKFLOW_INSTANCE2, State.NEW,
-      StateData.zero(), TIMESTAMP, 84L);
+      STATE_DATA, TIMESTAMP, 84L);
 
   static final RunState RUN_STATE3 = RunState.create(WORKFLOW_INSTANCE3, State.NEW,
-      StateData.zero(), TIMESTAMP, 17L);
+      STATE_DATA, TIMESTAMP, 17L);
 
 
   static final RunState FULLY_POPULATED_RUNSTATE = RunState.create(WORKFLOW_INSTANCE, State.QUEUED,
@@ -635,9 +657,12 @@ public class DatastoreStorageTest {
     assertThat(storage.config(), is(expectedConfig));
   }
 
-  @Parameters({"true", "false", ""})
+  @Parameters({
+      "true, true",
+      "false, false",
+      "_, true"})
   @Test
-  public void shouldStoreAndReadBackfill(String reverse) throws Exception {
+  public void shouldStoreAndReadBackfill(String reverse, boolean withTriggerParameters) throws Exception {
     final BackfillBuilder builder = Backfill.newBuilder()
         .id("backfill-2")
         .start(Instant.parse("2017-01-01T00:00:00Z"))
@@ -647,8 +672,15 @@ public class DatastoreStorageTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(DAYS);
 
-    if (!reverse.isEmpty()) {
+    if (!reverse.trim().equals("_")) {
       builder.reverse(Boolean.parseBoolean(reverse));
+    }
+
+    if (withTriggerParameters) {
+      builder.triggerParameters(TriggerParameters.builder()
+          .env("FOO", "foo",
+              "BAR", "bar")
+          .build());
     }
 
     final Backfill backfill = builder.build();

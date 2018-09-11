@@ -23,6 +23,7 @@ package com.spotify.styx.state;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.collect.Iterables;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.TriggerParameters;
 import io.norberg.automatter.AutoMatter;
 import java.util.List;
 import java.util.Optional;
@@ -49,6 +50,7 @@ public interface StateData {
   Optional<String> commitSha();
   Optional<ExecutionDescription> executionDescription();
   Optional<Set<String>> resourceIds(); // resources referenced in the workflow configuration at the time of dequeue
+  Optional<TriggerParameters> triggerParameters();
 
   /**
    * This field is deprecated and kept only for backwards compatibility.

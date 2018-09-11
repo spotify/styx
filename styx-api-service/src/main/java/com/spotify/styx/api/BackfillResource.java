@@ -349,6 +349,7 @@ public final class BackfillResource implements Closeable {
             : input.start())
         .description(input.description())
         .reverse(input.reverse())
+        .triggerParameters(input.triggerParameters())
         .halted(false);
 
     final Backfill backfill = builder.build();

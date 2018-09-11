@@ -46,6 +46,8 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.EditableBackfillInput;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.TriggerParameters;
+import com.spotify.styx.model.TriggerRequest;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -434,5 +436,48 @@ public class StyxApolloClientTest {
       final Request request = requestCaptor.getValue();
       assertThat(apiError.getRequestId(), is(request.header("X-Request-Id").get()));
     }
+  }
+  
+  @Test
+  public void testTriggerWorkflowInstance() throws IOException {
+    final TriggerRequest triggerRequest = TriggerRequest.of(WORKFLOW_1.id(), "2017-01-01",
+        TriggerParameters.zero());
+    when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
+        Response.forStatus(Status.OK)));
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+    final CompletableFuture<Void> r =
+        styx.triggerWorkflowInstance(WORKFLOW_1.componentId(), WORKFLOW_1.workflowId(),
+            "2017-01-01").toCompletableFuture();
+
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    assertThat(request.uri(), is(API_URL + "/scheduler/trigger"));
+    assertThat(request.method(), is("POST"));
+    assertThat(Json.deserialize(request.payload().get(), TriggerRequest.class),
+        equalTo(triggerRequest));
+  }
+
+  @Test
+  public void testTriggerWorkflowInstanceWithTriggerParameters() throws IOException {
+    final TriggerParameters triggerParameters = TriggerParameters.builder()
+        .env("FOO", "BAR", "BAR", "FOO")
+        .build();
+    final TriggerRequest triggerRequest =
+        TriggerRequest.of(WORKFLOW_1.id(), "2017-01-01", triggerParameters);
+    when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
+        Response.forStatus(Status.OK)));
+    final StyxApolloClient styx = new StyxApolloClient(client, CLIENT_HOST, auth);
+    final CompletableFuture<Void> r =
+        styx.triggerWorkflowInstance(WORKFLOW_1.componentId(), WORKFLOW_1.workflowId(),
+            "2017-01-01", triggerParameters).toCompletableFuture();
+
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    assertThat(request.uri(), is(API_URL + "/scheduler/trigger"));
+    assertThat(request.method(), is("POST"));
+    assertThat(Json.deserialize(request.payload().get(), TriggerRequest.class),
+        equalTo(triggerRequest));
   }
 }

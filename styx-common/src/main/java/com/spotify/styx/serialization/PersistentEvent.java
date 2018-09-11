@@ -32,6 +32,7 @@ import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
@@ -76,8 +77,9 @@ class PersistentEvent {
     }
 
     @Override
-    public PersistentEvent triggerExecution(WorkflowInstance workflowInstance, Trigger trigger) {
-      return new TriggerExecution(workflowInstance.toKey(), Optional.of(trigger));
+    public PersistentEvent triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
+        TriggerParameters parameters) {
+      return new TriggerExecution(workflowInstance.toKey(), Optional.of(trigger), Optional.of(parameters));
     }
 
     @Override
@@ -189,24 +191,32 @@ class PersistentEvent {
 
     public final Optional<String> triggerId; //for backwards compatibility
     public final Optional<Trigger> trigger;
+    public final Optional<TriggerParameters> parameters;
 
     @JsonCreator
     public TriggerExecution(
         @JsonProperty("workflow_instance") String workflowInstance,
-        @JsonProperty("trigger") Optional<Trigger> trigger) {
+        @JsonProperty("trigger") Optional<Trigger> trigger,
+        @JsonProperty("parameters") Optional<TriggerParameters> parameters) {
       super("triggerExecution", workflowInstance);
       this.triggerId = Optional.empty();
       this.trigger = trigger;
+      this.parameters = parameters;
     }
 
     @Override
     public Event toEvent() {
-      if (trigger.isPresent()) {
-        return Event.triggerExecution(WorkflowInstance.parseKey(workflowInstance), trigger.get());
+      return Event.triggerExecution(WorkflowInstance.parseKey(workflowInstance), trigger(),
+          parameters.orElse(TriggerParameters.zero()));
+    }
+
+    private Trigger trigger() {
+      if (this.trigger.isPresent()) {
+        return this.trigger.get();
       } else if (triggerId.isPresent()) {
-        return Event.triggerExecution(WorkflowInstance.parseKey(workflowInstance), Trigger.unknown(triggerId.get()));
+        return Trigger.unknown(triggerId.get());
       } else {
-        return Event.triggerExecution(WorkflowInstance.parseKey(workflowInstance), Trigger.unknown("UNKNOWN"));
+        return Trigger.unknown("UNKNOWN");
       }
     }
   }

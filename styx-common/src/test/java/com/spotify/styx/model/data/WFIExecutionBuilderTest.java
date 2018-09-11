@@ -28,6 +28,7 @@ import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.WorkflowInstanceEventFactory;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
@@ -82,6 +83,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig0",
                     time("07:55"),
+                    TriggerParameters.zero(),
                     true,
                     Arrays.asList(
                         Execution.create(
@@ -117,6 +119,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig0",
                     time("07:55"),
+                    TriggerParameters.zero(),
                     false,
                     Arrays.asList(
                         Execution.create(
@@ -138,8 +141,12 @@ public class WFIExecutionBuilderTest {
   @Test
   public void testGeneralExample() {
     long c = 0L;
+    TriggerParameters triggerParameters = TriggerParameters.builder()
+        .env("FOO", "foo",
+            "BAR", "bar")
+        .build();
     List<SequenceEvent> events = Arrays.asList(
-        SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
+        SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0, triggerParameters), c++, ts("07:55")),
         SequenceEvent.create(E.info(Message.info("foo bar")), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
         SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
@@ -179,6 +186,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig0",
                     time("07:55"),
+                    triggerParameters,
                     true,
                     Arrays.asList(
                         Execution.create(
@@ -206,6 +214,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig1",
                     time("09:55"),
+                    TriggerParameters.zero(),
                     false,
                     Arrays.asList(
                         Execution.create(
@@ -257,6 +266,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig0",
                     time("07:55"),
+                    TriggerParameters.zero(),
                     false,
                     Arrays.asList(
                         Execution.create(
@@ -305,6 +315,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig0",
                     time("07:55"),
+                    TriggerParameters.zero(),
                     false,
                     Arrays.asList(
                         Execution.create(
@@ -354,6 +365,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "UNKNOWN",
                     time("07:54"),
+                    TriggerParameters.zero(),
                     false,
                     Collections.singletonList(
                         Execution.create(
@@ -400,6 +412,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig0",
                     time("07:55"),
+                    TriggerParameters.zero(),
                     false,
                     Arrays.asList(
                         Execution.create(
@@ -455,6 +468,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig0",
                     time("07:55"),
+                    TriggerParameters.zero(),
                     true,
                     Collections.singletonList(
                         Execution.create(
@@ -471,6 +485,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig1",
                     time("08:56"),
+                    TriggerParameters.zero(),
                     false,
                     Collections.singletonList(
                         Execution.create(
@@ -518,6 +533,7 @@ public class WFIExecutionBuilderTest {
                 Trigger.create(
                     "trig0",
                     time("07:55"),
+                    TriggerParameters.zero(),
                     true,
                     Arrays.asList(
                         Execution.create(

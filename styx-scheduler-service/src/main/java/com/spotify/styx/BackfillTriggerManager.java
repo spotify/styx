@@ -31,6 +31,7 @@ import static com.spotify.styx.util.TimeUtil.previousInstant;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.StateManager;
@@ -208,8 +209,9 @@ class BackfillTriggerManager {
       //   - this scheduler reads initialNextTrigger before the other scheduler commits the
       //     transaction, so it will move on to trigger the same partition again, but we still
       //     don't violate concurrency limit in this case
+      final TriggerParameters parameters = backfill.triggerParameters().orElse(TriggerParameters.zero());
       final CompletableFuture<Void> processed = triggerListener
-          .event(workflow, Trigger.backfill(backfill.id()), nextTrigger)
+          .event(workflow, Trigger.backfill(backfill.id()), nextTrigger, parameters)
           .toCompletableFuture();
       // Wait for the trigger execution to complete before proceeding to the next partition
       processed.get();
