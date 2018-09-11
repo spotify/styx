@@ -20,9 +20,6 @@
 
 package com.spotify.styx.util;
 
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
-
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -32,19 +29,21 @@ public class ClassEnforcerTest {
   @Rule public ExpectedException exception = ExpectedException.none();
 
   @Test
-  public void shouldVerifyNotInstantiable() throws ReflectiveOperationException {
-    assertThat(ClassEnforcer.verifyNotInstantiable(ClassEnforcer.class), is(true));
+  public void shouldAssertNotInstantiable() throws ReflectiveOperationException {
+    ClassEnforcer.assertNotInstantiable(ClassEnforcer.class);
   }
 
   @Test
-  public void shouldVerifyInstantiable() throws ReflectiveOperationException {
-    assertThat(ClassEnforcer.verifyNotInstantiable(String.class), is(false));
+  public void shouldAssertInstantiable() throws ReflectiveOperationException {
+    exception.expect(AssertionError.class);
+    exception.expectMessage("Class should not be instantiable: " + String.class.getName());
+    ClassEnforcer.assertNotInstantiable(String.class);
   }
 
   @Test
-  public void shouldVerifyNotInstantiablWithoutDefaultConstructor()
+  public void shouldAssertNotInstantiablWithoutDefaultConstructor()
       throws ReflectiveOperationException {
     exception.expect(NoSuchMethodException.class);
-    ClassEnforcer.verifyNotInstantiable(Class.class);
+    ClassEnforcer.assertNotInstantiable(Class.class);
   }
 }

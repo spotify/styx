@@ -20,6 +20,8 @@
 
 package com.spotify.styx.util;
 
+import static org.junit.Assert.fail;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
@@ -38,14 +40,16 @@ public class ClassEnforcer {
    *
    * @throws ReflectiveOperationException if cls has not default constructor
    */
-  public static boolean verifyNotInstantiable(Class<?> cls) throws ReflectiveOperationException {
+  public static void assertNotInstantiable(Class<?> cls) throws ReflectiveOperationException {
     try {
       final Constructor<?> constructor = cls.getDeclaredConstructor();
       constructor.setAccessible(true);
       constructor.newInstance();
-      return false;
     } catch (InvocationTargetException e) {
-      return e.getCause() instanceof UnsupportedOperationException;
+      if (e.getCause() instanceof UnsupportedOperationException) {
+        return;
+      }
     }
+    fail("Class should not be instantiable: " + cls.getName());
   }
 }
