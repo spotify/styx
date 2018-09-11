@@ -22,7 +22,6 @@ package com.spotify.styx.cli;
 
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toCollection;
-import static java.util.stream.Collectors.toList;
 import static org.fusesource.jansi.Ansi.ansi;
 
 import com.google.api.client.repackaged.com.google.common.base.Joiner;
@@ -82,11 +81,7 @@ class CliUtil {
   }
 
   static String formatMap(Map<String, String> map) {
-    return Joiner.on(" ")
-        .join(ImmutableSortedMap.copyOf(map)
-            .entrySet()
-            .stream()
-            .map(entry -> String.format("%s=%s", entry.getKey(), entry.getValue()))
-            .collect(toList()));
+    return Joiner.on(" ").withKeyValueSeparator("=")
+        .join(ImmutableSortedMap.copyOf(map));
   }
 }
