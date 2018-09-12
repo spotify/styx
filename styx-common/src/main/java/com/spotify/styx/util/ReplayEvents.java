@@ -35,7 +35,6 @@ public final class ReplayEvents {
     throw new UnsupportedOperationException();
   }
 
-  // TODO: fix NPath complexity
   public static Optional<RunState> getBackfillRunState(
       WorkflowInstance workflowInstance,
       Storage storage,
@@ -61,7 +60,11 @@ public final class ReplayEvents {
     // transition if they have all been successfully written to bigtable
     for (SequenceEvent sequenceEvent : sequenceEvents) {
       time.set(Instant.ofEpochMilli(sequenceEvent.timestamp()));
-      if ("triggerExecution".equals(EventUtil.name(sequenceEvent.event()))) {
+
+      final boolean triggerExecutionEventMet =
+          "triggerExecution".equals(EventUtil.name(sequenceEvent.event()));
+
+      if (triggerExecutionEventMet) {
         if (backfillFound) {
           return Optional.of(restoredState);
         }
@@ -69,13 +72,19 @@ public final class ReplayEvents {
       }
 
       restoredState = restoredState.transition(sequenceEvent.event(), time);
-      if ("triggerExecution".equals(EventUtil.name(sequenceEvent.event()))
-          && restoredState.data().trigger().isPresent()
-          && backfillId.equals(TriggerUtil.triggerId(restoredState.data().trigger().get()))) {
+
+      if (triggerExecutionEventMet && triggerIdMatches(backfillId, restoredState)) {
         backfillFound = true;
       }
     }
+
     return backfillFound ? Optional.of(restoredState) : Optional.empty();
+  }
+
+  private static Boolean triggerIdMatches(String backfillId, RunState restoredState) {
+    return restoredState.data().trigger()
+        .map(trigger -> backfillId.equals(TriggerUtil.triggerId(trigger)))
+        .orElse(false);
   }
 
   private static final class SettableTime implements Time {
