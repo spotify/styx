@@ -20,7 +20,6 @@
 
 package com.spotify.styx.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.spotify.styx.model.Schedule.WellKnown;
 import com.spotify.styx.util.TimeUtil;
 import io.norberg.automatter.AutoMatter;
@@ -34,7 +33,6 @@ import java.util.Optional;
  * A specification of a scheduled workflow
  */
 @AutoMatter
-@JsonIgnoreProperties(ignoreUnknown = true)
 public interface WorkflowConfiguration {
 
   String id();
