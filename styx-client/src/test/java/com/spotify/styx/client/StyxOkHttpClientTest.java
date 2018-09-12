@@ -33,12 +33,15 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
+import static org.junit.internal.matchers.ThrowableMessageMatcher.hasMessage;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.spotify.styx.api.BackfillPayload;
+import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.EventsPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.client.auth.GoogleIdTokenAuth;
@@ -191,6 +194,85 @@ public class StyxOkHttpClientTest {
   }
 
   @Test
+  public void shouldGetBackfill() throws Exception {
+    final BackfillPayload payload = BackfillPayload.create(BACKFILL, Optional.empty());
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, payload)));
+    final CompletableFuture<BackfillPayload> r =
+        styx.backfill("backfill", false).toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    final URI uri = URI.create(API_URL + "/backfills/backfill?status=false");
+    assertThat(request.url().toString(), is(uri.toString()));
+    assertThat(request.method(), is("GET"));
+    assertThat(r.join(), is(payload));
+  }
+
+  @Test
+  public void shouldGetBackfills() throws Exception {
+    final BackfillsPayload payload = BackfillsPayload.create(Arrays.asList(BackfillPayload.create(BACKFILL, Optional.empty())));
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, payload)));
+    final CompletableFuture<BackfillsPayload> r =
+        styx.backfillList(Optional.of("component"), Optional.of("workflow"), false, false).toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    final URI uri = URI.create(API_URL + "/backfills?component=component&workflow=workflow&showAll=false&status=false");
+    assertThat(request.url().toString(), is(uri.toString()));
+    assertThat(request.method(), is("GET"));
+    assertThat(r.join(), is(payload));
+  }
+
+  @Test
+  public void shouldHaltBackfill() throws Exception {
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK)));
+    final CompletableFuture<Void> r =
+        styx.backfillHalt("backfill").toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    final URI uri = URI.create(API_URL + "/backfills/backfill");
+    assertThat(request.url().toString(), is(uri.toString()));
+    assertThat(request.method(), is("DELETE"));
+  }
+
+  @Test
+  public void shouldGetResource() throws Exception {
+    final Resource resource = Resource.create("resource", 3);
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, resource)));
+    final CompletableFuture<Resource> r =
+        styx.resource("resource").toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    final URI uri = URI.create(API_URL + "/resources/resource");
+    assertThat(request.url().toString(), is(uri.toString()));
+    assertThat(request.method(), is("GET"));
+    assertThat(r.join(), is(resource));
+  }
+
+  @Test
+  public void shouldEditResource() throws Exception {
+    final Resource resource = Resource.create("resource", 3);
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, resource)));
+    final CompletableFuture<Resource> r =
+        styx.resourceEdit("resource", 3).toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    final URI uri = URI.create(API_URL + "/resources/resource");
+    assertThat(request.url().toString(), is(uri.toString()));
+    assertThat(request.method(), is("PUT"));
+    assertThat(Json.deserialize(bytesOfRequestBody(request), Resource.class), is(resource));
+    assertThat(r.join(), is(resource));
+  }
+
+  @Test
   public void shouldCreateResource() throws Exception {
     final Resource resource = Resource.create("resource", 3);
     when(client.send(any(Request.class)))
@@ -271,6 +353,45 @@ public class StyxOkHttpClientTest {
     assertThat(request.url().toString(), is(uri.toString()));
     assertThat(request.method(), is("GET"));
     assertThat(r.join(), is(Arrays.asList(EventInfo.create(123, "stop", ""))));
+  }
+
+  @Test
+  public void shouldFailWithBadEventJson() throws Exception {
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(responseBuilder(HTTP_OK).body(ResponseBody.create(APPLICATION_JSON, "{invalid json is invalid".getBytes())).build()));
+    final CompletableFuture<List<EventInfo>> r =
+        styx.eventsForWorkflowInstance("component", "workflow", "2017-01-01T00").toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    assertThat(r.isCompletedExceptionally(), is(true));
+    final Request request = requestCaptor.getValue();
+    final URI uri = URI.create(API_URL + "/status/events/component/workflow/2017-01-01T00");
+    assertThat(request.url().toString(), is(uri.toString()));
+    assertThat(request.method(), is("GET"));
+    thrown.expectCause(hasMessage(is("Invalid json returned from API")));
+    r.join();
+  }
+
+  @Test
+  public void shouldWorkWithUnknownEvents() throws Exception {
+    final EventsPayload events = EventsPayload.create(Arrays.asList(
+        EventsPayload.TimestampedEvent
+            .create(Event.stop(WorkflowInstance.create(WORKFLOW_1.id(), "foo")), 123)));
+    final String badJson = Json.serialize(events).utf8().replace("stop", "stahp");
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(
+            responseBuilder(HTTP_OK).body(
+                ResponseBody.create(APPLICATION_JSON, badJson.getBytes()))
+                .build()));
+    final CompletableFuture<List<EventInfo>> r =
+        styx.eventsForWorkflowInstance("component", "workflow", "2017-01-01T00").toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    final URI uri = URI.create(API_URL + "/status/events/component/workflow/2017-01-01T00");
+    assertThat(request.url().toString(), is(uri.toString()));
+    assertThat(request.method(), is("GET"));
+    assertThat(r.join(), is(Arrays.asList(EventInfo.create(123, "stahp", ""))));
   }
 
   @Test
