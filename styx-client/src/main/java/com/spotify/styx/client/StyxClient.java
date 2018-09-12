@@ -20,10 +20,12 @@
 
 package com.spotify.styx.client;
 
+import java.io.Closeable;
+
 /**
  * Interface for the complete Styx client.
  */
 public interface StyxClient
     extends StyxStatusClient, StyxSchedulerClient, StyxResourceClient,
-            StyxBackfillClient, StyxWorkflowClient {
+            StyxBackfillClient, StyxWorkflowClient, Closeable {
 }

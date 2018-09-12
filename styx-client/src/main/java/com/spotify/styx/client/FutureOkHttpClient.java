@@ -40,7 +40,7 @@ import okio.ByteString;
 /**
  * Wrap OkHttpClient and return a CompletionStage instead of having to pass callbacks.
  */
-public class FutureOkHttpClient implements Closeable {
+class FutureOkHttpClient implements Closeable {
 
   private static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(10);
   private static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(90);

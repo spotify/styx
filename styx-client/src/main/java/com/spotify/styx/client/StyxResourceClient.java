@@ -22,12 +22,13 @@ package com.spotify.styx.client;
 
 import com.spotify.styx.api.ResourcesPayload;
 import com.spotify.styx.model.Resource;
+import java.io.Closeable;
 import java.util.concurrent.CompletionStage;
 
 /**
  * Interface for Styx client, Styx resource resources.
  */
-interface StyxResourceClient {
+interface StyxResourceClient extends Closeable {
 
   /**
    * Create a {@link Resource}
@@ -36,8 +37,8 @@ interface StyxResourceClient {
    * @param concurrency resource value
    * @return The created {@link Resource}
    */
-  CompletionStage<Resource> resourceCreate(final String resourceId,
-                                           final int concurrency);
+  CompletionStage<Resource> resourceCreate(String resourceId,
+                                           int concurrency);
 
   /**
    * Edit an existing {@link Resource}
@@ -46,8 +47,8 @@ interface StyxResourceClient {
    * @param concurrency the updated resource value
    * @return The updated{@link Resource}
    */
-  CompletionStage<Resource> resourceEdit(final String resourceId,
-                                         final int concurrency);
+  CompletionStage<Resource> resourceEdit(String resourceId,
+                                         int concurrency);
 
   /**
    * Get an existing {@link Resource}
@@ -55,7 +56,7 @@ interface StyxResourceClient {
    * @param resourceId resource id
    * @return The required {@link Resource}
    */
-  CompletionStage<Resource> resource(final String resourceId);
+  CompletionStage<Resource> resource(String resourceId);
 
   /**
    * List of existing {@link Resource}s

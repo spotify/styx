@@ -98,7 +98,7 @@ public class CliMainTest {
     when(cliContext.workflowValidator()).thenReturn(validator);
     when(validator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
     when(validator.validateWorkflow(any())).thenReturn(Collections.emptyList());
-    when(cliContext.createClient(any(), any())).thenReturn(client);
+    when(cliContext.createClient(any())).thenReturn(client);
     when(cliContext.output(any())).thenReturn(cliOutput);
     when(cliContext.env()).thenReturn(
         ImmutableMap.of("STYX_CLI_HOST", "https://styx.foo.bar:4711"));

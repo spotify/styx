@@ -24,6 +24,7 @@ import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.data.EventInfo;
+import java.io.Closeable;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
@@ -31,7 +32,7 @@ import java.util.concurrent.CompletionStage;
 /**
  * Interface for Styx client, status resources.
  */
-public interface StyxStatusClient {
+public interface StyxStatusClient extends Closeable {
 
   /**
    * Get information about the active stats
@@ -39,7 +40,7 @@ public interface StyxStatusClient {
    * @param componentId component id to filter on
    * @return The information about the active states
    */
-  CompletionStage<RunStateDataPayload> activeStates(final Optional<String> componentId);
+  CompletionStage<RunStateDataPayload> activeStates(Optional<String> componentId);
 
   /**
    * Get {@link EventInfo}s for a {@link WorkflowInstance}. If an unrecognized {@link Event} is
@@ -53,7 +54,7 @@ public interface StyxStatusClient {
    *
    * @return The list of {@link EventInfo}s for the selected {@link WorkflowInstance}
    */
-  CompletionStage<List<EventInfo>> eventsForWorkflowInstance(final String componentId,
-                                                             final String workflowId,
-                                                             final String parameter);
+  CompletionStage<List<EventInfo>> eventsForWorkflowInstance(String componentId,
+                                                             String workflowId,
+                                                             String parameter);
 }

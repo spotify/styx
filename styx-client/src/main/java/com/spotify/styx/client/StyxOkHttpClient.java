@@ -63,6 +63,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import okhttp3.HttpUrl.Builder;
+import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
@@ -99,11 +100,15 @@ class StyxOkHttpClient implements StyxClient {
     this.auth = Objects.requireNonNull(auth, "auth");
   }
 
-  public static StyxClient create(String apiHost, FutureOkHttpClient client) {
-    return new StyxOkHttpClient(apiHost, client, GoogleIdTokenAuth.ofDefaultCredential());
+  public static StyxClient create(String apiHost) {
+    return create(apiHost, FutureOkHttpClient.createDefault(), GoogleIdTokenAuth.ofDefaultCredential());
   }
 
-  public static StyxClient create(String apiHost, FutureOkHttpClient client, GoogleIdTokenAuth auth) {
+  public static StyxClient create(String apiHost, OkHttpClient client) {
+    return create(apiHost, FutureOkHttpClient.create(client), GoogleIdTokenAuth.ofDefaultCredential());
+  }
+
+  static StyxClient create(String apiHost, FutureOkHttpClient client, GoogleIdTokenAuth auth) {
     return new StyxOkHttpClient(apiHost, client, auth);
   }
 
@@ -443,5 +448,10 @@ class StyxOkHttpClient implements StyxClient {
       builder.port(apiHost.getPort());
     }
     return builder;
+  }
+
+  @Override
+  public void close() throws IOException {
+    client.close();
   }
 }

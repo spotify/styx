@@ -29,27 +29,27 @@ public class StyxClientFactory {
     throw new UnsupportedOperationException();
   }
 
-  public static StyxClient create(FutureOkHttpClient client, String apiHost) {
-    return StyxOkHttpClient.create(apiHost, client);
+  public static StyxClient create(String apiHost) {
+    return StyxOkHttpClient.create(apiHost);
   }
 
-  public static StyxStatusClient createStatusClient(FutureOkHttpClient client, String apiHost) {
-    return StyxOkHttpClient.create(apiHost, client);
+  public static StyxStatusClient createStatusClient(String apiHost) {
+    return StyxOkHttpClient.create(apiHost);
   }
 
-  public static StyxBackfillClient createBackfillClient(FutureOkHttpClient client, String apiHost) {
-    return StyxOkHttpClient.create(apiHost, client);
+  public static StyxBackfillClient createBackfillClient(String apiHost) {
+    return StyxOkHttpClient.create(apiHost);
   }
 
-  public static StyxSchedulerClient createSchedulerClient(FutureOkHttpClient client, String apiHost) {
-    return StyxOkHttpClient.create(apiHost, client);
+  public static StyxSchedulerClient createSchedulerClient(String apiHost) {
+    return StyxOkHttpClient.create(apiHost);
   }
 
-  public static StyxResourceClient createResourceClient(FutureOkHttpClient client, String apiHost) {
-    return StyxOkHttpClient.create(apiHost, client);
+  public static StyxResourceClient createResourceClient(String apiHost) {
+    return StyxOkHttpClient.create(apiHost);
   }
 
-  public static StyxWorkflowClient createWorkflowClient(FutureOkHttpClient client, String apiHost) {
-    return StyxOkHttpClient.create(apiHost, client);
+  public static StyxWorkflowClient createWorkflowClient(String apiHost) {
+    return StyxOkHttpClient.create(apiHost);
   }
 }

@@ -22,12 +22,13 @@ package com.spotify.styx.client;
 
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
+import java.io.Closeable;
 import java.util.concurrent.CompletionStage;
 
 /**
  * Interface for Styx client, scheduler resources.
  */
-public interface StyxSchedulerClient {
+public interface StyxSchedulerClient extends Closeable {
 
   /**
    * Trigger a {@link WorkflowInstance}
@@ -36,9 +37,9 @@ public interface StyxSchedulerClient {
    * @param workflowId  workflow id
    * @param parameter   parameter
    */
-  CompletionStage<Void> triggerWorkflowInstance(final String componentId,
-                                                final String workflowId,
-                                                final String parameter);
+  CompletionStage<Void> triggerWorkflowInstance(String componentId,
+                                                String workflowId,
+                                                String parameter);
 
   /**
    * Trigger a {@link WorkflowInstance}
@@ -48,10 +49,10 @@ public interface StyxSchedulerClient {
    * @param parameter   parameter
    * @param triggerParameters additional parameters for the {@link WorkflowInstance} 
    */
-  CompletionStage<Void> triggerWorkflowInstance(final String componentId,
-                                                final String workflowId,
-                                                final String parameter,
-                                                final TriggerParameters triggerParameters);
+  CompletionStage<Void> triggerWorkflowInstance(String componentId,
+                                                String workflowId,
+                                                String parameter,
+                                                TriggerParameters triggerParameters);
 
   /**
    * Halt a {@link WorkflowInstance}
@@ -60,9 +61,9 @@ public interface StyxSchedulerClient {
    * @param workflowId  workflow id
    * @param parameter   parameter
    */
-  CompletionStage<Void> haltWorkflowInstance(final String componentId,
-                                             final String workflowId,
-                                             final String parameter);
+  CompletionStage<Void> haltWorkflowInstance(String componentId,
+                                             String workflowId,
+                                             String parameter);
 
   /**
    * Retry a {@link WorkflowInstance}
@@ -71,7 +72,7 @@ public interface StyxSchedulerClient {
    * @param workflowId  workflow id
    * @param parameter   parameter
    */
-  CompletionStage<Void> retryWorkflowInstance(final String componentId,
-                                              final String workflowId,
-                                              final String parameter);
+  CompletionStage<Void> retryWorkflowInstance(String componentId,
+                                              String workflowId,
+                                              String parameter);
 }

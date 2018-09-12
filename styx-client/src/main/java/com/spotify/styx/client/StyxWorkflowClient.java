@@ -24,13 +24,14 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
+import java.io.Closeable;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 
 /**
  * Interface for Styx client, workflow resources.
  */
-public interface StyxWorkflowClient {
+public interface StyxWorkflowClient extends Closeable {
 
   /**
    * Get a {@link Workflow}
@@ -39,7 +40,7 @@ public interface StyxWorkflowClient {
    * @param workflowId  workflow id
    * @return the {@link Workflow}
    */
-  CompletionStage<Workflow> workflow(final String componentId, final String workflowId);
+  CompletionStage<Workflow> workflow(String componentId, String workflowId);
 
   /**
    * Get all {@link Workflow}s
@@ -73,7 +74,7 @@ public interface StyxWorkflowClient {
    * @param workflowId  workflow id
    * @return the {@link WorkflowState}
    */
-  CompletionStage<WorkflowState> workflowState(final String componentId, final String workflowId);
+  CompletionStage<WorkflowState> workflowState(String componentId, String workflowId);
 
   /**
    * Get execution data of an instance of a {@link Workflow}
@@ -83,11 +84,9 @@ public interface StyxWorkflowClient {
    * @param parameter   parameter
    * @return the {@link WorkflowInstanceExecutionData}
    */
-  CompletionStage<WorkflowInstanceExecutionData> workflowInstanceExecutions(
-      final String componentId,
-      final String workflowId,
-      final String parameter
-  );
+  CompletionStage<WorkflowInstanceExecutionData> workflowInstanceExecutions(String componentId,
+                                                                            String workflowId,
+                                                                            String parameter);
 
   /**
    * Update {@link WorkflowState}
@@ -97,7 +96,7 @@ public interface StyxWorkflowClient {
    * @param workflowState workflow state
    * @return the updated {@link WorkflowState}
    */
-  CompletionStage<WorkflowState> updateWorkflowState(final String componentId,
-                                                     final String workflowId,
-                                                     final WorkflowState workflowState);
+  CompletionStage<WorkflowState> updateWorkflowState(String componentId,
+                                                     String workflowId,
+                                                     WorkflowState workflowState);
 }

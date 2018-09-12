@@ -43,7 +43,6 @@ import com.spotify.styx.cli.CliExitException.ExitStatus;
 import com.spotify.styx.cli.CliMain.CliContext.Output;
 import com.spotify.styx.client.ApiErrorException;
 import com.spotify.styx.client.ClientErrorException;
-import com.spotify.styx.client.FutureOkHttpClient;
 import com.spotify.styx.client.StyxClient;
 import com.spotify.styx.client.StyxClientFactory;
 import com.spotify.styx.model.Backfill;
@@ -175,8 +174,8 @@ public final class CliMain {
   private void run() {
     final Command command = namespace.get(COMMAND_DEST);
 
-    try (final FutureOkHttpClient futureOkHttpClient = FutureOkHttpClient.createDefault()) {
-      styxClient = cliContext.createClient(futureOkHttpClient, apiHost);
+    try {
+      styxClient = cliContext.createClient(apiHost);
 
       switch (command) {
         case LIST:
@@ -324,6 +323,12 @@ public final class CliMain {
     } catch (Exception e) {
       cliOutput.printError(getStackTraceAsString(e));
       throw CliExitException.of(ExitStatus.UnknownError);
+    } finally {
+      try {
+        styxClient.close();
+      } catch (IOException ignored) {
+        // ignore exception about client not being able to close
+      }
     }
   }
 
@@ -998,7 +1003,7 @@ public final class CliMain {
 
     Map<String, String> env();
 
-    StyxClient createClient(FutureOkHttpClient client, String host);
+    StyxClient createClient(String host);
 
     boolean hasConsole();
 
@@ -1008,8 +1013,8 @@ public final class CliMain {
 
     CliContext DEFAULT = new CliContext() {
       @Override
-      public StyxClient createClient(FutureOkHttpClient client, String host) {
-        return StyxClientFactory.create(client, host);
+      public StyxClient createClient(String host) {
+        return StyxClientFactory.create(host);
       }
 
       @Override
