@@ -27,7 +27,6 @@ import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static java.net.HttpURLConnection.HTTP_INTERNAL_ERROR;
 import static java.net.HttpURLConnection.HTTP_NO_CONTENT;
 import static java.net.HttpURLConnection.HTTP_OK;
-import static java.util.Arrays.asList;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
@@ -125,7 +124,8 @@ public class StyxOkHttpClientTest {
       .build();
 
 
-  private static final String API_VERSION = getLast(asList(Api.Version.values())).name().toLowerCase();
+  private static final String API_VERSION =
+      getLast(Arrays.asList(Api.Version.values())).name().toLowerCase();
 
   private static final HttpUrl API_URL = new HttpUrl.Builder()
       .scheme("https").host("foo.bar")
@@ -160,8 +160,8 @@ public class StyxOkHttpClientTest {
       "https://foo.bar:17, https://foo.bar:17",
   })
   public void testHosts(String host, String expectedUriPrefix) {
-    final CompletableFuture<Response> responseFuture = new CompletableFuture<>();
-    when(client.send(any(Request.class))).thenReturn(responseFuture);
+    when(client.send(any(Request.class))).thenReturn(
+        CompletableFuture.completedFuture(response(200)));
     styx = StyxOkHttpClient.create(host, client, auth);
 
     styx.resourceList();
@@ -247,9 +247,7 @@ public class StyxOkHttpClientTest {
     final Request request = requestCaptor.getValue();
     final URI uri = URI.create(API_URL + "/workflows/f%5B%20%5Do-cmp");
     assertThat(request.url().toString(), is(uri.toString()));
-    final Buffer sink = new Buffer();
-    request.body().writeTo(sink);
-    assertThat(Json.deserialize(ByteString.of(sink.readByteArray()), WorkflowConfiguration.class),
+    assertThat(Json.deserialize(bytesOfRequestBody(request), WorkflowConfiguration.class),
         is(WORKFLOW_CONFIGURATION_1));
     assertThat(request.method(), is("POST"));
   }
@@ -266,9 +264,7 @@ public class StyxOkHttpClientTest {
     final Request request = requestCaptor.getValue();
     final URI uri = URI.create(API_URL + "/backfills");
     assertThat(request.url().toString(), is(uri.toString()));
-    final Buffer sink = new Buffer();
-    request.body().writeTo(sink);
-    assertThat(Json.deserialize(ByteString.of(sink.readByteArray()), BackfillInput.class),
+    assertThat(Json.deserialize(bytesOfRequestBody(request), BackfillInput.class),
         equalTo(BACKFILL_INPUT));
     assertThat(request.method(), is("POST"));
   }
@@ -287,9 +283,7 @@ public class StyxOkHttpClientTest {
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
     assertThat(request.url().toString(), is(API_URL + "/backfills"));
-    final Buffer sink = new Buffer();
-    request.body().writeTo(sink);
-    assertThat(Json.deserialize(ByteString.of(sink.readByteArray()), BackfillInput.class),
+    assertThat(Json.deserialize(bytesOfRequestBody(request), BackfillInput.class),
         equalTo(backfillInput));
     assertThat(request.method(), is("POST"));
   }
@@ -310,9 +304,7 @@ public class StyxOkHttpClientTest {
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
     assertThat(request.url().toString(), is(API_URL + "/backfills"));
-    final Buffer sink = new Buffer();
-    request.body().writeTo(sink);
-    assertThat(Json.deserialize(ByteString.of(sink.readByteArray()), BackfillInput.class),
+    assertThat(Json.deserialize(bytesOfRequestBody(request), BackfillInput.class),
                equalTo(backfillInput));
     assertThat(request.method(), is("POST"));
   }
@@ -332,9 +324,7 @@ public class StyxOkHttpClientTest {
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
     assertThat(request.url().toString(), is(API_URL + "/backfills/" + BACKFILL.id()));
-    final Buffer sink = new Buffer();
-    request.body().writeTo(sink);
-    assertThat(Json.deserialize(ByteString.of(sink.readByteArray()), EditableBackfillInput.class),
+    assertThat(Json.deserialize(bytesOfRequestBody(request), EditableBackfillInput.class),
         equalTo(backfillInput));
     assertThat(request.method(), is("PUT"));
   }
@@ -354,9 +344,7 @@ public class StyxOkHttpClientTest {
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
     assertThat(request.url().toString(), is(API_URL + "/workflows/f%5B%20%5Do-cmp/bar-w%5Bf%5D/state"));
-    final Buffer sink = new Buffer();
-    request.body().writeTo(sink);
-    assertThat(Json.deserialize(ByteString.of(sink.readByteArray()), WorkflowState.class), is(workflowState));
+    assertThat(Json.deserialize(bytesOfRequestBody(request), WorkflowState.class), is(workflowState));
     assertThat(request.method(), is("PATCH"));
   }
 
@@ -476,9 +464,7 @@ public class StyxOkHttpClientTest {
     final Request request = requestCaptor.getValue();
     assertThat(request.url().toString(), is(API_URL + "/scheduler/trigger"));
     assertThat(request.method(), is("POST"));
-    final Buffer sink = new Buffer();
-    request.body().writeTo(sink);
-    assertThat(Json.deserialize(ByteString.of(sink.readByteArray()), TriggerRequest.class),
+    assertThat(Json.deserialize(bytesOfRequestBody(request), TriggerRequest.class),
                equalTo(triggerRequest));
   }
 
@@ -500,10 +486,18 @@ public class StyxOkHttpClientTest {
     final Request request = requestCaptor.getValue();
     assertThat(request.url().toString(), is(API_URL + "/scheduler/trigger"));
     assertThat(request.method(), is("POST"));
-    final Buffer sink = new Buffer();
-    request.body().writeTo(sink);
-    assertThat(Json.deserialize(ByteString.of(sink.readByteArray()), TriggerRequest.class),
+    assertThat(Json.deserialize(bytesOfRequestBody(request), TriggerRequest.class),
                equalTo(triggerRequest));
+  }
+
+  private static ByteString bytesOfRequestBody(Request request) {
+    final Buffer sink = new Buffer();
+    try {
+      request.body().writeTo(sink);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return ByteString.of(sink.readByteArray());
   }
 
   private static Response.Builder responseBuilder(int code) {
@@ -519,11 +513,7 @@ public class StyxOkHttpClientTest {
   }
 
   private static Response.Builder responseBuilder(int code, Object body) throws JsonProcessingException {
-    return new Response.Builder()
-        .request(new Request.Builder().url("http://example.org").build())
-        .protocol(Protocol.HTTP_1_1)
-        .message("HTTP " + code)
-        .code(code)
+    return responseBuilder(code)
         .body(ResponseBody.create(APPLICATION_JSON, Json.serialize(body).toByteArray()));
   }
 
