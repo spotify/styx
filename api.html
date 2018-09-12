@@ -37,6 +37,9 @@ in those requests.</p>
         <span class="hljs-string">"CanaryJob"</span>
       ]</span>,
       "<span class="hljs-attribute">docker_termination_logging</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+      "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+      </span>}</span>,
       "<span class="hljs-attribute">secret</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
       "<span class="hljs-attribute">resources</span>": <span class="hljs-value">[]
     </span>}
@@ -59,6 +62,9 @@ in those requests.</p>
         <span class="hljs-string">"CanaryJob"</span>
       ]</span>,
       "<span class="hljs-attribute">docker_termination_logging</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+      "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+      </span>}</span>,
       "<span class="hljs-attribute">secret</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
       "<span class="hljs-attribute">resources</span>": <span class="hljs-value">[]
     </span>}
@@ -77,6 +83,9 @@ in those requests.</p>
     <span class="hljs-string">"CanaryJob"</span>
   ]</span>,
   "<span class="hljs-attribute">docker_termination_logging</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+  "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+    "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+  </span>}</span>,
   "<span class="hljs-attribute">secret</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
   "<span class="hljs-attribute">service_account</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
   "<span class="hljs-attribute">resources</span>": <span class="hljs-value">[]
@@ -96,6 +105,9 @@ in those requests.</p>
       <span class="hljs-string">"CanaryJob"</span>
     ]</span>,
     "<span class="hljs-attribute">docker_termination_logging</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+    "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+    </span>}</span>,
     "<span class="hljs-attribute">secret</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
     "<span class="hljs-attribute">service_account</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
     "<span class="hljs-attribute">resources</span>": <span class="hljs-value">[]
@@ -121,6 +133,9 @@ or updated. Note that a non-null value is required for docker_image.</p>
       <span class="hljs-string">"CanaryJob"</span>
     ]</span>,
     "<span class="hljs-attribute">docker_termination_logging</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+    "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+    </span>}</span>,
     "<span class="hljs-attribute">secret</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
     "<span class="hljs-attribute">resources</span>": <span class="hljs-value">[]
   </span>}
@@ -292,6 +307,11 @@ Workflow Instance belonging to a Backfill entity.</p>
         "<span class="hljs-attribute">next_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01:00:00Z"</span></span>,
         "<span class="hljs-attribute">schedule</span>": <span class="hljs-value"><span class="hljs-string">"hours"</span></span>,
         "<span class="hljs-attribute">start</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
+        "<span class="hljs-attribute">trigger_parameters</span>": <span class="hljs-value">{
+          "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+            "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+          </span>}
+        </span>}</span>,
         "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value">{
           "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
           "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
@@ -353,17 +373,25 @@ Workflow Instance belonging to a Backfill entity.</p>
     "<span class="hljs-attribute">start</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
     "<span class="hljs-attribute">end</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-02T00:00:00Z"</span></span>,
     "<span class="hljs-attribute">component</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
-    "<span class="hljs-attribute">workflow</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span></span>,
     "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-string">"10"</span></span>,
+    "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"fixed bug and reproduce data"</span></span>,
+    "<span class="hljs-attribute">trigger_parameters</span>": <span class="hljs-value">{"<span class="hljs-attribute">env</span>": <span class="hljs-value">{"<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span></span>}</span>}</span>,
+    "<span class="hljs-attribute">workflow</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span></span>,
 }</code></pre><div style="height: 1px;"></div></div></div><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
   "<span class="hljs-attribute">all_triggered</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
   "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-number">10</span></span>,
   "<span class="hljs-attribute">end</span>": <span class="hljs-value"><span class="hljs-string">"2017-02-00T00:00:00Z"</span></span>,
+  "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"fixed bug and reproduce data"</span></span>,
   "<span class="hljs-attribute">halted</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
   "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"backfill-1489054446085-52684"</span></span>,
   "<span class="hljs-attribute">next_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
   "<span class="hljs-attribute">schedule</span>": <span class="hljs-value"><span class="hljs-string">"hours"</span></span>,
   "<span class="hljs-attribute">start</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
+  "<span class="hljs-attribute">trigger_parameters</span>": <span class="hljs-value">{
+    "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+    </span>}
+  </span>}</span>,
   "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value">{
     "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
     "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
@@ -373,12 +401,18 @@ Workflow Instance belonging to a Backfill entity.</p>
   "<span class="hljs-attribute">backfill</span>": <span class="hljs-value">{
     "<span class="hljs-attribute">all_triggered</span>": <span class="hljs-value"><span class="hljs-literal">true</span></span>,
     "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-number">10</span></span>,
+    "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"fixed bug and reproduce data"</span></span>,
     "<span class="hljs-attribute">end</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01:00:00Z"</span></span>,
     "<span class="hljs-attribute">halted</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
     "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"backfill-1489054446085-53384"</span></span>,
     "<span class="hljs-attribute">next_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01:00:00Z"</span></span>,
     "<span class="hljs-attribute">schedule</span>": <span class="hljs-value"><span class="hljs-string">"hours"</span></span>,
     "<span class="hljs-attribute">start</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
+    "<span class="hljs-attribute">trigger_parameters</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+      </span>}
+    </span>}</span>,
     "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
       "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
@@ -433,27 +467,24 @@ Workflow Instance belonging to a Backfill entity.</p>
 <p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>backfill_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>backfill-1489054446085-52684</span></span><p>Backfill ID</p>
 </dd><dt>status</dt><dd><code>boolean</code>&nbsp;<span>(optional)</span>&nbsp;<span class="text-info default"><strong>Default:&nbsp;</strong><span>true</span></span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>true</span></span><p>If to return the status list per backfill</p>
 </dd></dl></div></div></div><hr class="split"><div class="right"><div class="definition"><span class="method put">PUT</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/backfills/<span class="hljs-attribute" title="backfill_id">backfill-1489054446085-52684</span></span></div><div class="tabs"><div class="example-names"><span>Requests</span><span class="tab-button">example 1</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+    "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-number">20</span></span>,
+    "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"fixed bug and reproduce data"</span></span>,
+    "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"backfill-1489054446085-52684"</span></span>,
+}</code></pre><div style="height: 1px;"></div></div></div><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
   "<span class="hljs-attribute">all_triggered</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
   "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-number">20</span></span>,
   "<span class="hljs-attribute">end</span>": <span class="hljs-value"><span class="hljs-string">"2017-02-00T00:00:00Z"</span></span>,
+  "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"fixed bug and reproduce data"</span></span>,
   "<span class="hljs-attribute">halted</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
   "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"backfill-1489054446085-52684"</span></span>,
   "<span class="hljs-attribute">next_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
   "<span class="hljs-attribute">schedule</span>": <span class="hljs-value"><span class="hljs-string">"hours"</span></span>,
   "<span class="hljs-attribute">start</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
-  "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value">{
-    "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
-    "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
-  </span>}
-</span>}</code></pre><div style="height: 1px;"></div></div></div><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
-  "<span class="hljs-attribute">all_triggered</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
-  "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-number">20</span></span>,
-  "<span class="hljs-attribute">end</span>": <span class="hljs-value"><span class="hljs-string">"2017-02-00T00:00:00Z"</span></span>,
-  "<span class="hljs-attribute">halted</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
-  "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"backfill-1489054446085-52684"</span></span>,
-  "<span class="hljs-attribute">next_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
-  "<span class="hljs-attribute">schedule</span>": <span class="hljs-value"><span class="hljs-string">"hours"</span></span>,
-  "<span class="hljs-attribute">start</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
+  "<span class="hljs-attribute">trigger_parameters</span>": <span class="hljs-value">{
+    "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+    </span>}
+  </span>}</span>,
   "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value">{
     "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
     "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
@@ -515,7 +546,12 @@ Workflow Instance belonging to a Backfill entity.</p>
         "<span class="hljs-attribute">trigger</span>": <span class="hljs-value">{
           "<span class="hljs-attribute">@type</span>": <span class="hljs-value"><span class="hljs-string">"natural"</span>
         </span>}</span>,
-        "<span class="hljs-attribute">workflow_instance</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary/StyxCanary/2017-01-01T01"</span>
+        "<span class="hljs-attribute">workflow_instance</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary/StyxCanary/2017-01-01T01"</span></span>,
+        "<span class="hljs-attribute">parameters</span>": <span class="hljs-value">{
+          "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+            "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+          </span>}
+        </span>}
       </span>}</span>,
       "<span class="hljs-attribute">timestamp</span>": <span class="hljs-value"><span class="hljs-number">1483228800000</span>
     </span>},
@@ -545,12 +581,22 @@ Workflow Instance belonging to a Backfill entity.</p>
 </span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div></div><div class="middle"><div id="scheduler-halt-post" class="action post"><h4 class="action-heading"><div class="name">Send Halt</div><a href="#scheduler-halt-post" class="method post">POST</a><code class="uri">/{version}/scheduler/halt</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
 <p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd></dl></div></div></div><hr class="split"><div class="middle"><div id="scheduler-trigger" class="resource"><h3 class="resource-heading">Trigger <a href="#scheduler-trigger" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method post">POST</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/scheduler/trigger</span></div><div class="tabs"><div class="example-names"><span>Requests</span><span class="tab-button">example 1</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
   "<span class="hljs-attribute">parameter</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01"</span></span>,
+  "<span class="hljs-attribute">trigger_parameters</span>": <span class="hljs-value">{
+    "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+    </span>}
+  </span>}</span>,
   "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value">{
     "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
     "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
   </span>}
 </span>}</code></pre><div style="height: 1px;"></div></div></div><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
   "<span class="hljs-attribute">parameter</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01"</span></span>,
+  "<span class="hljs-attribute">trigger_parameters</span>": <span class="hljs-value">{
+    "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+    </span>}
+  </span>}</span>,
   "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value">{
     "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
     "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
@@ -564,7 +610,7 @@ Workflow Instance belonging to a Backfill entity.</p>
   "<span class="hljs-attribute">enabled</span>": <span class="hljs-value"><span class="hljs-string">"true"</span>
 </span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="styx-config-global-enabled-post" class="action post"><h4 class="action-heading"><div class="name">Set Global Enabled</div><a href="#styx-config-global-enabled-post" class="method post">POST</a><code class="uri">/{version}/config{?enabled}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
 <p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>enabled</dt><dd><code>boolean</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>true</span></span><p>Global enabled value</p>
-</dd></dl></div></div></div><hr class="split"><div class="middle"><p style="text-align: center;" class="text-muted">Generated by&nbsp;<a href="https://github.com/danielgtaylor/aglio" class="aglio">aglio</a>&nbsp;on 14 Dec 2017</p></div></div></div></div><script>/* eslint-env browser */
+</dd></dl></div></div></div><hr class="split"><div class="middle"><p style="text-align: center;" class="text-muted">Generated by&nbsp;<a href="https://github.com/danielgtaylor/aglio" class="aglio">aglio</a>&nbsp;on 12 Sep 2018</p></div></div></div></div><script>/* eslint-env browser */
 /* eslint quotes: [2, "single"] */
 'use strict';
 
