@@ -31,17 +31,22 @@ import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
+import com.spotify.styx.cli.JsonCliOutput.WorkflowWithState;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.state.StateData;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -154,4 +159,30 @@ public class JsonCliOutputTest {
     assertThat(OBJECT_MAPPER.readValue(outContent.toString(), new TypeReference<List<Workflow>>() { }),
         is(workflows));
   }
+
+  @Test
+  public void shouldPrintWorkflow() throws IOException {
+    final Workflow workflow = Workflow.create("foo1", WorkflowConfiguration.builder()
+        .id("bar1")
+        .schedule(Schedule.DAYS)
+        .offset("6h")
+        .dockerImage("foo/bar:baz")
+        .dockerArgs(ImmutableList.of("foo", "the", "bar"))
+        .dockerTerminationLogging(true)
+        .secret(Secret.create("secret-foo", "/foo-secret"))
+        .serviceAccount("foo@bar.baz")
+        .resources("r1", "r2")
+        .env("FOO", "foo", "BAR", "bar")
+        .commitSha("deadbeef")
+        .build());
+    final WorkflowState state = WorkflowState.builder()
+        .enabled(true)
+        .nextNaturalTrigger(OffsetDateTime.of(2018, 1, 2, 3, 4, 5, 6, ZoneOffset.UTC).toInstant())
+        .nextNaturalOffsetTrigger(OffsetDateTime.of(2018, 1, 2, 9, 4, 5, 6, ZoneOffset.UTC).toInstant())
+        .build();
+    cliOutput.printWorkflow(workflow, state);
+    assertThat(OBJECT_MAPPER.readValue(outContent.toString(), WorkflowWithState.class),
+        is(WorkflowWithState.of(workflow, state)));
+  }
+
 }

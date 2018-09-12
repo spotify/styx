@@ -39,13 +39,17 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.After;
 import org.junit.Before;
@@ -237,6 +241,46 @@ public class PrettyCliOutputTest {
         "COMPONENT  WORKFLOW%n"
            + "foo1  bar1%n"
            + "foo2  bar2%n")));
+
+  }
+
+  @Test
+  public void shouldPrintWorkflow() {
+    final Workflow workflow = Workflow.create("foo1", WorkflowConfiguration.builder()
+        .id("bar1")
+        .schedule(Schedule.DAYS)
+        .offset("6h")
+        .dockerImage("foo/bar:baz")
+        .dockerArgs(ImmutableList.of("foo", "the", "bar"))
+        .dockerTerminationLogging(true)
+        .secret(Secret.create("secret-foo", "/foo-secret"))
+        .serviceAccount("foo@bar.baz")
+        .resources("r1", "r2")
+        .env("FOO", "foo", "BAR", "bar")
+        .commitSha("deadbeef")
+        .build());
+    final WorkflowState state = WorkflowState.builder()
+        .enabled(true)
+        .nextNaturalTrigger(OffsetDateTime.of(2018, 1, 2, 3, 4, 5, 6, ZoneOffset.UTC).toInstant())
+        .nextNaturalOffsetTrigger(OffsetDateTime.of(2018, 1, 2, 9, 4, 5, 6, ZoneOffset.UTC).toInstant())
+        .build();
+    cliOutput.printWorkflow(workflow, state);
+    assertThat(outContent.toString(), is(
+              "Component: foo1\n"
+            + " Workflow: bar1\n"
+            + " Schedule: DAYS\n"
+            + "   Offset: 6h\n"
+            + "    Image: foo/bar:baz\n"
+            + "     Args: [foo, the, bar]\n"
+            + "  TermLog: true\n"
+            + "   Secret: secret-foo:/foo-secret\n"
+            + " Svc Acct: foo@bar.baz\n"
+            + "Resources: [r1, r2]\n"
+            + "      Env: BAR=bar FOO=foo\n"
+            + "   Commit: deadbeef\n"
+            + "  Enabled: true\n"
+            + "     Trig: 2018-01-02T03:04:05.000000006Z\n"
+            + "Ofst Trig: 2018-01-02T09:04:05.000000006Z\n"));
 
   }
 }

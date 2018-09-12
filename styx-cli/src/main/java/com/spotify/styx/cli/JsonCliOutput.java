@@ -24,7 +24,6 @@ import static java.util.stream.Collectors.toMap;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
@@ -33,6 +32,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.serialization.Json;
+import io.norberg.automatter.AutoMatter;
 import java.util.List;
 import java.util.Map.Entry;
 
@@ -87,7 +87,7 @@ class JsonCliOutput implements CliOutput {
 
   @Override
   public void printWorkflow(Workflow workflow, WorkflowState state) {
-    printJson(ImmutableMap.of("workflow", workflow, "state", state));
+    printJson(WorkflowWithState.of(workflow, state));
   }
 
   @Override
@@ -98,5 +98,20 @@ class JsonCliOutput implements CliOutput {
   @Override
   public void printError(String message) {
     System.err.println(message);
+  }
+
+  @AutoMatter
+  interface WorkflowWithState {
+
+    Workflow workflow();
+
+    WorkflowState state();
+
+    static WorkflowWithState of(Workflow workflow, WorkflowState state) {
+      return new WorkflowWithStateBuilder()
+          .workflow(workflow)
+          .state(state)
+          .build();
+    }
   }
 }

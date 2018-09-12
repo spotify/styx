@@ -32,6 +32,7 @@ import static org.fusesource.jansi.Ansi.Color.GREEN;
 import static org.fusesource.jansi.Ansi.Color.RED;
 import static org.fusesource.jansi.Ansi.Color.YELLOW;
 
+import com.google.common.base.Joiner;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
@@ -234,6 +235,7 @@ class PrettyCliOutput implements CliOutput {
     System.out.println("   Secret: " + wf.configuration().secret().map(s -> s.name() + ':' + s.mountPath()).orElse(""));
     System.out.println(" Svc Acct: " + wf.configuration().serviceAccount().orElse(""));
     System.out.println("Resources: " + wf.configuration().resources());
+    System.out.println("      Env: " + Joiner.on(' ').withKeyValueSeparator('=').join(wf.configuration().env()));
     System.out.println("   Commit: " + wf.configuration().commitSha().orElse(""));
     System.out.println("  Enabled: " + state.enabled().map(Object::toString).orElse(""));
     System.out.println("     Trig: " + state.nextNaturalTrigger().map(Object::toString).orElse(""));
