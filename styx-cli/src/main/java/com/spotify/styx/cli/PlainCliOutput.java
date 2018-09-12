@@ -120,7 +120,7 @@ class PlainCliOutput implements CliOutput {
   public void printWorkflow(Workflow wf, WorkflowState state) {
     System.out.println(Joiner.on(' ').join(
         wf.componentId(),
-        wf.id(),
+        wf.id().id(),
         wf.configuration().schedule(),
         wf.configuration().offset().orElse(""),
         wf.configuration().dockerImage().orElse(""),
@@ -129,6 +129,7 @@ class PlainCliOutput implements CliOutput {
         wf.configuration().secret().map(s -> s.name() + ':' + s.mountPath()).orElse(""),
         wf.configuration().serviceAccount().map(Object::toString).orElse(""),
         wf.configuration().resources(),
+        wf.configuration().env(),
         wf.configuration().commitSha().orElse(""),
         state.enabled().map(Object::toString).orElse(""),
         state.nextNaturalTrigger().map(Object::toString).orElse(""),
