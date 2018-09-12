@@ -25,7 +25,6 @@ import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_TERMINATION_
 import static com.spotify.styx.docker.KubernetesDockerRunner.getMainContainerStatus;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Event;
@@ -51,7 +50,6 @@ final class KubernetesPodEventTranslator {
     throw new UnsupportedOperationException();
   }
 
-  @JsonIgnoreProperties(ignoreUnknown = true)
   private static class TerminationLogMessage {
     int exitCode;
 

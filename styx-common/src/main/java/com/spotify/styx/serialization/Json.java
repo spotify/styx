@@ -21,6 +21,7 @@
 package com.spotify.styx.serialization;
 
 import static com.fasterxml.jackson.databind.DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY;
+import static com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES;
 import static com.fasterxml.jackson.databind.PropertyNamingStrategy.SNAKE_CASE;
 import static com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS;
 import static com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS;
@@ -57,6 +58,7 @@ public final class Json {
       .enable(ACCEPT_SINGLE_VALUE_AS_ARRAY)
       .disable(WRITE_DATES_AS_TIMESTAMPS)
       .registerModule(ADT_MODULE)
+      .disable(FAIL_ON_UNKNOWN_PROPERTIES)
       .registerModule(new JavaTimeModule())
       .registerModule(new Jdk8Module())
       .registerModule(new AutoMatterModule());
@@ -65,6 +67,7 @@ public final class Json {
       .setPropertyNamingStrategy(SNAKE_CASE)
       .enable(ACCEPT_SINGLE_VALUE_AS_ARRAY)
       .disable(WRITE_DATES_AS_TIMESTAMPS)
+      .disable(FAIL_ON_UNKNOWN_PROPERTIES)
       .registerModule(ADT_MODULE)
       .registerModule(new Jdk8Module())
       .registerModule(new JavaTimeModule())

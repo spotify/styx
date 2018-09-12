@@ -21,14 +21,12 @@
 package com.spotify.styx.api;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
 import com.spotify.styx.model.Resource;
 import java.util.List;
 
 @AutoValue
-@JsonIgnoreProperties(ignoreUnknown = true)
 public abstract class ResourcesPayload {
 
   @JsonProperty

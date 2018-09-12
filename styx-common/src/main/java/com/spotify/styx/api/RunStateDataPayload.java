@@ -21,7 +21,6 @@
 package com.spotify.styx.api;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
 import com.spotify.styx.model.WorkflowInstance;
@@ -33,7 +32,6 @@ import java.util.List;
  * Value type for all current active states
  */
 @AutoValue
-@JsonIgnoreProperties(ignoreUnknown = true)
 public abstract class RunStateDataPayload {
 
   @JsonProperty
@@ -41,7 +39,6 @@ public abstract class RunStateDataPayload {
   public abstract List<RunStateData> activeStates();
 
   @AutoValue
-  @JsonIgnoreProperties(ignoreUnknown = true)
   public abstract static class RunStateData {
 
     public static final Comparator<RunStateData> PARAMETER_COMPARATOR =

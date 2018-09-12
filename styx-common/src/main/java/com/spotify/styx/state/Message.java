@@ -21,14 +21,12 @@
 package com.spotify.styx.state;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.norberg.automatter.AutoMatter;
 
 /**
  * A value type for holding a message.
  */
 @AutoMatter
-@JsonIgnoreProperties(ignoreUnknown = true)
 public interface Message {
   MessageLevel level();
   String line();

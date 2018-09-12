@@ -20,7 +20,6 @@
 
 package com.spotify.styx.state;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.collect.Iterables;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.TriggerParameters;
@@ -36,7 +35,6 @@ import java.util.Set;
  * suited for copy-modifying values. Another plus is the boilerplate-free Jackson integration.
  */
 @AutoMatter
-@JsonIgnoreProperties(ignoreUnknown = true)
 public interface StateData {
 
   int tries();
