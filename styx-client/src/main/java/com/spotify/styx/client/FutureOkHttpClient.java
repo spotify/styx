@@ -23,10 +23,10 @@ package com.spotify.styx.client;
 import java.io.Closeable;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.HttpUrl;
@@ -46,8 +46,8 @@ public class FutureOkHttpClient implements Closeable {
   private static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(90);
   private static final Duration DEFAULT_WRITE_TIMEOUT = Duration.ofSeconds(90);
 
-  @Nullable
-  static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
+  static final MediaType APPLICATION_JSON =
+      Objects.requireNonNull(MediaType.parse("application/json"));
 
   private final OkHttpClient client;
 
