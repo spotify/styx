@@ -20,6 +20,8 @@
 
 package com.spotify.styx.client;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.spotify.styx.serialization.Json;
 import java.io.Closeable;
 import java.io.IOException;
 import java.time.Duration;
@@ -87,14 +89,34 @@ class FutureOkHttpClient implements Closeable {
     return future;
   }
 
-  public static Request forUri(HttpUrl uri, String method, ByteString payload) {
+  private static Request internalForUri(HttpUrl uri, String method, ByteString payload) {
     return new Request.Builder().url(uri.uri().toString())
         .method(method, RequestBody.create(APPLICATION_JSON, payload))
         .build();
   }
 
+  public static Request forUri(HttpUrl uri, String method, Object payload) {
+    try {
+      return internalForUri(uri, method, Json.serialize(payload));
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public static Request forUri(HttpUrl.Builder uriBuilder, String method, Object payload) {
+    return forUri(uriBuilder.build(), method, payload);
+  }
+
   public static Request forUri(HttpUrl uri, String method) {
     return new Request.Builder().url(uri.uri().toString()).method(method, null).build();
+  }
+
+  public static Request forUri(HttpUrl.Builder uriBuilder, String method) {
+    return forUri(uriBuilder.build(), method);
+  }
+
+  public static Request forUri(HttpUrl.Builder uriBuilder) {
+    return forUri(uriBuilder.build());
   }
 
   public static Request forUri(HttpUrl uri) {

@@ -20,8 +20,8 @@
 
 package com.spotify.styx.client;
 
-import static com.google.common.collect.Iterables.getLast;
 import static com.spotify.styx.client.FutureOkHttpClient.APPLICATION_JSON;
+import static com.spotify.styx.client.StyxOkHttpClient.STYX_API_VERSION;
 import static com.spotify.styx.util.StringIsValidUuid.isValidUuid;
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static java.net.HttpURLConnection.HTTP_INTERNAL_ERROR;
@@ -39,7 +39,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.spotify.styx.api.Api;
 import com.spotify.styx.api.EventsPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.client.auth.GoogleIdTokenAuth;
@@ -78,7 +77,9 @@ import okhttp3.ResponseBody;
 import okio.Buffer;
 import okio.ByteString;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -128,13 +129,9 @@ public class StyxOkHttpClientTest {
       .schedule(Schedule.DAYS)
       .build();
 
-
-  private static final String API_VERSION =
-      getLast(Arrays.asList(Api.Version.values())).name().toLowerCase();
-
   private static final HttpUrl API_URL = new HttpUrl.Builder()
       .scheme("https").host("foo.bar")
-      .addPathSegment("api").addPathSegment(API_VERSION).build();
+      .addPathSegment("api").addPathSegment(STYX_API_VERSION).build();
 
   private static final String CLIENT_HOST = API_URL.scheme() + "://" + API_URL.host() ;
 
@@ -144,6 +141,8 @@ public class StyxOkHttpClientTest {
   StyxClient styx;
 
   @Captor ArgumentCaptor<Request> requestCaptor;
+
+  @Rule public ExpectedException thrown = ExpectedException.none();
 
   @Before
   public void setUp() throws Exception {
@@ -389,6 +388,7 @@ public class StyxOkHttpClientTest {
     assertThat(request.url().toString(), is(API_URL + "/backfills"));
     assertThat(Json.deserialize(bytesOfRequestBody(request), BackfillInput.class),
         equalTo(backfillInput));
+    assertThat(r.isCompletedExceptionally(), is(false));
     assertThat(request.method(), is("POST"));
   }
 
@@ -468,16 +468,10 @@ public class StyxOkHttpClientTest {
   public void testTokenFailure() throws Exception {
     final IOException rootCause = new IOException("netsplit!");
     when(auth.getToken(any())).thenThrow(rootCause);
-    final CompletableFuture<Void> f = styx.triggerWorkflowInstance("foo", "bar", "baz")
-        .toCompletableFuture();
-    try {
-      f.get();
-      fail();
-    } catch (ExecutionException e) {
-      assertThat(e.getCause(), instanceOf(ClientErrorException.class));
-      assertThat(e.getCause().getMessage(), is("Authentication failure: " + rootCause.getMessage()));
-      assertThat(e.getCause().getCause(), is(rootCause));
-    }
+    thrown.expect(ClientErrorException.class);
+    thrown.expectMessage("Authentication failure: " + rootCause.getMessage());
+    thrown.expectCause(is(rootCause));
+    styx.triggerWorkflowInstance("foo", "bar", "baz");
   }
 
   @Test
@@ -606,7 +600,7 @@ public class StyxOkHttpClientTest {
 
   private static Response.Builder responseBuilder(int code) {
     return new Response.Builder()
-        .request(new Request.Builder().url("http://example.org").build())
+        .request(new Request.Builder().url(API_URL).build())
         .protocol(Protocol.HTTP_1_1)
         .message("HTTP " + code)
         .code(code);

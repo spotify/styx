@@ -20,17 +20,12 @@
 
 package com.spotify.styx.client;
 
-import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.client.FutureOkHttpClient.forUri;
-import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
-import static com.spotify.styx.serialization.Json.serialize;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.collect.ImmutableList;
-import com.spotify.futures.CompletableFutures;
+import com.spotify.styx.api.Api;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.ResourcesPayload;
@@ -50,11 +45,11 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
+import com.spotify.styx.serialization.Json;
 import com.spotify.styx.util.EventUtil;
 import java.io.IOException;
 import java.net.URI;
 import java.security.GeneralSecurityException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -62,12 +57,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import okhttp3.HttpUrl.Builder;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
-import okio.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,13 +74,12 @@ import org.slf4j.LoggerFactory;
  */
 class StyxOkHttpClient implements StyxClient {
 
-  private static final Logger log = LoggerFactory.getLogger(StyxOkHttpClient.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StyxOkHttpClient.class);
 
-  private static final String STYX_API_VERSION = V3.name().toLowerCase();
+  static final String STYX_API_VERSION = Api.Version.V3.name().toLowerCase();
+
   private static final String STYX_CLIENT_VERSION =
       "Styx Client " + StyxOkHttpClient.class.getPackage().getImplementationVersion();
-  private static final Duration TTL = Duration.ofSeconds(90);
-  private static final String X_REQUEST_ID = "X-Request-Id";
 
   private final URI apiHost;
   private final FutureOkHttpClient client;
@@ -116,19 +111,18 @@ class StyxOkHttpClient implements StyxClient {
   public CompletionStage<RunStateDataPayload> activeStates(Optional<String> componentId) {
     final Builder url = urlBuilder("status", "activeStates");
     componentId.ifPresent(id -> url.addQueryParameter("component", id));
-    return executeRequest(forUri(url.build()), RunStateDataPayload.class);
+    return execute(forUri(url), RunStateDataPayload.class);
   }
 
   @Override
   public CompletionStage<List<EventInfo>> eventsForWorkflowInstance(String componentId,
                                                                     String workflowId,
                                                                     String parameter) {
-    final Builder url = urlBuilder("status", "events", componentId, workflowId, parameter);
-    return executeRequest(forUri(url.build()))
+    return execute(forUri(urlBuilder("status", "events", componentId, workflowId, parameter)))
         .thenApply(response -> {
           final JsonNode jsonNode;
           try (final ResponseBody responseBody = response.body()) {
-            jsonNode = OBJECT_MAPPER.readTree(responseBody.bytes());
+            jsonNode = Json.OBJECT_MAPPER.readTree(responseBody.bytes());
           } catch (IOException e) {
             throw new RuntimeException("Invalid json returned from API", e);
           }
@@ -137,86 +131,67 @@ class StyxOkHttpClient implements StyxClient {
             throw new RuntimeException("Unexpected json returned from API");
           }
 
-          final ObjectNode json = (ObjectNode) jsonNode;
-          final ArrayNode events = json.withArray("events");
-          final ImmutableList.Builder<EventInfo> eventInfos = ImmutableList.builder();
-          for (JsonNode eventWithTimestamp : events) {
-            final long ts = eventWithTimestamp.get("timestamp").asLong();
-            final JsonNode event = eventWithTimestamp.get("event");
+          final ArrayNode events = ((ObjectNode) jsonNode).withArray("events");
 
-            String eventName;
-            String eventInfo;
-            try {
-              Event typedEvent = OBJECT_MAPPER.convertValue(event, Event.class);
-              eventName = EventUtil.name(typedEvent);
-              eventInfo = EventUtil.info(typedEvent);
-            } catch (IllegalArgumentException e) {
-              // fall back to just inspecting the json
-              eventName = event.get("@type").asText();
-              eventInfo = "";
-            }
+          return StreamSupport.stream(events.spliterator(), false)
+              .map(eventWithTimestamp -> {
+                final long ts = eventWithTimestamp.get("timestamp").asLong();
+                final JsonNode event = eventWithTimestamp.get("event");
 
-            eventInfos.add(EventInfo.create(ts, eventName, eventInfo));
-          }
-          return eventInfos.build();
+                try {
+                  final Event typedEvent = Json.OBJECT_MAPPER.convertValue(event, Event.class);
+                  return EventInfo.create(ts, EventUtil.name(typedEvent), EventUtil.info(typedEvent));
+                } catch (IllegalArgumentException e) {
+                  // fall back to just inspecting the json
+                  return EventInfo.create(ts, event.get("@type").asText(), "");
+                }
+              })
+              .collect(Collectors.toList());
         });
   }
 
   @Override
   public CompletionStage<Workflow> workflow(String componentId, String workflowId) {
-    final Builder url = urlBuilder("workflows", componentId, workflowId);
-    return executeRequest(forUri(url.build()), Workflow.class);
+    return execute(forUri(urlBuilder("workflows", componentId, workflowId)), Workflow.class);
   }
 
   @Override
   public CompletionStage<List<Workflow>> workflows() {
-    final Builder url = urlBuilder("workflows");
-    return executeRequest(forUri(url.build()), Workflow[].class)
-        .thenApply(ImmutableList::copyOf);
+    return execute(forUri(urlBuilder("workflows")), Workflow[].class)
+        .thenApply(Arrays::asList);
   }
 
   @Override
   public CompletionStage<Workflow> createOrUpdateWorkflow(String componentId, WorkflowConfiguration workflowConfig) {
-    final Builder url = urlBuilder("workflows", componentId);
-    try {
-      final Request request = forUri(url.build(), "POST", serialize(workflowConfig));
-      return executeRequest(request, Workflow.class);
-    } catch (JsonProcessingException e) {
-      return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
-    }
+    return execute(forUri(urlBuilder("workflows", componentId), "POST", workflowConfig),
+                   Workflow.class);
   }
 
   @Override
   public CompletionStage<Void> deleteWorkflow(String componentId, String workflowId) {
-    final Builder url = urlBuilder("workflows", componentId, workflowId);
-    return executeRequest(forUri(url.build(), "DELETE"))
+    return execute(forUri(urlBuilder("workflows", componentId, workflowId), "DELETE"))
         .thenApply(response -> null);
   }
 
   @Override
   public CompletionStage<WorkflowState> workflowState(String componentId, String workflowId) {
-    final Builder url = urlBuilder("workflows", componentId, workflowId, "state");
-    return executeRequest(forUri(url.build()), WorkflowState.class);
+    return execute(forUri(urlBuilder("workflows", componentId, workflowId, "state")),
+                   WorkflowState.class);
   }
 
   @Override
   public CompletionStage<WorkflowInstanceExecutionData> workflowInstanceExecutions(String componentId,
                                                                                    String workflowId,
                                                                                    String parameter) {
-    final Builder url = urlBuilder("workflows", componentId, workflowId, "instances", parameter);
-    return executeRequest(forUri(url.build()),
-        WorkflowInstanceExecutionData.class);
+    return execute(forUri(urlBuilder("workflows", componentId, workflowId, "instances", parameter)),
+                   WorkflowInstanceExecutionData.class);
   }
 
   @Override
   public CompletionStage<WorkflowState> updateWorkflowState(String componentId, String workflowId,
                                                             WorkflowState workflowState) {
-    final Builder url = urlBuilder("workflows", componentId, workflowId, "state");
-    try {
-      return executeRequest(forUri(url.build(), "PATCH", serialize(workflowState)), WorkflowState.class);
-    } catch (JsonProcessingException e) {
-      return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
-    }
+    return execute(forUri(urlBuilder("workflows", componentId, workflowId, "state"), "PATCH", workflowState),
+                   WorkflowState.class);
   }
 
   @Override
@@ -230,16 +205,10 @@ class StyxOkHttpClient implements StyxClient {
                                                        String workflowId,
                                                        String parameter,
                                                        TriggerParameters triggerParameters) {
-    final Builder url = urlBuilder( "scheduler", "trigger");
     final TriggerRequest triggerRequest =
         TriggerRequest.of(WorkflowId.create(componentId, workflowId), parameter, triggerParameters);
-    try {
-      final ByteString payload = serialize(triggerRequest);
-      return executeRequest(forUri(url.build(), "POST", payload))
-          .thenApply(response -> null);
-    } catch (JsonProcessingException e) {
-      return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
-    }
+    return execute(forUri(urlBuilder("scheduler", "trigger"), "POST", triggerRequest))
+        .thenApply(response -> null);
   }
 
   @Override
@@ -250,13 +219,8 @@ class StyxOkHttpClient implements StyxClient {
     final WorkflowInstance workflowInstance = WorkflowInstance.create(
         WorkflowId.create(componentId, workflowId),
         parameter);
-    try {
-      final ByteString payload = serialize(workflowInstance);
-      return executeRequest(forUri(url.build(), "POST", payload))
-          .thenApply(response -> null);
-    } catch (JsonProcessingException e) {
-      return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
-    }
+    return execute(forUri(url, "POST", workflowInstance))
+        .thenApply(response -> null);
   }
 
   @Override
@@ -267,47 +231,34 @@ class StyxOkHttpClient implements StyxClient {
     final WorkflowInstance workflowInstance = WorkflowInstance.create(
         WorkflowId.create(componentId, workflowId),
         parameter);
-    try {
-      final ByteString payload = serialize(workflowInstance);
-      return executeRequest(forUri(url.build(), "POST", payload))
-          .thenApply(response -> null);
-    } catch (JsonProcessingException e) {
-      return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
-    }
+    return execute(forUri(url, "POST", workflowInstance))
+        .thenApply(response -> null);
   }
 
   @Override
   public CompletionStage<Resource> resourceCreate(String resourceId, int concurrency) {
-    final Builder url = urlBuilder("resources");
-    try {
-      final ByteString payload = serialize(Resource.create(resourceId, concurrency));
-      return executeRequest(forUri(url.build(), "POST", payload), Resource.class);
-    } catch (JsonProcessingException e) {
-      return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
-    }
+    final Resource resource = Resource.create(resourceId, concurrency);
+    return execute(forUri(urlBuilder("resources"), "POST", resource),
+                   Resource.class);
   }
 
   @Override
   public CompletionStage<Resource> resourceEdit(String resourceId, int concurrency) {
-    final Builder url = urlBuilder("resources", resourceId);
-    try {
-      final ByteString payload = serialize(Resource.create(resourceId, concurrency));
-      return executeRequest(forUri(url.build(), "PUT", payload), Resource.class);
-    } catch (JsonProcessingException e) {
-      return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
-    }
+    final Resource resource = Resource.create(resourceId, concurrency);
+    return execute(forUri(urlBuilder("resources", resourceId), "PUT", resource),
+                   Resource.class);
   }
 
   @Override
   public CompletionStage<Resource> resource(String resourceId) {
     final Builder url = urlBuilder("resources", resourceId);
-    return executeRequest(forUri(url.build()), Resource.class);
+    return execute(forUri(url), Resource.class);
   }
 
   @Override
   public CompletionStage<ResourcesPayload> resourceList() {
     final Builder url = urlBuilder("resources");
-    return executeRequest(forUri(url.build()), ResourcesPayload.class);
+    return execute(forUri(url), ResourcesPayload.class);
   }
 
   @Override
@@ -335,13 +286,7 @@ class StyxOkHttpClient implements StyxClient {
 
   @Override
   public CompletionStage<Backfill> backfillCreate(BackfillInput backfill) {
-    final Builder url = urlBuilder("backfills");
-    try {
-      final ByteString payload = serialize(backfill);
-      return executeRequest(forUri(url.build(), "POST", payload), Backfill.class);
-    } catch (JsonProcessingException e) {
-      return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
-    }
+    return execute(forUri(urlBuilder("backfills"), "POST", backfill), Backfill.class);
   }
 
   @Override
@@ -351,18 +296,12 @@ class StyxOkHttpClient implements StyxClient {
         .concurrency(concurrency)
         .build();
     final Builder url = urlBuilder("backfills", backfillId);
-    try {
-      final ByteString payload = serialize(editableBackfillInput);
-      return executeRequest(forUri(url.build(), "PUT", payload), Backfill.class);
-    } catch (JsonProcessingException e) {
-      return CompletableFutures.exceptionallyCompletedFuture(new RuntimeException(e));
-    }
+    return execute(forUri(url, "PUT", editableBackfillInput), Backfill.class);
   }
 
   @Override
   public CompletionStage<Void> backfillHalt(String backfillId) {
-    final Builder url = urlBuilder("backfills", backfillId);
-    return executeRequest(forUri(url.build(), "DELETE"))
+    return execute(forUri(urlBuilder("backfills", backfillId), "DELETE"))
         .thenApply(response -> null);
   }
 
@@ -370,7 +309,7 @@ class StyxOkHttpClient implements StyxClient {
   public CompletionStage<BackfillPayload> backfill(String backfillId, boolean includeStatus) {
     final Builder url = urlBuilder("backfills", backfillId);
     url.addQueryParameter("status", Boolean.toString(includeStatus));
-    return executeRequest(forUri(url.build()), BackfillPayload.class);
+    return execute(forUri(url), BackfillPayload.class);
   }
 
   @Override
@@ -383,15 +322,15 @@ class StyxOkHttpClient implements StyxClient {
     workflowId.ifPresent(w -> url.addQueryParameter("workflow", w));
     url.addQueryParameter("showAll", Boolean.toString(showAll));
     url.addQueryParameter("status", Boolean.toString(includeStatus));
-    return executeRequest(forUri(url.build()), BackfillsPayload.class);
+    return execute(forUri(url), BackfillsPayload.class);
   }
 
-  private <T> CompletionStage<T> executeRequest(Request request, Class<T> tClass) {
-    return executeRequest(request).thenApply(response -> {
+  private <T> CompletionStage<T> execute(Request request, Class<T> tClass) {
+    return execute(request).thenApply(response -> {
       try (final ResponseBody responseBody = response.body()) {
-        return OBJECT_MAPPER.readValue(responseBody.bytes(), tClass);
+        return Json.OBJECT_MAPPER.readValue(responseBody.bytes(), tClass);
       } catch (IOException e) {
-        throw new RuntimeException("Error while reading the received payload: " + e);
+        throw new RuntimeException("Error while reading the received payload: " + e.getMessage(), e);
       }
     });
   }
@@ -405,14 +344,13 @@ class StyxOkHttpClient implements StyxClient {
     return builder.build();
   }
 
-  private CompletionStage<Response> executeRequest(Request request) {
+  private CompletionStage<Response> execute(Request request) {
     final Optional<String> authToken;
     try {
       authToken = auth.getToken(apiHost.toString());
     } catch (IOException | GeneralSecurityException e) {
       // Credential probably invalid, configured wrongly or the token request failed.
-      return CompletableFutures.exceptionallyCompletedFuture(
-          new ClientErrorException("Authentication failure: " + e.getMessage(), e));
+      throw new ClientErrorException("Authentication failure: " + e.getMessage(), e);
     }
     final String requestId = UUID.randomUUID().toString().replace("-", "");  // UUID with no dashes, easier to deal with
     return client.send(decorateRequest(request, requestId, authToken)).handle((response, e) -> {
@@ -420,11 +358,11 @@ class StyxOkHttpClient implements StyxClient {
         throw new ClientErrorException("Request failed: " + request.method() + " " + request.url(), e);
       } else {
         final String effectiveRequestId;
-        final String responseRequestId = response.headers().get(X_REQUEST_ID);
+        final String responseRequestId = response.headers().get("X-Request-Id");
         if (responseRequestId != null && !responseRequestId.equals(requestId)) {
           // If some proxy etc dropped our request ID header, we might get another one back.
           effectiveRequestId = responseRequestId;
-          log.warn("Request ID mismatch: '" + requestId + "' != '" + responseRequestId + "'");
+          LOG.warn("Request ID mismatch: '{}' != '{}'", requestId, responseRequestId);
         } else {
           effectiveRequestId = requestId;
         }
