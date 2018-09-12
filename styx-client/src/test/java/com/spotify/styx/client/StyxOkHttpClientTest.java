@@ -40,10 +40,14 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.spotify.styx.api.Api;
+import com.spotify.styx.api.EventsPayload;
+import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.client.auth.GoogleIdTokenAuth;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.EditableBackfillInput;
+import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.TriggerRequest;
@@ -52,6 +56,7 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.serialization.Json;
 import java.io.IOException;
@@ -184,6 +189,105 @@ public class StyxOkHttpClientTest {
     assertThat(request.url().toString(), is(uri.toString()));
     assertThat(request.method(), is("GET"));
     assertThat(r.join(), is(workflows));
+  }
+
+  @Test
+  public void shouldCreateResource() throws Exception {
+    final Resource resource = Resource.create("resource", 3);
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK,
+                                                               resource)));
+    final CompletableFuture<Resource> r =
+        styx.resourceCreate("resource", 3).toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    final URI uri = URI.create(API_URL + "/resources");
+    assertThat(request.url().toString(), is(uri.toString()));
+    assertThat(request.method(), is("POST"));
+    assertThat(Json.deserialize(bytesOfRequestBody(request), Resource.class), is(resource));
+    assertThat(r.join(), is(resource));
+  }
+
+  @Test
+  public void shouldRetryWorkflow() throws Exception {
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, WorkflowState.empty())));
+    final CompletableFuture<Void> r =
+        styx.retryWorkflowInstance("component", "workflow", "2017-01-01T00").toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    final URI uri = URI.create(API_URL + "/scheduler/retry");
+    assertThat(request.url().toString(), is(uri.toString()));
+    assertThat(request.method(), is("POST"));
+    assertThat(Json.deserialize(bytesOfRequestBody(request), WorkflowInstance.class),
+               is(WorkflowInstance.create(WorkflowId.create("component", "workflow"), "2017-01-01T00")));
+  }
+
+  @Test
+  public void shouldHaltWorkflow() throws Exception {
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, WorkflowState.empty())));
+    final CompletableFuture<Void> r =
+        styx.haltWorkflowInstance("component", "workflow", "2017-01-01T00").toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    final URI uri = URI.create(API_URL + "/scheduler/halt");
+    assertThat(request.url().toString(), is(uri.toString()));
+    assertThat(request.method(), is("POST"));
+    assertThat(Json.deserialize(bytesOfRequestBody(request), WorkflowInstance.class),
+               is(WorkflowInstance.create(WorkflowId.create("component", "workflow"), "2017-01-01T00")));
+  }
+
+  @Test
+  public void shouldGetWorkflowState() throws Exception {
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, WorkflowState.empty())));
+    final CompletableFuture<WorkflowState> r =
+        styx.workflowState("component", "workflow").toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    final URI uri = URI.create(API_URL + "/workflows/component/workflow/state");
+    assertThat(request.url().toString(), is(uri.toString()));
+    assertThat(request.method(), is("GET"));
+    assertThat(r.join(), is(WorkflowState.empty()));
+  }
+
+  @Test
+  public void shouldGetEventsForWorkflowInstance() throws Exception {
+    final EventsPayload events = EventsPayload.create(Arrays.asList(
+        EventsPayload.TimestampedEvent
+            .create(Event.stop(WorkflowInstance.create(WORKFLOW_1.id(), "foo")), 123)));
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, events)));
+    final CompletableFuture<List<EventInfo>> r =
+        styx.eventsForWorkflowInstance("component", "workflow", "2017-01-01T00").toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    final URI uri = URI.create(API_URL + "/status/events/component/workflow/2017-01-01T00");
+    assertThat(request.url().toString(), is(uri.toString()));
+    assertThat(request.method(), is("GET"));
+    assertThat(r.join(), is(Arrays.asList(EventInfo.create(123, "stop", ""))));
+  }
+
+  @Test
+  public void shouldGetActiveStatesForComponent() throws Exception {
+    final RunStateDataPayload runStateDataPayload = RunStateDataPayload.create(Arrays.asList());
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, runStateDataPayload)));
+    final CompletableFuture<RunStateDataPayload> r =
+        styx.activeStates(Optional.of("component")).toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    final URI uri = URI.create(API_URL + "/status/activeStates?component=component");
+    assertThat(request.url().toString(), is(uri.toString()));
+    assertThat(request.method(), is("GET"));
+    assertThat(r.join(), is(runStateDataPayload));
   }
 
   @Test
