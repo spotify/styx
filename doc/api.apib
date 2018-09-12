@@ -57,6 +57,7 @@ Resources related to the Workflows registered in Styx.
                   "CanaryJob"
                 ],
                 "docker_termination_logging": false,
+                "env": {"FOO": "bar"},
                 "secret": null,
                 "resources": []
               }
@@ -90,6 +91,7 @@ Resources related to the Workflows registered in Styx.
                   "CanaryJob"
                 ],
                 "docker_termination_logging": false,
+                "env": {"FOO": "bar"},
                 "secret": null,
                 "resources": []
               }
@@ -114,6 +116,7 @@ or updated. Note that a non-null value is required for docker_image.
             "CanaryJob"
           ],
           "docker_termination_logging": false,
+          "env": {"FOO": "bar"},
           "secret": null,
           "service_account": null,
           "resources": []
@@ -137,6 +140,7 @@ or updated. Note that a non-null value is required for docker_image.
               "CanaryJob"
             ],
             "docker_termination_logging": false,
+            "env": {"FOO": "bar"},
             "secret": null,
             "service_account": null,
             "resources": []
@@ -173,6 +177,7 @@ or updated. Note that a non-null value is required for docker_image.
                   "CanaryJob"
                 ],
                 "docker_termination_logging": false,
+                "env": {"FOO": "bar"},
                 "secret": null,
                 "resources": []
               }
@@ -446,6 +451,7 @@ Workflow Instance belonging to a Backfill entity.
                     "next_trigger": "2017-01-01T01:00:00Z",
                     "schedule": "hours",
                     "start": "2017-01-01T00:00:00Z",
+                    "trigger_parameters": {"env": {"FOO": "bar"}},
                     "workflow_id": {
                         "component_id": "styx-canary",
                         "id": "StyxCanary"
@@ -721,7 +727,8 @@ Resources related to inspect detailed status of Workflow Instances.
                     "trigger": {
                         "@type": "natural"
                     },
-                    "workflow_instance": "styx-canary/StyxCanary/2017-01-01T01"
+                    "workflow_instance": "styx-canary/StyxCanary/2017-01-01T01",
+                    "parameters": {"env": {"FOO": "bar"}}
                 },
                 "timestamp": 1483228800000
             },
