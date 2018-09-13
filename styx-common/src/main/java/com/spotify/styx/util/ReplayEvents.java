@@ -35,47 +35,63 @@ public final class ReplayEvents {
     throw new UnsupportedOperationException();
   }
 
-  // TODO: fix NPath complexity
   public static Optional<RunState> getBackfillRunState(
       WorkflowInstance workflowInstance,
       Storage storage,
       String backfillId) {
-    final SettableTime time = new SettableTime();
-    boolean backfillFound = false;
 
-    final SortedSet<SequenceEvent> sequenceEvents;
-    try {
-      sequenceEvents = storage.readEvents(workflowInstance);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-
+    final SortedSet<SequenceEvent> sequenceEvents = getSequenceEvents(workflowInstance, storage);
     if (sequenceEvents.isEmpty()) {
       return Optional.empty();
     }
 
+    final SettableTime time = new SettableTime();
     RunState restoredState = RunState.fresh(workflowInstance, time);
+
+    boolean backfillFound = false;
 
     // events are written after the datastore transition transaction is successfully
     // committed, so we can trust the sequence of events faithfully reflect the state
     // transition if they have all been successfully written to bigtable
     for (SequenceEvent sequenceEvent : sequenceEvents) {
       time.set(Instant.ofEpochMilli(sequenceEvent.timestamp()));
-      if ("triggerExecution".equals(EventUtil.name(sequenceEvent.event()))) {
+
+      final boolean triggerExecutionEventMet =
+          "triggerExecution".equals(EventUtil.name(sequenceEvent.event()));
+
+      if (triggerExecutionEventMet) {
         if (backfillFound) {
-          return Optional.of(restoredState);
+          break;
         }
         restoredState = RunState.fresh(workflowInstance, time);
       }
 
       restoredState = restoredState.transition(sequenceEvent.event(), time);
-      if ("triggerExecution".equals(EventUtil.name(sequenceEvent.event()))
-          && restoredState.data().trigger().isPresent()
-          && backfillId.equals(TriggerUtil.triggerId(restoredState.data().trigger().get()))) {
+
+      if (backfillFound(triggerExecutionEventMet, backfillId, restoredState)) {
         backfillFound = true;
       }
     }
+
     return backfillFound ? Optional.of(restoredState) : Optional.empty();
+  }
+
+  private static SortedSet<SequenceEvent> getSequenceEvents(
+      final WorkflowInstance workflowInstance, final Storage storage) {
+    final SortedSet<SequenceEvent> sequenceEvents;
+    try {
+      sequenceEvents = storage.readEvents(workflowInstance);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return sequenceEvents;
+  }
+
+  private static boolean backfillFound(boolean triggerExecutionEventMet,
+                                       String backfillId, RunState restoredState) {
+    return triggerExecutionEventMet && restoredState.data().trigger()
+        .map(trigger -> backfillId.equals(TriggerUtil.triggerId(trigger)))
+        .orElse(false);
   }
 
   private static final class SettableTime implements Time {

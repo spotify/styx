@@ -54,11 +54,16 @@ public class ReplayEventsTest {
           "BAR", "bar")
       .build();
 
-  Storage storage;
+  private Storage storage;
 
   @Before
-  public void setUp() throws IOException {
+  public void setUp() {
     storage = mock(Storage.class);
+  }
+
+  @Test
+  public void shouldNotBeConstructable() throws ReflectiveOperationException {
+    assertThat(ClassEnforcer.assertNotInstantiable(ReplayEvents.class), is(true));
   }
 
   @Test
