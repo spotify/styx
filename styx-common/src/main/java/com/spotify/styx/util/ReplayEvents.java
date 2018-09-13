@@ -73,7 +73,7 @@ public final class ReplayEvents {
 
       restoredState = restoredState.transition(sequenceEvent.event(), time);
 
-      if (triggerExecutionEventMet && triggerIdMatches(backfillId, restoredState)) {
+      if (backfillFound(triggerExecutionEventMet, backfillId, restoredState)) {
         backfillFound = true;
       }
     }
@@ -81,8 +81,9 @@ public final class ReplayEvents {
     return backfillFound ? Optional.of(restoredState) : Optional.empty();
   }
 
-  private static Boolean triggerIdMatches(String backfillId, RunState restoredState) {
-    return restoredState.data().trigger()
+  private static boolean backfillFound(boolean triggerExecutionEventMet,
+                                       String backfillId, RunState restoredState) {
+    return triggerExecutionEventMet && restoredState.data().trigger()
         .map(trigger -> backfillId.equals(TriggerUtil.triggerId(trigger)))
         .orElse(false);
   }
