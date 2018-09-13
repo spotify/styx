@@ -36,6 +36,7 @@ import static org.fusesource.jansi.Ansi.Color.YELLOW;
 import com.google.common.base.Joiner;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
+import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
@@ -323,7 +324,7 @@ class PrettyCliOutput implements CliOutput {
     }
   }
 
-  private Ansi getAnsiForState(RunStateDataPayload.RunStateData RunStateData) {
+  private Ansi getAnsiForState(RunStateData RunStateData) {
     final String state = RunStateData.state();
     switch (state) {
       case "WAITING":    return coloredBright(BLACK, state);
