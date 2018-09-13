@@ -220,7 +220,7 @@ public class PrettyCliOutputTest {
   }
 
   @Test
-  public void shouldPrintStates() throws Exception {
+  public void shouldPrintStates() {
     final RunStateDataPayload states = RunStateDataPayload.create(ImmutableList.of(
         RunStateData.create(
             WorkflowInstance.create(WorkflowId.create("c0", "w0"), "2016-09-01"),

@@ -442,22 +442,21 @@ public final class BackfillResource implements Closeable {
 
   private RunStateData getRunStateData(Backfill backfill,
       Map<WorkflowInstance, RunState> activeWorkflowInstances, Instant instant) {
+
     final WorkflowInstance wfi = WorkflowInstance
         .create(backfill.workflowId(), toParameter(backfill.schedule(), instant));
+
     if (activeWorkflowInstances.containsKey(wfi)) {
-      RunState state = activeWorkflowInstances.get(wfi);
-      return RunStateData
-          .create(state.workflowInstance(), state.state().name(), state.data());
+      final RunState state = activeWorkflowInstances.get(wfi);
+      return RunStateData.newBuilder()
+          .workflowInstance(state.workflowInstance())
+          .state(state.state().name())
+          .stateData(state.data())
+          .latestTimestamp(state.timestamp())
+          .build();
     }
 
-    Optional<RunState> restoredStateOpt =
-        ReplayEvents.getBackfillRunState(wfi, storage, backfill.id());
-    if (restoredStateOpt.isPresent()) {
-      RunState state = restoredStateOpt.get();
-      return RunStateData
-          .create(state.workflowInstance(), state.state().name(), state.data());
-    } else {
-      return RunStateData.create(wfi, UNKNOWN, StateData.zero());
-    }
+    return ReplayEvents.getBackfillRunStateData(wfi, storage, backfill.id())
+        .orElse(RunStateData.create(wfi, UNKNOWN, StateData.zero()));
   }
 }

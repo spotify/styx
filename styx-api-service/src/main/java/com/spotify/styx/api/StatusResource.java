@@ -32,6 +32,7 @@ import com.spotify.apollo.entity.JacksonEntityCodec;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
+import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -84,10 +85,10 @@ public class StatusResource {
     return rc.pathArgs().get(name);
   }
 
-  public RunStateDataPayload activeStates(RequestContext requestContext) {
+  private RunStateDataPayload activeStates(RequestContext requestContext) {
     final Optional<String> componentOpt = requestContext.request().parameter("component");
 
-    final List<RunStateDataPayload.RunStateData> runStates = Lists.newArrayList();
+    final List<RunStateData> runStates = Lists.newArrayList();
     try {
 
       final Map<WorkflowInstance, RunState> activeStates = componentOpt.isPresent()
@@ -103,12 +104,13 @@ public class StatusResource {
     return RunStateDataPayload.create(runStates);
   }
 
-  private RunStateDataPayload.RunStateData runStateToRunStateData(RunState state) {
-    return RunStateDataPayload.RunStateData.create(
-        state.workflowInstance(),
-        state.state().toString(),
-        state.data()
-    );
+  private RunStateData runStateToRunStateData(RunState state) {
+    return RunStateData.newBuilder()
+        .workflowInstance(state.workflowInstance())
+        .state(state.state().name())
+        .stateData(state.data())
+        .latestTimestamp(state.timestamp())
+        .build();
   }
 
   public EventsPayload eventsForWorkflowInstance(String cid, String eid, String iid) {

@@ -22,7 +22,6 @@ package com.spotify.styx.util;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresent;
 import static com.google.common.collect.Sets.newTreeSet;
-import static com.spotify.styx.state.RunState.State.DONE;
 import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.RESOURCE_IDS;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
@@ -32,10 +31,10 @@ import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.TriggerParameters;
-import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
@@ -80,16 +79,19 @@ public class ReplayEventsTest {
     events.add(SequenceEvent.create(
         Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.adhoc("ad-hoc"), TRIGGER_PARAMETERS),       8L, 8L));
     events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE, RESOURCE_IDS),                   9L, 9L));
-    events.add(SequenceEvent.create(Event.halt(WORKFLOW_INSTANCE),                                  10L, 10L));
+    events.add(SequenceEvent.create(Event.halt(WORKFLOW_INSTANCE),                                    10L, 10L));
 
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
 
-    RunState restoredRunState =
-        ReplayEvents.getBackfillRunState(WORKFLOW_INSTANCE, storage, "bf-1").get();
+    RunStateData restoredRunStateData =
+        ReplayEvents.getBackfillRunStateData(WORKFLOW_INSTANCE, storage, "bf-1").get();
 
-    assertThat(restoredRunState.state(), is(DONE));
-    assertThat(restoredRunState.data().lastExit(), isPresent());
-    assertThat(restoredRunState.data().lastExit().get(), is(0));
+    assertThat(restoredRunStateData.state(), is("DONE"));
+    assertThat(restoredRunStateData.stateData().lastExit(), isPresent());
+    assertThat(restoredRunStateData.stateData().lastExit().get(), is(0));
+
+    assertThat(restoredRunStateData.initialTimestamp().get(), is(1L));
+    assertThat(restoredRunStateData.latestTimestamp().get(), is(7L));
   }
 
   @Test
@@ -101,11 +103,11 @@ public class ReplayEventsTest {
 
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
 
-    Optional<RunState> restoredRunState = ReplayEvents.getBackfillRunState(
+    Optional<RunStateData> restoredRunStateData = ReplayEvents.getBackfillRunStateData(
         WORKFLOW_INSTANCE,
         storage, "erroneous-id");
 
-    assertThat(restoredRunState, is(Optional.empty()));
+    assertThat(restoredRunStateData, is(Optional.empty()));
   }
 
   @Test
@@ -113,11 +115,11 @@ public class ReplayEventsTest {
     SortedSet<SequenceEvent> events = newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
 
-    Optional<RunState> restoredRunState = ReplayEvents.getBackfillRunState(
+    Optional<RunStateData> restoredRunStateData = ReplayEvents.getBackfillRunStateData(
         WORKFLOW_INSTANCE,
         storage, "bf-1");
 
-    assertThat(restoredRunState, is(Optional.empty()));
+    assertThat(restoredRunStateData, is(Optional.empty()));
   }
 
   @Test
@@ -126,7 +128,7 @@ public class ReplayEventsTest {
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenThrow(exception);
 
     try {
-      ReplayEvents.getBackfillRunState(WORKFLOW_INSTANCE, storage, "bf-1");
+      ReplayEvents.getBackfillRunStateData(WORKFLOW_INSTANCE, storage, "bf-1");
       fail();
     } catch (RuntimeException e) {
       assertThat(e.getCause(), is(exception));

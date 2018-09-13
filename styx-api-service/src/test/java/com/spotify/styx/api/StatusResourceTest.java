@@ -24,6 +24,7 @@ import static com.spotify.apollo.test.unit.ResponseMatchers.hasPayload;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static org.hamcrest.Matchers.any;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
@@ -31,6 +32,7 @@ import static org.junit.Assert.assertThat;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
+import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.TriggerParameters;
@@ -116,7 +118,20 @@ public class StatusResourceTest extends VersionedApiTest {
     RunStateDataPayload
         parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
-    assertThat(parsed.activeStates(), hasSize(2));
+    assertThat(parsed.activeStates(), containsInAnyOrder(
+        RunStateData.newBuilder()
+            .workflowInstance(PERSISTENT_STATE.workflowInstance())
+            .state(PERSISTENT_STATE.state().name())
+            .stateData(PERSISTENT_STATE.data())
+            .latestTimestamp(PERSISTENT_STATE.timestamp())
+            .build(),
+        RunStateData.newBuilder()
+            .workflowInstance(OTHER_PERSISTENT_STATE.workflowInstance())
+            .state(OTHER_PERSISTENT_STATE.state().name())
+            .stateData(OTHER_PERSISTENT_STATE.data())
+            .latestTimestamp(OTHER_PERSISTENT_STATE.timestamp())
+            .build()
+    ));
   }
 
   @Test
