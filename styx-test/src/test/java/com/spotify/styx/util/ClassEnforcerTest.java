@@ -83,7 +83,7 @@ public class ClassEnforcerTest {
   private static class FailingInstantiable {
 
     private FailingInstantiable() {
-      throw new NullPointerException();
+      throw new RuntimeException();
     }
   }
 
@@ -100,7 +100,7 @@ public class ClassEnforcerTest {
       throw new UnsupportedOperationException();
     }
 
-    public InstantiableWithArgs(String arg) {
+    public InstantiableWithArgs(String ignored) {
     }
   }
 }
