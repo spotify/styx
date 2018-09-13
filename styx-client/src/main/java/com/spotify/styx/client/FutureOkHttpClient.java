@@ -46,8 +46,7 @@ class FutureOkHttpClient implements AutoCloseable {
   private static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(10);
   private static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(90);
   private static final Duration DEFAULT_WRITE_TIMEOUT = Duration.ofSeconds(90);
-
-  static final MediaType APPLICATION_JSON =
+  private static final MediaType APPLICATION_JSON =
       Objects.requireNonNull(MediaType.parse("application/json"));
 
   private final OkHttpClient client;

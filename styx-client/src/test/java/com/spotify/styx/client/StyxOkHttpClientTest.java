@@ -20,7 +20,6 @@
 
 package com.spotify.styx.client;
 
-import static com.spotify.styx.client.FutureOkHttpClient.APPLICATION_JSON;
 import static com.spotify.styx.client.StyxOkHttpClient.STYX_API_VERSION;
 import static com.spotify.styx.util.StringIsValidUuid.isValidUuid;
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
@@ -67,12 +66,14 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import okhttp3.HttpUrl;
+import okhttp3.MediaType;
 import okhttp3.Protocol;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -137,6 +138,9 @@ public class StyxOkHttpClientTest {
       .addPathSegment("api").addPathSegment(STYX_API_VERSION).build();
 
   private static final String CLIENT_HOST = API_URL.scheme() + "://" + API_URL.host() ;
+
+  private static final MediaType APPLICATION_JSON =
+      Objects.requireNonNull(MediaType.parse("application/json"));
 
   @Mock FutureOkHttpClient client;
   @Mock GoogleIdTokenAuth auth;
