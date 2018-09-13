@@ -30,7 +30,7 @@ import java.util.concurrent.CompletionStage;
 /**
  * Interface for Styx client, backfill resources.
  */
-public interface StyxBackfillClient {
+public interface StyxBackfillClient extends AutoCloseable {
 
   /**
    * Create a {@link Backfill}
@@ -43,11 +43,11 @@ public interface StyxBackfillClient {
    * @return The created {@link Backfill}
    */
   @Deprecated
-  CompletionStage<Backfill> backfillCreate(final String componentId,
-                                           final String workflowId,
-                                           final String start,
-                                           final String end,
-                                           final int concurrency);
+  CompletionStage<Backfill> backfillCreate(String componentId,
+                                           String workflowId,
+                                           String start,
+                                           String end,
+                                           int concurrency);
 
 
   /**
@@ -62,12 +62,12 @@ public interface StyxBackfillClient {
    * @return The created {@link Backfill}
    */
   @Deprecated
-  CompletionStage<Backfill> backfillCreate(final String componentId,
-                                           final String workflowId,
-                                           final String start,
-                                           final String end,
-                                           final int concurrency,
-                                           final String description);
+  CompletionStage<Backfill> backfillCreate(String componentId,
+                                           String workflowId,
+                                           String start,
+                                           String end,
+                                           int concurrency,
+                                           String description);
 
   /**
    * Create a {@link Backfill}
@@ -84,15 +84,15 @@ public interface StyxBackfillClient {
    * @param concurrency the updated concurrency value
    * @return The updated {@link Backfill}
    */
-  CompletionStage<Backfill> backfillEditConcurrency(final String backfillId,
-                                                    final int concurrency);
+  CompletionStage<Backfill> backfillEditConcurrency(String backfillId,
+                                                    int concurrency);
 
   /**
    * Halt an existing {@link Backfill}
    *
    * @param backfillId backfill id
    */
-  CompletionStage<Void> backfillHalt(final String backfillId);
+  CompletionStage<Void> backfillHalt(String backfillId);
 
   /**
    * Get an existing {@link Backfill}
@@ -101,7 +101,7 @@ public interface StyxBackfillClient {
    * @param includeStatus if to include status info for the {@link Backfill}
    * @return The required {@link Backfill}
    */
-  CompletionStage<BackfillPayload> backfill(final String backfillId, boolean includeStatus);
+  CompletionStage<BackfillPayload> backfill(String backfillId, boolean includeStatus);
 
   /**
    * List of existing {@link Backfill}s
@@ -112,9 +112,11 @@ public interface StyxBackfillClient {
    * @param includeStatus if to include status info for the {@link Backfill}s
    * @return The required list of {@link Backfill}s, according to the applied filters/options
    */
-  CompletionStage<BackfillsPayload> backfillList(final Optional<String> componentId,
-                                                 final Optional<String> workflowId,
-                                                 final boolean showAll,
-                                                 final boolean includeStatus);
+  CompletionStage<BackfillsPayload> backfillList(Optional<String> componentId,
+                                                 Optional<String> workflowId,
+                                                 boolean showAll,
+                                                 boolean includeStatus);
 
+  @Override
+  void close();
 }

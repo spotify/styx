@@ -20,8 +20,6 @@
 
 package com.spotify.styx.client;
 
-import com.spotify.apollo.Client;
-
 /**
  * Factory to get a StyxClient implementation.
  */
@@ -31,27 +29,27 @@ public class StyxClientFactory {
     throw new UnsupportedOperationException();
   }
 
-  public static StyxClient create(Client client, String apiHost) {
-    return new StyxApolloClient(client, apiHost);
+  public static StyxClient create(String apiHost) {
+    return StyxOkHttpClient.create(apiHost);
   }
 
-  public static StyxStatusClient createStatusClient(Client client, String apiHost) {
-    return new StyxApolloClient(client, apiHost);
+  public static StyxStatusClient createStatusClient(String apiHost) {
+    return StyxOkHttpClient.create(apiHost);
   }
 
-  public static StyxBackfillClient createBackfillClient(Client client, String apiHost) {
-    return new StyxApolloClient(client, apiHost);
+  public static StyxBackfillClient createBackfillClient(String apiHost) {
+    return StyxOkHttpClient.create(apiHost);
   }
 
-  public static StyxSchedulerClient createSchedulerClient(Client client, String apiHost) {
-    return new StyxApolloClient(client, apiHost);
+  public static StyxSchedulerClient createSchedulerClient(String apiHost) {
+    return StyxOkHttpClient.create(apiHost);
   }
 
-  public static StyxResourceClient createResourceClient(Client client, String apiHost) {
-    return new StyxApolloClient(client, apiHost);
+  public static StyxResourceClient createResourceClient(String apiHost) {
+    return StyxOkHttpClient.create(apiHost);
   }
 
-  public static StyxWorkflowClient createWorkflowClient(Client client, String apiHost) {
-    return new StyxApolloClient(client, apiHost);
+  public static StyxWorkflowClient createWorkflowClient(String apiHost) {
+    return StyxOkHttpClient.create(apiHost);
   }
 }
