@@ -24,7 +24,6 @@ import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.data.EventInfo;
-import java.io.Closeable;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
@@ -32,7 +31,7 @@ import java.util.concurrent.CompletionStage;
 /**
  * Interface for Styx client, status resources.
  */
-public interface StyxStatusClient extends Closeable {
+public interface StyxStatusClient extends AutoCloseable {
 
   /**
    * Get information about the active stats

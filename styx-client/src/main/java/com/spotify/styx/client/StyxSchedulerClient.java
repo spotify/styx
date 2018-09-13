@@ -22,13 +22,12 @@ package com.spotify.styx.client;
 
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
-import java.io.Closeable;
 import java.util.concurrent.CompletionStage;
 
 /**
  * Interface for Styx client, scheduler resources.
  */
-public interface StyxSchedulerClient extends Closeable {
+public interface StyxSchedulerClient extends AutoCloseable {
 
   /**
    * Trigger a {@link WorkflowInstance}

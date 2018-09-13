@@ -24,14 +24,13 @@ import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
-import java.io.Closeable;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
 /**
  * Interface for Styx client, backfill resources.
  */
-public interface StyxBackfillClient extends Closeable {
+public interface StyxBackfillClient extends AutoCloseable {
 
   /**
    * Create a {@link Backfill}

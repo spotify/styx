@@ -24,14 +24,13 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
-import java.io.Closeable;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 
 /**
  * Interface for Styx client, workflow resources.
  */
-public interface StyxWorkflowClient extends Closeable {
+public interface StyxWorkflowClient extends AutoCloseable {
 
   /**
    * Get a {@link Workflow}

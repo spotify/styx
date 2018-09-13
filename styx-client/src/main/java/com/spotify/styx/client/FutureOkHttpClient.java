@@ -22,7 +22,6 @@ package com.spotify.styx.client;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.spotify.styx.serialization.Json;
-import java.io.Closeable;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Objects;
@@ -42,7 +41,7 @@ import okio.ByteString;
 /**
  * Wrap OkHttpClient and return a CompletionStage instead of having to pass callbacks.
  */
-class FutureOkHttpClient implements Closeable {
+class FutureOkHttpClient implements AutoCloseable {
 
   private static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(10);
   private static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(90);

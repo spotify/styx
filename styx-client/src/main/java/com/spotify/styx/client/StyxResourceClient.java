@@ -22,13 +22,12 @@ package com.spotify.styx.client;
 
 import com.spotify.styx.api.ResourcesPayload;
 import com.spotify.styx.model.Resource;
-import java.io.Closeable;
 import java.util.concurrent.CompletionStage;
 
 /**
  * Interface for Styx client, Styx resource resources.
  */
-interface StyxResourceClient extends Closeable {
+interface StyxResourceClient extends AutoCloseable {
 
   /**
    * Create a {@link Resource}
