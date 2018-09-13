@@ -51,11 +51,11 @@ class FutureOkHttpClient implements AutoCloseable {
 
   private final OkHttpClient client;
 
-  public static FutureOkHttpClient create(OkHttpClient client) {
+  static FutureOkHttpClient create(OkHttpClient client) {
     return new FutureOkHttpClient(client);
   }
 
-  public static FutureOkHttpClient createDefault() {
+  static FutureOkHttpClient createDefault() {
     return FutureOkHttpClient.create(
         new OkHttpClient.Builder()
             .connectTimeout(DEFAULT_CONNECT_TIMEOUT.getSeconds(), TimeUnit.SECONDS)
@@ -69,7 +69,7 @@ class FutureOkHttpClient implements AutoCloseable {
     this.client = client;
   }
 
-  public CompletionStage<Response> send(Request request) {
+  CompletionStage<Response> send(Request request) {
     final CompletableFuture<Response> future = new CompletableFuture<>();
 
     client.newCall(request).enqueue(new Callback() {
@@ -93,7 +93,7 @@ class FutureOkHttpClient implements AutoCloseable {
         .build();
   }
 
-  public static Request forUri(HttpUrl uri, String method, Object payload) {
+  static Request forUri(HttpUrl uri, String method, Object payload) {
     try {
       return internalForUri(uri, method, Json.serialize(payload));
     } catch (JsonProcessingException e) {
@@ -101,23 +101,23 @@ class FutureOkHttpClient implements AutoCloseable {
     }
   }
 
-  public static Request forUri(HttpUrl.Builder uriBuilder, String method, Object payload) {
+  static Request forUri(HttpUrl.Builder uriBuilder, String method, Object payload) {
     return forUri(uriBuilder.build(), method, payload);
   }
 
-  public static Request forUri(HttpUrl uri, String method) {
+  static Request forUri(HttpUrl uri, String method) {
     return new Request.Builder().url(uri.uri().toString()).method(method, null).build();
   }
 
-  public static Request forUri(HttpUrl.Builder uriBuilder, String method) {
+  static Request forUri(HttpUrl.Builder uriBuilder, String method) {
     return forUri(uriBuilder.build(), method);
   }
 
-  public static Request forUri(HttpUrl.Builder uriBuilder) {
+  static Request forUri(HttpUrl.Builder uriBuilder) {
     return forUri(uriBuilder.build());
   }
 
-  public static Request forUri(HttpUrl uri) {
+  static Request forUri(HttpUrl uri) {
     return new Request.Builder().url(uri.uri().toString()).build();
   }
 
