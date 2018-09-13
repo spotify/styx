@@ -100,7 +100,7 @@ public class ClassEnforcerTest {
       throw new UnsupportedOperationException();
     }
 
-    public InstantiableWithArgs(String ignored) {
+    public InstantiableWithArgs(String ignored) { // NOPMD
     }
   }
 }
