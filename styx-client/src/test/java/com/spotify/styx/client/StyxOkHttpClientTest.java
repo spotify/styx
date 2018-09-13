@@ -20,6 +20,10 @@
 
 package com.spotify.styx.client;
 
+import static com.spotify.styx.client.OkHttpTestUtil.APPLICATION_JSON;
+import static com.spotify.styx.client.OkHttpTestUtil.bytesOfRequestBody;
+import static com.spotify.styx.client.OkHttpTestUtil.response;
+import static com.spotify.styx.client.OkHttpTestUtil.responseBuilder;
 import static com.spotify.styx.client.StyxOkHttpClient.STYX_API_VERSION;
 import static com.spotify.styx.util.StringIsValidUuid.isValidUuid;
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
@@ -33,12 +37,11 @@ import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.junit.internal.matchers.ThrowableMessageMatcher.hasMessage;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.EventsPayload;
@@ -66,20 +69,14 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import okhttp3.HttpUrl;
-import okhttp3.MediaType;
-import okhttp3.Protocol;
 import okhttp3.Request;
-import okhttp3.Response;
 import okhttp3.ResponseBody;
-import okio.Buffer;
-import okio.ByteString;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -138,9 +135,6 @@ public class StyxOkHttpClientTest {
       .addPathSegment("api").addPathSegment(STYX_API_VERSION).build();
 
   private static final String CLIENT_HOST = API_URL.scheme() + "://" + API_URL.host() ;
-
-  private static final MediaType APPLICATION_JSON =
-      Objects.requireNonNull(MediaType.parse("application/json"));
 
   @Mock FutureOkHttpClient client;
   @Mock GoogleIdTokenAuth auth;
@@ -711,36 +705,5 @@ public class StyxOkHttpClientTest {
     assertThat(request.method(), is("POST"));
     assertThat(Json.deserialize(bytesOfRequestBody(request), TriggerRequest.class),
                equalTo(triggerRequest));
-  }
-
-  private static ByteString bytesOfRequestBody(Request request) {
-    final Buffer sink = new Buffer();
-    try {
-      request.body().writeTo(sink);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-    return ByteString.of(sink.readByteArray());
-  }
-
-  private static Response.Builder responseBuilder(int code) {
-    return new Response.Builder()
-        .request(new Request.Builder().url(API_URL).build())
-        .protocol(Protocol.HTTP_1_1)
-        .message("HTTP " + code)
-        .code(code);
-  }
-
-  private static Response response(int code) {
-    return responseBuilder(code).build();
-  }
-
-  private static Response.Builder responseBuilder(int code, Object body) throws JsonProcessingException {
-    return responseBuilder(code)
-        .body(ResponseBody.create(APPLICATION_JSON, Json.serialize(body).toByteArray()));
-  }
-
-  private static Response response(int code, Object body) throws JsonProcessingException {
-    return responseBuilder(code, body).build();
   }
 }
