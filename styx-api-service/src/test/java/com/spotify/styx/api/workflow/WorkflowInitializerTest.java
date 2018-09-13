@@ -21,6 +21,7 @@
 package com.spotify.styx.api.workflow;
 
 import static com.spotify.styx.util.TimeUtil.lastInstant;
+import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
@@ -81,6 +82,22 @@ public class WorkflowInitializerTest {
     verify(transaction, never()).store(any(Workflow.class));
     verify(transaction, never()).updateNextNaturalTrigger(any(), any());
     verify(transaction).storeWorkflowWithNextNaturalTrigger(HOURLY_WORKFLOW, expectedTriggerInstantSpec);
+  }
+
+  @Test
+  public void shouldStoreNewWorkflowAndUpdateNextNaturalTriggerWithOffset()
+      throws IOException, WorkflowInitializationException {
+    when(transaction.workflow(HOURLY_WORKFLOW_WITH_VALID_OFFSET.id())).thenReturn(Optional.empty());
+    workflowInitializer.store(HOURLY_WORKFLOW_WITH_VALID_OFFSET);
+
+    final Instant nextTrigger = nextInstant(NOW, Schedule.HOURS);
+    final Instant nextWithOffset = HOURLY_WORKFLOW_WITH_VALID_OFFSET.configuration().addOffset(nextTrigger);
+    TriggerInstantSpec expectedTriggerInstantSpec = TriggerInstantSpec.create(nextTrigger, nextTrigger);
+
+    verify(transaction, never()).store(any(Workflow.class));
+    verify(transaction, never()).updateNextNaturalTrigger(any(), any());
+    verify(transaction).storeWorkflowWithNextNaturalTrigger(
+        HOURLY_WORKFLOW_WITH_VALID_OFFSET, expectedTriggerInstantSpec);
   }
 
   @Test

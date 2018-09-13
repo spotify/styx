@@ -20,6 +20,7 @@
 
 package com.spotify.styx.api.workflow;
 
+import static com.spotify.styx.util.TimeUtil.lastInstant;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
 
 import com.spotify.styx.model.Schedule;
@@ -94,10 +95,12 @@ public class WorkflowInitializer {
   }
 
   private TriggerInstantSpec initializeNaturalTrigger(Workflow workflow) {
-    final Instant now = time.get();
+    final Instant now0 = time.get();
+    final Instant now = workflow.configuration().subtractOffset(now0);
+//    final Instant now = now0;
     final Schedule schedule = workflow.configuration().schedule();
-    final Instant nextTrigger = nextInstant(now, schedule); // Next trigger instant, rounded off by schedule
-    final Instant nextWithOffset = workflow.configuration().subtractOffset(nextTrigger); // gives offset by date
-    return TriggerInstantSpec.create(nextWithOffset, nextTrigger);
+    final Instant nextTrigger = lastInstant(now, schedule); // Next trigger instant, rounded off by schedule
+    final Instant nextWithOffset = workflow.configuration().addOffset(nextTrigger); // gives offset by date
+    return TriggerInstantSpec.create(nextTrigger, nextWithOffset);
   }
 }

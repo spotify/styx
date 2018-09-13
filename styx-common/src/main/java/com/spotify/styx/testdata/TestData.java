@@ -92,7 +92,7 @@ public final class TestData {
           .commitSha(VALID_SHA)
           .dockerImage("busybox")
           .schedule(HOURS)
-          .offset("P1DT2H")
+          .offset("P30DT30M")
           .build();
 
   public static final WorkflowConfiguration DAILY_WORKFLOW_CONFIGURATION =
