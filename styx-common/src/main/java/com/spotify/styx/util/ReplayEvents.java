@@ -39,21 +39,16 @@ public final class ReplayEvents {
       WorkflowInstance workflowInstance,
       Storage storage,
       String backfillId) {
-    final SettableTime time = new SettableTime();
-    boolean backfillFound = false;
 
-    final SortedSet<SequenceEvent> sequenceEvents;
-    try {
-      sequenceEvents = storage.readEvents(workflowInstance);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-
+    final SortedSet<SequenceEvent> sequenceEvents = getSequenceEvents(workflowInstance, storage);
     if (sequenceEvents.isEmpty()) {
       return Optional.empty();
     }
 
+    final SettableTime time = new SettableTime();
     RunState restoredState = RunState.fresh(workflowInstance, time);
+
+    boolean backfillFound = false;
 
     // events are written after the datastore transition transaction is successfully
     // committed, so we can trust the sequence of events faithfully reflect the state
@@ -79,6 +74,17 @@ public final class ReplayEvents {
     }
 
     return backfillFound ? Optional.of(restoredState) : Optional.empty();
+  }
+
+  private static SortedSet<SequenceEvent> getSequenceEvents(
+      final WorkflowInstance workflowInstance, final Storage storage) {
+    final SortedSet<SequenceEvent> sequenceEvents;
+    try {
+      sequenceEvents = storage.readEvents(workflowInstance);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return sequenceEvents;
   }
 
   private static boolean backfillFound(boolean triggerExecutionEventMet,
