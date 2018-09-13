@@ -121,6 +121,7 @@ class FutureOkHttpClient implements AutoCloseable {
     return new Request.Builder().url(uri.uri().toString()).build();
   }
 
+  @Override
   public void close() {
     client.connectionPool().evictAll();
     client.dispatcher().executorService().shutdown();
