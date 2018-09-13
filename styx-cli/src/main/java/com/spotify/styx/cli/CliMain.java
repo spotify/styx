@@ -324,11 +324,7 @@ public final class CliMain {
       cliOutput.printError(getStackTraceAsString(e));
       throw CliExitException.of(ExitStatus.UnknownError);
     } finally {
-      try {
-        styxClient.close();
-      } catch (IOException ignored) {
-        // ignore exception about client not being able to close
-      }
+      styxClient.close();
     }
   }
 

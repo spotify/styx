@@ -74,4 +74,7 @@ public interface StyxSchedulerClient extends AutoCloseable {
   CompletionStage<Void> retryWorkflowInstance(String componentId,
                                               String workflowId,
                                               String parameter);
+
+  @Override
+  void close();
 }

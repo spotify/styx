@@ -56,4 +56,7 @@ public interface StyxStatusClient extends AutoCloseable {
   CompletionStage<List<EventInfo>> eventsForWorkflowInstance(String componentId,
                                                              String workflowId,
                                                              String parameter);
+
+  @Override
+  void close();
 }

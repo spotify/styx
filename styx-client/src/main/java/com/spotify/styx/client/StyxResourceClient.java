@@ -64,4 +64,6 @@ interface StyxResourceClient extends AutoCloseable {
    */
   CompletionStage<ResourcesPayload> resourceList();
 
+  @Override
+  void close();
 }

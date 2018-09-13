@@ -389,7 +389,7 @@ class StyxOkHttpClient implements StyxClient {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     client.close();
   }
 }

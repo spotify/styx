@@ -117,4 +117,6 @@ public interface StyxBackfillClient extends AutoCloseable {
                                                  boolean showAll,
                                                  boolean includeStatus);
 
+  @Override
+  void close();
 }
