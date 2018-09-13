@@ -63,7 +63,7 @@ public class ReplayEventsTest {
 
   @Test
   public void shouldNotBeConstructable() throws ReflectiveOperationException {
-    ClassEnforcer.assertNotInstantiable(ReplayEvents.class);
+    assertThat(ClassEnforcer.assertNotInstantiable(ReplayEvents.class), is(true));
   }
 
   @Test

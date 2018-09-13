@@ -66,7 +66,7 @@ public final class ReplayEvents {
 
       if (triggerExecutionEventMet) {
         if (backfillFound) {
-          return Optional.of(restoredState);
+          break;
         }
         restoredState = RunState.fresh(workflowInstance, time);
       }

@@ -20,6 +20,9 @@
 
 package com.spotify.styx.util;
 
+import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThat;
+
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -30,7 +33,7 @@ public class ClassEnforcerTest {
 
   @Test
   public void shouldAssertNotInstantiable() throws ReflectiveOperationException {
-    ClassEnforcer.assertNotInstantiable(ClassEnforcer.class);
+    assertThat(ClassEnforcer.assertNotInstantiable(ClassEnforcer.class), is(true));
   }
 
   @Test
