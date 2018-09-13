@@ -69,6 +69,7 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
+import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.time.Duration;
@@ -97,7 +98,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   private static LocalDatastoreHelper localDatastore;
   private Connection bigtable = setupBigTableMockTable();
 
-  private AggregateStorage storage;
+  private Storage storage;
 
   private static final Backfill BACKFILL_1 = Backfill.newBuilder()
       .id("backfill-1")

@@ -98,7 +98,7 @@ public class StatusResource {
       runStates.addAll(
           activeStates.values().stream().map(this::runStateToRunStateData).collect(toList()));
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
 
     return RunStateDataPayload.create(runStates);
@@ -113,7 +113,7 @@ public class StatusResource {
         .build();
   }
 
-  public EventsPayload eventsForWorkflowInstance(String cid, String eid, String iid) {
+  private EventsPayload eventsForWorkflowInstance(String cid, String eid, String iid) {
     final WorkflowId workflowId = WorkflowId.create(cid, eid);
     final WorkflowInstance workflowInstance = WorkflowInstance.create(workflowId, iid);
 
