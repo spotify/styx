@@ -812,21 +812,18 @@ public final class CliMain {
 
     private Argument addEnvVarArgument(ArgumentParser parser, String... flags) {
       return parser.addArgument(flags).type(String.class)
-          .help("Environment variables")
           .action(append())
-          .setDefault(new ArrayList<>())
-          .nargs("*");
+          .help("Environment variables");
     }
 
     private Map<String, String> getEnvVars(Namespace namespace, Argument argument) {
-      final List<List<String>> args = namespace.getList(argument.getDest());
+      final List<String> args = namespace.getList(argument.getDest());
       return args == null
           ? Collections.emptyMap()
           : args.stream()
-                .flatMap(Collection::stream)
-                .map(s -> Splitter.on('=').splitToList(s))
-                .peek(kv -> Preconditions.checkArgument(kv.size() == 2))
-                .collect(toMap(kv -> kv.get(0), kv -> kv.get(1)));
+              .map(s -> Splitter.on('=').splitToList(s))
+              .peek(kv -> Preconditions.checkArgument(kv.size() == 2))
+              .collect(toMap(kv -> kv.get(0), kv -> kv.get(1)));
     }
   }
 
