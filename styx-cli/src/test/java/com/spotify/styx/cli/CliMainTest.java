@@ -270,8 +270,8 @@ public class CliMainTest {
     when(client.backfillCreate(expectedInput))
         .thenReturn(CompletableFuture.completedFuture(backfill));
 
-    CliMain.run(cliContext, "backfill", "create", component, "foo", "2017-01-01", "2017-01-30",
-        "1", "-e", "FOO=foo", "BAR=bar", "--env", "BAZ=baz", "-e", "FOOBAR=");
+    CliMain.run(cliContext, "backfill", "create", "-e", "FOO=foo", component, "foo", "2017-01-01", "2017-01-30",
+        "1", "-e", "BAR=bar", "--env", "BAZ=baz", "-e", "FOOBAR=");
 
     verify(client).backfillCreate(expectedInput);
     verify(cliOutput).printBackfill(backfill, true);
@@ -282,8 +282,8 @@ public class CliMainTest {
     final String component = "quux";
 
     try {
-      CliMain.run(cliContext, "backfill", "create", component, "foo", "2017-01-01", "2017-01-30",
-          "1", "-e", "FOO=foo", "BAR=bar", "--env", "BAZ=baz", "-e", "FOOBAR");
+      CliMain.run(cliContext, "backfill", "create", "-e", "FOO=foo", component, "foo", "2017-01-01", "2017-01-30",
+          "1", "-e", "BAR=bar", "--env", "BAZ=baz", "-e", "FOOBAR");
       fail();
     } catch (CliExitException e) {
       assertThat(e.status(), is(ExitStatus.UnknownError));
@@ -810,7 +810,7 @@ public class CliMainTest {
     when(client.triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters))
         .thenReturn(CompletableFuture.completedFuture(null));
 
-    CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02", "-e", "FOO=foo", "BAR=bar", "--env", "BAZ=baz");
+    CliMain.run(cliContext, "t", "-e", "FOO=foo", "foo", "bar", "2017-01-02", "-e", "BAR=bar", "--env", "BAZ=baz");
 
     verify(client).triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters);
   }
