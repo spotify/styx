@@ -48,7 +48,6 @@ import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.util.IsClosedException;
 import io.fabric8.kubernetes.api.model.DoneablePod;
 import io.fabric8.kubernetes.api.model.DoneableSecret;
 import io.fabric8.kubernetes.api.model.ObjectMeta;
@@ -132,7 +131,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   KubernetesGCPServiceAccountSecretManager sut;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     MockitoAnnotations.initMocks(this);
 
     executor = Executors.newCachedThreadPool();
@@ -151,12 +150,12 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @After
-  public void tearDown() throws Exception {
+  public void tearDown() {
     executor.shutdownNow();
   }
 
   @Test
-  public void shouldCreateServiceAccountKeysAndSecret() throws IsClosedException, IOException {
+  public void shouldCreateServiceAccountKeysAndSecret() throws IOException {
     when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(true);
 
     ServiceAccountKey jsonKey = new ServiceAccountKey();
@@ -181,7 +180,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test(expected = RuntimeException.class)
-  public void shouldCleanupKeysIfKeyCreationFails() throws IsClosedException, IOException {
+  public void shouldCleanupKeysIfKeyCreationFails() throws IOException {
     when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(true);
 
     ServiceAccountKey jsonKey = new ServiceAccountKey();
@@ -201,7 +200,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test
-  public void shouldDeleteGCPKeysIfSecretAlreadyExists() throws IsClosedException, IOException {
+  public void shouldDeleteGCPKeysIfSecretAlreadyExists() throws IOException {
     when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(true);
 
     ServiceAccountKey jsonKey = new ServiceAccountKey();
@@ -225,7 +224,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   @Test
   public void shouldNotConcurrentlyCreateServiceAccountKeysAndSecrets()
-      throws IsClosedException, IOException, ExecutionException, InterruptedException {
+      throws IOException, ExecutionException, InterruptedException {
 
     final ServiceAccountKey jsonKey = new ServiceAccountKey();
     jsonKey.setName("key.json");
@@ -410,6 +409,25 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test
+  public void shouldHandlePermissionDenied() throws IOException {
+    when(serviceAccountKeyManager.serviceAccountExists(anyString())).thenReturn(true);
+
+    final GoogleJsonResponseException permissionDenied = new GoogleJsonResponseException(
+        new HttpResponseException.Builder(403, "Forbidden", new HttpHeaders()),
+        new GoogleJsonError().set("status", "PERMISSION_DENIED"));
+
+    doThrow(permissionDenied).when(serviceAccountKeyManager).createJsonKey(any());
+    doThrow(permissionDenied).when(serviceAccountKeyManager).createP12Key(any());
+
+    exception.expect(InvalidExecutionException.class);
+    exception.expectMessage(String.format(
+        "Permission denied when creating keys for service account: %s. Styx needs to be Service Account Key Admin.",
+        SERVICE_ACCOUNT));
+
+    sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(), SERVICE_ACCOUNT);
+  }
+
+  @Test
   public void shouldHandleTooManyKeysCreated() throws IOException {
     when(serviceAccountKeyManager.serviceAccountExists(anyString())).thenReturn(true);
 
@@ -429,7 +447,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test
-  public void shouldUseExistingServiceAccountSecret() throws IsClosedException, IOException {
+  public void shouldUseExistingServiceAccountSecret() throws IOException {
 
     final String jsonKeyId = "json-key";
     final String p12KeyId = "p12-key";
@@ -455,7 +473,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test
-  public void shouldFailIfServiceAccountDoesNotExist() throws IsClosedException, IOException {
+  public void shouldFailIfServiceAccountDoesNotExist() throws IOException {
     when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(false);
 
     exception.expect(InvalidExecutionException.class);
@@ -513,7 +531,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test
-  public void shouldSmearRotationWeekly() throws Exception {
+  public void shouldSmearRotationWeekly() {
     final long hours = Duration.ofDays(7).toHours();
     final int[] rotationsPerHour = new int[(int) hours];
     final int n = 10000;
