@@ -20,6 +20,7 @@
 
 package com.spotify.styx.util;
 
+import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
@@ -35,47 +36,80 @@ public final class ReplayEvents {
     throw new UnsupportedOperationException();
   }
 
-  // TODO: fix NPath complexity
-  public static Optional<RunState> getBackfillRunState(
+  public static Optional<RunStateData> getBackfillRunStateData(
       WorkflowInstance workflowInstance,
       Storage storage,
       String backfillId) {
-    final SettableTime time = new SettableTime();
-    boolean backfillFound = false;
 
-    final SortedSet<SequenceEvent> sequenceEvents;
-    try {
-      sequenceEvents = storage.readEvents(workflowInstance);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-
+    final SortedSet<SequenceEvent> sequenceEvents = getSequenceEvents(workflowInstance, storage);
     if (sequenceEvents.isEmpty()) {
       return Optional.empty();
     }
 
+    final SettableTime time = new SettableTime();
     RunState restoredState = RunState.fresh(workflowInstance, time);
+
+    boolean backfillFound = false;
+
+    final SettableTime initialTime = new SettableTime();
+    final SettableTime latestTime = new SettableTime();
 
     // events are written after the datastore transition transaction is successfully
     // committed, so we can trust the sequence of events faithfully reflect the state
     // transition if they have all been successfully written to bigtable
     for (SequenceEvent sequenceEvent : sequenceEvents) {
       time.set(Instant.ofEpochMilli(sequenceEvent.timestamp()));
-      if ("triggerExecution".equals(EventUtil.name(sequenceEvent.event()))) {
+
+      final boolean triggerExecutionEventMet =
+          "triggerExecution".equals(EventUtil.name(sequenceEvent.event()));
+
+      if (triggerExecutionEventMet) {
         if (backfillFound) {
-          return Optional.of(restoredState);
+          break;
         }
+
         restoredState = RunState.fresh(workflowInstance, time);
+        initialTime.set(time.get());
       }
 
       restoredState = restoredState.transition(sequenceEvent.event(), time);
-      if ("triggerExecution".equals(EventUtil.name(sequenceEvent.event()))
-          && restoredState.data().trigger().isPresent()
-          && backfillId.equals(TriggerUtil.triggerId(restoredState.data().trigger().get()))) {
+      latestTime.set(time.get());
+
+      if (backfillFound(triggerExecutionEventMet, backfillId, restoredState)) {
         backfillFound = true;
       }
     }
-    return backfillFound ? Optional.of(restoredState) : Optional.empty();
+
+    if (backfillFound) {
+      final RunStateData runStateData = RunStateData.newBuilder()
+          .workflowInstance(restoredState.workflowInstance())
+          .state(restoredState.state().name())
+          .stateData(restoredState.data())
+          .initialTimestamp(initialTime.get().toEpochMilli())
+          .latestTimestamp(latestTime.get().toEpochMilli())
+          .build();
+      return Optional.of(runStateData);
+    } else {
+      return Optional.empty();
+    }
+  }
+
+  private static SortedSet<SequenceEvent> getSequenceEvents(
+      final WorkflowInstance workflowInstance, final Storage storage) {
+    final SortedSet<SequenceEvent> sequenceEvents;
+    try {
+      sequenceEvents = storage.readEvents(workflowInstance);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return sequenceEvents;
+  }
+
+  private static boolean backfillFound(boolean triggerExecutionEventMet,
+                                       String backfillId, RunState restoredState) {
+    return triggerExecutionEventMet && restoredState.data().trigger()
+        .map(trigger -> backfillId.equals(TriggerUtil.triggerId(trigger)))
+        .orElse(false);
   }
 
   private static final class SettableTime implements Time {

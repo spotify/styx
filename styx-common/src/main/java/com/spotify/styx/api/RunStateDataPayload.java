@@ -20,51 +20,59 @@
 
 package com.spotify.styx.api;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.auto.value.AutoValue;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.StateData;
+import io.norberg.automatter.AutoMatter;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Value type for all current active states
  */
-@AutoValue
-public abstract class RunStateDataPayload {
+@AutoMatter
+public interface RunStateDataPayload {
 
-  @JsonProperty
-  //todo change the name of this variable, remove 'active'
-  public abstract List<RunStateData> activeStates();
+  // todo change the name of this variable, remove 'active'
+  // however this will be a breaking change
+  List<RunStateData> activeStates();
 
-  @AutoValue
-  public abstract static class RunStateData {
+  @AutoMatter
+  interface RunStateData {
 
-    public static final Comparator<RunStateData> PARAMETER_COMPARATOR =
+    Comparator<RunStateData> PARAMETER_COMPARATOR =
         Comparator.comparing(a -> a.workflowInstance().parameter());
 
-    @JsonProperty
-    public abstract WorkflowInstance workflowInstance();
+    WorkflowInstance workflowInstance();
 
-    @JsonProperty
-    public abstract String state();
+    String state();
 
-    @JsonProperty
-    public abstract StateData stateData();
+    StateData stateData();
 
-    @JsonCreator
-    public static RunStateData create(
-        @JsonProperty("workflow_instance") WorkflowInstance workflowInstance,
-        @JsonProperty("state") String state,
-        @JsonProperty("state_data") StateData stateData) {
-      return new AutoValue_RunStateDataPayload_RunStateData(workflowInstance, state, stateData);
+    Optional<Long> initialTimestamp();
+
+    Optional<Long> latestTimestamp();
+
+    RunStateDataBuilder builder();
+
+    static RunStateDataBuilder newBuilder() {
+      return new RunStateDataBuilder();
+    }
+
+    static RunStateData create(
+        WorkflowInstance workflowInstance,
+        String state,
+        StateData stateData) {
+      return newBuilder()
+          .workflowInstance(workflowInstance)
+          .state(state)
+          .stateData(stateData)
+          .build();
     }
   }
 
-  @JsonCreator
-  public static RunStateDataPayload create(
-      @JsonProperty("active_states") List<RunStateData> runStateDataList) {
-    return new AutoValue_RunStateDataPayload(runStateDataList);
+  static RunStateDataPayload create(
+      List<RunStateData> runStateDataList) {
+    return new RunStateDataPayloadBuilder().activeStates(runStateDataList).build();
   }
 }

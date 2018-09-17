@@ -38,7 +38,7 @@ public class ClassEnforcer {
    * @throws ReflectiveOperationException if cls does not have a default constructor
    * @throws AssertionError if
    */
-  public static void assertNotInstantiable(Class<?> cls) throws ReflectiveOperationException {
+  public static boolean assertNotInstantiable(Class<?> cls) throws ReflectiveOperationException {
     if (cls.getDeclaredConstructors().length != 1) {
       throw new AssertionError("Class should only have a single private constructor: " + cls.getName());
     }
@@ -51,7 +51,7 @@ public class ClassEnforcer {
       constructor.newInstance();
     } catch (InvocationTargetException e) {
       if (e.getCause() instanceof UnsupportedOperationException) {
-        return;
+        return true;
       }
     }
     throw new AssertionError("Constructor should throw UnsupportedOperationException: " + cls.getName());

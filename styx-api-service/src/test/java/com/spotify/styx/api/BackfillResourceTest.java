@@ -69,6 +69,7 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
+import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.time.Duration;
@@ -97,7 +98,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   private static LocalDatastoreHelper localDatastore;
   private Connection bigtable = setupBigTableMockTable();
 
-  private AggregateStorage storage;
+  private Storage storage;
 
   private static final Backfill BACKFILL_1 = Backfill.newBuilder()
       .id("backfill-1")
@@ -180,7 +181,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @AfterClass
-  public static void tearDownClass() throws Exception {
+  public static void tearDownClass() {
     if (localDatastore != null) {
       try {
         localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
@@ -471,9 +472,23 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
     assertJson(response, "backfill.id", equalTo(BACKFILL_5.id()));
     assertJson(response, "statuses.active_states[0].state", equalTo("DONE"));
+    assertJson(response, "statuses.active_states[0].initial_timestamp", is(1));
+    assertJson(response, "statuses.active_states[0].latest_timestamp", is(7));
+    assertJson(response, "statuses.active_states[1].state", equalTo("DONE"));
+    assertJson(response, "statuses.active_states[1].initial_timestamp", is(1));
+    assertJson(response, "statuses.active_states[1].latest_timestamp", is(7));
+    assertJson(response, "statuses.active_states[2].state", equalTo("DONE"));
+    assertJson(response, "statuses.active_states[2].initial_timestamp", is(1));
+    assertJson(response, "statuses.active_states[2].latest_timestamp", is(7));
     assertJson(response, "statuses.active_states[3].state", equalTo("DONE"));
+    assertJson(response, "statuses.active_states[3].initial_timestamp", is(1));
+    assertJson(response, "statuses.active_states[3].latest_timestamp", is(7));
     assertJson(response, "statuses.active_states[4].state", equalTo("DONE"));
+    assertJson(response, "statuses.active_states[4].initial_timestamp", is(1));
+    assertJson(response, "statuses.active_states[4].latest_timestamp", is(7));
     assertJson(response, "statuses.active_states[5].state", equalTo("DONE"));
+    assertJson(response, "statuses.active_states[5].initial_timestamp", is(1));
+    assertJson(response, "statuses.active_states[5].latest_timestamp", is(7));
     assertJson(response, "statuses.active_states", hasSize(6));
   }
 
@@ -486,7 +501,6 @@ public class BackfillResourceTest extends VersionedApiTest {
     storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                 5L, 5L));
     storage.writeEvent(SequenceEvent.create(Event.terminate(wfi, Optional.of(0)),               6L, 6L));
     storage.writeEvent(SequenceEvent.create(Event.success(wfi),                                 7L, 7L));
-    storage.writeActiveState(wfi, RunState.create(wfi, State.DONE, StateData.zero(), Instant.now(), 8L));
   }
 
   @Test
