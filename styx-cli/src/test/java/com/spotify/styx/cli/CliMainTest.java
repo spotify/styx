@@ -70,6 +70,7 @@ import java.util.concurrent.CompletableFuture;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.hamcrest.Matchers;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
