@@ -281,8 +281,10 @@ public final class WorkflowResource {
           if (!workflow.isPresent()) {
             return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Could not find workflow."));
           }
+          final WorkflowState workflowState = storage.workflowState(workflowId);
+          final Instant now = workflowState.nextNaturalTrigger().orElseGet(Instant::now);
           final Schedule schedule = workflow.get().configuration().schedule();
-          offset = calculateTailOffset(limit, schedule);
+          offset = calculateTailOffset(limit, schedule, now);
         } else {
           offset = offsetParam;
         }
@@ -300,13 +302,13 @@ public final class WorkflowResource {
   /**
    * Calculate an offset suitable for getting the {@code limit} latest instances of a workflow.
    */
-  private String calculateTailOffset(int limit, Schedule schedule) {
+  private String calculateTailOffset(int limit, Schedule schedule, Instant now) {
     final Instant offsetInstant = schedule.wellKnown().unit()
         // Calculate a point in time using the well know schedule time unit
-        .map(unit -> TimeUtil.previousInstant(Instant.now().minus(limit, unit), schedule))
+        .map(unit -> TimeUtil.previousInstant(now.minus(limit, unit), schedule))
         // Fall back to iteratively walking back in time
         .orElseGet(() -> {
-          Instant offset = Instant.now();
+          Instant offset = now;
           for (int i = 0; i < limit; i++) {
             offset = TimeUtil.previousInstant(offset, schedule);
           }

@@ -29,6 +29,7 @@ import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.model.SequenceEvent.create;
 import static com.spotify.styx.serialization.Json.deserialize;
 import static com.spotify.styx.serialization.Json.serialize;
+import static java.time.ZoneOffset.UTC;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
@@ -67,6 +68,7 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
+import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
@@ -478,9 +480,16 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     final int limit = 3;
 
-    // Populate storage with 10x the number of instances we want to fetch
+    // Set the next natural trigger
+    final Instant nextNaturalTrigger = TimeUtil.previousInstant(
+        LocalDate.of(2018, 9, 17).atStartOfDay(UTC).toInstant(),
+        WORKFLOW.configuration().schedule());
+    final WorkflowState workflowState = WorkflowState.builder().nextNaturalTrigger(nextNaturalTrigger).build();
+    storage.patchState(WORKFLOW.id(), workflowState);
+
+    // Populate storage with more instances than we want to fetch
     final List<WorkflowInstance> allInstances = new ArrayList<>();
-    LocalDate end = LocalDate.now();
+    final LocalDate end = nextNaturalTrigger.atZone(UTC).toLocalDate().minusDays(1);
     LocalDate date = end.minusDays(limit * 10);
     while (date.isBefore(end)) {
       date = date.plusDays(1);
