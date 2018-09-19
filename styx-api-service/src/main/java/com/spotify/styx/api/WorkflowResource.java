@@ -301,12 +301,18 @@ public final class WorkflowResource {
    * Calculate an offset suitable for getting the {@code limit} latest instances of a workflow.
    */
   private String calculateTailOffset(int limit, Schedule schedule) {
-    // TODO: Optimize away for loop using Schedule.WellKnown
-    Instant offset = Instant.now();
-    for (int i = 0; i < limit; i++) {
-      offset = TimeUtil.previousInstant(offset, schedule);
-    }
-    return ParameterUtil.toParameter(schedule, offset);
+    final Instant offsetInstant = schedule.wellKnown().unit()
+        // Calculate a point in time using the well know schedule time unit
+        .map(unit -> TimeUtil.previousInstant(Instant.now().minus(limit, unit), schedule))
+        // Fall back to iteratively walking back in time
+        .orElseGet(() -> {
+          Instant offset = Instant.now();
+          for (int i = 0; i < limit; i++) {
+            offset = TimeUtil.previousInstant(offset, schedule);
+          }
+          return offset;
+        });
+    return ParameterUtil.toParameter(schedule, offsetInstant);
   }
 
   private Response<WorkflowInstanceExecutionData> instance(
