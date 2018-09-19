@@ -112,7 +112,7 @@ public class BigTableStorageTest {
     storage.writeEvent(SequenceEvent.create(Event.started(WFI2), 2L, 5L));
 
     List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =
-        storage.executionData(WORKFLOW_ID1, "", 100);
+        storage.executionData(WORKFLOW_ID1, "", 100, false);
 
     assertThat(workflowInstanceExecutionData.size(), is(2));
 
@@ -140,7 +140,7 @@ public class BigTableStorageTest {
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI3, TRIGGER3, TRIGGER_PARAMETERS), 0L, 3L));
 
     List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =
-        storage.executionData(WORKFLOW_ID1, WFI2.parameter(), 100);
+        storage.executionData(WORKFLOW_ID1, WFI2.parameter(), 100, false);
 
     assertThat(workflowInstanceExecutionData.size(), is(1));
     assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).triggerId(), is("triggerId2"));
@@ -154,10 +154,24 @@ public class BigTableStorageTest {
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI3, TRIGGER3, TRIGGER_PARAMETERS), 0L, 3L));
 
     List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =
-        storage.executionData(WORKFLOW_ID1, WFI1.parameter(), 1);
+        storage.executionData(WORKFLOW_ID1, WFI1.parameter(), 1, false);
 
     assertThat(workflowInstanceExecutionData.size(), is(1));
     assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).triggerId(), is("triggerId1"));
+  }
+
+  @Test
+  public void shouldLimitTailExecutionDataForWorkflow() throws Exception {
+    setUp(0);
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1, TRIGGER_PARAMETERS), 0L, 0L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2, TRIGGER_PARAMETERS), 0L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI3, TRIGGER3, TRIGGER_PARAMETERS), 0L, 3L));
+
+    List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =
+        storage.executionData(WORKFLOW_ID1, WFI1.parameter(), 1, true);
+
+    assertThat(workflowInstanceExecutionData.size(), is(1));
+    assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).triggerId(), is("triggerId2"));
   }
 
   @Test

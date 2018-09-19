@@ -446,6 +446,26 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldTailPaginateWorkflowInstancesData() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-11");
+    WorkflowInstance wfi2 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-12");
+    WorkflowInstance wfi3 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-13");
+    storage.writeEvent(create(Event.triggerExecution(wfi1, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi2, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi3, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("/foo/bar/instances?offset=2016-08-11&limit=1&tail=true")));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+
+    assertJson(response, "[*]", hasSize(1));
+    assertJson(response, "[0].workflow_instance.parameter", is("2016-08-13"));
+  }
+
+  @Test
   public void shouldReturnBadRequestWhenNoPayloadIsSentWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 

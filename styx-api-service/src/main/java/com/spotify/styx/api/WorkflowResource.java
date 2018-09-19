@@ -263,11 +263,12 @@ public final class WorkflowResource {
     final int limit = request.parameter("limit").map(Integer::parseInt).orElse(DEFAULT_PAGE_LIMIT);
     final String start = request.parameter("start").orElse("");
     final String stop = request.parameter("stop").orElse("");
+    final boolean tail = Boolean.parseBoolean(request.parameter("tail").orElse(""));
 
     final List<WorkflowInstanceExecutionData> data;
     try {
       if (Strings.isNullOrEmpty(start)) {
-        data = storage.executionData(workflowId, offset, limit);
+        data = storage.executionData(workflowId, offset, limit, tail);
       } else {
         data = storage.executionData(workflowId, start, stop);
       }

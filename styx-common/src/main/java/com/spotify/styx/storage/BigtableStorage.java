@@ -36,6 +36,8 @@ import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.RunnableWithException;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -107,7 +109,7 @@ public class BigtableStorage {
     });
   }
 
-  List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String offset, int limit)
+  List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String offset, int limit, boolean tail)
       throws IOException {
     try (final Table eventsTable = connection.getTable(EVENTS_TABLE_NAME)) {
       final Scan scan = new Scan()
@@ -119,6 +121,11 @@ public class BigtableStorage {
         scan.setStartRow(Bytes.toBytes(offsetInstance.toKey() + '#'));
       }
 
+      // If `tail` is:
+      //   true: Return the _latest_ instances by scanning over _all_ the rows for this workflow (from offset).
+      //   false: Return the _newest_ instances by only scanning over as many rows as necessary.
+
+      final Deque<WorkflowInstance> tailInstances = new ArrayDeque<>();
       final Set<WorkflowInstance> workflowInstancesSet = Sets.newHashSet();
       try (ResultScanner scanner = eventsTable.getScanner(scan)) {
         Result result = scanner.next();
@@ -127,9 +134,17 @@ public class BigtableStorage {
           final int lastHash = key.lastIndexOf('#');
 
           final WorkflowInstance wfi = WorkflowInstance.parseKey(key.substring(0, lastHash));
-          workflowInstancesSet.add(wfi);
-          if (workflowInstancesSet.size() == limit) {
-            break;
+          final boolean added = workflowInstancesSet.add(wfi);
+          if (added) {
+            if (tail) {
+              tailInstances.addLast(wfi);
+              if (workflowInstancesSet.size() > limit) {
+                final WorkflowInstance firstWfi = tailInstances.removeFirst();
+                workflowInstancesSet.remove(firstWfi);
+              }
+            } else if (workflowInstancesSet.size() >= limit) {
+              break;
+            }
           }
 
           result = scanner.next();

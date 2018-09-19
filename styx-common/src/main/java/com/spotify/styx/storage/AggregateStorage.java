@@ -136,8 +136,8 @@ public class AggregateStorage implements Storage {
 
   @Override
   public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String offset,
-                                                           int limit) throws IOException {
-    return bigtableStorage.executionData(workflowId, offset, limit);
+                                                           int limit, boolean tail) throws IOException {
+    return bigtableStorage.executionData(workflowId, offset, limit, tail);
   }
 
   @Override
