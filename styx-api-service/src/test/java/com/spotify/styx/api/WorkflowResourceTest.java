@@ -64,6 +64,7 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
+import com.spotify.styx.util.TriggerInstantSpec;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
@@ -443,6 +444,41 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertJson(response, "[*]", hasSize(1));
     assertJson(response, "[0].workflow_instance.parameter", is("2016-08-12"));
+  }
+
+  @Test
+  public void shouldTailWorkflowInstancesData() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    storage.updateNextNaturalTrigger(WORKFLOW.id(),
+        TriggerInstantSpec.create(Instant.parse("2016-08-14T00:00:00Z"), Instant.parse("2016-08-15T00:00:00Z")));
+    WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-11");
+    WorkflowInstance wfi2 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-12");
+    WorkflowInstance wfi3 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-13");
+    storage.writeEvent(create(Event.triggerExecution(wfi1, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi2, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi3, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("/foo/bar/instances?limit=2&tail=true")));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+
+    assertJson(response, "[*]", hasSize(2));
+    assertJson(response, "[0].workflow_instance.parameter", is("2016-08-12"));
+    assertJson(response, "[1].workflow_instance.parameter", is("2016-08-13"));
+  }
+
+  @Test
+  public void shouldReturnNotFoundWhenTailUnknownWorkflowInstancesData() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("/bar/foo/instances?limit=2&tail=true")));
+
+    assertThat(response, hasStatus(withCode(Status.NOT_FOUND)));
+    assertThat(response, hasNoPayload());
+    assertThat(response, hasStatus(withReasonPhrase(equalTo("Could not find workflow."))));
   }
 
   @Test

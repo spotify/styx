@@ -190,11 +190,15 @@ Returns 204 No Content if the Workflow was found and deleted, 404 Not Found othe
 + Response 204
 + Response 404
 
-## Workflow Instances [/{version}/workflows/{component_id}/{workflow_id}/instances{?offset,limit,start,stop}]
+## Workflow Instances [/{version}/workflows/{component_id}/{workflow_id}/instances{?offset,limit,tail,start,stop}]
 
-Query can be done in two different styles: `offset+limit` or `start+stop`.
+Query can be done in three different styles: `tail+limit`, `offset+limit`, or `start+stop`.
 
-By using `offset` and `limit`, the oldest workflow instances is specified by `offset`, and
+By using `tail=true` and `limit`, the oldest workflow instance is identified by
+`next_natural_trigger - limit`, and the latest is the most recently naturally triggered instance.
+Setting `tail=false` behaves the same as omitting it.
+
+By using `offset` and `limit`, the oldest workflow instance is specified by `offset`, and
 the max number of workflows instances is specified by `limit`.
 
 By using `start` and `stop`, the oldest workflow instance is specified by `start`, and the latest is
@@ -206,10 +210,11 @@ specified by `stop`; `start` is required while `stop` is optional.
             + `v3`
     + component_id: `styx-canary` (string) - Workflow Component
     + workflow_id: `StyxCanary` (string) - Workflow ID
-    + offset: `2017-01-01` (string) - the offset parameter
-    + limit: `10` (number) - max number of instances
-    + start: `2017-01-01` (string) - the start parameter
-    + stop: `2017-01-03` (string) - the stop parameter (exclusive)
+    + offset: `2017-01-01` (optional, string) - the offset parameter
+    + limit: `10` (optional, number) - max number of instances, default to `24 * 7`
+    + tail: `true` (optional, boolean) - return the newest workflow instances, default to false
+    + start: `2017-01-01` (optional, string) - the start parameter
+    + stop: `2017-01-03` (optional, string) - the stop parameter (exclusive)
 
 ### Get Workflow Instances [GET]
 

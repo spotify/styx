@@ -116,7 +116,7 @@ public class BigtableStorage {
 
       if (!Strings.isNullOrEmpty(offset)) {
         final WorkflowInstance offsetInstance = WorkflowInstance.create(workflowId, offset);
-        scan.setStartRow(Bytes.toBytes(offsetInstance.toKey() + '#'));
+        scan.withStartRow(Bytes.toBytes(offsetInstance.toKey() + '#'), true);
       }
 
       final Set<WorkflowInstance> workflowInstancesSet = Sets.newHashSet();
@@ -148,11 +148,11 @@ public class BigtableStorage {
           .setFilter(new FirstKeyOnlyFilter());
 
       final WorkflowInstance startRow = WorkflowInstance.create(workflowId, start);
-      scan.setStartRow(Bytes.toBytes(startRow.toKey() + '#'));
+      scan.withStartRow(Bytes.toBytes(startRow.toKey() + '#'), true);
 
       if (!Strings.isNullOrEmpty(stop)) {
         final WorkflowInstance stopRow = WorkflowInstance.create(workflowId, stop);
-        scan.setStopRow(Bytes.toBytes(stopRow.toKey() + '#'));
+        scan.withStopRow(Bytes.toBytes(stopRow.toKey() + '#'), true);
       }
 
       final Set<WorkflowInstance> workflowInstancesSet = Sets.newHashSet();

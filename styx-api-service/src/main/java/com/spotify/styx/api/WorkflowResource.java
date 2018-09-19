@@ -35,6 +35,7 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.workflow.WorkflowInitializationException;
 import com.spotify.styx.api.workflow.WorkflowInitializer;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -42,9 +43,12 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -261,21 +265,40 @@ public final class WorkflowResource {
     final WorkflowId workflowId = WorkflowId.create(componentId, id);
     final String offset = request.parameter("offset").orElse("");
     final int limit = request.parameter("limit").map(Integer::parseInt).orElse(DEFAULT_PAGE_LIMIT);
-    final String start = request.parameter("start").orElse("");
-    final String stop = request.parameter("stop").orElse("");
+    final String startParam = request.parameter("start").orElse("");
+    final String stopParam = request.parameter("stop").orElse("");
+    final boolean tail = Boolean.parseBoolean(request.parameter("tail").orElse(""));
 
     final List<WorkflowInstanceExecutionData> data;
     try {
-      if (Strings.isNullOrEmpty(start)) {
+      if (tail) {
+        final Optional<Workflow> workflow = storage.workflow(workflowId);
+        if (!workflow.isPresent()) {
+          return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Could not find workflow."));
+        }
+
+        final String start = calculateStart(limit, workflow.get());
+        data = storage.executionData(workflowId, start, "");
+      } else if (Strings.isNullOrEmpty(startParam)) {
         data = storage.executionData(workflowId, offset, limit);
       } else {
-        data = storage.executionData(workflowId, start, stop);
+        data = storage.executionData(workflowId, startParam, stopParam);
       }
     } catch (IOException e) {
       return Response.forStatus(
           Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch execution info."));
     }
     return Response.forPayload(data);
+  }
+
+  private String calculateStart(int limit, Workflow workflow) throws IOException {
+    final WorkflowState workflowState = storage.workflowState(workflow.id());
+    final Schedule schedule = workflow.configuration().schedule();
+
+    final Instant now = workflowState.nextNaturalTrigger()
+        .orElseGet(() -> TimeUtil.lastInstant(Instant.now(), schedule));
+    final Instant offsetInstant = TimeUtil.instantWithOffsetTo(now, -limit, schedule);
+    return ParameterUtil.toParameter(schedule, offsetInstant);
   }
 
   private Response<WorkflowInstanceExecutionData> instance(

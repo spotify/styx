@@ -37,6 +37,7 @@ import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Static utility functions for manipulating time based on {@link Schedule} and offsets.
@@ -172,6 +173,36 @@ public class TimeUtil {
     }
 
     return instants;
+  }
+
+  /**
+   * Gets the instant with the offset to the reference instant.
+   *
+   * @param referenceInstant The start instant from where to go back or forward
+   * @param offset           How far to go back or forward
+   * @param schedule         The schedule of the workflow
+   *
+   * @return The instant with the offset to the reference instant
+   */
+  public static Instant instantWithOffsetTo(Instant referenceInstant, int offset, Schedule schedule) {
+    if (!isAligned(referenceInstant, schedule)) {
+      throw new IllegalArgumentException("unaligned reference instant");
+    }
+
+    final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
+
+    Instant currentInstant = referenceInstant;
+    for (int i = 0; i < Math.abs(offset); i++) {
+      final ZonedDateTime utcDateTime = currentInstant.atZone(UTC);
+      final Optional<ZonedDateTime> execution = offset <= 0
+                                                ? executionTime.lastExecution(utcDateTime)
+                                                : executionTime.nextExecution(utcDateTime);
+      currentInstant = execution
+          .orElseThrow(IllegalArgumentException::new) // with unix cron, this should not happen
+          .toInstant();
+    }
+
+    return currentInstant;
   }
 
   /**
