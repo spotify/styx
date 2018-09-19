@@ -122,8 +122,8 @@ public class BigtableStorage {
       }
 
       // If `tail` is:
-      //   true: Return the _latest_ instances by scanning over _all_ the rows for this workflow (from offset).
-      //   false: Return the _newest_ instances by only scanning over as many rows as necessary.
+      //   true: Return the _newest_ instances by scanning over _all_ the rows for this workflow (from offset).
+      //   false: Return the _oldest_ instances by only scanning over as many rows as necessary.
 
       final Deque<WorkflowInstance> tailInstances = new ArrayDeque<>();
       final Set<WorkflowInstance> workflowInstancesSet = Sets.newHashSet();
