@@ -35,6 +35,7 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.workflow.WorkflowInitializationException;
 import com.spotify.styx.api.workflow.WorkflowInitializer;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -42,9 +43,12 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -259,7 +263,7 @@ public final class WorkflowResource {
       String id,
       Request request) {
     final WorkflowId workflowId = WorkflowId.create(componentId, id);
-    final String offset = request.parameter("offset").orElse("");
+    final String offsetParam = request.parameter("offset").orElse("");
     final int limit = request.parameter("limit").map(Integer::parseInt).orElse(DEFAULT_PAGE_LIMIT);
     final String start = request.parameter("start").orElse("");
     final String stop = request.parameter("stop").orElse("");
@@ -268,6 +272,20 @@ public final class WorkflowResource {
     final List<WorkflowInstanceExecutionData> data;
     try {
       if (Strings.isNullOrEmpty(start)) {
+        final String offset;
+        if (tail && Strings.isNullOrEmpty(offsetParam)) {
+          // Tailing and no offset supplied. If we do not supply an offset here we might end up scanning a lot of
+          // historical instances. Calculate a suitable offset by stepping back `limit` instances based on the
+          // configured schedule of the workflow.
+          final Optional<Workflow> workflow = storage.workflow(workflowId);
+          if (!workflow.isPresent()) {
+            return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Could not find workflow."));
+          }
+          final Schedule schedule = workflow.get().configuration().schedule();
+          offset = calculateTailOffset(limit, schedule);
+        } else {
+          offset = offsetParam;
+        }
         data = storage.executionData(workflowId, offset, limit, tail);
       } else {
         data = storage.executionData(workflowId, start, stop);
@@ -277,6 +295,18 @@ public final class WorkflowResource {
           Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch execution info."));
     }
     return Response.forPayload(data);
+  }
+
+  /**
+   * Calculate an offset suitable for getting the {@code limit} latest instances of a workflow.
+   */
+  private String calculateTailOffset(int limit, Schedule schedule) {
+    // TODO: Optimize away for loop using Schedule.WellKnown
+    Instant offset = Instant.now();
+    for (int i = 0; i < limit; i++) {
+      offset = TimeUtil.previousInstant(offset, schedule);
+    }
+    return ParameterUtil.toParameter(schedule, offset);
   }
 
   private Response<WorkflowInstanceExecutionData> instance(

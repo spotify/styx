@@ -196,7 +196,8 @@ Query can be done in two different styles: `offset+limit(+tail)` or `start+stop`
 
 By using `offset` and `limit`, the oldest workflow instances is specified by `offset`, and
 the max number of workflows instances is specified by `limit`. If `tail=true`, the newest workflow instances are
-returned instead of the oldest.
+returned instead of the oldest. If `tail=true` and `offset` is unset, a suitable `offset` is guesstimated using the
+`limit` and the configured schedule of the workflow.
 
 By using `start` and `stop`, the oldest workflow instance is specified by `start`, and the latest is
 specified by `stop`; `start` is required while `stop` is optional.

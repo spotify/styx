@@ -44,6 +44,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
@@ -60,6 +61,8 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
+import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
@@ -69,10 +72,14 @@ import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.logging.Level;
+import java.util.stream.Collectors;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -463,6 +470,43 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertJson(response, "[*]", hasSize(1));
     assertJson(response, "[0].workflow_instance.parameter", is("2016-08-13"));
+  }
+
+  @Test
+  public void shouldTailPaginateWorkflowInstancesDataWithDefaultOffset() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final int limit = 3;
+
+    // Populate storage with 10x the number of instances we want to fetch
+    final List<WorkflowInstance> allInstances = new ArrayList<>();
+    LocalDate end = LocalDate.now();
+    LocalDate date = end.minusDays(limit * 10);
+    while (date.isBefore(end)) {
+      date = date.plusDays(1);
+      WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), date.toString());
+      allInstances.add(wfi);
+      storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
+    }
+
+    // Expect to get the `limit` latest instances
+    final List<WorkflowInstance> expectedInstances = allInstances.subList(
+        allInstances.size() - limit, allInstances.size());
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("/foo/bar/instances?limit=" + limit + "&tail=true")));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+
+    final List<WorkflowInstanceExecutionData> executionData = Json.OBJECT_MAPPER.readValue(
+        response.payload().get().toByteArray(),
+        new TypeReference<List<WorkflowInstanceExecutionData>>() { });
+
+    final List<WorkflowInstance> instances = executionData.stream()
+        .map(WorkflowInstanceExecutionData::workflowInstance)
+        .collect(Collectors.toList());
+
+    assertThat(instances, is(expectedInstances));
   }
 
   @Test
