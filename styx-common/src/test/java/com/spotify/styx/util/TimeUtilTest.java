@@ -26,6 +26,7 @@ import static com.spotify.styx.util.TimeUtil.instantsInReversedRange;
 import static com.spotify.styx.util.TimeUtil.isAligned;
 import static com.spotify.styx.util.TimeUtil.lastInstant;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
+import static com.spotify.styx.util.TimeUtil.instantWithOffsetTo;
 import static java.time.Instant.parse;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
@@ -332,7 +333,6 @@ public class TimeUtilTest {
         instantsInRange(firstTimeHours, lastTimeHours, Schedule.parse("0 * * * *")).isEmpty());
   }
 
-
   @Test
   public void shouldGetExceptionIfLastInstantIsBeforeFirstInstantReversed() {
     final Instant firstTimeHours = parse("2016-01-19T09:00:00.00Z");
@@ -364,5 +364,31 @@ public class TimeUtilTest {
     expect.expectMessage("unaligned instant");
 
     instantsInReversedRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
+  }
+
+  @Test
+  public void shouldGetCorrectInstantWithNegativeOffset() {
+    assertThat(instantWithOffsetTo(parse("2018-01-19T09:00:00.00Z"), -2, Schedule.HOURS),
+        is(parse("2018-01-19T07:00:00.00Z")));
+  }
+
+  @Test
+  public void shouldGetCorrectInstantWithPositiveOffset() {
+    assertThat(instantWithOffsetTo(parse("2018-01-19T09:00:00.00Z"), 2, Schedule.HOURS),
+        is(parse("2018-01-19T11:00:00.00Z")));
+  }
+
+  @Test
+  public void shouldGetCorrectInstantWithZeroOffset() {
+    assertThat(instantWithOffsetTo(parse("2018-01-19T09:00:00.00Z"), 0, Schedule.HOURS),
+        is(parse("2018-01-19T09:00:00.00Z")));
+  }
+
+  @Test
+  public void shouldGetExceptionIfReferenceInstantIsNotAlignedWithSchedule() {
+    expect.expect(IllegalArgumentException.class);
+    expect.expectMessage("unaligned reference instant");
+
+    instantWithOffsetTo(parse("2016-01-19T09:10:00.00Z"), 0, Schedule.HOURS);
   }
 }
