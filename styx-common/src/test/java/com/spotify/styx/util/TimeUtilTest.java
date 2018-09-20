@@ -45,10 +45,10 @@ import org.junit.rules.ExpectedException;
 public class TimeUtilTest {
 
   private static final Instant TIME = parse("2016-01-19T09:11:22.333Z");
+  private static final Schedule EVERY_5_MINUTES = Schedule.parse("*/5 * * * *");
 
   @Rule
   public ExpectedException expect = ExpectedException.none();
-  public static final Schedule EVERY_5_MINUTES = Schedule.parse("*/5 * * * *");
 
   @Test
   public void shouldGetLastInstant() {
