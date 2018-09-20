@@ -128,7 +128,7 @@ public class BigtableStorage {
 
           final WorkflowInstance wfi = WorkflowInstance.parseKey(key.substring(0, lastHash));
           workflowInstancesSet.add(wfi);
-          if (workflowInstancesSet.size() >= limit) {
+          if (workflowInstancesSet.size() == limit) {
             break;
           }
 
