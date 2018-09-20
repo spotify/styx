@@ -23,9 +23,12 @@ package com.spotify.styx.monitoring;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
+import com.codahale.metrics.Metric;
+import com.codahale.metrics.SlidingTimeWindowArrayReservoir;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.spotify.metrics.core.MetricId;
+import com.spotify.metrics.core.SemanticMetricBuilder;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
@@ -41,6 +44,23 @@ import javaslang.Tuple2;
 import javaslang.Tuple3;
 
 public final class MetricsStats implements Stats {
+
+  /**
+   * A variant of {@link SemanticMetricBuilder#HISTOGRAMS} that uses {@link SlidingTimeWindowArrayReservoir}
+   * instead of {@link com.codahale.metrics.ExponentiallyDecayingReservoir}.
+   */
+  static final SemanticMetricBuilder<Histogram> HISTOGRAM = new SemanticMetricBuilder<Histogram>() {
+    @Override
+    public Histogram newMetric() {
+      // TODO: What time window do we want?
+      return new Histogram(new SlidingTimeWindowArrayReservoir(30, TimeUnit.SECONDS));
+    }
+
+    @Override
+    public boolean isInstance(Metric metric) {
+      return metric instanceof Histogram;
+    }
+  };
 
   private static final String UNIT_SECOND = "s";
   private static final String UNIT_MILLISECOND = "ms";
@@ -180,7 +200,7 @@ public final class MetricsStats implements Stats {
     this.registry = Objects.requireNonNull(registry);
     this.time = Objects.requireNonNull(time, "time");
 
-    this.submitToRunning = registry.histogram(TRANSITIONING_DURATION);
+    this.submitToRunning = registry.getOrAdd(TRANSITIONING_DURATION, HISTOGRAM);
     this.pullImageErrorMeter = registry.meter(PULL_IMAGE_ERROR_RATE);
     this.naturalTrigger = registry.meter(NATURAL_TRIGGER_RATE);
     this.terminationLogMissing = registry.meter(TERMINATION_LOG_MISSING);
@@ -377,7 +397,7 @@ public final class MetricsStats implements Stats {
 
   private Histogram storageOpHistogram(String operation, String status) {
     return storageOperationHistograms.computeIfAbsent(
-        operation, (op) -> registry.histogram(STORAGE_DURATION.tagged(OPERATION, op, STATUS, status)));
+        operation, (op) -> registry.getOrAdd(STORAGE_DURATION.tagged(OPERATION, op, STATUS, status), HISTOGRAM));
   }
 
   private Meter storageOpMeter(String operation, String status) {
@@ -387,7 +407,7 @@ public final class MetricsStats implements Stats {
 
   private Histogram dockerOpHistogram(String operation, String status) {
     return dockerOperationHistograms.computeIfAbsent(
-        operation, (op) -> registry.histogram(DOCKER_DURATION.tagged(OPERATION, op, STATUS, status)));
+        operation, (op) -> registry.getOrAdd(DOCKER_DURATION.tagged(OPERATION, op, STATUS, status), HISTOGRAM));
   }
 
   private Meter dockerOpMeter(String operation, String status) {
@@ -397,12 +417,12 @@ public final class MetricsStats implements Stats {
 
   private Histogram resourceConfiguredHistogram(String resource) {
     return resourceConfiguredHistograms.computeIfAbsent(
-        resource, (op) -> registry.histogram(RESOURCE_CONFIGURED.tagged("resource", resource)));
+        resource, (op) -> registry.getOrAdd(RESOURCE_CONFIGURED.tagged("resource", resource), HISTOGRAM));
   }
 
   private Histogram resourceUsedHistogram(String resource) {
     return resourceUsedHistograms.computeIfAbsent(
-        resource, (op) -> registry.histogram(RESOURCE_USED.tagged("resource", resource)));
+        resource, (op) -> registry.getOrAdd(RESOURCE_USED.tagged("resource", resource), HISTOGRAM));
   }
 
   private Meter eventConsumerMeter(SequenceEvent sequenceEvent) {
@@ -424,7 +444,7 @@ public final class MetricsStats implements Stats {
 
   private Histogram tickHistogram(String type) {
     return tickHistograms.computeIfAbsent(
-        type, (op) -> registry.histogram(TICK_DURATION.tagged("type", type)));
+        type, (op) -> registry.getOrAdd(TICK_DURATION.tagged("type", type), HISTOGRAM));
   }
 
   private Meter datastoreOperationMeter(String operation, String kind) {

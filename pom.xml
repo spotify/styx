@@ -18,7 +18,8 @@
     <jackson.version>2.8.8</jackson.version>
     <checkstyle.config.location>checkstyle.xml</checkstyle.config.location>
     <checkstyle.version>2.17</checkstyle.version>
-    <semantic-metrics.version>0.11.2</semantic-metrics.version>
+    <semantic-metrics.version>0.11.5</semantic-metrics.version>
+    <metrics.version>3.2.6</metrics.version>
     <opencensus.version>0.14.0</opencensus.version>
   </properties>
 
@@ -197,11 +198,33 @@
         <groupId>com.spotify.metrics</groupId>
         <artifactId>semantic-metrics-core</artifactId>
         <version>${semantic-metrics.version}</version>
+        <exclusions>
+          <exclusion>
+          <groupId>com.codahale.metrics</groupId>
+          <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.spotify.metrics</groupId>
         <artifactId>semantic-metrics-ffwd-reporter</artifactId>
         <version>${semantic-metrics.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.codahale.metrics</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard.metrics</groupId>
+        <artifactId>metrics-core</artifactId>
+        <version>${metrics.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard.metrics</groupId>
+        <artifactId>metrics-jvm</artifactId>
+        <version>${metrics.version}</version>
       </dependency>
       <dependency>
         <groupId>com.github.kabutz</groupId>
