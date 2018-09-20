@@ -26,6 +26,7 @@ import static com.spotify.styx.util.TimeUtil.instantsInReversedRange;
 import static com.spotify.styx.util.TimeUtil.isAligned;
 import static com.spotify.styx.util.TimeUtil.lastInstant;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
+import static com.spotify.styx.util.TimeUtil.offsetInstant;
 import static java.time.Instant.parse;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
@@ -44,6 +45,7 @@ import org.junit.rules.ExpectedException;
 public class TimeUtilTest {
 
   private static final Instant TIME = parse("2016-01-19T09:11:22.333Z");
+  private static final Schedule EVERY_5_MINUTES = Schedule.parse("*/5 * * * *");
 
   @Rule
   public ExpectedException expect = ExpectedException.none();
@@ -364,5 +366,49 @@ public class TimeUtilTest {
     expect.expectMessage("unaligned instant");
 
     instantsInReversedRange(firstTimeHours, lastTimeHours, Schedule.HOURS);
+  }
+
+  @Test
+  public void shouldGetCorrectInstantWithNegativeOffset() {
+    assertThat(offsetInstant(parse("2018-01-19T09:00:00.00Z"), Schedule.HOURS, -2),
+        is(parse("2018-01-19T07:00:00.00Z")));
+  }
+
+  @Test
+  public void shouldGetCorrectInstantWithPositiveOffset() {
+    assertThat(offsetInstant(parse("2018-01-19T09:00:00.00Z"), Schedule.HOURS, 2),
+        is(parse("2018-01-19T11:00:00.00Z")));
+  }
+
+  @Test
+  public void shouldGetCorrectInstantWithZeroOffset() {
+    assertThat(offsetInstant(parse("2018-01-19T09:00:00.00Z"), Schedule.HOURS, 0),
+        is(parse("2018-01-19T09:00:00.00Z")));
+  }
+
+  @Test
+  public void shouldGetCorrectInstantWithNegativeOffsetForCronSchedule() {
+    assertThat(offsetInstant(parse("2018-01-19T09:00:00.00Z"), EVERY_5_MINUTES, -2),
+        is(parse("2018-01-19T08:50:00.00Z")));
+  }
+
+  @Test
+  public void shouldGetCorrectInstantWithPositiveOffsetForCronSchedule() {
+    assertThat(offsetInstant(parse("2018-01-19T09:00:00.00Z"), EVERY_5_MINUTES, 2),
+        is(parse("2018-01-19T09:10:00.00Z")));
+  }
+
+  @Test
+  public void shouldGetCorrectInstantWithZeroOffsetForCronSchedule() {
+    assertThat(offsetInstant(parse("2018-01-19T09:00:00.00Z"), EVERY_5_MINUTES, 0),
+        is(parse("2018-01-19T09:00:00.00Z")));
+  }
+
+  @Test
+  public void shouldGetExceptionIfReferenceInstantIsNotAlignedWithSchedule() {
+    expect.expect(IllegalArgumentException.class);
+    expect.expectMessage("Unaligned origin");
+
+    offsetInstant(parse("2016-01-19T09:10:00.00Z"), Schedule.HOURS, 0);
   }
 }

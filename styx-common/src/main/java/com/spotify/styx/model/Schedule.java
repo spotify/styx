@@ -23,7 +23,10 @@ package com.spotify.styx.model;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.auto.value.AutoValue;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
 import java.util.Locale;
+import java.util.Optional;
 
 @AutoValue
 public abstract class Schedule {
@@ -122,6 +125,22 @@ public abstract class Schedule {
   }
 
   public enum WellKnown {
-    HOURLY, DAILY, WEEKLY, MONTHLY, YEARLY, UNKNOWN
+
+    HOURLY(ChronoUnit.HOURS),
+    DAILY(ChronoUnit.DAYS),
+    WEEKLY(ChronoUnit.WEEKS),
+    MONTHLY(ChronoUnit.MONTHS),
+    YEARLY(ChronoUnit.YEARS),
+    UNKNOWN(null);
+
+    private final Optional<TemporalUnit> unit;
+
+    public Optional<TemporalUnit> unit() {
+      return unit;
+    }
+
+    WellKnown(TemporalUnit unit) {
+      this.unit = Optional.ofNullable(unit);
+    }
   }
 }
