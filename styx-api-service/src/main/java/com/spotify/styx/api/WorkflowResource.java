@@ -278,7 +278,7 @@ public final class WorkflowResource {
         }
         final WorkflowState workflowState = storage.workflowState(workflowId);
         if (!workflowState.nextNaturalTrigger().isPresent()) {
-          return Response.forPayload(Collections.emptyList());
+          return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("No next natural trigger for workflow."));
         }
         final Schedule schedule = workflow.get().configuration().schedule();
         final Instant nextNaturalTrigger = workflowState.nextNaturalTrigger().get();

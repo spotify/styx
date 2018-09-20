@@ -474,6 +474,16 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldReturnEmptyNotFoundForTailWithNoNextNaturalTrigger() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("/foo/bar/instances?limit=2&tail=true")));
+
+    assertThat(response, hasStatus(withCode(Status.NOT_FOUND)));
+  }
+
+  @Test
   public void shouldReturnNotFoundWhenTailUnknownWorkflowInstancesData() throws Exception {
     sinceVersion(Api.Version.V3);
 
