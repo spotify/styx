@@ -48,6 +48,7 @@ public class TimeUtilTest {
 
   @Rule
   public ExpectedException expect = ExpectedException.none();
+  public static final Schedule EVERY_5_MINUTES = Schedule.parse("*/5 * * * *");
 
   @Test
   public void shouldGetLastInstant() {
@@ -382,6 +383,24 @@ public class TimeUtilTest {
   @Test
   public void shouldGetCorrectInstantWithZeroOffset() {
     assertThat(offsetInstant(parse("2018-01-19T09:00:00.00Z"), Schedule.HOURS, 0),
+        is(parse("2018-01-19T09:00:00.00Z")));
+  }
+
+  @Test
+  public void shouldGetCorrectInstantWithNegativeOffsetForCronSchedule() {
+    assertThat(offsetInstant(parse("2018-01-19T09:00:00.00Z"), EVERY_5_MINUTES, -2),
+        is(parse("2018-01-19T08:50:00.00Z")));
+  }
+
+  @Test
+  public void shouldGetCorrectInstantWithPositiveOffsetForCronSchedule() {
+    assertThat(offsetInstant(parse("2018-01-19T09:00:00.00Z"), EVERY_5_MINUTES, 2),
+        is(parse("2018-01-19T09:10:00.00Z")));
+  }
+
+  @Test
+  public void shouldGetCorrectInstantWithZeroOffsetForCronSchedule() {
+    assertThat(offsetInstant(parse("2018-01-19T09:00:00.00Z"), EVERY_5_MINUTES, 0),
         is(parse("2018-01-19T09:00:00.00Z")));
   }
 
