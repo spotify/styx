@@ -736,10 +736,4 @@ public class CliMainTest {
     }
     return workflowsFile.toPath();
   }
-
-  @Test
-  public void failure() {
-    // TODO: remove me!
-    assertThat(0, is(1));
-  }
 }
