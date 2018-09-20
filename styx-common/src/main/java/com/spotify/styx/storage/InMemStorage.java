@@ -143,7 +143,7 @@ public class InMemStorage implements Storage {
 
   @Override
   public List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String offset,
-                                                           int limit, boolean tail) throws IOException {
+                                                           int limit) throws IOException {
     throw new UnsupportedOperationException("Unsupported Operation!");
   }
 

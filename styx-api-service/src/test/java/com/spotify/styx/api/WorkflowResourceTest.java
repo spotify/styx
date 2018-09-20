@@ -29,7 +29,6 @@ import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.model.SequenceEvent.create;
 import static com.spotify.styx.serialization.Json.deserialize;
 import static com.spotify.styx.serialization.Json.serialize;
-import static java.time.ZoneOffset.UTC;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
@@ -45,7 +44,6 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
@@ -62,26 +60,20 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
-import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
-import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
-import com.spotify.styx.util.TimeUtil;
+import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.logging.Level;
-import java.util.stream.Collectors;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -458,6 +450,12 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldTailPaginateWorkflowInstancesData() throws Exception {
     sinceVersion(Api.Version.V3);
 
+    // Set the next natural trigger
+    final WorkflowState workflowState = WorkflowState.builder()
+        .nextNaturalTrigger(ParameterUtil.parseDate("2016-08-14"))
+        .build();
+    storage.patchState(WORKFLOW.id(), workflowState);
+
     WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-11");
     WorkflowInstance wfi2 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-12");
     WorkflowInstance wfi3 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-13");
@@ -466,56 +464,25 @@ public class WorkflowResourceTest extends VersionedApiTest {
     storage.writeEvent(create(Event.triggerExecution(wfi3, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
 
     Response<ByteString> response = awaitResponse(
-        serviceHelper.request("GET", path("/foo/bar/instances?offset=2016-08-11&limit=1&tail=true")));
+        serviceHelper.request("GET", path("/foo/bar/instances?limit=2&tail=true")));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
 
-    assertJson(response, "[*]", hasSize(1));
-    assertJson(response, "[0].workflow_instance.parameter", is("2016-08-13"));
+    assertJson(response, "[*]", hasSize(2));
+    assertJson(response, "[0].workflow_instance.parameter", is("2016-08-12"));
+    assertJson(response, "[1].workflow_instance.parameter", is("2016-08-13"));
   }
 
   @Test
-  public void shouldTailPaginateWorkflowInstancesDataWithDefaultOffset() throws Exception {
+  public void shouldReturnNotFoundWhenTailUnknownWorkflowInstancesData() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    final int limit = 3;
-
-    // Set the next natural trigger
-    final Instant nextNaturalTrigger = TimeUtil.previousInstant(
-        LocalDate.of(2018, 9, 17).atStartOfDay(UTC).toInstant(),
-        WORKFLOW.configuration().schedule());
-    final WorkflowState workflowState = WorkflowState.builder().nextNaturalTrigger(nextNaturalTrigger).build();
-    storage.patchState(WORKFLOW.id(), workflowState);
-
-    // Populate storage with more instances than we want to fetch
-    final List<WorkflowInstance> allInstances = new ArrayList<>();
-    final LocalDate end = nextNaturalTrigger.atZone(UTC).toLocalDate().minusDays(1);
-    LocalDate date = end.minusDays(limit * 10);
-    while (date.isBefore(end)) {
-      date = date.plusDays(1);
-      WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), date.toString());
-      allInstances.add(wfi);
-      storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
-    }
-
-    // Expect to get the `limit` latest instances
-    final List<WorkflowInstance> expectedInstances = allInstances.subList(
-        allInstances.size() - limit, allInstances.size());
-
     Response<ByteString> response = awaitResponse(
-        serviceHelper.request("GET", path("/foo/bar/instances?limit=" + limit + "&tail=true")));
+        serviceHelper.request("GET", path("/bar/foo/instances?limit=2&tail=true")));
 
-    assertThat(response, hasStatus(withCode(Status.OK)));
-
-    final List<WorkflowInstanceExecutionData> executionData = Json.OBJECT_MAPPER.readValue(
-        response.payload().get().toByteArray(),
-        new TypeReference<List<WorkflowInstanceExecutionData>>() { });
-
-    final List<WorkflowInstance> instances = executionData.stream()
-        .map(WorkflowInstanceExecutionData::workflowInstance)
-        .collect(Collectors.toList());
-
-    assertThat(instances, is(expectedInstances));
+    assertThat(response, hasStatus(withCode(Status.NOT_FOUND)));
+    assertThat(response, hasNoPayload());
+    assertThat(response, hasStatus(withReasonPhrase(equalTo("Could not find workflow."))));
   }
 
   @Test

@@ -28,6 +28,7 @@ import com.cronutils.model.CronType;
 import com.cronutils.model.definition.CronDefinition;
 import com.cronutils.model.time.ExecutionTime;
 import com.cronutils.parser.CronParser;
+import com.google.common.base.Preconditions;
 import com.spotify.styx.model.Schedule;
 import java.time.Duration;
 import java.time.Instant;
@@ -37,6 +38,7 @@ import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Static utility functions for manipulating time based on {@link Schedule} and offsets.
@@ -261,5 +263,23 @@ public class TimeUtil {
       default:
         return schedule.expression();
     }
+  }
+
+  public static Instant offsetInstant(Instant origin, Schedule schedule, int offset) {
+    Preconditions.checkArgument(isAligned(origin, schedule), "Unaligned origin");
+    return schedule.wellKnown().unit()
+        .map(unit -> origin.plus(offset, unit))
+        .orElseGet(() -> {
+          final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
+          ZonedDateTime time = origin.atZone(UTC);
+          for (int i = 0; i < Math.abs(offset); i++) {
+            final Optional<ZonedDateTime> execution = offset <= 0
+                ? executionTime.lastExecution(time)
+                : executionTime.nextExecution(time);
+            time = execution
+                .orElseThrow(AssertionError::new); // with unix cron, this should not happen
+          }
+          return time.toInstant();
+        });
   }
 }

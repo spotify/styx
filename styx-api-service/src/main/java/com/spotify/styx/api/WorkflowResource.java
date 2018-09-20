@@ -25,7 +25,6 @@ import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -51,6 +50,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -263,7 +263,7 @@ public final class WorkflowResource {
       String id,
       Request request) {
     final WorkflowId workflowId = WorkflowId.create(componentId, id);
-    final String offsetParam = request.parameter("offset").orElse("");
+    final String offset = request.parameter("offset").orElse("");
     final int limit = request.parameter("limit").map(Integer::parseInt).orElse(DEFAULT_PAGE_LIMIT);
     final String start = request.parameter("start").orElse("");
     final String stop = request.parameter("stop").orElse("");
@@ -271,24 +271,23 @@ public final class WorkflowResource {
 
     final List<WorkflowInstanceExecutionData> data;
     try {
-      if (Strings.isNullOrEmpty(start)) {
-        final String offset;
-        if (tail && Strings.isNullOrEmpty(offsetParam)) {
-          // Tailing and no offset supplied. If we do not supply an offset here we might end up scanning a lot of
-          // historical instances. Calculate a suitable offset by stepping back `limit` instances based on the
-          // configured schedule of the workflow.
-          final Optional<Workflow> workflow = storage.workflow(workflowId);
-          if (!workflow.isPresent()) {
-            return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Could not find workflow."));
-          }
-          final WorkflowState workflowState = storage.workflowState(workflowId);
-          final Instant now = workflowState.nextNaturalTrigger().orElseGet(Instant::now);
-          final Schedule schedule = workflow.get().configuration().schedule();
-          offset = calculateTailOffset(limit, schedule, now);
-        } else {
-          offset = offsetParam;
+      if (tail) {
+        final Optional<Workflow> workflow = storage.workflow(workflowId);
+        if (!workflow.isPresent()) {
+          return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Could not find workflow."));
         }
-        data = storage.executionData(workflowId, offset, limit, tail);
+        final WorkflowState workflowState = storage.workflowState(workflowId);
+        if (!workflowState.nextNaturalTrigger().isPresent()) {
+          return Response.forPayload(Collections.emptyList());
+        }
+        final Schedule schedule = workflow.get().configuration().schedule();
+        final Instant nextNaturalTrigger = workflowState.nextNaturalTrigger().get();
+        final Instant startInstant = TimeUtil.offsetInstant(nextNaturalTrigger, schedule, -limit);
+        final String tailStart = ParameterUtil.toParameter(schedule, startInstant);
+        final String tailStop = ParameterUtil.toParameter(schedule, nextNaturalTrigger);
+        data = storage.executionData(workflowId, tailStart, tailStop);
+      } else if (start.isEmpty()) {
+        data = storage.executionData(workflowId, offset, limit);
       } else {
         data = storage.executionData(workflowId, start, stop);
       }
@@ -297,24 +296,6 @@ public final class WorkflowResource {
           Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch execution info."));
     }
     return Response.forPayload(data);
-  }
-
-  /**
-   * Calculate an offset suitable for getting the {@code limit} latest instances of a workflow.
-   */
-  private String calculateTailOffset(int limit, Schedule schedule, Instant now) {
-    final Instant offsetInstant = schedule.wellKnown().unit()
-        // Calculate a point in time using the well know schedule time unit
-        .map(unit -> TimeUtil.previousInstant(now.minus(limit, unit), schedule))
-        // Fall back to iteratively walking back in time
-        .orElseGet(() -> {
-          Instant offset = now;
-          for (int i = 0; i < limit; i++) {
-            offset = TimeUtil.previousInstant(offset, schedule);
-          }
-          return offset;
-        });
-    return ParameterUtil.toParameter(schedule, offsetInstant);
   }
 
   private Response<WorkflowInstanceExecutionData> instance(

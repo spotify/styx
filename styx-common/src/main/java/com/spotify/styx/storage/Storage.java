@@ -209,10 +209,9 @@ public interface Storage extends Closeable {
    * @param workflowId  The workflowId to get execution information for
    * @param offset      The offset parameter
    * @param limit       Maximum number of results to return
-   * @param tail        {@code true} to get the newest results. {@code false} to return the oldest results.
    * @return A {@link WorkflowInstanceExecutionData} of all the instances
    */
-  List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String offset, int limit, boolean tail)
+  List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String offset, int limit)
       throws IOException;
 
   /**
