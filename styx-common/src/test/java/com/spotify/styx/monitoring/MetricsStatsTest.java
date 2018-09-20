@@ -30,6 +30,7 @@ import static com.spotify.styx.monitoring.MetricsStats.EVENT_CONSUMER_ERROR_RATE
 import static com.spotify.styx.monitoring.MetricsStats.EVENT_CONSUMER_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_MISMATCH;
 import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.HISTOGRAM;
 import static com.spotify.styx.monitoring.MetricsStats.NATURAL_TRIGGER_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.PULL_IMAGE_ERROR_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.QUEUED_EVENTS;
@@ -90,7 +91,7 @@ public class MetricsStatsTest {
   @Before
   public void setUp() {
     when(time.nanoTime()).then(a -> System.nanoTime());
-    when(registry.histogram(TRANSITIONING_DURATION)).thenReturn(histogram);
+    when(registry.getOrAdd(TRANSITIONING_DURATION, HISTOGRAM)).thenReturn(histogram);
     when(registry.meter(PULL_IMAGE_ERROR_RATE)).thenReturn(meter);
     when(registry.meter(NATURAL_TRIGGER_RATE)).thenReturn(meter);
     when(registry.meter(TERMINATION_LOG_MISSING)).thenReturn(meter);
@@ -106,7 +107,7 @@ public class MetricsStatsTest {
   public void shouldRecordStorageOperation() {
     String operation = "write";
     String status = "success";
-    when(registry.histogram(STORAGE_DURATION.tagged("operation", operation, "status", status))).thenReturn(histogram);
+    when(registry.getOrAdd(STORAGE_DURATION.tagged("operation", operation, "status", status), HISTOGRAM)).thenReturn(histogram);
     when(registry.meter(STORAGE_RATE.tagged("operation", operation, "status", status))).thenReturn(meter);
     stats.recordStorageOperation(operation, 1000L, status);
     verify(histogram).update(1000L);
@@ -117,7 +118,7 @@ public class MetricsStatsTest {
   public void shouldRecordDockerOperation() {
     String operation = "start";
     String status = "success";
-    when(registry.histogram(DOCKER_DURATION.tagged("operation", operation, "status", status))).thenReturn(histogram);
+    when(registry.getOrAdd(DOCKER_DURATION.tagged("operation", operation, "status", status), HISTOGRAM)).thenReturn(histogram);
     when(registry.meter(DOCKER_RATE.tagged("operation", operation, "status", status))).thenReturn(meter);
     stats.recordDockerOperation(operation, 1000L, status);
     verify(histogram).update(1000L);
@@ -216,7 +217,7 @@ public class MetricsStatsTest {
   @Test
   public void shouldRecordResourceConfigured() {
     String resource = "resource";
-    when(registry.histogram(RESOURCE_CONFIGURED.tagged("resource", resource))).thenReturn(histogram);
+    when(registry.getOrAdd(RESOURCE_CONFIGURED.tagged("resource", resource), HISTOGRAM)).thenReturn(histogram);
     stats.recordResourceConfigured(resource, 100L);
     verify(histogram).update(100L);
   }
@@ -224,7 +225,7 @@ public class MetricsStatsTest {
   @Test
   public void shouldRecordResourceUsed() {
     String resource = "resource";
-    when(registry.histogram(RESOURCE_USED.tagged("resource", resource))).thenReturn(histogram);
+    when(registry.getOrAdd(RESOURCE_USED.tagged("resource", resource), HISTOGRAM)).thenReturn(histogram);
     stats.recordResourceUsed(resource, 100L);
     verify(histogram).update(100L);
   }
@@ -263,7 +264,7 @@ public class MetricsStatsTest {
   @Test
   public void shouldRecordTickDuration() {
     String type = "dummy-tick";
-    when(registry.histogram(TICK_DURATION.tagged("type", type))).thenReturn(histogram);
+    when(registry.getOrAdd(TICK_DURATION.tagged("type", type), HISTOGRAM)).thenReturn(histogram);
     stats.recordTickDuration(type, 100L);
     verify(histogram).update(100L);
   }
