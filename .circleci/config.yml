@@ -7,19 +7,21 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: v1-deps-{{ checksum "pom.xml" }}
-      - run: mvn -B dependency:go-offline compile
+          key: v2-deps-{{ checksum "pom.xml" }}
+      - run: mvn -B dependency:go-offline compile test-compile -P disable-static-analysis
       - save_cache:
-          key: v1-deps-{{ checksum "pom.xml" }}
+          key: v2-deps-{{ checksum "pom.xml" }}
           paths:
             - ~/.m2
+      # Run tests without static analysis
       - run:
+          name: Tests
           environment:
             # Configure datastore emulator heap size
             JAVA: java -Xmx512m -Xms512m
             # Maven heap size
             MAVEN_OPTS: -Xmx256m -Xms256m
-          command: mvn -B verify
+          command: mvn -B verify -P disable-static-analysis
       - run: bash <(curl -s https://codecov.io/bash) -f '!**/jacoco-aggregate/**'
       - run: |
           mkdir test-reports
@@ -29,6 +31,11 @@ jobs:
       - store_artifacts:
           path: styx-report/target/site/jacoco-aggregate/
           destination: jacoco-aggregate
+      # Run static analysis after tests
+      - run:
+          name: Static Analysis
+          when: always
+          command: mvn -B clean compile test-compile
 
   test_jdk10:
     working_directory: ~/styx
@@ -37,14 +44,24 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: v1-deps-jdk10-{{ checksum "pom.xml" }}
-      - run: mvn -B dependency:go-offline compile
+          key: v2-deps-jdk10-{{ checksum "pom.xml" }}
+      - run: mvn -B dependency:go-offline compile test-compile -P disable-static-analysis
       - save_cache:
-          key: v1-deps-jdk10-{{ checksum "pom.xml" }}
+          key: v2-deps-jdk10-{{ checksum "pom.xml" }}
           paths:
             - ~/.m2
-      - run: mvn -B verify
-
+      - run:
+          name: Tests
+          environment:
+            # Configure datastore emulator heap size
+            JAVA: java -Xmx512m -Xms512m
+            # Maven heap size
+            MAVEN_OPTS: -Xmx256m -Xms256m
+          command: mvn -B verify -P disable-static-analysis
+      - run:
+          name: Static Analysis
+          when: always
+          command: mvn -B clean compile test-compile
 
 workflows:
   version: 2
