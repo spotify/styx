@@ -38,10 +38,14 @@ import static org.junit.Assert.assertTrue;
 import com.spotify.styx.model.Schedule;
 import java.time.Instant;
 import java.time.ZonedDateTime;
+import junitparams.JUnitParamsRunner;
+import junitparams.Parameters;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.junit.runner.RunWith;
 
+@RunWith(JUnitParamsRunner.class)
 public class TimeUtilTest {
 
   private static final Instant TIME = parse("2016-01-19T09:11:22.333Z");
@@ -369,21 +373,42 @@ public class TimeUtilTest {
   }
 
   @Test
-  public void shouldGetCorrectInstantWithNegativeOffset() {
-    assertThat(offsetInstant(parse("2018-01-19T09:00:00.00Z"), Schedule.HOURS, -2),
-        is(parse("2018-01-19T07:00:00.00Z")));
+  @Parameters({
+      "2018-01-19T09:00:00.00Z, hours, 2018-01-19T07:00:00.00Z",
+      "2018-01-19T00:00:00.00Z, days, 2018-01-17T00:00:00.00Z",
+      "2018-01-15T00:00:00.00Z, weeks, 2018-01-01T00:00:00Z",
+      "2018-01-01T00:00:00.00Z, months, 2017-11-01T00:00:00.00Z",
+      "2018-01-01T00:00:00.00Z, years, 2016-01-01T00:00:00.00Z",
+  })
+  public void shouldGetCorrectInstantWithNegativeOffset(String origin, String schedule,
+                                                        String expected) {
+    assertThat(offsetInstant(parse(origin), Schedule.parse(schedule), -2), is(parse(expected)));
   }
 
   @Test
-  public void shouldGetCorrectInstantWithPositiveOffset() {
-    assertThat(offsetInstant(parse("2018-01-19T09:00:00.00Z"), Schedule.HOURS, 2),
-        is(parse("2018-01-19T11:00:00.00Z")));
+  @Parameters({
+      "2018-01-19T09:00:00.00Z, hours, 2018-01-19T11:00:00.00Z",
+      "2018-01-19T00:00:00.00Z, days, 2018-01-21T00:00:00.00Z",
+      "2018-01-15T00:00:00.00Z, weeks, 2018-01-29T00:00:00Z",
+      "2018-01-01T00:00:00.00Z, months, 2018-03-01T00:00:00.00Z",
+      "2018-01-01T00:00:00.00Z, years, 2020-01-01T00:00:00.00Z",
+  })
+  public void shouldGetCorrectInstantWithPositiveOffset(String origin, String schedule,
+                                                        String expected) {
+    assertThat(offsetInstant(parse(origin), Schedule.parse(schedule), 2), is(parse(expected)));
   }
 
   @Test
-  public void shouldGetCorrectInstantWithZeroOffset() {
-    assertThat(offsetInstant(parse("2018-01-19T09:00:00.00Z"), Schedule.HOURS, 0),
-        is(parse("2018-01-19T09:00:00.00Z")));
+  @Parameters({
+      "2018-01-19T09:00:00.00Z, hours, 2018-01-19T09:00:00.00Z",
+      "2018-01-19T00:00:00.00Z, days, 2018-01-19T00:00:00.00Z",
+      "2018-01-15T00:00:00.00Z, weeks, 2018-01-15T00:00:00Z",
+      "2018-01-01T00:00:00.00Z, months, 2018-01-01T00:00:00.00Z",
+      "2018-01-01T00:00:00.00Z, years, 2018-01-01T00:00:00.00Z",
+  })
+  public void shouldGetCorrectInstantWithZeroOffset(String origin, String schedule,
+                                                    String expected) {
+    assertThat(offsetInstant(parse(origin), Schedule.parse(schedule), 0), is(parse(expected)));
   }
 
   @Test

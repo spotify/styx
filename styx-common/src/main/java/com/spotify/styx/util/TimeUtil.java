@@ -39,6 +39,7 @@ import java.time.temporal.TemporalAmount;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import javaslang.control.Try;
 
 /**
  * Static utility functions for manipulating time based on {@link Schedule} and offsets.
@@ -268,14 +269,14 @@ public class TimeUtil {
   public static Instant offsetInstant(Instant origin, Schedule schedule, int offset) {
     Preconditions.checkArgument(isAligned(origin, schedule), "Unaligned origin");
     return schedule.wellKnown().unit()
-        .map(unit -> origin.plus(offset, unit))
+        .map(unit -> Try.of(() -> origin.plus(offset, unit)).orElse(null))
         .orElseGet(() -> {
           final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
           ZonedDateTime time = origin.atZone(UTC);
           for (int i = 0; i < Math.abs(offset); i++) {
             final Optional<ZonedDateTime> execution = offset <= 0
-                ? executionTime.lastExecution(time)
-                : executionTime.nextExecution(time);
+                                                      ? executionTime.lastExecution(time)
+                                                      : executionTime.nextExecution(time);
             time = execution
                 .orElseThrow(AssertionError::new); // with unix cron, this should not happen
           }
