@@ -119,13 +119,11 @@ public class TimeUtil {
    */
   public static List<Instant> instantsInRange(Instant firstInstant, Instant lastInstant,
                                               Schedule schedule) {
-    if (!isAligned(firstInstant, schedule) || !isAligned(lastInstant, schedule)) {
-      throw new IllegalArgumentException("unaligned instant");
-    }
-
-    if (lastInstant.isBefore(firstInstant)) {
-      throw new IllegalArgumentException("last instant should not be before first instant");
-    }
+    Preconditions.checkArgument(
+        isAligned(firstInstant, schedule) && isAligned(lastInstant, schedule),
+        "unaligned instant");
+    Preconditions.checkArgument(!lastInstant.isBefore(firstInstant),
+        "last instant should not be before first instant");
 
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
     final List<Instant> instants = new ArrayList<>();
@@ -154,13 +152,11 @@ public class TimeUtil {
    */
   public static List<Instant> instantsInReversedRange(Instant firstInstant, Instant lastInstant,
                                                       Schedule schedule) {
-    if (!isAligned(firstInstant, schedule) || !isAligned(lastInstant, schedule)) {
-      throw new IllegalArgumentException("unaligned instant");
-    }
-
-    if (lastInstant.isAfter(firstInstant)) {
-      throw new IllegalArgumentException("last instant should not be after first instant");
-    }
+    Preconditions.checkArgument(
+        isAligned(firstInstant, schedule) && isAligned(lastInstant, schedule),
+        "unaligned instant");
+    Preconditions.checkArgument(!lastInstant.isAfter(firstInstant),
+        "last instant should not be after first instant");
 
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
     final List<Instant> instants = new ArrayList<>();
