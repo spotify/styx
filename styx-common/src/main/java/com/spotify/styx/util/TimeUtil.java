@@ -36,10 +36,10 @@ import java.time.Period;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
+import java.time.temporal.UnsupportedTemporalTypeException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import javaslang.control.Try;
 
 /**
  * Static utility functions for manipulating time based on {@link Schedule} and offsets.
@@ -269,7 +269,13 @@ public class TimeUtil {
   public static Instant offsetInstant(Instant origin, Schedule schedule, int offset) {
     Preconditions.checkArgument(isAligned(origin, schedule), "Unaligned origin");
     return schedule.wellKnown().unit()
-        .map(unit -> Try.of(() -> origin.plus(offset, unit)).orElse(null))
+        .map(unit -> {
+          try {
+            return origin.plus(offset, unit);
+          } catch (UnsupportedTemporalTypeException ignored) {
+            return null;
+          }
+        })
         .orElseGet(() -> {
           final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
           ZonedDateTime time = origin.atZone(UTC);
