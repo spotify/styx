@@ -36,6 +36,7 @@ import java.time.Period;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
+import java.time.temporal.UnsupportedTemporalTypeException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -118,13 +119,11 @@ public class TimeUtil {
    */
   public static List<Instant> instantsInRange(Instant firstInstant, Instant lastInstant,
                                               Schedule schedule) {
-    if (!isAligned(firstInstant, schedule) || !isAligned(lastInstant, schedule)) {
-      throw new IllegalArgumentException("unaligned instant");
-    }
-
-    if (lastInstant.isBefore(firstInstant)) {
-      throw new IllegalArgumentException("last instant should not be before first instant");
-    }
+    Preconditions.checkArgument(
+        isAligned(firstInstant, schedule) && isAligned(lastInstant, schedule),
+        "unaligned instant");
+    Preconditions.checkArgument(!lastInstant.isBefore(firstInstant),
+        "last instant should not be before first instant");
 
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
     final List<Instant> instants = new ArrayList<>();
@@ -153,13 +152,11 @@ public class TimeUtil {
    */
   public static List<Instant> instantsInReversedRange(Instant firstInstant, Instant lastInstant,
                                                       Schedule schedule) {
-    if (!isAligned(firstInstant, schedule) || !isAligned(lastInstant, schedule)) {
-      throw new IllegalArgumentException("unaligned instant");
-    }
-
-    if (lastInstant.isAfter(firstInstant)) {
-      throw new IllegalArgumentException("last instant should not be after first instant");
-    }
+    Preconditions.checkArgument(
+        isAligned(firstInstant, schedule) && isAligned(lastInstant, schedule),
+        "unaligned instant");
+    Preconditions.checkArgument(!lastInstant.isAfter(firstInstant),
+        "last instant should not be after first instant");
 
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
     final List<Instant> instants = new ArrayList<>();
@@ -266,16 +263,22 @@ public class TimeUtil {
   }
 
   public static Instant offsetInstant(Instant origin, Schedule schedule, int offset) {
-    Preconditions.checkArgument(isAligned(origin, schedule), "Unaligned origin");
+    Preconditions.checkArgument(isAligned(origin, schedule), "unaligned origin");
     return schedule.wellKnown().unit()
-        .map(unit -> origin.plus(offset, unit))
+        .map(unit -> {
+          try {
+            return origin.plus(offset, unit);
+          } catch (UnsupportedTemporalTypeException ignored) {
+            return null;
+          }
+        })
         .orElseGet(() -> {
           final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
           ZonedDateTime time = origin.atZone(UTC);
           for (int i = 0; i < Math.abs(offset); i++) {
             final Optional<ZonedDateTime> execution = offset <= 0
-                ? executionTime.lastExecution(time)
-                : executionTime.nextExecution(time);
+                                                      ? executionTime.lastExecution(time)
+                                                      : executionTime.nextExecution(time);
             time = execution
                 .orElseThrow(AssertionError::new); // with unix cron, this should not happen
           }
