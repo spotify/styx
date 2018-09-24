@@ -432,7 +432,7 @@ public class TimeUtilTest {
   @Test
   public void shouldGetExceptionIfReferenceInstantIsNotAlignedWithSchedule() {
     expect.expect(IllegalArgumentException.class);
-    expect.expectMessage("Unaligned origin");
+    expect.expectMessage("unaligned origin");
 
     offsetInstant(parse("2016-01-19T09:10:00.00Z"), Schedule.HOURS, 0);
   }

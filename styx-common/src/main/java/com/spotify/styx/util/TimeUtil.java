@@ -263,7 +263,7 @@ public class TimeUtil {
   }
 
   public static Instant offsetInstant(Instant origin, Schedule schedule, int offset) {
-    Preconditions.checkArgument(isAligned(origin, schedule), "Unaligned origin");
+    Preconditions.checkArgument(isAligned(origin, schedule), "unaligned origin");
     return schedule.wellKnown().unit()
         .map(unit -> {
           try {
