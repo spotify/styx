@@ -20,6 +20,7 @@
 
 package com.spotify.styx.state.handlers;
 
+import static com.spotify.styx.state.handlers.HandlerUtil.argsReplace;
 import static java.util.Objects.requireNonNull;
 
 import com.spotify.styx.docker.DockerRunner;
@@ -32,8 +33,6 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.ResourceNotFoundException;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -140,12 +139,5 @@ public class DockerRunnerHandler implements OutputHandler {
         .commitSha(state.data().executionDescription().flatMap(ExecutionDescription::commitSha))
         .env(executionDescription.env())
         .build();
-  }
-
-  private static List<String> argsReplace(List<String> template, String parameter) {
-    List<String> result = new ArrayList<>(template);
-
-    Collections.replaceAll(result, "{}", parameter);
-    return result;
   }
 }

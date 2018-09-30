@@ -20,6 +20,7 @@
 
 package com.spotify.styx.state.handlers;
 
+import static com.spotify.styx.state.handlers.HandlerUtil.argsReplace;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -124,13 +125,14 @@ public class ExecutionDescriptionHandler implements OutputHandler {
 
     final List<String> dockerArgs = workflow.configuration().dockerArgs()
         .orElse(Collections.emptyList());
+    final List<String> command = argsReplace(dockerArgs, workflowInstance.parameter());
 
     final Map<String, String> env = new HashMap<>(workflow.configuration().env());
     data.triggerParameters().ifPresent(p -> env.putAll(p.env()));
 
     return ExecutionDescription.builder()
         .dockerImage(dockerImage)
-        .dockerArgs(dockerArgs)
+        .dockerArgs(command)
         .dockerTerminationLogging(workflow.configuration().dockerTerminationLogging())
         .secret(workflow.configuration().secret())
         .serviceAccount(workflow.configuration().serviceAccount())
