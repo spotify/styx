@@ -187,7 +187,7 @@ public class BigtableStorage {
   WorkflowInstanceExecutionData executionData(WorkflowInstance workflowInstance) throws IOException {
     SortedSet<SequenceEvent> events = readEvents(workflowInstance);
     if (events.isEmpty()) {
-      throw new IOException("Workflow instance not found");
+      throw new ResourceNotFoundException("Workflow instance not found");
     }
 
     return WorkflowInstanceExecutionData.fromEvents(events);

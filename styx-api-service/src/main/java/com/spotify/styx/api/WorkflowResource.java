@@ -309,6 +309,8 @@ public final class WorkflowResource {
           storage.executionData(workflowInstance);
 
       return Response.forPayload(workflowInstanceExecutionData);
+    } catch (ResourceNotFoundException e) {
+      return Response.forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
       return Response.forStatus(
           Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch execution info."));
