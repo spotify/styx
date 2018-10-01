@@ -130,7 +130,7 @@ public class ExecutionDescriptionHandlerTest {
     assertThat(executionIdCaptor.getValue(), startsWith("styx-run-"));
     assertThat(executionDescriptionCaptor.getValue().dockerImage(), is(DOCKER_IMAGE));
     assertThat(executionDescriptionCaptor.getValue().commitSha(), hasValue(COMMIT_SHA));
-    assertThat(executionDescriptionCaptor.getValue().dockerArgs(), contains("--date", "{}", "--bar"));
+    assertThat(executionDescriptionCaptor.getValue().dockerArgs(), contains("--date", "2016-03-14", "--bar"));
   }
 
   @Test
