@@ -379,6 +379,7 @@ public final class BackfillResource implements Closeable {
           final BackfillBuilder backfillBuilder = oldBackfill.get().builder();
           backfillInput.concurrency().ifPresent(backfillBuilder::concurrency);
           backfillInput.description().ifPresent(backfillBuilder::description);
+          backfillInput.halted().ifPresent(backfillBuilder::halted);
           return tx.store(backfillBuilder.build());
         }
       });

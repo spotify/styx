@@ -679,12 +679,15 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldUpdateBackfill() throws Exception {
     sinceVersion(Api.Version.V3);
 
+    storage.storeBackfill(BACKFILL_1.builder().halted(true).build());
     assertThat(storage.backfill(BACKFILL_1.id()).get().concurrency(), equalTo(1));
+    assertThat(storage.backfill(BACKFILL_1.id()).get().halted(), is(true));
 
     final EditableBackfillInput backfillInput = EditableBackfillInput.newBuilder()
         .id(BACKFILL_1.id())
         .concurrency(4)
         .description("foobar")
+        .halted(false)
         .build();
     final String json = Json.OBJECT_MAPPER.writeValueAsString(backfillInput);
 
@@ -697,10 +700,12 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertJson(response, "id", equalTo(BACKFILL_1.id()));
     assertJson(response, "concurrency", equalTo(4));
     assertJson(response, "description", is("foobar"));
+    assertJson(response, "halted", is(false));
 
     assertThat(storage.backfill(BACKFILL_1.id()).get(), is(BACKFILL_1.builder()
         .concurrency(4)
         .description("foobar")
+        .halted(false)
         .build()));
   }
 

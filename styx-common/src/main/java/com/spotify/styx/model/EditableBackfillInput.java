@@ -32,6 +32,8 @@ public interface EditableBackfillInput {
 
   Optional<String> description();
 
+  Optional<Boolean> halted();
+
   static EditableBackfillInputBuilder newBuilder() {
     return new EditableBackfillInputBuilder();
   }
