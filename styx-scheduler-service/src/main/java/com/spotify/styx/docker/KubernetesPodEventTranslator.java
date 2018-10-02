@@ -61,16 +61,6 @@ final class KubernetesPodEventTranslator {
     }
   }
 
-  private static class StartedAndExited {
-    boolean started;
-    boolean exited;
-
-    StartedAndExited(boolean started, boolean exited) {
-      this.started = started;
-      this.exited = exited;
-    }
-  }
-
   private static Optional<Integer> getExitCodeIfValid(String workflowInstance,
                                                       Pod pod,
                                                       ContainerStatus status,
