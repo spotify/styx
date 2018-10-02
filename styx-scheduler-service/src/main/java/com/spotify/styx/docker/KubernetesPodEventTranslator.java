@@ -234,15 +234,8 @@ final class KubernetesPodEventTranslator {
   }
 
   private static boolean isStarted(Pod pod, Optional<ContainerStatus> mainContainerStatusOpt) {
-    switch (pod.getStatus().getPhase()) {
-      case "Running":
-        // check that the main container is ready
-        // TODO: is checking for "ready" meaningful without a readiness probe configured?
-        return mainContainerStatusOpt.map(ContainerStatus::getReady).orElse(false);
-
-      default:
-        // do nothing
-        break;
+    if ("Running".equals(pod.getStatus().getPhase())) {
+      return mainContainerStatusOpt.map(ContainerStatus::getReady).orElse(false);
     }
 
     return false;
