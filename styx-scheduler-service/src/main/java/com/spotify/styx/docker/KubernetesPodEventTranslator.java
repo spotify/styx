@@ -157,11 +157,13 @@ final class KubernetesPodEventTranslator {
       return generatedEvents;
     }
 
-    final StartedAndExited status = getStartedAndExited(pod, mainContainerStatusOpt);
+    if (isStarted(pod, mainContainerStatusOpt)) {
+      handleStarted(workflowInstance, state, generatedEvents);
+    }
 
-    handleStarted(workflowInstance, state, generatedEvents, status.started);
-    handleExited(workflowInstance, state, pod, mainContainerStatusOpt, stats, generatedEvents,
-        status.exited);
+    if (isExited(pod, mainContainerStatusOpt)) {
+      handleExited(workflowInstance, state, pod, mainContainerStatusOpt, stats, generatedEvents);
+    }
 
     return generatedEvents;
   }
@@ -169,40 +171,36 @@ final class KubernetesPodEventTranslator {
   private static void handleExited(WorkflowInstance workflowInstance, RunState state,
                                    Pod pod, Optional<ContainerStatus> mainContainerStatusOpt,
                                    Stats stats,
-                                   List<Event> generatedEvents, boolean exited) {
-    if (exited) {
-      switch (state.state()) {
-        case PREPARE:
-        case SUBMITTED:
-          generatedEvents.add(Event.started(workflowInstance));
-          // intentional fall-through
+                                   List<Event> generatedEvents) {
+    switch (state.state()) {
+      case PREPARE:
+      case SUBMITTED:
+        generatedEvents.add(Event.started(workflowInstance));
+        // intentional fall-through
 
-        case RUNNING:
-          final Optional<Integer> exitCode = mainContainerStatusOpt.flatMap(cs ->
-              getExitCodeIfValid(workflowInstance.toKey(), pod, cs, stats));
-          generatedEvents.add(Event.terminate(workflowInstance, exitCode));
-          break;
+      case RUNNING:
+        final Optional<Integer> exitCode = mainContainerStatusOpt.flatMap(cs ->
+            getExitCodeIfValid(workflowInstance.toKey(), pod, cs, stats));
+        generatedEvents.add(Event.terminate(workflowInstance, exitCode));
+        break;
 
-        default:
-          // no event
-          break;
-      }
+      default:
+        // no event
+        break;
     }
   }
 
   private static void handleStarted(final WorkflowInstance workflowInstance, final RunState state,
-                                    final List<Event> generatedEvents, final boolean started) {
-    if (started) {
-      switch (state.state()) {
-        case PREPARE:
-        case SUBMITTED:
-          generatedEvents.add(Event.started(workflowInstance));
-          break;
+                                    final List<Event> generatedEvents) {
+    switch (state.state()) {
+      case PREPARE:
+      case SUBMITTED:
+        generatedEvents.add(Event.started(workflowInstance));
+        break;
 
-        default:
-          // no event
-          break;
-      }
+      default:
+        // no event
+        break;
     }
   }
 
@@ -220,38 +218,44 @@ final class KubernetesPodEventTranslator {
     }
   }
 
-  private static StartedAndExited getStartedAndExited(Pod pod,
-                                                      Optional<ContainerStatus> mainContainerStatusOpt) {
-    boolean started = false;
-    boolean exited = false;
-
+  private static boolean isExited(Pod pod, Optional<ContainerStatus> mainContainerStatusOpt) {
     switch (pod.getStatus().getPhase()) {
       case "Running":
         // Check if the main container has exited
-        exited = mainContainerStatusOpt.map(ContainerStatus::getState)
+        final boolean mainContainerTerminated = mainContainerStatusOpt.map(ContainerStatus::getState)
             .map(ContainerState::getTerminated)
             .isPresent();
-        if (exited) {
-          break;
+        if (mainContainerTerminated) {
+          return true;
         }
 
-        // check that the main container is ready
-        // TODO: is checking for "ready" meaningful without a readiness probe configured?
-        started = mainContainerStatusOpt.map(ContainerStatus::getReady)
-            .orElse(false);
         break;
 
       case "Succeeded":
       case "Failed":
-        exited = true;
-        break;
+        return true;
 
       default:
         // do nothing
         break;
     }
 
-    return new StartedAndExited(started, exited);
+    return false;
+  }
+
+  private static boolean isStarted(Pod pod, Optional<ContainerStatus> mainContainerStatusOpt) {
+    switch (pod.getStatus().getPhase()) {
+      case "Running":
+        // check that the main container is ready
+        // TODO: is checking for "ready" meaningful without a readiness probe configured?
+        return mainContainerStatusOpt.map(ContainerStatus::getReady).orElse(false);
+
+      default:
+        // do nothing
+        break;
+    }
+
+    return false;
   }
 
   private static Optional<Event> isInErrorState(WorkflowInstance workflowInstance, Pod pod,
