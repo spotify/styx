@@ -148,6 +148,13 @@ public final class MetricsStats implements Stats {
       .tagged("what", "workflow-consumer-error-rate")
       .tagged("unit", "error");
 
+  static final MetricId PUBLISHING_RATE = BASE
+      .tagged("what", "publishing-rate");
+
+  static final MetricId PUBLISHING_ERROR_RATE = BASE
+      .tagged("what", "publishing-error-rate")
+      .tagged("unit", "error");
+
   static final MetricId TICK_DURATION = BASE
       .tagged("what", "tick-duration")
       .tagged("unit", UNIT_MILLISECOND);
@@ -185,6 +192,8 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Histogram> resourceUsedHistograms;
   private final ConcurrentMap<String, Meter> eventConsumerErrorMeters;
   private final ConcurrentMap<String, Meter> eventConsumerMeters;
+  private final ConcurrentMap<String, Meter> publishingMeters;
+  private final ConcurrentMap<String, Meter> publishingErrorMeters;
   private final ConcurrentMap<String, Meter> workflowConsumerMeters;
   private final ConcurrentMap<String, Histogram> tickHistograms;
   private final ConcurrentMap<Tuple2<String, String>, Meter> datastoreOperationMeters;
@@ -219,6 +228,8 @@ public final class MetricsStats implements Stats {
     this.resourceUsedHistograms = new ConcurrentHashMap<>();
     this.eventConsumerErrorMeters = new ConcurrentHashMap<>();
     this.eventConsumerMeters = new ConcurrentHashMap<>();
+    this.publishingMeters = new ConcurrentHashMap<>();
+    this.publishingErrorMeters = new ConcurrentHashMap<>();
     this.workflowConsumerMeters = new ConcurrentHashMap<>();
     this.tickHistograms = new ConcurrentHashMap<>();
     this.datastoreOperationMeters = new ConcurrentHashMap<>();
@@ -339,6 +350,16 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
+  public void recordPublishing(String type, String state) {
+    publishingMeter(type, state).mark();
+  }
+
+  @Override
+  public void recordPublishingError(String type, String state) {
+    publishingErrorMeter(type, state).mark();
+  }
+
+  @Override
   public void recordTickDuration(String type, long duration) {
     tickHistogram(type).update(duration);
   }
@@ -440,6 +461,16 @@ public final class MetricsStats implements Stats {
   private Meter workflowConsumerMeter(String action) {
     return workflowConsumerMeters.computeIfAbsent(
         action, (op) -> registry.meter(WORKFLOW_CONSUMER_RATE.tagged("action", action)));
+  }
+
+  private Meter publishingMeter(String type, String state) {
+    return publishingMeters.computeIfAbsent(
+        type, (op) -> registry.meter(PUBLISHING_RATE.tagged("type", type, "state", state)));
+  }
+
+  private Meter publishingErrorMeter(String type, String state) {
+    return publishingErrorMeters.computeIfAbsent(
+        type, (op) -> registry.meter(PUBLISHING_ERROR_RATE.tagged("type", type, "state", state)));
   }
 
   private Histogram tickHistogram(String type) {

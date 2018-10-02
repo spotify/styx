@@ -74,6 +74,10 @@ public interface Stats {
 
   void recordWorkflowConsumerError();
 
+  void recordPublishing(String type, String state);
+
+  void recordPublishingError(String type, String state);
+
   void recordTickDuration(String type, long duration);
 
   void recordDatastoreEntityReads(String kind, int n);
