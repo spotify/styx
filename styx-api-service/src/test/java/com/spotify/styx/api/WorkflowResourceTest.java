@@ -406,6 +406,29 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldReturn500WhenFailedToGetWorkflowInstanceData() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
+    doThrow(new IOException()).when(storage).executionData(wfi);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/foo/bar/instances/2016-08-10")));
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
+  }
+
+  @Test
+  public void shouldReturn404WhenWorkflowNotFound() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/foo/bar/instances/2016-08-10")));
+
+    assertThat(response, hasStatus(withCode(Status.NOT_FOUND)));
+  }
+
+  @Test
   public void shouldReturnWorkflowInstanceDataBackfill() throws Exception {
     sinceVersion(Api.Version.V3);
 

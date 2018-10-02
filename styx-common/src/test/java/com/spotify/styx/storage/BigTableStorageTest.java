@@ -33,6 +33,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.data.ExecStatus;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -232,5 +233,15 @@ public class BigTableStorageTest {
     setUp(BigtableStorage.MAX_BIGTABLE_RETRIES - 1);
 
     storage.writeEvent(SequenceEvent.create(Event.success(WFI1), 1, 0));
+  }
+
+  @Test
+  public void shouldProduceResourceNotFoundExceptionWhenNoExecutionData() throws Exception {
+    setUp(0);
+
+    thrown.expect(ResourceNotFoundException.class);
+    thrown.expectMessage(containsString("Workflow instance not found"));
+
+    storage.executionData(WFI1);
   }
 }
