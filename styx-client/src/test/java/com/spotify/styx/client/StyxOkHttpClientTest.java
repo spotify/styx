@@ -224,7 +224,7 @@ public class StyxOkHttpClientTest {
   }
 
   @Test
-  public void shouldHaltBackfill() throws Exception {
+  public void shouldHaltBackfill() {
     when(client.send(any(Request.class)))
         .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK)));
     final CompletableFuture<Void> r =
@@ -235,6 +235,26 @@ public class StyxOkHttpClientTest {
     final URI uri = URI.create(API_URL + "/backfills/backfill");
     assertThat(request.url().toString(), is(uri.toString()));
     assertThat(request.method(), is("DELETE"));
+  }
+
+  @Test
+  public void shouldUnhaltBackfill() throws Exception {
+    final EditableBackfillInput backfillInput = EditableBackfillInput.newBuilder()
+        .id(BACKFILL.id())
+        .halted(false)
+        .build();
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(
+            response(HTTP_OK, BACKFILL.builder().concurrency(4).build())));
+    final CompletableFuture<Backfill> r = styx.backfillUnhalt(BACKFILL.id())
+        .toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    assertThat(request.url().toString(), is(API_URL + "/backfills/" + BACKFILL.id()));
+    assertThat(Json.deserialize(bytesOfRequestBody(request), EditableBackfillInput.class),
+        equalTo(backfillInput));
+    assertThat(request.method(), is("PUT"));
   }
 
   @Test
@@ -354,7 +374,7 @@ public class StyxOkHttpClientTest {
   }
 
   @Test
-  public void shouldFailWithBadEventJson() throws Exception {
+  public void shouldFailWithBadEventJson() {
     when(client.send(any(Request.class)))
         .thenReturn(CompletableFuture.completedFuture(responseBuilder(HTTP_OK).body(ResponseBody.create(APPLICATION_JSON, "{invalid json is invalid".getBytes())).build()));
     final CompletableFuture<List<EventInfo>> r =

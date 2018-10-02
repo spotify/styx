@@ -306,6 +306,16 @@ class StyxOkHttpClient implements StyxClient {
   }
 
   @Override
+  public CompletionStage<Backfill> backfillUnhalt(String backfillId) {
+    final EditableBackfillInput editableBackfillInput = EditableBackfillInput.newBuilder()
+        .id(backfillId)
+        .halted(false)
+        .build();
+    final Builder url = urlBuilder("backfills", backfillId);
+    return execute(forUri(url, "PUT", editableBackfillInput), Backfill.class);
+  }
+
+  @Override
   public CompletionStage<BackfillPayload> backfill(String backfillId, boolean includeStatus) {
     final Builder url = urlBuilder("backfills", backfillId);
     url.addQueryParameter("status", Boolean.toString(includeStatus));

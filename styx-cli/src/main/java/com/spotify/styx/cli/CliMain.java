@@ -210,6 +210,9 @@ public final class CliMain {
             case HALT:
               backfillHalt();
               break;
+            case UNHALT:
+              backfillUnhalt();
+              break;
             case SHOW:
               backfillShow();
               break;
@@ -499,6 +502,14 @@ public final class CliMain {
                            + "` to check the backfill status.");
   }
 
+  private void backfillUnhalt() throws ExecutionException, InterruptedException {
+    final String id = namespace.getString(parser.backfillUnhaltId.getDest());
+
+    styxClient.backfillUnhalt(id).toCompletableFuture().get();
+    cliOutput.printMessage("Backfill unhalted! Use `styx backfill show " + id
+                           + "` to check the backfill status.");
+  }
+
   private void backfillShow() throws ExecutionException, InterruptedException {
     final String id = namespace.getString(parser.backfillShowId.getDest());
     final boolean noTruncate = namespace.getBoolean((parser.backfillShowNoTruncate.getDest()));
@@ -657,6 +668,10 @@ public final class CliMain {
     final Subparser backfillHalt = BackfillCommand.HALT.parser(backfillParser);
     final Argument backfillHaltId =
         backfillHalt.addArgument("backfill").help("Backfill ID");
+
+    final Subparser backfillUnhalt = BackfillCommand.UNHALT.parser(backfillParser);
+    final Argument backfillUnhaltId =
+        backfillUnhalt.addArgument("backfill").help("Backfill ID");
 
     final Subparser backfillList = BackfillCommand.LIST.parser(backfillParser);
     final Argument backfillListWorkflow =
@@ -865,6 +880,7 @@ public final class CliMain {
     CREATE("", "Create a backfill"),
     EDIT("e", "Edit a backfill"),
     HALT("h", "Halt a backfill"),
+    UNHALT("u", "Unhalt a halted backfill"),
     SHOW("get", "Show info about a specific backfill");
 
     private final String alias;

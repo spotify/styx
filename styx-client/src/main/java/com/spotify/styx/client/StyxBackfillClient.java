@@ -95,6 +95,13 @@ public interface StyxBackfillClient extends AutoCloseable {
   CompletionStage<Void> backfillHalt(String backfillId);
 
   /**
+   * Unhalt a unhalt {@link Backfill}
+   *
+   * @param backfillId backfill id
+   */
+  CompletionStage<Backfill> backfillUnhalt(String backfillId);
+
+  /**
    * Get an existing {@link Backfill}
    *
    * @param backfillId    backfill id

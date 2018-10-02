@@ -199,7 +199,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testBackfillCreate() throws Exception {
+  public void testBackfillCreate() {
     final String component = "quux";
     final String start = "2017-01-01T00:00:00Z";
     final String end = "2017-01-30T00:00:00Z";
@@ -291,7 +291,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testBackfillCreateReverse() throws Exception {
+  public void testBackfillCreateReverse() {
     final String component = "quux";
     final Instant start = Instant.parse("2017-01-01T00:00:00Z");
     final Instant end = Instant.parse("2017-01-30T00:00:00Z");
@@ -327,7 +327,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testBackfillCreateWithDescription() throws Exception {
+  public void testBackfillCreateWithDescription() {
     final String component = "quux";
     final String start = "2017-01-01T00:00:00Z";
     final String end = "2017-01-30T00:00:00Z";
@@ -364,7 +364,7 @@ public class CliMainTest {
   }
   
   @Test
-  public void testBackfillShow() throws Exception {
+  public void testBackfillShow() {
     final String backfillId = "backfill-2";
 
     final Backfill backfill = Backfill.newBuilder()
@@ -391,7 +391,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testBackfillShowTruncating() throws Exception {
+  public void testBackfillShowTruncating() {
     final String backfillId = "backfill-2";
 
     final Backfill backfill = Backfill.newBuilder()
@@ -418,7 +418,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testBackfillEdit() throws Exception {
+  public void testBackfillEdit() {
     final String backfillId = "backfill-2";
 
     final Backfill backfill = Backfill.newBuilder()
@@ -442,7 +442,33 @@ public class CliMainTest {
   }
 
   @Test
-  public void testBackfillList() throws Exception {
+  public void testBackfillUnhalt() {
+    final String backfillId = "backfill-2";
+
+    final Backfill backfill = Backfill.newBuilder()
+        .id(backfillId)
+        .start(Instant.parse("2017-01-01T00:00:00Z"))
+        .end(Instant.parse("2017-01-30T00:00:00Z"))
+        .workflowId(WorkflowId.create("quux", backfillId))
+        .concurrency(1)
+        .description("Description")
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+
+    when(client.backfillUnhalt(backfillId))
+        .thenReturn(CompletableFuture.completedFuture(backfill));
+
+    CliMain.run(cliContext, "backfill", "unhalt", backfillId);
+
+    verify(client).backfillUnhalt(backfillId);
+    verify(cliOutput).printMessage(
+        "Backfill unhalted! Use `styx backfill show backfill-2` to check the backfill status.");
+  }
+
+
+  @Test
+  public void testBackfillList() {
     final String component = "quux";
     final String workflow = "foo";
     final String start = "2017-01-01T00:00:00Z";
@@ -472,7 +498,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testBackfillListTruncating() throws Exception {
+  public void testBackfillListTruncating() {
     final String component = "quux";
     final String workflow = "foo";
     final String start = "2017-01-01T00:00:00Z";
