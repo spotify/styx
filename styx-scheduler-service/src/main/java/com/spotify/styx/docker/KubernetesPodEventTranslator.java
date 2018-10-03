@@ -147,12 +147,10 @@ final class KubernetesPodEventTranslator {
       return generatedEvents;
     }
 
-    if (isStarted(pod, mainContainerStatusOpt)) {
-      handleStarted(workflowInstance, state, generatedEvents);
-    }
-
     if (isExited(pod, mainContainerStatusOpt)) {
       handleExited(workflowInstance, state, pod, mainContainerStatusOpt, stats, generatedEvents);
+    } else if (isStarted(pod, mainContainerStatusOpt)) {
+      handleStarted(workflowInstance, state, generatedEvents);
     }
 
     return generatedEvents;
@@ -212,10 +210,9 @@ final class KubernetesPodEventTranslator {
     switch (pod.getStatus().getPhase()) {
       case "Running":
         // Check if the main container has exited
-        final boolean mainContainerTerminated = mainContainerStatusOpt.map(ContainerStatus::getState)
+        if (mainContainerStatusOpt.map(ContainerStatus::getState)
             .map(ContainerState::getTerminated)
-            .isPresent();
-        if (mainContainerTerminated) {
+            .isPresent()) {
           return true;
         }
 
@@ -234,11 +231,8 @@ final class KubernetesPodEventTranslator {
   }
 
   private static boolean isStarted(Pod pod, Optional<ContainerStatus> mainContainerStatusOpt) {
-    if ("Running".equals(pod.getStatus().getPhase())) {
-      return mainContainerStatusOpt.map(ContainerStatus::getReady).orElse(false);
-    }
-
-    return false;
+    return "Running".equals(pod.getStatus().getPhase()) && mainContainerStatusOpt
+        .map(ContainerStatus::getReady).orElse(false);
   }
 
   private static Optional<Event> isInErrorState(WorkflowInstance workflowInstance, Pod pod,
