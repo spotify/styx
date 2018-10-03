@@ -26,6 +26,7 @@ import static com.spotify.styx.docker.KubernetesDockerRunner.getMainContainerSta
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
@@ -131,101 +132,110 @@ final class KubernetesPodEventTranslator {
     }
   }
 
-  // TODO: fix NPath complexity
   static List<Event> translate(
       WorkflowInstance workflowInstance,
       RunState state,
       Pod pod,
       Stats stats) {
 
-    final List<Event> generatedEvents = Lists.newArrayList();
-    final Optional<Event> hasError = isInErrorState(workflowInstance, pod);
+    final Optional<ContainerStatus> mainContainerStatusOpt = getMainContainerStatus(pod);
 
+    final Optional<Event> hasError = isInErrorState(workflowInstance, pod, mainContainerStatusOpt);
     if (hasError.isPresent()) {
-      switch (state.state()) {
-        case PREPARE:
-        case SUBMITTED:
-        case RUNNING:
-          generatedEvents.add(hasError.get());
-          break;
-
-        default:
-          // no event
-          break;
-      }
-
-      return generatedEvents;
+      return handleError(state, hasError.get());
     }
 
-    final PodStatus status = pod.getStatus();
-    final String phase = status.getPhase();
+    if (isExited(pod, mainContainerStatusOpt)) {
+      return handleExited(workflowInstance, state, pod, mainContainerStatusOpt, stats);
+    }
 
-    boolean exited = false;
-    boolean started = false;
+    if (isStarted(pod, mainContainerStatusOpt)) {
+      return handleStarted(workflowInstance, state);
+    }
 
-    final Optional<ContainerStatus> containerStatus = getMainContainerStatus(pod);
-    switch (phase) {
+    return ImmutableList.of();
+  }
+
+  private static List<Event> handleExited(WorkflowInstance workflowInstance, RunState state,
+                                                Pod pod,
+                                                Optional<ContainerStatus> mainContainerStatusOpt,
+                                                Stats stats) {
+    final List<Event> generatedEvents = Lists.newArrayList();
+
+    switch (state.state()) {
+      case PREPARE:
+      case SUBMITTED:
+        generatedEvents.add(Event.started(workflowInstance));
+        // intentional fall-through
+
+      case RUNNING:
+        final Optional<Integer> exitCode = mainContainerStatusOpt.flatMap(cs ->
+            getExitCodeIfValid(workflowInstance.toKey(), pod, cs, stats));
+        generatedEvents.add(Event.terminate(workflowInstance, exitCode));
+        break;
+
+      default:
+        // no event
+        break;
+    }
+
+    return ImmutableList.copyOf(generatedEvents);
+  }
+
+  private static List<Event> handleStarted(WorkflowInstance workflowInstance, RunState state) {
+    switch (state.state()) {
+      case PREPARE:
+      case SUBMITTED:
+        return ImmutableList.of(Event.started(workflowInstance));
+
+      default:
+        return ImmutableList.of();
+    }
+  }
+
+  private static List<Event> handleError(RunState state, Event event) {
+    switch (state.state()) {
+      case PREPARE:
+      case SUBMITTED:
+      case RUNNING:
+        return ImmutableList.of(event);
+
+      default:
+        return ImmutableList.of();
+    }
+  }
+
+  private static boolean isExited(Pod pod, Optional<ContainerStatus> mainContainerStatusOpt) {
+    switch (pod.getStatus().getPhase()) {
       case "Running":
         // Check if the main container has exited
-        exited = containerStatus.map(ContainerStatus::getState)
-                                .map(ContainerState::getTerminated)
-                                .isPresent();
-        if (exited) {
-          break;
+        if (mainContainerStatusOpt.map(ContainerStatus::getState)
+            .map(ContainerState::getTerminated)
+            .isPresent()) {
+          return true;
         }
 
-        // check that the main container is ready
-        // TODO: is checking for "ready" meaningful without a readiness probe configured?
-        started = containerStatus.map(ContainerStatus::getReady)
-                                 .orElse(false);
         break;
 
       case "Succeeded":
       case "Failed":
-        exited = true;
-        break;
+        return true;
 
       default:
         // do nothing
         break;
     }
 
-    if (started) {
-      switch (state.state()) {
-        case PREPARE:
-        case SUBMITTED:
-          generatedEvents.add(Event.started(workflowInstance));
-          break;
-
-        default:
-          // no event
-          break;
-      }
-    }
-
-    if (exited) {
-      switch (state.state()) {
-        case PREPARE:
-        case SUBMITTED:
-          generatedEvents.add(Event.started(workflowInstance));
-          // intentional fall-through
-
-        case RUNNING:
-          final Optional<Integer> exitCode = containerStatus.flatMap(cs ->
-              getExitCodeIfValid(workflowInstance.toKey(), pod, cs, stats));
-          generatedEvents.add(Event.terminate(workflowInstance, exitCode));
-          break;
-
-        default:
-          // no event
-          break;
-      }
-    }
-
-    return generatedEvents;
+    return false;
   }
 
-  private static Optional<Event> isInErrorState(WorkflowInstance workflowInstance, Pod pod) {
+  private static boolean isStarted(Pod pod, Optional<ContainerStatus> mainContainerStatusOpt) {
+    return "Running".equals(pod.getStatus().getPhase()) && mainContainerStatusOpt
+        .map(ContainerStatus::getReady).orElse(false);
+  }
+
+  private static Optional<Event> isInErrorState(WorkflowInstance workflowInstance, Pod pod,
+                                                Optional<ContainerStatus> mainContainerStatusOpt) {
     final PodStatus status = pod.getStatus();
     final String phase = status.getPhase();
 
@@ -236,18 +246,17 @@ final class KubernetesPodEventTranslator {
     switch (phase) {
       case "Pending":
         // check if one or more docker contains failed to pull their image, a possible silent error
-        return getMainContainerStatus(pod)
+        return mainContainerStatusOpt
             .filter(KubernetesPodEventTranslator::hasPullImageError)
             .map(x -> Event.runError(workflowInstance, "One or more containers failed to pull their image"));
 
       case "Succeeded":
       case "Failed":
-        final Optional<ContainerStatus> containerStatusOpt = getMainContainerStatus(pod);
-        if (!containerStatusOpt.isPresent()) {
+        if (!mainContainerStatusOpt.isPresent()) {
           return Optional.of(Event.runError(workflowInstance, "Could not find our container in pod"));
         }
 
-        final ContainerStatus containerStatus = containerStatusOpt.get();
+        final ContainerStatus containerStatus = mainContainerStatusOpt.get();
         final ContainerStateTerminated terminated = containerStatus.getState().getTerminated();
         if (terminated == null) {
           return Optional.of(Event.runError(workflowInstance, "Unexpected null terminated status"));
