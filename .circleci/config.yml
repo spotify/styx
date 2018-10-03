@@ -58,6 +58,11 @@ jobs:
             # Maven heap size
             MAVEN_OPTS: -Xmx256m -Xms256m
           command: mvn -B verify -P disable-static-analysis
+      - store_test_results:
+          path: test-reports/
+      - store_artifacts:
+          path: styx-report/target/site/jacoco-aggregate/
+          destination: jacoco-aggregate
       - run:
           name: Static Analysis
           when: always
