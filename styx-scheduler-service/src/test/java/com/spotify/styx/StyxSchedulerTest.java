@@ -149,7 +149,7 @@ public class StyxSchedulerTest {
   }
 
   @Test
-  public void shouldUpdateShardsAccordingToUsedResources() throws IOException {
+  public void shouldUpdateShardsAccordingToUsedResources() throws Exception {
     when(storage.runInTransaction(any())).thenAnswer(
         a -> a.<TransactionFunction>getArgument(0).apply(transaction));
     final Map<String, Long> resourcesUsageMap = ImmutableMap.of("res1", 257L);
@@ -162,7 +162,7 @@ public class StyxSchedulerTest {
   }
 
   @Test
-  public void shouldFailToUpdateShardsAccordingToUsedResources() throws IOException {
+  public void shouldFailToUpdateShardsAccordingToUsedResources() throws Exception {
     final IOException exception = new IOException();
     when(storage.runInTransaction(any())).thenThrow(exception);
     final Map<String, Long> resourcesUsageMap = ImmutableMap.of("res1", 257L);
@@ -176,7 +176,7 @@ public class StyxSchedulerTest {
   }
 
   @Test
-  public void shouldResetShardsOfResource() throws IOException {
+  public void shouldResetShardsOfResource() throws Exception {
     when(storage.runInTransaction(any())).thenAnswer(
         a -> a.<TransactionFunction>getArgument(0).apply(transaction));
 
@@ -187,7 +187,7 @@ public class StyxSchedulerTest {
   }
 
   @Test
-  public void shouldFailToResetShardsOfResource() throws IOException {
+  public void shouldFailToResetShardsOfResource() throws Exception {
     final IOException exception = new IOException();
     when(storage.runInTransaction(any())).thenThrow(exception);
 

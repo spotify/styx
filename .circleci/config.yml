@@ -3,7 +3,7 @@ jobs:
   test_jdk8_with_coverage:
     working_directory: ~/styx
     docker:
-      - image: maven:3.5.3-jdk-8
+      - image: maven:3.5.4-jdk-8
     steps:
       - checkout
       - restore_cache:
@@ -37,17 +37,17 @@ jobs:
           when: always
           command: mvn -B clean compile test-compile
 
-  test_jdk10:
+  test_jdk11:
     working_directory: ~/styx
     docker:
-      - image: maven:3.5.3-jdk-10-slim
+      - image: maven:3.5.4-jdk-11-slim
     steps:
       - checkout
       - restore_cache:
-          key: v2-deps-jdk10-{{ checksum "pom.xml" }}
+          key: v2-deps-jdk11-{{ checksum "pom.xml" }}
       - run: mvn -B dependency:go-offline compile test-compile -P disable-static-analysis
       - save_cache:
-          key: v2-deps-jdk10-{{ checksum "pom.xml" }}
+          key: v2-deps-jdk11-{{ checksum "pom.xml" }}
           paths:
             - ~/.m2
       - run:
@@ -58,6 +58,11 @@ jobs:
             # Maven heap size
             MAVEN_OPTS: -Xmx256m -Xms256m
           command: mvn -B verify -P disable-static-analysis
+      - store_test_results:
+          path: test-reports/
+      - store_artifacts:
+          path: styx-report/target/site/jacoco-aggregate/
+          destination: jacoco-aggregate
       - run:
           name: Static Analysis
           when: always
@@ -68,4 +73,4 @@ workflows:
   build:
     jobs:
       - test_jdk8_with_coverage
-      - test_jdk10
+      - test_jdk11
