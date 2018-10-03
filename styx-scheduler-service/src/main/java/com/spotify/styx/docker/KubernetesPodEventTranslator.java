@@ -26,6 +26,7 @@ import static com.spotify.styx.docker.KubernetesDockerRunner.getMainContainerSta
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
@@ -137,29 +138,30 @@ final class KubernetesPodEventTranslator {
       Pod pod,
       Stats stats) {
 
-    final List<Event> generatedEvents = Lists.newArrayList();
-
     final Optional<ContainerStatus> mainContainerStatusOpt = getMainContainerStatus(pod);
 
     final Optional<Event> hasError = isInErrorState(workflowInstance, pod, mainContainerStatusOpt);
     if (hasError.isPresent()) {
-      handleError(state, generatedEvents, hasError.get());
-      return generatedEvents;
+      return handleError(state, hasError.get());
     }
 
     if (isExited(pod, mainContainerStatusOpt)) {
-      handleExited(workflowInstance, state, pod, mainContainerStatusOpt, stats, generatedEvents);
-    } else if (isStarted(pod, mainContainerStatusOpt)) {
-      handleStarted(workflowInstance, state, generatedEvents);
+      return handleExited(workflowInstance, state, pod, mainContainerStatusOpt, stats);
     }
 
-    return generatedEvents;
+    if (isStarted(pod, mainContainerStatusOpt)) {
+      return handleStarted(workflowInstance, state);
+    }
+
+    return ImmutableList.of();
   }
 
-  private static void handleExited(WorkflowInstance workflowInstance, RunState state,
-                                   Pod pod, Optional<ContainerStatus> mainContainerStatusOpt,
-                                   Stats stats,
-                                   List<Event> generatedEvents) {
+  private static List<Event> handleExited(WorkflowInstance workflowInstance, RunState state,
+                                                Pod pod,
+                                                Optional<ContainerStatus> mainContainerStatusOpt,
+                                                Stats stats) {
+    final List<Event> generatedEvents = Lists.newArrayList();
+
     switch (state.state()) {
       case PREPARE:
       case SUBMITTED:
@@ -176,33 +178,30 @@ final class KubernetesPodEventTranslator {
         // no event
         break;
     }
+
+    return ImmutableList.copyOf(generatedEvents);
   }
 
-  private static void handleStarted(final WorkflowInstance workflowInstance, final RunState state,
-                                    final List<Event> generatedEvents) {
+  private static List<Event> handleStarted(WorkflowInstance workflowInstance, RunState state) {
     switch (state.state()) {
       case PREPARE:
       case SUBMITTED:
-        generatedEvents.add(Event.started(workflowInstance));
-        break;
+        return ImmutableList.of(Event.started(workflowInstance));
 
       default:
-        // no event
-        break;
+        return ImmutableList.of();
     }
   }
 
-  private static void handleError(RunState state, List<Event> generatedEvents, Event event) {
+  private static List<Event> handleError(RunState state, Event event) {
     switch (state.state()) {
       case PREPARE:
       case SUBMITTED:
       case RUNNING:
-        generatedEvents.add(event);
-        break;
+        return ImmutableList.of(event);
 
       default:
-        // no event
-        break;
+        return ImmutableList.of();
     }
   }
 
