@@ -831,7 +831,7 @@ public final class CliMain {
     LIST("ls", "List active workflow instances"),
     EVENTS("e", "List events for a workflow instance"),
     HALT("h", "Halt a workflow instance"),
-    TRIGGER("t", "Trigger a completed workflow instance"),
+    TRIGGER("t", "Trigger a workflow instance, fail if the instance is already active"),
     RETRY("r", "Retry a workflow instance that is in a waiting state"),
     RESOURCE(null, "Commands related to resources"),
     BACKFILL(null, "Commands related to backfills"),
