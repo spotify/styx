@@ -503,6 +503,9 @@
       </activation>
       <build>
         <pluginManagement>
+          <!--TODO: set up error-prone when it supports JDK 11-->
+          <!--https://github.com/google/error-prone/issues/1091-->
+          <!--https://github.com/google/error-prone/issues/1127-->
           <plugins>
             <plugin>
               <groupId>org.apache.maven.plugins</groupId>
