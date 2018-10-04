@@ -134,6 +134,16 @@ final class NoopStats implements Stats {
   }
 
   @Override
+  public void recordPublishing(final String type, final String state) {
+    // nop
+  }
+
+  @Override
+  public void recordPublishingError(final String type, final String state) {
+    // nop
+  }
+
+  @Override
   public void recordTickDuration(String type, long duration) {
     // nop
   }

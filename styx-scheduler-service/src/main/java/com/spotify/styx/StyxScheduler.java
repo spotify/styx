@@ -373,7 +373,7 @@ public class StyxScheduler implements AppInit {
             dockerRunner, stateManager),
         new TerminationHandler(retryUtil, stateManager),
         new MonitoringHandler(stats),
-        new PublisherHandler(publisher),
+        new PublisherHandler(publisher, stats),
         new ExecutionDescriptionHandler(storage, stateManager, new WorkflowValidator(new DockerImageValidator()))));
 
     final TriggerListener trigger =

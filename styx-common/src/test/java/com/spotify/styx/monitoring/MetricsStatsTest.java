@@ -32,6 +32,8 @@ import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_MISMATCH;
 import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.HISTOGRAM;
 import static com.spotify.styx.monitoring.MetricsStats.NATURAL_TRIGGER_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.PUBLISHING_ERROR_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.PUBLISHING_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.PULL_IMAGE_ERROR_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.QUEUED_EVENTS;
 import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_CONFIGURED;
@@ -262,6 +264,20 @@ public class MetricsStatsTest {
   @Test
   public void shouldRecordWorkflowConsumerError() {
     stats.recordWorkflowConsumerError();
+    verify(meter).mark();
+  }
+
+  @Test
+  public void shouldRecordPublishing() {
+    when(registry.meter(PUBLISHING_RATE.tagged("type", "deploying", "state", "SUBMITTED"))).thenReturn(meter);
+    stats.recordPublishing("deploying", "SUBMITTED");
+    verify(meter).mark();
+  }
+
+  @Test
+  public void shouldRecordPublishingError() {
+    when(registry.meter(PUBLISHING_ERROR_RATE.tagged("type", "deploying", "state", "SUBMITTED"))).thenReturn(meter);
+    stats.recordPublishingError("deploying", "SUBMITTED");
     verify(meter).mark();
   }
 
