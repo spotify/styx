@@ -385,6 +385,23 @@ public class SchedulerResourceTest {
   }
 
   @Test
+  public void testTriggerWorkflowInstanceFutureWithAllowFutureFlag() throws Exception {
+    when(storage.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
+    TriggerParameters expectedParameters = TriggerParameters.zero();
+    TriggerRequest toTrigger = TriggerRequest.of(HOURLY_WORKFLOW.id(), "2016-12-31T23");
+
+    ByteString eventPayload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(toTrigger));
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", BASE + "/trigger?allowFuture=true", eventPayload);
+
+    Response<ByteString> response = post.toCompletableFuture().get();
+
+    assertThat(response.status(), is(Status.OK));
+    final Instant expectedInstant = Instant.parse("2016-12-31T23:00:00.00Z");
+    verify(triggerListener).event(eq(HOURLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant), eq(expectedParameters));
+  }
+
+  @Test
   public void testTriggerWorkflowInstanceParseDayForHourly() throws Exception {
     when(storage.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
     TriggerParameters expectedParameters = TriggerParameters.zero();

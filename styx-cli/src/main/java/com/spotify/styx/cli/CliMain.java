@@ -598,8 +598,10 @@ public final class CliMain {
     final TriggerParameters parameters = TriggerParameters.builder()
         .env(parser.getEnvVars(namespace, parser.triggerEnv))
         .build();
+    final boolean allowFuture = namespace.getBoolean(parser.triggerAllowFuture.getDest());
 
-    styxClient.triggerWorkflowInstance(component, workflow, parameter, parameters).toCompletableFuture().get();
+    styxClient.triggerWorkflowInstance(component, workflow, parameter, parameters, allowFuture)
+        .toCompletableFuture().get();
     cliOutput.printMessage("Triggered! Use `styx ls -c " + component
                            + "` to check active workflow instances.");
   }
@@ -771,6 +773,10 @@ public final class CliMain {
     final Subparser events = addWorkflowInstanceArguments(Command.EVENTS.parser(subCommands));
     final Subparser trigger = addWorkflowInstanceArguments(Command.TRIGGER.parser(subCommands));
     final Argument triggerEnv = addEnvVarArgument(trigger, "-e", "--env");
+    final Argument triggerAllowFuture = addEnvVarArgument(trigger, "--allow-future")
+        .help("Allow triggering future partition")
+        .setDefault(false)
+        .action(Arguments.storeTrue());
 
     final Subparser halt = addWorkflowInstanceArguments(Command.HALT.parser(subCommands));
     final Subparser retry = addWorkflowInstanceArguments(Command.RETRY.parser(subCommands));

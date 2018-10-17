@@ -641,7 +641,7 @@ public class CliMainTest {
 
   @Test
   public void testClientError() {
-    when(client.triggerWorkflowInstance(any(), any(), any(), any()))
+    when(client.triggerWorkflowInstance(any(), any(), any(), any(), eq(false)))
         .thenReturn(exceptionallyCompletedFuture(
             new ClientErrorException("foo failure",
                 new IOException("bar failure",
@@ -662,7 +662,7 @@ public class CliMainTest {
     final Throwable cause = new ClientErrorException("foo failure",
         new IOException("bar failure",
             new ConnectException("failed to connect to baz")));
-    when(client.triggerWorkflowInstance(any(), any(), any(), any()))
+    when(client.triggerWorkflowInstance(any(), any(), any(), any(), eq(false)))
         .thenReturn(exceptionallyCompletedFuture(cause));
 
     try {
@@ -679,7 +679,7 @@ public class CliMainTest {
   @Test
   public void testApiError() {
     final ApiErrorException exception = new ApiErrorException("bar failure", 500, true, requestId);
-    when(client.triggerWorkflowInstance(any(), any(), any(), any()))
+    when(client.triggerWorkflowInstance(any(), any(), any(), any(), eq(false)))
         .thenReturn(exceptionallyCompletedFuture(exception));
 
     try {
@@ -695,7 +695,7 @@ public class CliMainTest {
   @Test
   public void testClientUnknownError() {
     final Exception exception = new UnsupportedOperationException();
-    when(client.triggerWorkflowInstance(any(), any(), any(), any()))
+    when(client.triggerWorkflowInstance(any(), any(), any(), any(), eq(false)))
         .thenReturn(exceptionallyCompletedFuture(exception));
 
     try {
@@ -712,7 +712,7 @@ public class CliMainTest {
   @Test
   public void testUnknownError() {
     final Exception exception = new UnsupportedOperationException();
-    when(client.triggerWorkflowInstance(any(), any(), any(), any()))
+    when(client.triggerWorkflowInstance(any(), any(), any(), any(), eq(false)))
         .thenThrow(exception);
 
     try {
@@ -728,7 +728,7 @@ public class CliMainTest {
   @Test
   public void testMissingCredentialsHelpMessage() {
     final ApiErrorException apiError = new ApiErrorException("foo", 401, false, requestId);
-    when(client.triggerWorkflowInstance(any(), any(), any(), any()))
+    when(client.triggerWorkflowInstance(any(), any(), any(), any(), eq(false)))
         .thenReturn(exceptionallyCompletedFuture(apiError));
 
     try {
@@ -745,7 +745,7 @@ public class CliMainTest {
   @Test
   public void testUnauthorizedMessage() {
     final ApiErrorException apiError = new ApiErrorException("foo", 401, true, requestId);
-    when(client.triggerWorkflowInstance(any(), any(), any(), any()))
+    when(client.triggerWorkflowInstance(any(), any(), any(), any(), eq(false)))
         .thenReturn(exceptionallyCompletedFuture(apiError));
 
     try {
@@ -792,12 +792,12 @@ public class CliMainTest {
   @Test
   public void testTrigger() {
     final TriggerParameters expectedParameters = TriggerParameters.zero();
-    when(client.triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters))
+    when(client.triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters, false))
         .thenReturn(CompletableFuture.completedFuture(null));
 
     CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02");
 
-    verify(client).triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters);
+    verify(client).triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters, false);
   }
 
   @Test
@@ -807,12 +807,23 @@ public class CliMainTest {
             "BAR", "bar",
             "BAZ", "baz")
         .build();
-    when(client.triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters))
+    when(client.triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters, false))
         .thenReturn(CompletableFuture.completedFuture(null));
 
     CliMain.run(cliContext, "t", "-e", "FOO=foo", "foo", "bar", "2017-01-02", "-e", "BAR=bar", "--env", "BAZ=baz");
 
-    verify(client).triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters);
+    verify(client).triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters, false);
+  }
+
+  @Test
+  public void testTriggerAllowFuture() {
+    final TriggerParameters expectedParameters = TriggerParameters.zero();
+    when(client.triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters, true))
+        .thenReturn(CompletableFuture.completedFuture(null));
+
+    CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02", "--allow-future");
+
+    verify(client).triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters, true);
   }
 
   private Path fileFromResource(String name) throws IOException {

@@ -54,6 +54,21 @@ public interface StyxSchedulerClient extends AutoCloseable {
                                                 TriggerParameters triggerParameters);
 
   /**
+   * Trigger a {@link WorkflowInstance}
+   *
+   * @param componentId component id
+   * @param workflowId  workflow id
+   * @param parameter   parameter
+   * @param triggerParameters additional parameters for the {@link WorkflowInstance}
+   * @param allowFuture allow triggering future partition
+   */
+  CompletionStage<Void> triggerWorkflowInstance(String componentId,
+                                                String workflowId,
+                                                String parameter,
+                                                TriggerParameters triggerParameters,
+                                                boolean allowFuture);
+
+  /**
    * Halt a {@link WorkflowInstance}
    *
    * @param componentId component id
