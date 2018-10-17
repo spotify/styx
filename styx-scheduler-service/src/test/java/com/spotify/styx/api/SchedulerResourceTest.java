@@ -372,19 +372,6 @@ public class SchedulerResourceTest {
   }
 
   @Test
-  public void testTriggerWorkflowInstanceFuture() throws Exception {
-    when(storage.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
-    TriggerRequest toTrigger = TriggerRequest.of(HOURLY_WORKFLOW.id(), "2016-12-31T23");
-
-    Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
-
-    assertThat(response.status(),
-               is(Status.BAD_REQUEST.withReasonPhrase("Cannot trigger an instance of the future")));
-
-    verify(triggerListener, never()).event(any(), any(), any(), any());
-  }
-
-  @Test
   public void testTriggerWorkflowInstanceParseDayForHourly() throws Exception {
     when(storage.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
     TriggerParameters expectedParameters = TriggerParameters.zero();
