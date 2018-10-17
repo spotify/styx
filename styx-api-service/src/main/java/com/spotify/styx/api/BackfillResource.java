@@ -61,6 +61,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.ReplayEvents;
 import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.Closeable;
@@ -98,14 +99,17 @@ public final class BackfillResource implements Closeable {
   private final Storage storage;
   private final String schedulerServiceBaseUrl;
   private final WorkflowValidator workflowValidator;
+  private final Time time;
 
   private final ForkJoinPool forkJoinPool;
 
   public BackfillResource(String schedulerServiceBaseUrl, Storage storage,
-      WorkflowValidator workflowValidator) {
-    this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
-    this.storage = Objects.requireNonNull(storage);
+                          WorkflowValidator workflowValidator,
+                          Time time) {
+    this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl, "schedulerServiceBaseUrl");
+    this.storage = Objects.requireNonNull(storage, "storage");
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
+    this.time = Objects.requireNonNull(time, "time");
     this.forkJoinPool = register(closer, new ForkJoinPool(CONCURRENCY), "backfill-resource");
   }
 
@@ -318,6 +322,12 @@ public final class BackfillResource implements Closeable {
     if (!TimeUtil.isAligned(input.end(), schedule)) {
       return Response.forStatus(
           Status.BAD_REQUEST.withReasonPhrase("end parameter not aligned with schedule"));
+    }
+
+    if (input.start().isAfter(time.get()) || TimeUtil
+        .previousInstant(input.end(), workflow.configuration().schedule()).isAfter(time.get())) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(
+          "Cannot backfill future partitions"));
     }
 
     final List<Instant> instants = instantsInRange(input.start(), input.end(), schedule);
