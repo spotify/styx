@@ -78,6 +78,15 @@ public interface StyxBackfillClient extends AutoCloseable {
   CompletionStage<Backfill> backfillCreate(BackfillInput backfill);
 
   /**
+   * Create a {@link Backfill}
+   *
+   * @param backfill The backfill configuration.
+   * @param allowFuture allow backfilling future partitions 
+   * @return The created {@link Backfill}
+   */
+  CompletionStage<Backfill> backfillCreate(BackfillInput backfill, boolean allowFuture);
+
+  /**
    * Edit concurrency value of existing {@link Backfill}
    *
    * @param backfillId  backfill id

@@ -476,7 +476,9 @@ public final class CliMain {
         .description(description)
         .triggerParameters(triggerParameters)
         .build();
-    final Backfill backfill = styxClient.backfillCreate(configuration).toCompletableFuture().get();
+    final boolean allowFuture = namespace.getBoolean(parser.backfillCreateAllowFuture.getDest());
+    final Backfill backfill = styxClient.backfillCreate(configuration, allowFuture)
+        .toCompletableFuture().get();
     cliOutput.printBackfill(backfill, true);
   }
 
@@ -696,6 +698,10 @@ public final class CliMain {
         backfillCreate.addArgument("-d", "--description")
             .help("a description of the backfill");
     final Argument backfillCreateEnv = addEnvVarArgument(backfillCreate, "-e", "--env");
+    final Argument backfillCreateAllowFuture = addEnvVarArgument(backfillCreate, "--allow-future")
+        .help("Allow backfilling future partitions")
+        .setDefault(false)
+        .action(Arguments.storeTrue());
 
     final Subparsers resourceParser =
         Command.RESOURCE.parser(subCommands)

@@ -199,7 +199,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testBackfillCreate() throws Exception {
+  public void testBackfillCreate() {
     final String component = "quux";
     final String start = "2017-01-01T00:00:00Z";
     final String end = "2017-01-30T00:00:00Z";
@@ -224,13 +224,13 @@ public class CliMainTest {
         .triggerParameters(TriggerParameters.zero())
         .build();
 
-    when(client.backfillCreate(expectedInput))
+    when(client.backfillCreate(expectedInput, false))
         .thenReturn(CompletableFuture.completedFuture(backfill));
 
     CliMain.run(cliContext, "backfill", "create", component, "foo", "2017-01-01", "2017-01-30",
         "1");
 
-    verify(client).backfillCreate(expectedInput);
+    verify(client).backfillCreate(expectedInput, false);
     verify(cliOutput).printBackfill(backfill, true);
   }
 
@@ -267,13 +267,13 @@ public class CliMainTest {
         .triggerParameters(expectedTriggerParameters)
         .build();
 
-    when(client.backfillCreate(expectedInput))
+    when(client.backfillCreate(expectedInput, false))
         .thenReturn(CompletableFuture.completedFuture(backfill));
 
     CliMain.run(cliContext, "backfill", "create", "-e", "FOO=foo", component, "foo", "2017-01-01", "2017-01-30",
         "1", "-e", "BAR=bar", "--env", "BAZ=baz", "-e", "FOOBAR=");
 
-    verify(client).backfillCreate(expectedInput);
+    verify(client).backfillCreate(expectedInput, false);
     verify(cliOutput).printBackfill(backfill, true);
   }
 
@@ -291,7 +291,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testBackfillCreateReverse() throws Exception {
+  public void testBackfillCreateReverse() {
     final String component = "quux";
     final Instant start = Instant.parse("2017-01-01T00:00:00Z");
     final Instant end = Instant.parse("2017-01-30T00:00:00Z");
@@ -317,17 +317,17 @@ public class CliMainTest {
         .triggerParameters(TriggerParameters.zero())
         .build();
 
-    when(client.backfillCreate(expectedInput))
+    when(client.backfillCreate(expectedInput, false))
         .thenReturn(CompletableFuture.completedFuture(backfill));
 
     CliMain.run(cliContext, "backfill", "create", component, "foo", "2017-01-01", "2017-01-30", "1", "--reverse");
 
-    verify(client).backfillCreate(expectedInput);
+    verify(client).backfillCreate(expectedInput, false);
     verify(cliOutput).printBackfill(backfill, true);
   }
 
   @Test
-  public void testBackfillCreateWithDescription() throws Exception {
+  public void testBackfillCreateWithDescription() {
     final String component = "quux";
     final String start = "2017-01-01T00:00:00Z";
     final String end = "2017-01-30T00:00:00Z";
@@ -353,18 +353,54 @@ public class CliMainTest {
         .triggerParameters(TriggerParameters.zero())
         .build();
 
-    when(client.backfillCreate(expectedInput))
+    when(client.backfillCreate(expectedInput, false))
         .thenReturn(CompletableFuture.completedFuture(backfill));
 
     CliMain.run(cliContext, "backfill", "create", component, "foo", "2017-01-01", "2017-01-30", "1",
         "-d", "Description");
 
-    verify(client).backfillCreate(expectedInput);
+    verify(client).backfillCreate(expectedInput, false);
     verify(cliOutput).printBackfill(backfill, true);
   }
-  
+
   @Test
-  public void testBackfillShow() throws Exception {
+  public void testBackfillCreateAllowFuture() {
+    final String component = "quux";
+    final String start = "2017-01-01T00:00:00Z";
+    final String end = "2017-01-30T00:00:00Z";
+
+    final Backfill backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(Instant.parse(start))
+        .end(Instant.parse(end))
+        .workflowId(WorkflowId.create(component, "foo"))
+        .concurrency(1)
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+
+    final BackfillInput expectedInput = BackfillInput.newBuilder()
+        .component(backfill.workflowId().componentId())
+        .workflow(backfill.workflowId().id())
+        .start(backfill.start())
+        .end(backfill.end())
+        .reverse(backfill.reverse())
+        .concurrency(backfill.concurrency())
+        .triggerParameters(TriggerParameters.zero())
+        .build();
+
+    when(client.backfillCreate(expectedInput, true))
+        .thenReturn(CompletableFuture.completedFuture(backfill));
+
+    CliMain.run(cliContext, "backfill", "create", component, "foo", "2017-01-01", "2017-01-30",
+        "1", "--allow-future");
+
+    verify(client).backfillCreate(expectedInput, true);
+    verify(cliOutput).printBackfill(backfill, true);
+  }
+
+  @Test
+  public void testBackfillShow() {
     final String backfillId = "backfill-2";
 
     final Backfill backfill = Backfill.newBuilder()
@@ -391,7 +427,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testBackfillShowTruncating() throws Exception {
+  public void testBackfillShowTruncating() {
     final String backfillId = "backfill-2";
 
     final Backfill backfill = Backfill.newBuilder()
@@ -418,7 +454,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testBackfillEdit() throws Exception {
+  public void testBackfillEdit() {
     final String backfillId = "backfill-2";
 
     final Backfill backfill = Backfill.newBuilder()
@@ -442,7 +478,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testBackfillList() throws Exception {
+  public void testBackfillList() {
     final String component = "quux";
     final String workflow = "foo";
     final String start = "2017-01-01T00:00:00Z";
@@ -472,7 +508,7 @@ public class CliMainTest {
   }
 
   @Test
-  public void testBackfillListTruncating() throws Exception {
+  public void testBackfillListTruncating() {
     final String component = "quux";
     final String workflow = "foo";
     final String start = "2017-01-01T00:00:00Z";

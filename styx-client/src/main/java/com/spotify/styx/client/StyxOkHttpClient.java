@@ -297,7 +297,15 @@ class StyxOkHttpClient implements StyxClient {
 
   @Override
   public CompletionStage<Backfill> backfillCreate(BackfillInput backfill) {
-    return execute(forUri(urlBuilder("backfills"), "POST", backfill), Backfill.class);
+    return backfillCreate(backfill, false);
+  }
+
+  @Override
+  public CompletionStage<Backfill> backfillCreate(BackfillInput backfill, boolean allowFuture) {
+    return execute(forUri(
+        urlBuilder("backfills")
+            .addQueryParameter("allowFuture", String.valueOf(allowFuture)),
+        "POST", backfill), Backfill.class);
   }
 
   @Override

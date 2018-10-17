@@ -484,7 +484,7 @@ public class StyxOkHttpClientTest {
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
-    final URI uri = URI.create(API_URL + "/backfills");
+    final URI uri = URI.create(API_URL + "/backfills?allowFuture=false");
     assertThat(request.url().toString(), is(uri.toString()));
     assertThat(Json.deserialize(bytesOfRequestBody(request), BackfillInput.class),
         equalTo(BACKFILL_INPUT));
@@ -504,7 +504,7 @@ public class StyxOkHttpClientTest {
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
-    assertThat(request.url().toString(), is(API_URL + "/backfills"));
+    assertThat(request.url().toString(), is(API_URL + "/backfills?allowFuture=false"));
     assertThat(Json.deserialize(bytesOfRequestBody(request), BackfillInput.class),
         equalTo(backfillInput));
     assertThat(r.isCompletedExceptionally(), is(false));
@@ -526,9 +526,29 @@ public class StyxOkHttpClientTest {
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
-    assertThat(request.url().toString(), is(API_URL + "/backfills"));
+    assertThat(request.url().toString(), is(API_URL + "/backfills?allowFuture=false"));
     assertThat(Json.deserialize(bytesOfRequestBody(request), BackfillInput.class),
                equalTo(backfillInput));
+    assertThat(request.method(), is("POST"));
+  }
+
+  @Test
+  public void shouldCreateBackfillAllowFuture() throws Exception {
+    final BackfillInput backfillInput = BACKFILL_INPUT.builder()
+        .reverse(true)
+        .build();
+
+    when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
+        response(HTTP_OK, BACKFILL)));
+    final CompletableFuture<Backfill> r = styx.backfillCreate(backfillInput, true)
+        .toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    assertThat(request.url().toString(), is(API_URL + "/backfills?allowFuture=true"));
+    assertThat(Json.deserialize(bytesOfRequestBody(request), BackfillInput.class),
+        equalTo(backfillInput));
+    assertThat(r.isCompletedExceptionally(), is(false));
     assertThat(request.method(), is("POST"));
   }
 
