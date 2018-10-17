@@ -204,7 +204,6 @@ public class SchedulerResource {
       return Response.forStatus(BAD_REQUEST.withReasonPhrase(e.getMessage()));
     }
 
-
     final boolean allowFuture =
         Boolean.parseBoolean(rc.request().parameter("allowFuture").orElse("false"));
     if (!allowFuture) {

@@ -125,7 +125,7 @@ public final class BackfillResource implements Closeable {
         Route.with(
             em.response(BackfillInput.class, Backfill.class),
             "POST", BASE,
-            rc -> this::postBackfill),
+            rc -> payload -> postBackfill(rc, payload)),
         Route.with(
             em.serializerResponse(BackfillPayload.class),
             "GET", BASE + "/<bid>",
@@ -279,7 +279,8 @@ public final class BackfillResource implements Closeable {
     }
   }
 
-  private Response<Backfill> postBackfill(BackfillInput input) {
+  private Response<Backfill> postBackfill(final RequestContext rc,
+                                          BackfillInput input) {
     final BackfillBuilder builder = Backfill.newBuilder();
 
     final String id = RandomGenerator.DEFAULT.generateUniqueId("backfill");
@@ -324,10 +325,14 @@ public final class BackfillResource implements Closeable {
           Status.BAD_REQUEST.withReasonPhrase("end parameter not aligned with schedule"));
     }
 
-    if (input.start().isAfter(time.get()) || TimeUtil
-        .previousInstant(input.end(), workflow.configuration().schedule()).isAfter(time.get())) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(
-          "Cannot backfill future partitions"));
+    final boolean allowFuture =
+        Boolean.parseBoolean(rc.request().parameter("allowFuture").orElse("false"));
+    if (!allowFuture) {
+      if (input.start().isAfter(time.get()) || TimeUtil
+          .previousInstant(input.end(), workflow.configuration().schedule()).isAfter(time.get())) {
+        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(
+            "Cannot backfill future partitions"));
+      }
     }
 
     final List<Instant> instants = instantsInRange(input.start(), input.end(), schedule);

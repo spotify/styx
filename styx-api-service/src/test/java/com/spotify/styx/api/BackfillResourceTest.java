@@ -962,6 +962,66 @@ public class BackfillResourceTest extends VersionedApiTest {
         is(Status.BAD_REQUEST.withReasonPhrase("Cannot backfill future partitions")));
   }
 
+  @Test
+  public void shouldAllowPostBackfillIfStartInFuture() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final String json = "{\"start\":\"2018-10-18T00:00:00Z\"," +
+                        "\"end\":\"2018-10-19T00:00:00Z\"," +
+                        "\"component\":\"component\"," +
+                        "\"workflow\":\"workflow2\","+
+                        "\"concurrency\":1}";
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("POST", path("") + "?allowFuture=true", ByteString.encodeUtf8(json)));
+
+    assertThat(response.status().reasonPhrase(),
+        response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
+        response.payload().get().toByteArray(), Backfill.class);
+    assertThat(postedBackfill.id().matches("backfill-[\\d-]+"), is(true));
+    assertThat(postedBackfill.start(), equalTo(Instant.parse("2018-10-18T00:00:00Z")));
+    assertThat(postedBackfill.end(), equalTo(Instant.parse("2018-10-19T00:00:00Z")));
+    assertThat(postedBackfill.workflowId(), equalTo(WorkflowId.create("component", "workflow2")));
+    assertThat(postedBackfill.concurrency(), equalTo(1));
+    assertThat(postedBackfill.description(), equalTo(Optional.empty()));
+    assertThat(postedBackfill.nextTrigger(), equalTo(Instant.parse("2018-10-18T00:00:00Z")));
+    assertThat(postedBackfill.schedule(), equalTo(Schedule.HOURS));
+    assertThat(postedBackfill.allTriggered(), equalTo(false));
+    assertThat(postedBackfill.halted(), equalTo(false));
+    assertThat(postedBackfill.reverse(), equalTo(false));
+  }
+
+  @Test
+  public void shouldAllowPostBackfillIfEndInFuture() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final String json = "{\"start\":\"2018-10-16T00:00:00Z\"," +
+                        "\"end\":\"2018-10-17T02:00:00Z\"," +
+                        "\"component\":\"component\"," +
+                        "\"workflow\":\"workflow2\","+
+                        "\"concurrency\":1}";
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("POST", path("") + "?allowFuture=true", ByteString.encodeUtf8(json)));
+
+    assertThat(response.status().reasonPhrase(),
+        response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
+        response.payload().get().toByteArray(), Backfill.class);
+    assertThat(postedBackfill.id().matches("backfill-[\\d-]+"), is(true));
+    assertThat(postedBackfill.start(), equalTo(Instant.parse("2018-10-16T00:00:00Z")));
+    assertThat(postedBackfill.end(), equalTo(Instant.parse("2018-10-17T02:00:00Z")));
+    assertThat(postedBackfill.workflowId(), equalTo(WorkflowId.create("component", "workflow2")));
+    assertThat(postedBackfill.concurrency(), equalTo(1));
+    assertThat(postedBackfill.description(), equalTo(Optional.empty()));
+    assertThat(postedBackfill.nextTrigger(), equalTo(Instant.parse("2018-10-16T00:00:00Z")));
+    assertThat(postedBackfill.schedule(), equalTo(Schedule.HOURS));
+    assertThat(postedBackfill.allTriggered(), equalTo(false));
+    assertThat(postedBackfill.halted(), equalTo(false));
+    assertThat(postedBackfill.reverse(), equalTo(false));
+  }
+
   private Connection setupBigTableMockTable() {
     Connection bigtable = mock(Connection.class);
     try {
