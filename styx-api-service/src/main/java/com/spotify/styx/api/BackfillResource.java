@@ -279,9 +279,9 @@ public final class BackfillResource implements Closeable {
     }
   }
 
-  private <T> Optional<Response<T>> verify(RequestContext rc,
-                                           BackfillInput input,
-                                           Workflow workflow) {
+  private <T> Optional<Response<T>> validate(RequestContext rc,
+                                             BackfillInput input,
+                                             Workflow workflow) {
     if (!workflow.configuration().dockerImage().isPresent()) {
       return Optional.of(Response
           .forStatus(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing docker image")));
@@ -344,7 +344,7 @@ public final class BackfillResource implements Closeable {
       throw new RuntimeException(e);
     }
 
-    final Optional<Response<Backfill>> error = verify(rc, input, workflow);
+    final Optional<Response<Backfill>> error = validate(rc, input, workflow);
     if (error.isPresent()) {
       return error.get();
     }

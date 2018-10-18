@@ -170,7 +170,6 @@ public class SchedulerResource {
     final WorkflowInstance workflowInstance = WorkflowInstance.create(
         triggerRequest.workflowId(), triggerRequest.parameter());
     final Workflow workflow;
-    final Instant instant;
 
     // Verifying workflow
     try {
@@ -195,6 +194,8 @@ public class SchedulerResource {
           + String.join(", ", errors)));
     }
 
+    final Instant instant;
+
     // Verifying instant
     try {
       instant = parseAlignedInstant(
@@ -212,6 +213,12 @@ public class SchedulerResource {
           "Cannot trigger an instance of the future"));
     }
 
+    return triggerAndWait(triggerRequest, workflow, instant);
+  }
+
+  private Response<TriggerRequest> triggerAndWait(TriggerRequest triggerRequest,
+                                                  Workflow workflow,
+                                                  Instant instant) {
     final TriggerParameters parameters =
         triggerRequest.triggerParameters().orElse(TriggerParameters.zero());
     final String triggerId = randomGenerator.generateUniqueId(AD_HOC_CLI_TRIGGER_PREFIX);
