@@ -203,12 +203,6 @@ public class SchedulerResource {
       return Response.forStatus(BAD_REQUEST.withReasonPhrase(e.getMessage()));
     }
 
-    // Verifying future
-    if (instant.isAfter(time.get())) {
-      return Response.forStatus(BAD_REQUEST.withReasonPhrase(
-          "Cannot trigger an instance of the future"));
-    }
-
     final TriggerParameters parameters =
         triggerRequest.triggerParameters().orElse(TriggerParameters.zero());
     final String triggerId = randomGenerator.generateUniqueId(AD_HOC_CLI_TRIGGER_PREFIX);
