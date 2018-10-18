@@ -166,7 +166,7 @@ public class SchedulerResource {
   }
 
   private Response<TriggerRequest> triggerWorkflowInstance(
-      final RequestContext rc, TriggerRequest triggerRequest) {
+      RequestContext rc, TriggerRequest triggerRequest) {
     final WorkflowInstance workflowInstance = WorkflowInstance.create(
         triggerRequest.workflowId(), triggerRequest.parameter());
     final Workflow workflow;
@@ -204,14 +204,12 @@ public class SchedulerResource {
       return Response.forStatus(BAD_REQUEST.withReasonPhrase(e.getMessage()));
     }
 
+    // Verifying future
     final boolean allowFuture =
         Boolean.parseBoolean(rc.request().parameter("allowFuture").orElse("false"));
-    if (!allowFuture) {
-      // Verifying future
-      if (instant.isAfter(time.get())) {
-        return Response.forStatus(BAD_REQUEST.withReasonPhrase(
-            "Cannot trigger an instance of the future"));
-      }
+    if (!allowFuture && instant.isAfter(time.get())) {
+      return Response.forStatus(BAD_REQUEST.withReasonPhrase(
+          "Cannot trigger an instance of the future"));
     }
 
     final TriggerParameters parameters =

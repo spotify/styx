@@ -279,7 +279,7 @@ public final class BackfillResource implements Closeable {
     }
   }
 
-  private Response<Backfill> postBackfill(final RequestContext rc,
+  private Response<Backfill> postBackfill(RequestContext rc,
                                           BackfillInput input) {
     final BackfillBuilder builder = Backfill.newBuilder();
 
@@ -301,9 +301,11 @@ public final class BackfillResource implements Closeable {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+
     if (!workflow.configuration().dockerImage().isPresent()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing docker image"));
     }
+
     final Collection<String> errors = workflowValidator.validateWorkflow(workflow);
     if (!errors.isEmpty()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
@@ -327,12 +329,11 @@ public final class BackfillResource implements Closeable {
 
     final boolean allowFuture =
         Boolean.parseBoolean(rc.request().parameter("allowFuture").orElse("false"));
-    if (!allowFuture) {
-      if (input.start().isAfter(time.get()) || TimeUtil
-          .previousInstant(input.end(), workflow.configuration().schedule()).isAfter(time.get())) {
-        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(
-            "Cannot backfill future partitions"));
-      }
+    if (!allowFuture &&
+        (input.start().isAfter(time.get()) ||
+         TimeUtil.previousInstant(input.end(), schedule).isAfter(time.get()))) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(
+          "Cannot backfill future partitions"));
     }
 
     final List<Instant> instants = instantsInRange(input.start(), input.end(), schedule);
