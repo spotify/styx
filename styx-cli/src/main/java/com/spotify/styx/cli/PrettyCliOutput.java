@@ -317,7 +317,7 @@ class PrettyCliOutput implements CliOutput {
       return header.length();
     }
 
-    if (!noTruncate & length > (TRUNCATED_LENGTH + ELLIPSIS.length())) {
+    if (!noTruncate && length > (TRUNCATED_LENGTH + ELLIPSIS.length())) {
       return TRUNCATED_LENGTH + ELLIPSIS.length();
     } else {
       return length;
