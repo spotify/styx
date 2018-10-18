@@ -79,7 +79,7 @@ public final class ReplayEvents {
       try {
         restoredState = restoredState.transition(sequenceEvent.event(), time);
       } catch (IllegalStateException e) {
-        LOG.warn("failed to transition state and move on to next event", e);
+        LOG.warn("failed to transition state, move on to next event", e);
       }
 
       latestTime.set(time.get());
