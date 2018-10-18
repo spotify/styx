@@ -29,8 +29,12 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.SortedSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class ReplayEvents {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ReplayEvents.class);
 
   private ReplayEvents() {
     throw new UnsupportedOperationException();
@@ -72,7 +76,12 @@ public final class ReplayEvents {
         initialTime.set(time.get());
       }
 
-      restoredState = restoredState.transition(sequenceEvent.event(), time);
+      try {
+        restoredState = restoredState.transition(sequenceEvent.event(), time);
+      } catch (IllegalStateException e) {
+        LOG.warn("failed to transition state and move on to next event", e);
+      }
+
       latestTime.set(time.get());
 
       if (backfillFound(triggerExecutionEventMet, backfillId, restoredState)) {

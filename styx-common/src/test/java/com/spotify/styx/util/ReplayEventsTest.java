@@ -95,6 +95,35 @@ public class ReplayEventsTest {
   }
 
   @Test
+  public void restoreRunStateWhenMissingEvent() throws Exception {
+    SortedSet<SequenceEvent> events = newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
+    events.add(SequenceEvent.create(
+        Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.backfill("bf-1"), TRIGGER_PARAMETERS),      1L, 1L));
+    events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE, RESOURCE_IDS),                   2L, 2L));
+    // missing Event.submit(WORKFLOW_INSTANCE, EXECUTION_DESCRIPTION, "exec-1")
+    events.add(SequenceEvent.create(Event.submitted(WORKFLOW_INSTANCE, "exec-1"),                     4L, 4L));
+    events.add(SequenceEvent.create(Event.started(WORKFLOW_INSTANCE),                                 5L, 5L));
+    events.add(SequenceEvent.create(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)),               6L, 6L));
+    events.add(SequenceEvent.create(Event.success(WORKFLOW_INSTANCE),                                 7L, 7L));
+    events.add(SequenceEvent.create(
+        Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.adhoc("ad-hoc"), TRIGGER_PARAMETERS),       8L, 8L));
+    events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE, RESOURCE_IDS),                   9L, 9L));
+    events.add(SequenceEvent.create(Event.halt(WORKFLOW_INSTANCE),                                    10L, 10L));
+
+    when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
+
+    RunStateData restoredRunStateData =
+        ReplayEvents.getBackfillRunStateData(WORKFLOW_INSTANCE, storage, "bf-1").get();
+
+    assertThat(restoredRunStateData.state(), is("DONE"));
+    assertThat(restoredRunStateData.stateData().lastExit(), isPresent());
+    assertThat(restoredRunStateData.stateData().lastExit().get(), is(0));
+
+    assertThat(restoredRunStateData.initialTimestamp().get(), is(1L));
+    assertThat(restoredRunStateData.latestTimestamp().get(), is(7L));
+  }
+
+  @Test
   public void returnsEmptyWithMissingBackfill() throws Exception {
     SortedSet<SequenceEvent> events = newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
     events.add(SequenceEvent.create(
