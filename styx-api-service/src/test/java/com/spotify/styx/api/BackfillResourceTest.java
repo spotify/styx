@@ -636,7 +636,24 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldFailOnMisalignedRange() throws Exception {
+  public void shouldFailOnStartNotBeforeEnd() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final String json = "{\"start\":\"2017-02-01T00:00:00Z\"," +
+                        "\"end\":\"2017-01-01T00:00:00Z\"," +
+                        "\"component\":\"component\"," +
+                        "\"workflow\":\"workflow2\","+
+                        "\"concurrency\":1}";
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path(""), ByteString.encodeUtf8(json)));
+
+    assertThat(response.status().reasonPhrase(),
+        response, hasStatus(belongsToFamily(StatusType.Family.CLIENT_ERROR)));
+  }
+
+  @Test
+  public void shouldFailOnMisalignedStart() throws Exception {
     sinceVersion(Api.Version.V3);
 
     final String json = "{\"start\":\"2017-01-01T00:00:01Z\"," +
@@ -650,6 +667,23 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     assertThat(response.status().reasonPhrase(),
                response, hasStatus(belongsToFamily(StatusType.Family.CLIENT_ERROR)));
+  }
+
+  @Test
+  public void shouldFailOnMisalignedEnd() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final String json = "{\"start\":\"2017-01-01T00:00:00Z\"," +
+                        "\"end\":\"2017-02-01T00:00:01Z\"," +
+                        "\"component\":\"component\"," +
+                        "\"workflow\":\"workflow2\","+
+                        "\"concurrency\":1}";
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path(""), ByteString.encodeUtf8(json)));
+
+    assertThat(response.status().reasonPhrase(),
+        response, hasStatus(belongsToFamily(StatusType.Family.CLIENT_ERROR)));
   }
 
   @Test
