@@ -99,7 +99,7 @@ public class SchedulerResource {
         Route.with(
             em.response(TriggerRequest.class),
             "POST", BASE + "/trigger",
-            rc -> this::triggerWorkflowInstance),
+            rc -> payload -> triggerWorkflowInstance(rc, payload)),
         Route.with(
             em.response(WorkflowInstance.class),
             "POST", BASE + "/retry",
@@ -165,11 +165,11 @@ public class SchedulerResource {
     return OK;
   }
 
-  private Response<TriggerRequest> triggerWorkflowInstance(TriggerRequest triggerRequest) {
+  private Response<TriggerRequest> triggerWorkflowInstance(
+      RequestContext rc, TriggerRequest triggerRequest) {
     final WorkflowInstance workflowInstance = WorkflowInstance.create(
         triggerRequest.workflowId(), triggerRequest.parameter());
     final Workflow workflow;
-    final Instant instant;
 
     // Verifying workflow
     try {
@@ -194,6 +194,8 @@ public class SchedulerResource {
           + String.join(", ", errors)));
     }
 
+    final Instant instant;
+
     // Verifying instant
     try {
       instant = parseAlignedInstant(
@@ -204,11 +206,19 @@ public class SchedulerResource {
     }
 
     // Verifying future
-    if (instant.isAfter(time.get())) {
+    final boolean allowFuture =
+        Boolean.parseBoolean(rc.request().parameter("allowFuture").orElse("false"));
+    if (!allowFuture && instant.isAfter(time.get())) {
       return Response.forStatus(BAD_REQUEST.withReasonPhrase(
           "Cannot trigger an instance of the future"));
     }
 
+    return triggerAndWait(triggerRequest, workflow, instant);
+  }
+
+  private Response<TriggerRequest> triggerAndWait(TriggerRequest triggerRequest,
+                                                  Workflow workflow,
+                                                  Instant instant) {
     final TriggerParameters parameters =
         triggerRequest.triggerParameters().orElse(TriggerParameters.zero());
     final String triggerId = randomGenerator.generateUniqueId(AD_HOC_CLI_TRIGGER_PREFIX);

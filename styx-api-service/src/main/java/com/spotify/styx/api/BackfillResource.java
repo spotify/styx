@@ -61,6 +61,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.ReplayEvents;
 import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.Closeable;
@@ -98,14 +99,17 @@ public final class BackfillResource implements Closeable {
   private final Storage storage;
   private final String schedulerServiceBaseUrl;
   private final WorkflowValidator workflowValidator;
+  private final Time time;
 
   private final ForkJoinPool forkJoinPool;
 
   public BackfillResource(String schedulerServiceBaseUrl, Storage storage,
-      WorkflowValidator workflowValidator) {
-    this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
-    this.storage = Objects.requireNonNull(storage);
+                          WorkflowValidator workflowValidator,
+                          Time time) {
+    this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl, "schedulerServiceBaseUrl");
+    this.storage = Objects.requireNonNull(storage, "storage");
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
+    this.time = Objects.requireNonNull(time, "time");
     this.forkJoinPool = register(closer, new ForkJoinPool(CONCURRENCY), "backfill-resource");
   }
 
@@ -121,7 +125,7 @@ public final class BackfillResource implements Closeable {
         Route.with(
             em.response(BackfillInput.class, Backfill.class),
             "POST", BASE,
-            rc -> this::postBackfill),
+            rc -> payload -> postBackfill(rc, payload)),
         Route.with(
             em.serializerResponse(BackfillPayload.class),
             "GET", BASE + "/<bid>",
@@ -275,11 +279,48 @@ public final class BackfillResource implements Closeable {
     }
   }
 
-  private Response<Backfill> postBackfill(BackfillInput input) {
+  private Optional<String> validate(RequestContext rc,
+                                             BackfillInput input,
+                                             Workflow workflow) {
+    if (!workflow.configuration().dockerImage().isPresent()) {
+      return Optional.of("Workflow is missing docker image");
+    }
+
+    final Collection<String> errors = workflowValidator.validateWorkflow(workflow);
+    if (!errors.isEmpty()) {
+      return Optional.of("Invalid workflow configuration: " + String.join(", ", errors));
+    }
+
+    final Schedule schedule = workflow.configuration().schedule();
+
+    if (!input.start().isBefore(input.end())) {
+      return Optional.of("start must be before end");
+    }
+
+    if (!TimeUtil.isAligned(input.start(), schedule)) {
+      return Optional.of("start parameter not aligned with schedule");
+    }
+
+    if (!TimeUtil.isAligned(input.end(), schedule)) {
+      return Optional.of("end parameter not aligned with schedule");
+    }
+
+    final boolean allowFuture =
+        Boolean.parseBoolean(rc.request().parameter("allowFuture").orElse("false"));
+    if (!allowFuture &&
+        (input.start().isAfter(time.get()) ||
+         TimeUtil.previousInstant(input.end(), schedule).isAfter(time.get()))) {
+      return Optional.of("Cannot backfill future partitions");
+    }
+
+    return Optional.empty();
+  }
+
+  private Response<Backfill> postBackfill(RequestContext rc,
+                                          BackfillInput input) {
     final BackfillBuilder builder = Backfill.newBuilder();
 
     final String id = RandomGenerator.DEFAULT.generateUniqueId("backfill");
-    final Schedule schedule;
 
     final WorkflowId workflowId = WorkflowId.create(input.component(), input.workflow());
 
@@ -292,33 +333,16 @@ public final class BackfillResource implements Closeable {
         return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("workflow not found"));
       }
       workflow = workflowOpt.get();
-      schedule = workflow.configuration().schedule();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-    if (!workflow.configuration().dockerImage().isPresent()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing docker image"));
-    }
-    final Collection<String> errors = workflowValidator.validateWorkflow(workflow);
-    if (!errors.isEmpty()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
-          + String.join(", ", errors)));
+
+    final Optional<String> error = validate(rc, input, workflow);
+    if (error.isPresent()) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(error.get()));
     }
 
-    if (!input.start().isBefore(input.end())) {
-      return Response.forStatus(
-          Status.BAD_REQUEST.withReasonPhrase("start must be before end"));
-    }
-
-    if (!TimeUtil.isAligned(input.start(), schedule)) {
-      return Response.forStatus(
-          Status.BAD_REQUEST.withReasonPhrase("start parameter not aligned with schedule"));
-    }
-
-    if (!TimeUtil.isAligned(input.end(), schedule)) {
-      return Response.forStatus(
-          Status.BAD_REQUEST.withReasonPhrase("end parameter not aligned with schedule"));
-    }
+    final Schedule schedule = workflow.configuration().schedule();
 
     final List<Instant> instants = instantsInRange(input.start(), input.end(), schedule);
     final List<WorkflowInstance> alreadyActive =
@@ -345,8 +369,8 @@ public final class BackfillResource implements Closeable {
         .end(input.end())
         .schedule(schedule)
         .nextTrigger(input.reverse()
-            ? Iterables.getLast(instants)
-            : input.start())
+                     ? Iterables.getLast(instants)
+                     : input.start())
         .description(input.description())
         .reverse(input.reverse())
         .triggerParameters(input.triggerParameters())

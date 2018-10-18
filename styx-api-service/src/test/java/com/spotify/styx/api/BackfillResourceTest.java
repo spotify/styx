@@ -128,7 +128,7 @@ public class BackfillResourceTest extends VersionedApiTest {
       .workflowId(WorkflowId.create("component", "workflow2"))
       .concurrency(2)
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
-      .schedule(Schedule.DAYS) // TODO: it's confusing that this is DAYS but workflow2 is created with HOURS
+      .schedule(Schedule.HOURS)
       .build();
 
   private static final Backfill BACKFILL_4 = Backfill.newBuilder()
@@ -138,7 +138,7 @@ public class BackfillResourceTest extends VersionedApiTest {
       .workflowId(WorkflowId.create("other_component", "other_workflow"))
       .concurrency(2)
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
-      .schedule(Schedule.DAYS)
+      .schedule(Schedule.HOURS)
       .build();
 
   private static final Backfill BACKFILL_5 = Backfill.newBuilder()
@@ -165,7 +165,8 @@ public class BackfillResourceTest extends VersionedApiTest {
         Duration.ZERO));
 
     final BackfillResource backfillResource = closer.register(
-        new BackfillResource(SCHEDULER_BASE, storage, workflowValidator));
+        new BackfillResource(SCHEDULER_BASE, storage, workflowValidator,
+            () -> Instant.parse("2018-10-17T00:00:00.000Z")));
     environment.routingEngine()
         .registerRoutes(backfillResource.routes());
   }
@@ -635,7 +636,24 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldFailOnMisalignedRange() throws Exception {
+  public void shouldFailOnStartNotBeforeEnd() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final String json = "{\"start\":\"2017-02-01T00:00:00Z\"," +
+                        "\"end\":\"2017-01-01T00:00:00Z\"," +
+                        "\"component\":\"component\"," +
+                        "\"workflow\":\"workflow2\","+
+                        "\"concurrency\":1}";
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path(""), ByteString.encodeUtf8(json)));
+
+    assertThat(response.status().reasonPhrase(),
+        response, hasStatus(belongsToFamily(StatusType.Family.CLIENT_ERROR)));
+  }
+
+  @Test
+  public void shouldFailOnMisalignedStart() throws Exception {
     sinceVersion(Api.Version.V3);
 
     final String json = "{\"start\":\"2017-01-01T00:00:01Z\"," +
@@ -649,6 +667,23 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     assertThat(response.status().reasonPhrase(),
                response, hasStatus(belongsToFamily(StatusType.Family.CLIENT_ERROR)));
+  }
+
+  @Test
+  public void shouldFailOnMisalignedEnd() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final String json = "{\"start\":\"2017-01-01T00:00:00Z\"," +
+                        "\"end\":\"2017-02-01T00:00:01Z\"," +
+                        "\"component\":\"component\"," +
+                        "\"workflow\":\"workflow2\","+
+                        "\"concurrency\":1}";
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path(""), ByteString.encodeUtf8(json)));
+
+    assertThat(response.status().reasonPhrase(),
+        response, hasStatus(belongsToFamily(StatusType.Family.CLIENT_ERROR)));
   }
 
   @Test
@@ -925,6 +960,100 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     assertThat(response.status(),
         is(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing docker image")));
+  }
+
+  @Test
+  public void shouldReturnBadRequestForPostBackfillIfStartInFuture() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final String json = "{\"start\":\"2018-10-18T00:00:00Z\"," +
+                        "\"end\":\"2018-10-19T00:00:00Z\"," +
+                        "\"component\":\"component\"," +
+                        "\"workflow\":\"workflow2\","+
+                        "\"concurrency\":1}";
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path(""), ByteString.encodeUtf8(json)));
+
+    assertThat(response.status(),
+        is(Status.BAD_REQUEST.withReasonPhrase("Cannot backfill future partitions")));
+  }
+
+  @Test
+  public void shouldReturnBadRequestForPostBackfillIfEndInFuture() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final String json = "{\"start\":\"2018-10-16T00:00:00Z\"," +
+                        "\"end\":\"2018-10-17T02:00:00Z\"," +
+                        "\"component\":\"component\"," +
+                        "\"workflow\":\"workflow2\","+
+                        "\"concurrency\":1}";
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path(""), ByteString.encodeUtf8(json)));
+
+    assertThat(response.status(),
+        is(Status.BAD_REQUEST.withReasonPhrase("Cannot backfill future partitions")));
+  }
+
+  @Test
+  public void shouldAllowPostBackfillIfStartInFuture() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final String json = "{\"start\":\"2018-10-18T00:00:00Z\"," +
+                        "\"end\":\"2018-10-19T00:00:00Z\"," +
+                        "\"component\":\"component\"," +
+                        "\"workflow\":\"workflow2\","+
+                        "\"concurrency\":1}";
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("POST", path("") + "?allowFuture=true", ByteString.encodeUtf8(json)));
+
+    assertThat(response.status().reasonPhrase(),
+        response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
+        response.payload().get().toByteArray(), Backfill.class);
+    assertThat(postedBackfill.id().matches("backfill-[\\d-]+"), is(true));
+    assertThat(postedBackfill.start(), equalTo(Instant.parse("2018-10-18T00:00:00Z")));
+    assertThat(postedBackfill.end(), equalTo(Instant.parse("2018-10-19T00:00:00Z")));
+    assertThat(postedBackfill.workflowId(), equalTo(WorkflowId.create("component", "workflow2")));
+    assertThat(postedBackfill.concurrency(), equalTo(1));
+    assertThat(postedBackfill.description(), equalTo(Optional.empty()));
+    assertThat(postedBackfill.nextTrigger(), equalTo(Instant.parse("2018-10-18T00:00:00Z")));
+    assertThat(postedBackfill.schedule(), equalTo(Schedule.HOURS));
+    assertThat(postedBackfill.allTriggered(), equalTo(false));
+    assertThat(postedBackfill.halted(), equalTo(false));
+    assertThat(postedBackfill.reverse(), equalTo(false));
+  }
+
+  @Test
+  public void shouldAllowPostBackfillIfEndInFuture() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final String json = "{\"start\":\"2018-10-16T00:00:00Z\"," +
+                        "\"end\":\"2018-10-17T02:00:00Z\"," +
+                        "\"component\":\"component\"," +
+                        "\"workflow\":\"workflow2\","+
+                        "\"concurrency\":1}";
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("POST", path("") + "?allowFuture=true", ByteString.encodeUtf8(json)));
+
+    assertThat(response.status().reasonPhrase(),
+        response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
+        response.payload().get().toByteArray(), Backfill.class);
+    assertThat(postedBackfill.id().matches("backfill-[\\d-]+"), is(true));
+    assertThat(postedBackfill.start(), equalTo(Instant.parse("2018-10-16T00:00:00Z")));
+    assertThat(postedBackfill.end(), equalTo(Instant.parse("2018-10-17T02:00:00Z")));
+    assertThat(postedBackfill.workflowId(), equalTo(WorkflowId.create("component", "workflow2")));
+    assertThat(postedBackfill.concurrency(), equalTo(1));
+    assertThat(postedBackfill.description(), equalTo(Optional.empty()));
+    assertThat(postedBackfill.nextTrigger(), equalTo(Instant.parse("2018-10-16T00:00:00Z")));
+    assertThat(postedBackfill.schedule(), equalTo(Schedule.HOURS));
+    assertThat(postedBackfill.allTriggered(), equalTo(false));
+    assertThat(postedBackfill.halted(), equalTo(false));
+    assertThat(postedBackfill.reverse(), equalTo(false));
   }
 
   private Connection setupBigTableMockTable() {

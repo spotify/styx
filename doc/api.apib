@@ -425,7 +425,7 @@ Resources related to the Backfills in Styx. This group allows to operate on
 Backfill entities registered in Styx and check detailed status of each single
 Workflow Instance belonging to a Backfill entity.
 
-## Backfills [/{version}/backfills{?component,workflow,status,showAll}]
+## Backfills [/{version}/backfills{?component,workflow,status,showAll,allowFuture}]
 
 + Parameters
     + version: `v3` (enum[string]) - API version
@@ -510,6 +510,10 @@ Workflow Instance belonging to a Backfill entity.
         }
 
 ### Create Backfill [POST]
+
++ Parameters
+    + allowFuture: `false` (optional, boolean) - allow backfilling future partitions
+      + Default: false
 
 + Request (application/json)
 
@@ -800,12 +804,14 @@ Resources related to operations that act on the current state of the scheduler.
             "workflow_instance": "styx-canary/StyxCanary/2017-01-01T01"
         }
 
-## Trigger [/{version}/scheduler/trigger]
+## Trigger [/{version}/scheduler/trigger{?allowFuture}]
 
 + Parameters
     + version: `v3` (enum[string]) - API version
         + Members
             + `v3`
+    + allowFuture: `false` (optional, boolean) - allow triggering future partition
+        + Default: false
 
 ### Trigger Workflow Instance [POST]
 

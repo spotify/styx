@@ -205,9 +205,20 @@ class StyxOkHttpClient implements StyxClient {
                                                        String workflowId,
                                                        String parameter,
                                                        TriggerParameters triggerParameters) {
+    return triggerWorkflowInstance(componentId, workflowId, parameter, triggerParameters, false);
+  }
+
+  @Override
+  public CompletionStage<Void> triggerWorkflowInstance(String componentId,
+                                                       String workflowId,
+                                                       String parameter,
+                                                       TriggerParameters triggerParameters,
+                                                       boolean allowFuture) {
     final TriggerRequest triggerRequest =
         TriggerRequest.of(WorkflowId.create(componentId, workflowId), parameter, triggerParameters);
-    return execute(forUri(urlBuilder("scheduler", "trigger"), "POST", triggerRequest))
+    return execute(
+        forUri(urlBuilder("scheduler", "trigger")
+            .addQueryParameter("allowFuture", String.valueOf(allowFuture)), "POST", triggerRequest))
         .thenApply(response -> null);
   }
 
@@ -286,7 +297,15 @@ class StyxOkHttpClient implements StyxClient {
 
   @Override
   public CompletionStage<Backfill> backfillCreate(BackfillInput backfill) {
-    return execute(forUri(urlBuilder("backfills"), "POST", backfill), Backfill.class);
+    return backfillCreate(backfill, false);
+  }
+
+  @Override
+  public CompletionStage<Backfill> backfillCreate(BackfillInput backfill, boolean allowFuture) {
+    return execute(forUri(
+        urlBuilder("backfills")
+            .addQueryParameter("allowFuture", String.valueOf(allowFuture)),
+        "POST", backfill), Backfill.class);
   }
 
   @Override

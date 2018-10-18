@@ -484,7 +484,7 @@ public class StyxOkHttpClientTest {
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
-    final URI uri = URI.create(API_URL + "/backfills");
+    final URI uri = URI.create(API_URL + "/backfills?allowFuture=false");
     assertThat(request.url().toString(), is(uri.toString()));
     assertThat(Json.deserialize(bytesOfRequestBody(request), BackfillInput.class),
         equalTo(BACKFILL_INPUT));
@@ -504,7 +504,7 @@ public class StyxOkHttpClientTest {
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
-    assertThat(request.url().toString(), is(API_URL + "/backfills"));
+    assertThat(request.url().toString(), is(API_URL + "/backfills?allowFuture=false"));
     assertThat(Json.deserialize(bytesOfRequestBody(request), BackfillInput.class),
         equalTo(backfillInput));
     assertThat(r.isCompletedExceptionally(), is(false));
@@ -526,9 +526,29 @@ public class StyxOkHttpClientTest {
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
-    assertThat(request.url().toString(), is(API_URL + "/backfills"));
+    assertThat(request.url().toString(), is(API_URL + "/backfills?allowFuture=false"));
     assertThat(Json.deserialize(bytesOfRequestBody(request), BackfillInput.class),
                equalTo(backfillInput));
+    assertThat(request.method(), is("POST"));
+  }
+
+  @Test
+  public void shouldCreateBackfillAllowFuture() throws Exception {
+    final BackfillInput backfillInput = BACKFILL_INPUT.builder()
+        .reverse(true)
+        .build();
+
+    when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
+        response(HTTP_OK, BACKFILL)));
+    final CompletableFuture<Backfill> r = styx.backfillCreate(backfillInput, true)
+        .toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    assertThat(request.url().toString(), is(API_URL + "/backfills?allowFuture=true"));
+    assertThat(Json.deserialize(bytesOfRequestBody(request), BackfillInput.class),
+        equalTo(backfillInput));
+    assertThat(r.isCompletedExceptionally(), is(false));
     assertThat(request.method(), is("POST"));
   }
 
@@ -679,14 +699,33 @@ public class StyxOkHttpClientTest {
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
-    assertThat(request.url().toString(), is(API_URL + "/scheduler/trigger"));
+    assertThat(request.url().toString(), is(API_URL + "/scheduler/trigger?allowFuture=false"));
     assertThat(request.method(), is("POST"));
     assertThat(Json.deserialize(bytesOfRequestBody(request), TriggerRequest.class),
                equalTo(triggerRequest));
   }
 
   @Test
-  public void testTriggerWorkflowInstanceWithTriggerParameters() throws IOException {
+  public void testTriggerWorkflowInstanceAllowFuture() throws IOException {
+    final TriggerRequest triggerRequest = TriggerRequest.of(WORKFLOW_1.id(), "2017-01-01",
+        TriggerParameters.zero());
+    when(client.send(any(Request.class))).thenReturn(CompletableFuture.completedFuture(
+        response(HTTP_OK)));
+    final CompletableFuture<Void> r =
+        styx.triggerWorkflowInstance(WORKFLOW_1.componentId(), WORKFLOW_1.workflowId(),
+            "2017-01-01").toCompletableFuture();
+
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    assertThat(request.url().toString(), is(API_URL + "/scheduler/trigger?allowFuture=false"));
+    assertThat(request.method(), is("POST"));
+    assertThat(Json.deserialize(bytesOfRequestBody(request), TriggerRequest.class),
+        equalTo(triggerRequest));
+  }
+
+  @Test
+  public void testTriggerWorkflowInstanceWithTriggerParametersAllowFuture() throws IOException {
     final TriggerParameters triggerParameters = TriggerParameters.builder()
         .env("FOO", "BAR", "BAR", "FOO")
         .build();
@@ -696,14 +735,14 @@ public class StyxOkHttpClientTest {
         .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK)));
     final CompletableFuture<Void> r =
         styx.triggerWorkflowInstance(WORKFLOW_1.componentId(), WORKFLOW_1.workflowId(),
-                                     "2017-01-01", triggerParameters).toCompletableFuture();
+            "2017-01-01", triggerParameters, true).toCompletableFuture();
 
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
-    assertThat(request.url().toString(), is(API_URL + "/scheduler/trigger"));
+    assertThat(request.url().toString(), is(API_URL + "/scheduler/trigger?allowFuture=true"));
     assertThat(request.method(), is("POST"));
     assertThat(Json.deserialize(bytesOfRequestBody(request), TriggerRequest.class),
-               equalTo(triggerRequest));
+        equalTo(triggerRequest));
   }
 }
