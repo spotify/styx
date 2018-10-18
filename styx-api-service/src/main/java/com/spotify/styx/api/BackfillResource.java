@@ -279,36 +279,30 @@ public final class BackfillResource implements Closeable {
     }
   }
 
-  private <T> Optional<Response<T>> validate(RequestContext rc,
+  private Optional<String> validate(RequestContext rc,
                                              BackfillInput input,
                                              Workflow workflow) {
     if (!workflow.configuration().dockerImage().isPresent()) {
-      return Optional.of(Response
-          .forStatus(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing docker image")));
+      return Optional.of("Workflow is missing docker image");
     }
 
     final Collection<String> errors = workflowValidator.validateWorkflow(workflow);
     if (!errors.isEmpty()) {
-      return Optional.of(Response
-          .forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
-                                                         + String.join(", ", errors))));
+      return Optional.of("Invalid workflow configuration: " + String.join(", ", errors));
     }
 
     final Schedule schedule = workflow.configuration().schedule();
 
     if (!input.start().isBefore(input.end())) {
-      return Optional.of(Response.forStatus(
-          Status.BAD_REQUEST.withReasonPhrase("start must be before end")));
+      return Optional.of("start must be before end");
     }
 
     if (!TimeUtil.isAligned(input.start(), schedule)) {
-      return Optional.of(Response.forStatus(
-          Status.BAD_REQUEST.withReasonPhrase("start parameter not aligned with schedule")));
+      return Optional.of("start parameter not aligned with schedule");
     }
 
     if (!TimeUtil.isAligned(input.end(), schedule)) {
-      return Optional.of(Response.forStatus(
-          Status.BAD_REQUEST.withReasonPhrase("end parameter not aligned with schedule")));
+      return Optional.of("end parameter not aligned with schedule");
     }
 
     final boolean allowFuture =
@@ -316,8 +310,7 @@ public final class BackfillResource implements Closeable {
     if (!allowFuture &&
         (input.start().isAfter(time.get()) ||
          TimeUtil.previousInstant(input.end(), schedule).isAfter(time.get()))) {
-      return Optional.of(Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(
-          "Cannot backfill future partitions")));
+      return Optional.of("Cannot backfill future partitions");
     }
 
     return Optional.empty();
@@ -344,9 +337,9 @@ public final class BackfillResource implements Closeable {
       throw new RuntimeException(e);
     }
 
-    final Optional<Response<Backfill>> error = validate(rc, input, workflow);
+    final Optional<String> error = validate(rc, input, workflow);
     if (error.isPresent()) {
-      return error.get();
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(error.get()));
     }
 
     final Schedule schedule = workflow.configuration().schedule();
