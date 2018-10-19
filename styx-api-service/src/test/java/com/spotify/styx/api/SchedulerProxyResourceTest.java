@@ -83,6 +83,20 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void testTriggerWorkflowWithQueryParameter() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    serviceHelper.stubClient()
+        .respond(Response.forStatus(Status.ACCEPTED))
+        .to(SCHEDULER_BASE + "/api/v0/trigger?bar=foo&foo=foo&foo=bar");
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path("/trigger?foo=foo&foo=bar&bar=foo")));
+
+    assertThat(response, hasStatus(withCode(Status.ACCEPTED)));
+  }
+
+  @Test
   public void verifyPassesHeaders() throws Exception {
     sinceVersion(Api.Version.V3);
 
