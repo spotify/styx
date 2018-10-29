@@ -232,7 +232,7 @@ public class ResourceResourceTest extends VersionedApiTest {
             ByteString.encodeUtf8("{\"id\": \"resource2\", \"concurrency\": 3}")));
     assertThat(putResponse, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
 
-    // make sure resource2 is changed in list and that resource1 is unchanged
+    // make sure resource2 is changed in projectsList and that resource1 is unchanged
     Response<ByteString> listResponse2 =
         awaitResponse(serviceHelper.request("GET", path("")));
     assertThat(listResponse2, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));

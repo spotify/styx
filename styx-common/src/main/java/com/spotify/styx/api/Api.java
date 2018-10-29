@@ -29,6 +29,7 @@ import static com.spotify.styx.api.Middlewares.tracer;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
+import com.spotify.styx.util.GoogleIdTokenValidator;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
 import java.util.Collection;
@@ -48,6 +49,11 @@ public final class Api {
     public String prefix() {
       return "/api/" + name().toLowerCase();
     }
+
+  }
+
+  private Api() {
+    throw new UnsupportedOperationException();
   }
 
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> prefixRoutes(
@@ -58,20 +64,22 @@ public final class Api {
   }
 
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
-      Stream<Route<AsyncHandler<Response<ByteString>>>> routes, String service) {
-    return withCommonMiddleware(routes, Collections::emptyList, service);
+      Stream<Route<AsyncHandler<Response<ByteString>>>> routes,
+      GoogleIdTokenValidator validator,
+      String service) {
+    return withCommonMiddleware(routes, Collections::emptyList, validator, service);
   }
 
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
       Stream<Route<AsyncHandler<Response<ByteString>>>> routes,
-      Supplier<List<String>> clientBlacklistSupplier, String service) {
+      Supplier<List<String>> clientBlacklistSupplier,
+      GoogleIdTokenValidator validator,
+      String service) {
     return routes.map(r -> r
-        .withMiddleware(httpLogger())
-        .withMiddleware(authValidator())
+        .withMiddleware(httpLogger(validator))
+        .withMiddleware(authValidator(validator))
         .withMiddleware(clientValidator(clientBlacklistSupplier))
         .withMiddleware(exceptionAndRequestIdHandler())
         .withMiddleware(tracer(tracer, service)));
-  }
-  private Api() {
   }
 }

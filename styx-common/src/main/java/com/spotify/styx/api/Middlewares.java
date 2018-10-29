@@ -28,10 +28,6 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.googleapis.util.Utils;
-import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
@@ -43,20 +39,17 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.SyncHandler;
+import com.spotify.styx.util.GoogleIdTokenValidator;
 import com.spotify.styx.util.MDCUtil;
-import io.norberg.automatter.AutoMatter;
 import io.opencensus.trace.Span;
 import io.opencensus.trace.Tracer;
-import java.io.IOException;
 import java.net.URI;
-import java.security.GeneralSecurityException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import okio.ByteString;
@@ -75,24 +68,12 @@ public final class Middlewares {
 
   public static final String BEARER_PREFIX = "Bearer ";
   private static final Set<String> BLACKLISTED_HEADERS = ImmutableSet.of(HttpHeaders.AUTHORIZATION);
-  private static final GoogleIdTokenVerifier GOOGLE_ID_TOKEN_VERIFIER;
 
   private static final String REQUEST_ID = "request-id";
   private static final String X_REQUEST_ID = "X-Request-Id";
 
-  static {
-    final NetHttpTransport transport;
-    try {
-      transport = GoogleNetHttpTransport.newTrustedTransport();
-    } catch (GeneralSecurityException | IOException e) {
-      throw new RuntimeException(e);
-    }
-    GOOGLE_ID_TOKEN_VERIFIER = new GoogleIdTokenVerifier
-        .Builder(transport, Utils.getDefaultJsonFactory())
-        .build();
-  }
-
   private Middlewares() {
+    throw new UnsupportedOperationException();
   }
 
   public static Middleware<SyncHandler<? extends Response<?>>, AsyncHandler<Response<ByteString>>>
@@ -190,23 +171,14 @@ public final class Middlewares {
     return CharMatcher.anyOf("\n\r").replaceFrom(reason.toString(), ' ');
   }
 
-  static GoogleIdToken verifyIdToken(String s, GoogleIdTokenVerifier verifier) {
-    try {
-      return verifier.verify(s);
-    } catch (GeneralSecurityException e) {
-      return null; // will be treated as an invalid token
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> httpLogger() {
-    return httpLogger(LOG, GOOGLE_ID_TOKEN_VERIFIER);
+  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> httpLogger(
+      GoogleIdTokenValidator validator) {
+    return httpLogger(LOG, validator);
   }
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> httpLogger(
       Logger log,
-      GoogleIdTokenVerifier verifier) {
+      GoogleIdTokenValidator validator) {
     return innerHandler -> requestContext -> {
       final Request request = requestContext.request();
 
@@ -214,7 +186,7 @@ public final class Middlewares {
                "GET".equals(request.method()) ? "" : "[AUDIT] ",
                request.method(),
                request.uri(),
-               auth(requestContext, verifier).user().map(idToken -> idToken.getPayload()
+               auth(requestContext, validator).map(idToken -> idToken.getPayload()
                    .getEmail())
                    .orElse("anonymous"),
                hideSensitiveHeaders(request.headers()),
@@ -253,18 +225,13 @@ public final class Middlewares {
     };
   }
 
-  @AutoMatter
-  public interface AuthContext {
-    Optional<GoogleIdToken> user();
-  }
-
-  private static AuthContext auth(RequestContext requestContext,
-      GoogleIdTokenVerifier verifier) {
+  private static Optional<GoogleIdToken> auth(RequestContext requestContext,
+                                              GoogleIdTokenValidator validator) {
     final Request request = requestContext.request();
     final boolean hasAuthHeader = request.header(HttpHeaders.AUTHORIZATION).isPresent();
 
     if (!hasAuthHeader) {
-      return Optional::empty;
+      return Optional.empty();
     }
 
     final String authHeader = request.header(HttpHeaders.AUTHORIZATION).get();
@@ -275,8 +242,7 @@ public final class Middlewares {
 
     final GoogleIdToken googleIdToken;
     try {
-      final String token = authHeader.substring(BEARER_PREFIX.length());
-      googleIdToken = verifyIdToken(token, verifier);
+      googleIdToken = validator.validate(authHeader.substring(BEARER_PREFIX.length()));
     } catch (IllegalArgumentException e) {
       throw new ResponseException(Response.forStatus(Status.BAD_REQUEST
           .withReasonPhrase("Failed to parse Authorization token")), e);
@@ -287,7 +253,7 @@ public final class Middlewares {
           .withReasonPhrase("Authorization token is invalid")));
     }
 
-    return () -> Optional.of(googleIdToken);
+    return Optional.of(googleIdToken);
   }
 
   private static Map<String, String> hideSensitiveHeaders(Map<String, String> headers) {
@@ -296,28 +262,10 @@ public final class Middlewares {
             entry -> BLACKLISTED_HEADERS.contains(entry.getKey()) ? "<hidden>" : entry.getValue()));
   }
 
-  // todo: make use of following middleware where we need to use the auth context in route handlers
-
-  interface Authenticated<T> extends Function<AuthContext, T> {}
-  interface Requested<T> extends Function<RequestContext, T> {}
-
-  public static <T> Middleware<Requested<Authenticated<T>>, AsyncHandler<Response<ByteString>>> authed() {
-    return authed(GOOGLE_ID_TOKEN_VERIFIER);
-  }
-
-  public static <T> Middleware<Requested<Authenticated<T>>, AsyncHandler<Response<ByteString>>> authed(
-      GoogleIdTokenVerifier verifier) {
-    return ar -> jsonAsync().apply(requestContext -> {
-      final T payload = ar
-          .apply(requestContext)
-          .apply(auth(requestContext, verifier));
-      return completedFuture(Response.forPayload(payload));
-    });
-  }
-
-  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authValidator() {
+  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authValidator(
+      GoogleIdTokenValidator validator) {
     return h -> rc -> {
-      if (!"GET".equals(rc.request().method()) && !auth(rc, GOOGLE_ID_TOKEN_VERIFIER).user().isPresent()) {
+      if (!"GET".equals(rc.request().method()) && !auth(rc, validator).isPresent()) {
         return completedFuture(
             Response.forStatus(Status.UNAUTHORIZED.withReasonPhrase("Unauthorized access")));
       }

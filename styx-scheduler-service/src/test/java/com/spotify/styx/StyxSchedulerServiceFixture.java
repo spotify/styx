@@ -54,6 +54,7 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
 import com.spotify.styx.util.EventUtil;
+import com.spotify.styx.util.GoogleIdTokenValidatorFactory;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
@@ -151,6 +152,7 @@ public class StyxSchedulerServiceFixture {
         Sets.union(res, resourceIdsToDecorateWith);
     StyxScheduler.EventConsumerFactory eventConsumerFactory =
         (env, stats) -> (event, state) ->  transitionedEvents.add(Tuple.of(event, state.state()));
+    GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory = (l, s) -> null;
 
     styxScheduler = StyxScheduler.newBuilder()
         .setTime(time)
@@ -161,6 +163,7 @@ public class StyxSchedulerServiceFixture {
         .setPublisherFactory(publisherFactory)
         .setResourceDecorator(resourceDecorator)
         .setEventConsumerFactory(eventConsumerFactory)
+        .setGoogleIdTokenValidatorFactory(googleIdTokenValidatorFactory)
         .build();
 
     serviceHelper = ServiceHelper.create(styxScheduler, StyxScheduler.SERVICE_NAME)

@@ -42,7 +42,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -55,11 +54,12 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.request.RequestContexts;
 import com.spotify.apollo.request.RequestMetadataImpl;
 import com.spotify.apollo.route.AsyncHandler;
+import com.spotify.styx.util.ClassEnforcer;
+import com.spotify.styx.util.GoogleIdTokenValidator;
 import com.spotify.styx.util.MockSpan;
 import io.opencensus.trace.SpanBuilder;
 import io.opencensus.trace.Tracer;
 import java.io.IOException;
-import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -91,7 +91,7 @@ public class MiddlewaresTest {
   @Rule public ExpectedException exception = ExpectedException.none();
 
   @Mock public Logger log;
-  @Mock public GoogleIdTokenVerifier idTokenVerifier;
+  @Mock public GoogleIdTokenValidator validator;
   @Mock public GoogleIdToken idToken;
   @Mock public GoogleIdToken.Payload idTokenPayload;
   @Mock Tracer tracer;
@@ -130,6 +130,11 @@ public class MiddlewaresTest {
     // noinspection unchecked
     when(innerHandler.invoke(requestContext)).thenThrow(throwable);
     return innerHandler;
+  }
+
+  @Test
+  public void shouldNotBeConstructable() throws ReflectiveOperationException {
+    assertThat(ClassEnforcer.assertNotInstantiable(Middlewares.class), is(true));
   }
 
   @Test
@@ -257,7 +262,7 @@ public class MiddlewaresTest {
     Request request = Request.forUri("/", "GET");
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = awaitResponse(Middlewares.httpLogger()
+    Response<Object> response = awaitResponse(Middlewares.httpLogger(validator)
         .apply(mockInnerHandler(requestContext))
         .invoke(requestContext));
     assertThat(response, hasStatus(withCode(Status.OK)));
@@ -270,7 +275,7 @@ public class MiddlewaresTest {
         .withPayload(ByteString.encodeUtf8("hello"));
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = awaitResponse(Middlewares.httpLogger()
+    Response<Object> response = awaitResponse(Middlewares.httpLogger(validator)
         .apply(mockInnerHandler(requestContext))
         .invoke(requestContext));
     assertThat(response, hasStatus(withCode(Status.OK)));
@@ -285,12 +290,52 @@ public class MiddlewaresTest {
         .withPayload(ByteString.encodeUtf8("hello"));
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = Middlewares.httpLogger().and(Middlewares.exceptionAndRequestIdHandler())
+    when(validator.validate(anyString())).thenThrow(new IllegalArgumentException());
+
+    Response<Object> response = Middlewares.httpLogger(validator).and(Middlewares.exceptionAndRequestIdHandler())
         .apply(mockInnerHandler(requestContext))
         .invoke(requestContext)
         .toCompletableFuture().get(5, SECONDS);
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
+  }
+
+  @Test
+  public void testAuditLoggingForPutAuthorizationMissingBearerPrefix()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = Request.forUri("/", "PUT")
+        .withHeader(HttpHeaders.AUTHORIZATION, "broken")
+        .withPayload(ByteString.encodeUtf8("hello"));
+    when(requestContext.request()).thenReturn(request);
+
+    Response<Object> response =
+        Middlewares.httpLogger(validator).and(Middlewares.exceptionAndRequestIdHandler())
+            .apply(mockInnerHandler(requestContext))
+            .invoke(requestContext)
+            .toCompletableFuture().get(5, SECONDS);
+
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
+  }
+
+  @Test
+  public void testAuditLoggingForPutFailedToValidate()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = Request.forUri("/", "PUT")
+        .withHeader(HttpHeaders.AUTHORIZATION, "Bearer foobar")
+        .withPayload(ByteString.encodeUtf8("hello"));
+    when(requestContext.request()).thenReturn(request);
+
+    when(validator.validate(anyString())).thenReturn(null);
+
+    Response<Object> response =
+        Middlewares.httpLogger(validator).and(Middlewares.exceptionAndRequestIdHandler())
+            .apply(mockInnerHandler(requestContext))
+            .invoke(requestContext)
+            .toCompletableFuture().get(5, SECONDS);
+
+    assertThat(response, hasStatus(withCode(Status.UNAUTHORIZED)));
   }
 
   @Test
@@ -459,7 +504,7 @@ public class MiddlewaresTest {
     Request request = Request.forUri("/", "GET");
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = awaitResponse(Middlewares.authValidator()
+    Response<Object> response = awaitResponse(Middlewares.authValidator(validator)
                                                   .apply(mockInnerHandler(requestContext))
                                                   .invoke(requestContext));
     assertThat(response, hasStatus(withCode(Status.OK)));
@@ -472,7 +517,7 @@ public class MiddlewaresTest {
         .withPayload(ByteString.encodeUtf8("hello"));
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = awaitResponse(Middlewares.authValidator()
+    Response<Object> response = awaitResponse(Middlewares.authValidator(validator)
                                                   .apply(mockInnerHandler(requestContext))
                                                   .invoke(requestContext));
     assertThat(response, hasStatus(withCode(Status.UNAUTHORIZED)));
@@ -488,11 +533,11 @@ public class MiddlewaresTest {
 
     String email = "foo@bar.net";
 
-    when(idTokenVerifier.verify(anyString())).thenReturn(idToken);
+    when(validator.validate(anyString())).thenReturn(idToken);
     when(idToken.getPayload()).thenReturn(idTokenPayload);
     when(idTokenPayload.getEmail()).thenReturn(email);
 
-    awaitResponse(Middlewares.httpLogger(log, idTokenVerifier)
+    awaitResponse(Middlewares.httpLogger(log, validator)
         .apply(mockInnerHandler(requestContext))
         .invoke(requestContext));
 
@@ -504,42 +549,6 @@ public class MiddlewaresTest {
         ImmutableMap.of(HttpHeaders.AUTHORIZATION, "<hidden>"),
         ImmutableMap.of(),
         request.payload().get().utf8());
-  }
-
-  @Test
-  public void testVerifyIdTokenGeneralSecurityException() throws GeneralSecurityException, IOException {
-    when(idTokenVerifier.verify("foo")).thenThrow(new GeneralSecurityException());
-    assertThat(Middlewares.verifyIdToken("foo", idTokenVerifier), is(nullValue()));
-  }
-
-  @Test
-  public void testVerifyIdTokenIOException() throws GeneralSecurityException, IOException {
-    final IOException cause = new IOException();
-    when(idTokenVerifier.verify("foo")).thenThrow(cause);
-    exception.expect(RuntimeException.class);
-    exception.expectCause(is(cause));
-    Middlewares.verifyIdToken("foo", idTokenVerifier);
-  }
-
-  @Test
-  public void testAuthed() throws Exception {
-    RequestContext requestContext = mock(RequestContext.class);
-    Request request = Request.forUri("/", "PUT")
-        .withPayload(ByteString.encodeUtf8("hello"))
-        .withHeader(HttpHeaders.AUTHORIZATION, "Bearer s3cr3tp455w0rd");
-    when(requestContext.request()).thenReturn(request);
-
-    when(idTokenVerifier.verify("s3cr3tp455w0rd")).thenReturn(idToken);
-
-    final AtomicReference<GoogleIdToken> userHolder = new AtomicReference<>();
-    awaitResponse(Middlewares.authed(idTokenVerifier)
-        .apply(rc -> auth -> {
-          userHolder.set(auth.user().get());
-          return completedFuture(Response.ok());
-        })
-        .invoke(requestContext));
-
-    assertThat(userHolder.get(), is(idToken));
   }
 
   @Test

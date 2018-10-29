@@ -25,6 +25,7 @@ import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
 
 import com.google.cloud.datastore.Datastore;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Streams;
 import com.google.common.io.Closer;
 import com.spotify.apollo.AppInit;
@@ -50,6 +51,7 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.DockerImageValidator;
+import com.spotify.styx.util.GoogleIdTokenValidatorFactory;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.WorkflowValidator;
@@ -58,6 +60,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
@@ -75,12 +78,15 @@ public class StyxApi implements AppInit {
   public static final String SCHEDULER_SERVICE_BASE_URL = "styx.scheduler.base-url";
   public static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
+  private static final String STYX_AUTHENTICATION_DOMAIN_WHITELIST = "styx.authentication.domain-whitelist";
+
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
 
   private final String serviceName;
   private final StorageFactory storageFactory;
   private final WorkflowConsumerFactory workflowConsumerFactory;
   private final StatsFactory statsFactory;
+  private final GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory;
   private final Time time;
 
   public interface WorkflowConsumerFactory
@@ -92,6 +98,7 @@ public class StyxApi implements AppInit {
     private StorageFactory storageFactory = StyxApi::storage;
     private WorkflowConsumerFactory workflowConsumerFactory = (env, stats) -> (oldWorkflow, newWorkflow) -> { };
     private StatsFactory statsFactory = StyxApi::stats;
+    private GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory = GoogleIdTokenValidatorFactory.DEFAULT;
     private Time time = Instant::now;
 
     public Builder setServiceName(String serviceName) {
@@ -111,6 +118,12 @@ public class StyxApi implements AppInit {
 
     public Builder setStatsFactory(StatsFactory statsFactory) {
       this.statsFactory = statsFactory;
+      return this;
+    }
+
+    public Builder setGoogleIdTokenValidatorFactory(
+        GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory) {
+      this.googleIdTokenValidatorFactory = googleIdTokenValidatorFactory;
       return this;
     }
 
@@ -137,6 +150,7 @@ public class StyxApi implements AppInit {
     this.storageFactory = requireNonNull(builder.storageFactory);
     this.workflowConsumerFactory = requireNonNull(builder.workflowConsumerFactory);
     this.statsFactory = requireNonNull(builder.statsFactory);
+    this.googleIdTokenValidatorFactory = requireNonNull(builder.googleIdTokenValidatorFactory);
     this.time = requireNonNull(builder.time);
   }
 
@@ -187,9 +201,15 @@ public class StyxApi implements AppInit {
         schedulerProxyResource.routes()
     );
 
+    final Set<String> domainWhitelist =
+        config.hasPath(STYX_AUTHENTICATION_DOMAIN_WHITELIST)
+        ? ImmutableSet.copyOf(config.getStringList(STYX_AUTHENTICATION_DOMAIN_WHITELIST))
+        : ImmutableSet.of();
+
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
-        .registerRoutes(Api.withCommonMiddleware(routes, clientBlacklistSupplier, serviceName));
+        .registerRoutes(Api.withCommonMiddleware(routes, clientBlacklistSupplier,
+            googleIdTokenValidatorFactory.apply(domainWhitelist, serviceName), serviceName));
   }
 
   private static AggregateStorage storage(Environment environment, Stats stats) {

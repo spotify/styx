@@ -45,6 +45,7 @@ import com.google.cloud.datastore.Datastore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -88,6 +89,7 @@ import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.CounterSnapshotFactory;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.DockerImageValidator;
+import com.spotify.styx.util.GoogleIdTokenValidatorFactory;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.Shard;
@@ -147,6 +149,7 @@ public class StyxScheduler implements AppInit {
   public static final String STYX_TRIGGER_TICK_INTERVAL = "styx.trigger.tick-interval";
   public static final String STYX_SCHEDULER_THREADS = "styx.scheduler-threads";
   private static final String STYX_ENVIRONMENT = "styx.environment";
+  private static final String STYX_AUTHENTICATION_DOMAIN_WHITELIST = "styx.authentication.domain-whitelist";
 
   public static final int DEFAULT_STYX_EVENT_PROCESSING_THREADS = 32;
   public static final int DEFAULT_STYX_SCHEDULER_THREADS = 32;
@@ -176,6 +179,7 @@ public class StyxScheduler implements AppInit {
   private final WorkflowResourceDecorator resourceDecorator;
   private final EventConsumerFactory eventConsumerFactory;
   private final WorkflowExecutionGateFactory executionGateFactory;
+  private final GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory;
 
   private StateManager stateManager;
   private Scheduler scheduler;
@@ -218,6 +222,7 @@ public class StyxScheduler implements AppInit {
     private WorkflowResourceDecorator resourceDecorator = WorkflowResourceDecorator.NOOP;
     private EventConsumerFactory eventConsumerFactory = (env, stats) -> (event, state) -> { };
     private WorkflowExecutionGateFactory executionGateFactory = (env, storage) -> WorkflowExecutionGate.NOOP;
+    private GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory = GoogleIdTokenValidatorFactory.DEFAULT;
 
     public Builder setServiceName(String serviceName) {
       this.serviceName = serviceName;
@@ -274,6 +279,12 @@ public class StyxScheduler implements AppInit {
       return this;
     }
 
+    public Builder setGoogleIdTokenValidatorFactory(
+        GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory) {
+      this.googleIdTokenValidatorFactory = googleIdTokenValidatorFactory;
+      return this;
+    }
+
     public StyxScheduler build() {
       return new StyxScheduler(this);
     }
@@ -301,6 +312,7 @@ public class StyxScheduler implements AppInit {
     this.resourceDecorator = requireNonNull(builder.resourceDecorator);
     this.eventConsumerFactory = requireNonNull(builder.eventConsumerFactory);
     this.executionGateFactory = requireNonNull(builder.executionGateFactory);
+    this.googleIdTokenValidatorFactory = requireNonNull(builder.googleIdTokenValidatorFactory);
   }
 
   @Override
@@ -409,10 +421,16 @@ public class StyxScheduler implements AppInit {
     final SchedulerResource schedulerResource =
         new SchedulerResource(stateManager, trigger, storage, time,
             new WorkflowValidator(new DockerImageValidator()));
+    
+    final Set<String> domainWhitelist = 
+        config.hasPath(STYX_AUTHENTICATION_DOMAIN_WHITELIST)
+        ? ImmutableSet.copyOf(config.getStringList(STYX_AUTHENTICATION_DOMAIN_WHITELIST))
+        : ImmutableSet.of();
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
-        .registerRoutes(Api.withCommonMiddleware(schedulerResource.routes(), serviceName));
+        .registerRoutes(Api.withCommonMiddleware(schedulerResource.routes(),
+            googleIdTokenValidatorFactory.apply(domainWhitelist, serviceName), serviceName));
 
     this.stateManager = stateManager;
     this.scheduler = scheduler;
