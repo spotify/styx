@@ -152,7 +152,8 @@ public class StyxSchedulerServiceFixture {
         Sets.union(res, resourceIdsToDecorateWith);
     StyxScheduler.EventConsumerFactory eventConsumerFactory =
         (env, stats) -> (event, state) ->  transitionedEvents.add(Tuple.of(event, state.state()));
-    GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory = (l, s) -> null;
+    GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory =
+        (domainWhitelist, service) -> null;
 
     styxScheduler = StyxScheduler.newBuilder()
         .setTime(time)

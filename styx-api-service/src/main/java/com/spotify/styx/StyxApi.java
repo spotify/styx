@@ -201,8 +201,7 @@ public class StyxApi implements AppInit {
         schedulerProxyResource.routes()
     );
 
-    final Set<String> domainWhitelist =
-        config.hasPath(STYX_AUTHENTICATION_DOMAIN_WHITELIST)
+    final Set<String> domainWhitelist = config.hasPath(STYX_AUTHENTICATION_DOMAIN_WHITELIST)
         ? ImmutableSet.copyOf(config.getStringList(STYX_AUTHENTICATION_DOMAIN_WHITELIST))
         : ImmutableSet.of();
 

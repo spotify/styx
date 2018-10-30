@@ -34,7 +34,6 @@ import java.security.GeneralSecurityException;
 import java.util.Set;
 import java.util.function.BiFunction;
 
-@FunctionalInterface
 public interface GoogleIdTokenValidatorFactory
     extends BiFunction<Set<String>, String, GoogleIdTokenValidator> {
 
