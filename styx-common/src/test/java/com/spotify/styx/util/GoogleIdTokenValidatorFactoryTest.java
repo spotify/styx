@@ -52,20 +52,20 @@ public class GoogleIdTokenValidatorFactoryTest {
 
   private GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory;
   
-  @Mock GoogleIdTokenVerifier googleIdTokenVerifier;
+  @Mock private GoogleIdTokenVerifier googleIdTokenVerifier;
   
-  @Mock GoogleCredential googleCredential;
+  @Mock private GoogleCredential googleCredential;
   
-  @Mock Iam iam;
+  @Mock private Iam iam;
 
   @Mock(answer = Answers.RETURNS_DEEP_STUBS)
-  CloudResourceManager cloudResourceManager;
+  private CloudResourceManager cloudResourceManager;
 
-  @Mock CloudResourceManager.Projects.List projectsList;
+  @Mock private CloudResourceManager.Projects.List projectsList;
   
-  @Mock HttpTransport httpTransport;
+  @Mock private HttpTransport httpTransport;
   
-  @Mock JsonFactory jsonFactory;
+  @Mock private JsonFactory jsonFactory;
   
   private class TestGoogleIdTokenValidatorFactory extends DefaultGoogleIdTokenValidatorFactory {
 

@@ -94,9 +94,9 @@ public class GoogleIdTokenValidatorTest {
 
   @Rule public final ExpectedException expectedException = ExpectedException.none();
 
-  @Mock public GoogleIdToken idToken;
+  @Mock private GoogleIdToken idToken;
 
-  @Mock public GoogleIdToken.Payload idTokenPayload;
+  @Mock private GoogleIdToken.Payload idTokenPayload;
 
   @Mock private GoogleIdTokenVerifier verifier;
 
@@ -106,11 +106,11 @@ public class GoogleIdTokenValidatorTest {
   @Mock(answer = Answers.RETURNS_DEEP_STUBS)
   private Iam iam;
 
-  @Mock CloudResourceManager.Projects.List projectsList;
+  @Mock private CloudResourceManager.Projects.List projectsList;
 
-  @Mock CloudResourceManager.Projects.Get projectsGet;
+  @Mock private CloudResourceManager.Projects.Get projectsGet;
 
-  @Mock Iam.Projects.ServiceAccounts.Get serviceAccountsGet;
+  @Mock private Iam.Projects.ServiceAccounts.Get serviceAccountsGet;
 
   @Before
   public void setUp() throws IOException, GeneralSecurityException {

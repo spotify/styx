@@ -90,12 +90,12 @@ public class MiddlewaresTest {
 
   @Rule public ExpectedException exception = ExpectedException.none();
 
-  @Mock public Logger log;
-  @Mock public GoogleIdTokenValidator validator;
-  @Mock public GoogleIdToken idToken;
-  @Mock public GoogleIdToken.Payload idTokenPayload;
-  @Mock Tracer tracer;
-  @Mock SpanBuilder spanBuilder;
+  @Mock private Logger log;
+  @Mock private GoogleIdTokenValidator validator;
+  @Mock private GoogleIdToken idToken;
+  @Mock private GoogleIdToken.Payload idTokenPayload;
+  @Mock private Tracer tracer;
+  @Mock private SpanBuilder spanBuilder;
 
   private static final TestStruct TEST_STRUCT = new AutoValue_MiddlewaresTest_TestStruct(
       "blah", new AutoValue_MiddlewaresTest_Inner("bloh", TestEnum.ENUM_VALUE));
