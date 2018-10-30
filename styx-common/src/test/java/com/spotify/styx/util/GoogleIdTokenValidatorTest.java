@@ -129,8 +129,6 @@ public class GoogleIdTokenValidatorTest {
         .thenReturn(listProjectsResponse1)
         .thenReturn(listProjectsResponse2);
 
-//    when(projectsGet.execute()).thenReturn(PROJECT);
-
     validator = new GoogleIdTokenValidator(verifier, cloudResourceManager, iam, DOMAIN_WHITELIST);
     validator.cacheProjects();
   }
@@ -209,6 +207,7 @@ public class GoogleIdTokenValidatorTest {
     when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.validate("token"), is(nullValue()));
 
+    verify(cloudResourceManager.projects()).get(anyString());
     verifyZeroInteractions(iam);
   }
 
@@ -219,6 +218,7 @@ public class GoogleIdTokenValidatorTest {
     when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.validate("token"), is(nullValue()));
 
+    verify(cloudResourceManager.projects()).get(anyString());
     verifyZeroInteractions(iam);
   }
 
@@ -229,6 +229,7 @@ public class GoogleIdTokenValidatorTest {
     when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.validate("token"), is(nullValue()));
 
+    verify(cloudResourceManager.projects()).get(anyString());
     verifyZeroInteractions(iam);
   }
 
@@ -251,6 +252,7 @@ public class GoogleIdTokenValidatorTest {
     when(idTokenPayload.getEmail()).thenReturn("foo@developer.gserviceaccount.com");
     assertThat(validator.validate("token"), is(idToken));
 
+    verify(serviceAccountsGet).execute();
     verifyZeroInteractions(projectsGet);
   }
 
@@ -260,6 +262,7 @@ public class GoogleIdTokenValidatorTest {
     when(idTokenPayload.getEmail()).thenReturn("foo@developer.gserviceaccount.com");
     assertThat(validator.validate("token"), is(nullValue()));
 
+    verify(iam.projects().serviceAccounts()).get(anyString());
     verifyZeroInteractions(projectsGet);
   }
 
@@ -269,6 +272,7 @@ public class GoogleIdTokenValidatorTest {
     when(idTokenPayload.getEmail()).thenReturn("foo@developer.gserviceaccount.com");
     assertThat(validator.validate("token"), is(nullValue()));
 
+    verify(iam.projects().serviceAccounts()).get(anyString());
     verifyZeroInteractions(projectsGet);
   }
 
@@ -278,6 +282,7 @@ public class GoogleIdTokenValidatorTest {
     when(idTokenPayload.getEmail()).thenReturn("foo@developer.gserviceaccount.com");
     assertThat(validator.validate("token"), is(nullValue()));
 
+    verify(iam.projects().serviceAccounts()).get(anyString());
     verifyZeroInteractions(projectsGet);
   }
 }
