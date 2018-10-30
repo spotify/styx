@@ -26,10 +26,13 @@ import com.spotify.apollo.httpservice.LoadingException;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.StatsFactory;
+import com.spotify.styx.util.GoogleIdTokenValidator;
+import com.spotify.styx.util.GoogleIdTokenValidatorFactory;
 import io.opencensus.exporter.trace.stackdriver.StackdriverTraceConfiguration;
 import io.opencensus.exporter.trace.stackdriver.StackdriverTraceExporter;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Set;
 
 public class StyxService {
 
@@ -48,13 +51,29 @@ public class StyxService {
           new MetricsStats(env.resolve(SemanticMetricRegistry.class), Instant::now);
       final StatsFactory statsFactory = (ignored) -> stats;
 
+      final GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory =
+          new GoogleIdTokenValidatorFactory() {
+            private GoogleIdTokenValidator googleIdTokenValidator;
+
+            @Override
+            public GoogleIdTokenValidator apply(Set<String> domainWhitelist, String service) {
+              if (googleIdTokenValidator == null) {
+                googleIdTokenValidator =
+                    GoogleIdTokenValidatorFactory.DEFAULT.apply(domainWhitelist, service);
+              }
+              return googleIdTokenValidator;
+            }
+          };
+
       final StyxScheduler scheduler = StyxScheduler.newBuilder()
           .setServiceName(SERVICE_NAME)
           .setStatsFactory(statsFactory)
+          .setGoogleIdTokenValidatorFactory(googleIdTokenValidatorFactory)
           .build();
       final StyxApi api = StyxApi.newBuilder()
           .setServiceName(SERVICE_NAME)
           .setStatsFactory(statsFactory)
+          .setGoogleIdTokenValidatorFactory(googleIdTokenValidatorFactory)
           .build();
 
       scheduler.create(env);
