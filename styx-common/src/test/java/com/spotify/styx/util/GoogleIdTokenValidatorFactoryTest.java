@@ -20,7 +20,9 @@
 
 package com.spotify.styx.util;
 
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.isA;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.verify;
@@ -39,6 +41,7 @@ import java.io.IOException;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.contrib.java.lang.system.EnvironmentVariables;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Answers;
@@ -49,6 +52,9 @@ import org.mockito.junit.MockitoJUnitRunner;
 public class GoogleIdTokenValidatorFactoryTest {
 
   @Rule public final ExpectedException expectedException = ExpectedException.none();
+
+  @Rule
+  public final EnvironmentVariables environmentVariables = new EnvironmentVariables();
 
   private GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory;
   
@@ -118,7 +124,13 @@ public class GoogleIdTokenValidatorFactoryTest {
 
     googleIdTokenValidatorFactory.apply(ImmutableSet.of(), "test");
   }
-  
+
+  @Test
+  public void shouldBeInstanceOfDefaultGoogleIdTokenValidatorFactory() {
+    assertThat(GoogleIdTokenValidatorFactory.DEFAULT,
+        is(instanceOf(DefaultGoogleIdTokenValidatorFactory.class)));
+  }
+
   @Test
   public void shouldBuildGoogleIdTokenVerifier() {
     final GoogleIdTokenVerifier googleIdTokenVerifier = new DefaultGoogleIdTokenValidatorFactory()
@@ -145,5 +157,13 @@ public class GoogleIdTokenValidatorFactoryTest {
     assertThat(cloudResourceManager.getJsonFactory(), is(jsonFactory));
     assertThat(cloudResourceManager.getRequestFactory().getInitializer(), is(googleCredential));
     assertThat(cloudResourceManager.getApplicationName(), is("test"));
+  }
+
+  @Test
+  public void shouldFailToLoadGoogleCredential() {
+    environmentVariables.set("GOOGLE_APPLICATION_CREDENTIALS", "/foo/bar");
+    expectedException.expect(RuntimeException.class);
+    expectedException.expectCause(isA(IOException.class));
+    new DefaultGoogleIdTokenValidatorFactory().loadCredential();
   }
 }

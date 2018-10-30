@@ -167,5 +167,9 @@
       <groupId>com.github.cbismuth</groupId>
       <artifactId>junit-repeat-rule</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.github.stefanbirkner</groupId>
+      <artifactId>system-rules</artifactId>
+    </dependency>
   </dependencies>
 </project>
