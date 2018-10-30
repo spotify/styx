@@ -20,8 +20,8 @@ jobs:
             # Configure datastore emulator heap size
             JAVA: java -Xmx512m -Xms512m
             # Maven heap size
-            MAVEN_OPTS: -Xmx256m -Xms256m -Djdk.net.URLClassPath.disableClassPathURLCheck=true
-          command: mvn -B verify -P disable-static-analysis
+            MAVEN_OPTS: -Xmx256m -Xms256m
+          command: mvn -Djdk.net.URLClassPath.disableClassPathURLCheck=true -B verify -P disable-static-analysis
       - run: bash <(curl -s https://codecov.io/bash) -f '!**/jacoco-aggregate/**'
       - run: |
           mkdir test-reports
