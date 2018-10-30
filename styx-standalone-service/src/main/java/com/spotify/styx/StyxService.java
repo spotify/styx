@@ -56,7 +56,8 @@ public class StyxService {
             private GoogleIdTokenValidator googleIdTokenValidator;
 
             @Override
-            public GoogleIdTokenValidator apply(Set<String> domainWhitelist, String service) {
+            public synchronized GoogleIdTokenValidator apply(Set<String> domainWhitelist,
+                                                             String service) {
               if (googleIdTokenValidator == null) {
                 googleIdTokenValidator =
                     GoogleIdTokenValidatorFactory.DEFAULT.apply(domainWhitelist, service);
