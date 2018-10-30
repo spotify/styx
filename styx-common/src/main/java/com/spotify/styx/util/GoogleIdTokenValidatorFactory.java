@@ -29,6 +29,7 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.IamScopes;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.Set;
@@ -37,43 +38,74 @@ import java.util.function.BiFunction;
 public interface GoogleIdTokenValidatorFactory
     extends BiFunction<Set<String>, String, GoogleIdTokenValidator> {
 
-  GoogleIdTokenValidatorFactory DEFAULT = (domainWhitelist, service) -> {
-    final HttpTransport httpTransport;
-    try {
-      httpTransport = GoogleNetHttpTransport.newTrustedTransport();
-    } catch (GeneralSecurityException | IOException e) {
-      throw new RuntimeException(e);
+  class DefaultGoogleIdTokenValidatorFactory implements GoogleIdTokenValidatorFactory {
+
+    @VisibleForTesting
+    GoogleIdTokenVerifier buildGoogleIdTokenVerifier(HttpTransport httpTransport,
+                                                     JsonFactory jsonFactory) {
+      return new GoogleIdTokenVerifier(httpTransport, jsonFactory);
     }
 
-    final JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
-
-    final GoogleIdTokenVerifier
-        idTokenVerifier = new GoogleIdTokenVerifier(httpTransport, jsonFactory);
-
-    final GoogleCredential credential;
-    try {
-      credential = GoogleCredential.getApplicationDefault().createScoped(IamScopes.all());
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+    @VisibleForTesting
+    GoogleCredential loadCredential() {
+      try {
+        return GoogleCredential.getApplicationDefault().createScoped(IamScopes.all());
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
     }
 
-    final CloudResourceManager cloudResourceManager =
-        new CloudResourceManager.Builder(httpTransport, jsonFactory, credential)
-            .setApplicationName(service)
-            .build();
-
-    final Iam iam = new Iam.Builder(
-        httpTransport, jsonFactory, credential)
-        .setApplicationName(service)
-        .build();
-
-    final GoogleIdTokenValidator validator =
-        new GoogleIdTokenValidator(idTokenVerifier, cloudResourceManager, iam, domainWhitelist);
-    try {
-      validator.cacheProjects();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+    @VisibleForTesting
+    Iam buildIam(HttpTransport httpTransport, JsonFactory jsonFactory, GoogleCredential credential,
+                 String service) {
+      return new Iam.Builder(
+          httpTransport, jsonFactory, credential)
+          .setApplicationName(service)
+          .build();
     }
-    return validator;
-  };
+
+    @VisibleForTesting
+    CloudResourceManager buildCloudResourceManager(HttpTransport httpTransport,
+                                                   JsonFactory jsonFactory,
+                                                   GoogleCredential credential,
+                                                   String service) {
+      return new CloudResourceManager.Builder(httpTransport, jsonFactory, credential)
+          .setApplicationName(service)
+          .build();
+    }
+
+    @Override
+    public GoogleIdTokenValidator apply(Set<String> domainWhitelist, String service) {
+      final HttpTransport httpTransport;
+      try {
+        httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+      } catch (GeneralSecurityException | IOException e) {
+        throw new RuntimeException(e);
+      }
+
+      final JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
+
+      final GoogleIdTokenVerifier googleIdTokenVerifier =
+          buildGoogleIdTokenVerifier(httpTransport, jsonFactory);
+
+      final GoogleCredential credential = loadCredential();
+
+      final CloudResourceManager cloudResourceManager =
+          buildCloudResourceManager(httpTransport, jsonFactory, credential, service);
+
+      final Iam iam = buildIam(httpTransport, jsonFactory, credential, service);
+
+      final GoogleIdTokenValidator validator =
+          new GoogleIdTokenValidator(googleIdTokenVerifier, cloudResourceManager, iam,
+              domainWhitelist);
+      try {
+        validator.cacheProjects();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      return validator;
+    }
+  }
+
+  GoogleIdTokenValidatorFactory DEFAULT = new DefaultGoogleIdTokenValidatorFactory();
 }

@@ -52,7 +52,7 @@ public class GoogleIdTokenValidator {
 
   private static final long VALIDATED_EMAIL_CACHE_SIZE = 1000;
 
-  private final GoogleIdTokenVerifier idTokenVerifier;
+  private final GoogleIdTokenVerifier googleIdTokenVerifier;
 
   private final CloudResourceManager cloudResourceManager;
 
@@ -66,11 +66,12 @@ public class GoogleIdTokenValidator {
       .maximumSize(VALIDATED_EMAIL_CACHE_SIZE)
       .build();
 
-  public GoogleIdTokenValidator(GoogleIdTokenVerifier idTokenVerifier,
+  public GoogleIdTokenValidator(GoogleIdTokenVerifier googleIdTokenVerifier,
                          CloudResourceManager cloudResourceManager,
                          Iam iam,
                          Set<String> domainWhitelist) {
-    this.idTokenVerifier = Objects.requireNonNull(idTokenVerifier, "idTokenVerifier");
+    this.googleIdTokenVerifier =
+        Objects.requireNonNull(googleIdTokenVerifier, "googleIdTokenVerifier");
     this.cloudResourceManager =
         Objects.requireNonNull(cloudResourceManager, "cloudResourceManager");
     this.iam = Objects.requireNonNull(iam, "iam");
@@ -149,7 +150,7 @@ public class GoogleIdTokenValidator {
 
   private GoogleIdToken verifyIdToken(String token) throws IOException {
     try {
-      return idTokenVerifier.verify(token);
+      return googleIdTokenVerifier.verify(token);
     } catch (GeneralSecurityException e) {
       return null;
     }
