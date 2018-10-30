@@ -18,7 +18,7 @@ jobs:
           name: Tests
           environment:
             # Configure datastore emulator heap size
-            JAVA: java -Xmx512m -Xms512m
+            JAVA: java -Xmx512m -Xms512m -Djdk.net.URLClassPath.disableClassPathURLCheck=true
             # Maven heap size
             MAVEN_OPTS: -Xmx256m -Xms256m
           command: mvn -B verify -P disable-static-analysis
