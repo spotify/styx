@@ -38,6 +38,8 @@ import java.util.function.BiFunction;
 public interface AuthenticatorFactory
     extends BiFunction<Set<String>, String, Authenticator> {
 
+  AuthenticatorFactory DEFAULT = new DefaultAuthenticatorFactory();
+
   class DefaultAuthenticatorFactory implements AuthenticatorFactory {
 
     @VisibleForTesting
@@ -106,6 +108,4 @@ public interface AuthenticatorFactory
       return validator;
     }
   }
-
-  AuthenticatorFactory DEFAULT = new DefaultAuthenticatorFactory();
 }
