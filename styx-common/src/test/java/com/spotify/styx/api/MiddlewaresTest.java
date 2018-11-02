@@ -55,7 +55,7 @@ import com.spotify.apollo.request.RequestContexts;
 import com.spotify.apollo.request.RequestMetadataImpl;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.styx.util.ClassEnforcer;
-import com.spotify.styx.util.GoogleIdTokenValidator;
+import com.spotify.styx.util.Authenticator;
 import com.spotify.styx.util.MockSpan;
 import io.opencensus.trace.SpanBuilder;
 import io.opencensus.trace.Tracer;
@@ -91,7 +91,7 @@ public class MiddlewaresTest {
   @Rule public ExpectedException exception = ExpectedException.none();
 
   @Mock private Logger log;
-  @Mock private GoogleIdTokenValidator validator;
+  @Mock private Authenticator authenticator;
   @Mock private GoogleIdToken idToken;
   @Mock private GoogleIdToken.Payload idTokenPayload;
   @Mock private Tracer tracer;
@@ -262,7 +262,7 @@ public class MiddlewaresTest {
     Request request = Request.forUri("/", "GET");
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = awaitResponse(Middlewares.httpLogger(validator)
+    Response<Object> response = awaitResponse(Middlewares.httpLogger(authenticator)
         .apply(mockInnerHandler(requestContext))
         .invoke(requestContext));
     assertThat(response, hasStatus(withCode(Status.OK)));
@@ -275,7 +275,7 @@ public class MiddlewaresTest {
         .withPayload(ByteString.encodeUtf8("hello"));
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = awaitResponse(Middlewares.httpLogger(validator)
+    Response<Object> response = awaitResponse(Middlewares.httpLogger(authenticator)
         .apply(mockInnerHandler(requestContext))
         .invoke(requestContext));
     assertThat(response, hasStatus(withCode(Status.OK)));
@@ -290,9 +290,9 @@ public class MiddlewaresTest {
         .withPayload(ByteString.encodeUtf8("hello"));
     when(requestContext.request()).thenReturn(request);
 
-    when(validator.validate(anyString())).thenThrow(new IllegalArgumentException());
+    when(authenticator.authenticate(anyString())).thenThrow(new IllegalArgumentException());
 
-    Response<Object> response = Middlewares.httpLogger(validator).and(Middlewares.exceptionAndRequestIdHandler())
+    Response<Object> response = Middlewares.httpLogger(authenticator).and(Middlewares.exceptionAndRequestIdHandler())
         .apply(mockInnerHandler(requestContext))
         .invoke(requestContext)
         .toCompletableFuture().get(5, SECONDS);
@@ -310,7 +310,7 @@ public class MiddlewaresTest {
     when(requestContext.request()).thenReturn(request);
 
     Response<Object> response =
-        Middlewares.httpLogger(validator).and(Middlewares.exceptionAndRequestIdHandler())
+        Middlewares.httpLogger(authenticator).and(Middlewares.exceptionAndRequestIdHandler())
             .apply(mockInnerHandler(requestContext))
             .invoke(requestContext)
             .toCompletableFuture().get(5, SECONDS);
@@ -327,10 +327,10 @@ public class MiddlewaresTest {
         .withPayload(ByteString.encodeUtf8("hello"));
     when(requestContext.request()).thenReturn(request);
 
-    when(validator.validate(anyString())).thenReturn(null);
+    when(authenticator.authenticate(anyString())).thenReturn(null);
 
     Response<Object> response =
-        Middlewares.httpLogger(validator).and(Middlewares.exceptionAndRequestIdHandler())
+        Middlewares.httpLogger(authenticator).and(Middlewares.exceptionAndRequestIdHandler())
             .apply(mockInnerHandler(requestContext))
             .invoke(requestContext)
             .toCompletableFuture().get(5, SECONDS);
@@ -504,7 +504,7 @@ public class MiddlewaresTest {
     Request request = Request.forUri("/", "GET");
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = awaitResponse(Middlewares.authValidator(validator)
+    Response<Object> response = awaitResponse(Middlewares.authValidator(authenticator)
                                                   .apply(mockInnerHandler(requestContext))
                                                   .invoke(requestContext));
     assertThat(response, hasStatus(withCode(Status.OK)));
@@ -517,7 +517,7 @@ public class MiddlewaresTest {
         .withPayload(ByteString.encodeUtf8("hello"));
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = awaitResponse(Middlewares.authValidator(validator)
+    Response<Object> response = awaitResponse(Middlewares.authValidator(authenticator)
                                                   .apply(mockInnerHandler(requestContext))
                                                   .invoke(requestContext));
     assertThat(response, hasStatus(withCode(Status.UNAUTHORIZED)));
@@ -533,11 +533,11 @@ public class MiddlewaresTest {
 
     String email = "foo@bar.net";
 
-    when(validator.validate(anyString())).thenReturn(idToken);
+    when(authenticator.authenticate(anyString())).thenReturn(idToken);
     when(idToken.getPayload()).thenReturn(idTokenPayload);
     when(idTokenPayload.getEmail()).thenReturn(email);
 
-    awaitResponse(Middlewares.httpLogger(log, validator)
+    awaitResponse(Middlewares.httpLogger(log, authenticator)
         .apply(mockInnerHandler(requestContext))
         .invoke(requestContext));
 

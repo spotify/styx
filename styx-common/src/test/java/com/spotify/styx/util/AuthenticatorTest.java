@@ -56,7 +56,7 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
-public class GoogleIdTokenValidatorTest {
+public class AuthenticatorTest {
 
   private static final Set<String> DOMAIN_WHITELIST = ImmutableSet.of("example.com", "test.com");
 
@@ -90,7 +90,7 @@ public class GoogleIdTokenValidatorTest {
           new HttpResponseException.Builder(404, "Not found", new HttpHeaders()),
           new GoogleJsonError().set("status", "NOT_FOUND"));
 
-  private GoogleIdTokenValidator validator;
+  private Authenticator validator;
 
   @Rule public final ExpectedException expectedException = ExpectedException.none();
 
@@ -129,7 +129,7 @@ public class GoogleIdTokenValidatorTest {
         .thenReturn(listProjectsResponse1)
         .thenReturn(listProjectsResponse2);
 
-    validator = new GoogleIdTokenValidator(verifier, cloudResourceManager, iam, DOMAIN_WHITELIST);
+    validator = new Authenticator(verifier, cloudResourceManager, iam, DOMAIN_WHITELIST);
     validator.cacheProjects();
   }
 
@@ -144,7 +144,7 @@ public class GoogleIdTokenValidatorTest {
   @Test
   public void shouldFailIfInvalidToken() throws GeneralSecurityException, IOException {
     when(verifier.verify(anyString())).thenThrow(new GeneralSecurityException());
-    assertThat(validator.validate("token"), is(nullValue()));
+    assertThat(validator.authenticate("token"), is(nullValue()));
 
     verifyZeroInteractions(idToken);
     verifyZeroInteractions(projectsGet);
@@ -154,7 +154,7 @@ public class GoogleIdTokenValidatorTest {
   @Test
   public void shouldFailToVerifyToken() throws GeneralSecurityException, IOException {
     when(verifier.verify(anyString())).thenThrow(new IOException());
-    assertThat(validator.validate("token"), is(nullValue()));
+    assertThat(validator.authenticate("token"), is(nullValue()));
 
     verifyZeroInteractions(idToken);
     verifyZeroInteractions(projectsGet);
@@ -164,7 +164,7 @@ public class GoogleIdTokenValidatorTest {
   @Test
   public void shouldBeWhitelisted() {
     when(idTokenPayload.getEmail()).thenReturn("foo@example.com");
-    assertThat(validator.validate("token"), is(idToken));
+    assertThat(validator.authenticate("token"), is(idToken));
 
     verifyZeroInteractions(projectsGet);
     verifyZeroInteractions(iam);
@@ -173,7 +173,7 @@ public class GoogleIdTokenValidatorTest {
   @Test
   public void shouldFailIfInvalidEmailAddress() {
     when(idTokenPayload.getEmail()).thenReturn("example.com");
-    assertThat(validator.validate("token"), is(nullValue()));
+    assertThat(validator.authenticate("token"), is(nullValue()));
 
     verifyZeroInteractions(projectsGet);
     verifyZeroInteractions(iam);
@@ -182,7 +182,7 @@ public class GoogleIdTokenValidatorTest {
   @Test
   public void shouldHitProjectCache() {
     when(idTokenPayload.getEmail()).thenReturn("foo@foo.iam.gserviceaccount.com");
-    assertThat(validator.validate("token"), is(idToken));
+    assertThat(validator.authenticate("token"), is(idToken));
 
     verifyZeroInteractions(projectsGet);
     verifyZeroInteractions(iam);
@@ -194,7 +194,7 @@ public class GoogleIdTokenValidatorTest {
     when(cloudResourceManager.projects().get(anyString())).thenReturn(projectsGet);
 
     when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
-    assertThat(validator.validate("token"), is(idToken));
+    assertThat(validator.authenticate("token"), is(idToken));
 
     verify(projectsGet).execute();
     verifyZeroInteractions(iam);
@@ -205,7 +205,7 @@ public class GoogleIdTokenValidatorTest {
     when(cloudResourceManager.projects().get(anyString())).thenThrow(new IOException());
 
     when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
-    assertThat(validator.validate("token"), is(nullValue()));
+    assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(cloudResourceManager.projects()).get(anyString());
     verifyZeroInteractions(iam);
@@ -216,7 +216,7 @@ public class GoogleIdTokenValidatorTest {
     when(cloudResourceManager.projects().get(anyString())).thenThrow(NOT_FOUND);
 
     when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
-    assertThat(validator.validate("token"), is(nullValue()));
+    assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(cloudResourceManager.projects()).get(anyString());
     verifyZeroInteractions(iam);
@@ -227,7 +227,7 @@ public class GoogleIdTokenValidatorTest {
     when(cloudResourceManager.projects().get(anyString())).thenThrow(PERMISSION_DENIED);
 
     when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
-    assertThat(validator.validate("token"), is(nullValue()));
+    assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(cloudResourceManager.projects()).get(anyString());
     verifyZeroInteractions(iam);
@@ -236,10 +236,10 @@ public class GoogleIdTokenValidatorTest {
   @Test
   public void shouldHitValidatedEmailCache() {
     when(idTokenPayload.getEmail()).thenReturn("foo@foo.iam.gserviceaccount.com");
-    assertThat(validator.validate("token"), is(idToken));
+    assertThat(validator.authenticate("token"), is(idToken));
 
     validator.clearProjectCache();
-    assertThat(validator.validate("token"), is(idToken));
+    assertThat(validator.authenticate("token"), is(idToken));
 
     verifyZeroInteractions(projectsGet);
     verifyZeroInteractions(iam);
@@ -250,7 +250,7 @@ public class GoogleIdTokenValidatorTest {
     when(serviceAccountsGet.execute()).thenReturn(SERVICE_ACCOUNT);
     when(iam.projects().serviceAccounts().get(anyString())).thenReturn(serviceAccountsGet);
     when(idTokenPayload.getEmail()).thenReturn("foo@developer.gserviceaccount.com");
-    assertThat(validator.validate("token"), is(idToken));
+    assertThat(validator.authenticate("token"), is(idToken));
 
     verify(serviceAccountsGet).execute();
     verifyZeroInteractions(projectsGet);
@@ -260,7 +260,7 @@ public class GoogleIdTokenValidatorTest {
   public void shouldFailToGetProjectFromIAM() throws IOException {
     when(iam.projects().serviceAccounts().get(anyString())).thenThrow(new IOException());
     when(idTokenPayload.getEmail()).thenReturn("foo@developer.gserviceaccount.com");
-    assertThat(validator.validate("token"), is(nullValue()));
+    assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(iam.projects().serviceAccounts()).get(anyString());
     verifyZeroInteractions(projectsGet);
@@ -270,7 +270,7 @@ public class GoogleIdTokenValidatorTest {
   public void shouldFailForNonExistServiceAccount() throws IOException {
     when(iam.projects().serviceAccounts().get(anyString())).thenThrow(NOT_FOUND);
     when(idTokenPayload.getEmail()).thenReturn("foo@developer.gserviceaccount.com");
-    assertThat(validator.validate("token"), is(nullValue()));
+    assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(iam.projects().serviceAccounts()).get(anyString());
     verifyZeroInteractions(projectsGet);
@@ -280,7 +280,7 @@ public class GoogleIdTokenValidatorTest {
   public void shouldFailIfNoPermissionGettingServiceAccountFromIAM() throws IOException {
     when(iam.projects().serviceAccounts().get(anyString())).thenThrow(PERMISSION_DENIED);
     when(idTokenPayload.getEmail()).thenReturn("foo@developer.gserviceaccount.com");
-    assertThat(validator.validate("token"), is(nullValue()));
+    assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(iam.projects().serviceAccounts()).get(anyString());
     verifyZeroInteractions(projectsGet);

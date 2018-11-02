@@ -39,7 +39,7 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.SyncHandler;
-import com.spotify.styx.util.GoogleIdTokenValidator;
+import com.spotify.styx.util.Authenticator;
 import com.spotify.styx.util.MDCUtil;
 import io.opencensus.trace.Span;
 import io.opencensus.trace.Tracer;
@@ -172,13 +172,13 @@ public final class Middlewares {
   }
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> httpLogger(
-      GoogleIdTokenValidator validator) {
-    return httpLogger(LOG, validator);
+      Authenticator authenticator) {
+    return httpLogger(LOG, authenticator);
   }
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> httpLogger(
       Logger log,
-      GoogleIdTokenValidator validator) {
+      Authenticator authenticator) {
     return innerHandler -> requestContext -> {
       final Request request = requestContext.request();
 
@@ -186,7 +186,7 @@ public final class Middlewares {
                "GET".equals(request.method()) ? "" : "[AUDIT] ",
                request.method(),
                request.uri(),
-               auth(requestContext, validator).map(idToken -> idToken.getPayload()
+               auth(requestContext, authenticator).map(idToken -> idToken.getPayload()
                    .getEmail())
                    .orElse("anonymous"),
                hideSensitiveHeaders(request.headers()),
@@ -226,7 +226,7 @@ public final class Middlewares {
   }
 
   private static Optional<GoogleIdToken> auth(RequestContext requestContext,
-                                              GoogleIdTokenValidator validator) {
+                                              Authenticator authenticator) {
     final Request request = requestContext.request();
     final boolean hasAuthHeader = request.header(HttpHeaders.AUTHORIZATION).isPresent();
 
@@ -242,7 +242,7 @@ public final class Middlewares {
 
     final GoogleIdToken googleIdToken;
     try {
-      googleIdToken = validator.validate(authHeader.substring(BEARER_PREFIX.length()));
+      googleIdToken = authenticator.authenticate(authHeader.substring(BEARER_PREFIX.length()));
     } catch (IllegalArgumentException e) {
       throw new ResponseException(Response.forStatus(Status.BAD_REQUEST
           .withReasonPhrase("Failed to parse Authorization token")), e);
@@ -263,9 +263,9 @@ public final class Middlewares {
   }
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authValidator(
-      GoogleIdTokenValidator validator) {
+      Authenticator authenticator) {
     return h -> rc -> {
-      if (!"GET".equals(rc.request().method()) && !auth(rc, validator).isPresent()) {
+      if (!"GET".equals(rc.request().method()) && !auth(rc, authenticator).isPresent()) {
         return completedFuture(
             Response.forStatus(Status.UNAUTHORIZED.withReasonPhrase("Unauthorized access")));
       }

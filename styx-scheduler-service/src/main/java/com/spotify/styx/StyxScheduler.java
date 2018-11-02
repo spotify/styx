@@ -89,7 +89,7 @@ import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.CounterSnapshotFactory;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.DockerImageValidator;
-import com.spotify.styx.util.GoogleIdTokenValidatorFactory;
+import com.spotify.styx.util.AuthenticatorFactory;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.Shard;
@@ -179,7 +179,7 @@ public class StyxScheduler implements AppInit {
   private final WorkflowResourceDecorator resourceDecorator;
   private final EventConsumerFactory eventConsumerFactory;
   private final WorkflowExecutionGateFactory executionGateFactory;
-  private final GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory;
+  private final AuthenticatorFactory authenticatorFactory;
 
   private StateManager stateManager;
   private Scheduler scheduler;
@@ -222,7 +222,7 @@ public class StyxScheduler implements AppInit {
     private WorkflowResourceDecorator resourceDecorator = WorkflowResourceDecorator.NOOP;
     private EventConsumerFactory eventConsumerFactory = (env, stats) -> (event, state) -> { };
     private WorkflowExecutionGateFactory executionGateFactory = (env, storage) -> WorkflowExecutionGate.NOOP;
-    private GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory = GoogleIdTokenValidatorFactory.DEFAULT;
+    private AuthenticatorFactory authenticatorFactory = AuthenticatorFactory.DEFAULT;
 
     public Builder setServiceName(String serviceName) {
       this.serviceName = serviceName;
@@ -279,9 +279,9 @@ public class StyxScheduler implements AppInit {
       return this;
     }
 
-    public Builder setGoogleIdTokenValidatorFactory(
-        GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory) {
-      this.googleIdTokenValidatorFactory = googleIdTokenValidatorFactory;
+    public Builder setAuthenticatorFactory(
+        AuthenticatorFactory authenticatorFactory) {
+      this.authenticatorFactory = authenticatorFactory;
       return this;
     }
 
@@ -312,7 +312,7 @@ public class StyxScheduler implements AppInit {
     this.resourceDecorator = requireNonNull(builder.resourceDecorator);
     this.eventConsumerFactory = requireNonNull(builder.eventConsumerFactory);
     this.executionGateFactory = requireNonNull(builder.executionGateFactory);
-    this.googleIdTokenValidatorFactory = requireNonNull(builder.googleIdTokenValidatorFactory);
+    this.authenticatorFactory = requireNonNull(builder.authenticatorFactory);
   }
 
   @Override
@@ -429,7 +429,7 @@ public class StyxScheduler implements AppInit {
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
         .registerRoutes(Api.withCommonMiddleware(schedulerResource.routes(),
-            googleIdTokenValidatorFactory.apply(domainWhitelist, serviceName), serviceName));
+            authenticatorFactory.apply(domainWhitelist, serviceName), serviceName));
 
     this.stateManager = stateManager;
     this.scheduler = scheduler;

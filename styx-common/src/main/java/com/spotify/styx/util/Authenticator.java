@@ -41,11 +41,9 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class GoogleIdTokenValidator {
+public class Authenticator {
 
-  private static final Logger logger = LoggerFactory.getLogger(GoogleIdTokenValidator.class);
-
-  private static final Pattern EMAIL_PATTERN = Pattern.compile("^.+@(.+)$");
+  private static final Logger logger = LoggerFactory.getLogger(Authenticator.class);
 
   private static final Pattern SERVICE_ACCOUNT_PATTERN =
       Pattern.compile("^.+@(.+)\\.iam\\.gserviceaccount\\.com$");
@@ -66,10 +64,10 @@ public class GoogleIdTokenValidator {
       .maximumSize(VALIDATED_EMAIL_CACHE_SIZE)
       .build();
 
-  public GoogleIdTokenValidator(GoogleIdTokenVerifier googleIdTokenVerifier,
-                         CloudResourceManager cloudResourceManager,
-                         Iam iam,
-                         Set<String> domainWhitelist) {
+  public Authenticator(GoogleIdTokenVerifier googleIdTokenVerifier,
+                       CloudResourceManager cloudResourceManager,
+                       Iam iam,
+                       Set<String> domainWhitelist) {
     this.googleIdTokenVerifier =
         Objects.requireNonNull(googleIdTokenVerifier, "googleIdTokenVerifier");
     this.cloudResourceManager =
@@ -96,7 +94,7 @@ public class GoogleIdTokenValidator {
     logger.info("project cache loaded");
   }
 
-  public GoogleIdToken validate(String token) {
+  public GoogleIdToken authenticate(String token) {
     final GoogleIdToken googleIdToken;
     try {
       googleIdToken = verifyIdToken(token);
@@ -111,9 +109,8 @@ public class GoogleIdTokenValidator {
 
     final String email = googleIdToken.getPayload().getEmail();
 
-    final Matcher matcher = EMAIL_PATTERN.matcher(email);
-    if (matcher.matches()) {
-      final String domain = matcher.group(1);
+    final String domain = getDomain(email);
+    if (domain != null) {
       if (domainWhitelist.contains(domain)) {
         logger.debug("domain {} in whitelist", domain);
         return googleIdToken;
@@ -131,7 +128,7 @@ public class GoogleIdTokenValidator {
     try {
       projectId = checkProject(email);
     } catch (IOException e) {
-      logger.info("cannot validate {}", email);
+      logger.info("cannot authenticate {}", email);
       return null;
     }
 
@@ -213,6 +210,15 @@ public class GoogleIdTokenValidator {
 
       logger.info("cannot get project with id {}", projectId, e);
       return false;
+    }
+  }
+  
+  private static String getDomain(String email) {
+    final int index = email.indexOf('@');
+    if (index == -1) {
+      return null;
+    } else {
+      return email.substring(index + 1);
     }
   }
 }

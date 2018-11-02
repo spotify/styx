@@ -34,7 +34,7 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.util.ClassEnforcer;
-import com.spotify.styx.util.GoogleIdTokenValidator;
+import com.spotify.styx.util.Authenticator;
 import java.util.List;
 import okio.ByteString;
 import org.junit.Test;
@@ -51,7 +51,7 @@ public class ApiTest {
 
   @Mock private Route<AsyncHandler<Response<ByteString>>> route;
 
-  @Mock private GoogleIdTokenValidator validator;
+  @Mock private Authenticator validator;
 
   @Test
   public void shouldNotBeConstructable() throws ReflectiveOperationException {

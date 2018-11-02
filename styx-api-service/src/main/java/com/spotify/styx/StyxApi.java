@@ -51,7 +51,7 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.DockerImageValidator;
-import com.spotify.styx.util.GoogleIdTokenValidatorFactory;
+import com.spotify.styx.util.AuthenticatorFactory;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.WorkflowValidator;
@@ -86,7 +86,7 @@ public class StyxApi implements AppInit {
   private final StorageFactory storageFactory;
   private final WorkflowConsumerFactory workflowConsumerFactory;
   private final StatsFactory statsFactory;
-  private final GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory;
+  private final AuthenticatorFactory authenticatorFactory;
   private final Time time;
 
   public interface WorkflowConsumerFactory
@@ -98,7 +98,7 @@ public class StyxApi implements AppInit {
     private StorageFactory storageFactory = StyxApi::storage;
     private WorkflowConsumerFactory workflowConsumerFactory = (env, stats) -> (oldWorkflow, newWorkflow) -> { };
     private StatsFactory statsFactory = StyxApi::stats;
-    private GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory = GoogleIdTokenValidatorFactory.DEFAULT;
+    private AuthenticatorFactory authenticatorFactory = AuthenticatorFactory.DEFAULT;
     private Time time = Instant::now;
 
     public Builder setServiceName(String serviceName) {
@@ -121,9 +121,9 @@ public class StyxApi implements AppInit {
       return this;
     }
 
-    public Builder setGoogleIdTokenValidatorFactory(
-        GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory) {
-      this.googleIdTokenValidatorFactory = googleIdTokenValidatorFactory;
+    public Builder setAuthenticatorFactory(
+        AuthenticatorFactory authenticatorFactory) {
+      this.authenticatorFactory = authenticatorFactory;
       return this;
     }
 
@@ -150,7 +150,7 @@ public class StyxApi implements AppInit {
     this.storageFactory = requireNonNull(builder.storageFactory);
     this.workflowConsumerFactory = requireNonNull(builder.workflowConsumerFactory);
     this.statsFactory = requireNonNull(builder.statsFactory);
-    this.googleIdTokenValidatorFactory = requireNonNull(builder.googleIdTokenValidatorFactory);
+    this.authenticatorFactory = requireNonNull(builder.authenticatorFactory);
     this.time = requireNonNull(builder.time);
   }
 
@@ -208,7 +208,7 @@ public class StyxApi implements AppInit {
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
         .registerRoutes(Api.withCommonMiddleware(routes, clientBlacklistSupplier,
-            googleIdTokenValidatorFactory.apply(domainWhitelist, serviceName), serviceName));
+            authenticatorFactory.apply(domainWhitelist, serviceName), serviceName));
   }
 
   private static AggregateStorage storage(Environment environment, Stats stats) {

@@ -29,7 +29,7 @@ import static com.spotify.styx.api.Middlewares.tracer;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
-import com.spotify.styx.util.GoogleIdTokenValidator;
+import com.spotify.styx.util.Authenticator;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
 import java.util.Collection;
@@ -65,7 +65,7 @@ public final class Api {
 
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
       Stream<Route<AsyncHandler<Response<ByteString>>>> routes,
-      GoogleIdTokenValidator validator,
+      Authenticator validator,
       String service) {
     return withCommonMiddleware(routes, Collections::emptyList, validator, service);
   }
@@ -73,7 +73,7 @@ public final class Api {
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
       Stream<Route<AsyncHandler<Response<ByteString>>>> routes,
       Supplier<List<String>> clientBlacklistSupplier,
-      GoogleIdTokenValidator validator,
+      Authenticator validator,
       String service) {
     return routes.map(r -> r
         .withMiddleware(httpLogger(validator))

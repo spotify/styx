@@ -26,8 +26,8 @@ import com.spotify.apollo.httpservice.LoadingException;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.StatsFactory;
-import com.spotify.styx.util.GoogleIdTokenValidator;
-import com.spotify.styx.util.GoogleIdTokenValidatorFactory;
+import com.spotify.styx.util.Authenticator;
+import com.spotify.styx.util.AuthenticatorFactory;
 import io.opencensus.exporter.trace.stackdriver.StackdriverTraceConfiguration;
 import io.opencensus.exporter.trace.stackdriver.StackdriverTraceExporter;
 import java.io.IOException;
@@ -51,30 +51,30 @@ public class StyxService {
           new MetricsStats(env.resolve(SemanticMetricRegistry.class), Instant::now);
       final StatsFactory statsFactory = (ignored) -> stats;
 
-      final GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory =
-          new GoogleIdTokenValidatorFactory() {
-            private GoogleIdTokenValidator googleIdTokenValidator;
+      final AuthenticatorFactory authenticatorFactory =
+          new AuthenticatorFactory() {
+            private Authenticator authenticator;
 
             @Override
-            public synchronized GoogleIdTokenValidator apply(Set<String> domainWhitelist,
-                                                             String service) {
-              if (googleIdTokenValidator == null) {
-                googleIdTokenValidator =
-                    GoogleIdTokenValidatorFactory.DEFAULT.apply(domainWhitelist, service);
+            public synchronized Authenticator apply(Set<String> domainWhitelist,
+                                                    String service) {
+              if (authenticator == null) {
+                authenticator =
+                    AuthenticatorFactory.DEFAULT.apply(domainWhitelist, service);
               }
-              return googleIdTokenValidator;
+              return authenticator;
             }
           };
 
       final StyxScheduler scheduler = StyxScheduler.newBuilder()
           .setServiceName(SERVICE_NAME)
           .setStatsFactory(statsFactory)
-          .setGoogleIdTokenValidatorFactory(googleIdTokenValidatorFactory)
+          .setAuthenticatorFactory(authenticatorFactory)
           .build();
       final StyxApi api = StyxApi.newBuilder()
           .setServiceName(SERVICE_NAME)
           .setStatsFactory(statsFactory)
-          .setGoogleIdTokenValidatorFactory(googleIdTokenValidatorFactory)
+          .setAuthenticatorFactory(authenticatorFactory)
           .build();
 
       scheduler.create(env);

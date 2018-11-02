@@ -36,7 +36,7 @@ import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.cloudresourcemanager.model.ListProjectsResponse;
 import com.google.api.services.iam.v1.Iam;
 import com.google.common.collect.ImmutableSet;
-import com.spotify.styx.util.GoogleIdTokenValidatorFactory.DefaultGoogleIdTokenValidatorFactory;
+import com.spotify.styx.util.AuthenticatorFactory.DefaultAuthenticatorFactory;
 import java.io.IOException;
 import org.junit.Before;
 import org.junit.Rule;
@@ -49,14 +49,14 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
-public class GoogleIdTokenValidatorFactoryTest {
+public class AuthenticatorFactoryTest {
 
   @Rule public final ExpectedException expectedException = ExpectedException.none();
 
   @Rule
   public final EnvironmentVariables environmentVariables = new EnvironmentVariables();
 
-  private GoogleIdTokenValidatorFactory googleIdTokenValidatorFactory;
+  private AuthenticatorFactory authenticatorFactory;
   
   @Mock private GoogleIdTokenVerifier googleIdTokenVerifier;
   
@@ -73,7 +73,7 @@ public class GoogleIdTokenValidatorFactoryTest {
   
   @Mock private JsonFactory jsonFactory;
   
-  private class TestGoogleIdTokenValidatorFactory extends DefaultGoogleIdTokenValidatorFactory {
+  private class TestAuthenticatorFactory extends DefaultAuthenticatorFactory {
 
     @Override
     GoogleIdTokenVerifier buildGoogleIdTokenVerifier(HttpTransport httpTransport,
@@ -106,34 +106,34 @@ public class GoogleIdTokenValidatorFactoryTest {
   public void setUp() throws Exception {
     when(projectsList.execute()).thenReturn(new ListProjectsResponse());
     when(cloudResourceManager.projects().list()).thenReturn(projectsList);
-    googleIdTokenValidatorFactory = new TestGoogleIdTokenValidatorFactory();
+    authenticatorFactory = new TestAuthenticatorFactory();
   }
   
   @Test
-  public void shouldCreateGoogleIdTokenValidator() throws IOException {
-    assertThat(googleIdTokenValidatorFactory.apply(ImmutableSet.of(), "test"), is(notNullValue()));
+  public void shouldCreateAuthenticator() throws IOException {
+    assertThat(authenticatorFactory.apply(ImmutableSet.of(), "test"), is(notNullValue()));
     verify(projectsList).execute();
   }
   
   @Test
-  public void shouldFailToCreateGoogleIdTokenValidator() throws IOException {
+  public void shouldFailToCreateAuthenticator() throws IOException {
     final IOException exception = new IOException();
     when(projectsList.execute()).thenThrow(exception);
     expectedException.expect(RuntimeException.class);
     expectedException.expectCause(is(exception));
 
-    googleIdTokenValidatorFactory.apply(ImmutableSet.of(), "test");
+    authenticatorFactory.apply(ImmutableSet.of(), "test");
   }
 
   @Test
-  public void shouldBeInstanceOfDefaultGoogleIdTokenValidatorFactory() {
-    assertThat(GoogleIdTokenValidatorFactory.DEFAULT,
-        is(instanceOf(DefaultGoogleIdTokenValidatorFactory.class)));
+  public void shouldBeInstanceOfDefaultAuthenticatorFactory() {
+    assertThat(AuthenticatorFactory.DEFAULT,
+        is(instanceOf(DefaultAuthenticatorFactory.class)));
   }
 
   @Test
   public void shouldBuildGoogleIdTokenVerifier() {
-    final GoogleIdTokenVerifier googleIdTokenVerifier = new DefaultGoogleIdTokenValidatorFactory()
+    final GoogleIdTokenVerifier googleIdTokenVerifier = new DefaultAuthenticatorFactory()
         .buildGoogleIdTokenVerifier(httpTransport, jsonFactory);
     assertThat(googleIdTokenVerifier.getTransport(), is(httpTransport));
     assertThat(googleIdTokenVerifier.getJsonFactory(), is(jsonFactory));
@@ -141,7 +141,7 @@ public class GoogleIdTokenValidatorFactoryTest {
 
   @Test
   public void shouldBuildIam() {
-    final Iam iam = new DefaultGoogleIdTokenValidatorFactory()
+    final Iam iam = new DefaultAuthenticatorFactory()
         .buildIam(httpTransport, jsonFactory, googleCredential, "test");
     assertThat(iam.getRequestFactory().getTransport(), is(httpTransport));
     assertThat(iam.getJsonFactory(), is(jsonFactory));
@@ -151,7 +151,7 @@ public class GoogleIdTokenValidatorFactoryTest {
   
   @Test
   public void shouldBuildCloudResourceManager() {
-    final CloudResourceManager cloudResourceManager = new DefaultGoogleIdTokenValidatorFactory()
+    final CloudResourceManager cloudResourceManager = new DefaultAuthenticatorFactory()
         .buildCloudResourceManager(httpTransport, jsonFactory, googleCredential, "test");
     assertThat(cloudResourceManager.getRequestFactory().getTransport(), is(httpTransport));
     assertThat(cloudResourceManager.getJsonFactory(), is(jsonFactory));
@@ -164,6 +164,6 @@ public class GoogleIdTokenValidatorFactoryTest {
     environmentVariables.set("GOOGLE_APPLICATION_CREDENTIALS", "/foo/bar");
     expectedException.expect(RuntimeException.class);
     expectedException.expectCause(isA(IOException.class));
-    new DefaultGoogleIdTokenValidatorFactory().loadCredential();
+    new DefaultAuthenticatorFactory().loadCredential();
   }
 }

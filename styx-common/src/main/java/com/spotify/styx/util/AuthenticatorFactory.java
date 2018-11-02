@@ -35,10 +35,10 @@ import java.security.GeneralSecurityException;
 import java.util.Set;
 import java.util.function.BiFunction;
 
-public interface GoogleIdTokenValidatorFactory
-    extends BiFunction<Set<String>, String, GoogleIdTokenValidator> {
+public interface AuthenticatorFactory
+    extends BiFunction<Set<String>, String, Authenticator> {
 
-  class DefaultGoogleIdTokenValidatorFactory implements GoogleIdTokenValidatorFactory {
+  class DefaultAuthenticatorFactory implements AuthenticatorFactory {
 
     @VisibleForTesting
     GoogleIdTokenVerifier buildGoogleIdTokenVerifier(HttpTransport httpTransport,
@@ -75,7 +75,7 @@ public interface GoogleIdTokenValidatorFactory
     }
 
     @Override
-    public GoogleIdTokenValidator apply(Set<String> domainWhitelist, String service) {
+    public Authenticator apply(Set<String> domainWhitelist, String service) {
       final HttpTransport httpTransport;
       try {
         httpTransport = GoogleNetHttpTransport.newTrustedTransport();
@@ -95,8 +95,8 @@ public interface GoogleIdTokenValidatorFactory
 
       final Iam iam = buildIam(httpTransport, jsonFactory, credential, service);
 
-      final GoogleIdTokenValidator validator =
-          new GoogleIdTokenValidator(googleIdTokenVerifier, cloudResourceManager, iam,
+      final Authenticator validator =
+          new Authenticator(googleIdTokenVerifier, cloudResourceManager, iam,
               domainWhitelist);
       try {
         validator.cacheProjects();
@@ -107,5 +107,5 @@ public interface GoogleIdTokenValidatorFactory
     }
   }
 
-  GoogleIdTokenValidatorFactory DEFAULT = new DefaultGoogleIdTokenValidatorFactory();
+  AuthenticatorFactory DEFAULT = new DefaultAuthenticatorFactory();
 }
