@@ -160,6 +160,12 @@ public class AuthenticatorTest {
   }
 
   @Test
+  public void shouldFailExternalProject() {
+    when(idTokenPayload.getEmail()).thenReturn("foo@external.iam.gserviceaccount.com");
+    assertThat(validator.authenticate("token"), is(nullValue()));
+  }
+
+  @Test
   public void shouldFailToLoadCache() throws IOException {
     final IOException exception = new IOException();
     when(projectsList.execute()).thenThrow(exception);
