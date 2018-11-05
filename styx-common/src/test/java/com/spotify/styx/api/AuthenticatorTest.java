@@ -30,7 +30,10 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
@@ -119,7 +122,6 @@ public class AuthenticatorTest {
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private CloudResourceManager cloudResourceManager;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Iam iam;
   @Mock private CloudResourceManager.Projects.List projectsList;
-  @Mock private CloudResourceManager.Projects.Get projectsGet;
   @Mock private CloudResourceManager.Projects.GetAncestry projectsGetAncestry;
   @Mock private Iam.Projects.ServiceAccounts.Get serviceAccountsGet;
 
@@ -127,6 +129,8 @@ public class AuthenticatorTest {
   public void setUp() throws IOException, GeneralSecurityException {
     when(idToken.getPayload()).thenReturn(idTokenPayload);
     when(verifier.verify(anyString())).thenReturn(idToken);
+
+    when(cloudResourceManager.projects().getAncestry(any(), any())).thenReturn(projectsGetAncestry);
 
     mockAncestryResponse(FOO_PROJECT, resourceId(FOO_PROJECT), ORGANIZATION_RESOURCE);
     mockAncestryResponse(BAR_PROJECT, resourceId(BAR_PROJECT), FOLDER_RESOURCE);
@@ -169,7 +173,7 @@ public class AuthenticatorTest {
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verifyZeroInteractions(idToken);
-    verifyZeroInteractions(projectsGet);
+    verifyZeroInteractions(projectsGetAncestry);
     verifyZeroInteractions(iam);
   }
 
@@ -179,7 +183,7 @@ public class AuthenticatorTest {
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verifyZeroInteractions(idToken);
-    verifyZeroInteractions(projectsGet);
+    verifyZeroInteractions(projectsGetAncestry);
     verifyZeroInteractions(iam);
   }
 
@@ -188,7 +192,7 @@ public class AuthenticatorTest {
     when(idTokenPayload.getEmail()).thenReturn("foo@example.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
-    verifyZeroInteractions(projectsGet);
+    verifyZeroInteractions(projectsGetAncestry);
     verifyZeroInteractions(iam);
   }
 
@@ -197,16 +201,24 @@ public class AuthenticatorTest {
     when(idTokenPayload.getEmail()).thenReturn("example.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verifyZeroInteractions(projectsGet);
+    verifyZeroInteractions(projectsGetAncestry);
     verifyZeroInteractions(iam);
   }
 
   @Test
-  public void shouldHitProjectCache() {
-    when(idTokenPayload.getEmail()).thenReturn("foo@" + FOO_PROJECT.getProjectId() + ".iam.gserviceaccount.com");
+  public void shouldHitProjectCache() throws IOException {
+
+    // Populate cache
+    when(idTokenPayload.getEmail()).thenReturn("foo@foo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
-    verifyZeroInteractions(projectsGet);
+    // Hit cache
+    reset(cloudResourceManager.projects());
+    when(idTokenPayload.getEmail()).thenReturn("bar@foo.iam.gserviceaccount.com");
+    assertThat(validator.authenticate("token"), is(idToken));
+
+    verify(cloudResourceManager.projects(), never()).getAncestry(eq("foo"), any());
+    verifyZeroInteractions(projectsGetAncestry);
     verifyZeroInteractions(iam);
   }
 
@@ -214,12 +226,11 @@ public class AuthenticatorTest {
   public void shouldMissProjectCache() throws IOException {
     when(projectsGetAncestry.execute()).thenReturn(
         ancestryResponse(resourceId(UNCACHED_PROJECT), UNCACHED_FOLDER_RESOURCE, ORGANIZATION_RESOURCE));
-    when(cloudResourceManager.projects().getAncestry(eq(UNCACHED_PROJECT.getProjectId()), any()))
-        .thenReturn(projectsGetAncestry);
 
     when(idTokenPayload.getEmail()).thenReturn("foo@" + UNCACHED_PROJECT.getProjectId() + ".iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
+    verify(cloudResourceManager.projects()).getAncestry(eq(UNCACHED_PROJECT.getProjectId()), any());
     verify(projectsGetAncestry).execute();
     verifyZeroInteractions(iam);
   }
@@ -265,26 +276,32 @@ public class AuthenticatorTest {
   }
 
   @Test
-  public void shouldHitValidatedEmailCache() {
-    when(idTokenPayload.getEmail()).thenReturn("foo@foo.iam.gserviceaccount.com");
+  public void shouldHitValidatedEmailCache() throws IOException {
+    when(projectsGetAncestry.execute()).thenReturn(
+        ancestryResponse(resourceId(UNCACHED_PROJECT), UNCACHED_FOLDER_RESOURCE, ORGANIZATION_RESOURCE));
+
+    when(idTokenPayload.getEmail()).thenReturn("foo@uncached.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
+    // TODO: this is a serious code smell
     validator.clearResourceCache();
+    reset(projectsGetAncestry);
     assertThat(validator.authenticate("token"), is(idToken));
 
-    verifyZeroInteractions(projectsGet);
+    verifyZeroInteractions(projectsGetAncestry);
     verifyZeroInteractions(iam);
   }
 
   @Test
   public void shouldGetProjectFromIAMAndThenHitProjectCache() throws IOException {
+    mockAncestryResponse(FOO_PROJECT, resourceId(FOO_PROJECT), ORGANIZATION_RESOURCE);
     when(serviceAccountsGet.execute()).thenReturn(SERVICE_ACCOUNT);
     when(iam.projects().serviceAccounts().get(anyString())).thenReturn(serviceAccountsGet);
     when(idTokenPayload.getEmail()).thenReturn("foo@developer.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
     verify(serviceAccountsGet).execute();
-    verifyZeroInteractions(projectsGet);
+    verifyZeroInteractions(projectsGetAncestry);
   }
 
   @Test
@@ -294,7 +311,7 @@ public class AuthenticatorTest {
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(iam.projects().serviceAccounts()).get(anyString());
-    verifyZeroInteractions(projectsGet);
+    verifyZeroInteractions(projectsGetAncestry);
   }
 
   @Test
@@ -304,7 +321,7 @@ public class AuthenticatorTest {
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(iam.projects().serviceAccounts()).get(anyString());
-    verifyZeroInteractions(projectsGet);
+    verifyZeroInteractions(projectsGetAncestry);
   }
 
   @Test
@@ -314,6 +331,6 @@ public class AuthenticatorTest {
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(iam.projects().serviceAccounts()).get(anyString());
-    verifyZeroInteractions(projectsGet);
+    verifyZeroInteractions(projectsGetAncestry);
   }
 }
