@@ -71,20 +71,16 @@ public class AuthenticatorTest {
   private static final ResourceId ORGANIZATION_RESOURCE = resourceId("organization", "test-org");
   private static final ResourceId FOLDER_RESOURCE = resourceId("folder", "test-folder");
 
-  private static final Project FOO_PROJECT = project("foo", ORGANIZATION_RESOURCE);
-  private static final Project BAR_PROJECT = project("bar", FOLDER_RESOURCE);
-  private static final Project BAZ_PROJECT = project("baz", null);
-  private static final Project EXTERNAL_PROJECT = project("external", null);
+  private static final Project FOO_PROJECT = new Project().setProjectId("foo").setParent(ORGANIZATION_RESOURCE);
+  private static final Project BAR_PROJECT = new Project().setProjectId("bar").setParent(FOLDER_RESOURCE);
+  private static final Project BAZ_PROJECT = new Project().setProjectId("baz");
+  private static final Project EXTERNAL_PROJECT = new Project().setProjectId("external");
 
   private static final List<Project> PROJECTS = ImmutableList.of(
       FOO_PROJECT, BAR_PROJECT, BAZ_PROJECT, EXTERNAL_PROJECT);
 
   private static final List<ResourceId> WHITELIST = ImmutableList.of(
       ORGANIZATION_RESOURCE, FOLDER_RESOURCE, resourceId(BAZ_PROJECT));
-
-  private static Project project(String id, ResourceId parent) {
-    return new Project().setProjectId(id).setParent(parent);
-  }
 
   private static final String DOMAIN1 = "example.com";
   private static final String DOMAIN2 = "test.com";
