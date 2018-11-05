@@ -35,8 +35,6 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.cloudresourcemanager.model.ListProjectsResponse;
 import com.google.api.services.iam.v1.Iam;
-import com.google.common.collect.ImmutableSet;
-import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.api.AuthenticatorFactory.Configuration;
 import com.spotify.styx.api.AuthenticatorFactory.DefaultAuthenticatorFactory;
 import java.io.IOException;
