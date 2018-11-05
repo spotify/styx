@@ -31,6 +31,7 @@ import io.opencensus.exporter.trace.stackdriver.StackdriverTraceConfiguration;
 import io.opencensus.exporter.trace.stackdriver.StackdriverTraceExporter;
 import java.io.IOException;
 import java.time.Instant;
+import javaslang.Function1;
 
 public class StyxService {
 
@@ -48,7 +49,9 @@ public class StyxService {
       final MetricsStats stats =
           new MetricsStats(env.resolve(SemanticMetricRegistry.class), Instant::now);
       final StatsFactory statsFactory = (ignored) -> stats;
-      final AuthenticatorFactory authenticatorFactory = new SingletonAuthenticatorFactory(AuthenticatorFactory.DEFAULT);
+
+      final AuthenticatorFactory authenticatorFactory =
+          Function1.of(AuthenticatorFactory.DEFAULT::apply).memoized()::apply;
 
       final StyxScheduler scheduler = StyxScheduler.newBuilder()
           .setServiceName(SERVICE_NAME)

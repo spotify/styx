@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.util;
+package com.spotify.styx.api;
 
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
@@ -37,6 +37,7 @@ import com.google.api.services.cloudresourcemanager.model.ListProjectsResponse;
 import com.google.api.services.iam.v1.Iam;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.api.AuthenticatorFactory;
+import com.spotify.styx.api.AuthenticatorFactory.Configuration;
 import com.spotify.styx.api.AuthenticatorFactory.DefaultAuthenticatorFactory;
 import java.io.IOException;
 import org.junit.Before;
@@ -53,25 +54,15 @@ import org.mockito.junit.MockitoJUnitRunner;
 public class AuthenticatorFactoryTest {
 
   @Rule public final ExpectedException expectedException = ExpectedException.none();
+  @Rule public final EnvironmentVariables environmentVariables = new EnvironmentVariables();
 
-  @Rule
-  public final EnvironmentVariables environmentVariables = new EnvironmentVariables();
-
-  private AuthenticatorFactory authenticatorFactory;
-  
+  @Mock private AuthenticatorFactory authenticatorFactory;
   @Mock private GoogleIdTokenVerifier googleIdTokenVerifier;
-  
   @Mock private GoogleCredential googleCredential;
-  
   @Mock private Iam iam;
-
-  @Mock(answer = Answers.RETURNS_DEEP_STUBS)
-  private CloudResourceManager cloudResourceManager;
-
+  @Mock(answer = Answers.RETURNS_DEEP_STUBS) private CloudResourceManager cloudResourceManager;
   @Mock private CloudResourceManager.Projects.List projectsList;
-  
   @Mock private HttpTransport httpTransport;
-  
   @Mock private JsonFactory jsonFactory;
   
   private class TestAuthenticatorFactory extends DefaultAuthenticatorFactory {
@@ -112,18 +103,20 @@ public class AuthenticatorFactoryTest {
   
   @Test
   public void shouldCreateAuthenticator() throws IOException {
-    assertThat(authenticatorFactory.apply(ImmutableSet.of(), "test"), is(notNullValue()));
+    final Configuration configuration = Configuration.builder().service("test").build();
+    assertThat(authenticatorFactory.apply(configuration), is(notNullValue()));
     verify(projectsList).execute();
   }
   
   @Test
   public void shouldFailToCreateAuthenticator() throws IOException {
+    final Configuration configuration = Configuration.builder().service("test").build();
     final IOException exception = new IOException();
     when(projectsList.execute()).thenThrow(exception);
     expectedException.expect(RuntimeException.class);
     expectedException.expectCause(is(exception));
 
-    authenticatorFactory.apply(ImmutableSet.of(), "test");
+    authenticatorFactory.apply(configuration);
   }
 
   @Test

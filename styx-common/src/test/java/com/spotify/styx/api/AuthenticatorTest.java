@@ -20,11 +20,16 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.styx.api.Authenticator.resourceId;
 import static java.util.stream.Collectors.toList;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
@@ -36,16 +41,20 @@ import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpResponseException;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
+import com.google.api.services.cloudresourcemanager.CloudResourceManager.Projects.GetAncestry;
+import com.google.api.services.cloudresourcemanager.model.Ancestor;
+import com.google.api.services.cloudresourcemanager.model.GetAncestryResponse;
 import com.google.api.services.cloudresourcemanager.model.ListProjectsResponse;
 import com.google.api.services.cloudresourcemanager.model.Project;
+import com.google.api.services.cloudresourcemanager.model.ResourceId;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.model.ServiceAccount;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
+import com.spotify.styx.api.AuthenticatorFactory.Configuration;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.List;
-import java.util.Set;
+import java.util.stream.Stream;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -58,27 +67,39 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class AuthenticatorTest {
 
-  private static final Set<String> DOMAIN_WHITELIST = ImmutableSet.of("example.com", "test.com");
+  private static final ResourceId ORGANIZATION_RESOURCE = resourceId("organization", "test-org");
+  private static final ResourceId FOLDER_RESOURCE = resourceId("folder", "test-folder");
 
-  private static final List<Project> PROJECTS = ImmutableList.of("foo", "bar", "foobar").stream()
-      .map(id -> {
-        final Project project = new Project();
-        project.setProjectId(id);
-        return project;
-      })
-      .collect(toList());
+  private static final Project FOO_PROJECT = project("foo", ORGANIZATION_RESOURCE);
+  private static final Project BAR_PROJECT = project("bar", FOLDER_RESOURCE);
+  private static final Project BAZ_PROJECT = project("baz", null);
 
-  private static final Project PROJECT;
+  private static final List<Project> PROJECTS = ImmutableList.of(FOO_PROJECT, BAR_PROJECT, BAZ_PROJECT);
 
-  private static final ServiceAccount SERVICE_ACCOUNT;
+  private static final ResourceId BAZ_PROJECT_RESOURCE = resourceId(BAZ_PROJECT);
 
-  static {
-    PROJECT = new Project();
-    PROJECT.setProjectId("barfoo");
+  private static final List<ResourceId> WHITELIST =
+      ImmutableList.of(ORGANIZATION_RESOURCE, FOLDER_RESOURCE, BAZ_PROJECT_RESOURCE);
 
-    SERVICE_ACCOUNT = new ServiceAccount();
-    SERVICE_ACCOUNT.setProjectId("foo");
+  private static Project project(String id, ResourceId parent) {
+    return new Project().setProjectId(id).setParent(parent);
   }
+
+  private static final String DOMAIN1 = "example.com";
+  private static final String DOMAIN2 = "test.com";
+
+  private static final AuthenticatorFactory.Configuration CONFIGURATION = Configuration.builder()
+      .domainWhitelist(DOMAIN1, DOMAIN2)
+      .resourceWhitelist(WHITELIST)
+      .service("test")
+      .build();
+
+  private static final Project UNCACHED_PROJECT = new Project()
+      .setProjectId("uncached")
+      .setParent(ORGANIZATION_RESOURCE);
+
+  private static final ServiceAccount SERVICE_ACCOUNT = new ServiceAccount()
+      .setProjectId("foo");
 
   private static final GoogleJsonResponseException PERMISSION_DENIED =
       new GoogleJsonResponseException(
@@ -95,27 +116,24 @@ public class AuthenticatorTest {
   @Rule public final ExpectedException expectedException = ExpectedException.none();
 
   @Mock private GoogleIdToken idToken;
-
   @Mock private GoogleIdToken.Payload idTokenPayload;
-
   @Mock private GoogleIdTokenVerifier verifier;
-
-  @Mock(answer = Answers.RETURNS_DEEP_STUBS)
-  private CloudResourceManager cloudResourceManager;
-
-  @Mock(answer = Answers.RETURNS_DEEP_STUBS)
-  private Iam iam;
-
+  @Mock(answer = Answers.RETURNS_DEEP_STUBS) private CloudResourceManager cloudResourceManager;
+  @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Iam iam;
   @Mock private CloudResourceManager.Projects.List projectsList;
-
   @Mock private CloudResourceManager.Projects.Get projectsGet;
-
+  @Mock private CloudResourceManager.Projects.GetAncestry projectsGetAncestry;
   @Mock private Iam.Projects.ServiceAccounts.Get serviceAccountsGet;
 
   @Before
   public void setUp() throws IOException, GeneralSecurityException {
     when(idToken.getPayload()).thenReturn(idTokenPayload);
     when(verifier.verify(anyString())).thenReturn(idToken);
+
+    mockAncestryResponse(FOO_PROJECT, resourceId(FOO_PROJECT), ORGANIZATION_RESOURCE);
+    mockAncestryResponse(BAR_PROJECT, resourceId(BAR_PROJECT), FOLDER_RESOURCE);
+    mockAncestryResponse(BAZ_PROJECT, resourceId(BAZ_PROJECT));
+    mockAncestryResponse(UNCACHED_PROJECT, resourceId(UNCACHED_PROJECT), ORGANIZATION_RESOURCE);
 
     when(cloudResourceManager.projects().list()).thenReturn(projectsList);
 
@@ -129,8 +147,15 @@ public class AuthenticatorTest {
         .thenReturn(listProjectsResponse1)
         .thenReturn(listProjectsResponse2);
 
-    validator = new Authenticator(verifier, cloudResourceManager, iam, DOMAIN_WHITELIST);
-    validator.cacheProjects();
+    validator = new Authenticator(verifier, cloudResourceManager, iam, CONFIGURATION);
+    validator.cacheResources();
+  }
+
+  private void mockAncestryResponse(Project project, ResourceId... ancestors) throws IOException {
+    final GetAncestry ancestry = mock(GetAncestry.class);
+    doReturn(ancestryResponse(ancestors)).when(ancestry).execute();
+    when(cloudResourceManager.projects().getAncestry(eq(project.getProjectId()), any()))
+        .thenReturn(ancestry);
   }
 
   @Test
@@ -138,7 +163,7 @@ public class AuthenticatorTest {
     final IOException exception = new IOException();
     when(projectsList.execute()).thenThrow(exception);
     expectedException.expect(is(exception));
-    validator.cacheProjects();
+    validator.cacheResources();
   }
 
   @Test
@@ -181,7 +206,7 @@ public class AuthenticatorTest {
 
   @Test
   public void shouldHitProjectCache() {
-    when(idTokenPayload.getEmail()).thenReturn("foo@foo.iam.gserviceaccount.com");
+    when(idTokenPayload.getEmail()).thenReturn("foo@" + FOO_PROJECT.getProjectId() + ".iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
     verifyZeroInteractions(projectsGet);
@@ -190,46 +215,54 @@ public class AuthenticatorTest {
 
   @Test
   public void shouldMissProjectCache() throws IOException {
-    when(projectsGet.execute()).thenReturn(PROJECT);
-    when(cloudResourceManager.projects().get(anyString())).thenReturn(projectsGet);
+    when(projectsGetAncestry.execute()).thenReturn(
+        ancestryResponse(resourceId(UNCACHED_PROJECT), UNCACHED_PROJECT.getParent()));
+    when(cloudResourceManager.projects().getAncestry(eq("barfoo"), any())).thenReturn(projectsGetAncestry);
 
     when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
-    verify(projectsGet).execute();
+    verify(projectsGetAncestry).execute();
     verifyZeroInteractions(iam);
+  }
+
+  private static GetAncestryResponse ancestryResponse(ResourceId... ancestors) {
+    return new GetAncestryResponse()
+        .setAncestor(Stream.of(ancestors)
+            .map(id -> new Ancestor().setResourceId(id))
+            .collect(toList()));
   }
 
   @Test
   public void shouldFailToGetProject() throws IOException {
-    when(cloudResourceManager.projects().get(anyString())).thenThrow(new IOException());
+    when(cloudResourceManager.projects().getAncestry(any(), any())).thenThrow(new IOException());
 
     when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verify(cloudResourceManager.projects()).get(anyString());
+    verify(cloudResourceManager.projects()).getAncestry(any(), any());
     verifyZeroInteractions(iam);
   }
 
   @Test
   public void shouldFailForNonExistProject() throws IOException {
-    when(cloudResourceManager.projects().get(anyString())).thenThrow(NOT_FOUND);
+    when(cloudResourceManager.projects().getAncestry(any(), any())).thenThrow(NOT_FOUND);
 
     when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verify(cloudResourceManager.projects()).get(anyString());
+    verify(cloudResourceManager.projects()).getAncestry(any(), any());
     verifyZeroInteractions(iam);
   }
 
   @Test
   public void shouldFailIfNoPermissionGettingProject() throws IOException {
-    when(cloudResourceManager.projects().get(anyString())).thenThrow(PERMISSION_DENIED);
+    when(cloudResourceManager.projects().getAncestry(any(), any())).thenThrow(PERMISSION_DENIED);
 
     when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verify(cloudResourceManager.projects()).get(anyString());
+    verify(cloudResourceManager.projects()).getAncestry(eq("barfoo"), any());
     verifyZeroInteractions(iam);
   }
 
@@ -238,7 +271,7 @@ public class AuthenticatorTest {
     when(idTokenPayload.getEmail()).thenReturn("foo@foo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
-    validator.clearProjectCache();
+    validator.clearResourceCache();
     assertThat(validator.authenticate("token"), is(idToken));
 
     verifyZeroInteractions(projectsGet);

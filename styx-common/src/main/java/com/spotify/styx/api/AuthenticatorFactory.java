@@ -27,24 +27,25 @@ import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
+import com.google.api.services.cloudresourcemanager.model.ResourceId;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.IamScopes;
 import com.google.common.annotations.VisibleForTesting;
+import com.spotify.styx.api.AuthenticatorFactory.Configuration;
+import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.Set;
-import java.util.function.BiFunction;
+import java.util.function.Function;
 
-public interface AuthenticatorFactory
-    extends BiFunction<Set<String>, String, Authenticator> {
+public interface AuthenticatorFactory extends Function<Configuration, Authenticator> {
 
   AuthenticatorFactory DEFAULT = new DefaultAuthenticatorFactory();
 
   class DefaultAuthenticatorFactory implements AuthenticatorFactory {
 
     @VisibleForTesting
-    GoogleIdTokenVerifier buildGoogleIdTokenVerifier(HttpTransport httpTransport,
-                                                     JsonFactory jsonFactory) {
+    GoogleIdTokenVerifier buildGoogleIdTokenVerifier(HttpTransport httpTransport, JsonFactory jsonFactory) {
       return new GoogleIdTokenVerifier(httpTransport, jsonFactory);
     }
 
@@ -58,8 +59,7 @@ public interface AuthenticatorFactory
     }
 
     @VisibleForTesting
-    Iam buildIam(HttpTransport httpTransport, JsonFactory jsonFactory, GoogleCredential credential,
-                 String service) {
+    Iam buildIam(HttpTransport httpTransport, JsonFactory jsonFactory, GoogleCredential credential, String service) {
       return new Iam.Builder(
           httpTransport, jsonFactory, credential)
           .setApplicationName(service)
@@ -77,7 +77,7 @@ public interface AuthenticatorFactory
     }
 
     @Override
-    public Authenticator apply(Set<String> domainWhitelist, String service) {
+    public Authenticator apply(Configuration configuration) {
       final HttpTransport httpTransport;
       try {
         httpTransport = GoogleNetHttpTransport.newTrustedTransport();
@@ -93,19 +93,30 @@ public interface AuthenticatorFactory
       final GoogleCredential credential = loadCredential();
 
       final CloudResourceManager cloudResourceManager =
-          buildCloudResourceManager(httpTransport, jsonFactory, credential, service);
+          buildCloudResourceManager(httpTransport, jsonFactory, credential, configuration.service());
 
-      final Iam iam = buildIam(httpTransport, jsonFactory, credential, service);
+      final Iam iam = buildIam(httpTransport, jsonFactory, credential, configuration.service());
 
       final Authenticator validator =
-          new Authenticator(googleIdTokenVerifier, cloudResourceManager, iam,
-              domainWhitelist);
+          new Authenticator(googleIdTokenVerifier, cloudResourceManager, iam, configuration);
       try {
-        validator.cacheProjects();
+        validator.cacheResources();
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
       return validator;
+    }
+  }
+
+  @AutoMatter
+  interface Configuration {
+
+    Set<String> domainWhitelist();
+    Set<ResourceId> resourceWhitelist();
+    String service();
+
+    static ConfigurationBuilder builder() {
+      return new ConfigurationBuilder();
     }
   }
 }
