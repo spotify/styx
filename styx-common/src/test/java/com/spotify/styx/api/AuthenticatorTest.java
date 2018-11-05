@@ -75,10 +75,8 @@ public class AuthenticatorTest {
 
   private static final List<Project> PROJECTS = ImmutableList.of(FOO_PROJECT, BAR_PROJECT, BAZ_PROJECT);
 
-  private static final ResourceId BAZ_PROJECT_RESOURCE = resourceId(BAZ_PROJECT);
-
-  private static final List<ResourceId> WHITELIST =
-      ImmutableList.of(ORGANIZATION_RESOURCE, FOLDER_RESOURCE, BAZ_PROJECT_RESOURCE);
+  private static final List<ResourceId> WHITELIST = ImmutableList.of(
+      ORGANIZATION_RESOURCE, FOLDER_RESOURCE, resourceId(BAZ_PROJECT));
 
   private static Project project(String id, ResourceId parent) {
     return new Project().setProjectId(id).setParent(parent);
@@ -93,9 +91,10 @@ public class AuthenticatorTest {
       .service("test")
       .build();
 
+  private static final ResourceId UNCACHED_FOLDER_RESOURCE = resourceId("folder", "uncached-test-folder");
   private static final Project UNCACHED_PROJECT = new Project()
       .setProjectId("uncached")
-      .setParent(ORGANIZATION_RESOURCE);
+      .setParent(UNCACHED_FOLDER_RESOURCE);
 
   private static final ServiceAccount SERVICE_ACCOUNT = new ServiceAccount()
       .setProjectId("foo");
@@ -132,7 +131,6 @@ public class AuthenticatorTest {
     mockAncestryResponse(FOO_PROJECT, resourceId(FOO_PROJECT), ORGANIZATION_RESOURCE);
     mockAncestryResponse(BAR_PROJECT, resourceId(BAR_PROJECT), FOLDER_RESOURCE);
     mockAncestryResponse(BAZ_PROJECT, resourceId(BAZ_PROJECT));
-    mockAncestryResponse(UNCACHED_PROJECT, resourceId(UNCACHED_PROJECT), ORGANIZATION_RESOURCE);
 
     when(cloudResourceManager.projects().list()).thenReturn(projectsList);
 
@@ -215,10 +213,11 @@ public class AuthenticatorTest {
   @Test
   public void shouldMissProjectCache() throws IOException {
     when(projectsGetAncestry.execute()).thenReturn(
-        ancestryResponse(resourceId(UNCACHED_PROJECT), UNCACHED_PROJECT.getParent()));
-    when(cloudResourceManager.projects().getAncestry(eq("barfoo"), any())).thenReturn(projectsGetAncestry);
+        ancestryResponse(resourceId(UNCACHED_PROJECT), UNCACHED_FOLDER_RESOURCE, ORGANIZATION_RESOURCE));
+    when(cloudResourceManager.projects().getAncestry(eq(UNCACHED_PROJECT.getProjectId()), any()))
+        .thenReturn(projectsGetAncestry);
 
-    when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
+    when(idTokenPayload.getEmail()).thenReturn("foo@" + UNCACHED_PROJECT.getProjectId() + ".iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
     verify(projectsGetAncestry).execute();
