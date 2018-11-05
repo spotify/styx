@@ -43,19 +43,20 @@ public class AuthenticatorConfigurationTest {
 
   @Mock private Config config;
   
-  @Mock private Config resourceType1;
+  @Mock private Config resourceConfig1;
 
-  @Mock private Config resourceType2;
+  @Mock private Config resourceConfig2;
 
   @Test
   public void shouldBuildFromConfig() {
-    when(resourceType1.getString("type")).thenReturn("type1");
-    when(resourceType1.getString("id")).thenReturn("1");
-    when(resourceType2.getString("type")).thenReturn("type2");
-    when(resourceType2.getString("id")).thenReturn("2");
+    when(resourceConfig1.getString("type")).thenReturn("type1");
+    when(resourceConfig1.getString("id")).thenReturn("1");
+    when(resourceConfig2.getString("type")).thenReturn("type2");
+    when(resourceConfig2.getString("id")).thenReturn("2");
 
     final List<String> domainWhitelist = ImmutableList.of("foo.com", "bar.com");
-    final List<? extends Config> resourceWhitelist = ImmutableList.of(resourceType1, resourceType2);
+    final List<? extends Config> resourceWhitelist = ImmutableList.of(resourceConfig1,
+        resourceConfig2);
     
     when(config.hasPath(DOMAIN_WHITELIST_KEY)).thenReturn(true);
     when(config.hasPath(RESOURCE_WHITELIST_KEY)).thenReturn(true);
@@ -68,8 +69,8 @@ public class AuthenticatorConfigurationTest {
 
     assertThat(configuration.domainWhitelist(), is(ImmutableSet.copyOf(domainWhitelist)));
     assertThat(configuration.resourceWhitelist(), is(ImmutableSet
-        .of(resourceId(resourceType1.getString("type"), resourceType1.getString("id")),
-            resourceId(resourceType2.getString("type"), resourceType2.getString("id")))));
+        .of(resourceId(resourceConfig1.getString("type"), resourceConfig1.getString("id")),
+            resourceId(resourceConfig2.getString("type"), resourceConfig2.getString("id")))));
     assertThat(configuration.service(), is("foo"));
   }
   
