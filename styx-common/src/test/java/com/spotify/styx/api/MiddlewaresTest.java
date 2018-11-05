@@ -503,7 +503,7 @@ public class MiddlewaresTest {
     Request request = Request.forUri("/", "GET");
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = awaitResponse(Middlewares.authValidator(authenticator)
+    Response<Object> response = awaitResponse(Middlewares.authenticator(authenticator)
                                                   .apply(mockInnerHandler(requestContext))
                                                   .invoke(requestContext));
     assertThat(response, hasStatus(withCode(Status.OK)));
@@ -516,7 +516,7 @@ public class MiddlewaresTest {
         .withPayload(ByteString.encodeUtf8("hello"));
     when(requestContext.request()).thenReturn(request);
 
-    Response<Object> response = awaitResponse(Middlewares.authValidator(authenticator)
+    Response<Object> response = awaitResponse(Middlewares.authenticator(authenticator)
                                                   .apply(mockInnerHandler(requestContext))
                                                   .invoke(requestContext));
     assertThat(response, hasStatus(withCode(Status.UNAUTHORIZED)));

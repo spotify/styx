@@ -35,7 +35,6 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.cloudresourcemanager.model.ListProjectsResponse;
 import com.google.api.services.iam.v1.Iam;
-import com.spotify.styx.api.AuthenticatorFactory.Configuration;
 import com.spotify.styx.api.AuthenticatorFactory.DefaultAuthenticatorFactory;
 import java.io.IOException;
 import org.junit.Before;
@@ -101,14 +100,14 @@ public class AuthenticatorFactoryTest {
   
   @Test
   public void shouldCreateAuthenticator() throws IOException {
-    final Configuration configuration = Configuration.builder().service("test").build();
+    final AuthenticatorConfiguration configuration = AuthenticatorConfiguration.builder().service("test").build();
     assertThat(authenticatorFactory.apply(configuration), is(notNullValue()));
     verify(projectsList).execute();
   }
   
   @Test
   public void shouldFailToCreateAuthenticator() throws IOException {
-    final Configuration configuration = Configuration.builder().service("test").build();
+    final AuthenticatorConfiguration configuration = AuthenticatorConfiguration.builder().service("test").build();
     final IOException exception = new IOException();
     when(projectsList.execute()).thenThrow(exception);
     expectedException.expect(RuntimeException.class);

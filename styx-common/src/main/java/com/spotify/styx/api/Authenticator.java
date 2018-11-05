@@ -36,7 +36,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Sets;
-import com.spotify.styx.api.AuthenticatorFactory.Configuration;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.List;
@@ -75,7 +74,7 @@ public class Authenticator {
   Authenticator(GoogleIdTokenVerifier googleIdTokenVerifier,
       CloudResourceManager cloudResourceManager,
       Iam iam,
-      Configuration configuration) {
+      AuthenticatorConfiguration configuration) {
     this.googleIdTokenVerifier =
         Objects.requireNonNull(googleIdTokenVerifier, "googleIdTokenVerifier");
     this.cloudResourceManager =

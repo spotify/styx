@@ -36,6 +36,7 @@ import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
+import com.google.api.services.cloudresourcemanager.model.ResourceId;
 import com.google.api.services.container.v1beta1.Container;
 import com.google.api.services.container.v1beta1.ContainerScopes;
 import com.google.api.services.container.v1beta1.model.Cluster;
@@ -45,7 +46,6 @@ import com.google.cloud.datastore.Datastore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -54,6 +54,9 @@ import com.spotify.apollo.Environment;
 import com.spotify.apollo.route.Route;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.api.Api;
+import com.spotify.styx.api.AuthenticatorConfiguration;
+import com.spotify.styx.api.AuthenticatorConfigurationBuilder;
+import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
@@ -89,7 +92,6 @@ import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.CounterSnapshotFactory;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.DockerImageValidator;
-import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.Shard;
@@ -127,6 +129,7 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hbase.client.Connection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -149,7 +152,6 @@ public class StyxScheduler implements AppInit {
   public static final String STYX_TRIGGER_TICK_INTERVAL = "styx.trigger.tick-interval";
   public static final String STYX_SCHEDULER_THREADS = "styx.scheduler-threads";
   private static final String STYX_ENVIRONMENT = "styx.environment";
-  private static final String STYX_AUTHENTICATION_DOMAIN_WHITELIST = "styx.authentication.domain-whitelist";
 
   public static final int DEFAULT_STYX_EVENT_PROCESSING_THREADS = 32;
   public static final int DEFAULT_STYX_SCHEDULER_THREADS = 32;
@@ -421,15 +423,11 @@ public class StyxScheduler implements AppInit {
     final SchedulerResource schedulerResource =
         new SchedulerResource(stateManager, trigger, storage, time,
             new WorkflowValidator(new DockerImageValidator()));
-    
-    final Set<String> domainWhitelist = config.hasPath(STYX_AUTHENTICATION_DOMAIN_WHITELIST)
-        ? ImmutableSet.copyOf(config.getStringList(STYX_AUTHENTICATION_DOMAIN_WHITELIST))
-        : ImmutableSet.of();
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
         .registerRoutes(Api.withCommonMiddleware(schedulerResource.routes(),
-            authenticatorFactory.apply(domainWhitelist, serviceName), serviceName));
+            authenticatorFactory.apply(AuthenticatorConfiguration.fromConfig(config, serviceName)), serviceName));
 
     this.stateManager = stateManager;
     this.scheduler = scheduler;

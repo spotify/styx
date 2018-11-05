@@ -35,6 +35,7 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.api.Api;
+import com.spotify.styx.api.AuthenticatorConfiguration;
 import com.spotify.styx.api.BackfillResource;
 import com.spotify.styx.api.ResourceResource;
 import com.spotify.styx.api.SchedulerProxyResource;
@@ -77,8 +78,6 @@ public class StyxApi implements AppInit {
 
   public static final String SCHEDULER_SERVICE_BASE_URL = "styx.scheduler.base-url";
   public static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
-
-  private static final String STYX_AUTHENTICATION_DOMAIN_WHITELIST = "styx.authentication.domain-whitelist";
 
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
 
@@ -201,14 +200,10 @@ public class StyxApi implements AppInit {
         schedulerProxyResource.routes()
     );
 
-    final Set<String> domainWhitelist = config.hasPath(STYX_AUTHENTICATION_DOMAIN_WHITELIST)
-        ? ImmutableSet.copyOf(config.getStringList(STYX_AUTHENTICATION_DOMAIN_WHITELIST))
-        : ImmutableSet.of();
-
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
         .registerRoutes(Api.withCommonMiddleware(routes, clientBlacklistSupplier,
-            authenticatorFactory.apply(domainWhitelist, serviceName), serviceName));
+            authenticatorFactory.apply(AuthenticatorConfiguration.fromConfig(config, serviceName)), serviceName));
   }
 
   private static AggregateStorage storage(Environment environment, Stats stats) {

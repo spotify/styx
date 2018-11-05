@@ -50,7 +50,6 @@ import com.google.api.services.cloudresourcemanager.model.ResourceId;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.model.ServiceAccount;
 import com.google.common.collect.ImmutableList;
-import com.spotify.styx.api.AuthenticatorFactory.Configuration;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.List;
@@ -88,7 +87,7 @@ public class AuthenticatorTest {
   private static final String DOMAIN1 = "example.com";
   private static final String DOMAIN2 = "test.com";
 
-  private static final AuthenticatorFactory.Configuration CONFIGURATION = Configuration.builder()
+  private static final AuthenticatorConfiguration CONFIGURATION = AuthenticatorConfiguration.builder()
       .domainWhitelist(DOMAIN1, DOMAIN2)
       .resourceWhitelist(WHITELIST)
       .service("test")

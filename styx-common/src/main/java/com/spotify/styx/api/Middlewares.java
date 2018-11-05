@@ -261,7 +261,7 @@ public final class Middlewares {
             entry -> BLACKLISTED_HEADERS.contains(entry.getKey()) ? "<hidden>" : entry.getValue()));
   }
 
-  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authValidator(
+  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authenticator(
       Authenticator authenticator) {
     return h -> rc -> {
       if (!"GET".equals(rc.request().method()) && !auth(rc, authenticator).isPresent()) {

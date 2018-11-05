@@ -27,18 +27,14 @@ import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
-import com.google.api.services.cloudresourcemanager.model.ResourceId;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.IamScopes;
 import com.google.common.annotations.VisibleForTesting;
-import com.spotify.styx.api.AuthenticatorFactory.Configuration;
-import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
-import java.util.Set;
 import java.util.function.Function;
 
-public interface AuthenticatorFactory extends Function<Configuration, Authenticator> {
+public interface AuthenticatorFactory extends Function<AuthenticatorConfiguration, Authenticator> {
 
   AuthenticatorFactory DEFAULT = new DefaultAuthenticatorFactory();
 
@@ -77,7 +73,7 @@ public interface AuthenticatorFactory extends Function<Configuration, Authentica
     }
 
     @Override
-    public Authenticator apply(Configuration configuration) {
+    public Authenticator apply(AuthenticatorConfiguration configuration) {
       final HttpTransport httpTransport;
       try {
         httpTransport = GoogleNetHttpTransport.newTrustedTransport();
@@ -105,18 +101,6 @@ public interface AuthenticatorFactory extends Function<Configuration, Authentica
         throw new RuntimeException(e);
       }
       return validator;
-    }
-  }
-
-  @AutoMatter
-  interface Configuration {
-
-    Set<String> domainWhitelist();
-    Set<ResourceId> resourceWhitelist();
-    String service();
-
-    static ConfigurationBuilder builder() {
-      return new ConfigurationBuilder();
     }
   }
 }
