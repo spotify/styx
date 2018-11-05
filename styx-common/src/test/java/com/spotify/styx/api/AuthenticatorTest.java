@@ -75,8 +75,10 @@ public class AuthenticatorTest {
   private static final Project FOO_PROJECT = project("foo", ORGANIZATION_RESOURCE);
   private static final Project BAR_PROJECT = project("bar", FOLDER_RESOURCE);
   private static final Project BAZ_PROJECT = project("baz", null);
+  private static final Project EXTERNAL_PROJECT = project("external", null);
 
-  private static final List<Project> PROJECTS = ImmutableList.of(FOO_PROJECT, BAR_PROJECT, BAZ_PROJECT);
+  private static final List<Project> PROJECTS = ImmutableList.of(
+      FOO_PROJECT, BAR_PROJECT, BAZ_PROJECT, EXTERNAL_PROJECT);
 
   private static final List<ResourceId> WHITELIST = ImmutableList.of(
       ORGANIZATION_RESOURCE, FOLDER_RESOURCE, resourceId(BAZ_PROJECT));
@@ -135,6 +137,7 @@ public class AuthenticatorTest {
     mockAncestryResponse(FOO_PROJECT, resourceId(FOO_PROJECT), ORGANIZATION_RESOURCE);
     mockAncestryResponse(BAR_PROJECT, resourceId(BAR_PROJECT), FOLDER_RESOURCE);
     mockAncestryResponse(BAZ_PROJECT, resourceId(BAZ_PROJECT));
+    mockAncestryResponse(EXTERNAL_PROJECT, resourceId(EXTERNAL_PROJECT));
 
     when(cloudResourceManager.projects().list()).thenReturn(projectsList);
 
@@ -255,7 +258,7 @@ public class AuthenticatorTest {
     when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verify(cloudResourceManager.projects()).getAncestry(any(), any());
+    verify(cloudResourceManager.projects()).getAncestry(eq("barfoo"), any());
     verifyZeroInteractions(iam);
   }
 
@@ -266,7 +269,7 @@ public class AuthenticatorTest {
     when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verify(cloudResourceManager.projects()).getAncestry(any(), any());
+    verify(cloudResourceManager.projects()).getAncestry(eq("barfoo"), any());
     verifyZeroInteractions(iam);
   }
 
