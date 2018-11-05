@@ -89,7 +89,7 @@ import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.CounterSnapshotFactory;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.DockerImageValidator;
-import com.spotify.styx.util.AuthenticatorFactory;
+import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.Shard;

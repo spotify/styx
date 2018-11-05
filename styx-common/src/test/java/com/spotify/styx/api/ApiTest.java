@@ -34,7 +34,6 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.util.ClassEnforcer;
-import com.spotify.styx.util.Authenticator;
 import java.util.List;
 import okio.ByteString;
 import org.junit.Test;

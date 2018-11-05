@@ -39,7 +39,6 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.SyncHandler;
-import com.spotify.styx.util.Authenticator;
 import com.spotify.styx.util.MDCUtil;
 import io.opencensus.trace.Span;
 import io.opencensus.trace.Tracer;

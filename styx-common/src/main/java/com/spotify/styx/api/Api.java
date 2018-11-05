@@ -29,7 +29,6 @@ import static com.spotify.styx.api.Middlewares.tracer;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
-import com.spotify.styx.util.Authenticator;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
 import java.util.Collection;

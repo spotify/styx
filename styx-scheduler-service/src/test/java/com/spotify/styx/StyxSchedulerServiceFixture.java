@@ -54,7 +54,7 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
 import com.spotify.styx.util.EventUtil;
-import com.spotify.styx.util.AuthenticatorFactory;
+import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;

@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.util;
+package com.spotify.styx.api;
 
 import static java.util.stream.Collectors.toList;
 import static org.hamcrest.Matchers.is;

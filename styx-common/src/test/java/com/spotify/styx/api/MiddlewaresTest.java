@@ -55,7 +55,6 @@ import com.spotify.apollo.request.RequestContexts;
 import com.spotify.apollo.request.RequestMetadataImpl;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.styx.util.ClassEnforcer;
-import com.spotify.styx.util.Authenticator;
 import com.spotify.styx.util.MockSpan;
 import io.opencensus.trace.SpanBuilder;
 import io.opencensus.trace.Tracer;

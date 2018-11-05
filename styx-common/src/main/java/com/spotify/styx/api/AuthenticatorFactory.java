@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.util;
+package com.spotify.styx.api;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;

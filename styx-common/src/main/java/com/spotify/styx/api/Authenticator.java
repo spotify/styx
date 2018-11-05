@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.util;
+package com.spotify.styx.api;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
@@ -64,10 +64,10 @@ public class Authenticator {
       .maximumSize(VALIDATED_EMAIL_CACHE_SIZE)
       .build();
 
-  public Authenticator(GoogleIdTokenVerifier googleIdTokenVerifier,
-                       CloudResourceManager cloudResourceManager,
-                       Iam iam,
-                       Set<String> domainWhitelist) {
+  Authenticator(GoogleIdTokenVerifier googleIdTokenVerifier,
+      CloudResourceManager cloudResourceManager,
+      Iam iam,
+      Set<String> domainWhitelist) {
     this.googleIdTokenVerifier =
         Objects.requireNonNull(googleIdTokenVerifier, "googleIdTokenVerifier");
     this.cloudResourceManager =
@@ -76,7 +76,7 @@ public class Authenticator {
     this.domainWhitelist = Objects.requireNonNull(domainWhitelist, "domainWhitelist");
   }
 
-  public void cacheProjects() throws IOException {
+  void cacheProjects() throws IOException {
     final CloudResourceManager.Projects.List request = cloudResourceManager.projects().list();
 
     ListProjectsResponse response;
