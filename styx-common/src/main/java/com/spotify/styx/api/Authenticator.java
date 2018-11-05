@@ -244,15 +244,10 @@ public class Authenticator {
     if (isWhitelisted(resourceId)) {
       return true;
     }
-    if (isWhitelisted(project.getParent())) {
+    if (project.getParent() != null && isWhitelisted(project.getParent())) {
       return true;
     }
-    // Check project ancestry
-    // TODO: handle 403 quota exhausted?
-    final GetAncestryResponse ancestry = cloudResourceManager.projects()
-        .getAncestry(project.getProjectId(), new GetAncestryRequest())
-        .execute();
-    return resolveAccess(ancestry.getAncestor());
+    return resolveProjectAccess(project.getProjectId());
   }
 
   private boolean resolveAccess(List<Ancestor> ancestry) {
