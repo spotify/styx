@@ -20,7 +20,7 @@
 
 package com.spotify.styx.api;
 
-import static com.spotify.styx.api.Middlewares.authValidator;
+import static com.spotify.styx.api.Middlewares.authenticator;
 import static com.spotify.styx.api.Middlewares.clientValidator;
 import static com.spotify.styx.api.Middlewares.exceptionAndRequestIdHandler;
 import static com.spotify.styx.api.Middlewares.httpLogger;
@@ -48,6 +48,11 @@ public final class Api {
     public String prefix() {
       return "/api/" + name().toLowerCase();
     }
+
+  }
+
+  private Api() {
+    throw new UnsupportedOperationException();
   }
 
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> prefixRoutes(
@@ -58,20 +63,22 @@ public final class Api {
   }
 
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
-      Stream<Route<AsyncHandler<Response<ByteString>>>> routes, String service) {
-    return withCommonMiddleware(routes, Collections::emptyList, service);
+      Stream<Route<AsyncHandler<Response<ByteString>>>> routes,
+      Authenticator authenticator,
+      String service) {
+    return withCommonMiddleware(routes, Collections::emptyList, authenticator, service);
   }
 
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
       Stream<Route<AsyncHandler<Response<ByteString>>>> routes,
-      Supplier<List<String>> clientBlacklistSupplier, String service) {
+      Supplier<List<String>> clientBlacklistSupplier,
+      Authenticator authenticator,
+      String service) {
     return routes.map(r -> r
-        .withMiddleware(httpLogger())
-        .withMiddleware(authValidator())
+        .withMiddleware(httpLogger(authenticator))
+        .withMiddleware(authenticator(authenticator))
         .withMiddleware(clientValidator(clientBlacklistSupplier))
         .withMiddleware(exceptionAndRequestIdHandler())
         .withMiddleware(tracer(tracer, service)));
-  }
-  private Api() {
   }
 }

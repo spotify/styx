@@ -24,12 +24,14 @@ import com.spotify.apollo.AppInit;
 import com.spotify.apollo.httpservice.HttpService;
 import com.spotify.apollo.httpservice.LoadingException;
 import com.spotify.metrics.core.SemanticMetricRegistry;
+import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.StatsFactory;
 import io.opencensus.exporter.trace.stackdriver.StackdriverTraceConfiguration;
 import io.opencensus.exporter.trace.stackdriver.StackdriverTraceExporter;
 import java.io.IOException;
 import java.time.Instant;
+import javaslang.Function1;
 
 public class StyxService {
 
@@ -48,13 +50,18 @@ public class StyxService {
           new MetricsStats(env.resolve(SemanticMetricRegistry.class), Instant::now);
       final StatsFactory statsFactory = (ignored) -> stats;
 
+      final AuthenticatorFactory authenticatorFactory =
+          Function1.of(AuthenticatorFactory.DEFAULT::apply).memoized()::apply;
+
       final StyxScheduler scheduler = StyxScheduler.newBuilder()
           .setServiceName(SERVICE_NAME)
           .setStatsFactory(statsFactory)
+          .setAuthenticatorFactory(authenticatorFactory)
           .build();
       final StyxApi api = StyxApi.newBuilder()
           .setServiceName(SERVICE_NAME)
           .setStatsFactory(statsFactory)
+          .setAuthenticatorFactory(authenticatorFactory)
           .build();
 
       scheduler.create(env);

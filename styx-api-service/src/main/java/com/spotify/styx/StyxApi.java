@@ -34,6 +34,8 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.api.Api;
+import com.spotify.styx.api.AuthenticatorConfiguration;
+import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.api.BackfillResource;
 import com.spotify.styx.api.ResourceResource;
 import com.spotify.styx.api.SchedulerProxyResource;
@@ -81,6 +83,7 @@ public class StyxApi implements AppInit {
   private final StorageFactory storageFactory;
   private final WorkflowConsumerFactory workflowConsumerFactory;
   private final StatsFactory statsFactory;
+  private final AuthenticatorFactory authenticatorFactory;
   private final Time time;
 
   public interface WorkflowConsumerFactory
@@ -92,6 +95,7 @@ public class StyxApi implements AppInit {
     private StorageFactory storageFactory = StyxApi::storage;
     private WorkflowConsumerFactory workflowConsumerFactory = (env, stats) -> (oldWorkflow, newWorkflow) -> { };
     private StatsFactory statsFactory = StyxApi::stats;
+    private AuthenticatorFactory authenticatorFactory = AuthenticatorFactory.DEFAULT;
     private Time time = Instant::now;
 
     public Builder setServiceName(String serviceName) {
@@ -111,6 +115,12 @@ public class StyxApi implements AppInit {
 
     public Builder setStatsFactory(StatsFactory statsFactory) {
       this.statsFactory = statsFactory;
+      return this;
+    }
+
+    public Builder setAuthenticatorFactory(
+        AuthenticatorFactory authenticatorFactory) {
+      this.authenticatorFactory = authenticatorFactory;
       return this;
     }
 
@@ -137,6 +147,7 @@ public class StyxApi implements AppInit {
     this.storageFactory = requireNonNull(builder.storageFactory);
     this.workflowConsumerFactory = requireNonNull(builder.workflowConsumerFactory);
     this.statsFactory = requireNonNull(builder.statsFactory);
+    this.authenticatorFactory = requireNonNull(builder.authenticatorFactory);
     this.time = requireNonNull(builder.time);
   }
 
@@ -189,7 +200,8 @@ public class StyxApi implements AppInit {
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
-        .registerRoutes(Api.withCommonMiddleware(routes, clientBlacklistSupplier, serviceName));
+        .registerRoutes(Api.withCommonMiddleware(routes, clientBlacklistSupplier,
+            authenticatorFactory.apply(AuthenticatorConfiguration.fromConfig(config, serviceName)), serviceName));
   }
 
   private static AggregateStorage storage(Environment environment, Stats stats) {

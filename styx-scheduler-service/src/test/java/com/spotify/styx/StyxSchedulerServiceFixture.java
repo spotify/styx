@@ -36,6 +36,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.spotify.apollo.test.ServiceHelper;
+import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
@@ -151,6 +152,7 @@ public class StyxSchedulerServiceFixture {
         Sets.union(res, resourceIdsToDecorateWith);
     StyxScheduler.EventConsumerFactory eventConsumerFactory =
         (env, stats) -> (event, state) ->  transitionedEvents.add(Tuple.of(event, state.state()));
+    AuthenticatorFactory authenticatorFactory = (cfg) -> null;
 
     styxScheduler = StyxScheduler.newBuilder()
         .setTime(time)
@@ -161,6 +163,7 @@ public class StyxSchedulerServiceFixture {
         .setPublisherFactory(publisherFactory)
         .setResourceDecorator(resourceDecorator)
         .setEventConsumerFactory(eventConsumerFactory)
+        .setAuthenticatorFactory(authenticatorFactory)
         .build();
 
     serviceHelper = ServiceHelper.create(styxScheduler, StyxScheduler.SERVICE_NAME)

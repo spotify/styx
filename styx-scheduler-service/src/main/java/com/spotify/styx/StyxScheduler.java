@@ -53,6 +53,8 @@ import com.spotify.apollo.Environment;
 import com.spotify.apollo.route.Route;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.api.Api;
+import com.spotify.styx.api.AuthenticatorConfiguration;
+import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
@@ -176,6 +178,7 @@ public class StyxScheduler implements AppInit {
   private final WorkflowResourceDecorator resourceDecorator;
   private final EventConsumerFactory eventConsumerFactory;
   private final WorkflowExecutionGateFactory executionGateFactory;
+  private final AuthenticatorFactory authenticatorFactory;
 
   private StateManager stateManager;
   private Scheduler scheduler;
@@ -218,6 +221,7 @@ public class StyxScheduler implements AppInit {
     private WorkflowResourceDecorator resourceDecorator = WorkflowResourceDecorator.NOOP;
     private EventConsumerFactory eventConsumerFactory = (env, stats) -> (event, state) -> { };
     private WorkflowExecutionGateFactory executionGateFactory = (env, storage) -> WorkflowExecutionGate.NOOP;
+    private AuthenticatorFactory authenticatorFactory = AuthenticatorFactory.DEFAULT;
 
     public Builder setServiceName(String serviceName) {
       this.serviceName = serviceName;
@@ -274,6 +278,12 @@ public class StyxScheduler implements AppInit {
       return this;
     }
 
+    public Builder setAuthenticatorFactory(
+        AuthenticatorFactory authenticatorFactory) {
+      this.authenticatorFactory = authenticatorFactory;
+      return this;
+    }
+
     public StyxScheduler build() {
       return new StyxScheduler(this);
     }
@@ -301,6 +311,7 @@ public class StyxScheduler implements AppInit {
     this.resourceDecorator = requireNonNull(builder.resourceDecorator);
     this.eventConsumerFactory = requireNonNull(builder.eventConsumerFactory);
     this.executionGateFactory = requireNonNull(builder.executionGateFactory);
+    this.authenticatorFactory = requireNonNull(builder.authenticatorFactory);
   }
 
   @Override
@@ -412,7 +423,8 @@ public class StyxScheduler implements AppInit {
 
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
-        .registerRoutes(Api.withCommonMiddleware(schedulerResource.routes(), serviceName));
+        .registerRoutes(Api.withCommonMiddleware(schedulerResource.routes(),
+            authenticatorFactory.apply(AuthenticatorConfiguration.fromConfig(config, serviceName)), serviceName));
 
     this.stateManager = stateManager;
     this.scheduler = scheduler;
