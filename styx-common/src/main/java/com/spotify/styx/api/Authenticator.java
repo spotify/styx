@@ -257,7 +257,7 @@ public class Authenticator {
         // Cache descendants
         for (Ancestor descendant : ancestry.subList(0, i)) {
           if (resourceCache.add(descendant.getResourceId())) {
-            logger.debug("White list cached {}/{}, descendant of {}/{}",
+            logger.debug("Whitelist cached {}/{}, descendant of {}/{}",
                 descendant.getResourceId().getType(), descendant.getResourceId().getId(),
                 ancestor.getResourceId().getType(), ancestor.getResourceId().getId());
           }
