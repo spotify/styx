@@ -22,6 +22,7 @@ package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V3;
 
+import com.google.common.collect.ImmutableSortedMap;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Stream;
+import okhttp3.HttpUrl;
 import okio.ByteString;
 import org.slf4j.MDC;
 
@@ -75,8 +77,13 @@ public class SchedulerProxyResource {
   }
 
   private CompletionStage<Response<ByteString>> proxyToScheduler(String path, RequestContext rc) {
-    return client.send(withRequestId(rc.request()
-        .withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + path)));
+    final HttpUrl.Builder builder =
+        Objects.requireNonNull(HttpUrl.parse(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + path))
+            .newBuilder();
+    ImmutableSortedMap.copyOf(rc.request().parameters()).forEach((name, values) ->
+        values.forEach(value -> builder.addQueryParameter(name, value)));
+
+    return client.send(withRequestId(rc.request().withUri(builder.build().toString())));
   }
 
   private Request withRequestId(Request request) {
