@@ -345,4 +345,12 @@ public class AuthenticatorTest {
     verifyZeroInteractions(projectsGetAncestry);
     verifyZeroInteractions(iam);
   }
+
+  @Test
+  public void shouldDenyWhitelistedEmailNonSA() {
+    when(idTokenPayload.getEmail()).thenReturn("foo@bar.com");
+    assertThat(validator.authenticate("token"), is(nullValue()));
+    verifyZeroInteractions(projectsGetAncestry);
+    verifyZeroInteractions(iam);
+  }
 }
