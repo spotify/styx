@@ -51,6 +51,9 @@ public class Authenticator {
   private static final Logger logger = LoggerFactory.getLogger(Authenticator.class);
 
   private static final Pattern SERVICE_ACCOUNT_PATTERN =
+      Pattern.compile("^.+\\.gserviceaccount\\.com$");
+
+  private static final Pattern USER_CREATED_SERVICE_ACCOUNT_PATTERN =
       Pattern.compile("^.+@(.+)\\.iam\\.gserviceaccount\\.com$");
 
   private static final long VALIDATED_EMAIL_CACHE_SIZE = 1000;
@@ -117,6 +120,10 @@ public class Authenticator {
     }
 
     final String email = googleIdToken.getPayload().getEmail();
+    if (email == null) {
+      logger.debug("No email in id token");
+      return null;
+    }
 
     final String domain = getDomain(email);
     if (domain != null) {
@@ -133,9 +140,14 @@ public class Authenticator {
       return googleIdToken;
     }
 
+    // Is this a GCP service account?
+    if (!SERVICE_ACCOUNT_PATTERN.matcher(email).matches()) {
+      return null;
+    }
+
     final String projectId;
     try {
-      projectId = checkProject(email);
+      projectId = checkServiceAccountProject(email);
     } catch (IOException e) {
       logger.info("Cannot authenticate {}", email);
       return null;
@@ -176,16 +188,17 @@ public class Authenticator {
     }
   }
 
-  private String checkProject(String email) throws IOException {
+  private String checkServiceAccountProject(String email) throws IOException {
     String projectId = null;
 
-    final Matcher matcher = SERVICE_ACCOUNT_PATTERN.matcher(email);
+    // Check if this is a user created SA with the project id in the email domain
+    final Matcher matcher = USER_CREATED_SERVICE_ACCOUNT_PATTERN.matcher(email);
     if (matcher.matches()) {
       projectId = matcher.group(1);
     }
 
     if (projectId == null) {
-      // no projectId, could be GCE default
+      // Not recognized as a user created SA, could be GCE default or app engine, etc
       logger.debug("Email {} doesn't contain project id, looking up its project", email);
       projectId = getProjectIdOfServiceAccount(email);
     }

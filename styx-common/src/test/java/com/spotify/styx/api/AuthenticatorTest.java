@@ -337,4 +337,20 @@ public class AuthenticatorTest {
     verify(iam.projects().serviceAccounts()).get(anyString());
     verifyZeroInteractions(projectsGetAncestry);
   }
+
+  @Test
+  public void shouldFailTokenWithNoEmail() {
+    when(idTokenPayload.getEmail()).thenReturn(null);
+    assertThat(validator.authenticate("token"), is(nullValue()));
+    verifyZeroInteractions(projectsGetAncestry);
+    verifyZeroInteractions(iam);
+  }
+
+  @Test
+  public void shouldDenyWhitelistedEmailNonSA() {
+    when(idTokenPayload.getEmail()).thenReturn("foo@bar.com");
+    assertThat(validator.authenticate("token"), is(nullValue()));
+    verifyZeroInteractions(projectsGetAncestry);
+    verifyZeroInteractions(iam);
+  }
 }
