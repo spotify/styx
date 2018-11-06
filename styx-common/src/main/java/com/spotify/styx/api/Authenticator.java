@@ -117,6 +117,10 @@ public class Authenticator {
     }
 
     final String email = googleIdToken.getPayload().getEmail();
+    if (email == null) {
+      logger.debug("No email in id token");
+      return null;
+    }
 
     final String domain = getDomain(email);
     if (domain != null) {
