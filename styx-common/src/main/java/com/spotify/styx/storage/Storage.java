@@ -285,8 +285,6 @@ public interface Storage extends Closeable {
 
   Map<Integer, Long> shardsForCounter(String counterId) throws IOException;
 
-  void deleteShardsForCounter(String counterId) throws IOException;
-
   long getLimitForCounter(String counterId) throws IOException;
 
   /**
@@ -295,8 +293,4 @@ public interface Storage extends Closeable {
    */
   <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
       throws IOException, E;
-
-  void deleteLimitForCounter(String counterId) throws IOException;
-
-  void updateLimitForCounter(String counterId, long limit) throws IOException;
 }

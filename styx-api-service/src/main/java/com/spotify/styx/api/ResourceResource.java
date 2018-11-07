@@ -23,7 +23,6 @@ package com.spotify.styx.api;
 import static com.spotify.styx.api.Api.Version.V3;
 import static java.util.stream.Collectors.toList;
 
-import com.google.common.base.Throwables;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.entity.EntityMiddleware;
@@ -86,7 +85,7 @@ public final class ResourceResource {
     try {
       return ResourcesPayload.create(storage.resources());
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
   }
 
@@ -95,16 +94,15 @@ public final class ResourceResource {
       return storage.resource(id).map(Response::forPayload)
           .orElse(Response.forStatus(Status.NOT_FOUND));
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
   }
 
   private Response<Void> deleteResource(String id) {
     try {
       storage.deleteResource(id);
-      storage.deleteLimitForCounter(id);
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
     return Response.forStatus(Status.NO_CONTENT);
   }
@@ -112,11 +110,11 @@ public final class ResourceResource {
   private Resource postResource(Resource resource) {
     try {
       storage.storeResource(resource);
-      storage.updateLimitForCounter(resource.id(), resource.concurrency());
-      return resource;
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
+
+    return resource;
   }
 
   private Response<Resource> updateResource(String id, Resource resource) {
@@ -127,11 +125,8 @@ public final class ResourceResource {
 
     try {
       storage.storeResource(resource);
-      storage.updateLimitForCounter(resource.id(), resource.concurrency());
     } catch (IOException e) {
-      return Response
-          .forStatus(
-              Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Failed to store resource."));
+      throw new RuntimeException(e);
     }
 
     return Response.forStatus(Status.OK).withPayload(resource);

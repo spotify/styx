@@ -42,7 +42,6 @@ import com.spotify.apollo.Response;
 import com.spotify.apollo.StatusType;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.AggregateStorage;
-import com.spotify.styx.util.ShardedCounter;
 import java.time.Duration;
 import java.util.logging.Level;
 import okio.ByteString;
@@ -52,12 +51,10 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 public class ResourceResourceTest extends VersionedApiTest {
 
-  @Mock private ShardedCounter shardedCounter;
   private static LocalDatastoreHelper localDatastore;
 
   private AggregateStorage storage;
@@ -94,7 +91,7 @@ public class ResourceResourceTest extends VersionedApiTest {
   }
 
   @AfterClass
-  public static void tearDownClass() throws Exception {
+  public static void tearDownClass() {
     if (localDatastore != null) {
       try {
         localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
@@ -107,7 +104,6 @@ public class ResourceResourceTest extends VersionedApiTest {
   @Before
   public void setUp() throws Exception {
     storage.storeResource(RESOURCE_1);
-    storage.updateLimitForCounter(RESOURCE_1.id(), RESOURCE_1.concurrency());
   }
 
   @After
@@ -168,7 +164,7 @@ public class ResourceResourceTest extends VersionedApiTest {
     assertJson(response, "concurrency", equalTo(2));
 
     assertThat(storage.resource(RESOURCE_2.id()), hasValue(RESOURCE_2));
-    verify(storage).updateLimitForCounter(RESOURCE_2.id(), RESOURCE_2.concurrency());
+    verify(storage).storeResource(RESOURCE_2);
     assertThat(storage.getLimitForCounter(RESOURCE_2.id()), is(RESOURCE_2.concurrency()));
   }
 
@@ -185,7 +181,7 @@ public class ResourceResourceTest extends VersionedApiTest {
     assertJson(response, "concurrency", equalTo(21));
 
     assertThat(storage.resource(RESOURCE_1.id()), hasValue(Resource.create(RESOURCE_1.id(), 21)));
-    verify(storage).updateLimitForCounter(RESOURCE_1.id(), 21L);
+    verify(storage).storeResource(Resource.create(RESOURCE_1.id(), 21L));
     assertThat(storage.getLimitForCounter(RESOURCE_1.id()), is(21L));
   }
 

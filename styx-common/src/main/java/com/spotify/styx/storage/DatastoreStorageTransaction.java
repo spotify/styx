@@ -21,7 +21,6 @@
 package com.spotify.styx.storage;
 
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
-import static com.spotify.styx.storage.DatastoreStorage.KIND_RESOURCE;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_ALL_TRIGGERED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_COMPONENT;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONCURRENCY;
@@ -146,9 +145,9 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   }
 
   private Entity resourceToEntity(CheckedDatastore datastore, Resource resource) {
-    final Key key = datastore.newKeyFactory().setKind(KIND_RESOURCE).newKey(resource.id());
+    final Key key = datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(resource.id());
     return Entity.newBuilder(key)
-        .set(PROPERTY_CONCURRENCY, resource.concurrency())
+        .set(PROPERTY_LIMIT, resource.concurrency())
         .build();
   }
 

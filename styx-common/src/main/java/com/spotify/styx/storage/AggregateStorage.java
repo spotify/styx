@@ -214,6 +214,11 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
+  public void storeResource(Resource resource) throws IOException {
+    datastoreStorage.postResource(resource);
+  }
+
+  @Override
   public void storeBackfill(Backfill backfill) throws IOException {
     datastoreStorage.storeBackfill(backfill);
   }
@@ -224,18 +229,8 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public void deleteShardsForCounter(String counterId) throws IOException {
-    datastoreStorage.deleteShardsForCounter(counterId);
-  }
-
-  @Override
   public long getLimitForCounter(String counterId) throws IOException {
     return datastoreStorage.getLimitForCounter(counterId);
-  }
-
-  @Override
-  public void storeResource(Resource resource) throws IOException {
-    datastoreStorage.postResource(resource);
   }
 
   @Override
@@ -266,15 +261,5 @@ public class AggregateStorage implements Storage {
   @Override
   public <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f) throws IOException, E {
     return datastoreStorage.runInTransaction(f);
-  }
-
-  @Override
-  public void deleteLimitForCounter(String counterId) throws IOException {
-    datastoreStorage.deleteLimitForCounter(counterId);
-  }
-
-  @Override
-  public void updateLimitForCounter(String counterId, long limit) throws IOException {
-    datastoreStorage.updateLimitForCounter(counterId, limit);
   }
 }

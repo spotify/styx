@@ -30,6 +30,7 @@ import static org.mockito.Mockito.verify;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
@@ -84,7 +85,7 @@ public class ShardedCounterSnapshotFactoryTest {
   @Before
   public void setUp() throws IOException {
     counterSnapshotFactory = spy(new ShardedCounterSnapshotFactory(storage));
-    storage.updateLimitForCounter(RESOURCE_ID, 10L);
+    storage.storeResource(Resource.create(RESOURCE_ID, 10L));
   }
 
   @After

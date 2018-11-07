@@ -53,6 +53,7 @@ import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
@@ -118,8 +119,8 @@ public class ShardedCounterTest {
   public void setUp() throws IOException {
     counterSnapshotFactory = spy(new ShardedCounterSnapshotFactory(storage));
     shardedCounter = new ShardedCounter(storage, stats, counterSnapshotFactory);
-    storage.updateLimitForCounter(COUNTER_ID1, 10L);
-    storage.updateLimitForCounter(COUNTER_ID2, 10L);
+    storage.storeResource(Resource.create(COUNTER_ID1, 10L));
+    storage.storeResource(Resource.create(COUNTER_ID2, 10L));
   }
 
   @After
@@ -481,7 +482,7 @@ public class ShardedCounterTest {
       return null;
     });
 
-    shardedCounter.deleteCounter(COUNTER_ID1);
+    storage.deleteResource(COUNTER_ID1);
 
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
 
@@ -502,7 +503,7 @@ public class ShardedCounterTest {
       return null;
     });
 
-    shardedCounter.deleteCounter(COUNTER_ID1);
+    storage.deleteResource(COUNTER_ID1);
 
     QueryResults<Entity> shardsCounter1 = getShardsForCounter(COUNTER_ID1);
     QueryResults<Entity> shardsCounter2 = getShardsForCounter(COUNTER_ID2);
@@ -516,7 +517,7 @@ public class ShardedCounterTest {
 
   @Test
   public void shouldPassDeletingNonExistingCounterAndLimit() throws IOException {
-    shardedCounter.deleteCounter(COUNTER_ID1);
+    storage.deleteResource(COUNTER_ID1);
 
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
     assertFalse(results.hasNext());
