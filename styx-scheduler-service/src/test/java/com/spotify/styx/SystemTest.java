@@ -692,23 +692,4 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(getState(workflowInstance), is(Optional.empty()));
   }
   }
-
-  @RunWith(JUnitParamsRunner.class)
-  public static class CreatesCounterShardsForExistingResourcesTest extends SystemTest {
-  @Test
-  public void createsCounterShardsForExistingResources() throws Exception {
-    givenResource(RESOURCE_1);
-    givenResource(RESOURCE_2);
-    givenResource(RESOURCE_3);
-
-    styxStarts();
-
-    assertEquals(RESOURCE_1.concurrency(), storage.getLimitForCounter(RESOURCE_1.id()));
-    assertEquals(RESOURCE_2.concurrency(), storage.getLimitForCounter(RESOURCE_2.id()));
-    assertEquals(RESOURCE_3.concurrency(), storage.getLimitForCounter(RESOURCE_3.id()));
-    assertEquals(128, storage.shardsForCounter(RESOURCE_1.id()).size());
-    assertEquals(128, storage.shardsForCounter(RESOURCE_2.id()).size());
-    assertEquals(128, storage.shardsForCounter(RESOURCE_3.id()).size());
-  }
-  }
 }
