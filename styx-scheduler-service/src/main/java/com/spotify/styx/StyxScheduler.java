@@ -22,7 +22,6 @@ package com.spotify.styx;
 
 import static com.spotify.apollo.environment.ConfigUtil.optionalInt;
 import static com.spotify.styx.state.OutputHandler.fanOutput;
-import static com.spotify.styx.state.StateUtil.getResourcesUsageMap;
 import static com.spotify.styx.util.CloserUtil.closeable;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
@@ -357,8 +356,6 @@ public class StyxScheduler implements AppInit {
 
     final Supplier<Map<WorkflowId, Workflow>> workflowCache = new CachedSupplier<>(storage::workflows, time);
 
-    initializeResources(storage, shardedCounter, counterSnapshotFactory, timeoutConfig, workflowCache);
-
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
     //       take StateManager as argument instead?
     final List<OutputHandler> outputHandlers = new ArrayList<>();
@@ -455,48 +452,6 @@ public class StyxScheduler implements AppInit {
   @VisibleForTesting
   void tickBackfillTriggerManager() {
     backfillTriggerManager.tick();
-  }
-
-  private void initializeResources(Storage storage, ShardedCounter shardedCounter,
-                                   CounterSnapshotFactory counterSnapshotFactory,
-                                   TimeoutConfig timeoutConfig,
-                                   Supplier<Map<WorkflowId, Workflow>> workflowCache) {
-    try {
-      // Initialize resources
-      storage.resources().parallelStream().forEach(
-          resource -> {
-            try {
-              counterSnapshotFactory.create(resource.id());
-              storage.runInTransaction(tx -> {
-                shardedCounter.updateLimit(tx, resource.id(), resource.concurrency());
-                return null;
-              });
-            } catch (IOException e) {
-              LOG.error("Error creating a counter limit for {}", resource, e);
-              throw new RuntimeException(e);
-            }
-          });
-      LOG.info("Finished initializing resources");
-
-      // Sync resources usage
-      if (storage.config().resourcesSyncEnabled()) {
-        // first we reset all shards for each resource
-        storage.resources().parallelStream().forEach(resource -> resetShards(storage, resource));
-        // then we update shards with actual usage
-        try {
-          final Map<String, Long> resourcesUsageMap = getResourcesUsageMap(storage, timeoutConfig,
-              workflowCache, time.get(), resourceDecorator);
-          updateShards(storage, resourcesUsageMap);
-        } catch (Exception e) {
-          LOG.error("Error syncing resources", e);
-          throw new RuntimeException(e);
-        }
-        LOG.info("Finished syncing resources");
-      }
-    } catch (IOException e) {
-      LOG.error("Error while initializing/syncing resources", e);
-      throw new RuntimeException(e);
-    }
   }
 
   @VisibleForTesting
