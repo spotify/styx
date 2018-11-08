@@ -31,6 +31,9 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -42,6 +45,7 @@ import com.spotify.apollo.Response;
 import com.spotify.apollo.StatusType;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.AggregateStorage;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.logging.Level;
 import okio.ByteString;
@@ -140,6 +144,18 @@ public class ResourceResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldFailToListResources() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    doThrow(new IOException()).when(storage).resources();
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("")));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SERVER_ERROR)));
+  }
+
+  @Test
   public void shouldGetResource() throws Exception {
     sinceVersion(Api.Version.V3);
 
@@ -149,6 +165,18 @@ public class ResourceResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
     assertJson(response, "id", equalTo("resource1"));
     assertJson(response, "concurrency", equalTo(1));
+  }
+
+  @Test
+  public void shouldFailToGetResource() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    doThrow(new IOException()).when(storage).resource(anyString());
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/resource1")));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SERVER_ERROR)));
   }
 
   @Test
@@ -169,6 +197,19 @@ public class ResourceResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldFailToPostResource() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    doThrow(new IOException()).when(storage).storeResource(any(Resource.class));
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path(""),
+            ByteString.encodeUtf8("{\"id\": \"resource2\", \"concurrency\": 2}")));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SERVER_ERROR)));
+  }
+
+  @Test
   public void shouldUpdateResource() throws Exception {
     sinceVersion(Api.Version.V3);
 
@@ -186,6 +227,19 @@ public class ResourceResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldFailToUpdateResource() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    doThrow(new IOException()).when(storage).storeResource(any(Resource.class));
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("PUT", path("/resource1"),
+            ByteString.encodeUtf8("{\"id\": \"resource1\", \"concurrency\": 21}")));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SERVER_ERROR)));
+  }
+
+  @Test
   public void shouldDeleteResource() throws Exception {
     sinceVersion(Api.Version.V3);
 
@@ -193,15 +247,20 @@ public class ResourceResourceTest extends VersionedApiTest {
         awaitResponse(serviceHelper.request("DELETE", path("/resource1")));
 
     assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
-
     assertThat(storage.resource(RESOURCE_1.id()).isPresent(), is(false));
+    assertThat(storage.shardsForCounter(RESOURCE_1.id()), is(ImmutableMap.of()));
+  }
 
-    try {
-      storage.getLimitForCounter(RESOURCE_1.id());
-      fail();
-    } catch (IllegalArgumentException e) {
-      assertThat(e.getMessage(), is("No limit found in Datastore for resource1"));
-    }
+  @Test
+  public void shouldFailToDeleteResource() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    doThrow(new IOException()).when(storage).deleteResource(anyString());
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("DELETE", path("/resource1")));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SERVER_ERROR)));
   }
 
   @Test
