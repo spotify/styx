@@ -38,8 +38,6 @@ import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
 import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
-import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
-import static com.spotify.styx.util.ShardedCounter.PROPERTY_LIMIT;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -920,9 +918,12 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldReturnCounterLimit() throws IOException {
-    updateLimitInStorage("foo-resource", 10L);
+    storage.runInTransaction(tx -> {
+      tx.store(RESOURCE1);
+      return null;
+    });
 
-    assertEquals(10L, storage.getLimitForCounter("foo-resource"));
+    assertEquals(1L, storage.getLimitForCounter(RESOURCE1.id()));
   }
 
   @Test
@@ -942,19 +943,10 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldGetExceptionForUnknownCounter() throws IOException {
-    updateLimitInStorage("foo-resource", 10L);
-
     exception.expect(IllegalArgumentException.class);
     exception.expectMessage("No limit found in Datastore for bar-resource");
 
     storage.getLimitForCounter("bar-resource");
-  }
-
-  private void updateLimitInStorage(String counterId, long limit) throws IOException {
-    datastore.put(Entity.newBuilder((datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey
-        (counterId)))
-        .set(PROPERTY_LIMIT, limit)
-        .build());
   }
 
   private static class FooException extends Exception {
