@@ -118,7 +118,7 @@ public class ShardedCounterTest {
   @Before
   public void setUp() throws IOException {
     counterSnapshotFactory = spy(new ShardedCounterSnapshotFactory(storage));
-    shardedCounter = new ShardedCounter(storage, stats, counterSnapshotFactory);
+    shardedCounter = new ShardedCounter(stats, counterSnapshotFactory);
     storage.storeResource(Resource.create(COUNTER_ID1, 10L));
     storage.storeResource(Resource.create(COUNTER_ID2, 10L));
   }

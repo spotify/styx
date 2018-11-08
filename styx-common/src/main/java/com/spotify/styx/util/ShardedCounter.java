@@ -67,7 +67,6 @@ public class ShardedCounter {
   public static final String PROPERTY_SHARD_INDEX = "index";
   public static final String PROPERTY_COUNTER_ID = "counterId";
 
-  private final Storage storage;
   private final Stats stats;
   /**
    * A weakly consistent view of the state in Datastore, refreshed by ShardedCounter on demand.
@@ -175,8 +174,7 @@ public class ShardedCounter {
     }
   }
 
-  public ShardedCounter(Storage storage, Stats stats, CounterSnapshotFactory counterSnapshotFactory) {
-    this.storage = Objects.requireNonNull(storage);
+  public ShardedCounter(Stats stats, CounterSnapshotFactory counterSnapshotFactory) {
     this.stats = Objects.requireNonNull(stats);
     this.counterSnapshotFactory = Objects.requireNonNull(counterSnapshotFactory);
   }
