@@ -26,7 +26,6 @@ import static com.spotify.styx.util.CloserUtil.closeable;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.GuardedRunnable.runGuarded;
-import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -57,7 +56,6 @@ import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -91,7 +89,6 @@ import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RetryUtil;
-import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.ShardedCounterSnapshotFactory;
 import com.spotify.styx.util.StorageFactory;
@@ -452,54 +449,6 @@ public class StyxScheduler implements AppInit {
   @VisibleForTesting
   void tickBackfillTriggerManager() {
     backfillTriggerManager.tick();
-  }
-
-  @VisibleForTesting
-  void resetShards(final Storage storage, final Resource resource) {
-    LOG.info("Resetting shards of resource {}", resource.id());
-    for (int i = 0; i < NUM_SHARDS; i++) {
-      final int index = i;
-      try {
-        storage.runInTransaction(tx -> {
-          tx.store(Shard.create(resource.id(), index, 0));
-          return null;
-        });
-      } catch (IOException e) {
-        LOG.error("Error resetting shards of resource {}", resource, e);
-        throw new RuntimeException(e);
-      }
-    }
-  }
-
-  /**
-   * For each resource, distribute usage value evenly across shards.
-   * For example, with a usage value of 10 and 3 available shards, the latter will be set to:
-   * Shard 1 = 4
-   * Shard 2 = 3
-   * Shard 3 = 3
-   */
-  @VisibleForTesting
-  void updateShards(final Storage storage,
-                    final Map<String, Long> resourceUsage) {
-    resourceUsage.entrySet().parallelStream().forEach(entity -> {
-      final String resource = entity.getKey();
-      final Long usage = entity.getValue();
-      LOG.info("Syncing {} -> {}", resource, usage);
-      try {
-        for (int i = 0; i < NUM_SHARDS; i++) {
-          final int index = i;
-          final int shardValue = (int) (usage / NUM_SHARDS + (index < usage % NUM_SHARDS ? 1 : 0));
-          storage.runInTransaction(tx -> {
-            tx.store(Shard.create(resource, index, shardValue));
-            return null;
-          });
-          LOG.info("Stored {}#shard-{} -> {}", resource, index, shardValue);
-        }
-      } catch (IOException e) {
-        LOG.error("Error syncing resource: {}", resource, e);
-        throw new RuntimeException(e);
-      }
-    });
   }
 
   private static void startCleaner(Cleaner cleaner, ScheduledExecutorService exec) {

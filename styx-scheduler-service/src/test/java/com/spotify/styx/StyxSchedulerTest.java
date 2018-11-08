@@ -24,7 +24,6 @@ import static com.spotify.styx.model.Schedule.DAYS;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.theInstance;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
@@ -41,7 +40,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.StyxScheduler.KubernetesClientFactory;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -54,7 +52,6 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
-import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
@@ -146,57 +143,6 @@ public class StyxSchedulerTest {
     assertThat(k8sConfig.getClientCertData(), is(clientCertificate));
     assertThat(k8sConfig.getClientKeyData(), is(clientKey));
     assertThat(k8sConfig.getNamespace(), is(namespace));
-  }
-
-  @Test
-  public void shouldUpdateShardsAccordingToUsedResources() throws Exception {
-    when(storage.runInTransaction(any())).thenAnswer(
-        a -> a.<TransactionFunction>getArgument(0).apply(transaction));
-    final Map<String, Long> resourcesUsageMap = ImmutableMap.of("res1", 257L);
-
-    styxScheduler.updateShards(storage, resourcesUsageMap);
-
-    verify(transaction, times(128)).store(shardArgumentCaptor.capture());
-    shardsWithValue(shardArgumentCaptor, 3L, 1L);
-    shardsWithValue(shardArgumentCaptor, 2L, 127L);
-  }
-
-  @Test
-  public void shouldFailToUpdateShardsAccordingToUsedResources() throws Exception {
-    final IOException exception = new IOException();
-    when(storage.runInTransaction(any())).thenThrow(exception);
-    final Map<String, Long> resourcesUsageMap = ImmutableMap.of("res1", 257L);
-
-    try {
-      styxScheduler.updateShards(storage, resourcesUsageMap);
-      fail();
-    } catch (Exception e) {
-      assertThat(e.getCause(), is(exception));
-    }
-  }
-
-  @Test
-  public void shouldResetShardsOfResource() throws Exception {
-    when(storage.runInTransaction(any())).thenAnswer(
-        a -> a.<TransactionFunction>getArgument(0).apply(transaction));
-
-    styxScheduler.resetShards(storage, Resource.create("res1", 300));
-
-    verify(transaction, times(128)).store(shardArgumentCaptor.capture());
-    shardsWithValue(shardArgumentCaptor, 0L, 128);
-  }
-
-  @Test
-  public void shouldFailToResetShardsOfResource() throws Exception {
-    final IOException exception = new IOException();
-    when(storage.runInTransaction(any())).thenThrow(exception);
-
-    try {
-      styxScheduler.resetShards(storage, Resource.create("res1", 300));
-      fail();
-    } catch (Exception e) {
-      assertThat(e.getCause(), is(exception));
-    }
   }
 
   @Test
