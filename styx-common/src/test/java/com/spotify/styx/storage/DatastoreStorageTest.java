@@ -76,6 +76,7 @@ import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
@@ -121,23 +122,25 @@ public class DatastoreStorageTest {
 
   @Rule public ExpectedException exception = ExpectedException.none();
 
-  static final WorkflowId WORKFLOW_ID1 = WorkflowId.create("component", "endpoint1");
-  static final WorkflowId WORKFLOW_ID2 = WorkflowId.create("component", "endpoint2");
-  static final WorkflowId WORKFLOW_ID3 = WorkflowId.create("component2", "pointless");
+  private static final WorkflowId WORKFLOW_ID1 = WorkflowId.create("component", "endpoint1");
+  private static final WorkflowId WORKFLOW_ID2 = WorkflowId.create("component", "endpoint2");
+  private static final WorkflowId WORKFLOW_ID3 = WorkflowId.create("component2", "pointless");
 
   static final WorkflowInstance WORKFLOW_INSTANCE1 = WorkflowInstance.create(WORKFLOW_ID1, "2016-09-01");
-  static final WorkflowInstance WORKFLOW_INSTANCE2 = WorkflowInstance.create(WORKFLOW_ID2, "2016-09-01");
-  static final WorkflowInstance WORKFLOW_INSTANCE3 = WorkflowInstance.create(WORKFLOW_ID3, "2016-09-01");
+  private static final WorkflowInstance WORKFLOW_INSTANCE2 = WorkflowInstance.create(WORKFLOW_ID2, "2016-09-01");
+  private static final WorkflowInstance WORKFLOW_INSTANCE3 = WorkflowInstance.create(WORKFLOW_ID3, "2016-09-01");
+
+  private static final Resource RESOURCE1 = Resource.create("resource1", 1L);
+  private static final Resource RESOURCE2 = Resource.create("resource2", 2L);
 
   static final Instant TIMESTAMP = Instant.parse("2017-01-01T00:00:00Z");
 
-
-  static final TriggerParameters TRIGGER_PARAMETERS = TriggerParameters.builder()
+  private static final TriggerParameters TRIGGER_PARAMETERS = TriggerParameters.builder()
       .env("FOO", "foo",
           "BAR", "bar")
       .build();
 
-  static final StateData STATE_DATA = StateData.newBuilder()
+  private static final StateData STATE_DATA = StateData.newBuilder()
       .tries(17)
       .consecutiveFailures(13)
       .retryCost(472893)
@@ -191,16 +194,15 @@ public class DatastoreStorageTest {
       TIMESTAMP,
       42L);
 
-  static final WorkflowId WORKFLOW_ID = WorkflowId.create("dockerComp", "dockerEndpoint");
+  private static final WorkflowId WORKFLOW_ID = WorkflowId.create("dockerComp", "dockerEndpoint");
 
-  static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
+  private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
           .id(WORKFLOW_ID.id())
           .schedule(DAYS)
           .build();
   static final Workflow WORKFLOW = Workflow.create(WORKFLOW_ID.componentId(),
-                                                           WORKFLOW_CONFIGURATION);
-  private static final String COUNTER_ID1 = "counter-id1";
+      WORKFLOW_CONFIGURATION);
 
   private static LocalDatastoreHelper helper;
   private DatastoreStorage storage;
@@ -873,13 +875,44 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldReturnShardsForCounter() throws Exception {
+  public void shouldReturnResource() throws IOException {
     storage.runInTransaction(tx -> {
-      tx.store(Shard.create(COUNTER_ID1, 0, 0));
-      tx.store(Shard.create(COUNTER_ID1, 1, 3));
+      tx.store(RESOURCE1);
+      tx.store(RESOURCE2);
       return null;
     });
-    final Map<Integer, Long> map = storage.shardsForCounter(COUNTER_ID1);
+    assertThat(storage.getResource(RESOURCE1.id()), is(Optional.of(RESOURCE1)));
+  }
+
+  @Test
+  public void shouldReturnResources() throws IOException {
+    storage.runInTransaction(tx -> {
+      tx.store(RESOURCE1);
+      tx.store(RESOURCE2);
+      return null;
+    });
+    assertThat(storage.getResources(), is(ImmutableList.of(RESOURCE1, RESOURCE2)));
+  }
+
+  @Test
+  public void shouldDeleteResource() throws IOException {
+    storage.runInTransaction(tx -> {
+      tx.store(RESOURCE1);
+      return null;
+    });
+    storage.deleteResource(RESOURCE1.id());
+    assertThat(storage.getResources(), is(ImmutableList.of()));
+    assertThat(storage.shardsForCounter(RESOURCE1.id()), is(ImmutableMap.of()));
+  }
+
+  @Test
+  public void shouldReturnShardsForCounter() throws Exception {
+    storage.runInTransaction(tx -> {
+      tx.store(Shard.create(RESOURCE1.id(), 0, 0));
+      tx.store(Shard.create(RESOURCE1.id(), 1, 3));
+      return null;
+    });
+    final Map<Integer, Long> map = storage.shardsForCounter(RESOURCE1.id());
     assertEquals(2, map.size());
     assertEquals(0, map.get(0).longValue());
     assertEquals(3, map.get(1).longValue());
