@@ -750,7 +750,7 @@ public class DatastoreStorage implements Closeable {
    * Delete resource by id. Deletes both counter shards and counter limit if it exists.
    *
    * <p>Due to Datastore limitations (modify max 25 entity groups per transaction),
-   * deletion of shards is done in batches of 25 shards.
+   * we cannot do everything in one transaction.
    */
   void deleteResource(String id) throws IOException {
     storeWithRetries(() -> {
@@ -767,6 +767,8 @@ public class DatastoreStorage implements Closeable {
         .setFilter(PropertyFilter.eq(PROPERTY_COUNTER_ID, counterId))
         .build(), entity -> shards.add(entity.getKey()));
 
+    // this is a safe guard to not to exceed max number of entities in one batch write
+    // because in practice number of shards is much smaller
     for (List<Key> batch : Lists.partition(shards, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_WRITE)) {
       storeWithRetries(() -> {
         datastore.delete(batch.toArray(new Key[0]));
@@ -962,13 +964,6 @@ public class DatastoreStorage implements Closeable {
     } else {
       return limitEntity.getLong(PROPERTY_LIMIT);
     }
-  }
-
-  void updateLimitForCounter(String counterId, long limit) throws IOException {
-    storeWithRetries(() -> runInTransaction(tx -> {
-      tx.updateLimitForCounter(counterId, limit);
-      return null;
-    }));
   }
 
   private <T> CompletableFuture<T> asyncIO(IOOperation<T> f) {
