@@ -215,7 +215,7 @@ public class AggregateStorage implements Storage {
 
   @Override
   public void storeResource(Resource resource) throws IOException {
-    datastoreStorage.postResource(resource);
+    datastoreStorage.storeResource(resource);
   }
 
   @Override

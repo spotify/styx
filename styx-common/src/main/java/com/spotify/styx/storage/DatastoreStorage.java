@@ -732,7 +732,7 @@ public class DatastoreStorage implements Closeable {
     return Optional.of(entityToResource(entity));
   }
 
-  void postResource(Resource resource) throws IOException {
+  void storeResource(Resource resource) throws IOException {
     storeWithRetries(() -> runInTransaction(transaction -> {
       transaction.store(resource);
       return null;
