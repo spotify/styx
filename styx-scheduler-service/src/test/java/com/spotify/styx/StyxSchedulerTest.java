@@ -65,15 +65,17 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.function.Supplier;
+import junitparams.JUnitParamsRunner;
+import junitparams.Parameters;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.MockitoAnnotations;
 
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(JUnitParamsRunner.class)
 public class StyxSchedulerTest {
 
   @Captor private ArgumentCaptor<io.fabric8.kubernetes.client.Config> k8sClientConfigCaptor;
@@ -97,6 +99,7 @@ public class StyxSchedulerTest {
 
   @Before
   public void setUp() throws Exception {
+    MockitoAnnotations.initMocks(this);
     when(kubernetesClientFactory.apply(any())).thenReturn(kubernetesClient);
     when(gkeClient.projects().locations().clusters().get(any())).thenReturn(gkeClusterGet);
 
@@ -104,20 +107,29 @@ public class StyxSchedulerTest {
   }
 
   @Test
-  public void testGetKubernetesClient() throws Exception {
+  @Parameters({"4711", ""})
+  public void testGetKubernetesClient(String k8sRequestTimeoutConfig) throws Exception {
 
     final String project = "test-project";
     final String zone = "test-zone";
     final String cluster = "test-cluster";
     final String namespace = "test-namespace";
-    final int k8sRequestTimeout = 4711;
 
-    final Config config = ConfigFactory.parseMap(ImmutableMap.of(
-        "styx.gke.foo.project-id", project,
-        "styx.gke.foo.cluster-zone", zone,
-        "styx.gke.foo.cluster-id", cluster,
-        "styx.gke.foo.namespace", namespace,
-        "styx.k8s.request-timeout", k8sRequestTimeout));
+    final ImmutableMap.Builder<String, String> configMap = ImmutableMap.<String, String>builder()
+        .put("styx.gke.foo.project-id", project)
+        .put("styx.gke.foo.cluster-zone", zone)
+        .put("styx.gke.foo.cluster-id", cluster)
+        .put("styx.gke.foo.namespace", namespace);
+
+    final int expectedK8sRequestTimeout;
+    if (!k8sRequestTimeoutConfig.isEmpty()) {
+      configMap.put("styx.k8s.request-timeout", k8sRequestTimeoutConfig);
+      expectedK8sRequestTimeout = Integer.parseInt(k8sRequestTimeoutConfig);
+    } else {
+      expectedK8sRequestTimeout = StyxScheduler.DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS;
+    }
+
+    final Config config = ConfigFactory.parseMap(configMap.build());
 
     final String endpoint = "k8s.example.com:4711";
     final String clusterCaCertificate = "cluster-ca-cert";
@@ -148,7 +160,7 @@ public class StyxSchedulerTest {
     assertThat(k8sConfig.getClientCertData(), is(clientCertificate));
     assertThat(k8sConfig.getClientKeyData(), is(clientKey));
     assertThat(k8sConfig.getNamespace(), is(namespace));
-    assertThat(k8sConfig.getRequestTimeout(), is(k8sRequestTimeout));
+    assertThat(k8sConfig.getRequestTimeout(), is(expectedK8sRequestTimeout));
   }
 
   @Test
