@@ -110,12 +110,14 @@ public class StyxSchedulerTest {
     final String zone = "test-zone";
     final String cluster = "test-cluster";
     final String namespace = "test-namespace";
+    final int k8sRequestTimeout = 4711;
 
     final Config config = ConfigFactory.parseMap(ImmutableMap.of(
         "styx.gke.foo.project-id", project,
         "styx.gke.foo.cluster-zone", zone,
         "styx.gke.foo.cluster-id", cluster,
-        "styx.gke.foo.namespace", namespace));
+        "styx.gke.foo.namespace", namespace,
+        "styx.k8s.request-timeout", k8sRequestTimeout));
 
     final String endpoint = "k8s.example.com:4711";
     final String clusterCaCertificate = "cluster-ca-cert";
@@ -146,6 +148,7 @@ public class StyxSchedulerTest {
     assertThat(k8sConfig.getClientCertData(), is(clientCertificate));
     assertThat(k8sConfig.getClientKeyData(), is(clientKey));
     assertThat(k8sConfig.getNamespace(), is(namespace));
+    assertThat(k8sConfig.getRequestTimeout(), is(k8sRequestTimeout));
   }
 
   @Test
