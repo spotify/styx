@@ -768,7 +768,10 @@ public class DatastoreStorage implements Closeable {
         .build(), entity -> shards.add(entity.getKey()));
 
     for (List<Key> batch : Lists.partition(shards, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_WRITE)) {
-      datastore.delete(batch.toArray(new Key[0]));
+      storeWithRetries(() -> {
+        datastore.delete(batch.toArray(new Key[0]));
+        return null;
+      });
     }
   }
 
