@@ -21,6 +21,9 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.model.Schedule.DAYS;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.theInstance;
 import static org.junit.Assert.assertThat;
@@ -39,6 +42,7 @@ import com.google.api.services.container.v1beta1.model.Cluster;
 import com.google.api.services.container.v1beta1.model.MasterAuth;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.Resources;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.StyxScheduler.KubernetesClientFactory;
 import com.spotify.styx.model.Resource;
@@ -68,6 +72,7 @@ import java.util.Map;
 import java.util.function.Supplier;
 import okhttp3.ConnectionPool;
 import okhttp3.OkHttpClient;
+import okhttp3.Protocol;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -121,10 +126,11 @@ public class StyxSchedulerTest {
         "styx.gke.foo.cluster-id", cluster,
         "styx.gke.foo.namespace", namespace));
 
+
     final String endpoint = "k8s.example.com:4711";
-    final String clusterCaCertificate = "cluster-ca-cert";
-    final String clientCertificate = "client-cert";
-    final String clientKey = "client-key";
+    final String clusterCaCertificate = Resources.toString(Resources.getResource("ca.crt"), UTF_8);
+    final String clientCertificate = Resources.toString(Resources.getResource("client.crt"), UTF_8);
+    final String clientKey = Resources.toString(Resources.getResource("client.key"), UTF_8);
 
     final Cluster gkeCluster = new Cluster();
     gkeCluster.setEndpoint(endpoint);
@@ -152,13 +158,14 @@ public class StyxSchedulerTest {
     assertThat(k8sConfig.getClientKeyData(), is(clientKey));
     assertThat(k8sConfig.getNamespace(), is(namespace));
 
-    final Field maxIdleConnections = ConnectionPool.class.getDeclaredField("maxIdleConnections");
-    maxIdleConnections.setAccessible(true);
-    final Field keepAliveDurationNs = ConnectionPool.class.getDeclaredField("keepAliveDurationNs");
-    keepAliveDurationNs.setAccessible(true);
+    assertThat(httpClient.protocols(), contains(Protocol.HTTP_1_1));
 
-    assertThat(keepAliveDurationNs.get(httpClient.connectionPool()), is(0L));
+    final Field maxIdleConnections = ConnectionPool.class.getDeclaredField("maxIdleConnections");
+    final Field keepAliveDurationNs = ConnectionPool.class.getDeclaredField("keepAliveDurationNs");
+    maxIdleConnections.setAccessible(true);
+    keepAliveDurationNs.setAccessible(true);
     assertThat(maxIdleConnections.get(httpClient.connectionPool()), is(0));
+    assertThat(keepAliveDurationNs.get(httpClient.connectionPool()), is(SECONDS.toNanos(1L)));
   }
 
   @Test

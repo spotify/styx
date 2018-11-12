@@ -768,7 +768,7 @@ public class StyxScheduler implements AppInit {
           .build();
 
       final OkHttpClient httpClient = HttpClientUtils.createHttpClient(kubeConfig).newBuilder()
-          .connectionPool(new ConnectionPool(0, 0, SECONDS))
+          .connectionPool(new ConnectionPool(0, 1, SECONDS))
           .protocols(Collections.singletonList(Protocol.HTTP_1_1))
           .build();
 
