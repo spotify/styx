@@ -30,6 +30,7 @@ import static com.spotify.styx.util.GuardedRunnable.runGuarded;
 import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
@@ -104,6 +105,7 @@ import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorServic
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
+import io.fabric8.kubernetes.client.utils.HttpClientUtils;
 import io.opencensus.common.Scope;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
@@ -113,6 +115,7 @@ import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -127,6 +130,9 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import okhttp3.ConnectionPool;
+import okhttp3.OkHttpClient;
+import okhttp3.Protocol;
 import org.apache.hadoop.hbase.client.Connection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -761,7 +767,12 @@ public class StyxScheduler implements AppInit {
           .withNamespace(config.getString(GKE_CLUSTER_NAMESPACE))
           .build();
 
-      return clientFactory.apply(kubeConfig);
+      final OkHttpClient httpClient = HttpClientUtils.createHttpClient(kubeConfig).newBuilder()
+          .connectionPool(new ConnectionPool(0, 0, SECONDS))
+          .protocols(Collections.singletonList(Protocol.HTTP_1_1))
+          .build();
+
+      return clientFactory.apply(httpClient, kubeConfig);
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
@@ -773,5 +784,5 @@ public class StyxScheduler implements AppInit {
   }
 
   interface KubernetesClientFactory
-      extends Function<io.fabric8.kubernetes.client.Config, NamespacedKubernetesClient> { }
+      extends BiFunction<OkHttpClient, io.fabric8.kubernetes.client.Config, NamespacedKubernetesClient> { }
 }
