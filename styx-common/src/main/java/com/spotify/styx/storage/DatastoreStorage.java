@@ -754,10 +754,10 @@ public class DatastoreStorage implements Closeable {
    * deletion of shards is done in batches of 25 shards.
    */
   void deleteResource(String id) throws IOException {
-    storeWithRetries(() -> runInTransaction(tx -> {
-      tx.deleteCounterLimit(id);
+    storeWithRetries(() -> {
+      datastore.delete(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(id));
       return null;
-    }));
+    });
     deleteShardsForCounter(id);
   }
 
@@ -769,10 +769,7 @@ public class DatastoreStorage implements Closeable {
         .build(), entity -> shards.add(entity.getKey()));
 
     for (List<Key> batch : Lists.partition(shards, MAX_NUMBER_OF_ENTITY_GROUPS_IN_ONE_TRANSACTION)) {
-      storeWithRetries(() -> runInTransaction(transaction -> {
-        datastore.delete(batch.toArray(new Key[0]));
-        return null;
-      }));
+      datastore.delete(batch.toArray(new Key[0]));
     }
   }
 
