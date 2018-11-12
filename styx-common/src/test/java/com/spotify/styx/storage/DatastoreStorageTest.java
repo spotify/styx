@@ -26,7 +26,6 @@ import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_ALL_TRIGGERED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_COMPONENT;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONCURRENCY;
-import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_END;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_HALTED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_TRIGGER;
@@ -519,16 +518,6 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void getsResourcesSyncEnabled() throws IOException {
-    Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
-        .set(PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED, true)
-        .build();
-    helper.getOptions().getService().put(config);
-
-    assertThat(storage.config().resourcesSyncEnabled(), is(true));
-  }
-
-  @Test
   public void shouldReturnEmptyClientBlacklist() throws IOException {
     Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
@@ -650,7 +639,6 @@ public class DatastoreStorageTest {
         .globalDockerRunnerId("default")
         .globalEnabled(true)
         .debugEnabled(false)
-        .resourcesSyncEnabled(false)
         .executionGatingEnabled(false)
         .build();
 

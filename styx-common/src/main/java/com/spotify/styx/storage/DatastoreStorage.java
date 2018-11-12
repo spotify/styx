@@ -129,7 +129,6 @@ public class DatastoreStorage implements Closeable {
   public static final String PROPERTY_CONFIG_CLIENT_BLACKLIST = "clientBlacklist";
   public static final String PROPERTY_CONFIG_EXECUTION_GATING_ENABLED = "executionGatingEnabled";
   public static final String PROPERTY_CONFIG_DEBUG_ENABLED = "debug";
-  public static final String PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED = "resourcesSyncEnabled";
 
   public static final String PROPERTY_WORKFLOW_JSON = "json";
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
@@ -173,7 +172,6 @@ public class DatastoreStorage implements Closeable {
   public static final boolean DEFAULT_WORKFLOW_ENABLED = false;
   public static final boolean DEFAULT_CONFIG_DEBUG_ENABLED = false;
   public static final boolean DEFAULT_CONFIG_EXECUTION_GATING_ENABLED = false;
-  public static final boolean DEFAULT_CONFIG_RESOURCES_SYNC_ENABLED = false;
   private static final boolean DEFAULT_CONFIG_BOOTSTRAP_ACTIVE_WFI_ENABLED = false;
 
   public static final int ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS = 128;
@@ -223,8 +221,6 @@ public class DatastoreStorage implements Closeable {
         .globalConcurrency(readOpt(entity, PROPERTY_CONFIG_CONCURRENCY))
         .globalEnabled(read(entity, PROPERTY_CONFIG_ENABLED, DEFAULT_CONFIG_ENABLED))
         .debugEnabled(read(entity, PROPERTY_CONFIG_DEBUG_ENABLED, DEFAULT_CONFIG_DEBUG_ENABLED))
-        .resourcesSyncEnabled(read(entity, PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED,
-            DEFAULT_CONFIG_RESOURCES_SYNC_ENABLED))
         .submissionRateLimit(readOpt(entity, PROPERTY_SUBMISSION_RATE_LIMIT))
         .globalDockerRunnerId(
             read(entity, PROPERTY_CONFIG_DOCKER_RUNNER_ID, DEFAULT_CONFIG_DOCKER_RUNNER_ID))
