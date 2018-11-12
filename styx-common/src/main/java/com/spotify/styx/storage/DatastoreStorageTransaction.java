@@ -139,11 +139,6 @@ public class DatastoreStorageTransaction implements StorageTransaction {
     tx.put(resourceToEntity(tx.getDatastore(), resource));
   }
 
-  @Override
-  public void deleteCounterLimit(String counterId) throws IOException {
-    tx.delete(tx.getDatastore().newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId));
-  }
-
   private Entity resourceToEntity(CheckedDatastore datastore, Resource resource) {
     final Key key = datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(resource.id());
     return Entity.newBuilder(key)
