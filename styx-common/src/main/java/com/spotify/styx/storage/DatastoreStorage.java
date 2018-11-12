@@ -180,7 +180,6 @@ public class DatastoreStorage implements Closeable {
   public static final int MAX_RETRIES = 100;
   public static final int MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ = 1000;
   public static final int MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_WRITE = 500;
-  private static final int MAX_NUMBER_OF_ENTITY_GROUPS_IN_ONE_TRANSACTION = 25;
 
   private static final int REQUEST_CONCURRENCY = 32;
 
@@ -768,7 +767,7 @@ public class DatastoreStorage implements Closeable {
         .setFilter(PropertyFilter.eq(PROPERTY_COUNTER_ID, counterId))
         .build(), entity -> shards.add(entity.getKey()));
 
-    for (List<Key> batch : Lists.partition(shards, MAX_NUMBER_OF_ENTITY_GROUPS_IN_ONE_TRANSACTION)) {
+    for (List<Key> batch : Lists.partition(shards, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_WRITE)) {
       datastore.delete(batch.toArray(new Key[0]));
     }
   }
