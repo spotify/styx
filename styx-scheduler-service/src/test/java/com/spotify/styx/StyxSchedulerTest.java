@@ -146,6 +146,7 @@ public class StyxSchedulerTest {
     assertThat(k8sConfig.getClientCertData(), is(clientCertificate));
     assertThat(k8sConfig.getClientKeyData(), is(clientKey));
     assertThat(k8sConfig.getNamespace(), is(namespace));
+    assertThat(k8sConfig.getWebsocketPingInterval(), is(StyxScheduler.KUBERNETES_CLIENT_PING_INTERVAL_MILLIS));
   }
 
   @Test
