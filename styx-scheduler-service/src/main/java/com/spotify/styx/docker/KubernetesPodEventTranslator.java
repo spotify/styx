@@ -69,7 +69,9 @@ final class KubernetesPodEventTranslator {
     final ContainerStateTerminated terminated = status.getState().getTerminated();
 
     // Check termination log exit code, if available
-    if ("true".equals(pod.getMetadata().getAnnotations().get(DOCKER_TERMINATION_LOGGING_ANNOTATION))) {
+    if (Optional.ofNullable(pod.getMetadata().getAnnotations())
+        .map(annotations -> "true".equals(annotations.get(DOCKER_TERMINATION_LOGGING_ANNOTATION)))
+        .orElse(false)) {
       if (terminated.getMessage() == null) {
         LOG.warn("Missing termination log message for workflow instance {} container {}",
                  workflowInstance, status.getContainerID());

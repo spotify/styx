@@ -539,10 +539,10 @@ class KubernetesDockerRunner implements DockerRunner {
         runState.state().equals(RUNNING) && runState.data().executionId().isPresent());
 
     final Set<WorkflowInstance> workflowInstancesForPods = podList.getItems().stream()
-        .filter(pod -> pod.getMetadata().getAnnotations()
-            .containsKey(STYX_WORKFLOW_INSTANCE_ANNOTATION))
-        .map(pod -> WorkflowInstance
-            .parseKey(pod.getMetadata().getAnnotations().get(STYX_WORKFLOW_INSTANCE_ANNOTATION)))
+        .map(pod -> pod.getMetadata().getAnnotations())
+        .filter(Objects::nonNull)
+        .filter(annotations -> annotations.containsKey(STYX_WORKFLOW_INSTANCE_ANNOTATION))
+        .map(annotations -> WorkflowInstance.parseKey(annotations.get(STYX_WORKFLOW_INSTANCE_ANNOTATION)))
         .collect(toSet());
 
     // Emit errors for workflow instances that seem to be missing its pod
@@ -609,7 +609,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private static Optional<WorkflowInstance> readPodWorkflowInstance(Pod pod) {
     final Map<String, String> annotations = pod.getMetadata().getAnnotations();
     final String podName = pod.getMetadata().getName();
-    if (!annotations.containsKey(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION)) {
+    if (annotations == null || !annotations.containsKey(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION)) {
       LOG.warn("[AUDIT] Got pod without workflow instance annotation {}", podName);
       return Optional.empty();
     }
@@ -674,8 +674,9 @@ class KubernetesDockerRunner implements DockerRunner {
   private void logEvent(Watcher.Action action, Pod pod, String resourceVersion,
                         boolean polled) {
     final String podName = pod.getMetadata().getName();
-    final String workflowInstance = pod.getMetadata().getAnnotations()
-        .getOrDefault(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION, "N/A");
+    final String workflowInstance = Optional.ofNullable(pod.getMetadata().getAnnotations())
+        .map(annotations -> annotations.get(STYX_WORKFLOW_INSTANCE_ANNOTATION))
+        .orElse("N/A");
     final String status = readStatus(pod);
 
     LOG.info("{}Pod event for {} ({}) at resource version {}, action: {}, workflow instance: {}, status: {}",
