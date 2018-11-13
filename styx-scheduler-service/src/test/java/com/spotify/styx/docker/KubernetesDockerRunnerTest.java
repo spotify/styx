@@ -98,6 +98,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import javaslang.control.Try;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.After;
@@ -854,7 +855,7 @@ public class KubernetesDockerRunnerTest {
     when(namedPod.get()).thenReturn(pod);
     when(podList.getItems()).thenReturn(ImmutableList.of(pod));
 
-    kdr.tryPollPods();
+    assertThat(Try.run(() -> kdr.tryPollPods()).isSuccess(), is(true));
   }
 
   @Test
@@ -865,7 +866,7 @@ public class KubernetesDockerRunnerTest {
             ImmutableMap.of("name", "foobar")), Pod.class);
 
     final PodWatcher watcher = kdr.new PodWatcher();
-    watcher.eventReceived(Action.MODIFIED, pod);
+    assertThat(Try.run(() -> watcher.eventReceived(Action.MODIFIED, pod)).isSuccess(), is(true));
   }
 
   @Test
