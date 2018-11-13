@@ -30,6 +30,7 @@ import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminate
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminatedContainerState;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyListOf;
@@ -52,6 +53,7 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
+import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
@@ -836,6 +838,22 @@ public class KubernetesDockerRunnerTest {
     verify(stateManager, timeout(30_000)).receive(
         Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)),
         0);
+  }
+
+  @Test
+  public void shouldHandlePodWithoutAnnotationsWhenPolling()  {
+    // Create a pod instance with null `annotations` field - not possible through builder
+    final Pod pod = Json.OBJECT_MAPPER.convertValue(
+        ImmutableMap.of("metadata",
+            ImmutableMap.of("name", "foobar")), Pod.class);
+
+    assertThat(pod.getMetadata().getAnnotations(), is(nullValue()));
+
+    when(k8sClient.pods().withName("foobar")).thenReturn(namedPod);
+    when(namedPod.get()).thenReturn(pod);
+    when(podList.getItems()).thenReturn(ImmutableList.of(pod));
+
+    kdr.tryPollPods();
   }
 
   @Test
