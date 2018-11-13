@@ -49,6 +49,7 @@ import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.QuietDeterministicScheduler;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
+import com.spotify.styx.docker.KubernetesDockerRunner.PodWatcher;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
@@ -854,6 +855,17 @@ public class KubernetesDockerRunnerTest {
     when(podList.getItems()).thenReturn(ImmutableList.of(pod));
 
     kdr.tryPollPods();
+  }
+
+  @Test
+  public void shouldHandlePodWithoutAnnotationsWhenWatching()  {
+    // Create a pod instance with null `annotations` field - not possible through builder
+    final Pod pod = Json.OBJECT_MAPPER.convertValue(
+        ImmutableMap.of("metadata",
+            ImmutableMap.of("name", "foobar")), Pod.class);
+
+    final PodWatcher watcher = kdr.new PodWatcher();
+    watcher.eventReceived(Action.MODIFIED, pod);
   }
 
   @Test
