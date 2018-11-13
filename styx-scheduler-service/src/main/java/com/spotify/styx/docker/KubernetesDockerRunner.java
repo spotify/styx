@@ -541,8 +541,9 @@ class KubernetesDockerRunner implements DockerRunner {
     final Set<WorkflowInstance> workflowInstancesForPods = podList.getItems().stream()
         .map(pod -> pod.getMetadata().getAnnotations())
         .filter(Objects::nonNull)
-        .filter(annotations -> annotations.containsKey(STYX_WORKFLOW_INSTANCE_ANNOTATION))
-        .map(annotations -> WorkflowInstance.parseKey(annotations.get(STYX_WORKFLOW_INSTANCE_ANNOTATION)))
+        .map(annotations -> annotations.get(STYX_WORKFLOW_INSTANCE_ANNOTATION))
+        .filter(Objects::nonNull)
+        .map(WorkflowInstance::parseKey)
         .collect(toSet());
 
     // Emit errors for workflow instances that seem to be missing its pod
