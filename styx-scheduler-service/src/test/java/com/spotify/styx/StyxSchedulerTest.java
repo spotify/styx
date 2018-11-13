@@ -21,10 +21,11 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.model.Schedule.DAYS;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.theInstance;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
@@ -39,9 +40,9 @@ import com.google.api.services.container.v1beta1.model.Cluster;
 import com.google.api.services.container.v1beta1.model.MasterAuth;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.Resources;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.StyxScheduler.KubernetesClientFactory;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -54,7 +55,6 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
-import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
@@ -67,6 +67,8 @@ import java.util.Map;
 import java.util.function.Supplier;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
+import okhttp3.OkHttpClient;
+import okhttp3.Protocol;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -79,6 +81,7 @@ import org.mockito.MockitoAnnotations;
 public class StyxSchedulerTest {
 
   @Captor private ArgumentCaptor<io.fabric8.kubernetes.client.Config> k8sClientConfigCaptor;
+  @Captor private ArgumentCaptor<OkHttpClient> httpClientCaptor;
   @Captor private ArgumentCaptor<Shard> shardArgumentCaptor;
   @Captor private ArgumentCaptor<Gauge<Long>> longGaugeCaptor;
   @Captor private ArgumentCaptor<Gauge<Double>> doubleGaugeCaptor;
@@ -100,7 +103,7 @@ public class StyxSchedulerTest {
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
-    when(kubernetesClientFactory.apply(any())).thenReturn(kubernetesClient);
+    when(kubernetesClientFactory.apply(any(), any())).thenReturn(kubernetesClient);
     when(gkeClient.projects().locations().clusters().get(any())).thenReturn(gkeClusterGet);
 
     styxScheduler = StyxScheduler.newBuilder().build();
@@ -131,10 +134,11 @@ public class StyxSchedulerTest {
 
     final Config config = ConfigFactory.parseMap(configMap.build());
 
+
     final String endpoint = "k8s.example.com:4711";
-    final String clusterCaCertificate = "cluster-ca-cert";
-    final String clientCertificate = "client-cert";
-    final String clientKey = "client-key";
+    final String clusterCaCertificate = Resources.toString(Resources.getResource("ca.crt"), UTF_8);
+    final String clientCertificate = Resources.toString(Resources.getResource("client.crt"), UTF_8);
+    final String clientKey = Resources.toString(Resources.getResource("client.key"), UTF_8);
 
     final Cluster gkeCluster = new Cluster();
     gkeCluster.setEndpoint(endpoint);
@@ -151,9 +155,10 @@ public class StyxSchedulerTest {
         StyxScheduler.getKubernetesClient(config, "foo", gkeClient, kubernetesClientFactory);
     assertThat(client, is(theInstance(kubernetesClient)));
 
-    verify(kubernetesClientFactory).apply(k8sClientConfigCaptor.capture());
+    verify(kubernetesClientFactory).apply(httpClientCaptor.capture(), k8sClientConfigCaptor.capture());
 
     final io.fabric8.kubernetes.client.Config k8sConfig = k8sClientConfigCaptor.getValue();
+    final OkHttpClient httpClient = httpClientCaptor.getValue();
 
     assertThat(k8sConfig.getMasterUrl(), is("https://" + endpoint + "/"));
     assertThat(k8sConfig.getCaCertData(), is(clusterCaCertificate));
@@ -161,57 +166,8 @@ public class StyxSchedulerTest {
     assertThat(k8sConfig.getClientKeyData(), is(clientKey));
     assertThat(k8sConfig.getNamespace(), is(namespace));
     assertThat(k8sConfig.getRequestTimeout(), is(expectedK8sRequestTimeout));
-  }
 
-  @Test
-  public void shouldUpdateShardsAccordingToUsedResources() throws Exception {
-    when(storage.runInTransaction(any())).thenAnswer(
-        a -> a.<TransactionFunction>getArgument(0).apply(transaction));
-    final Map<String, Long> resourcesUsageMap = ImmutableMap.of("res1", 257L);
-
-    styxScheduler.updateShards(storage, resourcesUsageMap);
-
-    verify(transaction, times(128)).store(shardArgumentCaptor.capture());
-    shardsWithValue(shardArgumentCaptor, 3L, 1L);
-    shardsWithValue(shardArgumentCaptor, 2L, 127L);
-  }
-
-  @Test
-  public void shouldFailToUpdateShardsAccordingToUsedResources() throws Exception {
-    final IOException exception = new IOException();
-    when(storage.runInTransaction(any())).thenThrow(exception);
-    final Map<String, Long> resourcesUsageMap = ImmutableMap.of("res1", 257L);
-
-    try {
-      styxScheduler.updateShards(storage, resourcesUsageMap);
-      fail();
-    } catch (Exception e) {
-      assertThat(e.getCause(), is(exception));
-    }
-  }
-
-  @Test
-  public void shouldResetShardsOfResource() throws Exception {
-    when(storage.runInTransaction(any())).thenAnswer(
-        a -> a.<TransactionFunction>getArgument(0).apply(transaction));
-
-    styxScheduler.resetShards(storage, Resource.create("res1", 300));
-
-    verify(transaction, times(128)).store(shardArgumentCaptor.capture());
-    shardsWithValue(shardArgumentCaptor, 0L, 128);
-  }
-
-  @Test
-  public void shouldFailToResetShardsOfResource() throws Exception {
-    final IOException exception = new IOException();
-    when(storage.runInTransaction(any())).thenThrow(exception);
-
-    try {
-      styxScheduler.resetShards(storage, Resource.create("res1", 300));
-      fail();
-    } catch (Exception e) {
-      assertThat(e.getCause(), is(exception));
-    }
+    assertThat(httpClient.protocols(), contains(Protocol.HTTP_1_1));
   }
 
   @Test

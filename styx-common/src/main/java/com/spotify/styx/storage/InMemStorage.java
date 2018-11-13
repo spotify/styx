@@ -282,11 +282,6 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public void deleteShardsForCounter(String counterId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public long getLimitForCounter(String counterId) {
     throw new UnsupportedOperationException();
   }
@@ -295,16 +290,6 @@ public class InMemStorage implements Storage {
   public <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
       throws IOException, E {
     throw new UnsupportedOperationException("Unsupported Operation!");
-  }
-
-  @Override
-  public void deleteLimitForCounter(String counterId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void updateLimitForCounter(String counterId, long limit) throws IOException {
-    throw new UnsupportedOperationException();
   }
 
   @Override

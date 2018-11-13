@@ -120,7 +120,6 @@ public class DatastoreStorage implements Closeable {
   public static final String KIND_ACTIVE_WORKFLOW_INSTANCE = "ActiveWorkflowInstance";
   public static final String KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD = "ActiveWorkflowInstanceIndexShard";
   public static final String KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY = "ActiveWorkflowInstanceIndexShardEntry";
-  public static final String KIND_RESOURCE = "Resource";
   public static final String KIND_BACKFILL = "Backfill";
 
   public static final String PROPERTY_CONFIG_ENABLED = "enabled";
@@ -129,7 +128,6 @@ public class DatastoreStorage implements Closeable {
   public static final String PROPERTY_CONFIG_CLIENT_BLACKLIST = "clientBlacklist";
   public static final String PROPERTY_CONFIG_EXECUTION_GATING_ENABLED = "executionGatingEnabled";
   public static final String PROPERTY_CONFIG_DEBUG_ENABLED = "debug";
-  public static final String PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED = "resourcesSyncEnabled";
 
   public static final String PROPERTY_WORKFLOW_JSON = "json";
   public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
@@ -173,7 +171,6 @@ public class DatastoreStorage implements Closeable {
   public static final boolean DEFAULT_WORKFLOW_ENABLED = false;
   public static final boolean DEFAULT_CONFIG_DEBUG_ENABLED = false;
   public static final boolean DEFAULT_CONFIG_EXECUTION_GATING_ENABLED = false;
-  public static final boolean DEFAULT_CONFIG_RESOURCES_SYNC_ENABLED = false;
   private static final boolean DEFAULT_CONFIG_BOOTSTRAP_ACTIVE_WFI_ENABLED = false;
 
   public static final int ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS = 128;
@@ -223,8 +220,6 @@ public class DatastoreStorage implements Closeable {
         .globalConcurrency(readOpt(entity, PROPERTY_CONFIG_CONCURRENCY))
         .globalEnabled(read(entity, PROPERTY_CONFIG_ENABLED, DEFAULT_CONFIG_ENABLED))
         .debugEnabled(read(entity, PROPERTY_CONFIG_DEBUG_ENABLED, DEFAULT_CONFIG_DEBUG_ENABLED))
-        .resourcesSyncEnabled(read(entity, PROPERTY_CONFIG_RESOURCES_SYNC_ENABLED,
-            DEFAULT_CONFIG_RESOURCES_SYNC_ENABLED))
         .submissionRateLimit(readOpt(entity, PROPERTY_SUBMISSION_RATE_LIMIT))
         .globalDockerRunnerId(
             read(entity, PROPERTY_CONFIG_DOCKER_RUNNER_ID, DEFAULT_CONFIG_DOCKER_RUNNER_ID))
@@ -725,36 +720,61 @@ public class DatastoreStorage implements Closeable {
   }
 
   Optional<Resource> getResource(String id) throws IOException {
-    Entity entity = datastore.get(datastore.newKeyFactory().setKind(KIND_RESOURCE).newKey(id));
+    Entity entity = datastore.get(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(id));
     if (entity == null) {
       return Optional.empty();
     }
     return Optional.of(entityToResource(entity));
   }
 
-  void postResource(Resource resource) throws IOException {
+  void storeResource(Resource resource) throws IOException {
     storeWithRetries(() -> runInTransaction(transaction -> {
       transaction.store(resource);
       return null;
-      // TODO store just in one place, eliminate one of the two calls ^?
     }));
   }
 
   List<Resource> getResources() throws IOException {
-    final EntityQuery query = Query.newEntityQueryBuilder().setKind(KIND_RESOURCE).build();
+    final EntityQuery query = Query.newEntityQueryBuilder().setKind(KIND_COUNTER_LIMIT).build();
     final List<Resource> resources = Lists.newArrayList();
     datastore.query(query, entity ->
         resources.add(entityToResource(entity)));
     return resources;
   }
 
-  private Resource entityToResource(Entity entity) {
-    return Resource.create(entity.getKey().getName(), entity.getLong(PROPERTY_CONCURRENCY));
+  /**
+   * Delete resource by id. Deletes both counter shards and counter limit if it exists.
+   *
+   * <p>Due to Datastore limitations (modify max 25 entity groups per transaction),
+   * we cannot do everything in one transaction.
+   */
+  void deleteResource(String id) throws IOException {
+    storeWithRetries(() -> {
+      datastore.delete(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(id));
+      return null;
+    });
+    deleteShardsForCounter(id);
   }
 
-  void deleteResource(String id) throws IOException {
-    final Key key = datastore.newKeyFactory().setKind(KIND_RESOURCE).newKey(id);
-    datastore.delete(key);
+  private void deleteShardsForCounter(String counterId) throws IOException {
+    final List<Key> shards = new ArrayList<>();
+    datastore.query(EntityQuery.newEntityQueryBuilder()
+        .setKind(KIND_COUNTER_SHARD)
+        .setFilter(PropertyFilter.eq(PROPERTY_COUNTER_ID, counterId))
+        .build(), entity -> shards.add(entity.getKey()));
+
+    // this is a safe guard to not to exceed max number of entities in one batch write
+    // because in practice number of shards is much smaller
+    for (List<Key> batch : Lists.partition(shards, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_WRITE)) {
+      storeWithRetries(() -> {
+        datastore.delete(batch.toArray(new Key[0]));
+        return null;
+      });
+    }
+  }
+
+  private Resource entityToResource(Entity entity) {
+    return Resource.create(entity.getKey().getName(), entity.getLong(PROPERTY_LIMIT));
   }
 
   Optional<Backfill> getBackfill(String id) throws IOException {
@@ -940,33 +960,6 @@ public class DatastoreStorage implements Closeable {
     } else {
       return limitEntity.getLong(PROPERTY_LIMIT);
     }
-  }
-
-  void deleteShardsForCounter(String counterId) throws IOException {
-    final List<Key> shards = new ArrayList<>();
-    datastore.query(EntityQuery.newEntityQueryBuilder()
-        .setKind(KIND_COUNTER_SHARD)
-        .setFilter(PropertyFilter.eq(PROPERTY_COUNTER_ID, counterId))
-        .build(), entity -> shards.add(entity.getKey()));
-
-    // remove max 25 entities per transaction
-    for (List<Key> batch : Lists.partition(shards, 25)) {
-      datastore.delete(batch.toArray(new Key[0]));
-    }
-  }
-
-  void deleteLimitForCounter(String counterId) throws IOException {
-    storeWithRetries(() -> runInTransaction(tx -> {
-      tx.deleteCounterLimit(counterId);
-      return null;
-    }));
-  }
-
-  void updateLimitForCounter(String counterId, long limit) throws IOException {
-    storeWithRetries(() -> runInTransaction(tx -> {
-      tx.updateLimitForCounter(counterId, limit);
-      return null;
-    }));
   }
 
   private <T> CompletableFuture<T> asyncIO(IOOperation<T> f) {

@@ -289,7 +289,6 @@ public class StyxSchedulerServiceFixture {
 
   void givenResource(Resource resource) throws IOException {
     storage.storeResource(resource);
-    storage.updateLimitForCounter(resource.id(), resource.concurrency());
   }
 
   void givenResourceIdsToDecorateWith(Set<String> resourceIds) throws IOException {
