@@ -67,7 +67,6 @@ public class ShardedCounter {
   public static final String PROPERTY_SHARD_INDEX = "index";
   public static final String PROPERTY_COUNTER_ID = "counterId";
 
-  private final Storage storage;
   private final Stats stats;
   /**
    * A weakly consistent view of the state in Datastore, refreshed by ShardedCounter on demand.
@@ -175,8 +174,7 @@ public class ShardedCounter {
     }
   }
 
-  public ShardedCounter(Storage storage, Stats stats, CounterSnapshotFactory counterSnapshotFactory) {
-    this.storage = Objects.requireNonNull(storage);
+  public ShardedCounter(Stats stats, CounterSnapshotFactory counterSnapshotFactory) {
     this.stats = Objects.requireNonNull(stats);
     this.counterSnapshotFactory = Objects.requireNonNull(counterSnapshotFactory);
   }
@@ -315,22 +313,5 @@ public class ShardedCounter {
    */
   public long getCounter(String counterId) throws IOException {
     return getCounterSnapshot(counterId).getTotalUsage();
-  }
-
-  /**
-   * Delete counter by counterId. Deletes both counter shards and counter limit if it exists.
-   *
-   * <p>Due to Datastore limitations (modify max 25 entity groups per transaction),
-   * deletion of shards is done in batches of 25 shards.
-   *
-   * <p>Behaviour is best-effort and non-determined if other instances try to access the same counter in the meantime.
-   * Best results are achieved if all usages of the given resource - which the counter is associated with -
-   * are removed before calling deleteCounter. This is so, in order to avoid a scenario where one instance
-   * is trying to delete all shards, while another is creating/updating shards in between the
-   * multiple transactions made by this method.
-   */
-  public void deleteCounter(String counterId) throws IOException {
-    storage.deleteShardsForCounter(counterId);
-    storage.deleteLimitForCounter(counterId);
   }
 }

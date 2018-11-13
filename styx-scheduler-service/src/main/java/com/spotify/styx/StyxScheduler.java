@@ -346,7 +346,7 @@ public class StyxScheduler implements AppInit {
     closer.register(storage);
 
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
-    final ShardedCounter shardedCounter = new ShardedCounter(storage, stats, counterSnapshotFactory);
+    final ShardedCounter shardedCounter = new ShardedCounter(stats, counterSnapshotFactory);
 
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);

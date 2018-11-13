@@ -163,9 +163,4 @@ public interface StorageTransaction {
    * Stores a resource
    */
   void store(Resource resource) throws IOException;
-
-  /**
-   * Deletes the limit configured for the given counter
-   */
-  void deleteCounterLimit(String counterId) throws IOException;
 }
