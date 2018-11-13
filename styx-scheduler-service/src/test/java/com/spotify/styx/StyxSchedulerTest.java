@@ -21,6 +21,8 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.model.Schedule.DAYS;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.theInstance;
 import static org.junit.Assert.assertThat;
@@ -38,6 +40,7 @@ import com.google.api.services.container.v1beta1.model.Cluster;
 import com.google.api.services.container.v1beta1.model.MasterAuth;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.Resources;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.StyxScheduler.KubernetesClientFactory;
 import com.spotify.styx.model.Workflow;
@@ -62,6 +65,8 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.function.Supplier;
+import okhttp3.OkHttpClient;
+import okhttp3.Protocol;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -74,6 +79,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 public class StyxSchedulerTest {
 
   @Captor private ArgumentCaptor<io.fabric8.kubernetes.client.Config> k8sClientConfigCaptor;
+  @Captor private ArgumentCaptor<OkHttpClient> httpClientCaptor;
   @Captor private ArgumentCaptor<Shard> shardArgumentCaptor;
   @Captor private ArgumentCaptor<Gauge<Long>> longGaugeCaptor;
   @Captor private ArgumentCaptor<Gauge<Double>> doubleGaugeCaptor;
@@ -94,7 +100,7 @@ public class StyxSchedulerTest {
 
   @Before
   public void setUp() throws Exception {
-    when(kubernetesClientFactory.apply(any())).thenReturn(kubernetesClient);
+    when(kubernetesClientFactory.apply(any(), any())).thenReturn(kubernetesClient);
     when(gkeClient.projects().locations().clusters().get(any())).thenReturn(gkeClusterGet);
 
     styxScheduler = StyxScheduler.newBuilder().build();
@@ -114,10 +120,11 @@ public class StyxSchedulerTest {
         "styx.gke.foo.cluster-id", cluster,
         "styx.gke.foo.namespace", namespace));
 
+
     final String endpoint = "k8s.example.com:4711";
-    final String clusterCaCertificate = "cluster-ca-cert";
-    final String clientCertificate = "client-cert";
-    final String clientKey = "client-key";
+    final String clusterCaCertificate = Resources.toString(Resources.getResource("ca.crt"), UTF_8);
+    final String clientCertificate = Resources.toString(Resources.getResource("client.crt"), UTF_8);
+    final String clientKey = Resources.toString(Resources.getResource("client.key"), UTF_8);
 
     final Cluster gkeCluster = new Cluster();
     gkeCluster.setEndpoint(endpoint);
@@ -134,15 +141,18 @@ public class StyxSchedulerTest {
         StyxScheduler.getKubernetesClient(config, "foo", gkeClient, kubernetesClientFactory);
     assertThat(client, is(theInstance(kubernetesClient)));
 
-    verify(kubernetesClientFactory).apply(k8sClientConfigCaptor.capture());
+    verify(kubernetesClientFactory).apply(httpClientCaptor.capture(), k8sClientConfigCaptor.capture());
 
     final io.fabric8.kubernetes.client.Config k8sConfig = k8sClientConfigCaptor.getValue();
+    final OkHttpClient httpClient = httpClientCaptor.getValue();
 
     assertThat(k8sConfig.getMasterUrl(), is("https://" + endpoint + "/"));
     assertThat(k8sConfig.getCaCertData(), is(clusterCaCertificate));
     assertThat(k8sConfig.getClientCertData(), is(clientCertificate));
     assertThat(k8sConfig.getClientKeyData(), is(clientKey));
     assertThat(k8sConfig.getNamespace(), is(namespace));
+
+    assertThat(httpClient.protocols(), contains(Protocol.HTTP_1_1));
   }
 
   @Test
