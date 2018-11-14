@@ -23,12 +23,10 @@ package com.spotify.styx.docker;
 import static com.spotify.styx.docker.KubernetesDockerRunner.KEEPALIVE_CONTAINER_NAME;
 import static com.spotify.styx.docker.KubernetesDockerRunner.MAIN_CONTAINER_NAME;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
-import static java.util.Collections.emptyList;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.junit.Assert.assertThat;
 
-import com.google.common.collect.Lists;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
@@ -44,6 +42,7 @@ import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.ContainerStatusBuilder;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodStatus;
+import io.fabric8.kubernetes.api.model.PodStatusBuilder;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -372,7 +371,9 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   static PodStatus podStatusNoContainer(String phase) {
-    return new PodStatus(emptyList(), Lists.newArrayList(), "", "", phase, "", "", "");
+    return new PodStatusBuilder()
+        .withPhase(phase)
+        .build();
   }
 
   private Pod podWithTerminationLogging() {
