@@ -24,6 +24,7 @@ import com.google.api.client.auth.oauth2.RefreshTokenRequest;
 import com.google.api.client.auth.oauth2.TokenRequest;
 import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpTransport;
@@ -35,8 +36,11 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.Objects;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GoogleIdTokenAuth {
+  private static final Logger log = LoggerFactory.getLogger(GoogleIdToken.class);
   private static final JsonFactory JSON_FACTORY = Utils.getDefaultJsonFactory();
 
   private final HttpTransport httpTransport;
@@ -69,6 +73,7 @@ public class GoogleIdTokenAuth {
 
   private String getServiceAccountToken(GoogleCredential credential, String targetAudience)
       throws IOException, GeneralSecurityException {
+    log.debug("Fetching service account access token for {}", credential.getServiceAccountUser());
     final TokenRequest request = new TokenRequest(
         this.httpTransport, JSON_FACTORY,
         new GenericUrl(credential.getTokenServerEncodedUrl()),
@@ -101,6 +106,7 @@ public class GoogleIdTokenAuth {
   }
 
   private String getUserToken(GoogleCredential credential) throws IOException {
+    log.debug("fetching user access token");
     final TokenRequest request = new RefreshTokenRequest(
         this.httpTransport, JSON_FACTORY,
         new GenericUrl(credential.getTokenServerEncodedUrl()),

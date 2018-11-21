@@ -35,6 +35,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.spotify.logging.LoggingConfigurator;
+import com.spotify.logging.LoggingConfigurator.Level;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.ResourcesPayload;
@@ -83,6 +85,7 @@ import net.sourceforge.argparse4j.inf.Namespace;
 import net.sourceforge.argparse4j.inf.Subparser;
 import net.sourceforge.argparse4j.inf.Subparsers;
 import net.sourceforge.argparse4j.internal.HelpScreenException;
+import org.slf4j.LoggerFactory;
 
 public final class CliMain {
 
@@ -167,6 +170,12 @@ public final class CliMain {
     }
 
     final boolean debug = namespace.getBoolean(parser.debug.getDest());
+
+    if (debug) {
+      LoggingConfigurator.configureDefaults("styx-cli", Level.DEBUG);
+    } else {
+      LoggingConfigurator.configureNoLogging();
+    }
 
     new CliMain(parser, namespace, apiHost, cliOutput, cliContext, debug).run();
   }
