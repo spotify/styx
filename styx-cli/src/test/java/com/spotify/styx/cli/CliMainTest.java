@@ -43,6 +43,7 @@ import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.cli.CliExitException.ExitStatus;
 import com.spotify.styx.cli.CliMain.CliContext;
+import com.spotify.styx.cli.CliMain.CliContext.Output;
 import com.spotify.styx.client.ApiErrorException;
 import com.spotify.styx.client.ClientErrorException;
 import com.spotify.styx.client.StyxClient;
@@ -68,6 +69,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import javaslang.control.Try;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.hamcrest.Matchers;
@@ -122,7 +124,6 @@ public class CliMainTest {
     CliMain.run(cliContext, "workflow", "ls");
     verify(client).workflows();
     verify(cliOutput).printWorkflows(payload);
-
   }
 
   @Test
@@ -860,6 +861,53 @@ public class CliMainTest {
     CliMain.run(cliContext, "t", "foo", "bar", "2017-01-02", "--allow-future");
 
     verify(client).triggerWorkflowInstance("foo", "bar", "2017-01-02", expectedParameters, true);
+  }
+
+  @Test
+  @Parameters({
+      "--json workflow ls",
+      "workflow --json ls",
+      "workflow ls --json",
+  })
+  public void testJsonOptionIsGlobal(final String argLine) {
+    when(client.workflows()).thenReturn(CompletableFuture.completedFuture(Collections.emptyList()));
+    CliMain.run(cliContext, argLine.split(" "));
+    verify(cliContext).output(Output.JSON);
+  }
+
+  @Test
+  @Parameters({
+      "--plain workflow ls",
+      "workflow --plain ls",
+      "workflow ls --plain",
+  })
+  public void testPlainOptionIsGlobal(final String argLine) {
+    when(client.workflows()).thenReturn(CompletableFuture.completedFuture(Collections.emptyList()));
+    CliMain.run(cliContext, argLine.split(" "));
+    verify(cliContext).output(Output.PLAIN);
+  }
+
+  @Test
+  @Parameters({
+      "--debug workflow ls",
+      "workflow --debug ls",
+      "workflow ls --debug",
+  })
+  public void testDebugOptionIsGlobal(final String argLine) {
+    when(client.workflows()).thenReturn(CompletableFuture.completedFuture(Collections.emptyList()));
+    assertThat(Try.run(() -> CliMain.run(cliContext, argLine.split(" "))).isSuccess(), is(true));
+  }
+
+  @Test
+  @Parameters({
+      "--host https://foo.bar workflow ls",
+      "workflow --host https://foo.bar ls",
+      "workflow ls --host https://foo.bar",
+  })
+  public void testHostOptionIsGlobal(final String argLine) {
+    when(client.workflows()).thenReturn(CompletableFuture.completedFuture(Collections.emptyList()));
+    CliMain.run(cliContext, argLine.split(" "));
+    verify(cliContext).createClient("https://foo.bar");
   }
 
   private Path fileFromResource(String name) throws IOException {
