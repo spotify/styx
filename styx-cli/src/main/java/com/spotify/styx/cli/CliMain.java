@@ -851,7 +851,7 @@ public final class CliMain {
     }
 
     public Subparser parser(Subparsers subCommands, CliContext cliContext) {
-      Subparser subparser = addSubparser(subCommands, name().toLowerCase(), cliContext)
+      final Subparser subparser = addSubparser(subCommands, name().toLowerCase(), cliContext)
           .setDefault(COMMAND_DEST, this)
           .description(description)
           .help(description);
