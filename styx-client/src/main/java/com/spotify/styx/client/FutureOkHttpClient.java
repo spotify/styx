@@ -37,11 +37,15 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okio.ByteString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Wrap OkHttpClient and return a CompletionStage instead of having to pass callbacks.
  */
 class FutureOkHttpClient implements AutoCloseable {
+
+  private static final Logger log = LoggerFactory.getLogger(FutureOkHttpClient.class);
 
   private static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(10);
   private static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(90);
@@ -70,21 +74,32 @@ class FutureOkHttpClient implements AutoCloseable {
   }
 
   CompletionStage<Response> send(Request request) {
+    log.debug("{} {}", request.method(), request.url());
+    final long start = System.nanoTime();
+
     final CompletableFuture<Response> future = new CompletableFuture<>();
 
     client.newCall(request).enqueue(new Callback() {
       @Override
       public void onFailure(Call call, IOException e) {
+        log.debug("{} {}: failed (latency: {}s)", request.method(), request.url(), latency(start), e);
         future.completeExceptionally(e);
       }
 
       @Override
       public void onResponse(Call call, Response response) throws IOException {
+        log.debug("{} {}: {} {} (latency: {}s)", request.method(), request.url(), response.code(), response.message(),
+            latency(start));
         future.complete(response);
       }
     });
 
     return future;
+  }
+
+  private static String latency(long start) {
+    final long end = System.nanoTime();
+    return Long.toString(TimeUnit.NANOSECONDS.toSeconds(end - start));
   }
 
   private static Request internalForUri(HttpUrl uri, String method, ByteString payload) {
