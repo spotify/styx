@@ -35,7 +35,6 @@ import java.util.ArrayList;
 import java.util.Optional;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Answers;
 import org.mockito.Mock;
@@ -48,15 +47,10 @@ public class ServiceAccountUsageAuthorizerTest {
   private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
   private static final String SERVICE_ACCOUNT_PROJECT = "bar";
 
-  @Mock public final ExpectedException exception = ExpectedException.none();
-
   @Mock private GoogleIdToken idToken;
   @Mock private GoogleIdToken.Payload idTokenPayload;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private CloudResourceManager crm;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Iam iam;
-  @Mock private CloudResourceManager.Projects.List projectsList;
-  @Mock private CloudResourceManager.Projects.GetAncestry projectsGetAncestry;
-  @Mock private Iam.Projects.ServiceAccounts.Get serviceAccountsGet;
   private com.google.api.services.cloudresourcemanager.model.Policy projectPolicy;
   private com.google.api.services.cloudresourcemanager.model.Binding projectBinding;
   private com.google.api.services.iam.v1.model.Policy saPolicy;
