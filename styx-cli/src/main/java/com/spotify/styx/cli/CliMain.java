@@ -79,8 +79,10 @@ import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.inf.Argument;
 import net.sourceforge.argparse4j.inf.ArgumentAction;
+import net.sourceforge.argparse4j.inf.ArgumentGroup;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
+import net.sourceforge.argparse4j.inf.FeatureControl;
 import net.sourceforge.argparse4j.inf.Namespace;
 import net.sourceforge.argparse4j.inf.Subparser;
 import net.sourceforge.argparse4j.inf.Subparsers;
@@ -147,7 +149,7 @@ public final class CliMain {
 
     try {
       namespace = parser.parser.parseArgs(args.toArray(new String[0]));
-      apiHost = namespace.getString(parser.host.getDest());
+      apiHost = namespace.getString(parser.globalOptions.host.getDest());
       if (apiHost == null) {
         throw new ArgumentParserException("Styx API host not set", parser.parser);
       }
@@ -158,8 +160,8 @@ public final class CliMain {
       throw CliExitException.of(ExitStatus.ArgumentError);
     }
 
-    final boolean plainOutput = namespace.getBoolean(parser.plain.getDest());
-    final boolean jsonOutput = namespace.getBoolean(parser.json.getDest());
+    final boolean plainOutput = Objects.equals(namespace.getBoolean(parser.globalOptions.plain.getDest()), true);
+    final boolean jsonOutput = Objects.equals(namespace.getBoolean(parser.globalOptions.json.getDest()), true);
     final CliOutput cliOutput;
     if (jsonOutput) {
       cliOutput = cliContext.output(Output.JSON);
@@ -169,7 +171,7 @@ public final class CliMain {
       cliOutput = cliContext.output(Output.PRETTY);
     }
 
-    final boolean debug = namespace.getBoolean(parser.debug.getDest());
+    final boolean debug = Objects.equals(namespace.getBoolean(parser.globalOptions.debug.getDest()), true);
 
     if (debug) {
       LoggingConfigurator.configureDefaults("styx-cli", Level.DEBUG);
@@ -637,7 +639,15 @@ public final class CliMain {
                            + "` to check active workflow instances.");
   }
 
-  private static class StyxCliParser {
+  private static class ParserBase {
+    final CliContext cliContext;
+
+    protected ParserBase(CliContext cliContext) {
+      this.cliContext = cliContext;
+    }
+  }
+
+  private static class StyxCliParser extends ParserBase {
 
     final ArgumentParser parser = ArgumentParsers.newArgumentParser("styx")
         .description("Styx CLI")
@@ -648,10 +658,10 @@ public final class CliMain {
     final Subparsers subCommands = parser.addSubparsers().title("commands").metavar(" ");
 
     final Subparsers backfillParser =
-        Command.BACKFILL.parser(subCommands)
+        Command.BACKFILL.parser(subCommands, cliContext)
             .addSubparsers().title("commands").metavar(" ");
 
-    final Subparser backfillShow = BackfillCommand.SHOW.parser(backfillParser);
+    final Subparser backfillShow = BackfillCommand.SHOW.parser(backfillParser, cliContext);
     final Argument backfillShowId =
         backfillShow.addArgument("backfill").help("Backfill ID");
     final Argument backfillShowNoTruncate = backfillShow
@@ -660,18 +670,18 @@ public final class CliMain {
         .action(Arguments.storeTrue())
         .help("don't truncate output (only for pretty printing)");
 
-    final Subparser backfillEdit = BackfillCommand.EDIT.parser(backfillParser);
+    final Subparser backfillEdit = BackfillCommand.EDIT.parser(backfillParser, cliContext);
     final Argument backfillEditId =
         backfillEdit.addArgument("backfill").help("Backfill ID");
     final Argument backfillEditConcurrency =
         backfillEdit.addArgument("--concurrency").help("set the concurrency value for the backfill")
             .type(Integer.class);
 
-    final Subparser backfillHalt = BackfillCommand.HALT.parser(backfillParser);
+    final Subparser backfillHalt = BackfillCommand.HALT.parser(backfillParser, cliContext);
     final Argument backfillHaltId =
         backfillHalt.addArgument("backfill").help("Backfill ID");
 
-    final Subparser backfillList = BackfillCommand.LIST.parser(backfillParser);
+    final Subparser backfillList = BackfillCommand.LIST.parser(backfillParser, cliContext);
     final Argument backfillListWorkflow =
         backfillList.addArgument("-w", "--workflow").help("only show backfills for WORKFLOW");
     final Argument backfillListComponent =
@@ -687,7 +697,7 @@ public final class CliMain {
             .action(Arguments.storeTrue())
             .help("don't truncate output (only for pretty printing)");
 
-    final Subparser backfillCreate = BackfillCommand.CREATE.parser(backfillParser);
+    final Subparser backfillCreate = BackfillCommand.CREATE.parser(backfillParser, cliContext);
     final Argument backfillCreateComponent =
         backfillCreate.addArgument("component").help("Component ID");
     final Argument backfillCreateWorkflow =
@@ -713,14 +723,14 @@ public final class CliMain {
         .action(Arguments.storeTrue());
 
     final Subparsers resourceParser =
-        Command.RESOURCE.parser(subCommands)
+        Command.RESOURCE.parser(subCommands, cliContext)
             .addSubparsers().title("commands").metavar(" ");
 
-    final Subparser resourceShow = ResourceCommand.SHOW.parser(resourceParser);
+    final Subparser resourceShow = ResourceCommand.SHOW.parser(resourceParser, cliContext);
     final Argument resourceShowId =
         resourceShow.addArgument("id").help("Resource ID");
 
-    final Subparser resourceEdit = ResourceCommand.EDIT.parser(resourceParser);
+    final Subparser resourceEdit = ResourceCommand.EDIT.parser(resourceParser, cliContext);
     final Argument resourceEditId =
         resourceEdit.addArgument("id").help("Resource ID");
     final Argument resourceEditConcurrency =
@@ -728,9 +738,9 @@ public final class CliMain {
             .help("set the concurrency value for the resource")
             .type(Integer.class);
 
-    final Subparser resourceList = ResourceCommand.LIST.parser(resourceParser);
+    final Subparser resourceList = ResourceCommand.LIST.parser(resourceParser, cliContext);
 
-    final Subparser resourceCreate = ResourceCommand.CREATE.parser(resourceParser);
+    final Subparser resourceCreate = ResourceCommand.CREATE.parser(resourceParser, cliContext);
     final Argument resourceCreateId =
         resourceCreate.addArgument("id").help("Resource ID");
     final Argument resourceCreateConcurrency =
@@ -739,18 +749,18 @@ public final class CliMain {
             .type(Integer.class);
 
     final Subparsers workflowParser =
-        Command.WORKFLOW.parser(subCommands)
+        Command.WORKFLOW.parser(subCommands, cliContext)
             .addSubparsers().title("commands").metavar(" ");
 
-    final Subparser workflowList = WorkflowCommand.LIST.parser(workflowParser);
+    final Subparser workflowList = WorkflowCommand.LIST.parser(workflowParser, cliContext);
 
-    final Subparser workflowShow = WorkflowCommand.SHOW.parser(workflowParser);
+    final Subparser workflowShow = WorkflowCommand.SHOW.parser(workflowParser, cliContext);
     final Argument workflowShowComponentId =
         workflowShow.addArgument("component").help("Component ID");
     final Argument workflowShowWorkflowId =
         workflowShow.addArgument("workflow").help("Workflow ID");
 
-    final Subparser workflowCreate = WorkflowCommand.CREATE.parser(workflowParser);
+    final Subparser workflowCreate = WorkflowCommand.CREATE.parser(workflowParser, cliContext);
     final Argument workflowCreateComponentId =
         workflowCreate.addArgument("component").help("Component ID");
     final Argument workflowCreateFile =
@@ -758,7 +768,7 @@ public final class CliMain {
             .type(fileType().acceptSystemIn().verifyCanRead())
             .help("Workflow configuration file");
 
-    final Subparser workflowDelete = WorkflowCommand.DELETE.parser(workflowParser);
+    final Subparser workflowDelete = WorkflowCommand.DELETE.parser(workflowParser, cliContext);
     final Argument workflowDeleteComponentId =
         workflowDelete.addArgument("component").help("Component ID");
     final Argument workflowDeleteWorkflowId =
@@ -769,56 +779,39 @@ public final class CliMain {
             .setDefault(false)
             .action(Arguments.storeTrue());
 
-    final Subparser workflowEnable = WorkflowCommand.ENABLE.parser(workflowParser);
+    final Subparser workflowEnable = WorkflowCommand.ENABLE.parser(workflowParser, cliContext);
     final Argument workflowEnableComponentId =
         workflowEnable.addArgument("component").help("Component ID");
     final Argument workflowEnableWorkflowId =
         workflowEnable.addArgument("workflow").nargs("+").help("Workflow IDs");
 
-    final Subparser workflowDisable = WorkflowCommand.DISABLE.parser(workflowParser);
+    final Subparser workflowDisable = WorkflowCommand.DISABLE.parser(workflowParser, cliContext);
     final Argument workflowDisableComponentId =
         workflowDisable.addArgument("component").help("Component ID");
     final Argument workflowDisableWorkflowId =
         workflowDisable.addArgument("workflow").nargs("+").help("Workflow IDs");
 
-    final Subparser list = Command.LIST.parser(subCommands);
+    final Subparser list = Command.LIST.parser(subCommands, cliContext);
     final Argument listComponent = list.addArgument("-c", "--component")
         .help("only show instances for COMPONENT");
 
-    final Subparser events = addWorkflowInstanceArguments(Command.EVENTS.parser(subCommands));
-    final Subparser trigger = addWorkflowInstanceArguments(Command.TRIGGER.parser(subCommands));
+    final Subparser events = addWorkflowInstanceArguments(Command.EVENTS.parser(subCommands, cliContext));
+    final Subparser trigger = addWorkflowInstanceArguments(Command.TRIGGER.parser(subCommands, cliContext));
     final Argument triggerEnv = addEnvVarArgument(trigger, "-e", "--env");
     final Argument triggerAllowFuture = addEnvVarArgument(trigger, "--allow-future")
         .help("Allow triggering future partition")
         .setDefault(false)
         .action(Arguments.storeTrue());
 
-    final Subparser halt = addWorkflowInstanceArguments(Command.HALT.parser(subCommands));
-    final Subparser retry = addWorkflowInstanceArguments(Command.RETRY.parser(subCommands));
+    final Subparser halt = addWorkflowInstanceArguments(Command.HALT.parser(subCommands, cliContext));
+    final Subparser retry = addWorkflowInstanceArguments(Command.RETRY.parser(subCommands, cliContext));
 
-    final Argument host = parser.addArgument("-H", "--host")
-        .help("Styx API host (can also be set with environment variable " + ENV_VAR_PREFIX + "_HOST)")
-        .action(Arguments.store());
-
-    final Argument json = parser.addArgument("--json")
-        .help("json output")
-        .setDefault(false)
-        .action(Arguments.storeTrue());
-
-    final Argument plain = parser.addArgument("-p", "--plain")
-        .help("plain output")
-        .setDefault(false)
-        .action(Arguments.storeTrue());
-
-    final Argument debug = parser.addArgument("--debug")
-        .help("debug output")
-        .setDefault(false)
-        .action(Arguments.storeTrue());
+    final GlobalOptions globalOptions = GlobalOptions.add(parser, cliContext, false);
 
     final Argument version = parser.addArgument("--version").action(Arguments.version());
 
     private StyxCliParser(CliContext cliContext) {
-      host.setDefault(cliContext.env().get(ENV_VAR_PREFIX + "_HOST"));
+      super(cliContext);
     }
 
     private static Subparser addWorkflowInstanceArguments(Subparser subparser) {
@@ -866,9 +859,8 @@ public final class CliMain {
       this.description = description;
     }
 
-    public Subparser parser(Subparsers subCommands) {
-      Subparser subparser = subCommands
-          .addParser(name().toLowerCase())
+    public Subparser parser(Subparsers subCommands, CliContext cliContext) {
+      final Subparser subparser = addSubparser(subCommands, name().toLowerCase(), cliContext)
           .setDefault(COMMAND_DEST, this)
           .description(description)
           .help(description);
@@ -878,6 +870,47 @@ public final class CliMain {
       }
 
       return subparser;
+    }
+
+  }
+
+  private static Subparser addSubparser(Subparsers subCommands, String name, CliContext cliContext) {
+    final Subparser parser = subCommands.addParser(name);
+    GlobalOptions.add(parser, cliContext, true);
+    return parser;
+  }
+
+  private static class GlobalOptions {
+
+    final Argument host;
+    final Argument json;
+    final Argument plain;
+    final Argument debug;
+    final ArgumentGroup options;
+
+    private GlobalOptions(ArgumentParser parser, CliContext cliContext, boolean subCommand) {
+      this.options = parser.addArgumentGroup("global options");
+      this.host = options.addArgument("-H", "--host")
+          .help("Styx API host (can also be set with environment variable " + ENV_VAR_PREFIX + "_HOST)")
+          .setDefault(subCommand ? FeatureControl.SUPPRESS : null)
+          .setDefault(cliContext.env().get(ENV_VAR_PREFIX + "_HOST"))
+          .action(Arguments.store());
+      this.json = options.addArgument("--json")
+          .help("json output")
+          .setDefault(subCommand ? FeatureControl.SUPPRESS : null)
+          .action(Arguments.storeTrue());
+      this.plain = options.addArgument("-p", "--plain")
+          .help("plain output")
+          .setDefault(subCommand ? FeatureControl.SUPPRESS : null)
+          .action(Arguments.storeTrue());
+      this.debug = options.addArgument("--debug")
+          .help("debug output")
+          .setDefault(subCommand ? FeatureControl.SUPPRESS : null)
+          .action(Arguments.storeTrue());
+    }
+
+    static GlobalOptions add(ArgumentParser parser, CliContext cliContext, boolean subCommand) {
+      return new GlobalOptions(parser, cliContext, subCommand);
     }
   }
 
@@ -896,9 +929,8 @@ public final class CliMain {
       this.description = description;
     }
 
-    public Subparser parser(Subparsers subCommands) {
-      final Subparser subparser = subCommands
-          .addParser(name().toLowerCase())
+    public Subparser parser(Subparsers subCommands, CliContext cliContext) {
+      final Subparser subparser = addSubparser(subCommands, name().toLowerCase(), cliContext)
           .setDefault(SUBCOMMAND_DEST, this)
           .description(description)
           .help(description);
@@ -925,9 +957,8 @@ public final class CliMain {
       this.description = description;
     }
 
-    public Subparser parser(Subparsers subCommands) {
-      final Subparser subparser = subCommands
-          .addParser(name().toLowerCase())
+    public Subparser parser(Subparsers subCommands, CliContext cliContext) {
+      final Subparser subparser = addSubparser(subCommands, name().toLowerCase(), cliContext)
           .setDefault(SUBCOMMAND_DEST, this)
           .description(description)
           .help(description);
@@ -956,9 +987,8 @@ public final class CliMain {
       this.description = description;
     }
 
-    public Subparser parser(Subparsers subCommands) {
-      final Subparser subparser = subCommands
-          .addParser(name().toLowerCase())
+    public Subparser parser(Subparsers subCommands, CliContext cliContext) {
+      final Subparser subparser = addSubparser(subCommands, name().toLowerCase(), cliContext)
           .setDefault(SUBCOMMAND_DEST, this)
           .description(description)
           .help(description);
