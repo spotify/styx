@@ -20,6 +20,8 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.apollo.Status.BAD_REQUEST;
+import static com.spotify.apollo.Status.FORBIDDEN;
 import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.SERVICE_ACCOUNT_USER_ROLE;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
@@ -85,7 +87,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void shouldDenyAccessIfPrincipalDoesNotHaveUserRole() {
     final Optional<Response<Object>> error = sut.authorizeServiceAccountUsage(SERVICE_ACCOUNT, idToken);
-    assertThat(error.get().status().code(), is(403));
+    assertThat(error.get().status().code(), is(FORBIDDEN.code()));
     assertThat(error.get().status().reasonPhrase(), is("Missing role " + SERVICE_ACCOUNT_USER_ROLE
         + " on either the project " + SERVICE_ACCOUNT_PROJECT + " or the service account " + SERVICE_ACCOUNT));
   }
@@ -102,5 +104,24 @@ public class ServiceAccountUsageAuthorizerTest {
     saBinding.getMembers().add("user:" + PRINCIPAL_EMAIL);
     final Optional<Response<Object>> error = sut.authorizeServiceAccountUsage(SERVICE_ACCOUNT, idToken);
     assertThat(error, is(Optional.empty()));
+  }
+
+  @Test
+  public void shouldFailIfNotAUserCreatedServiceAccount() {
+    final String serviceAccount = "4711-compute@developer.gserviceaccount.com";
+    final Optional<Response<Object>> error =
+        sut.authorizeServiceAccountUsage(serviceAccount, idToken);
+    assertThat(error.get().status().code(), is(BAD_REQUEST.code()));
+    assertThat(error.get().status().reasonPhrase(), is("Not a user created service account: " + serviceAccount));
+  }
+
+  @Test
+  public void shouldFailIfProjectDoesNotExist() {
+    // TODO
+  }
+
+  @Test
+  public void shouldFailIfServiceAccountDoesNotExist() {
+    // TODO
   }
 }
