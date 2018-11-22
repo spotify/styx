@@ -82,7 +82,7 @@ class FutureOkHttpClient implements AutoCloseable {
     client.newCall(request).enqueue(new Callback() {
       @Override
       public void onFailure(Call call, IOException e) {
-        log.debug("{} {}: failed (latency: {}s)", request.method(), request.url(), e, latency(start));
+        log.debug("{} {}: failed (latency: {}s)", request.method(), request.url(), latency(start), e);
         future.completeExceptionally(e);
       }
 
