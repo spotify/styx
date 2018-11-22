@@ -37,8 +37,10 @@ import com.spotify.styx.api.Api;
 import com.spotify.styx.api.AuthenticatorConfiguration;
 import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.api.BackfillResource;
+import com.spotify.styx.api.Middlewares;
 import com.spotify.styx.api.ResourceResource;
 import com.spotify.styx.api.SchedulerProxyResource;
+import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
 import com.spotify.styx.api.StatusResource;
 import com.spotify.styx.api.WorkflowResource;
 import com.spotify.styx.api.workflow.WorkflowInitializer;
@@ -169,10 +171,11 @@ public class StyxApi implements AppInit {
     // results duplicated headers, and that would make nginx unhappy. This has been fixed
     // in later Apollo version.
 
+    final ServiceAccountUsageAuthorizer serviceAccountUseAuthorizer = ServiceAccountUsageAuthorizer.create();
     final WorkflowResource workflowResource = new WorkflowResource(storage,
         new WorkflowValidator(new DockerImageValidator()),
         new WorkflowInitializer(storage, time),
-        workflowConsumer);
+        workflowConsumer, serviceAccountUseAuthorizer, Middlewares.requestIdTokenSupplier());
 
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
         storage,

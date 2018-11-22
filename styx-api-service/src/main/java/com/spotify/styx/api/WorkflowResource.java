@@ -25,6 +25,7 @@ import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -54,6 +55,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import okio.ByteString;
 import org.slf4j.Logger;
@@ -71,14 +73,21 @@ public final class WorkflowResource {
 
   private final Storage storage;
   private final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
+  private final ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer;
+  private final Supplier<Optional<GoogleIdToken>> idTokenSupplier;
 
   public WorkflowResource(Storage storage, WorkflowValidator workflowValidator,
-                          WorkflowInitializer workflowInitializer,
-                          final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
+      WorkflowInitializer workflowInitializer,
+      BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer,
+      ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer,
+      Supplier<Optional<GoogleIdToken>> idTokenSupplier) {
     this.storage = Objects.requireNonNull(storage, "storage");
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
     this.workflowInitializer = Objects.requireNonNull(workflowInitializer, "workflowInitializer");
     this.workflowConsumer = Objects.requireNonNull(workflowConsumer, "workflowConsumer");
+    this.serviceAccountUsageAuthorizer = Objects.requireNonNull(serviceAccountUsageAuthorizer,
+        "serviceAccountUsageAuthorizer");
+    this.idTokenSupplier = Objects.requireNonNull(idTokenSupplier, "idTokenSupplier");
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -158,6 +167,16 @@ public final class WorkflowResource {
     } catch (IOException e) {
       return Response.forStatus(Status.BAD_REQUEST
           .withReasonPhrase("Invalid payload. " + e.getMessage()));
+    }
+
+    if (workflowConfig.serviceAccount().isPresent()) {
+      final String serviceAccount = workflowConfig.serviceAccount().get();
+      final GoogleIdToken idToken = idTokenSupplier.get().orElseThrow(AssertionError::new);
+      final Optional<Response<Workflow>> error =
+          serviceAccountUsageAuthorizer.authorizeServiceAccountUsage(serviceAccount, idToken);
+      if (error.isPresent()) {
+        return error.get();
+      }
     }
 
     final Collection<String> errors =
