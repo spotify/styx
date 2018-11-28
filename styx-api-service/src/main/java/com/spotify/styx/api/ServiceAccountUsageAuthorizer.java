@@ -45,6 +45,14 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Verifies that a user is authorized to use a service account in a workflow by verifying that the user has
+ * a specific role either on the service account itself or in the project of the service account.
+ * <p> This requires the following permissions:<ul>
+ * <li> {@code resourcemanager.projects.getIamPolicy}
+ * <li> {@code iam.serviceAccounts.getIamPolicy}
+ * </ul></p>
+ */
 @FunctionalInterface
 public interface ServiceAccountUsageAuthorizer {
 
