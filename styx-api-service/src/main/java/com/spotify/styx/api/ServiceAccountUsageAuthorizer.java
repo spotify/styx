@@ -45,119 +45,126 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ServiceAccountUsageAuthorizer {
+@FunctionalInterface
+public interface ServiceAccountUsageAuthorizer {
 
-  private static final Logger log = LoggerFactory.getLogger(ServiceAccountUsageAuthorizer.class);
+  void authorizeServiceAccountUsage(String serviceAccount, GoogleIdToken idToken);
 
-  // TODO: make configurable
-  static final String SERVICE_ACCOUNT_USER_ROLE = "organizations/3141592/roles/StyxWorkflowServiceAccountUser";
+  class Impl implements ServiceAccountUsageAuthorizer {
 
-  private static final Pattern SERVICE_ACCOUNT_PATTERN =
-      Pattern.compile("^.+\\.gserviceaccount\\.com$");
+    private static final Logger log = LoggerFactory.getLogger(ServiceAccountUsageAuthorizer.class);
 
-  private static final Pattern USER_CREATED_SERVICE_ACCOUNT_PATTERN =
-      Pattern.compile("^.+@(.+)\\.iam\\.gserviceaccount\\.com$");
+    private static final Pattern SERVICE_ACCOUNT_PATTERN =
+        Pattern.compile("^.+\\.gserviceaccount\\.com$");
 
-  private final Iam iam;
-  private final CloudResourceManager crm;
+    private static final Pattern USER_CREATED_SERVICE_ACCOUNT_PATTERN =
+        Pattern.compile("^.+@(.+)\\.iam\\.gserviceaccount\\.com$");
 
-  ServiceAccountUsageAuthorizer(Iam iam, CloudResourceManager crm) {
-    this.iam = Objects.requireNonNull(iam, "iam");
-    this.crm = Objects.requireNonNull(crm, "crm");
-  }
+    private final Iam iam;
+    private final CloudResourceManager crm;
+    private final String serviceAccountUserRole;
 
-  void authorizeServiceAccountUsage(String serviceAccount, GoogleIdToken idToken) {
-
-    final String principalEmail = idToken.getPayload().getEmail();
-    final String projectId = serviceAccountProjectId(serviceAccount);
-
-    // Check if the principal has been granted the service account user role in the project of the SA
-    if (projectPolicyAccessGranted(projectId, principalEmail)) {
-      log.info("[AUDIT] Principal {} has role {} in project {}, authorizing use of service account {}",
-          principalEmail, SERVICE_ACCOUNT_USER_ROLE, projectId, serviceAccount);
-      return;
+    Impl(Iam iam, CloudResourceManager crm, final String serviceAccountUserRole) {
+      this.iam = Objects.requireNonNull(iam, "iam");
+      this.crm = Objects.requireNonNull(crm, "crm");
+      this.serviceAccountUserRole = Objects.requireNonNull(serviceAccountUserRole, "serviceAccountUserRole");
     }
 
-    // Check if the principal has been granted the service account user role on the SA itself
-    if (serviceAccountPolicyAccessGranted(serviceAccount, principalEmail)) {
-      log.info("[AUDIT] Principal {} has role {} on service account {}, authorizing use of service account {}",
-          principalEmail, SERVICE_ACCOUNT_USER_ROLE, serviceAccount, serviceAccount);
-      return;
-    }
+    @Override
+    public void authorizeServiceAccountUsage(String serviceAccount, GoogleIdToken idToken) {
 
-    log.info("[AUDIT] Principal {} denied use of service account {}", principalEmail, serviceAccount);
-    throw new ResponseException(Response.forStatus(
-        FORBIDDEN.withReasonPhrase("Missing role " + SERVICE_ACCOUNT_USER_ROLE
-            + " on either the project " + projectId + " or the service account " + serviceAccount)));
-  }
+      final String principalEmail = idToken.getPayload().getEmail();
+      final String projectId = serviceAccountProjectId(serviceAccount);
 
-  private String serviceAccountProjectId(String serviceAccount) {
-    final Matcher matcher = USER_CREATED_SERVICE_ACCOUNT_PATTERN.matcher(serviceAccount);
-    if (!matcher.matches()) {
+      // Check if the principal has been granted the service account user role in the project of the SA
+      if (projectPolicyAccessGranted(projectId, principalEmail)) {
+        log.info("[AUDIT] Principal {} has role {} in project {}, authorizing use of service account {}",
+            principalEmail, serviceAccountUserRole, projectId, serviceAccount);
+        return;
+      }
+
+      // Check if the principal has been granted the service account user role on the SA itself
+      if (serviceAccountPolicyAccessGranted(serviceAccount, principalEmail)) {
+        log.info("[AUDIT] Principal {} has role {} on service account {}, authorizing use of service account {}",
+            principalEmail, serviceAccountUserRole, serviceAccount, serviceAccount);
+        return;
+      }
+
+      log.info("[AUDIT] Principal {} denied use of service account {}", principalEmail, serviceAccount);
       throw new ResponseException(Response.forStatus(
-          BAD_REQUEST.withReasonPhrase("Not a user created service account: " + serviceAccount)));
+          FORBIDDEN.withReasonPhrase("Missing role " + serviceAccountUserRole
+              + " on either the project " + projectId + " or the service account " + serviceAccount)));
     }
-    return matcher.group(1);
-  }
 
-  private boolean projectPolicyAccessGranted(String projectId, String principalEmail) {
-    final com.google.api.services.cloudresourcemanager.model.Policy policy = getProjectPolicy(projectId)
-        .orElseThrow(() -> new ResponseException(Response.forStatus(
-            BAD_REQUEST.withReasonPhrase("Project does not exist: " + projectId))));
-
-    return policy.getBindings().stream()
-        .filter(binding -> SERVICE_ACCOUNT_USER_ROLE.equals(binding.getRole()))
-        .flatMap(binding -> binding.getMembers().stream())
-        .anyMatch(memberEntry(principalEmail)::equals);
-  }
-
-  private boolean serviceAccountPolicyAccessGranted(String serviceAccount, String principalEmail) {
-    final com.google.api.services.iam.v1.model.Policy policy = getServiceAccountPolicy(serviceAccount)
-        .orElseThrow(() -> new ResponseException(Response.forStatus(
-            BAD_REQUEST.withReasonPhrase("Service account does not exist: " + serviceAccount))));
-
-    return policy.getBindings().stream()
-        .filter(binding -> SERVICE_ACCOUNT_USER_ROLE.equals(binding.getRole()))
-        .flatMap(binding -> binding.getMembers().stream())
-        .anyMatch(memberEntry(principalEmail)::equals);
-  }
-
-  private Optional<Policy> getProjectPolicy(String projectId) {
-    try {
-      return Optional.of(crm.projects()
-          .getIamPolicy(projectId, new GetIamPolicyRequest())
-          .execute());
-    } catch (GoogleJsonResponseException e) {
-      if (e.getStatusCode() == 404) {
-        return Optional.empty();
+    private String serviceAccountProjectId(String serviceAccount) {
+      final Matcher matcher = USER_CREATED_SERVICE_ACCOUNT_PATTERN.matcher(serviceAccount);
+      if (!matcher.matches()) {
+        throw new ResponseException(Response.forStatus(
+            BAD_REQUEST.withReasonPhrase("Not a user created service account: " + serviceAccount)));
       }
-      throw new RuntimeException(e);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+      return matcher.group(1);
     }
-  }
 
-  private Optional<com.google.api.services.iam.v1.model.Policy> getServiceAccountPolicy(String serviceAccount) {
-    try {
-      return Optional.of(iam.projects().serviceAccounts()
-          .getIamPolicy("projects/-/serviceAccounts/" + serviceAccount)
-          .execute());
-    } catch (GoogleJsonResponseException e) {
-      if (e.getStatusCode() == 404) {
-        return Optional.empty();
+    private boolean projectPolicyAccessGranted(String projectId, String principalEmail) {
+      final com.google.api.services.cloudresourcemanager.model.Policy policy = getProjectPolicy(projectId)
+          .orElseThrow(() -> new ResponseException(Response.forStatus(
+              BAD_REQUEST.withReasonPhrase("Project does not exist: " + projectId))));
+
+      return policy.getBindings().stream()
+          .filter(binding -> serviceAccountUserRole.equals(binding.getRole()))
+          .flatMap(binding -> binding.getMembers().stream())
+          .anyMatch(memberEntry(principalEmail)::equals);
+    }
+
+    private boolean serviceAccountPolicyAccessGranted(String serviceAccount, String principalEmail) {
+      final com.google.api.services.iam.v1.model.Policy policy = getServiceAccountPolicy(serviceAccount)
+          .orElseThrow(() -> new ResponseException(Response.forStatus(
+              BAD_REQUEST.withReasonPhrase("Service account does not exist: " + serviceAccount))));
+
+      return policy.getBindings().stream()
+          .filter(binding -> serviceAccountUserRole.equals(binding.getRole()))
+          .flatMap(binding -> binding.getMembers().stream())
+          .anyMatch(memberEntry(principalEmail)::equals);
+    }
+
+    private Optional<Policy> getProjectPolicy(String projectId) {
+      try {
+        return Optional.of(crm.projects()
+            .getIamPolicy(projectId, new GetIamPolicyRequest())
+            .execute());
+      } catch (GoogleJsonResponseException e) {
+        if (e.getStatusCode() == 404) {
+          return Optional.empty();
+        }
+        throw new RuntimeException(e);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
       }
-      throw new RuntimeException(e);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+    }
+
+    private Optional<com.google.api.services.iam.v1.model.Policy> getServiceAccountPolicy(String serviceAccount) {
+      try {
+        return Optional.of(iam.projects().serviceAccounts()
+            .getIamPolicy("projects/-/serviceAccounts/" + serviceAccount)
+            .execute());
+      } catch (GoogleJsonResponseException e) {
+        if (e.getStatusCode() == 404) {
+          return Optional.empty();
+        }
+        throw new RuntimeException(e);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    private static String memberEntry(String email) {
+      final String type = SERVICE_ACCOUNT_PATTERN.matcher(email).matches() ? "serviceAccount" : "user";
+      return type + ":" + email;
     }
   }
 
-  private static String memberEntry(String email) {
-    final String type = SERVICE_ACCOUNT_PATTERN.matcher(email).matches() ? "serviceAccount" : "user";
-    return type + ":" + email;
-  }
 
-  public static ServiceAccountUsageAuthorizer create() {
+  static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole) {
 
     final HttpTransport httpTransport;
     try {
@@ -186,6 +193,10 @@ public class ServiceAccountUsageAuthorizer {
         .setApplicationName(applicationName)
         .build();
 
-    return new ServiceAccountUsageAuthorizer(iam, crm);
+    return new Impl(iam, crm, serviceAccountUserRole);
+  }
+
+  static ServiceAccountUsageAuthorizer nop() {
+    return (sa, id) -> { };
   }
 }

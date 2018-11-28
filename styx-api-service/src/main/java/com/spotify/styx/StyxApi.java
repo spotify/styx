@@ -80,6 +80,7 @@ public class StyxApi implements AppInit {
   public static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
+  public static final String SERVICE_ACCOUNT_USER_ROLE_CONFIG = "styx.authorizaton.service-account-user-role";
 
   private final String serviceName;
   private final StorageFactory storageFactory;
@@ -171,7 +172,11 @@ public class StyxApi implements AppInit {
     // results duplicated headers, and that would make nginx unhappy. This has been fixed
     // in later Apollo version.
 
-    final ServiceAccountUsageAuthorizer serviceAccountUseAuthorizer = ServiceAccountUsageAuthorizer.create();
+    final ServiceAccountUsageAuthorizer serviceAccountUseAuthorizer =
+        environment.config().hasPath(SERVICE_ACCOUNT_USER_ROLE_CONFIG)
+            ? ServiceAccountUsageAuthorizer.create(environment.config().getString(SERVICE_ACCOUNT_USER_ROLE_CONFIG))
+            : ServiceAccountUsageAuthorizer.nop();
+
     final WorkflowResource workflowResource = new WorkflowResource(storage,
         new WorkflowValidator(new DockerImageValidator()),
         new WorkflowInitializer(storage, time),

@@ -22,7 +22,6 @@ package com.spotify.styx.api;
 
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.FORBIDDEN;
-import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.SERVICE_ACCOUNT_USER_ROLE;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -47,6 +46,7 @@ public class ServiceAccountUsageAuthorizerTest {
   private static final String PRINCIPAL_EMAIL = "user@corp.com";
   private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
   private static final String SERVICE_ACCOUNT_PROJECT = "bar";
+  private static final String SERVICE_ACCOUNT_USER_ROLE = "organizations/3141592/roles/StyxWorkflowServiceAccountUser";
 
   @Mock private GoogleIdToken idToken;
   @Mock private GoogleIdToken.Payload idTokenPayload;
@@ -80,7 +80,7 @@ public class ServiceAccountUsageAuthorizerTest {
     when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenReturn(projectPolicy);
     when((Object) iam.projects().serviceAccounts().getIamPolicy("projects/-/serviceAccounts/" + SERVICE_ACCOUNT)
         .execute()).thenReturn(saPolicy);
-    sut = new ServiceAccountUsageAuthorizer(iam, crm);
+    sut = new ServiceAccountUsageAuthorizer.Impl(iam, crm, SERVICE_ACCOUNT_USER_ROLE);
   }
 
   @Test
@@ -121,6 +121,12 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void shouldFailIfServiceAccountDoesNotExist() {
     // TODO
+  }
+
+  @Test
+  public void testNop() {
+    final ServiceAccountUsageAuthorizer sut = ServiceAccountUsageAuthorizer.nop();
+    sut.authorizeServiceAccountUsage(SERVICE_ACCOUNT, idToken);
   }
 
   private static Response<?> assertThrowsResponseException(Runnable r) {
