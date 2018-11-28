@@ -34,7 +34,6 @@ import com.google.api.services.iam.v1.Iam;
 import com.spotify.apollo.Response;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Optional;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -86,33 +85,32 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Test
   public void shouldDenyAccessIfPrincipalDoesNotHaveUserRole() {
-    final Optional<Response<Object>> error = sut.authorizeServiceAccountUsage(SERVICE_ACCOUNT, idToken);
-    assertThat(error.get().status().code(), is(FORBIDDEN.code()));
-    assertThat(error.get().status().reasonPhrase(), is("Missing role " + SERVICE_ACCOUNT_USER_ROLE
+    final Response<?> response = assertThrowsResponseException(() ->
+        sut.authorizeServiceAccountUsage(SERVICE_ACCOUNT, idToken));
+    assertThat(response.status().code(), is(FORBIDDEN.code()));
+    assertThat(response.status().reasonPhrase(), is("Missing role " + SERVICE_ACCOUNT_USER_ROLE
         + " on either the project " + SERVICE_ACCOUNT_PROJECT + " or the service account " + SERVICE_ACCOUNT));
   }
 
   @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnProject() {
     projectBinding.getMembers().add("user:" + PRINCIPAL_EMAIL);
-    final Optional<Response<Object>> error = sut.authorizeServiceAccountUsage(SERVICE_ACCOUNT, idToken);
-    assertThat(error, is(Optional.empty()));
+    sut.authorizeServiceAccountUsage(SERVICE_ACCOUNT, idToken);
   }
 
   @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnSA() {
     saBinding.getMembers().add("user:" + PRINCIPAL_EMAIL);
-    final Optional<Response<Object>> error = sut.authorizeServiceAccountUsage(SERVICE_ACCOUNT, idToken);
-    assertThat(error, is(Optional.empty()));
+    sut.authorizeServiceAccountUsage(SERVICE_ACCOUNT, idToken);
   }
 
   @Test
   public void shouldFailIfNotAUserCreatedServiceAccount() {
     final String serviceAccount = "4711-compute@developer.gserviceaccount.com";
-    final Optional<Response<Object>> error =
-        sut.authorizeServiceAccountUsage(serviceAccount, idToken);
-    assertThat(error.get().status().code(), is(BAD_REQUEST.code()));
-    assertThat(error.get().status().reasonPhrase(), is("Not a user created service account: " + serviceAccount));
+    final Response<?> error = assertThrowsResponseException(() ->
+        sut.authorizeServiceAccountUsage(serviceAccount, idToken));
+    assertThat(error.status().code(), is(BAD_REQUEST.code()));
+    assertThat(error.status().reasonPhrase(), is("Not a user created service account: " + serviceAccount));
   }
 
   @Test
@@ -123,5 +121,14 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void shouldFailIfServiceAccountDoesNotExist() {
     // TODO
+  }
+
+  private static Response<?> assertThrowsResponseException(Runnable r) {
+    try {
+      r.run();
+      throw new AssertionError();
+    } catch (ResponseException e) {
+      return e.getResponse();
+    }
   }
 }

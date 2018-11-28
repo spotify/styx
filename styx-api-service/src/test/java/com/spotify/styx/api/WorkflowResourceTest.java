@@ -36,7 +36,6 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -46,7 +45,6 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
@@ -76,8 +74,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -152,15 +148,14 @@ public class WorkflowResourceTest extends VersionedApiTest {
     storage = spy(new AggregateStorage(bigtable, datastore, Duration.ZERO));
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
-    when(serviceAccountUseAuthorizer.authorizeServiceAccountUsage(SERVICE_ACCOUNT, idToken))
-        .thenReturn(Optional.empty());
     when(idTokenSupplier.get()).thenReturn(Optional.of(idToken));
     WorkflowResource workflowResource =
         new WorkflowResource(storage, workflowValidator, workflowInitializer, workflowConsumer,
             serviceAccountUseAuthorizer, idTokenSupplier);
 
     environment.routingEngine()
-        .registerRoutes(workflowResource.routes());
+        .registerRoutes(workflowResource.routes().map(r ->
+            r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));
   }
 
   @BeforeClass
@@ -619,8 +614,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldFailToUpdateWorkflowIfNotAuthorized() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(serviceAccountUseAuthorizer.authorizeServiceAccountUsage(SERVICE_ACCOUNT, idToken))
-        .thenReturn(Optional.of(Response.forStatus(FORBIDDEN)));
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(serviceAccountUseAuthorizer).authorizeServiceAccountUsage(SERVICE_ACCOUNT, idToken);
 
     final Response<ByteString> response = awaitResponse(
         serviceHelper.request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
