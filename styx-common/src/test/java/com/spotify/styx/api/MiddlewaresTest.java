@@ -33,6 +33,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -520,6 +521,43 @@ public class MiddlewaresTest {
                                                   .apply(mockInnerHandler(requestContext))
                                                   .invoke(requestContext));
     assertThat(response, hasStatus(withCode(Status.UNAUTHORIZED)));
+  }
+
+  @Test
+  public void testAuthValidatorPropagatesException() throws Exception {
+    RequestContext requestContext = mock(RequestContext.class);
+    Request request = Request.forUri("/", "GET");
+    when(requestContext.request()).thenReturn(request);
+
+    final IOException cause = new IOException();
+    final AsyncHandler<Response<Object>> handler = mock(AsyncHandler.class);
+    when(handler.invoke(requestContext)).thenAnswer(a -> { throw cause; });
+    exception.expect(RuntimeException.class);
+    exception.expectCause(is(cause));
+    Middlewares.authenticator(authenticator)
+        .apply(handler)
+        .invoke(requestContext);
+  }
+
+  @Test
+  public void testAuthValidatorPropagatesIdToken() throws Exception {
+    final RequestContext requestContext = mock(RequestContext.class);
+    final Request request = Request.forUri("/", "PUT")
+        .withPayload(ByteString.encodeUtf8("hello"))
+        .withHeader(HttpHeaders.AUTHORIZATION, "Bearer s3cr3tp455w0rd");
+    when(requestContext.request()).thenReturn(request);
+    when(authenticator.authenticate(any())).thenReturn(idToken);
+
+    final Supplier<Optional<GoogleIdToken>> idTokenSupplier = Middlewares.requestIdTokenSupplier();
+    final AsyncHandler<Response<GoogleIdToken>> handler = mock(AsyncHandler.class);
+    when(handler.invoke(requestContext))
+        .thenAnswer(a -> completedFuture(Response.forPayload(idTokenSupplier.get().get())));
+
+    final Response<GoogleIdToken> response = awaitResponse(Middlewares.<GoogleIdToken>authenticator(authenticator)
+        .apply(handler)
+        .invoke(requestContext));
+
+    assertThat(response.payload().get(), is(idToken));
   }
 
   @Test
