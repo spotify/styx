@@ -163,8 +163,11 @@ public interface ServiceAccountUsageAuthorizer {
     }
   }
 
-
   static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole) {
+    return create(serviceAccountUserRole, defaultCredential());
+  }
+
+  static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole, GoogleCredential credential) {
 
     final HttpTransport httpTransport;
     try {
@@ -174,12 +177,6 @@ public interface ServiceAccountUsageAuthorizer {
     }
 
     final JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
-    final GoogleCredential credential;
-    try {
-      credential = GoogleCredential.getApplicationDefault().createScoped(IamScopes.all());
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
 
     final String applicationName = "styx-api";
 
@@ -199,4 +196,17 @@ public interface ServiceAccountUsageAuthorizer {
   static ServiceAccountUsageAuthorizer nop() {
     return (sa, id) -> { };
   }
+
+  static GoogleCredential defaultCredential() {
+    final GoogleCredential credential;
+    try {
+      credential = GoogleCredential.getApplicationDefault()
+          .createScoped(IamScopes.all());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return credential;
+  }
+
+
 }
