@@ -46,6 +46,7 @@ import com.spotify.styx.api.ServiceAccountUsageAuthorizer.WhitelistAuthorization
 import com.spotify.styx.model.WorkflowId;
 import java.io.IOException;
 import java.util.ArrayList;
+import javaslang.control.Try;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -125,13 +126,15 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnProject() {
     projectBinding.getMembers().add("user:" + PRINCIPAL_EMAIL);
-    sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken);
+    assertThat(Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).isSuccess(),
+        is(true));
   }
 
   @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnSA() {
     saBinding.getMembers().add("user:" + PRINCIPAL_EMAIL);
-    sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken);
+    assertThat(Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).isSuccess(),
+        is(true));
   }
 
   @Test
@@ -210,7 +213,8 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void testNop() {
     final ServiceAccountUsageAuthorizer sut = ServiceAccountUsageAuthorizer.nop();
-    sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken);
+    assertThat(Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).isSuccess(),
+        is(true));
   }
 
   @Test
