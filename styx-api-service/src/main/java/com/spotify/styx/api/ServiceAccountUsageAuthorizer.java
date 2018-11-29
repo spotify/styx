@@ -33,7 +33,6 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.cloudresourcemanager.model.GetIamPolicyRequest;
 import com.google.api.services.iam.v1.Iam;
-import com.google.api.services.iam.v1.IamScopes;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.apollo.Response;
 import com.spotify.styx.model.WorkflowId;
@@ -84,8 +83,7 @@ public interface ServiceAccountUsageAuthorizer {
     }
 
     @Override
-    public void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount,
-        GoogleIdToken idToken) {
+    public void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
 
       final boolean enforce = authorizationPolicy.shouldEnforceAuthorization(workflowId, serviceAccount, idToken);
 
@@ -184,8 +182,13 @@ public interface ServiceAccountUsageAuthorizer {
     }
   }
 
-  static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole, AuthorizationPolicy authorizationPolicy) {
-    return create(serviceAccountUserRole, authorizationPolicy, defaultCredential());
+  class Nop implements ServiceAccountUsageAuthorizer {
+
+    static final Nop INSTANCE = new Nop();
+
+    @Override
+    public void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
+    }
   }
 
   static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole, AuthorizationPolicy authorizationPolicy,
@@ -216,18 +219,7 @@ public interface ServiceAccountUsageAuthorizer {
   }
 
   static ServiceAccountUsageAuthorizer nop() {
-    return (workflowId, sa, id) -> { };
-  }
-
-  static GoogleCredential defaultCredential() {
-    final GoogleCredential credential;
-    try {
-      credential = GoogleCredential.getApplicationDefault()
-          .createScoped(IamScopes.all());
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-    return credential;
+    return Nop.INSTANCE;
   }
 
   /**

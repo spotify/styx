@@ -24,6 +24,8 @@ import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.services.iam.v1.IamScopes;
 import com.google.cloud.datastore.Datastore;
 import com.google.common.collect.Streams;
 import com.google.common.io.Closer;
@@ -41,6 +43,7 @@ import com.spotify.styx.api.Middlewares;
 import com.spotify.styx.api.ResourceResource;
 import com.spotify.styx.api.SchedulerProxyResource;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
+import com.spotify.styx.api.ServiceAccountUsageAuthorizer.AuthorizationPolicy;
 import com.spotify.styx.api.StatusResource;
 import com.spotify.styx.api.WorkflowResource;
 import com.spotify.styx.api.workflow.WorkflowInitializer;
@@ -59,6 +62,7 @@ import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.WorkflowValidator;
 import com.typesafe.config.Config;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -176,25 +180,7 @@ public class StyxApi implements AppInit {
     // results duplicated headers, and that would make nginx unhappy. This has been fixed
     // in later Apollo version.
 
-    final ServiceAccountUsageAuthorizer.AuthorizationPolicy authorizationPolicy;
-    if (environment.config().hasPath(AUTHORIZATION_REQUIRE_ALL_CONFIG) &&
-        environment.config().getBoolean(AUTHORIZATION_REQUIRE_ALL_CONFIG)) {
-      authorizationPolicy = new ServiceAccountUsageAuthorizer.AllAuthorizationPolicy();
-    } else if (environment.config().hasPath(AUTHORIZATION_REQUIRE_WORKFLOWS)) {
-      final List<String> keys = environment.config().getStringList(AUTHORIZATION_REQUIRE_WORKFLOWS);
-      final List<WorkflowId> ids = keys.stream().map(WorkflowId::parseKey).collect(Collectors.toList());
-      authorizationPolicy = new ServiceAccountUsageAuthorizer.WhitelistAuthorizationPolicy(ids);
-    } else {
-      authorizationPolicy = new ServiceAccountUsageAuthorizer.NoAuthorizationPolicy();
-    }
-
-    final ServiceAccountUsageAuthorizer authorizer;
-    if (environment.config().hasPath(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)) {
-      final String role = environment.config().getString(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG);
-      authorizer = ServiceAccountUsageAuthorizer.create(role, authorizationPolicy);
-    } else {
-      authorizer = ServiceAccountUsageAuthorizer.nop();
-    }
+    final ServiceAccountUsageAuthorizer authorizer = serviceAccountUsageAuthorizer(config, defaultCredential());
 
     final WorkflowResource workflowResource = new WorkflowResource(storage,
         new WorkflowValidator(new DockerImageValidator()),
@@ -231,6 +217,35 @@ public class StyxApi implements AppInit {
             authenticatorFactory.apply(AuthenticatorConfiguration.fromConfig(config, serviceName)), serviceName));
   }
 
+  static ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer(Config config, GoogleCredential credential) {
+    final AuthorizationPolicy authorizationPolicy = authorizationPolicy(config);
+
+    final ServiceAccountUsageAuthorizer authorizer;
+    if (config.hasPath(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)) {
+      final String role = config.getString(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG);
+      authorizer = ServiceAccountUsageAuthorizer.create(role, authorizationPolicy, credential);
+    } else {
+      authorizer = ServiceAccountUsageAuthorizer.nop();
+    }
+    return authorizer;
+  }
+
+  static AuthorizationPolicy authorizationPolicy(Config config) {
+    final List<String> keys;
+    final AuthorizationPolicy authorizationPolicy;
+    if (config.hasPath(AUTHORIZATION_REQUIRE_ALL_CONFIG) &&
+        config.getBoolean(AUTHORIZATION_REQUIRE_ALL_CONFIG)) {
+      authorizationPolicy = new ServiceAccountUsageAuthorizer.AllAuthorizationPolicy();
+    } else if (config.hasPath(AUTHORIZATION_REQUIRE_WORKFLOWS) &&
+        !(keys = config.getStringList(AUTHORIZATION_REQUIRE_WORKFLOWS)).isEmpty()) {
+      final List<WorkflowId> ids = keys.stream().map(WorkflowId::parseKey).collect(Collectors.toList());
+      authorizationPolicy = new ServiceAccountUsageAuthorizer.WhitelistAuthorizationPolicy(ids);
+    } else {
+      authorizationPolicy = new ServiceAccountUsageAuthorizer.NoAuthorizationPolicy();
+    }
+    return authorizationPolicy;
+  }
+
   private static AggregateStorage storage(Environment environment, Stats stats) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
@@ -242,5 +257,16 @@ public class StyxApi implements AppInit {
 
   private static Stats stats(Environment environment) {
     return new MetricsStats(environment.resolve(SemanticMetricRegistry.class), Instant::now);
+  }
+
+  static GoogleCredential defaultCredential() {
+    final GoogleCredential credential;
+    try {
+      credential = GoogleCredential.getApplicationDefault()
+          .createScoped(IamScopes.all());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return credential;
   }
 }

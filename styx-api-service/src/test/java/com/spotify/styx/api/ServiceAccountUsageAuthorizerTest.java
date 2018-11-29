@@ -59,13 +59,13 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class ServiceAccountUsageAuthorizerTest {
 
-  @Rule public ExpectedException exception = ExpectedException.none();
-
   private static final WorkflowId WORKFLOW_ID = WorkflowId.create("foo", "bar");
   private static final String PRINCIPAL_EMAIL = "user@corp.com";
   private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
   private static final String SERVICE_ACCOUNT_PROJECT = "bar";
   private static final String SERVICE_ACCOUNT_USER_ROLE = "organizations/3141592/roles/StyxWorkflowServiceAccountUser";
+
+  @Rule public ExpectedException exception = ExpectedException.none();
 
   @Mock private AuthorizationPolicy authorizationPolicy;
   @Mock private GoogleCredential credential;
