@@ -32,7 +32,6 @@ import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.cloudresourcemanager.model.GetIamPolicyRequest;
-import com.google.api.services.cloudresourcemanager.model.Policy;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.IamScopes;
 import com.google.common.collect.ImmutableSet;
@@ -149,7 +148,7 @@ public interface ServiceAccountUsageAuthorizer {
           .anyMatch(memberEntry(principalEmail)::equals);
     }
 
-    private Optional<Policy> getProjectPolicy(String projectId) {
+    private Optional<com.google.api.services.cloudresourcemanager.model.Policy> getProjectPolicy(String projectId) {
       try {
         return Optional.of(crm.projects()
             .getIamPolicy(projectId, new GetIamPolicyRequest())
