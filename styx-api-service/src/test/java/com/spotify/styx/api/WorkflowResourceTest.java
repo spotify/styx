@@ -60,6 +60,7 @@ import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.state.Trigger;
@@ -615,7 +616,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
-        .when(serviceAccountUseAuthorizer).authorizeServiceAccountUsage(SERVICE_ACCOUNT, idToken);
+        .when(serviceAccountUseAuthorizer).authorizeServiceAccountUsage(
+            WorkflowId.create("foo", "bar"), SERVICE_ACCOUNT, idToken);
 
     final Response<ByteString> response = awaitResponse(
         serviceHelper.request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));

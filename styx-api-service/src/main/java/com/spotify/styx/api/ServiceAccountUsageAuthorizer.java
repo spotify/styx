@@ -35,11 +35,14 @@ import com.google.api.services.cloudresourcemanager.model.GetIamPolicyRequest;
 import com.google.api.services.cloudresourcemanager.model.Policy;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.IamScopes;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.apollo.Response;
+import com.spotify.styx.model.WorkflowId;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -56,7 +59,8 @@ import org.slf4j.LoggerFactory;
 @FunctionalInterface
 public interface ServiceAccountUsageAuthorizer {
 
-  void authorizeServiceAccountUsage(String serviceAccount, GoogleIdToken idToken);
+  void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount,
+      GoogleIdToken idToken);
 
   class Impl implements ServiceAccountUsageAuthorizer {
 
@@ -71,37 +75,47 @@ public interface ServiceAccountUsageAuthorizer {
     private final Iam iam;
     private final CloudResourceManager crm;
     private final String serviceAccountUserRole;
+    private final AuthorizationPolicy authorizationPolicy;
 
-    Impl(Iam iam, CloudResourceManager crm, final String serviceAccountUserRole) {
+    Impl(Iam iam, CloudResourceManager crm, String serviceAccountUserRole, AuthorizationPolicy authorizationPolicy) {
       this.iam = Objects.requireNonNull(iam, "iam");
       this.crm = Objects.requireNonNull(crm, "crm");
       this.serviceAccountUserRole = Objects.requireNonNull(serviceAccountUserRole, "serviceAccountUserRole");
+      this.authorizationPolicy = Objects.requireNonNull(authorizationPolicy, "authorizationPolicy");
     }
 
     @Override
-    public void authorizeServiceAccountUsage(String serviceAccount, GoogleIdToken idToken) {
+    public void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount,
+        GoogleIdToken idToken) {
+
+      final boolean enforce = authorizationPolicy.shouldEnforceAuthorization(workflowId, serviceAccount, idToken);
 
       final String principalEmail = idToken.getPayload().getEmail();
       final String projectId = serviceAccountProjectId(serviceAccount);
 
       // Check if the principal has been granted the service account user role in the project of the SA
       if (projectPolicyAccessGranted(projectId, principalEmail)) {
-        log.info("[AUDIT] Principal {} has role {} in project {}, authorizing use of service account {}",
-            principalEmail, serviceAccountUserRole, projectId, serviceAccount);
+        log.info("[AUDIT] Principal {} has role {} in project {}, "
+                + "authorizing use of service account {} in workflow {} (Enforcing: {})",
+            principalEmail, serviceAccountUserRole, projectId, serviceAccount, workflowId.toKey(), enforce);
         return;
       }
 
       // Check if the principal has been granted the service account user role on the SA itself
       if (serviceAccountPolicyAccessGranted(serviceAccount, principalEmail)) {
-        log.info("[AUDIT] Principal {} has role {} on service account {}, authorizing use of service account {}",
-            principalEmail, serviceAccountUserRole, serviceAccount, serviceAccount);
+        log.info("[AUDIT] Principal {} has role {} on service account {}, "
+                + "authorizing use of service account {} in workflow {} (Enforcing: {})",
+            principalEmail, serviceAccountUserRole, serviceAccount, serviceAccount, workflowId.toKey(), enforce);
         return;
       }
 
-      log.info("[AUDIT] Principal {} denied use of service account {}", principalEmail, serviceAccount);
-      throw new ResponseException(Response.forStatus(
-          FORBIDDEN.withReasonPhrase("Missing role " + serviceAccountUserRole
-              + " on either the project " + projectId + " or the service account " + serviceAccount)));
+      log.info("[AUDIT] Principal {} denied use of service account {} in workflow {} (Enforcing: {})",
+          principalEmail, serviceAccount, workflowId.toKey(), enforce);
+      if (enforce) {
+        throw new ResponseException(Response.forStatus(
+            FORBIDDEN.withReasonPhrase("Missing role " + serviceAccountUserRole
+                + " on either the project " + projectId + " or the service account " + serviceAccount)));
+      }
     }
 
     private String serviceAccountProjectId(String serviceAccount) {
@@ -171,11 +185,12 @@ public interface ServiceAccountUsageAuthorizer {
     }
   }
 
-  static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole) {
-    return create(serviceAccountUserRole, defaultCredential());
+  static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole, AuthorizationPolicy authorizationPolicy) {
+    return create(serviceAccountUserRole, authorizationPolicy, defaultCredential());
   }
 
-  static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole, GoogleCredential credential) {
+  static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole, AuthorizationPolicy authorizationPolicy,
+      GoogleCredential credential) {
 
     final HttpTransport httpTransport;
     try {
@@ -198,11 +213,11 @@ public interface ServiceAccountUsageAuthorizer {
         .setApplicationName(applicationName)
         .build();
 
-    return new Impl(iam, crm, serviceAccountUserRole);
+    return new Impl(iam, crm, serviceAccountUserRole, authorizationPolicy);
   }
 
   static ServiceAccountUsageAuthorizer nop() {
-    return (sa, id) -> { };
+    return (workflowId, sa, id) -> { };
   }
 
   static GoogleCredential defaultCredential() {
@@ -216,5 +231,53 @@ public interface ServiceAccountUsageAuthorizer {
     return credential;
   }
 
+  /**
+   * A policy that decides whether to enforce an authorization decision.
+   */
+  interface AuthorizationPolicy {
 
+    /**
+     * Returns true if authorization should be enforced, false otherwise.
+     */
+    boolean shouldEnforceAuthorization(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken);
+  }
+
+  /**
+   * A policy that does not enforce any authorization.
+   */
+  class NoAuthorizationPolicy implements AuthorizationPolicy {
+
+    @Override
+    public boolean shouldEnforceAuthorization(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
+      return false;
+    }
+  }
+
+  /**
+   * A policy that always enforces authorization.
+   */
+  class AllAuthorizationPolicy implements AuthorizationPolicy {
+
+    @Override
+    public boolean shouldEnforceAuthorization(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
+      return true;
+    }
+  }
+
+  /**
+   * A policy that only enforces authorization for a set of workflows.
+   */
+  class WhitelistAuthorizationPolicy implements AuthorizationPolicy {
+
+    private final Set<WorkflowId> whitelist;
+
+    public WhitelistAuthorizationPolicy(Iterable<WorkflowId> whitelist) {
+      this.whitelist = ImmutableSet.copyOf(whitelist);
+    }
+
+    @Override
+    public boolean shouldEnforceAuthorization(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
+      return whitelist.contains(workflowId);
+    }
+  }
 }

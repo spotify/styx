@@ -172,7 +172,8 @@ public final class WorkflowResource {
     if (workflowConfig.serviceAccount().isPresent()) {
       final String serviceAccount = workflowConfig.serviceAccount().get();
       final GoogleIdToken idToken = idTokenSupplier.get().orElseThrow(AssertionError::new);
-      serviceAccountUsageAuthorizer.authorizeServiceAccountUsage(serviceAccount, idToken);
+      final WorkflowId workflowId = WorkflowId.create(componentId, workflowConfig.id());
+      serviceAccountUsageAuthorizer.authorizeServiceAccountUsage(workflowId, serviceAccount, idToken);
     }
 
     final Collection<String> errors =

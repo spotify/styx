@@ -46,6 +46,7 @@ import com.spotify.styx.api.WorkflowResource;
 import com.spotify.styx.api.workflow.WorkflowInitializer;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.monitoring.MeteredStorageProxy;
 import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.Stats;
@@ -65,6 +66,7 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
@@ -80,7 +82,9 @@ public class StyxApi implements AppInit {
   public static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
-  public static final String SERVICE_ACCOUNT_USER_ROLE_CONFIG = "styx.authorizaton.service-account-user-role";
+  public static final String AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG = "styx.authorizaton.service-account-user-role";
+  public static final String AUTHORIZATION_REQUIRE_ALL_CONFIG = "styx.authorizaton.require.all";
+  public static final String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorizaton.require.workflows";
 
   private final String serviceName;
   private final StorageFactory storageFactory;
@@ -172,15 +176,30 @@ public class StyxApi implements AppInit {
     // results duplicated headers, and that would make nginx unhappy. This has been fixed
     // in later Apollo version.
 
-    final ServiceAccountUsageAuthorizer serviceAccountUseAuthorizer =
-        environment.config().hasPath(SERVICE_ACCOUNT_USER_ROLE_CONFIG)
-            ? ServiceAccountUsageAuthorizer.create(environment.config().getString(SERVICE_ACCOUNT_USER_ROLE_CONFIG))
-            : ServiceAccountUsageAuthorizer.nop();
+    final ServiceAccountUsageAuthorizer.AuthorizationPolicy authorizationPolicy;
+    if (environment.config().hasPath(AUTHORIZATION_REQUIRE_ALL_CONFIG) &&
+        environment.config().getBoolean(AUTHORIZATION_REQUIRE_ALL_CONFIG)) {
+      authorizationPolicy = new ServiceAccountUsageAuthorizer.AllAuthorizationPolicy();
+    } else if (environment.config().hasPath(AUTHORIZATION_REQUIRE_WORKFLOWS)) {
+      final List<String> keys = environment.config().getStringList(AUTHORIZATION_REQUIRE_WORKFLOWS);
+      final List<WorkflowId> ids = keys.stream().map(WorkflowId::parseKey).collect(Collectors.toList());
+      authorizationPolicy = new ServiceAccountUsageAuthorizer.WhitelistAuthorizationPolicy(ids);
+    } else {
+      authorizationPolicy = new ServiceAccountUsageAuthorizer.NoAuthorizationPolicy();
+    }
+
+    final ServiceAccountUsageAuthorizer authorizer;
+    if (environment.config().hasPath(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)) {
+      final String role = environment.config().getString(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG);
+      authorizer = ServiceAccountUsageAuthorizer.create(role, authorizationPolicy);
+    } else {
+      authorizer = ServiceAccountUsageAuthorizer.nop();
+    }
 
     final WorkflowResource workflowResource = new WorkflowResource(storage,
         new WorkflowValidator(new DockerImageValidator()),
         new WorkflowInitializer(storage, time),
-        workflowConsumer, serviceAccountUseAuthorizer, Middlewares.requestIdTokenSupplier());
+        workflowConsumer, authorizer, Middlewares.requestIdTokenSupplier());
 
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
         storage,
