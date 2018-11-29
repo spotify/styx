@@ -324,6 +324,8 @@ public final class BackfillResource implements Closeable {
 
     final WorkflowId workflowId = WorkflowId.create(input.component(), input.workflow());
 
+    // TODO: authorize backfills using ServiceAccountUsageAuthorizer ?
+
     final Workflow workflow;
     final Set<WorkflowInstance> activeWorkflowInstances;
     try {
