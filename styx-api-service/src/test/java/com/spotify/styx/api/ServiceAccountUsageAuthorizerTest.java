@@ -72,27 +72,28 @@ public class ServiceAccountUsageAuthorizerTest {
   @Mock private GoogleIdToken.Payload idTokenPayload;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private CloudResourceManager crm;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Iam iam;
-  private com.google.api.services.cloudresourcemanager.model.Policy projectPolicy;
-  private com.google.api.services.cloudresourcemanager.model.Binding projectBinding;
-  private com.google.api.services.iam.v1.model.Policy saPolicy;
-  private com.google.api.services.iam.v1.model.Binding saBinding;
+
+  private final com.google.api.services.cloudresourcemanager.model.Binding projectBinding =
+      new com.google.api.services.cloudresourcemanager.model.Binding();
+  private final com.google.api.services.iam.v1.model.Binding saBinding =
+      new com.google.api.services.iam.v1.model.Binding();;
 
   private ServiceAccountUsageAuthorizer sut;
 
   @Before
   public void setUp() throws IOException {
-    projectBinding = new com.google.api.services.cloudresourcemanager.model.Binding();
     projectBinding.setRole(SERVICE_ACCOUNT_USER_ROLE);
     projectBinding.setMembers(new ArrayList<>());
     projectBinding.getMembers().add("user:someone@else.com");
-    projectPolicy = new com.google.api.services.cloudresourcemanager.model.Policy();
+    final com.google.api.services.cloudresourcemanager.model.Policy projectPolicy =
+        new com.google.api.services.cloudresourcemanager.model.Policy();
     projectPolicy.setBindings(new ArrayList<>());
     projectPolicy.getBindings().add(projectBinding);
-    saBinding = new com.google.api.services.iam.v1.model.Binding();
     saBinding.setRole(SERVICE_ACCOUNT_USER_ROLE);
     saBinding.setMembers(new ArrayList<>());
     saBinding.getMembers().add("user:someone@else.com");
-    saPolicy = new com.google.api.services.iam.v1.model.Policy();
+    final com.google.api.services.iam.v1.model.Policy saPolicy =
+        new com.google.api.services.iam.v1.model.Policy();
     saPolicy.setBindings(new ArrayList<>());
     saPolicy.getBindings().add(saBinding);
     when(authorizationPolicy.shouldEnforceAuthorization(any(), any(), any())).thenReturn(true);
