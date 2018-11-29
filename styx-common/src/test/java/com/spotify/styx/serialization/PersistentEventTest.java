@@ -47,7 +47,8 @@ public class PersistentEventTest {
   private static final Trigger NATURAL_TRIGGER1 = Trigger.natural();
   private static final Trigger ADHOC_TRIGGER2 = Trigger.adhoc("trig2");
   private static final Trigger BACKFILL_TRIGGER3 = Trigger.backfill("trig3");
-  private static final Trigger TRIGGER_UNKNOWN = Trigger.unknown("UNKNOWN");
+  private static final String UNKNOWN = "UNKNOWN";
+  private static final Trigger TRIGGER_UNKNOWN = Trigger.unknown(UNKNOWN);
   private static final WorkflowInstance INSTANCE1 = WorkflowInstance.create(WORKFLOW1, PARAMETER1);
   private static final String POD_NAME = "test-event";
   private static final String DOCKER_IMAGE = "busybox:1.1";
@@ -80,7 +81,7 @@ public class PersistentEventTest {
     assertRoundtrip(Event.stop(INSTANCE1));
     assertRoundtrip(Event.timeout(INSTANCE1));
     assertRoundtrip(Event.halt(INSTANCE1));
-    assertRoundtrip(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION, POD_NAME));
+    assertRoundtrip(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION, POD_NAME, "trig"));
     assertRoundtrip(Event.submitted(INSTANCE1, POD_NAME));
   }
 
@@ -102,16 +103,18 @@ public class PersistentEventTest {
                                                + "\"docker_args\":[\"foo\",\"bar\"],"
                                                + "\"secret\":{\"name\":\"secret\",\"mount_path\":\"/dev/null\"},"
                                                + "\"commit_sha\":\"" + COMMIT_SHA
-                                               + "\"}")),
-        is(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION, null)));
+                                               + "\"}, "
+                                               + "\"trigger_id\": \"" + UNKNOWN + "\"")),
+        is(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION, null, UNKNOWN)));
     assertThat(deserializeEvent(json("submit", "\"execution_description\": { "
                                                + "\"docker_image\":\"" + DOCKER_IMAGE + "\","
                                                + "\"docker_args\":[\"foo\",\"bar\"],"
                                                + "\"secret\":{\"name\":\"secret\",\"mount_path\":\"/dev/null\"},"
                                                + "\"commit_sha\":\"" + COMMIT_SHA
                                                + "\"}, "
-                                               + "\"execution_id\": \"" + POD_NAME + "\"")),
-        is(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION, POD_NAME)));
+                                               + "\"execution_id\": \"" + POD_NAME + "\","
+                                               + "\"trigger_id\": \"" + UNKNOWN + "\"")),
+        is(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION, POD_NAME, UNKNOWN)));
     assertThat(
         deserializeEvent(json("info", "\"message\":{\"line\":\"InfoMessage\",\"level\":\"INFO\"}")),
         is(Event.info(INSTANCE1, Message.info("InfoMessage"))));

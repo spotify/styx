@@ -786,7 +786,7 @@ public class QueuedStateManagerTest {
   @Test
   public void shouldNotUpdateResourceCountersOnSubmit() throws Exception {
     givenState(INSTANCE, State.PREPARE);
-    receiveEvent(Event.submit(INSTANCE, ExecutionDescription.forImage("docker-image"),"styx-run-1"));
+    receiveEvent(Event.submit(INSTANCE, ExecutionDescription.forImage("docker-image"), "styx-run-1", "trig1"));
     verify(transaction, never()).updateCounter(eq(shardedCounter), anyString(), anyInt());
   }
 

@@ -354,10 +354,11 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
     storage.storeBackfill(BACKFILL_1.builder().nextTrigger(Instant.parse("2017-01-01T02:00:00Z")).build());
+    final Trigger backfillTrigger = Trigger.backfill("backfill-1");
     storage.writeEvent(SequenceEvent.create(
-        Event.triggerExecution(wfi, Trigger.backfill("backfill-1"), TRIGGER_PARAMETERS),        1L, 1L));
+        Event.triggerExecution(wfi, backfillTrigger, TRIGGER_PARAMETERS),        1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi, RESOURCE_IDS),                   2L, 2L));
-    storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"), 3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1", "backfill-1"), 3L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                     4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                 5L, 5L));
     storage.writeActiveState(wfi, RunState.create(wfi, State.RUNNING,
@@ -387,12 +388,13 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldGetBackfillStatusWithStatusByDefaultReversed() throws Exception {
     sinceVersion(Api.Version.V3);
 
+    final Trigger backfillTrigger = Trigger.backfill("backfill-2");
     WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_2.workflowId(), "2017-01-01T22");
     storage.storeBackfill(BACKFILL_2.builder().nextTrigger(Instant.parse("2017-01-01T21:00:00Z")).build());
     storage.writeEvent(SequenceEvent.create(
-        Event.triggerExecution(wfi, Trigger.backfill("backfill-2"), TRIGGER_PARAMETERS),        1L, 1L));
+        Event.triggerExecution(wfi, backfillTrigger, TRIGGER_PARAMETERS),        1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi, RESOURCE_IDS),                   2L, 2L));
-    storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"), 3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1", "backfill-2"), 3L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                 5L, 5L));
     storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                     4L, 4L));
     storage.writeActiveState(wfi, RunState.create(wfi, State.RUNNING,
@@ -424,10 +426,11 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_2.workflowId(), "2017-01-01T22");
     storage.storeBackfill(BACKFILL_2.builder().nextTrigger(Instant.parse("2017-01-01T21:00:00Z")).build());
+    final Trigger backfillTrigger = Trigger.backfill("backfill-2");
     storage.writeEvent(SequenceEvent.create(
-        Event.triggerExecution(wfi, Trigger.backfill("backfill-2"), TRIGGER_PARAMETERS),        1L, 1L));
+        Event.triggerExecution(wfi, backfillTrigger, TRIGGER_PARAMETERS),        1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi, RESOURCE_IDS),                   2L, 2L));
-    storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"), 3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1", "backfill-2"), 3L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                     4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                 5L, 5L));
     storage.writeActiveState(wfi, RunState.create(wfi, State.RUNNING,
@@ -494,10 +497,11 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   private void storeSucessfulInstance(WorkflowInstance wfi, String backfillId) throws IOException {
+    final Trigger backfillTrigger = Trigger.backfill(backfillId);
     storage.writeEvent(SequenceEvent.create(
-        Event.triggerExecution(wfi, Trigger.backfill(backfillId), TRIGGER_PARAMETERS),          1L, 1L));
+        Event.triggerExecution(wfi, backfillTrigger, TRIGGER_PARAMETERS),          1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi, RESOURCE_IDS),                   2L, 2L));
-    storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"), 3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1", backfillId), 3L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                     4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                 5L, 5L));
     storage.writeEvent(SequenceEvent.create(Event.terminate(wfi, Optional.of(0)),               6L, 6L));
@@ -825,10 +829,11 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   private void storeRunningWorkflowInstance(WorkflowInstance wfi, String backfillId) throws IOException {
+    final Trigger backfillTrigger = Trigger.backfill(backfillId);
     storage.writeEvent(SequenceEvent.create(
-        Event.triggerExecution(wfi, Trigger.backfill(backfillId), TRIGGER_PARAMETERS),          1L, 1L));
+        Event.triggerExecution(wfi, backfillTrigger, TRIGGER_PARAMETERS),          1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi, RESOURCE_IDS),                   2L, 2L));
-    storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"), 3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1", backfillId), 3L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                     4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                 5L, 5L));
     storage.writeActiveState(wfi, RunState.create(wfi, State.RUNNING, StateData.zero(), Instant.now(), 5L));
@@ -844,11 +849,12 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     WorkflowInstance wfi1 = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
     WorkflowInstance wfi2 = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T02");
+    final Trigger backfillTrigger = Trigger.backfill("backfill-1");
     storage.storeBackfill(BACKFILL_1.builder().nextTrigger(Instant.parse("2017-01-01T03:00:00Z")).build());
     storage.writeEvent(SequenceEvent.create(
-        Event.triggerExecution(wfi1, Trigger.backfill("backfill-1"), TRIGGER_PARAMETERS),        1L, 1L));
+        Event.triggerExecution(wfi1, backfillTrigger, TRIGGER_PARAMETERS),        1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi1, RESOURCE_IDS),                   2L, 2L));
-    storage.writeEvent(SequenceEvent.create(Event.submit(wfi1, EXECUTION_DESCRIPTION, "exec-1"), 3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi1, EXECUTION_DESCRIPTION, "exec-1", "backfill-1"), 3L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.submitted(wfi1, "exec-1"),                     4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi1),                                 5L, 5L));
     storage.writeActiveState(wfi1, RunState.create(wfi1, State.RUNNING,
@@ -883,17 +889,18 @@ public class BackfillResourceTest extends VersionedApiTest {
     WorkflowInstance wfi2 = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T02");
     storage.storeBackfill(BACKFILL_1.builder().nextTrigger(Instant.parse("2017-01-01T03:00:00Z")).build());
 
+    final Trigger backfillTrigger = Trigger.backfill("backfill-1");
     storage.writeEvent(SequenceEvent.create(
-        Event.triggerExecution(wfi1, Trigger.backfill("backfill-1"), TRIGGER_PARAMETERS),        1L, 1L));
+        Event.triggerExecution(wfi1, backfillTrigger, TRIGGER_PARAMETERS),        1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi1, RESOURCE_IDS),                   2L, 2L));
-    storage.writeEvent(SequenceEvent.create(Event.submit(wfi1, EXECUTION_DESCRIPTION, "exec-1"), 3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi1, EXECUTION_DESCRIPTION, "exec-1", "backfill-1"), 3L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.submitted(wfi1, "exec-1"),                     4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi1),                                 5L, 5L));
 
     storage.writeEvent(SequenceEvent.create(
-        Event.triggerExecution(wfi2, Trigger.backfill("backfill-1"), TRIGGER_PARAMETERS),        1L, 1L));
+        Event.triggerExecution(wfi2, backfillTrigger, TRIGGER_PARAMETERS),        1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi2, RESOURCE_IDS),                   2L, 2L));
-    storage.writeEvent(SequenceEvent.create(Event.submit(wfi2, EXECUTION_DESCRIPTION, "exec-2"), 3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi2, EXECUTION_DESCRIPTION, "exec-2", "backfill-1"), 3L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.submitted(wfi2, "exec-2"),                     4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi2),                                 5L, 5L));
 

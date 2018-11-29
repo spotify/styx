@@ -99,8 +99,8 @@ class PersistentEvent {
 
     @Override
     public PersistentEvent submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
-        String executionId) {
-      return new Submit(workflowInstance.toKey(), executionDescription, executionId);
+        String executionId, String triggerId) {
+      return new Submit(workflowInstance.toKey(), executionDescription, executionId, triggerId);
     }
 
     @Override
@@ -373,20 +373,23 @@ class PersistentEvent {
 
     public final ExecutionDescription executionDescription;
     public final String executionId;
+    public final String triggerId;
 
     @JsonCreator
     public Submit(
         @JsonProperty("workflow_instance") String workflowInstance,
         @JsonProperty("execution_description") ExecutionDescription executionDescription,
-        @JsonProperty("execution_id") String executionId) {
+        @JsonProperty("execution_id") String executionId,
+        @JsonProperty("trigger_id") String triggerId) {
       super("submit", workflowInstance);
       this.executionDescription = executionDescription;
+      this.triggerId = triggerId;
       this.executionId = executionId;
     }
 
     @Override
     public Event toEvent() {
-      return Event.submit(WorkflowInstance.parseKey(workflowInstance), executionDescription, executionId);
+      return Event.submit(WorkflowInstance.parseKey(workflowInstance), executionDescription, executionId, triggerId);
     }
   }
 }

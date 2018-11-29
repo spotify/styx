@@ -75,7 +75,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
       case PREPARE:
         try {
           final Event submitEvent = Event.submit(
-              state.workflowInstance(), getExecDescription(workflowInstance, state.data()), createExecutionId());
+              state.workflowInstance(), getExecDescription(workflowInstance, state.data()), createExecutionId(), state.data().triggerId().orElse(null));
           try {
             stateManager.receive(submitEvent);
           } catch (IsClosedException isClosedException) {

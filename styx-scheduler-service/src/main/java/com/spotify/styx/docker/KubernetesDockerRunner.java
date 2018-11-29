@@ -815,7 +815,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
     @Override
     public Boolean submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
-        String executionId) {
+        String executionId, String triggerId) {
       return false;
     }
 

@@ -33,6 +33,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.EventUtil;
+import com.spotify.styx.util.TriggerUtil;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -47,10 +48,12 @@ public class WFIExecutionBuilderTest {
       WorkflowInstance.parseKey("component1#endpoint1#2016-08-03T06");
   private static final WorkflowInstanceEventFactory E =
       new WorkflowInstanceEventFactory(WORKFLOW_INSTANCE);
+  private static final String UNKNOWN_TRIGGERID_0 = "trig0";
+  private static final String UNKNOWN_TRIGGERID_1 = "trig1";
   private static final com.spotify.styx.state.Trigger
-      UNKNOWN_TRIGGER0 = com.spotify.styx.state.Trigger.unknown("trig0");
+      UNKNOWN_TRIGGER0 = com.spotify.styx.state.Trigger.unknown(UNKNOWN_TRIGGERID_0);
   private static final com.spotify.styx.state.Trigger
-      UNKNOWN_TRIGGER1 = com.spotify.styx.state.Trigger.unknown("trig1");
+      UNKNOWN_TRIGGER1 = com.spotify.styx.state.Trigger.unknown(UNKNOWN_TRIGGERID_1);
   private static final Set<String> RESOURCE_IDS = ImmutableSet.of("foo-resource", "bar-resource");
 
   private ExecutionDescription desc(String dockerImage, String commitSha) {
@@ -75,7 +78,7 @@ public class WFIExecutionBuilderTest {
     );
     assertValidTransitionSequence(events);
     WorkflowInstanceExecutionData workflowInstanceExecutionData =
-    new WFIExecutionBuilder().executionInfo(events);
+        new WFIExecutionBuilder().executionInfo(events);
     WorkflowInstanceExecutionData expected =
         WorkflowInstanceExecutionData.create(
             WORKFLOW_INSTANCE,
@@ -149,14 +152,16 @@ public class WFIExecutionBuilderTest {
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0, triggerParameters), c++, ts("07:55")),
         SequenceEvent.create(E.info(Message.info("foo bar")), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00", UNKNOWN_TRIGGERID_0), c++,
+            ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
         SequenceEvent.create(E.started(), c++, ts("07:57")),
         SequenceEvent.create(E.terminate(RunState.MISSING_DEPS_EXIT_CODE), c++, ts("07:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
         SequenceEvent.create(E.retry(), c++, ts("08:56")),
-        SequenceEvent.create(E.submit(desc("img2"), "exec-id-01"), c++, ts("08:55")),
+        SequenceEvent.create(E.submit(desc("img2"), "exec-id-01", UNKNOWN_TRIGGERID_0), c++,
+            ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57")),
         SequenceEvent.create(E.terminate(0), c++, ts("08:58")),
@@ -164,14 +169,16 @@ public class WFIExecutionBuilderTest {
 
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER1), c++, ts("09:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("09:55")),
-        SequenceEvent.create(E.submit(desc("img3", "sha3"), "exec-id-10"), c++, ts("09:55")),
+        SequenceEvent.create(E.submit(desc("img3", "sha3"), "exec-id-10", UNKNOWN_TRIGGERID_1), c++,
+            ts("09:55")),
         SequenceEvent.create(E.submitted("exec-id-10"), c++, ts("09:56")),
         SequenceEvent.create(E.started(), c++, ts("09:57")),
         SequenceEvent.create(E.terminate(1), c++, ts("09:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("09:59")),
 
         SequenceEvent.create(E.retry(), c++, ts("10:56")),
-        SequenceEvent.create(E.submit(desc("img4", "sha4"), "exec-id-11"), c++, ts("10:55")),
+        SequenceEvent.create(E.submit(desc("img4", "sha4"), "exec-id-11", UNKNOWN_TRIGGERID_1), c++,
+            ts("10:55")),
         SequenceEvent.create(E.submitted("exec-id-11"), c++, ts("10:56")),
         SequenceEvent.create(E.started(), c++, ts("10:57"))
     );
@@ -250,7 +257,8 @@ public class WFIExecutionBuilderTest {
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00", UNKNOWN_TRIGGERID_0), c++,
+            ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
         SequenceEvent.create(E.started(), c++, ts("07:57")),
         SequenceEvent.create(E.terminate(Optional.empty()), c++, ts("07:58"))
@@ -293,14 +301,16 @@ public class WFIExecutionBuilderTest {
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00", UNKNOWN_TRIGGERID_0), c++,
+            ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
         SequenceEvent.create(E.started(), c++, ts("07:57")),
         SequenceEvent.create(E.timeout(), c++, ts("07:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
         SequenceEvent.create(E.retry(), c++, ts("08:56")),
-        SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-01"), c++, ts("08:55")),
+        SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-01", UNKNOWN_TRIGGERID_0), c++,
+            ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57"))
     );
@@ -351,7 +361,8 @@ public class WFIExecutionBuilderTest {
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.timeout(), c++, ts("07:54")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00", "UNKNOWN"), c++,
+            ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
         SequenceEvent.create(E.started(), c++, ts("07:57"))
     );
@@ -391,12 +402,14 @@ public class WFIExecutionBuilderTest {
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00", UNKNOWN_TRIGGERID_0), c++,
+            ts("07:55")),
         SequenceEvent.create(E.runError("First failure"), c++, ts("07:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
         SequenceEvent.create(E.retry(), c++, ts("08:56")),
-        SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-01"), c++, ts("08:55")),
+        SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-01", UNKNOWN_TRIGGERID_0), c++,
+            ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57")),
         SequenceEvent.create(E.runError("Second failure"), c++, ts("08:59"))
@@ -447,13 +460,15 @@ public class WFIExecutionBuilderTest {
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00", UNKNOWN_TRIGGERID_0), c++,
+            ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
         SequenceEvent.create(E.halt(), c++, ts("07:57")),
 
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER1), c++, ts("08:56")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("08:56")),
-        SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-10"), c++, ts("08:55")),
+        SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-10", UNKNOWN_TRIGGERID_1), c++,
+            ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-10"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57"))
     );
@@ -511,12 +526,14 @@ public class WFIExecutionBuilderTest {
     List<SequenceEvent> events = Arrays.asList(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00", UNKNOWN_TRIGGERID_0), c++,
+            ts("07:55")),
         SequenceEvent.create(E.runError("First failure"), c++, ts("07:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
         SequenceEvent.create(E.retry(), c++, ts("08:56")),
-        SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-01"), c++, ts("08:55")),
+        SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-01", UNKNOWN_TRIGGERID_0), c++,
+            ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57")),
         SequenceEvent.create(E.runError("Second failure"), c++, ts("08:59")),
@@ -569,7 +586,7 @@ public class WFIExecutionBuilderTest {
       fail("first event must be triggerExecution");
     }
 
-    for(SequenceEvent event : events) {
+    for (SequenceEvent event : events) {
       if ("triggerExecution".equals(EventUtil.name(event.event()))
           && runState.state() != RunState.State.NEW) {
         assertThat(runState.state().isTerminal(), is(true));

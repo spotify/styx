@@ -78,7 +78,8 @@ public class RunStateTest {
 
   private static final String COMMIT_SHA = "sha_1";
 
-  private static final Trigger UNKNOWN_TRIGGER = Trigger.unknown("trig");
+  private static final String UNKNOWN_TRIGGERID = "trig";
+  private static final Trigger UNKNOWN_TRIGGER = Trigger.unknown(UNKNOWN_TRIGGERID);
   private static final Trigger NATURAL_TRIGGER1 = Trigger.natural();
 
   private WorkflowInstanceEventFactory eventFactory =
@@ -161,7 +162,7 @@ public class RunStateTest {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
-    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1"));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1", UNKNOWN_TRIGGERID));
     transitioner.receive(eventFactory.submitted("exec1"));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(1));
@@ -171,7 +172,7 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), hasValue(777L));
 
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
-    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec2"));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec2", UNKNOWN_TRIGGERID));
     transitioner.receive(eventFactory.submitted("exec2"));
     transitioner.receive(eventFactory.started());
 
@@ -243,7 +244,7 @@ public class RunStateTest {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
-    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_1));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_1, UNKNOWN_TRIGGERID));
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(SUBMITTING));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().get(), equalTo(TEST_EXECUTION_ID_1));
@@ -259,7 +260,7 @@ public class RunStateTest {
     transitioner.receive(eventFactory.terminate(1));
     transitioner.receive(eventFactory.retryAfter(999));
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
-    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_2));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_2, UNKNOWN_TRIGGERID));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().get(), equalTo(TEST_EXECUTION_ID_2));
   }
 
@@ -315,7 +316,6 @@ public class RunStateTest {
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
     transitioner.receive(eventFactory.retry());
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
-
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(SUBMITTED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(2));
@@ -552,7 +552,7 @@ public class RunStateTest {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
-    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_1));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_1, UNKNOWN_TRIGGERID));
     transitioner.receive(eventFactory.submitted(TEST_EXECUTION_ID_1));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(20));
@@ -633,7 +633,7 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), isEmpty());
 
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of("r1")));
-    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1"));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1", UNKNOWN_TRIGGERID));
     transitioner.receive(eventFactory.submitted("exec1"));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
@@ -658,7 +658,7 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), isEmpty());
 
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of("r1")));
-    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1"));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1", UNKNOWN_TRIGGERID));
     transitioner.receive(eventFactory.submitted("exec1"));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(RunState.MISSING_DEPS_EXIT_CODE));
@@ -675,7 +675,7 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), isEmpty());
 
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of("r1")));
-    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1"));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1", UNKNOWN_TRIGGERID));
     transitioner.receive(eventFactory.timeout());
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(FAILED));

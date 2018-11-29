@@ -129,7 +129,7 @@ public final class EventUtil {
 
     @Override
     public String submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
-        String executionId) {
+        String executionId, String triggerId) {
       return String.format("Execution description: %s, id: %s", executionDescription, executionId);
     }
 
@@ -219,7 +219,7 @@ public final class EventUtil {
 
     @Override
     public String submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
-        String executionId) {
+        String executionId, String triggerId) {
       return "submit";
     }
 

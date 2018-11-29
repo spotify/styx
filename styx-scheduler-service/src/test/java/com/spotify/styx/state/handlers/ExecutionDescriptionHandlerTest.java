@@ -44,6 +44,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
@@ -72,6 +73,7 @@ public class ExecutionDescriptionHandlerTest {
   @Mock EventVisitor<Void> eventVisitor;
 
   @Captor ArgumentCaptor<WorkflowInstance> workflowInstanceCaptor;
+  @Captor ArgumentCaptor<String> triggerCaptor;
   @Captor ArgumentCaptor<ExecutionDescription> executionDescriptionCaptor;
   @Captor ArgumentCaptor<String> executionIdCaptor;
   @Captor ArgumentCaptor<Event> eventCaptor;
@@ -101,7 +103,8 @@ public class ExecutionDescriptionHandlerTest {
     final Event event = eventCaptor.getValue();
     event.accept(eventVisitor);
     verify(eventVisitor)
-        .submit(workflowInstanceCaptor.capture(), executionDescriptionCaptor.capture(), executionIdCaptor.capture());
+        .submit(workflowInstanceCaptor.capture(), executionDescriptionCaptor.capture(),
+            executionIdCaptor.capture(), triggerCaptor.capture());
 
     assertThat(executionIdCaptor.getValue(), startsWith("styx-run-"));
     assertThat(executionDescriptionCaptor.getValue().dockerImage(), is(DOCKER_IMAGE));
@@ -125,7 +128,7 @@ public class ExecutionDescriptionHandlerTest {
     event.accept(eventVisitor);
 
     verify(eventVisitor)
-        .submit(workflowInstanceCaptor.capture(), executionDescriptionCaptor.capture(), executionIdCaptor.capture());
+        .submit(workflowInstanceCaptor.capture(), executionDescriptionCaptor.capture(), executionIdCaptor.capture(), triggerCaptor.capture());
 
     assertThat(executionIdCaptor.getValue(), startsWith("styx-run-"));
     assertThat(executionDescriptionCaptor.getValue().dockerImage(), is(DOCKER_IMAGE));

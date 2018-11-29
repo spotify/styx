@@ -211,7 +211,7 @@ public abstract class RunState {
 
     @Override
     public RunState submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
-        String executionId) {
+        String executionId, String triggerId) {
       switch (state()) {
         case QUEUED: // for backwards compatibility
         case PREPARE:
@@ -220,6 +220,7 @@ public abstract class RunState {
               data().builder()
                   .executionDescription(executionDescription)
                   .executionId(executionId)
+                  .triggerId(triggerId)
                   .build());
 
         default:

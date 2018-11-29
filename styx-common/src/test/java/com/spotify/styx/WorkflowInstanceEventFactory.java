@@ -61,8 +61,8 @@ public class WorkflowInstanceEventFactory {
     return Event.dequeue(workflowInstance, resourceIds);
   }
 
-  public Event submit(ExecutionDescription executionDescription, String executionId) {
-    return Event.submit(workflowInstance, executionDescription, executionId);
+  public Event submit(ExecutionDescription executionDescription, String executionId, String triggerId) {
+    return Event.submit(workflowInstance, executionDescription, executionId, triggerId);
   }
 
   public Event submitted(String executionId) {

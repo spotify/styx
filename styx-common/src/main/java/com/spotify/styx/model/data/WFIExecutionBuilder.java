@@ -140,14 +140,14 @@ class WFIExecutionBuilder {
 
     @Override
     public Void submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
-        String executionId) {
+        String executionId, String triggerId) {
       currWorkflowInstance = workflowInstance;
       currDockerImg = executionDescription.dockerImage();
       if (executionDescription.commitSha().isPresent()) {
         currCommitSha = executionDescription.commitSha().get();
       }
       currExecutionId = executionId;
-
+      currTriggerId = triggerId;
       return null;
     }
 
