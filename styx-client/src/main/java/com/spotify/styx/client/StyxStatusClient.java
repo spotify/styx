@@ -34,7 +34,7 @@ import java.util.concurrent.CompletionStage;
 public interface StyxStatusClient extends AutoCloseable {
 
   /**
-   * Get information about the active stats
+   * Get information about the active states (workflow instances)
    *
    * @param componentId component id to filter on
    * @return The information about the active states
