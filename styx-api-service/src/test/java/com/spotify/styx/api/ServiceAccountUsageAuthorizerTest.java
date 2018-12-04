@@ -35,6 +35,8 @@ import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpResponseException.Builder;
+import com.google.api.services.admin.directory.Directory;
+import com.google.api.services.admin.directory.model.MembersHasMember;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.iam.v1.Iam;
 import com.google.common.collect.ImmutableList;
@@ -61,6 +63,8 @@ public class ServiceAccountUsageAuthorizerTest {
 
   private static final WorkflowId WORKFLOW_ID = WorkflowId.create("foo", "bar");
   private static final String PRINCIPAL_EMAIL = "user@corp.com";
+  private static final String PROJECT_ADMINS_GROUP_EMAIL = "project-admins@corp.com";
+  private static final String SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL = "service-account-admins@corp.com";
   private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
   private static final String SERVICE_ACCOUNT_PROJECT = "bar";
   private static final String SERVICE_ACCOUNT_USER_ROLE = "organizations/3141592/roles/StyxWorkflowServiceAccountUser";
@@ -73,6 +77,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Mock private GoogleIdToken.Payload idTokenPayload;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private CloudResourceManager crm;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Iam iam;
+  @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Directory directory;
 
   private final com.google.api.services.cloudresourcemanager.model.Binding projectBinding =
       new com.google.api.services.cloudresourcemanager.model.Binding();
@@ -86,6 +91,7 @@ public class ServiceAccountUsageAuthorizerTest {
     projectBinding.setRole(SERVICE_ACCOUNT_USER_ROLE);
     projectBinding.setMembers(new ArrayList<>());
     projectBinding.getMembers().add("user:someone@else.com");
+    projectBinding.getMembers().add("group:" + PROJECT_ADMINS_GROUP_EMAIL);
     final com.google.api.services.cloudresourcemanager.model.Policy projectPolicy =
         new com.google.api.services.cloudresourcemanager.model.Policy();
     projectPolicy.setBindings(new ArrayList<>());
@@ -93,6 +99,7 @@ public class ServiceAccountUsageAuthorizerTest {
     saBinding.setRole(SERVICE_ACCOUNT_USER_ROLE);
     saBinding.setMembers(new ArrayList<>());
     saBinding.getMembers().add("user:someone@else.com");
+    saBinding.getMembers().add("group:" + SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL);
     final com.google.api.services.iam.v1.model.Policy saPolicy =
         new com.google.api.services.iam.v1.model.Policy();
     saPolicy.setBindings(new ArrayList<>());
@@ -103,7 +110,9 @@ public class ServiceAccountUsageAuthorizerTest {
     when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenReturn(projectPolicy);
     when((Object) iam.projects().serviceAccounts().getIamPolicy("projects/-/serviceAccounts/" + SERVICE_ACCOUNT)
         .execute()).thenReturn(saPolicy);
-    sut = new ServiceAccountUsageAuthorizer.Impl(iam, crm, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy);
+    when((Object) directory.members().hasMember(any(), any()).execute())
+        .thenReturn(new MembersHasMember().setIsMember(false));
+    sut = new ServiceAccountUsageAuthorizer.Impl(iam, crm, directory, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy);
   }
 
   @Test
@@ -112,8 +121,9 @@ public class ServiceAccountUsageAuthorizerTest {
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
     verify(authorizationPolicy).shouldEnforceAuthorization(WORKFLOW_ID, SERVICE_ACCOUNT, idToken);
     assertThat(response.status().code(), is(FORBIDDEN.code()));
-    assertThat(response.status().reasonPhrase(), is("Missing role " + SERVICE_ACCOUNT_USER_ROLE
-        + " on either the project " + SERVICE_ACCOUNT_PROJECT + " or the service account " + SERVICE_ACCOUNT));
+    assertThat(response.status().reasonPhrase(), is("The user " + PRINCIPAL_EMAIL + " must have the role " +
+        SERVICE_ACCOUNT_USER_ROLE + " on the project " + SERVICE_ACCOUNT_PROJECT + " or the service account " +
+        SERVICE_ACCOUNT + ", either through a group membership (recommended) or directly"));
   }
 
   @Test
@@ -124,17 +134,35 @@ public class ServiceAccountUsageAuthorizerTest {
   }
 
   @Test
-  public void shouldAuthorizeIfPrincipalHasUserRoleOnProject() {
+  public void shouldAuthorizeIfPrincipalHasUserRoleOnProjectDirectly() {
     projectBinding.getMembers().add("user:" + PRINCIPAL_EMAIL);
     assertThat(Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).isSuccess(),
         is(true));
   }
 
   @Test
-  public void shouldAuthorizeIfPrincipalHasUserRoleOnSA() {
+  public void shouldAuthorizeIfPrincipalHasUserRoleOnProjectViaGroup() throws IOException {
+    when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute())
+        .thenReturn(new MembersHasMember().setIsMember(true));
+    assertThat(Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).isSuccess(),
+        is(true));
+    verify(directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL)).execute();
+  }
+
+  @Test
+  public void shouldAuthorizeIfPrincipalHasUserRoleOnServiceAccountDirectly() {
     saBinding.getMembers().add("user:" + PRINCIPAL_EMAIL);
     assertThat(Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).isSuccess(),
         is(true));
+  }
+
+  @Test
+  public void shouldAuthorizeIfPrincipalHasUserRoleOnServiceAccountViaGroup() throws IOException {
+    when((Object) directory.members().hasMember(SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute())
+        .thenReturn(new MembersHasMember().setIsMember(true));
+    assertThat(Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).isSuccess(),
+        is(true));
+    verify(directory.members().hasMember(SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL)).execute();
   }
 
   @Test

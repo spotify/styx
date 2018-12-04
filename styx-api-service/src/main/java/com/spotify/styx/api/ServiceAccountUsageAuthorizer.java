@@ -22,6 +22,8 @@ package com.spotify.styx.api;
 
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.FORBIDDEN;
+import static java.lang.Boolean.TRUE;
+import static java.util.stream.Collectors.toList;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
@@ -30,6 +32,7 @@ import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
+import com.google.api.services.admin.directory.Directory;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.cloudresourcemanager.model.GetIamPolicyRequest;
 import com.google.api.services.iam.v1.Iam;
@@ -38,6 +41,7 @@ import com.spotify.apollo.Response;
 import com.spotify.styx.model.WorkflowId;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -72,12 +76,15 @@ public interface ServiceAccountUsageAuthorizer {
 
     private final Iam iam;
     private final CloudResourceManager crm;
+    private final Directory directory;
     private final String serviceAccountUserRole;
     private final AuthorizationPolicy authorizationPolicy;
 
-    Impl(Iam iam, CloudResourceManager crm, String serviceAccountUserRole, AuthorizationPolicy authorizationPolicy) {
+    Impl(Iam iam, CloudResourceManager crm, Directory directory, String serviceAccountUserRole,
+        AuthorizationPolicy authorizationPolicy) {
       this.iam = Objects.requireNonNull(iam, "iam");
       this.crm = Objects.requireNonNull(crm, "crm");
+      this.directory = Objects.requireNonNull(directory, "directory");
       this.serviceAccountUserRole = Objects.requireNonNull(serviceAccountUserRole, "serviceAccountUserRole");
       this.authorizationPolicy = Objects.requireNonNull(authorizationPolicy, "authorizationPolicy");
     }
@@ -91,18 +98,23 @@ public interface ServiceAccountUsageAuthorizer {
       final String projectId = serviceAccountProjectId(serviceAccount);
 
       // Check if the principal has been granted the service account user role in the project of the SA
-      if (projectPolicyAccessGranted(projectId, principalEmail)) {
-        log.info("[AUDIT] Principal {} has role {} in project {}, "
+      final Optional<String> projectPolicyAccess = projectPolicyAccess(projectId, principalEmail);
+      if (projectPolicyAccess.isPresent()) {
+        final String accessType = projectPolicyAccess.get();
+        log.info("[AUDIT] Principal {} has role {} in project {} {}, "
                 + "authorizing use of service account {} in workflow {} (Enforcing: {})",
-            principalEmail, serviceAccountUserRole, projectId, serviceAccount, workflowId.toKey(), enforce);
+            principalEmail, serviceAccountUserRole, projectId, accessType, serviceAccount, workflowId.toKey(), enforce);
         return;
       }
 
       // Check if the principal has been granted the service account user role on the SA itself
-      if (serviceAccountPolicyAccessGranted(serviceAccount, principalEmail)) {
-        log.info("[AUDIT] Principal {} has role {} on service account {}, "
+      final Optional<String> serviceAccountPolicyAccess = serviceAccountPolicyAccess(serviceAccount, principalEmail);
+      if (serviceAccountPolicyAccess.isPresent()) {
+        final String accessType = serviceAccountPolicyAccess.get();
+        log.info("[AUDIT] Principal {} has role {} on service account {} {}, "
                 + "authorizing use of service account {} in workflow {} (Enforcing: {})",
-            principalEmail, serviceAccountUserRole, serviceAccount, serviceAccount, workflowId.toKey(), enforce);
+            principalEmail, serviceAccountUserRole, serviceAccount, accessType, serviceAccount, workflowId.toKey(),
+            enforce);
         return;
       }
 
@@ -110,8 +122,9 @@ public interface ServiceAccountUsageAuthorizer {
           principalEmail, serviceAccount, workflowId.toKey(), enforce);
       if (enforce) {
         throw new ResponseException(Response.forStatus(
-            FORBIDDEN.withReasonPhrase("Missing role " + serviceAccountUserRole
-                + " on either the project " + projectId + " or the service account " + serviceAccount)));
+            FORBIDDEN.withReasonPhrase("The user " + principalEmail + " must have the role " + serviceAccountUserRole
+                + " on the project " + projectId + " or the service account " + serviceAccount +
+                ", either through a group membership (recommended) or directly")));
       }
     }
 
@@ -124,26 +137,62 @@ public interface ServiceAccountUsageAuthorizer {
       return matcher.group(1);
     }
 
-    private boolean projectPolicyAccessGranted(String projectId, String principalEmail) {
+    private Optional<String> projectPolicyAccess(String projectId, String principalEmail) {
       final com.google.api.services.cloudresourcemanager.model.Policy policy = getProjectPolicy(projectId)
           .orElseThrow(() -> new ResponseException(Response.forStatus(
               BAD_REQUEST.withReasonPhrase("Project does not exist: " + projectId))));
 
-      return policy.getBindings().stream()
+      final List<String> members = policy.getBindings().stream()
           .filter(binding -> serviceAccountUserRole.equals(binding.getRole()))
           .flatMap(binding -> binding.getMembers().stream())
-          .anyMatch(memberEntry(principalEmail)::equals);
+          .collect(toList());
+
+      return memberStatus(principalEmail, members);
     }
 
-    private boolean serviceAccountPolicyAccessGranted(String serviceAccount, String principalEmail) {
+    private Optional<String> serviceAccountPolicyAccess(String serviceAccount, String principalEmail) {
       final com.google.api.services.iam.v1.model.Policy policy = getServiceAccountPolicy(serviceAccount)
           .orElseThrow(() -> new ResponseException(Response.forStatus(
               BAD_REQUEST.withReasonPhrase("Service account does not exist: " + serviceAccount))));
 
-      return policy.getBindings().stream()
+      final List<String> members = policy.getBindings().stream()
           .filter(binding -> serviceAccountUserRole.equals(binding.getRole()))
           .flatMap(binding -> binding.getMembers().stream())
-          .anyMatch(memberEntry(principalEmail)::equals);
+          .collect(toList());
+      return memberStatus(principalEmail, members);
+
+    }
+
+    private Optional<String> memberStatus(String principalEmail, List<String> members) {
+
+      // Direct member?
+      if (members.contains(memberEntry(principalEmail))) {
+        return Optional.of("directly");
+      }
+
+      // Group member?
+      final String groupPrefix = "group:";
+      return members.stream()
+          .filter(s -> s.startsWith(groupPrefix))
+          .map(s -> s.substring(groupPrefix.length()))
+          .filter(group -> isMemberOfGroup(principalEmail, group))
+          .findFirst()
+          .map(group -> "via group " + group);
+    }
+
+    private boolean isMemberOfGroup(String principalEmail, String group) {
+      try {
+        return TRUE.equals(directory.members().hasMember(group, principalEmail)
+            .execute()
+            .getIsMember());
+      } catch (GoogleJsonResponseException e) {
+        if (e.getStatusCode() == 404) {
+          return false;
+        }
+        throw new RuntimeException(e);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
     }
 
     private Optional<com.google.api.services.cloudresourcemanager.model.Policy> getProjectPolicy(String projectId) {
@@ -215,7 +264,11 @@ public interface ServiceAccountUsageAuthorizer {
         .setApplicationName(applicationName)
         .build();
 
-    return new Impl(iam, crm, serviceAccountUserRole, authorizationPolicy);
+    final Directory directory = new Directory.Builder(httpTransport, jsonFactory, credential)
+        .setApplicationName(applicationName)
+        .build();
+
+    return new Impl(iam, crm, directory, serviceAccountUserRole, authorizationPolicy);
   }
 
   static ServiceAccountUsageAuthorizer nop() {
