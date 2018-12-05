@@ -26,9 +26,11 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.github.rholder.retry.StopStrategies;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.json.GoogleJsonError;
@@ -39,6 +41,7 @@ import com.google.api.services.admin.directory.Directory;
 import com.google.api.services.admin.directory.model.MembersHasMember;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.iam.v1.Iam;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Response;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.AllAuthorizationPolicy;
@@ -50,9 +53,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import javaslang.control.Try;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Answers;
 import org.mockito.Mock;
@@ -68,8 +69,7 @@ public class ServiceAccountUsageAuthorizerTest {
   private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
   private static final String SERVICE_ACCOUNT_PROJECT = "bar";
   private static final String SERVICE_ACCOUNT_USER_ROLE = "organizations/3141592/roles/StyxWorkflowServiceAccountUser";
-
-  @Rule public ExpectedException exception = ExpectedException.none();
+  private static final int RETRY_ATTEMPTS = 3;
 
   @Mock private AuthorizationPolicy authorizationPolicy;
   @Mock private GoogleCredential credential;
@@ -112,7 +112,8 @@ public class ServiceAccountUsageAuthorizerTest {
         .execute()).thenReturn(saPolicy);
     when((Object) directory.members().hasMember(any(), any()).execute())
         .thenReturn(new MembersHasMember().setIsMember(false));
-    sut = new ServiceAccountUsageAuthorizer.Impl(iam, crm, directory, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy);
+    sut = new ServiceAccountUsageAuthorizer.Impl(iam, crm, directory, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy,
+        StopStrategies.stopAfterAttempt(RETRY_ATTEMPTS));
   }
 
   @Test
@@ -199,36 +200,36 @@ public class ServiceAccountUsageAuthorizerTest {
   public void shouldFailIfProjectRequestFailsWithGoogleException() throws IOException {
     final Throwable cause = googleJsonResponseException(500);
     when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenThrow(cause);
-    exception.expect(RuntimeException.class);
-    exception.expectCause(is(cause));
-    sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken);
+    assertThat(Throwables.getRootCause(Try.run(() ->
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).getCause()), is(cause));
+    verify(crm.projects().getIamPolicy(any(), any()), atLeast(RETRY_ATTEMPTS)).execute();
   }
 
   @Test
   public void shouldFailIfServiceAccountRequestFailsWithGoogleException() throws IOException {
     final Throwable cause = googleJsonResponseException(500);
     when((Object) iam.projects().serviceAccounts().getIamPolicy(any()).execute()).thenThrow(cause);
-    exception.expect(RuntimeException.class);
-    exception.expectCause(is(cause));
-    sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken);
+    assertThat(Throwables.getRootCause(Try.run(() ->
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).getCause()), is(cause));
+    verify(iam.projects().serviceAccounts().getIamPolicy(any()), atLeast(RETRY_ATTEMPTS)).execute();
   }
 
   @Test
   public void shouldFailIfProjectRequestFailsWithIOException() throws IOException {
     final Throwable cause = new IOException();
     when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenThrow(cause);
-    exception.expect(RuntimeException.class);
-    exception.expectCause(is(cause));
-    sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken);
+    assertThat(Throwables.getRootCause(Try.run(() ->
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).getCause()), is(cause));
+    verify(crm.projects().getIamPolicy(any(), any()), atLeast(RETRY_ATTEMPTS)).execute();
   }
 
   @Test
   public void shouldFailIfServiceAccountRequestFailsWithIOException() throws IOException {
     final Throwable cause = new IOException();
     when((Object) iam.projects().serviceAccounts().getIamPolicy(any()).execute()).thenThrow(cause);
-    exception.expect(RuntimeException.class);
-    exception.expectCause(is(cause));
-    sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken);
+    assertThat(Throwables.getRootCause(Try.run(() ->
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).getCause()), is(cause));
+    verify(iam.projects().serviceAccounts().getIamPolicy(any()), atLeast(RETRY_ATTEMPTS)).execute();
   }
 
   @Test

@@ -23,8 +23,16 @@ package com.spotify.styx.api;
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.FORBIDDEN;
 import static java.lang.Boolean.TRUE;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
 
+import com.github.rholder.retry.Attempt;
+import com.github.rholder.retry.RetryException;
+import com.github.rholder.retry.Retryer;
+import com.github.rholder.retry.RetryerBuilder;
+import com.github.rholder.retry.StopStrategies;
+import com.github.rholder.retry.StopStrategy;
+import com.github.rholder.retry.WaitStrategies;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
@@ -45,6 +53,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -74,19 +84,23 @@ public interface ServiceAccountUsageAuthorizer {
     private static final Pattern USER_CREATED_SERVICE_ACCOUNT_PATTERN =
         Pattern.compile("^.+@(.+)\\.iam\\.gserviceaccount\\.com$");
 
+    private static final StopStrategy DEFAULT_RETRY_STOP_STRATEGY = StopStrategies.stopAfterDelay(10, SECONDS);
+
     private final Iam iam;
     private final CloudResourceManager crm;
     private final Directory directory;
     private final String serviceAccountUserRole;
     private final AuthorizationPolicy authorizationPolicy;
+    private final StopStrategy retryStopStrategy;
 
     Impl(Iam iam, CloudResourceManager crm, Directory directory, String serviceAccountUserRole,
-        AuthorizationPolicy authorizationPolicy) {
+        AuthorizationPolicy authorizationPolicy, StopStrategy retryStopStrategy) {
       this.iam = Objects.requireNonNull(iam, "iam");
       this.crm = Objects.requireNonNull(crm, "crm");
       this.directory = Objects.requireNonNull(directory, "directory");
       this.serviceAccountUserRole = Objects.requireNonNull(serviceAccountUserRole, "serviceAccountUserRole");
       this.authorizationPolicy = Objects.requireNonNull(authorizationPolicy, "authorizationPolicy");
+      this.retryStopStrategy = Objects.requireNonNull(retryStopStrategy, "retryStopStrategy");
     }
 
     @Override
@@ -182,47 +196,81 @@ public interface ServiceAccountUsageAuthorizer {
 
     private boolean isMemberOfGroup(String principalEmail, String group) {
       try {
-        return TRUE.equals(directory.members().hasMember(group, principalEmail)
+        final Boolean isMember = retry(() -> directory.members().hasMember(group, principalEmail)
             .execute()
             .getIsMember());
-      } catch (GoogleJsonResponseException e) {
-        if (e.getStatusCode() == 404) {
+        return TRUE.equals(isMember);
+      } catch (ExecutionException e) {
+        final Throwable cause = e.getCause();
+        if (cause instanceof GoogleJsonResponseException
+            && ((GoogleJsonResponseException) cause).getStatusCode() == 404) {
           return false;
         }
         throw new RuntimeException(e);
-      } catch (IOException e) {
+      } catch (RetryException e) {
         throw new RuntimeException(e);
       }
     }
 
     private Optional<com.google.api.services.cloudresourcemanager.model.Policy> getProjectPolicy(String projectId) {
       try {
-        return Optional.of(crm.projects()
+        return retry(() -> Optional.of(crm.projects()
             .getIamPolicy(projectId, new GetIamPolicyRequest())
-            .execute());
-      } catch (GoogleJsonResponseException e) {
-        if (e.getStatusCode() == 404) {
+            .execute()));
+      } catch (ExecutionException e) {
+        final Throwable cause = e.getCause();
+        if (cause instanceof GoogleJsonResponseException
+            && ((GoogleJsonResponseException) cause).getStatusCode() == 404) {
           return Optional.empty();
         }
         throw new RuntimeException(e);
-      } catch (IOException e) {
+      } catch (RetryException e) {
         throw new RuntimeException(e);
       }
     }
 
     private Optional<com.google.api.services.iam.v1.model.Policy> getServiceAccountPolicy(String serviceAccount) {
       try {
-        return Optional.of(iam.projects().serviceAccounts()
+        return retry(() -> Optional.of(iam.projects().serviceAccounts()
             .getIamPolicy("projects/-/serviceAccounts/" + serviceAccount)
-            .execute());
-      } catch (GoogleJsonResponseException e) {
-        if (e.getStatusCode() == 404) {
+            .execute()));
+      } catch (ExecutionException e) {
+        final Throwable cause = e.getCause();
+        if (cause instanceof GoogleJsonResponseException
+            && ((GoogleJsonResponseException) cause).getStatusCode() == 404) {
           return Optional.empty();
         }
         throw new RuntimeException(e);
-      } catch (IOException e) {
+      } catch (RetryException e) {
         throw new RuntimeException(e);
       }
+    }
+
+    private <T> T retry(Callable<T> f) throws ExecutionException, RetryException {
+      final Retryer<T> retryer = RetryerBuilder.<T>newBuilder()
+          .retryIfException(Impl::isRetryableException)
+          .withWaitStrategy(WaitStrategies.fibonacciWait(3, SECONDS))
+          .withStopStrategy(retryStopStrategy)
+          .withRetryListener(Impl::onRequestAttempt)
+          .build();
+
+      return retryer.call(f);
+    }
+
+    private static <T> void onRequestAttempt(Attempt<T> attempt) {
+      if (attempt.hasException()) {
+        log.warn("Failed request attempt {}", attempt.getAttemptNumber(), attempt.getExceptionCause());
+      }
+    }
+
+    private static boolean isRetryableException(Throwable t) {
+      if (t instanceof IOException) {
+        if (t instanceof GoogleJsonResponseException) {
+          return ((GoogleJsonResponseException) t).getStatusCode() / 100 == 5;
+        }
+        return true;
+      }
+      return false;
     }
 
     private static String memberEntry(String email) {
@@ -268,7 +316,7 @@ public interface ServiceAccountUsageAuthorizer {
         .setApplicationName(applicationName)
         .build();
 
-    return new Impl(iam, crm, directory, serviceAccountUserRole, authorizationPolicy);
+    return new Impl(iam, crm, directory, serviceAccountUserRole, authorizationPolicy, Impl.DEFAULT_RETRY_STOP_STRATEGY);
   }
 
   static ServiceAccountUsageAuthorizer nop() {
