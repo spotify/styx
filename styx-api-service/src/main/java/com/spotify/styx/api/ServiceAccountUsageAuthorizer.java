@@ -20,6 +20,8 @@
 
 package com.spotify.styx.api;
 
+import static com.github.rholder.retry.WaitStrategies.exponentialWait;
+import static com.github.rholder.retry.WaitStrategies.randomWait;
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.FORBIDDEN;
 import static java.lang.Boolean.TRUE;
@@ -307,7 +309,7 @@ public interface ServiceAccountUsageAuthorizer {
     private <T> T retry(Callable<T> f) throws ExecutionException, RetryException {
       final Retryer<T> retryer = RetryerBuilder.<T>newBuilder()
           .retryIfException(Impl::isRetryableException)
-          .withWaitStrategy(WaitStrategies.fibonacciWait(3, SECONDS))
+          .withWaitStrategy(WaitStrategies.join(exponentialWait(), randomWait(1, SECONDS)))
           .withStopStrategy(retryStopStrategy)
           .withRetryListener(Impl::onRequestAttempt)
           .build();
