@@ -44,6 +44,8 @@ import com.google.api.services.admin.directory.Directory;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.cloudresourcemanager.model.GetIamPolicyRequest;
 import com.google.api.services.iam.v1.Iam;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.apollo.Response;
 import com.spotify.styx.model.WorkflowId;
@@ -55,8 +57,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
+import javaslang.Tuple;
+import javaslang.Tuple2;
+import javaslang.control.Either;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,12 +94,24 @@ public interface ServiceAccountUsageAuthorizer {
 
     private static final StopStrategy DEFAULT_RETRY_STOP_STRATEGY = StopStrategies.stopAfterDelay(10, SECONDS);
 
+    private static final String CACHE_HIT = "hit";
+    private static final String CACHE_MISS = "miss";
+
     private final Iam iam;
     private final CloudResourceManager crm;
     private final Directory directory;
     private final String serviceAccountUserRole;
     private final AuthorizationPolicy authorizationPolicy;
     private final StopStrategy retryStopStrategy;
+
+    /**
+     * (principalEmail, serviceAccount) -> Either[ResponseException, [Optional[accessMessage]]
+     */
+    private final Cache<Tuple2<String, String>, Either<Response<?>, Optional<String>>> cache =
+        CacheBuilder.newBuilder()
+            .expireAfterWrite(60, SECONDS)
+            .maximumSize(10_000)
+            .build();
 
     Impl(Iam iam, CloudResourceManager crm, Directory directory, String serviceAccountUserRole,
         AuthorizationPolicy authorizationPolicy, StopStrategy retryStopStrategy) {
@@ -111,35 +131,73 @@ public interface ServiceAccountUsageAuthorizer {
       final String principalEmail = idToken.getPayload().getEmail();
       final String projectId = serviceAccountProjectId(serviceAccount);
 
-      // Check if the principal has been granted the service account user role in the project of the SA
-      final Optional<String> projectPolicyAccess = projectPolicyAccess(projectId, principalEmail);
-      if (projectPolicyAccess.isPresent()) {
-        final String accessType = projectPolicyAccess.get();
-        log.info("[AUDIT] Principal {} has role {} in project {} {}, "
-                + "authorizing use of service account {} in workflow {} (Enforcing: {})",
-            principalEmail, serviceAccountUserRole, projectId, accessType, serviceAccount, workflowId.toKey(), enforce);
+      final AtomicBoolean cached = new AtomicBoolean(true);
+
+      // Cached access check
+      final Either<Response<?>, Optional<String>> result = get(cache, Tuple.of(principalEmail, serviceAccount), () -> {
+        cached.set(false);
+
+        try {
+          return Either.right(firstPresent(
+              // Check if the principal has been granted the service account user role in the project of the SA
+              () -> projectPolicyAccess(projectId, principalEmail)
+                  .map(type -> String.format("Principal %s has role %s on service account %s %s",
+                      principalEmail, serviceAccountUserRole, serviceAccount, type)),
+
+              // Check if the principal has been granted the service account user role on the SA itself
+              () -> serviceAccountPolicyAccess(serviceAccount, principalEmail)
+                  .map(type -> String.format("Principal %s has role %s on service account %s %s",
+                      principalEmail, serviceAccountUserRole, serviceAccount, type))));
+        } catch (ResponseException e) {
+          return Either.left(e.getResponse());
+        }
+      });
+
+      // Propagate response exception
+      if (result.isLeft()) {
+        throw new ResponseException(result.left().get());
+      }
+
+      final Optional<String> accessMessage = result.right().get();
+
+      // Grant access?
+      if (accessMessage.isPresent()) {
+        logAuthorization(workflowId, serviceAccount, enforce, accessMessage.get(), cached.get());
         return;
       }
 
-      // Check if the principal has been granted the service account user role on the SA itself
-      final Optional<String> serviceAccountPolicyAccess = serviceAccountPolicyAccess(serviceAccount, principalEmail);
-      if (serviceAccountPolicyAccess.isPresent()) {
-        final String accessType = serviceAccountPolicyAccess.get();
-        log.info("[AUDIT] Principal {} has role {} on service account {} {}, "
-                + "authorizing use of service account {} in workflow {} (Enforcing: {})",
-            principalEmail, serviceAccountUserRole, serviceAccount, accessType, serviceAccount, workflowId.toKey(),
-            enforce);
-        return;
-      }
-
-      log.info("[AUDIT] Principal {} denied use of service account {} in workflow {} (Enforcing: {})",
-          principalEmail, serviceAccount, workflowId.toKey(), enforce);
+      // Deny access?
+      logDenial(workflowId, serviceAccount, enforce, principalEmail, cached.get());
       if (enforce) {
-        throw new ResponseException(Response.forStatus(
-            FORBIDDEN.withReasonPhrase("The user " + principalEmail + " must have the role " + serviceAccountUserRole
-                + " on the project " + projectId + " or the service account " + serviceAccount +
-                ", either through a group membership (recommended) or directly")));
+        throw denialResponseException(serviceAccount, principalEmail, projectId);
       }
+    }
+
+    private static <K, V> V get(Cache<K, V> cache, K key, Callable<V> loader) {
+      try {
+        return cache.get(key, loader);
+      } catch (ExecutionException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    private ResponseException denialResponseException(String serviceAccount, String principalEmail, String projectId) {
+      return new ResponseException(Response.forStatus(
+          FORBIDDEN.withReasonPhrase("The user " + principalEmail + " must have the role " + serviceAccountUserRole
+              + " on the project " + projectId + " or the service account " + serviceAccount +
+              ", either through a group membership (recommended) or directly")));
+    }
+
+    private void logDenial(WorkflowId workflowId, String serviceAccount, boolean enforce, String principalEmail,
+        boolean cached) {
+      log.info("[AUDIT] Principal {} denied use of service account {} in workflow {} (Enforcing: {}, Cache: {})",
+          principalEmail, serviceAccount, workflowId.toKey(), enforce, cached ? CACHE_HIT : CACHE_MISS);
+    }
+
+    private void logAuthorization(WorkflowId workflowId, String serviceAccount, boolean enforce, String accessMessage,
+        boolean cached) {
+      log.info("[AUDIT] {}, authorizing use of service account {} in workflow {} (Enforcing: {}, Cache: {})",
+          accessMessage, serviceAccount, workflowId.toKey(), enforce, cached ? CACHE_HIT : CACHE_MISS);
     }
 
     private String serviceAccountProjectId(String serviceAccount) {
@@ -276,6 +334,15 @@ public interface ServiceAccountUsageAuthorizer {
     private static String memberEntry(String email) {
       final String type = SERVICE_ACCOUNT_PATTERN.matcher(email).matches() ? "serviceAccount" : "user";
       return type + ":" + email;
+    }
+
+    @SafeVarargs
+    private static <T> Optional<T> firstPresent(final Supplier<Optional<T>>... optionals) {
+      return Stream.of(optionals)
+          .map(Supplier::get)
+          .filter(Optional::isPresent)
+          .findFirst()
+          .orElse(Optional.empty());
     }
   }
 

@@ -26,8 +26,11 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.github.rholder.retry.StopStrategies;
@@ -117,7 +120,7 @@ public class ServiceAccountUsageAuthorizerTest {
   }
 
   @Test
-  public void shouldDenyAccessIfPrincipalDoesNotHaveUserRole() {
+  public void shouldDenyAccessIfPrincipalDoesNotHaveUserRole() throws IOException {
     final Response<?> response = assertThrowsResponseException(() ->
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
     verify(authorizationPolicy).shouldEnforceAuthorization(WORKFLOW_ID, SERVICE_ACCOUNT, idToken);
@@ -125,6 +128,35 @@ public class ServiceAccountUsageAuthorizerTest {
     assertThat(response.status().reasonPhrase(), is("The user " + PRINCIPAL_EMAIL + " must have the role " +
         SERVICE_ACCOUNT_USER_ROLE + " on the project " + SERVICE_ACCOUNT_PROJECT + " or the service account " +
         SERVICE_ACCOUNT + ", either through a group membership (recommended) or directly"));
+
+    verify(iam.projects().serviceAccounts().getIamPolicy("projects/-/serviceAccounts/" + SERVICE_ACCOUNT)).execute();
+    verify(crm.projects().getIamPolicy(eq(SERVICE_ACCOUNT_PROJECT), any())).execute();
+    verify(directory.members()).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
+    verify(directory.members()).hasMember(SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
+  }
+
+  @Test
+  public void shouldCacheAccessDenial() {
+    final Response<?> response = assertThrowsResponseException(() ->
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
+    assertThat(response.status().code(), is(FORBIDDEN.code()));
+    assertThat(response.status().reasonPhrase(), is("The user " + PRINCIPAL_EMAIL + " must have the role " +
+        SERVICE_ACCOUNT_USER_ROLE + " on the project " + SERVICE_ACCOUNT_PROJECT + " or the service account " +
+        SERVICE_ACCOUNT + ", either through a group membership (recommended) or directly"));
+
+    reset(iam);
+    reset(crm);
+    reset(directory);
+
+    for (int i = 0; i < 3; i++) {
+      final Response<?> repeated = assertThrowsResponseException(() ->
+          sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
+      assertThat(repeated, is(response));
+    }
+
+    verifyZeroInteractions(iam);
+    verifyZeroInteractions(crm);
+    verifyZeroInteractions(directory);
   }
 
   @Test
@@ -137,33 +169,27 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnProjectDirectly() {
     projectBinding.getMembers().add("user:" + PRINCIPAL_EMAIL);
-    assertThat(Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).isSuccess(),
-        is(true));
+    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
   }
 
   @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnProjectViaGroup() throws IOException {
     when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute())
         .thenReturn(new MembersHasMember().setIsMember(true));
-    assertThat(Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).isSuccess(),
-        is(true));
-    verify(directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL)).execute();
+    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
   }
 
   @Test
-  public void shouldAuthorizeIfPrincipalHasUserRoleOnServiceAccountDirectly() {
+  public void shouldAuthorizeIfPrincipalHasUserRoleOnServiceAccountDirectly() throws IOException {
     saBinding.getMembers().add("user:" + PRINCIPAL_EMAIL);
-    assertThat(Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).isSuccess(),
-        is(true));
+    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
   }
 
   @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnServiceAccountViaGroup() throws IOException {
     when((Object) directory.members().hasMember(SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute())
         .thenReturn(new MembersHasMember().setIsMember(true));
-    assertThat(Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).isSuccess(),
-        is(true));
-    verify(directory.members().hasMember(SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL)).execute();
+    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
   }
 
   @Test
@@ -264,6 +290,22 @@ public class ServiceAccountUsageAuthorizerTest {
     assertThat(policy.shouldEnforceAuthorization(WORKFLOW_ID, SERVICE_ACCOUNT, idToken), is(true));
     assertThat(policy.shouldEnforceAuthorization(WorkflowId.create("another", "workflow"), SERVICE_ACCOUNT, idToken),
         is(false));
+  }
+
+  private void assertCachedSuccess(Runnable r) {
+    r.run();
+
+    reset(iam);
+    reset(crm);
+    reset(directory);
+
+    for (int i = 0; i < 3; i++) {
+      r.run();
+    }
+
+    verifyZeroInteractions(iam);
+    verifyZeroInteractions(crm);
+    verifyZeroInteractions(directory);
   }
 
   private static Response<?> assertThrowsResponseException(Runnable r) {
