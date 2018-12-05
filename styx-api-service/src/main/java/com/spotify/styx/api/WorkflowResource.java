@@ -21,6 +21,7 @@
 package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V3;
+import static com.spotify.styx.api.Middlewares.authed;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
@@ -33,6 +34,9 @@ import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
+import com.spotify.styx.api.Middlewares.AuthContext;
+import com.spotify.styx.api.Middlewares.Authenticated;
+import com.spotify.styx.api.Middlewares.Requested;
 import com.spotify.styx.api.workflow.WorkflowInitializationException;
 import com.spotify.styx.api.workflow.WorkflowInitializer;
 import com.spotify.styx.model.Schedule;
@@ -55,7 +59,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 import okio.ByteString;
 import org.slf4j.Logger;
@@ -74,23 +77,21 @@ public final class WorkflowResource {
   private final Storage storage;
   private final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
   private final ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer;
-  private final Supplier<Optional<GoogleIdToken>> idTokenSupplier;
 
   public WorkflowResource(Storage storage, WorkflowValidator workflowValidator,
       WorkflowInitializer workflowInitializer,
       BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer,
-      ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer,
-      Supplier<Optional<GoogleIdToken>> idTokenSupplier) {
+      ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer) {
     this.storage = Objects.requireNonNull(storage, "storage");
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
     this.workflowInitializer = Objects.requireNonNull(workflowInitializer, "workflowInitializer");
     this.workflowConsumer = Objects.requireNonNull(workflowConsumer, "workflowConsumer");
     this.serviceAccountUsageAuthorizer = Objects.requireNonNull(serviceAccountUsageAuthorizer,
         "serviceAccountUsageAuthorizer");
-    this.idTokenSupplier = Objects.requireNonNull(idTokenSupplier, "idTokenSupplier");
   }
 
-  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
+  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(Authenticator authenticator) {
+    final Requested<Authenticated<Object>> cid = rc -> ac -> createOrUpdateWorkflow(arg("cid", rc), rc, ac);
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Arrays.asList(
         Route.with(
             json(), "GET", BASE + "/<cid>/<wfid>",
@@ -102,8 +103,8 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>",
             rc -> workflows(arg("cid", rc))),
         Route.with(
-            json(), "POST", BASE + "/<cid>",
-            rc -> createOrUpdateWorkflow(arg("cid", rc), rc)),
+            authed(authenticator), "POST", BASE + "/<cid>",
+            cid),
         Route.with(
             json(), "DELETE", BASE + "/<cid>/<wfid>",
             rc -> deleteWorkflow(arg("cid", rc),arg("wfid", rc))),
@@ -155,7 +156,7 @@ public final class WorkflowResource {
   }
 
   private Response<Workflow> createOrUpdateWorkflow(String componentId,
-                                                    RequestContext rc) {
+      RequestContext rc, AuthContext ac) {
     final Optional<ByteString> payload = rc.request().payload();
     if (!payload.isPresent()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
@@ -171,7 +172,7 @@ public final class WorkflowResource {
 
     if (workflowConfig.serviceAccount().isPresent()) {
       final String serviceAccount = workflowConfig.serviceAccount().get();
-      final GoogleIdToken idToken = idTokenSupplier.get().orElseThrow(AssertionError::new);
+      final GoogleIdToken idToken = ac.user().orElseThrow(AssertionError::new);
       final WorkflowId workflowId = WorkflowId.create(componentId, workflowConfig.id());
       serviceAccountUsageAuthorizer.authorizeServiceAccountUsage(workflowId, serviceAccount, idToken);
     }

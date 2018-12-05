@@ -36,10 +36,10 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.api.Api;
+import com.spotify.styx.api.Authenticator;
 import com.spotify.styx.api.AuthenticatorConfiguration;
 import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.api.BackfillResource;
-import com.spotify.styx.api.Middlewares;
 import com.spotify.styx.api.ResourceResource;
 import com.spotify.styx.api.SchedulerProxyResource;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
@@ -185,7 +185,7 @@ public class StyxApi implements AppInit {
     final WorkflowResource workflowResource = new WorkflowResource(storage,
         new WorkflowValidator(new DockerImageValidator()),
         new WorkflowInitializer(storage, time),
-        workflowConsumer, authorizer, Middlewares.requestIdTokenSupplier());
+        workflowConsumer, authorizer);
 
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
         storage,
@@ -203,8 +203,11 @@ public class StyxApi implements AppInit {
     final Supplier<List<String>> clientBlacklistSupplier =
         () -> configSupplier.get().clientBlacklist();
 
+    final Authenticator authenticator = authenticatorFactory.apply(
+        AuthenticatorConfiguration.fromConfig(config, serviceName));
+
     final Stream<Route<AsyncHandler<Response<ByteString>>>> routes = Streams.concat(
-        workflowResource.routes(),
+        workflowResource.routes(authenticator),
         backfillResource.routes(),
         resourceResource.routes(),
         statusResource.routes(),
@@ -214,7 +217,7 @@ public class StyxApi implements AppInit {
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
         .registerRoutes(Api.withCommonMiddleware(routes, clientBlacklistSupplier,
-            authenticatorFactory.apply(AuthenticatorConfiguration.fromConfig(config, serviceName)), serviceName));
+            authenticator, serviceName));
   }
 
   static ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer(Config config, GoogleCredential credential) {

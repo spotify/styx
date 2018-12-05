@@ -40,8 +40,7 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.SyncHandler;
 import com.spotify.styx.util.MDCUtil;
-import io.grpc.Context;
-import io.grpc.Context.Key;
+import io.norberg.automatter.AutoMatter;
 import io.opencensus.trace.Span;
 import io.opencensus.trace.Tracer;
 import java.net.URI;
@@ -51,6 +50,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import okio.ByteString;
@@ -72,8 +72,6 @@ public final class Middlewares {
 
   private static final String REQUEST_ID = "request-id";
   private static final String X_REQUEST_ID = "X-Request-Id";
-
-  private static final Key<GoogleIdToken> ID_TOKEN_KEY = Context.key("id_token");
 
   private Middlewares() {
     throw new UnsupportedOperationException();
@@ -189,7 +187,8 @@ public final class Middlewares {
                "GET".equals(request.method()) ? "" : "[AUDIT] ",
                request.method(),
                request.uri(),
-               auth(requestContext, authenticator).map(idToken -> idToken.getPayload()
+          // TODO: pass in auth context instead of authenticating twice
+          auth(requestContext, authenticator).user().map(idToken -> idToken.getPayload()
                    .getEmail())
                    .orElse("anonymous"),
                hideSensitiveHeaders(request.headers()),
@@ -228,13 +227,37 @@ public final class Middlewares {
     };
   }
 
-  private static Optional<GoogleIdToken> auth(RequestContext requestContext,
-                                              Authenticator authenticator) {
+  @AutoMatter
+  public interface AuthContext {
+
+    Optional<GoogleIdToken> user();
+  }
+
+  interface Authenticated<T> extends Function<AuthContext, T> {
+
+  }
+
+  interface Requested<T> extends Function<RequestContext, T> {
+
+  }
+
+  public static <T> Middleware<Requested<Authenticated<T>>, AsyncHandler<Response<ByteString>>> authed(
+      Authenticator authenticator) {
+    return ar -> jsonAsync().apply(requestContext -> {
+      final T payload = ar
+          .apply(requestContext)
+          .apply(auth(requestContext, authenticator));
+      return completedFuture(Response.forPayload(payload));
+    });
+  }
+
+  private static AuthContext auth(RequestContext requestContext,
+      Authenticator authenticator) {
     final Request request = requestContext.request();
     final boolean hasAuthHeader = request.header(HttpHeaders.AUTHORIZATION).isPresent();
 
     if (!hasAuthHeader) {
-      return Optional.empty();
+      return Optional::empty;
     }
 
     final String authHeader = request.header(HttpHeaders.AUTHORIZATION).get();
@@ -256,7 +279,7 @@ public final class Middlewares {
           .withReasonPhrase("Authorization token is invalid")));
     }
 
-    return Optional.of(googleIdToken);
+    return () -> Optional.of(googleIdToken);
   }
 
   private static Map<String, String> hideSensitiveHeaders(Map<String, String> headers) {
@@ -268,24 +291,13 @@ public final class Middlewares {
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authenticator(
       Authenticator authenticator) {
     return h -> rc -> {
-      final Optional<GoogleIdToken> idToken = auth(rc, authenticator);
+      final Optional<GoogleIdToken> idToken = auth(rc, authenticator).user();
       if (!"GET".equals(rc.request().method()) && !idToken.isPresent()) {
         return completedFuture(
             Response.forStatus(Status.UNAUTHORIZED.withReasonPhrase("Unauthorized access")));
       }
 
-      try {
-        return Context.current()
-            .withValue(ID_TOKEN_KEY, idToken.orElse(null))
-            .call(() -> h.invoke(rc));
-      } catch (Exception e) {
-        Throwables.throwIfUnchecked(e);
-        throw new RuntimeException(e);
-      }
+      return h.invoke(rc);
     };
-  }
-
-  public static Supplier<Optional<GoogleIdToken>> requestIdTokenSupplier() {
-    return () -> Optional.ofNullable(ID_TOKEN_KEY.get());
   }
 }

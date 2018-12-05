@@ -76,7 +76,6 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.function.BiConsumer;
-import java.util.function.Supplier;
 import java.util.logging.Level;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
@@ -105,8 +104,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Mock private WorkflowInitializer workflowInitializer;
   @Mock private BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
   @Mock private ServiceAccountUsageAuthorizer serviceAccountUseAuthorizer;
-  @Mock private Supplier<Optional<GoogleIdToken>> idTokenSupplier;
   @Mock private GoogleIdToken idToken;
+  @Mock private Authenticator authenticator;
 
   private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
 
@@ -149,13 +148,13 @@ public class WorkflowResourceTest extends VersionedApiTest {
     storage = spy(new AggregateStorage(bigtable, datastore, Duration.ZERO));
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
-    when(idTokenSupplier.get()).thenReturn(Optional.of(idToken));
+    when(authenticator.authenticate(any())).thenReturn(idToken);
     WorkflowResource workflowResource =
         new WorkflowResource(storage, workflowValidator, workflowInitializer, workflowConsumer,
-            serviceAccountUseAuthorizer, idTokenSupplier);
+            serviceAccountUseAuthorizer);
 
     environment.routingEngine()
-        .registerRoutes(workflowResource.routes().map(r ->
+        .registerRoutes(workflowResource.routes(authenticator).map(r ->
             r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));
   }
 
@@ -597,10 +596,10 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldFailToUpdateWorkflowIfThereIsNoIdToken() throws Exception {
+  public void shouldFailToUpdateWorkflowIfNotAuthenticated() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(idTokenSupplier.get()).thenReturn(Optional.empty());
+    when(authenticator.authenticate(any())).thenReturn(null);
 
     try {
       awaitResponse(serviceHelper.request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));

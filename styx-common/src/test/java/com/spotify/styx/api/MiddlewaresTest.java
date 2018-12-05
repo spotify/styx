@@ -55,6 +55,9 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.request.RequestContexts;
 import com.spotify.apollo.request.RequestMetadataImpl;
 import com.spotify.apollo.route.AsyncHandler;
+import com.spotify.styx.api.Middlewares.Authenticated;
+import com.spotify.styx.api.Middlewares.Requested;
+import com.spotify.styx.serialization.Json;
 import com.spotify.styx.util.ClassEnforcer;
 import com.spotify.styx.util.MockSpan;
 import io.opencensus.trace.SpanBuilder;
@@ -524,23 +527,7 @@ public class MiddlewaresTest {
   }
 
   @Test
-  public void testAuthValidatorPropagatesException() throws Exception {
-    RequestContext requestContext = mock(RequestContext.class);
-    Request request = Request.forUri("/", "GET");
-    when(requestContext.request()).thenReturn(request);
-
-    final IOException cause = new IOException();
-    final AsyncHandler<Response<Object>> handler = mock(AsyncHandler.class);
-    when(handler.invoke(requestContext)).thenAnswer(a -> { throw cause; });
-    exception.expect(RuntimeException.class);
-    exception.expectCause(is(cause));
-    Middlewares.authenticator(authenticator)
-        .apply(handler)
-        .invoke(requestContext);
-  }
-
-  @Test
-  public void testAuthValidatorPropagatesIdToken() throws Exception {
+  public void testAuthedProvidesIdToken() throws Exception {
     final RequestContext requestContext = mock(RequestContext.class);
     final Request request = Request.forUri("/", "PUT")
         .withPayload(ByteString.encodeUtf8("hello"))
@@ -548,16 +535,12 @@ public class MiddlewaresTest {
     when(requestContext.request()).thenReturn(request);
     when(authenticator.authenticate(any())).thenReturn(idToken);
 
-    final Supplier<Optional<GoogleIdToken>> idTokenSupplier = Middlewares.requestIdTokenSupplier();
-    final AsyncHandler<Response<GoogleIdToken>> handler = mock(AsyncHandler.class);
-    when(handler.invoke(requestContext))
-        .thenAnswer(a -> completedFuture(Response.forPayload(idTokenSupplier.get().get())));
-
-    final Response<GoogleIdToken> response = awaitResponse(Middlewares.<GoogleIdToken>authenticator(authenticator)
+    final Requested<Authenticated<Boolean>> handler = rc -> ac -> ac.user().map(idToken::equals).orElse(false);
+    final Response<ByteString> response = awaitResponse(Middlewares.<Boolean>authed(authenticator)
         .apply(handler)
         .invoke(requestContext));
 
-    assertThat(response.payload().get(), is(idToken));
+    assertThat(Json.deserialize(response.payload().get(), Boolean.class), is(true));
   }
 
   @Test
