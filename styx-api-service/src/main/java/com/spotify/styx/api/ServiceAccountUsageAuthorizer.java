@@ -354,6 +354,7 @@ public interface ServiceAccountUsageAuthorizer {
 
     @Override
     public void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
+      // nop
     }
   }
 
