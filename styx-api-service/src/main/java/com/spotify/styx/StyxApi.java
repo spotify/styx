@@ -181,7 +181,8 @@ public class StyxApi implements AppInit {
     // results duplicated headers, and that would make nginx unhappy. This has been fixed
     // in later Apollo version.
 
-    final ServiceAccountUsageAuthorizer authorizer = serviceAccountUsageAuthorizer(config, defaultCredential());
+    final ServiceAccountUsageAuthorizer authorizer =
+        serviceAccountUsageAuthorizer(config, defaultCredential(), serviceName);
 
     final WorkflowResource workflowResource = new WorkflowResource(storage,
         new WorkflowValidator(new DockerImageValidator()),
@@ -222,13 +223,16 @@ public class StyxApi implements AppInit {
   }
 
   @VisibleForTesting
-  static ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer(Config config, GoogleCredential credential) {
+  static ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer(Config config,
+                                                                     GoogleCredential credential,
+                                                                     String serviceName) {
+
     final AuthorizationPolicy authorizationPolicy = authorizationPolicy(config);
 
     final ServiceAccountUsageAuthorizer authorizer;
     if (config.hasPath(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)) {
       final String role = config.getString(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG);
-      authorizer = ServiceAccountUsageAuthorizer.create(role, authorizationPolicy, credential);
+      authorizer = ServiceAccountUsageAuthorizer.create(role, authorizationPolicy, credential, serviceName);
     } else {
       authorizer = ServiceAccountUsageAuthorizer.nop();
     }

@@ -356,8 +356,10 @@ public interface ServiceAccountUsageAuthorizer {
     }
   }
 
-  static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole, AuthorizationPolicy authorizationPolicy,
-                                              GoogleCredential credential, ) {
+  static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole,
+                                              AuthorizationPolicy authorizationPolicy,
+                                              GoogleCredential credential,
+                                              String serviceName) {
 
     final HttpTransport httpTransport;
     try {
@@ -368,20 +370,18 @@ public interface ServiceAccountUsageAuthorizer {
 
     final JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
 
-    final String applicationName = "styx-api";
-
     final CloudResourceManager crm =
         new CloudResourceManager.Builder(httpTransport, jsonFactory, credential)
-            .setApplicationName(applicationName)
+            .setApplicationName(serviceName)
             .build();
 
     final Iam iam = new Iam.Builder(
         httpTransport, jsonFactory, credential)
-        .setApplicationName(applicationName)
+        .setApplicationName(serviceName)
         .build();
 
     final Directory directory = new Directory.Builder(httpTransport, jsonFactory, credential)
-        .setApplicationName(applicationName)
+        .setApplicationName(serviceName)
         .build();
 
     return new Impl(iam, crm, directory, serviceAccountUserRole, authorizationPolicy, Impl.DEFAULT_RETRY_STOP_STRATEGY);

@@ -261,7 +261,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void testCreate() {
     final ServiceAccountUsageAuthorizer sut =
-        ServiceAccountUsageAuthorizer.create(SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential);
+        ServiceAccountUsageAuthorizer.create(SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, "foo");
     assertThat(sut, is(notNullValue()));
   }
 

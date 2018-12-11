@@ -50,14 +50,14 @@ public class StyxApiTest {
   public void shouldCreateServiceAccountUsageAuthorizerWithRole() {
     final Config config = ConfigFactory.parseMap(ImmutableMap.of(
         AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG, SERVICE_ACCOUNT_USER_ROLE));
-    final ServiceAccountUsageAuthorizer authorizer = StyxApi.serviceAccountUsageAuthorizer(config, credential);
+    final ServiceAccountUsageAuthorizer authorizer = StyxApi.serviceAccountUsageAuthorizer(config, credential, "foo");
     assertThat(authorizer, is(instanceOf(ServiceAccountUsageAuthorizer.Impl.class)));
   }
 
   @Test
   public void shouldCreateNopServiceAccountUsageAuthorizer() {
     final Config config = ConfigFactory.parseMap(ImmutableMap.of());
-    final ServiceAccountUsageAuthorizer authorizer = StyxApi.serviceAccountUsageAuthorizer(config, credential);
+    final ServiceAccountUsageAuthorizer authorizer = StyxApi.serviceAccountUsageAuthorizer(config, credential, "foo");
     assertThat(authorizer, is(ServiceAccountUsageAuthorizer.nop()));
   }
 
