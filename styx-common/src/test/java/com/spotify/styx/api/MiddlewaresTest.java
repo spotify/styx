@@ -499,8 +499,9 @@ public class MiddlewaresTest {
     when(requestContext.request()).thenReturn(request);
     when(authenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
 
-    final Requested<Authenticated<Boolean>> handler = rc -> ac -> ac.user().map(idToken::equals).orElse(false);
-    final Response<ByteString> response = awaitResponse(Middlewares.<Boolean>authed(authenticator)
+    final Requested<Authenticated<Response<?>>> handler = rc -> ac ->
+        Response.forPayload(ac.user().map(idToken::equals).orElse(false));
+    final Response<ByteString> response = awaitResponse(Middlewares.authed(authenticator)
         .apply(handler)
         .invoke(requestContext));
 
