@@ -27,6 +27,7 @@ import static java.util.Objects.requireNonNull;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.services.iam.v1.IamScopes;
 import com.google.cloud.datastore.Datastore;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Streams;
 import com.google.common.io.Closer;
 import com.spotify.apollo.AppInit;
@@ -220,6 +221,7 @@ public class StyxApi implements AppInit {
             requestAuthenticator, serviceName));
   }
 
+  @VisibleForTesting
   static ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer(Config config, GoogleCredential credential) {
     final AuthorizationPolicy authorizationPolicy = authorizationPolicy(config);
 
@@ -233,6 +235,7 @@ public class StyxApi implements AppInit {
     return authorizer;
   }
 
+  @VisibleForTesting
   static AuthorizationPolicy authorizationPolicy(Config config) {
     final List<String> keys;
     final AuthorizationPolicy authorizationPolicy;
@@ -262,7 +265,7 @@ public class StyxApi implements AppInit {
     return new MetricsStats(environment.resolve(SemanticMetricRegistry.class), Instant::now);
   }
 
-  static GoogleCredential defaultCredential() {
+  private static GoogleCredential defaultCredential() {
     final GoogleCredential credential;
     try {
       credential = GoogleCredential.getApplicationDefault()

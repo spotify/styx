@@ -127,9 +127,6 @@ public interface ServiceAccountUsageAuthorizer {
 
     @Override
     public void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
-
-      final boolean enforce = authorizationPolicy.shouldEnforceAuthorization(workflowId, serviceAccount, idToken);
-
       final String principalEmail = idToken.getPayload().getEmail();
       final String projectId = serviceAccountProjectId(serviceAccount);
 
@@ -160,6 +157,7 @@ public interface ServiceAccountUsageAuthorizer {
         throw new ResponseException(result.left().get());
       }
 
+      final boolean enforce = authorizationPolicy.shouldEnforceAuthorization(workflowId, serviceAccount, idToken);
       final Optional<String> accessMessage = result.right().get();
 
       // Grant access?
@@ -359,7 +357,7 @@ public interface ServiceAccountUsageAuthorizer {
   }
 
   static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole, AuthorizationPolicy authorizationPolicy,
-      GoogleCredential credential) {
+                                              GoogleCredential credential, ) {
 
     final HttpTransport httpTransport;
     try {
