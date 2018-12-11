@@ -53,6 +53,7 @@ import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.api.Api;
 import com.spotify.styx.api.AuthenticatorConfiguration;
 import com.spotify.styx.api.AuthenticatorFactory;
+import com.spotify.styx.api.RequestAuthenticator;
 import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
@@ -421,10 +422,12 @@ public class StyxScheduler implements AppInit {
         new SchedulerResource(stateManager, trigger, storage, time,
             new WorkflowValidator(new DockerImageValidator()));
 
+    final RequestAuthenticator requestAuthenticator = new RequestAuthenticator(
+        authenticatorFactory.apply(AuthenticatorConfiguration.fromConfig(config, serviceName)));
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
         .registerRoutes(Api.withCommonMiddleware(schedulerResource.routes(),
-            authenticatorFactory.apply(AuthenticatorConfiguration.fromConfig(config, serviceName)), serviceName));
+            requestAuthenticator, serviceName));
 
     this.stateManager = stateManager;
     this.scheduler = scheduler;

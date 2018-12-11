@@ -46,6 +46,9 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Authenticates and authorizes Google ID tokens for incoming Styx API requests.
+ */
 public class Authenticator {
 
   private static final Logger logger = LoggerFactory.getLogger(Authenticator.class);
@@ -106,6 +109,11 @@ public class Authenticator {
     logger.info("Resource cache loaded");
   }
 
+  /**
+   * Authenticate and authorize a Google ID token string from an incoming Styx API request.
+   * @param token The Google ID token string.
+   * @return A {@link GoogleIdToken} instance if the token was valid and the user is authorized.
+   */
   GoogleIdToken authenticate(String token) {
     final GoogleIdToken googleIdToken;
     try {

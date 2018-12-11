@@ -67,7 +67,6 @@ public final class Middlewares {
 
   private static final Logger LOG = LoggerFactory.getLogger(Middlewares.class);
 
-  public static final String BEARER_PREFIX = "Bearer ";
   private static final Set<String> BLACKLISTED_HEADERS = ImmutableSet.of(HttpHeaders.AUTHORIZATION);
 
   private static final String REQUEST_ID = "request-id";
@@ -149,9 +148,9 @@ public final class Middlewares {
       } catch (ResponseException e) {
         return completedFuture(e.<T>getResponse()
             .withHeader(X_REQUEST_ID, requestId));
-      } catch (Exception e) {
+      } catch (Throwable t) {
         return completedFuture(Response.<T>forStatus(INTERNAL_SERVER_ERROR
-            .withReasonPhrase(internalServerErrorReason(requestId, e)))
+            .withReasonPhrase(internalServerErrorReason(requestId, t)))
             .withHeader(X_REQUEST_ID, requestId));
       }
     };
@@ -173,13 +172,13 @@ public final class Middlewares {
   }
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> httpLogger(
-      Authenticator authenticator) {
+      RequestAuthenticator authenticator) {
     return httpLogger(LOG, authenticator);
   }
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> httpLogger(
       Logger log,
-      Authenticator authenticator) {
+      RequestAuthenticator authenticator) {
     return innerHandler -> requestContext -> {
       final Request request = requestContext.request();
 
@@ -242,7 +241,7 @@ public final class Middlewares {
   }
 
   public static <T> Middleware<Requested<Authenticated<T>>, AsyncHandler<Response<ByteString>>> authed(
-      Authenticator authenticator) {
+      RequestAuthenticator authenticator) {
     return ar -> jsonAsync().apply(requestContext -> {
       final T payload = ar
           .apply(requestContext)
@@ -251,35 +250,19 @@ public final class Middlewares {
     });
   }
 
+  public static <T> Middleware<Requested<Authenticated<Response<T>>>, AsyncHandler<Response<ByteString>>> authed2(
+      RequestAuthenticator authenticator) {
+    return ar -> jsonAsync().apply(requestContext -> {
+      final Response<T> payload = ar
+          .apply(requestContext)
+          .apply(auth(requestContext, authenticator));
+      return completedFuture(payload);
+    });
+  }
+
   private static AuthContext auth(RequestContext requestContext,
-      Authenticator authenticator) {
-    final Request request = requestContext.request();
-    final boolean hasAuthHeader = request.header(HttpHeaders.AUTHORIZATION).isPresent();
-
-    if (!hasAuthHeader) {
-      return Optional::empty;
-    }
-
-    final String authHeader = request.header(HttpHeaders.AUTHORIZATION).get();
-    if (!authHeader.startsWith(BEARER_PREFIX)) {
-      throw new ResponseException(Response.forStatus(Status.BAD_REQUEST
-          .withReasonPhrase("Authorization token must be of type Bearer")));
-    }
-
-    final GoogleIdToken googleIdToken;
-    try {
-      googleIdToken = authenticator.authenticate(authHeader.substring(BEARER_PREFIX.length()));
-    } catch (IllegalArgumentException e) {
-      throw new ResponseException(Response.forStatus(Status.BAD_REQUEST
-          .withReasonPhrase("Failed to parse Authorization token")), e);
-    }
-
-    if (googleIdToken == null) {
-      throw new ResponseException(Response.forStatus(Status.UNAUTHORIZED
-          .withReasonPhrase("Authorization token is invalid")));
-    }
-
-    return () -> Optional.of(googleIdToken);
+      RequestAuthenticator authenticator) {
+    return authenticator.authenticate(requestContext.request());
   }
 
   private static Map<String, String> hideSensitiveHeaders(Map<String, String> headers) {
@@ -289,7 +272,7 @@ public final class Middlewares {
   }
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authenticator(
-      Authenticator authenticator) {
+      RequestAuthenticator authenticator) {
     return h -> rc -> {
       final Optional<GoogleIdToken> idToken = auth(rc, authenticator).user();
       if (!"GET".equals(rc.request().method()) && !idToken.isPresent()) {

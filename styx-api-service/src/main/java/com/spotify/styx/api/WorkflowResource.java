@@ -21,7 +21,6 @@
 package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V3;
-import static com.spotify.styx.api.Middlewares.authed;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
@@ -35,8 +34,6 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.Middlewares.AuthContext;
-import com.spotify.styx.api.Middlewares.Authenticated;
-import com.spotify.styx.api.Middlewares.Requested;
 import com.spotify.styx.api.workflow.WorkflowInitializationException;
 import com.spotify.styx.api.workflow.WorkflowInitializer;
 import com.spotify.styx.model.Schedule;
@@ -90,8 +87,7 @@ public final class WorkflowResource {
         "serviceAccountUsageAuthorizer");
   }
 
-  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(Authenticator authenticator) {
-    final Requested<Authenticated<Object>> cid = rc -> ac -> createOrUpdateWorkflow(arg("cid", rc), rc, ac);
+  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(RequestAuthenticator requestAuthenticator) {
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Arrays.asList(
         Route.with(
             json(), "GET", BASE + "/<cid>/<wfid>",
@@ -103,8 +99,8 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>",
             rc -> workflows(arg("cid", rc))),
         Route.with(
-            authed(authenticator), "POST", BASE + "/<cid>",
-            cid),
+            Middlewares.<Workflow>authed2(requestAuthenticator), "POST", BASE + "/<cid>",
+            rc -> ac -> createOrUpdateWorkflow(arg("cid", rc), rc, ac)),
         Route.with(
             json(), "DELETE", BASE + "/<cid>/<wfid>",
             rc -> deleteWorkflow(arg("cid", rc),arg("wfid", rc))),

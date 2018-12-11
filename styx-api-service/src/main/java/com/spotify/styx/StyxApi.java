@@ -36,10 +36,10 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.api.Api;
-import com.spotify.styx.api.Authenticator;
 import com.spotify.styx.api.AuthenticatorConfiguration;
 import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.api.BackfillResource;
+import com.spotify.styx.api.RequestAuthenticator;
 import com.spotify.styx.api.ResourceResource;
 import com.spotify.styx.api.SchedulerProxyResource;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
@@ -203,11 +203,11 @@ public class StyxApi implements AppInit {
     final Supplier<List<String>> clientBlacklistSupplier =
         () -> configSupplier.get().clientBlacklist();
 
-    final Authenticator authenticator = authenticatorFactory.apply(
-        AuthenticatorConfiguration.fromConfig(config, serviceName));
+    final RequestAuthenticator requestAuthenticator = new RequestAuthenticator(authenticatorFactory.apply(
+        AuthenticatorConfiguration.fromConfig(config, serviceName)));
 
     final Stream<Route<AsyncHandler<Response<ByteString>>>> routes = Streams.concat(
-        workflowResource.routes(authenticator),
+        workflowResource.routes(requestAuthenticator),
         backfillResource.routes(),
         resourceResource.routes(),
         statusResource.routes(),
@@ -217,7 +217,7 @@ public class StyxApi implements AppInit {
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
         .registerRoutes(Api.withCommonMiddleware(routes, clientBlacklistSupplier,
-            authenticator, serviceName));
+            requestAuthenticator, serviceName));
   }
 
   static ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer(Config config, GoogleCredential credential) {

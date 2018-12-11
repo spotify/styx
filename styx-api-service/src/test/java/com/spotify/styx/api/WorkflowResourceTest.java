@@ -21,6 +21,7 @@
 package com.spotify.styx.api;
 
 import static com.spotify.apollo.Status.FORBIDDEN;
+import static com.spotify.apollo.StatusType.Family.SERVER_ERROR;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasHeader;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasNoPayload;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
@@ -105,7 +106,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Mock private BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
   @Mock private ServiceAccountUsageAuthorizer serviceAccountUseAuthorizer;
   @Mock private GoogleIdToken idToken;
-  @Mock private Authenticator authenticator;
+  @Mock private RequestAuthenticator requestAuthenticator;
 
   private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
 
@@ -148,13 +149,13 @@ public class WorkflowResourceTest extends VersionedApiTest {
     storage = spy(new AggregateStorage(bigtable, datastore, Duration.ZERO));
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
-    when(authenticator.authenticate(any())).thenReturn(idToken);
+    when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     WorkflowResource workflowResource =
         new WorkflowResource(storage, workflowValidator, workflowInitializer, workflowConsumer,
             serviceAccountUseAuthorizer);
 
     environment.routingEngine()
-        .registerRoutes(workflowResource.routes(authenticator).map(r ->
+        .registerRoutes(workflowResource.routes(requestAuthenticator).map(r ->
             r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));
   }
 
@@ -599,13 +600,11 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldFailToUpdateWorkflowIfNotAuthenticated() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(authenticator.authenticate(any())).thenReturn(null);
+    when(requestAuthenticator.authenticate(any())).thenReturn(Optional::empty);
 
-    try {
-      awaitResponse(serviceHelper.request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
-      throw new RuntimeException();
-    } catch (AssertionError ignore) {
-    }
+    final Response<ByteString> response = awaitResponse(
+        serviceHelper.request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
+    assertThat(response.status().family(), is(SERVER_ERROR));
 
     verify(workflowInitializer, never()).store(WORKFLOW);
   }

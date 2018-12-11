@@ -34,7 +34,6 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -75,6 +74,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import okio.ByteString;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -94,7 +94,7 @@ public class MiddlewaresTest {
   @Rule public ExpectedException exception = ExpectedException.none();
 
   @Mock private Logger log;
-  @Mock private Authenticator authenticator;
+  @Mock private RequestAuthenticator authenticator;
   @Mock private GoogleIdToken idToken;
   @Mock private GoogleIdToken.Payload idTokenPayload;
   @Mock private Tracer tracer;
@@ -102,6 +102,11 @@ public class MiddlewaresTest {
 
   private static final TestStruct TEST_STRUCT = new AutoValue_MiddlewaresTest_TestStruct(
       "blah", new AutoValue_MiddlewaresTest_Inner("bloh", TestEnum.ENUM_VALUE));
+
+  @Before
+  public void setUp() throws Exception {
+    when(authenticator.authenticate(any())).thenReturn(Optional::empty);
+  }
 
   private RequestContext mockRequestContext(boolean hasHeader) {
     RequestContext requestContext = mock(RequestContext.class);
@@ -285,63 +290,6 @@ public class MiddlewaresTest {
   }
 
   @Test
-  public void testAuditLoggingForPutWithBrokenAuthorization()
-      throws InterruptedException, ExecutionException, TimeoutException {
-    RequestContext requestContext = mock(RequestContext.class);
-    Request request = Request.forUri("/", "PUT")
-        .withHeader(HttpHeaders.AUTHORIZATION, "Bearer broken")
-        .withPayload(ByteString.encodeUtf8("hello"));
-    when(requestContext.request()).thenReturn(request);
-
-    when(authenticator.authenticate(anyString())).thenThrow(new IllegalArgumentException());
-
-    Response<Object> response = Middlewares.httpLogger(authenticator).and(Middlewares.exceptionAndRequestIdHandler())
-        .apply(mockInnerHandler(requestContext))
-        .invoke(requestContext)
-        .toCompletableFuture().get(5, SECONDS);
-
-    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
-  }
-
-  @Test
-  public void testAuditLoggingForPutAuthorizationMissingBearerPrefix()
-      throws InterruptedException, ExecutionException, TimeoutException {
-    RequestContext requestContext = mock(RequestContext.class);
-    Request request = Request.forUri("/", "PUT")
-        .withHeader(HttpHeaders.AUTHORIZATION, "broken")
-        .withPayload(ByteString.encodeUtf8("hello"));
-    when(requestContext.request()).thenReturn(request);
-
-    Response<Object> response =
-        Middlewares.httpLogger(authenticator).and(Middlewares.exceptionAndRequestIdHandler())
-            .apply(mockInnerHandler(requestContext))
-            .invoke(requestContext)
-            .toCompletableFuture().get(5, SECONDS);
-
-    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
-  }
-
-  @Test
-  public void testAuditLoggingForPutFailedToValidate()
-      throws InterruptedException, ExecutionException, TimeoutException {
-    RequestContext requestContext = mock(RequestContext.class);
-    Request request = Request.forUri("/", "PUT")
-        .withHeader(HttpHeaders.AUTHORIZATION, "Bearer foobar")
-        .withPayload(ByteString.encodeUtf8("hello"));
-    when(requestContext.request()).thenReturn(request);
-
-    when(authenticator.authenticate(anyString())).thenReturn(null);
-
-    Response<Object> response =
-        Middlewares.httpLogger(authenticator).and(Middlewares.exceptionAndRequestIdHandler())
-            .apply(mockInnerHandler(requestContext))
-            .invoke(requestContext)
-            .toCompletableFuture().get(5, SECONDS);
-
-    assertThat(response, hasStatus(withCode(Status.UNAUTHORIZED)));
-  }
-
-  @Test
   public void testExceptionAndRequestIdHandlerOnImmediateResponseException()
       throws InterruptedException, ExecutionException, TimeoutException {
     final RequestContext requestContext = mock(RequestContext.class);
@@ -391,6 +339,21 @@ public class MiddlewaresTest {
   @Test
   public void testExceptionAndRequestIdHandlerOnImmediateUnhandledException()
       throws InterruptedException, ExecutionException, TimeoutException {
+    assertImmediateUnhandledExceptionIsHandled(
+        () -> { throw new RuntimeException("fubar", new IOException("deadbeef")); },
+        "RuntimeException: fubar: IOException: deadbeef");
+  }
+
+  @Test
+  public void testExceptionAndRequestIdHandlerOnImmediateUnhandledError()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    assertImmediateUnhandledExceptionIsHandled(
+        () -> { throw new AssertionError("fubar", new IOException("deadbeef")); },
+        "AssertionError: fubar: IOException: deadbeef");
+  }
+
+  private void assertImmediateUnhandledExceptionIsHandled(Runnable cause, String expectedMessage)
+      throws InterruptedException, ExecutionException, TimeoutException {
     final RequestContext requestContext = mock(RequestContext.class);
     final Request request = Request.forUri("/", "GET");
     final AtomicReference<String> requestId = new AtomicReference<>();
@@ -400,14 +363,15 @@ public class MiddlewaresTest {
         .apply(rc -> {
           requestId.set(MDC.get("request-id"));
           LoggerFactory.getLogger(MiddlewaresTest.class).error("deadbeef");
-          throw new RuntimeException("fubar", new IOException("deadbeef"));
+          cause.run();
+          return null;
         })
         .invoke(requestContext)
         .toCompletableFuture().get(5, SECONDS);
 
     assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
     assertThat(response, hasStatus(withReasonPhrase(is(
-        "Internal Server Error (Request ID: " + requestId.get() + "): RuntimeException: fubar: IOException: deadbeef"))));
+        "Internal Server Error (Request ID: " + requestId.get() + "): " + expectedMessage))));
     assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
     assertThat(requestId.get(), isValidUuid());
   }
@@ -533,7 +497,7 @@ public class MiddlewaresTest {
         .withPayload(ByteString.encodeUtf8("hello"))
         .withHeader(HttpHeaders.AUTHORIZATION, "Bearer s3cr3tp455w0rd");
     when(requestContext.request()).thenReturn(request);
-    when(authenticator.authenticate(any())).thenReturn(idToken);
+    when(authenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
 
     final Requested<Authenticated<Boolean>> handler = rc -> ac -> ac.user().map(idToken::equals).orElse(false);
     final Response<ByteString> response = awaitResponse(Middlewares.<Boolean>authed(authenticator)
@@ -553,7 +517,7 @@ public class MiddlewaresTest {
 
     String email = "foo@bar.net";
 
-    when(authenticator.authenticate(anyString())).thenReturn(idToken);
+    when(authenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     when(idToken.getPayload()).thenReturn(idTokenPayload);
     when(idTokenPayload.getEmail()).thenReturn(email);
 

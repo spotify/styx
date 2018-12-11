@@ -50,7 +50,7 @@ public class ApiTest {
 
   @Mock private Route<AsyncHandler<Response<ByteString>>> route;
 
-  @Mock private Authenticator validator;
+  @Mock private RequestAuthenticator requestAuthenticator;
 
   @Test
   public void shouldNotBeConstructable() throws ReflectiveOperationException {
@@ -77,7 +77,7 @@ public class ApiTest {
 
     final List<Route<AsyncHandler<Response<ByteString>>>> originalRoutes = ImmutableList.of(route);
     final List<Route<AsyncHandler<Response<ByteString>>>> routes =
-        Api.withCommonMiddleware(originalRoutes.stream(), validator, "test").collect(toList());
+        Api.withCommonMiddleware(originalRoutes.stream(), requestAuthenticator, "test").collect(toList());
     verify(route, times(5)).withMiddleware(any(Middleware.class));
     assertThat(routes, is(originalRoutes));
   }

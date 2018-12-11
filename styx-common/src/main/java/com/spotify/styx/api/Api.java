@@ -64,7 +64,7 @@ public final class Api {
 
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
       Stream<Route<AsyncHandler<Response<ByteString>>>> routes,
-      Authenticator authenticator,
+      RequestAuthenticator authenticator,
       String service) {
     return withCommonMiddleware(routes, Collections::emptyList, authenticator, service);
   }
@@ -72,7 +72,7 @@ public final class Api {
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
       Stream<Route<AsyncHandler<Response<ByteString>>>> routes,
       Supplier<List<String>> clientBlacklistSupplier,
-      Authenticator authenticator,
+      RequestAuthenticator authenticator,
       String service) {
     return routes.map(r -> r
         .withMiddleware(httpLogger(authenticator))
