@@ -99,7 +99,7 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>",
             rc -> workflows(arg("cid", rc))),
         Route.with(
-            Middlewares.<Workflow>authed2(requestAuthenticator), "POST", BASE + "/<cid>",
+            Middlewares.<Workflow>authed(requestAuthenticator), "POST", BASE + "/<cid>",
             rc -> ac -> createOrUpdateWorkflow(arg("cid", rc), rc, ac)),
         Route.with(
             json(), "DELETE", BASE + "/<cid>/<wfid>",

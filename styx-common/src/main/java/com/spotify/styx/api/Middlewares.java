@@ -240,17 +240,7 @@ public final class Middlewares {
 
   }
 
-  public static <T> Middleware<Requested<Authenticated<T>>, AsyncHandler<Response<ByteString>>> authed(
-      RequestAuthenticator authenticator) {
-    return ar -> jsonAsync().apply(requestContext -> {
-      final T payload = ar
-          .apply(requestContext)
-          .apply(auth(requestContext, authenticator));
-      return completedFuture(Response.forPayload(payload));
-    });
-  }
-
-  public static <T> Middleware<Requested<Authenticated<Response<T>>>, AsyncHandler<Response<ByteString>>> authed2(
+  public static <T> Middleware<Requested<Authenticated<Response<T>>>, AsyncHandler<Response<ByteString>>> authed(
       RequestAuthenticator authenticator) {
     return ar -> jsonAsync().apply(requestContext -> {
       final Response<T> payload = ar
