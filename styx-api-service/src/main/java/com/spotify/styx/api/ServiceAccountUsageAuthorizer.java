@@ -132,7 +132,7 @@ public interface ServiceAccountUsageAuthorizer {
     @Override
     public void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
       final String principalEmail = idToken.getPayload().getEmail();
-      final String projectId = serviceAccountProjectId(serviceAccount);
+      final String projectId = serviceAccountProjectId(workflowId, serviceAccount);
 
       final AtomicBoolean cached = new AtomicBoolean(true);
 
@@ -204,9 +204,10 @@ public interface ServiceAccountUsageAuthorizer {
           accessMessage, serviceAccount, workflowId.toKey(), enforce, cached ? CACHE_HIT : CACHE_MISS);
     }
 
-    private String serviceAccountProjectId(String serviceAccount) {
+    private String serviceAccountProjectId(WorkflowId workflowId, String serviceAccount) {
       final Matcher matcher = USER_CREATED_SERVICE_ACCOUNT_PATTERN.matcher(serviceAccount);
       if (!matcher.matches()) {
+        log.info("Non user created service account {} is used in workflow {}", serviceAccount, workflowId.toKey());
         throw new ResponseException(Response.forStatus(
             BAD_REQUEST.withReasonPhrase("Not a user created service account: " + serviceAccount)));
       }
