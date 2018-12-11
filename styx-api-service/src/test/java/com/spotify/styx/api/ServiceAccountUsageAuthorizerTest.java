@@ -267,7 +267,7 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Test
   public void testNop() {
-    final ServiceAccountUsageAuthorizer sut = ServiceAccountUsageAuthorizer.nop();
+    final ServiceAccountUsageAuthorizer sut = ServiceAccountUsageAuthorizer.NOP;
     assertThat(Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).isSuccess(),
         is(true));
   }

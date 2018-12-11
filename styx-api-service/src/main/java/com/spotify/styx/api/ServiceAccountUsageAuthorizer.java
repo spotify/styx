@@ -81,6 +81,10 @@ import org.slf4j.LoggerFactory;
 @FunctionalInterface
 public interface ServiceAccountUsageAuthorizer {
 
+  ServiceAccountUsageAuthorizer NOP = (x, y, z) -> {
+    // nop
+  };
+
   void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount,
       GoogleIdToken idToken);
 
@@ -337,22 +341,12 @@ public interface ServiceAccountUsageAuthorizer {
     }
 
     @SafeVarargs
-    private static <T> Optional<T> firstPresent(final Supplier<Optional<T>>... optionals) {
+    private static <T> Optional<T> firstPresent(Supplier<Optional<T>>... optionals) {
       return Stream.of(optionals)
           .map(Supplier::get)
           .filter(Optional::isPresent)
           .findFirst()
           .orElse(Optional.empty());
-    }
-  }
-
-  class Nop implements ServiceAccountUsageAuthorizer {
-
-    static final Nop INSTANCE = new Nop();
-
-    @Override
-    public void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
-      // nop
     }
   }
 
@@ -385,10 +379,6 @@ public interface ServiceAccountUsageAuthorizer {
         .build();
 
     return new Impl(iam, crm, directory, serviceAccountUserRole, authorizationPolicy, Impl.DEFAULT_RETRY_STOP_STRATEGY);
-  }
-
-  static ServiceAccountUsageAuthorizer nop() {
-    return Nop.INSTANCE;
   }
 
   /**

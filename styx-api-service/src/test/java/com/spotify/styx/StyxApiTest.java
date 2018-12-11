@@ -58,7 +58,7 @@ public class StyxApiTest {
   public void shouldCreateNopServiceAccountUsageAuthorizer() {
     final Config config = ConfigFactory.parseMap(ImmutableMap.of());
     final ServiceAccountUsageAuthorizer authorizer = StyxApi.serviceAccountUsageAuthorizer(config, credential, "foo");
-    assertThat(authorizer, is(ServiceAccountUsageAuthorizer.nop()));
+    assertThat(authorizer, is(ServiceAccountUsageAuthorizer.NOP));
   }
 
   @Test

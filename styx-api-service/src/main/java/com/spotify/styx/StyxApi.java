@@ -234,7 +234,7 @@ public class StyxApi implements AppInit {
       final String role = config.getString(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG);
       authorizer = ServiceAccountUsageAuthorizer.create(role, authorizationPolicy, credential, serviceName);
     } else {
-      authorizer = ServiceAccountUsageAuthorizer.nop();
+      authorizer = ServiceAccountUsageAuthorizer.NOP;
     }
     return authorizer;
   }
