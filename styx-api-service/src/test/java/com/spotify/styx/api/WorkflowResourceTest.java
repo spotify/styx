@@ -31,6 +31,7 @@ import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.model.SequenceEvent.create;
 import static com.spotify.styx.serialization.Json.deserialize;
 import static com.spotify.styx.serialization.Json.serialize;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
@@ -597,7 +598,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldFailToUpdateWorkflowIfNotAuthenticated() throws Exception {
+  public void shouldHaveAssertionErrorIfMissingAuthContext() throws Exception {
     sinceVersion(Api.Version.V3);
 
     when(requestAuthenticator.authenticate(any())).thenReturn(Optional::empty);
@@ -605,6 +606,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     final Response<ByteString> response = awaitResponse(
         serviceHelper.request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
     assertThat(response.status().family(), is(SERVER_ERROR));
+    assertThat(response.status().reasonPhrase(), containsString("AssertionError"));
 
     verify(workflowInitializer, never()).store(WORKFLOW);
   }

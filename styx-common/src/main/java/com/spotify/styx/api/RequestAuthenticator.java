@@ -26,6 +26,7 @@ import com.spotify.apollo.Request;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.styx.api.Middlewares.AuthContext;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -38,7 +39,7 @@ public class RequestAuthenticator {
   private final Authenticator authenticator;
 
   public RequestAuthenticator(Authenticator authenticator) {
-    this.authenticator = authenticator;
+    this.authenticator = Objects.requireNonNull(authenticator, "authenticator");
   }
 
   /**
