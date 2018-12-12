@@ -36,6 +36,9 @@ import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
+import com.spotify.apollo.entity.EntityCodec;
+import com.spotify.apollo.entity.EntityMiddleware;
+import com.spotify.apollo.entity.EntityMiddleware.EntityResponseHandler;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.SyncHandler;
@@ -43,6 +46,7 @@ import com.spotify.styx.util.MDCUtil;
 import io.norberg.automatter.AutoMatter;
 import io.opencensus.trace.Span;
 import io.opencensus.trace.Tracer;
+import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -240,7 +244,7 @@ public final class Middlewares {
 
   }
 
-  public static Middleware<Requested<Authenticated<Response<?>>>, AsyncHandler<Response<ByteString>>> authed(
+  public static Middleware<Requested<Authenticated<Response<?>>>, AsyncHandler<Response<ByteString>>> authedJson(
       RequestAuthenticator authenticator) {
     return ar -> jsonAsync().apply(requestContext -> {
       final Response<?> payload = ar
@@ -248,6 +252,80 @@ public final class Middlewares {
           .apply(auth(requestContext, authenticator));
       return completedFuture(payload);
     });
+  }
+
+  public static <T> Middleware<Requested<Authenticated<EntityResponseHandler<T, T>>>, SyncHandler<Response<ByteString>>> authedEntity(
+      EntityCodec codec,
+      RequestAuthenticator authenticator,
+      Class<T> cls) {
+    return ar -> rc -> {
+      final EntityResponseHandler<T, T> h = ar
+          .apply(rc)
+          .apply(auth(rc, authenticator));
+
+      if (!rc.request().payload().isPresent()) {
+        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload"));
+      }
+
+      final T requestPayload;
+      try {
+        requestPayload = codec.read(rc.request().payload().get(), cls);
+      } catch (IOException e) {
+        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Payload parsing failed: " + e.getMessage()));
+      }
+
+      final Response<T> response = h.apply(rc).apply(requestPayload);
+      if (!response.payload().isPresent()) {
+        //noinspection unchecked
+        return (Response<ByteString>) response;
+      }
+
+      final ByteString responsePayload;
+      try {
+        responsePayload = codec.write(response.payload().get(), cls);
+      } catch (IOException e) {
+        return Response.forStatus(
+            Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Payload serialization failed: " + e.getMessage()));
+      }
+
+      return response.withPayload(responsePayload);
+    };
+  }
+
+  public static <T> Middleware<Requested<Authenticated<Response<T>>>, SyncHandler<Response<T>>> authed(
+      RequestAuthenticator authenticator) {
+    return ar -> rc -> ar
+        .apply(rc)
+        .apply(auth(rc, authenticator));
+  }
+
+  public static <E, R> Middleware<Authenticated<EntityResponseHandler<E, R>>, SyncHandler<Response<ByteString>>> authedEntity(
+      Middleware<EntityResponseHandler<E, R>, SyncHandler<Response<ByteString>>> entityMiddleware,
+      Middleware<Requested<Authenticated<Response<ByteString>>>, SyncHandler<Response<ByteString>>> authed) {
+    // TODO: there must be some better way to compose the entity and authed middlewares
+    return ar -> rc -> authed.apply(__ ->
+        ac -> entityMiddleware.apply(ar.apply(ac)).invoke(rc)).invoke(rc);
+  }
+
+  public static <E, R> Middleware<Authenticated<EntityResponseHandler<E, R>>, SyncHandler<Response<ByteString>>> authedEntity(
+      RequestAuthenticator authenticator,
+      Middleware<EntityResponseHandler<E, R>, SyncHandler<Response<ByteString>>> entityMiddleware) {
+    return authedEntity(entityMiddleware, authed(authenticator));
+  }
+
+  public static <E, R> Middleware<Authenticated<EntityResponseHandler<E, R>>, SyncHandler<Response<ByteString>>> authedEntity(
+      EntityMiddleware em,
+      Class<E> requestEntityClass,
+      Class<R> responseEntityClass,
+      RequestAuthenticator authenticator) {
+    return authedEntity(em.response(requestEntityClass, responseEntityClass), authed(authenticator));
+  }
+
+  public static <E> Middleware<Authenticated<EntityResponseHandler<E, E>>, SyncHandler<Response<ByteString>>> authedEntity(
+      EntityMiddleware em,
+      Class<E> entityClass,
+      RequestAuthenticator authenticator) {
+    return authedEntity(em.response(entityClass), authed(authenticator));
   }
 
   private static AuthContext auth(RequestContext requestContext,

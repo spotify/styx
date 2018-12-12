@@ -21,12 +21,11 @@
 package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V3;
-import static com.spotify.styx.api.Middlewares.authed;
+import static com.spotify.styx.api.Middlewares.authedJson;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -74,18 +73,18 @@ public final class WorkflowResource {
 
   private final Storage storage;
   private final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
-  private final ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer;
+  private final WorkflowActionAuthorizer workflowActionAuthorizer;
 
   public WorkflowResource(Storage storage, WorkflowValidator workflowValidator,
-      WorkflowInitializer workflowInitializer,
-      BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer,
-      ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer) {
+                          WorkflowInitializer workflowInitializer,
+                          BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer,
+                          WorkflowActionAuthorizer workflowActionAuthorizer) {
     this.storage = Objects.requireNonNull(storage, "storage");
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
     this.workflowInitializer = Objects.requireNonNull(workflowInitializer, "workflowInitializer");
     this.workflowConsumer = Objects.requireNonNull(workflowConsumer, "workflowConsumer");
-    this.serviceAccountUsageAuthorizer = Objects.requireNonNull(serviceAccountUsageAuthorizer,
-        "serviceAccountUsageAuthorizer");
+    this.workflowActionAuthorizer = Objects.requireNonNull(workflowActionAuthorizer,
+        "workflowActionAuthorizer");
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(RequestAuthenticator requestAuthenticator) {
@@ -100,7 +99,7 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>",
             rc -> workflows(arg("cid", rc))),
         Route.with(
-            authed(requestAuthenticator), "POST", BASE + "/<cid>",
+            authedJson(requestAuthenticator), "POST", BASE + "/<cid>",
             rc -> ac -> createOrUpdateWorkflow(arg("cid", rc), rc, ac)),
         Route.with(
             json(), "DELETE", BASE + "/<cid>/<wfid>",
@@ -115,8 +114,8 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>/<wfid>/state",
             rc -> state(arg("cid", rc), arg("wfid", rc))),
         Route.with(
-            json(), "PATCH", BASE + "/<cid>/<wfid>/state",
-            rc -> patchState(arg("cid", rc), arg("wfid", rc), rc.request()))
+            authedJson(requestAuthenticator), "PATCH", BASE + "/<cid>/<wfid>/state",
+            rc -> ac -> patchState(arg("cid", rc), arg("wfid", rc), rc.request(), ac))
     );
 
     return Api.prefixRoutes(routes, V3);
@@ -167,12 +166,8 @@ public final class WorkflowResource {
           .withReasonPhrase("Invalid payload. " + e.getMessage()));
     }
 
-    if (workflowConfig.serviceAccount().isPresent()) {
-      final String serviceAccount = workflowConfig.serviceAccount().get();
-      final GoogleIdToken idToken = ac.user().orElseThrow(AssertionError::new);
-      final WorkflowId workflowId = WorkflowId.create(componentId, workflowConfig.id());
-      serviceAccountUsageAuthorizer.authorizeServiceAccountUsage(workflowId, serviceAccount, idToken);
-    }
+    final Workflow workflow = Workflow.create(componentId, workflowConfig);
+    workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow);
 
     final Collection<String> errors =
         workflowValidator.validateWorkflowConfiguration(workflowConfig);
@@ -181,7 +176,6 @@ public final class WorkflowResource {
           Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: " + errors));
     }
 
-    final Workflow workflow = Workflow.create(componentId, workflowConfig);
     final Optional<Workflow> oldWorkflowOptional;
     try {
       oldWorkflowOptional = workflowInitializer.store(workflow);
@@ -219,13 +213,16 @@ public final class WorkflowResource {
     }
   }
 
-  private Response<WorkflowState> patchState(String componentId, String id, Request request) {
+  private Response<WorkflowState> patchState(String componentId, String id, Request request,
+                                             AuthContext ac) {
     final Optional<ByteString> payload = request.payload();
     if (!payload.isPresent()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
     }
 
     final WorkflowId workflowId = WorkflowId.create(componentId, id);
+    workflowActionAuthorizer.authorizeWorkflowAction(ac, workflowId);
+
     final WorkflowState patchState;
     try {
       final JsonNode json = OBJECT_MAPPER.readTree(payload.get().toByteArray());

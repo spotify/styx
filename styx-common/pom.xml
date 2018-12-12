@@ -20,6 +20,10 @@
       <artifactId>apollo-metrics</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>apollo-entity</artifactId>
+    </dependency>
+    <dependency>
       <groupId>io.dropwizard.metrics</groupId>
       <artifactId>metrics-core</artifactId>
     </dependency>
@@ -70,6 +74,10 @@
     <dependency>
       <groupId>com.google.apis</groupId>
       <artifactId>google-api-services-iam</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.apis</groupId>
+      <artifactId>google-api-services-admin-directory</artifactId>
     </dependency>
 
     <dependency>

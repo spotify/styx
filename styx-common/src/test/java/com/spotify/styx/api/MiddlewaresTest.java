@@ -501,7 +501,7 @@ public class MiddlewaresTest {
 
     final Requested<Authenticated<Response<?>>> handler = rc -> ac ->
         Response.forPayload(ac.user().map(idToken::equals).orElse(false));
-    final Response<ByteString> response = awaitResponse(Middlewares.authed(authenticator)
+    final Response<ByteString> response = awaitResponse(Middlewares.authedJson(authenticator)
         .apply(handler)
         .invoke(requestContext));
 

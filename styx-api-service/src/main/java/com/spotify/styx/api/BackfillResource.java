@@ -20,8 +20,10 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.apollo.Status.NOT_FOUND;
 import static com.spotify.apollo.StatusType.Family.SUCCESSFUL;
 import static com.spotify.styx.api.Api.Version.V3;
+import static com.spotify.styx.api.Middlewares.authedEntity;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.util.CloserUtil.register;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
@@ -44,6 +46,7 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
 import com.spotify.futures.CompletableFutures;
+import com.spotify.styx.api.Middlewares.AuthContext;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
@@ -102,18 +105,22 @@ public final class BackfillResource implements Closeable {
   private final Time time;
 
   private final ForkJoinPool forkJoinPool;
+  private final WorkflowActionAuthorizer workflowActionAuthorizer;
 
   public BackfillResource(String schedulerServiceBaseUrl, Storage storage,
                           WorkflowValidator workflowValidator,
-                          Time time) {
+                          Time time,
+                          WorkflowActionAuthorizer workflowActionAuthorizer) {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl, "schedulerServiceBaseUrl");
     this.storage = Objects.requireNonNull(storage, "storage");
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
     this.time = Objects.requireNonNull(time, "time");
+    this.workflowActionAuthorizer = Objects.requireNonNull(workflowActionAuthorizer,
+        "workflowActionAuthorizer");
     this.forkJoinPool = register(closer, new ForkJoinPool(CONCURRENCY), "backfill-resource");
   }
 
-  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
+  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(RequestAuthenticator authenticator) {
     final EntityMiddleware em =
         EntityMiddleware.forCodec(JacksonEntityCodec.forMapper(Json.OBJECT_MAPPER));
 
@@ -123,17 +130,17 @@ public final class BackfillResource implements Closeable {
             "GET", BASE,
             this::getBackfills),
         Route.with(
-            em.response(BackfillInput.class, Backfill.class),
+            authedEntity(authenticator, em.response(BackfillInput.class, Backfill.class)),
             "POST", BASE,
-            rc -> payload -> postBackfill(rc, payload)),
+            ac -> rc -> payload -> postBackfill(ac, rc, payload)),
         Route.with(
             em.serializerResponse(BackfillPayload.class),
             "GET", BASE + "/<bid>",
             rc -> getBackfill(rc, rc.pathArgs().get("bid"))),
         Route.with(
-            em.response(EditableBackfillInput.class, Backfill.class),
+            authedEntity(authenticator, em.response(EditableBackfillInput.class, Backfill.class)),
             "PUT", BASE + "/<bid>",
-            rc -> payload -> updateBackfill(rc.pathArgs().get("bid"), payload))
+            ac -> rc -> payload -> updateBackfill(ac, rc.pathArgs().get("bid"), payload))
     )
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
         .collect(toList());
@@ -204,7 +211,7 @@ public final class BackfillResource implements Closeable {
       return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Error in internal storage"));
     }
     if (!backfillOpt.isPresent()) {
-      return Response.forStatus(Status.NOT_FOUND);
+      return Response.forStatus(NOT_FOUND);
     }
     final Backfill backfill = backfillOpt.get();
     if (includeStatuses) {
@@ -229,7 +236,7 @@ public final class BackfillResource implements Closeable {
         return haltActiveBackfillInstances(backfill, rc.requestScopedClient());
       } else {
         return CompletableFuture.completedFuture(
-            Response.forStatus(Status.NOT_FOUND.withReasonPhrase("backfill not found")));
+            Response.forStatus(NOT_FOUND.withReasonPhrase("backfill not found")));
       }
     } catch (IOException e) {
       return CompletableFuture.completedFuture(Response.forStatus(
@@ -316,25 +323,27 @@ public final class BackfillResource implements Closeable {
     return Optional.empty();
   }
 
-  private Response<Backfill> postBackfill(RequestContext rc,
-                                          BackfillInput input) {
+  private Response<Backfill> postBackfill(AuthContext ac, RequestContext rc,
+      BackfillInput input) {
     final BackfillBuilder builder = Backfill.newBuilder();
 
     final String id = RandomGenerator.DEFAULT.generateUniqueId("backfill");
 
     final WorkflowId workflowId = WorkflowId.create(input.component(), input.workflow());
-
-    // TODO: authorize backfills using ServiceAccountUsageAuthorizer ?
-
     final Workflow workflow;
+    try {
+      workflow = storage.workflow(workflowId)
+          .orElseThrow(() -> new ResponseException(
+              Response.forStatus(NOT_FOUND.withReasonPhrase("workflow not found"))));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+
+    workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow);
+
     final Set<WorkflowInstance> activeWorkflowInstances;
     try {
       activeWorkflowInstances = storage.readActiveStates(input.component()).keySet();
-      final Optional<Workflow> workflowOpt = storage.workflow(workflowId);
-      if (!workflowOpt.isPresent()) {
-        return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("workflow not found"));
-      }
-      workflow = workflowOpt.get();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -389,7 +398,8 @@ public final class BackfillResource implements Closeable {
     return Response.forPayload(backfill);
   }
 
-  private Response<Backfill> updateBackfill(String id, EditableBackfillInput backfillInput) {
+  private Response<Backfill> updateBackfill(AuthContext ac, String id,
+      EditableBackfillInput backfillInput) {
     if (!backfillInput.id().equals(id)) {
       return Response.forStatus(
           Status.BAD_REQUEST.withReasonPhrase("ID of payload does not match ID in uri."));
@@ -398,18 +408,16 @@ public final class BackfillResource implements Closeable {
     final Backfill backfill;
     try {
       backfill = storage.runInTransaction(tx -> {
-        final Optional<Backfill> oldBackfill = tx.backfill(id);
-        if (!oldBackfill.isPresent()) {
-          throw new ResourceNotFoundException(String.format("Backfill %s not found.", id));
-        } else {
-          final BackfillBuilder backfillBuilder = oldBackfill.get().builder();
-          backfillInput.concurrency().ifPresent(backfillBuilder::concurrency);
-          backfillInput.description().ifPresent(backfillBuilder::description);
-          return tx.store(backfillBuilder.build());
-        }
+        final Backfill oldBackfill = tx.backfill(id)
+            .orElseThrow(() -> new ResourceNotFoundException(String.format("Backfill %s not found.", id)));
+        workflowActionAuthorizer.authorizeWorkflowAction(ac, oldBackfill.workflowId());
+        final BackfillBuilder backfillBuilder = oldBackfill.builder();
+        backfillInput.concurrency().ifPresent(backfillBuilder::concurrency);
+        backfillInput.description().ifPresent(backfillBuilder::description);
+        return tx.store(backfillBuilder.build());
       });
     } catch (ResourceNotFoundException e) {
-      return Response.forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
+      return Response.forStatus(NOT_FOUND.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
       return Response.forStatus(
           Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Failed to store backfill."));
