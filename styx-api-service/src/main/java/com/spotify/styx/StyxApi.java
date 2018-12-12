@@ -241,14 +241,14 @@ public class StyxApi implements AppInit {
 
   @VisibleForTesting
   static AuthorizationPolicy authorizationPolicy(Config config) {
-    final List<String> keys;
     final AuthorizationPolicy authorizationPolicy;
     if (config.hasPath(AUTHORIZATION_REQUIRE_ALL_CONFIG) &&
         config.getBoolean(AUTHORIZATION_REQUIRE_ALL_CONFIG)) {
       authorizationPolicy = new ServiceAccountUsageAuthorizer.AllAuthorizationPolicy();
-    } else if (config.hasPath(AUTHORIZATION_REQUIRE_WORKFLOWS) &&
-        !(keys = config.getStringList(AUTHORIZATION_REQUIRE_WORKFLOWS)).isEmpty()) {
-      final List<WorkflowId> ids = keys.stream().map(WorkflowId::parseKey).collect(Collectors.toList());
+    } else if (config.hasPath(AUTHORIZATION_REQUIRE_WORKFLOWS)) {
+      final List<WorkflowId> ids = config.getStringList(AUTHORIZATION_REQUIRE_WORKFLOWS).stream()
+          .map(WorkflowId::parseKey)
+          .collect(Collectors.toList());
       authorizationPolicy = new ServiceAccountUsageAuthorizer.WhitelistAuthorizationPolicy(ids);
     } else {
       authorizationPolicy = new ServiceAccountUsageAuthorizer.NoAuthorizationPolicy();
