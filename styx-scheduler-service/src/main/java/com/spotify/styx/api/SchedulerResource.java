@@ -171,6 +171,8 @@ public class SchedulerResource {
         triggerRequest.workflowId(), triggerRequest.parameter());
     final Workflow workflow;
 
+    // TODO: authorize triggering using ServiceAccountUsageAuthorizer ?
+
     // Verifying workflow
     try {
       final Optional<Workflow> workflowResult = storage.workflow(workflowInstance.workflowId());

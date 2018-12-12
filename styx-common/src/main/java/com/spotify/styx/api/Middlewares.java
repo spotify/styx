@@ -40,6 +40,7 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.SyncHandler;
 import com.spotify.styx.util.MDCUtil;
+import io.norberg.automatter.AutoMatter;
 import io.opencensus.trace.Span;
 import io.opencensus.trace.Tracer;
 import java.net.URI;
@@ -49,6 +50,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import okio.ByteString;
@@ -65,7 +67,6 @@ public final class Middlewares {
 
   private static final Logger LOG = LoggerFactory.getLogger(Middlewares.class);
 
-  public static final String BEARER_PREFIX = "Bearer ";
   private static final Set<String> BLACKLISTED_HEADERS = ImmutableSet.of(HttpHeaders.AUTHORIZATION);
 
   private static final String REQUEST_ID = "request-id";
@@ -147,9 +148,9 @@ public final class Middlewares {
       } catch (ResponseException e) {
         return completedFuture(e.<T>getResponse()
             .withHeader(X_REQUEST_ID, requestId));
-      } catch (Exception e) {
+      } catch (Throwable t) {
         return completedFuture(Response.<T>forStatus(INTERNAL_SERVER_ERROR
-            .withReasonPhrase(internalServerErrorReason(requestId, e)))
+            .withReasonPhrase(internalServerErrorReason(requestId, t)))
             .withHeader(X_REQUEST_ID, requestId));
       }
     };
@@ -171,13 +172,13 @@ public final class Middlewares {
   }
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> httpLogger(
-      Authenticator authenticator) {
+      RequestAuthenticator authenticator) {
     return httpLogger(LOG, authenticator);
   }
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> httpLogger(
       Logger log,
-      Authenticator authenticator) {
+      RequestAuthenticator authenticator) {
     return innerHandler -> requestContext -> {
       final Request request = requestContext.request();
 
@@ -185,7 +186,8 @@ public final class Middlewares {
                "GET".equals(request.method()) ? "" : "[AUDIT] ",
                request.method(),
                request.uri(),
-               auth(requestContext, authenticator).map(idToken -> idToken.getPayload()
+          // TODO: pass in auth context instead of authenticating twice
+          auth(requestContext, authenticator).user().map(idToken -> idToken.getPayload()
                    .getEmail())
                    .orElse("anonymous"),
                hideSensitiveHeaders(request.headers()),
@@ -224,35 +226,33 @@ public final class Middlewares {
     };
   }
 
-  private static Optional<GoogleIdToken> auth(RequestContext requestContext,
-                                              Authenticator authenticator) {
-    final Request request = requestContext.request();
-    final boolean hasAuthHeader = request.header(HttpHeaders.AUTHORIZATION).isPresent();
+  @AutoMatter
+  public interface AuthContext {
 
-    if (!hasAuthHeader) {
-      return Optional.empty();
-    }
+    Optional<GoogleIdToken> user();
+  }
 
-    final String authHeader = request.header(HttpHeaders.AUTHORIZATION).get();
-    if (!authHeader.startsWith(BEARER_PREFIX)) {
-      throw new ResponseException(Response.forStatus(Status.BAD_REQUEST
-          .withReasonPhrase("Authorization token must be of type Bearer")));
-    }
+  interface Authenticated<T> extends Function<AuthContext, T> {
 
-    final GoogleIdToken googleIdToken;
-    try {
-      googleIdToken = authenticator.authenticate(authHeader.substring(BEARER_PREFIX.length()));
-    } catch (IllegalArgumentException e) {
-      throw new ResponseException(Response.forStatus(Status.BAD_REQUEST
-          .withReasonPhrase("Failed to parse Authorization token")), e);
-    }
+  }
 
-    if (googleIdToken == null) {
-      throw new ResponseException(Response.forStatus(Status.UNAUTHORIZED
-          .withReasonPhrase("Authorization token is invalid")));
-    }
+  interface Requested<T> extends Function<RequestContext, T> {
 
-    return Optional.of(googleIdToken);
+  }
+
+  public static Middleware<Requested<Authenticated<Response<?>>>, AsyncHandler<Response<ByteString>>> authed(
+      RequestAuthenticator authenticator) {
+    return ar -> jsonAsync().apply(requestContext -> {
+      final Response<?> payload = ar
+          .apply(requestContext)
+          .apply(auth(requestContext, authenticator));
+      return completedFuture(payload);
+    });
+  }
+
+  private static AuthContext auth(RequestContext requestContext,
+      RequestAuthenticator authenticator) {
+    return authenticator.authenticate(requestContext.request());
   }
 
   private static Map<String, String> hideSensitiveHeaders(Map<String, String> headers) {
@@ -262,9 +262,10 @@ public final class Middlewares {
   }
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authenticator(
-      Authenticator authenticator) {
+      RequestAuthenticator authenticator) {
     return h -> rc -> {
-      if (!"GET".equals(rc.request().method()) && !auth(rc, authenticator).isPresent()) {
+      final Optional<GoogleIdToken> idToken = auth(rc, authenticator).user();
+      if (!"GET".equals(rc.request().method()) && !idToken.isPresent()) {
         return completedFuture(
             Response.forStatus(Status.UNAUTHORIZED.withReasonPhrase("Unauthorized access")));
       }

@@ -20,6 +20,8 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.apollo.Status.FORBIDDEN;
+import static com.spotify.apollo.StatusType.Family.SERVER_ERROR;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasHeader;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasNoPayload;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
@@ -29,6 +31,7 @@ import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.model.SequenceEvent.create;
 import static com.spotify.styx.serialization.Json.deserialize;
 import static com.spotify.styx.serialization.Json.serialize;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
@@ -44,6 +47,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
@@ -58,6 +62,7 @@ import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.state.Trigger;
@@ -100,6 +105,11 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Mock private WorkflowValidator workflowValidator;
   @Mock private WorkflowInitializer workflowInitializer;
   @Mock private BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
+  @Mock private ServiceAccountUsageAuthorizer serviceAccountUseAuthorizer;
+  @Mock private GoogleIdToken idToken;
+  @Mock private RequestAuthenticator requestAuthenticator;
+
+  private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
@@ -107,6 +117,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
           .schedule(Schedule.DAYS)
           .commitSha("00000ef508c1cb905e360590ce3e7e9193f6b370")
           .dockerImage("bar-dummy:dummy")
+          .serviceAccount(SERVICE_ACCOUNT)
           .build();
 
   private static final Workflow WORKFLOW =
@@ -139,11 +150,14 @@ public class WorkflowResourceTest extends VersionedApiTest {
     storage = spy(new AggregateStorage(bigtable, datastore, Duration.ZERO));
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
+    when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     WorkflowResource workflowResource =
-        new WorkflowResource(storage, workflowValidator, workflowInitializer, workflowConsumer);
+        new WorkflowResource(storage, workflowValidator, workflowInitializer, workflowConsumer,
+            serviceAccountUseAuthorizer);
 
     environment.routingEngine()
-        .registerRoutes(workflowResource.routes());
+        .registerRoutes(workflowResource.routes(requestAuthenticator).map(r ->
+            r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));
   }
 
   @BeforeClass
@@ -581,6 +595,36 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(deserialize(response.payload().get(), Workflow.class), equalTo(WORKFLOW));
+  }
+
+  @Test
+  public void shouldHaveAssertionErrorIfMissingAuthContext() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(requestAuthenticator.authenticate(any())).thenReturn(Optional::empty);
+
+    final Response<ByteString> response = awaitResponse(
+        serviceHelper.request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
+    assertThat(response.status().family(), is(SERVER_ERROR));
+    assertThat(response.status().reasonPhrase(), containsString("AssertionError"));
+
+    verify(workflowInitializer, never()).store(WORKFLOW);
+  }
+
+  @Test
+  public void shouldFailToUpdateWorkflowIfNotAuthorized() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(serviceAccountUseAuthorizer).authorizeServiceAccountUsage(
+            WorkflowId.create("foo", "bar"), SERVICE_ACCOUNT, idToken);
+
+    final Response<ByteString> response = awaitResponse(
+        serviceHelper.request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
+
+    verify(workflowInitializer, never()).store(WORKFLOW);
+
+    assertThat(response.status().code(), is(FORBIDDEN.code()));
   }
 
   @Test

@@ -21,10 +21,12 @@
 package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V3;
+import static com.spotify.styx.api.Middlewares.authed;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -32,6 +34,7 @@ import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
+import com.spotify.styx.api.Middlewares.AuthContext;
 import com.spotify.styx.api.workflow.WorkflowInitializationException;
 import com.spotify.styx.api.workflow.WorkflowInitializer;
 import com.spotify.styx.model.Schedule;
@@ -71,17 +74,21 @@ public final class WorkflowResource {
 
   private final Storage storage;
   private final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
+  private final ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer;
 
   public WorkflowResource(Storage storage, WorkflowValidator workflowValidator,
-                          WorkflowInitializer workflowInitializer,
-                          final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
+      WorkflowInitializer workflowInitializer,
+      BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer,
+      ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer) {
     this.storage = Objects.requireNonNull(storage, "storage");
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
     this.workflowInitializer = Objects.requireNonNull(workflowInitializer, "workflowInitializer");
     this.workflowConsumer = Objects.requireNonNull(workflowConsumer, "workflowConsumer");
+    this.serviceAccountUsageAuthorizer = Objects.requireNonNull(serviceAccountUsageAuthorizer,
+        "serviceAccountUsageAuthorizer");
   }
 
-  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
+  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(RequestAuthenticator requestAuthenticator) {
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Arrays.asList(
         Route.with(
             json(), "GET", BASE + "/<cid>/<wfid>",
@@ -93,8 +100,8 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>",
             rc -> workflows(arg("cid", rc))),
         Route.with(
-            json(), "POST", BASE + "/<cid>",
-            rc -> createOrUpdateWorkflow(arg("cid", rc), rc)),
+            authed(requestAuthenticator), "POST", BASE + "/<cid>",
+            rc -> ac -> createOrUpdateWorkflow(arg("cid", rc), rc, ac)),
         Route.with(
             json(), "DELETE", BASE + "/<cid>/<wfid>",
             rc -> deleteWorkflow(arg("cid", rc),arg("wfid", rc))),
@@ -146,7 +153,7 @@ public final class WorkflowResource {
   }
 
   private Response<Workflow> createOrUpdateWorkflow(String componentId,
-                                                    RequestContext rc) {
+      RequestContext rc, AuthContext ac) {
     final Optional<ByteString> payload = rc.request().payload();
     if (!payload.isPresent()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
@@ -158,6 +165,13 @@ public final class WorkflowResource {
     } catch (IOException e) {
       return Response.forStatus(Status.BAD_REQUEST
           .withReasonPhrase("Invalid payload. " + e.getMessage()));
+    }
+
+    if (workflowConfig.serviceAccount().isPresent()) {
+      final String serviceAccount = workflowConfig.serviceAccount().get();
+      final GoogleIdToken idToken = ac.user().orElseThrow(AssertionError::new);
+      final WorkflowId workflowId = WorkflowId.create(componentId, workflowConfig.id());
+      serviceAccountUsageAuthorizer.authorizeServiceAccountUsage(workflowId, serviceAccount, idToken);
     }
 
     final Collection<String> errors =

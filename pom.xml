@@ -298,6 +298,11 @@
       </dependency>
       <dependency>
         <groupId>com.google.apis</groupId>
+        <artifactId>google-api-services-admin-directory</artifactId>
+        <version>directory_v1-rev105-${google.client.lib.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-cloudresourcemanager</artifactId>
         <version>v1-rev513-${google.client.lib.version}</version>
       </dependency>
