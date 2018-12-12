@@ -207,7 +207,8 @@ public interface ServiceAccountUsageAuthorizer {
     private String serviceAccountProjectId(WorkflowId workflowId, String serviceAccount) {
       final Matcher matcher = USER_CREATED_SERVICE_ACCOUNT_PATTERN.matcher(serviceAccount);
       if (!matcher.matches()) {
-        log.info("Non user created service account {} is used in workflow {}", serviceAccount, workflowId.toKey());
+        log.info("Attempted to use non user created service account {} in workflow {}",
+            serviceAccount, workflowId.toKey());
         throw new ResponseException(Response.forStatus(
             BAD_REQUEST.withReasonPhrase("Not a user created service account: " + serviceAccount)));
       }
