@@ -198,6 +198,15 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
+  public void shouldAllowAccessOnFailureIfNotEnforcingAuthorizationPolicy(String serviceAccount) throws IOException {
+    final Throwable cause = new AssertionError();
+    when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenThrow(cause);
+    when(authorizationPolicy.shouldEnforceAuthorization(any(), any(), any())).thenReturn(false);
+    sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken);
+  }
+
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
+  @Test
   public void shouldAllowAccessIfNotEnforcingAuthorizationPolicy(String serviceAccount) {
     when(authorizationPolicy.shouldEnforceAuthorization(any(), any(), any())).thenReturn(false);
     sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken);
