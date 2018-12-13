@@ -272,7 +272,6 @@ public interface ServiceAccountUsageAuthorizer {
           .flatMap(binding -> binding.getMembers().stream())
           .collect(toList());
       return memberStatus(principalEmail, members);
-
     }
 
     private Optional<String> memberStatus(String principalEmail, List<String> members) {
