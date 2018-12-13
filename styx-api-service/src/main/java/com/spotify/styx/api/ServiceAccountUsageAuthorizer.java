@@ -22,6 +22,7 @@ package com.spotify.styx.api;
 
 import static com.github.rholder.retry.WaitStrategies.exponentialWait;
 import static com.github.rholder.retry.WaitStrategies.randomWait;
+import static com.google.api.services.admin.directory.DirectoryScopes.ADMIN_DIRECTORY_GROUP_MEMBER_READONLY;
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.FORBIDDEN;
 import static java.lang.Boolean.TRUE;
@@ -74,8 +75,9 @@ import org.slf4j.LoggerFactory;
  * Verifies that a user is authorized to use a service account in a workflow by verifying that the user has
  * a specific role either on the service account itself or in the project of the service account.
  * <p> This requires the following permissions:<ul>
- * <li> {@code resourcemanager.projects.getIamPolicy}
- * <li> {@code iam.serviceAccounts.getIamPolicy}
+ * <li> GCP: {@code resourcemanager.projects.getIamPolicy}
+ * <li> GCP: {@code iam.serviceAccounts.getIamPolicy}
+ * <li> GSuite: {@code https://www.googleapis.com/auth/admin.directory.group.member.readonly}
  * </ul></p>
  */
 @FunctionalInterface
@@ -355,6 +357,7 @@ public interface ServiceAccountUsageAuthorizer {
   static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole,
                                               AuthorizationPolicy authorizationPolicy,
                                               GoogleCredential credential,
+                                              String gsuiteUserEmail,
                                               String serviceName) {
 
     final HttpTransport httpTransport;
@@ -376,7 +379,20 @@ public interface ServiceAccountUsageAuthorizer {
         .setApplicationName(serviceName)
         .build();
 
-    final Directory directory = new Directory.Builder(httpTransport, jsonFactory, credential)
+    if (credential.getServiceAccountId() == null) {
+      throw new AssertionError("Credential must be a service account");
+    }
+
+    final GoogleCredential directoryCredential = new GoogleCredential.Builder()
+        .setTransport(httpTransport)
+        .setJsonFactory(jsonFactory)
+        .setServiceAccountId(credential.getServiceAccountId())
+        .setServiceAccountScopes(ImmutableSet.of(ADMIN_DIRECTORY_GROUP_MEMBER_READONLY))
+        .setServiceAccountUser(gsuiteUserEmail)
+        .setServiceAccountPrivateKey(credential.getServiceAccountPrivateKey())
+        .build();
+
+    final Directory directory = new Directory.Builder(httpTransport, jsonFactory, directoryCredential)
         .setApplicationName(serviceName)
         .build();
 
