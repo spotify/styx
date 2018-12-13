@@ -230,6 +230,38 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
+  public void shouldFailToAuthorizeIfPrincipalHasUserRoleOnProjectViaNonexistGroup(String serviceAccount)
+      throws IOException {
+    final Throwable cause = googleJsonResponseException(404);
+    when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute()).thenThrow(cause);
+    final Response<?> response =
+        assertThrowsResponseException(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
+    assertThat(response.status().code(), is(FORBIDDEN.code()));
+  }
+
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
+  @Test
+  public void shouldFailToAuthorizeIfGroupMemberCheckReturnClientError(String serviceAccount)
+      throws IOException {
+    final Throwable cause = googleJsonResponseException(400);
+    when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute()).thenThrow(cause);
+    final Response<?> response =
+        assertThrowsResponseException(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
+    assertThat(response.status().code(), is(FORBIDDEN.code()));
+  }
+
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
+  @Test
+  public void shouldFailIfGroupMemberCheckFails(String serviceAccount)
+      throws IOException {
+    final Throwable cause = googleJsonResponseException(500);
+    when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute()).thenThrow(cause);
+    assertThat(Throwables.getRootCause(Try.run(() ->
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
+  }
+
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
+  @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnServiceAccountDirectly(String serviceAccount) {
     saBinding.getMembers().add("user:" + PRINCIPAL_EMAIL);
     assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
