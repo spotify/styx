@@ -56,6 +56,7 @@ import com.spotify.styx.model.WorkflowId;
 import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -253,7 +254,7 @@ public interface ServiceAccountUsageAuthorizer {
           .orElseThrow(() -> new ResponseException(Response.forStatus(
               BAD_REQUEST.withReasonPhrase("Project does not exist: " + projectId))));
 
-      final List<String> members = policy.getBindings().stream()
+      final List<String> members = Optional.ofNullable(policy.getBindings()).orElse(Collections.emptyList()).stream()
           .filter(binding -> serviceAccountUserRole.equals(binding.getRole()))
           .flatMap(binding -> binding.getMembers().stream())
           .collect(toList());
@@ -266,7 +267,7 @@ public interface ServiceAccountUsageAuthorizer {
           .orElseThrow(() -> new ResponseException(Response.forStatus(
               BAD_REQUEST.withReasonPhrase("Service account does not exist: " + serviceAccount))));
 
-      final List<String> members = policy.getBindings().stream()
+      final List<String> members = Optional.ofNullable(policy.getBindings()).orElse(Collections.emptyList()).stream()
           .filter(binding -> serviceAccountUserRole.equals(binding.getRole()))
           .flatMap(binding -> binding.getMembers().stream())
           .collect(toList());
