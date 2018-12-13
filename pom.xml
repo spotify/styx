@@ -601,7 +601,7 @@
                   <arg>-Xep:UngroupedOverloads:WARN</arg>
                   <arg>-Xep:UnnecessaryStaticImport:ERROR</arg>
                   <arg>-Xep:WildcardImport:ERROR</arg>
-                  <ark>-XepExcludedPaths:.*/target/generated.*</ark>
+                  <arg>-XepExcludedPaths:.*/target/generated.*</arg>
                 </compilerArgs>
               </configuration>
               <dependencies>
