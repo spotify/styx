@@ -380,7 +380,7 @@ public interface ServiceAccountUsageAuthorizer {
         .build();
 
     if (credential.getServiceAccountId() == null) {
-      throw new AssertionError("Credential must be a service account");
+      throw new IllegalArgumentException("Credential must be a service account");
     }
 
     final GoogleCredential directoryCredential = new GoogleCredential.Builder()
