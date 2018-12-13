@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
@@ -44,6 +45,7 @@ import com.google.api.services.admin.directory.Directory;
 import com.google.api.services.admin.directory.model.MembersHasMember;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.iam.v1.Iam;
+import com.google.api.services.iam.v1.model.ServiceAccount;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Response;
@@ -56,14 +58,16 @@ import java.io.IOException;
 import java.security.PrivateKey;
 import java.util.ArrayList;
 import javaslang.control.Try;
+import junitparams.JUnitParamsRunner;
+import junitparams.Parameters;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Answers;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.MockitoAnnotations;
 
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(JUnitParamsRunner.class)
 public class ServiceAccountUsageAuthorizerTest {
 
   private static final WorkflowId WORKFLOW_ID = WorkflowId.create("foo", "bar");
@@ -71,6 +75,7 @@ public class ServiceAccountUsageAuthorizerTest {
   private static final String PROJECT_ADMINS_GROUP_EMAIL = "project-admins@corp.com";
   private static final String SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL = "service-account-admins@corp.com";
   private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
+  private static final String MANAGED_SERVICE_ACCOUNT = "4711-compute@developer.gserviceaccount.com";
   private static final String SERVICE_ACCOUNT_PROJECT = "bar";
   private static final String SERVICE_ACCOUNT_USER_ROLE = "organizations/3141592/roles/StyxWorkflowServiceAccountUser";
   private static final int RETRY_ATTEMPTS = 3;
@@ -92,6 +97,7 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Before
   public void setUp() throws IOException {
+    MockitoAnnotations.initMocks(this);
     projectBinding.setRole(SERVICE_ACCOUNT_USER_ROLE);
     projectBinding.setMembers(new ArrayList<>());
     projectBinding.getMembers().add("user:someone@else.com");
@@ -112,10 +118,13 @@ public class ServiceAccountUsageAuthorizerTest {
     when(idToken.getPayload()).thenReturn(idTokenPayload);
     when(idTokenPayload.getEmail()).thenReturn(PRINCIPAL_EMAIL);
     when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenReturn(projectPolicy);
-    when((Object) iam.projects().serviceAccounts().getIamPolicy("projects/-/serviceAccounts/" + SERVICE_ACCOUNT)
-        .execute()).thenReturn(saPolicy);
+    when((Object) iam.projects().serviceAccounts().getIamPolicy(any()).execute()).thenReturn(saPolicy);
     when((Object) directory.members().hasMember(any(), any()).execute())
         .thenReturn(new MembersHasMember().setIsMember(false));
+    when((Object) iam.projects().serviceAccounts().get(any()).execute())
+        .thenReturn(new ServiceAccount()
+            .setEmail(MANAGED_SERVICE_ACCOUNT)
+            .setProjectId(SERVICE_ACCOUNT_PROJECT));
     sut = new ServiceAccountUsageAuthorizer.Impl(iam, crm, directory, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy,
         StopStrategies.stopAfterAttempt(RETRY_ATTEMPTS));
   }
@@ -161,101 +170,129 @@ public class ServiceAccountUsageAuthorizerTest {
   }
 
   @Test
-  public void shouldAllowAccessIfNotEnforcingAuthorizationPolicy() {
+  public void shouldLookupManagedServiceAccountAndCacheResult() throws IOException {
+    for (int i = 0; i < 3; i++) {
+      Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, MANAGED_SERVICE_ACCOUNT, idToken));
+    }
+    verify(iam.projects().serviceAccounts(), times(1)).get("projects/-/serviceAccounts/" + MANAGED_SERVICE_ACCOUNT);
+  }
+
+  @Test
+  public void shouldFailIfManagedServiceAccountLookupFailsWithGoogleException() throws IOException {
+    final Throwable cause = googleJsonResponseException(404);
+    when((Object) iam.projects().serviceAccounts().get(any()).execute()).thenThrow(cause);
+    final Response<?> response = assertThrowsResponseException(() ->
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, MANAGED_SERVICE_ACCOUNT, idToken));
+    assertThat(response.status().code(), is(BAD_REQUEST.code()));
+    assertThat(response.status().reasonPhrase(), is("Service account does not exist: " + MANAGED_SERVICE_ACCOUNT));
+  }
+
+  @Test
+  public void shouldFailIfManagedServiceAccountLookupFailsWithIOException() throws IOException {
+    final Throwable cause = new IOException();
+    when((Object) iam.projects().serviceAccounts().get(any()).execute()).thenThrow(cause);
+    assertThat(Throwables.getRootCause(Try.run(() ->
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, MANAGED_SERVICE_ACCOUNT, idToken)).getCause()), is(cause));
+    verify(iam.projects().serviceAccounts().get(any()), atLeast(RETRY_ATTEMPTS)).execute();
+  }
+
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
+  @Test
+  public void shouldAllowAccessIfNotEnforcingAuthorizationPolicy(String serviceAccount) {
     when(authorizationPolicy.shouldEnforceAuthorization(any(), any(), any())).thenReturn(false);
-    sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken);
-    verify(authorizationPolicy).shouldEnforceAuthorization(WORKFLOW_ID, SERVICE_ACCOUNT, idToken);
+    sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken);
+    verify(authorizationPolicy).shouldEnforceAuthorization(WORKFLOW_ID, serviceAccount, idToken);
   }
 
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
-  public void shouldAuthorizeIfPrincipalHasUserRoleOnProjectDirectly() {
+  public void shouldAuthorizeIfPrincipalHasUserRoleOnProjectDirectly(String serviceAccount) {
     projectBinding.getMembers().add("user:" + PRINCIPAL_EMAIL);
-    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
+    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
   }
 
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
-  public void shouldAuthorizeIfPrincipalHasUserRoleOnProjectViaGroup() throws IOException {
+  public void shouldAuthorizeIfPrincipalHasUserRoleOnProjectViaGroup(String serviceAccount) throws IOException {
     when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute())
         .thenReturn(new MembersHasMember().setIsMember(true));
-    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
+    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
   }
 
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
-  public void shouldAuthorizeIfPrincipalHasUserRoleOnServiceAccountDirectly() throws IOException {
+  public void shouldAuthorizeIfPrincipalHasUserRoleOnServiceAccountDirectly(String serviceAccount) {
     saBinding.getMembers().add("user:" + PRINCIPAL_EMAIL);
-    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
+    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
   }
 
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
-  public void shouldAuthorizeIfPrincipalHasUserRoleOnServiceAccountViaGroup() throws IOException {
+  public void shouldAuthorizeIfPrincipalHasUserRoleOnServiceAccountViaGroup(String serviceAccount) throws IOException {
     when((Object) directory.members().hasMember(SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute())
         .thenReturn(new MembersHasMember().setIsMember(true));
-    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
+    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
   }
 
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
-  public void shouldFailIfNotAUserCreatedServiceAccount() {
-    final String serviceAccount = "4711-compute@developer.gserviceaccount.com";
-    final Response<?> error = assertThrowsResponseException(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
-    assertThat(error.status().code(), is(BAD_REQUEST.code()));
-    assertThat(error.status().reasonPhrase(), is("Not a user created service account: " + serviceAccount));
-  }
-
-  @Test
-  public void shouldFailIfProjectDoesNotExist() throws IOException {
+  public void shouldFailIfProjectDoesNotExist(String serviceAccount) throws IOException {
     final Throwable cause = googleJsonResponseException(404);
     when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenThrow(cause);
     final Response<?> response = assertThrowsResponseException(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
     assertThat(response.status().code(), is(BAD_REQUEST.code()));
     assertThat(response.status().reasonPhrase(), is("Project does not exist: " + SERVICE_ACCOUNT_PROJECT));
   }
 
-
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
-  public void shouldFailIfServiceAccountDoesNotExist() throws IOException {
+  public void shouldFailIfServiceAccountIamPolicyDoesNotExist(String serviceAccount) throws IOException {
     final Throwable cause = googleJsonResponseException(404);
     when((Object) iam.projects().serviceAccounts().getIamPolicy(any()).execute()).thenThrow(cause);
     final Response<?> response = assertThrowsResponseException(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
     assertThat(response.status().code(), is(BAD_REQUEST.code()));
-    assertThat(response.status().reasonPhrase(), is("Service account does not exist: " + SERVICE_ACCOUNT));
+    assertThat(response.status().reasonPhrase(), is("Service account does not exist: " + serviceAccount));
   }
 
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
-  public void shouldFailIfProjectRequestFailsWithGoogleException() throws IOException {
+  public void shouldFailIfProjectRequestFailsWithGoogleException(String serviceAccount) throws IOException {
     final Throwable cause = googleJsonResponseException(500);
     when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenThrow(cause);
     assertThat(Throwables.getRootCause(Try.run(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).getCause()), is(cause));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
     verify(crm.projects().getIamPolicy(any(), any()), atLeast(RETRY_ATTEMPTS)).execute();
   }
 
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
-  public void shouldFailIfServiceAccountRequestFailsWithGoogleException() throws IOException {
+  public void shouldFailIfServiceAccountIamPolicyRequestFailsWithGoogleException(String serviceAccount) throws IOException {
     final Throwable cause = googleJsonResponseException(500);
     when((Object) iam.projects().serviceAccounts().getIamPolicy(any()).execute()).thenThrow(cause);
     assertThat(Throwables.getRootCause(Try.run(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).getCause()), is(cause));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
     verify(iam.projects().serviceAccounts().getIamPolicy(any()), atLeast(RETRY_ATTEMPTS)).execute();
   }
 
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
-  public void shouldFailIfProjectRequestFailsWithIOException() throws IOException {
+  public void shouldFailIfProjectRequestFailsWithIOException(String serviceAccount) throws IOException {
     final Throwable cause = new IOException();
     when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenThrow(cause);
     assertThat(Throwables.getRootCause(Try.run(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).getCause()), is(cause));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
     verify(crm.projects().getIamPolicy(any(), any()), atLeast(RETRY_ATTEMPTS)).execute();
   }
 
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
-  public void shouldFailIfServiceAccountRequestFailsWithIOException() throws IOException {
+  public void shouldFailIfServiceAccountRequestFailsWithIOException(String serviceAccount) throws IOException {
     final Throwable cause = new IOException();
     when((Object) iam.projects().serviceAccounts().getIamPolicy(any()).execute()).thenThrow(cause);
     assertThat(Throwables.getRootCause(Try.run(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).getCause()), is(cause));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
     verify(iam.projects().serviceAccounts().getIamPolicy(any()), atLeast(RETRY_ATTEMPTS)).execute();
   }
 
