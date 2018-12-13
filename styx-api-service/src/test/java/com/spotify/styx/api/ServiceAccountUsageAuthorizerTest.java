@@ -266,7 +266,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void shouldFailIfGroupMemberCheckFailsForNonGoogleJsonResponseException(String serviceAccount)
       throws IOException {
-    final Throwable cause = new IOException();
+    final Throwable cause = new IllegalStateException();
     when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute()).thenThrow(cause);
     assertThat(Throwables.getRootCause(Try.run(() ->
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
