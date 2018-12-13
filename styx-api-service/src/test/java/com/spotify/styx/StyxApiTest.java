@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.StyxApi.AUTHORIZATION_GSUITE_USER_CONFIG;
 import static com.spotify.styx.StyxApi.AUTHORIZATION_REQUIRE_ALL_CONFIG;
 import static com.spotify.styx.StyxApi.AUTHORIZATION_REQUIRE_WORKFLOWS;
 import static com.spotify.styx.StyxApi.AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG;
@@ -34,6 +35,8 @@ import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.AuthorizationPolicy;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
+import java.security.PrivateKey;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -43,13 +46,25 @@ import org.mockito.junit.MockitoJUnitRunner;
 public class StyxApiTest {
 
   private static final String SERVICE_ACCOUNT_USER_ROLE = "organizations/3141592/roles/StyxWorkflowServiceAccountUser";
+  private static final String GSUITE_USER = "gsuite-user@example.com";
 
-  @Mock private GoogleCredential credential;
+  @Mock private PrivateKey privateKey;
+
+  private GoogleCredential credential;
+
+  @Before
+  public void setUp() {
+    credential = new GoogleCredential.Builder()
+        .setServiceAccountPrivateKey(privateKey)
+        .setServiceAccountId("styx@bar.iam.gserviceaccount.com")
+        .build();
+  }
 
   @Test
   public void shouldCreateServiceAccountUsageAuthorizerWithRole() {
     final Config config = ConfigFactory.parseMap(ImmutableMap.of(
-        AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG, SERVICE_ACCOUNT_USER_ROLE));
+        AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG, SERVICE_ACCOUNT_USER_ROLE,
+        AUTHORIZATION_GSUITE_USER_CONFIG, GSUITE_USER));
     final ServiceAccountUsageAuthorizer authorizer = StyxApi.serviceAccountUsageAuthorizer(config, credential, "foo");
     assertThat(authorizer, is(instanceOf(ServiceAccountUsageAuthorizer.Impl.class)));
   }

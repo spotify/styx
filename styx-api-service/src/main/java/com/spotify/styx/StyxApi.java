@@ -87,9 +87,10 @@ public class StyxApi implements AppInit {
   public static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
-  public static final String AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG = "styx.authorizaton.service-account-user-role";
-  public static final String AUTHORIZATION_REQUIRE_ALL_CONFIG = "styx.authorizaton.require.all";
-  public static final String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorizaton.require.workflows";
+  public static final String AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG = "styx.authorization.service-account-user-role";
+  public static final String AUTHORIZATION_GSUITE_USER_CONFIG = "styx.authorization.gsuite-user";
+  public static final String AUTHORIZATION_REQUIRE_ALL_CONFIG = "styx.authorization.require.all";
+  public static final String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorization.require.workflows";
 
   private final String serviceName;
   private final StorageFactory storageFactory;
@@ -232,7 +233,9 @@ public class StyxApi implements AppInit {
     final ServiceAccountUsageAuthorizer authorizer;
     if (config.hasPath(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)) {
       final String role = config.getString(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG);
-      authorizer = ServiceAccountUsageAuthorizer.create(role, authorizationPolicy, credential, serviceName);
+      final String gsuiteUserEmail = config.getString(AUTHORIZATION_GSUITE_USER_CONFIG);
+      authorizer = ServiceAccountUsageAuthorizer.create(
+          role, authorizationPolicy, credential, gsuiteUserEmail, serviceName);
     } else {
       authorizer = ServiceAccountUsageAuthorizer.NOP;
     }

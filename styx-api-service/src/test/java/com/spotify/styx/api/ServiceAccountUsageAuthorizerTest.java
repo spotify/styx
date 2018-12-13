@@ -53,6 +53,7 @@ import com.spotify.styx.api.ServiceAccountUsageAuthorizer.NoAuthorizationPolicy;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.WhitelistAuthorizationPolicy;
 import com.spotify.styx.model.WorkflowId;
 import java.io.IOException;
+import java.security.PrivateKey;
 import java.util.ArrayList;
 import javaslang.control.Try;
 import org.junit.Before;
@@ -75,7 +76,7 @@ public class ServiceAccountUsageAuthorizerTest {
   private static final int RETRY_ATTEMPTS = 3;
 
   @Mock private AuthorizationPolicy authorizationPolicy;
-  @Mock private GoogleCredential credential;
+  @Mock private PrivateKey privateKey;
   @Mock private GoogleIdToken idToken;
   @Mock private GoogleIdToken.Payload idTokenPayload;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private CloudResourceManager crm;
@@ -260,8 +261,12 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Test
   public void testCreate() {
-    final ServiceAccountUsageAuthorizer sut =
-        ServiceAccountUsageAuthorizer.create(SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, "foo");
+    final GoogleCredential credential = new GoogleCredential.Builder()
+        .setServiceAccountPrivateKey(privateKey)
+        .setServiceAccountId("styx@bar.iam.gserviceaccount.com")
+        .build();
+    final ServiceAccountUsageAuthorizer sut = ServiceAccountUsageAuthorizer.create(
+        SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, "gsuite-user@example.com", "foo");
     assertThat(sut, is(notNullValue()));
   }
 
