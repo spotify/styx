@@ -139,37 +139,33 @@ public interface ServiceAccountUsageAuthorizer {
 
       final AtomicBoolean cached = new AtomicBoolean(true);
 
-      // Cached access check
-      final Either<Response<?>, ServiceAccountUsageAuthorizationResult> maybeResult =
-          get(cache, Tuple.of(principalEmail, serviceAccount), () -> {
-            cached.set(false);
-            try {
-              final String projectId = serviceAccountProjectId(workflowId, serviceAccount);
-              return Either.right(ServiceAccountUsageAuthorizationResult.builder()
-                  .serviceAccountProjectId(projectId)
-                  .accessMessage(firstPresent(
-                      // Check if the principal has been granted the service account user role in the project of the SA
-                      () -> projectPolicyAccess(projectId, principalEmail)
-                          .map(type -> String.format("Principal %s has role %s on service account %s %s",
-                              principalEmail, serviceAccountUserRole, serviceAccount, type)),
+      final boolean enforce = authorizationPolicy.shouldEnforceAuthorization(workflowId, serviceAccount, idToken);
 
-                      // Check if the principal has been granted the service account user role on the SA itself
-                      () -> serviceAccountPolicyAccess(serviceAccount, principalEmail)
-                          .map(type -> String.format("Principal %s has role %s on service account %s %s",
-                              principalEmail, serviceAccountUserRole, serviceAccount, type))))
-                  .build());
-            } catch (ResponseException e) {
-              return Either.left(e.getResponse());
-            }
-          });
-
+      // Cached authorization check
+      final Either<Response<?>, ServiceAccountUsageAuthorizationResult> maybeResult;
+      try {
+        maybeResult = cache.get(Tuple.of(principalEmail, serviceAccount), () -> {
+          cached.set(false);
+          try {
+            return Either.right(authorizationCheck(workflowId, serviceAccount, principalEmail));
+          } catch (ResponseException e) {
+            return Either.left(e.getResponse());
+          }
+        });
+      } catch (Exception e) {
+        log.warn("Authorization failure (enforce: {})", enforce, e);
+        if (enforce) {
+          throw new RuntimeException(e);
+        } else {
+          return;
+        }
+      }
 
       // Propagate response exception
       if (maybeResult.isLeft()) {
         throw new ResponseException(maybeResult.left().get());
       }
 
-      final boolean enforce = authorizationPolicy.shouldEnforceAuthorization(workflowId, serviceAccount, idToken);
       final ServiceAccountUsageAuthorizationResult result = maybeResult.right().get();
 
       // Grant access?
@@ -185,12 +181,23 @@ public interface ServiceAccountUsageAuthorizer {
       }
     }
 
-    private static <K, V> V get(Cache<K, V> cache, K key, Callable<V> loader) {
-      try {
-        return cache.get(key, loader);
-      } catch (ExecutionException e) {
-        throw new RuntimeException(e);
-      }
+    private ServiceAccountUsageAuthorizationResult authorizationCheck(WorkflowId workflowId,
+                                                                      String serviceAccount,
+                                                                      String principalEmail) {
+      final String projectId = serviceAccountProjectId(workflowId, serviceAccount);
+      return ServiceAccountUsageAuthorizationResult.builder()
+          .serviceAccountProjectId(projectId)
+          .accessMessage(firstPresent(
+              // Check if the principal has been granted the service account user role in the project of the SA
+              () -> projectPolicyAccess(projectId, principalEmail)
+                  .map(type -> String.format("Principal %s has role %s on service account %s %s",
+                      principalEmail, serviceAccountUserRole, serviceAccount, type)),
+
+              // Check if the principal has been granted the service account user role on the SA itself
+              () -> serviceAccountPolicyAccess(serviceAccount, principalEmail)
+                  .map(type -> String.format("Principal %s has role %s on service account %s %s",
+                      principalEmail, serviceAccountUserRole, serviceAccount, type))))
+          .build();
     }
 
     private ResponseException denialResponseException(String serviceAccount, String principalEmail, String projectId) {
@@ -221,7 +228,7 @@ public interface ServiceAccountUsageAuthorizer {
       return lookupServiceAccountProjectId(serviceAccount);
     }
 
-    private String lookupServiceAccountProjectId(final String email) {
+    private String lookupServiceAccountProjectId(String email) {
       try {
         final ServiceAccount serviceAccount = retry(() ->
             iam.projects().serviceAccounts().get("projects/-/serviceAccounts/" + email).execute());
