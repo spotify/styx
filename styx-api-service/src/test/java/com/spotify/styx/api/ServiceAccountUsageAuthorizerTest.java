@@ -140,7 +140,7 @@ public class ServiceAccountUsageAuthorizerTest {
     final Response<?> response = assertThrowsResponseException(() ->
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
     assertThat(response.status().code(), is(FORBIDDEN.code()));
-    assertThat(response.status().reasonPhrase(), is(deniedMessaeg()));
+    assertThat(response.status().reasonPhrase(), is(deniedMessage(SERVICE_ACCOUNT)));
 
     verify(iam.projects().serviceAccounts().getIamPolicy("projects/-/serviceAccounts/" + SERVICE_ACCOUNT)).execute();
     verify(crm.projects().getIamPolicy(eq(SERVICE_ACCOUNT_PROJECT), any())).execute();
@@ -155,7 +155,7 @@ public class ServiceAccountUsageAuthorizerTest {
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
     verify(authorizationPolicy).shouldEnforceAuthorization(WORKFLOW_ID, SERVICE_ACCOUNT, idToken);
     assertThat(response.status().code(), is(FORBIDDEN.code()));
-    assertThat(response.status().reasonPhrase(), is(deniedMessaeg()));
+    assertThat(response.status().reasonPhrase(), is(deniedMessage(SERVICE_ACCOUNT)));
 
     verify(iam.projects().serviceAccounts().getIamPolicy("projects/-/serviceAccounts/" + SERVICE_ACCOUNT)).execute();
     verify(crm.projects().getIamPolicy(eq(SERVICE_ACCOUNT_PROJECT), any())).execute();
@@ -168,7 +168,7 @@ public class ServiceAccountUsageAuthorizerTest {
     final Response<?> response = assertThrowsResponseException(() ->
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
     assertThat(response.status().code(), is(FORBIDDEN.code()));
-    assertThat(response.status().reasonPhrase(), is(deniedMessaeg()));
+    assertThat(response.status().reasonPhrase(), is(deniedMessage(SERVICE_ACCOUNT)));
 
     reset(iam);
     reset(crm);
@@ -388,9 +388,9 @@ public class ServiceAccountUsageAuthorizerTest {
     return new GoogleJsonResponseException(new Builder(code, "", new HttpHeaders()), new GoogleJsonError());
   }
 
-  private static String deniedMessaeg() {
+  private static String deniedMessage(String serviceAccount) {
     return "The user " + PRINCIPAL_EMAIL + " must have the role " +
            SERVICE_ACCOUNT_USER_ROLE + " on the project " + SERVICE_ACCOUNT_PROJECT + " or the service account " +
-           SERVICE_ACCOUNT + ", either through a group membership (recommended) or directly";
+           serviceAccount + ", either through a group membership (recommended) or directly";
   }
 }
