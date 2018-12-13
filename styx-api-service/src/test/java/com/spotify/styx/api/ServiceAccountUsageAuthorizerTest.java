@@ -262,6 +262,16 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
+  public void shouldFailIfGroupMemberCheckFailsForNonGoogleJsonResponseException(String serviceAccount)
+      throws IOException {
+    final Throwable cause = new IOException();
+    when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute()).thenThrow(cause);
+    assertThat(Throwables.getRootCause(Try.run(() ->
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
+  }
+
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
+  @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnServiceAccountDirectly(String serviceAccount) {
     saBinding.getMembers().add("user:" + PRINCIPAL_EMAIL);
     assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
