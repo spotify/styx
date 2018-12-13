@@ -153,7 +153,8 @@ public interface ServiceAccountUsageAuthorizer {
           }
         });
       } catch (Exception e) {
-        log.warn("Authorization failure (enforce: {})", enforce, e);
+        log.warn("Authorization failure for service account {} used by {} (enforce: {})",
+            serviceAccount, principalEmail, enforce, e);
         if (enforce) {
           throw new RuntimeException(e);
         } else {
