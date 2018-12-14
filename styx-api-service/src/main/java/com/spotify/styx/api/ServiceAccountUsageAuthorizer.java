@@ -205,8 +205,8 @@ public interface ServiceAccountUsageAuthorizer {
     private ResponseException denialResponseException(String serviceAccount, String principalEmail, String projectId) {
       return new ResponseException(Response.forStatus(
           FORBIDDEN.withReasonPhrase("The user " + principalEmail + " must have the role " + serviceAccountUserRole
-              + " on the project " + projectId + " or the service account " + serviceAccount +
-              ", either through a group membership (recommended) or directly")));
+              + " in the project " + projectId + " or on the service account " + serviceAccount +
+              ", either through a group membership or directly")));
     }
 
     private void logDenial(WorkflowId workflowId, String serviceAccount, boolean enforce, String principalEmail,
