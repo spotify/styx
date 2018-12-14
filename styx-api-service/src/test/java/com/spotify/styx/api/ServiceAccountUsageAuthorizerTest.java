@@ -28,6 +28,7 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -91,7 +92,7 @@ public class ServiceAccountUsageAuthorizerTest {
   private final com.google.api.services.cloudresourcemanager.model.Binding projectBinding =
       new com.google.api.services.cloudresourcemanager.model.Binding();
   private final com.google.api.services.iam.v1.model.Binding saBinding =
-      new com.google.api.services.iam.v1.model.Binding();;
+      new com.google.api.services.iam.v1.model.Binding();
 
   private ServiceAccountUsageAuthorizer sut;
 
@@ -130,14 +131,31 @@ public class ServiceAccountUsageAuthorizerTest {
   }
 
   @Test
+  public void shouldDenyAccessIfNoPolicyBinding() throws IOException {
+    when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenReturn(
+        new com.google.api.services.cloudresourcemanager.model.Policy());
+    when((Object) iam.projects().serviceAccounts().getIamPolicy(any()).execute()).thenReturn(
+        new com.google.api.services.iam.v1.model.Policy());
+
+    final Response<?> response = assertThrowsResponseException(() ->
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
+    assertThat(response.status().code(), is(FORBIDDEN.code()));
+    assertThat(response.status().reasonPhrase(), is(deniedMessage(SERVICE_ACCOUNT)));
+
+    verify(iam.projects().serviceAccounts().getIamPolicy("projects/-/serviceAccounts/" + SERVICE_ACCOUNT)).execute();
+    verify(crm.projects().getIamPolicy(eq(SERVICE_ACCOUNT_PROJECT), any())).execute();
+
+    verify(directory.members(), never()).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
+    verify(directory.members(), never()).hasMember(SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
+  }
+
+  @Test
   public void shouldDenyAccessIfPrincipalDoesNotHaveUserRole() throws IOException {
     final Response<?> response = assertThrowsResponseException(() ->
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
     verify(authorizationPolicy).shouldEnforceAuthorization(WORKFLOW_ID, SERVICE_ACCOUNT, idToken);
     assertThat(response.status().code(), is(FORBIDDEN.code()));
-    assertThat(response.status().reasonPhrase(), is("The user " + PRINCIPAL_EMAIL + " must have the role " +
-        SERVICE_ACCOUNT_USER_ROLE + " on the project " + SERVICE_ACCOUNT_PROJECT + " or the service account " +
-        SERVICE_ACCOUNT + ", either through a group membership (recommended) or directly"));
+    assertThat(response.status().reasonPhrase(), is(deniedMessage(SERVICE_ACCOUNT)));
 
     verify(iam.projects().serviceAccounts().getIamPolicy("projects/-/serviceAccounts/" + SERVICE_ACCOUNT)).execute();
     verify(crm.projects().getIamPolicy(eq(SERVICE_ACCOUNT_PROJECT), any())).execute();
@@ -150,9 +168,7 @@ public class ServiceAccountUsageAuthorizerTest {
     final Response<?> response = assertThrowsResponseException(() ->
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
     assertThat(response.status().code(), is(FORBIDDEN.code()));
-    assertThat(response.status().reasonPhrase(), is("The user " + PRINCIPAL_EMAIL + " must have the role " +
-        SERVICE_ACCOUNT_USER_ROLE + " on the project " + SERVICE_ACCOUNT_PROJECT + " or the service account " +
-        SERVICE_ACCOUNT + ", either through a group membership (recommended) or directly"));
+    assertThat(response.status().reasonPhrase(), is(deniedMessage(SERVICE_ACCOUNT)));
 
     reset(iam);
     reset(crm);

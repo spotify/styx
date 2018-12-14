@@ -56,6 +56,7 @@ import com.spotify.styx.model.WorkflowId;
 import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -253,9 +254,9 @@ public interface ServiceAccountUsageAuthorizer {
           .orElseThrow(() -> new ResponseException(Response.forStatus(
               BAD_REQUEST.withReasonPhrase("Project does not exist: " + projectId))));
 
-      final List<String> members = policy.getBindings().stream()
+      final List<String> members = emptyListIfNull(policy.getBindings()).stream()
           .filter(binding -> serviceAccountUserRole.equals(binding.getRole()))
-          .flatMap(binding -> binding.getMembers().stream())
+          .flatMap(binding -> emptyListIfNull(binding.getMembers()).stream())
           .collect(toList());
 
       return memberStatus(principalEmail, members);
@@ -266,12 +267,11 @@ public interface ServiceAccountUsageAuthorizer {
           .orElseThrow(() -> new ResponseException(Response.forStatus(
               BAD_REQUEST.withReasonPhrase("Service account does not exist: " + serviceAccount))));
 
-      final List<String> members = policy.getBindings().stream()
+      final List<String> members = emptyListIfNull(policy.getBindings()).stream()
           .filter(binding -> serviceAccountUserRole.equals(binding.getRole()))
-          .flatMap(binding -> binding.getMembers().stream())
+          .flatMap(binding -> emptyListIfNull(binding.getMembers()).stream())
           .collect(toList());
       return memberStatus(principalEmail, members);
-
     }
 
     private Optional<String> memberStatus(String principalEmail, List<String> members) {
@@ -387,6 +387,14 @@ public interface ServiceAccountUsageAuthorizer {
           .filter(Optional::isPresent)
           .findFirst()
           .orElse(Optional.empty());
+    }
+
+    private static <T> List<T> emptyListIfNull(List<T> list) {
+      if (list == null) {
+        return Collections.emptyList();
+      } else {
+        return list;
+      }
     }
   }
 
