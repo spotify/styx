@@ -254,9 +254,9 @@ public interface ServiceAccountUsageAuthorizer {
           .orElseThrow(() -> new ResponseException(Response.forStatus(
               BAD_REQUEST.withReasonPhrase("Project does not exist: " + projectId))));
 
-      final List<String> members = Optional.ofNullable(policy.getBindings()).orElse(Collections.emptyList()).stream()
+      final List<String> members = emptyListIfNull(policy.getBindings()).stream()
           .filter(binding -> serviceAccountUserRole.equals(binding.getRole()))
-          .flatMap(binding -> binding.getMembers().stream())
+          .flatMap(binding -> emptyListIfNull(binding.getMembers()).stream())
           .collect(toList());
 
       return memberStatus(principalEmail, members);
@@ -267,9 +267,9 @@ public interface ServiceAccountUsageAuthorizer {
           .orElseThrow(() -> new ResponseException(Response.forStatus(
               BAD_REQUEST.withReasonPhrase("Service account does not exist: " + serviceAccount))));
 
-      final List<String> members = Optional.ofNullable(policy.getBindings()).orElse(Collections.emptyList()).stream()
+      final List<String> members = emptyListIfNull(policy.getBindings()).stream()
           .filter(binding -> serviceAccountUserRole.equals(binding.getRole()))
-          .flatMap(binding -> binding.getMembers().stream())
+          .flatMap(binding -> emptyListIfNull(binding.getMembers()).stream())
           .collect(toList());
       return memberStatus(principalEmail, members);
     }
@@ -382,6 +382,14 @@ public interface ServiceAccountUsageAuthorizer {
           .filter(Optional::isPresent)
           .findFirst()
           .orElse(Optional.empty());
+    }
+
+    private static <T> List<T> emptyListIfNull(List<T> list) {
+      if (list == null) {
+        return Collections.emptyList();
+      } else {
+        return list;
+      }
     }
   }
 
