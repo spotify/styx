@@ -304,6 +304,7 @@ public interface ServiceAccountUsageAuthorizer {
           // hasMember API returns 404 if the group does not exist, while returning 400 if the principal
           // email does not exist or does not have the same domain as the group if it is enforced
           if (statusCode == 400 || statusCode == 404) {
+            log.info("Failed to check membership for {} against group {}", principalEmail, group, cause);
             return false;
           }
         }
