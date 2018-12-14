@@ -230,6 +230,50 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
+  public void shouldDenyAccessIfPrincipalHasUserRoleOnProjectViaNonexistGroup(String serviceAccount)
+      throws IOException {
+    final Throwable cause = googleJsonResponseException(404);
+    when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute()).thenThrow(cause);
+    final Response<?> response =
+        assertThrowsResponseException(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
+    assertThat(response.status().code(), is(FORBIDDEN.code()));
+    assertThat(response.status().reasonPhrase(), is(deniedMessage(serviceAccount)));
+  }
+
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
+  @Test
+  public void shouldDenyAccessIfGroupMemberCheckReturnClientError(String serviceAccount)
+      throws IOException {
+    final Throwable cause = googleJsonResponseException(400);
+    when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute()).thenThrow(cause);
+    final Response<?> response =
+        assertThrowsResponseException(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
+    assertThat(response.status().code(), is(FORBIDDEN.code()));
+    assertThat(response.status().reasonPhrase(), is(deniedMessage(serviceAccount)));
+  }
+
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
+  @Test
+  public void shouldFailIfGroupMemberCheckFails(String serviceAccount)
+      throws IOException {
+    final Throwable cause = googleJsonResponseException(418);
+    when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute()).thenThrow(cause);
+    assertThat(Throwables.getRootCause(Try.run(() ->
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
+  }
+
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
+  @Test
+  public void shouldFailIfGroupMemberCheckFailsForNonGoogleJsonResponseException(String serviceAccount)
+      throws IOException {
+    final Throwable cause = new IllegalStateException();
+    when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute()).thenThrow(cause);
+    assertThat(Throwables.getRootCause(Try.run(() ->
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
+  }
+
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
+  @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnServiceAccountDirectly(String serviceAccount) {
     saBinding.getMembers().add("user:" + PRINCIPAL_EMAIL);
     assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
@@ -370,5 +414,11 @@ public class ServiceAccountUsageAuthorizerTest {
 
   private static GoogleJsonResponseException googleJsonResponseException(int code) {
     return new GoogleJsonResponseException(new Builder(code, "", new HttpHeaders()), new GoogleJsonError());
+  }
+
+  private static String deniedMessage(String serviceAccount) {
+    return "The user " + PRINCIPAL_EMAIL + " must have the role " +
+           SERVICE_ACCOUNT_USER_ROLE + " on the project " + SERVICE_ACCOUNT_PROJECT + " or the service account " +
+           serviceAccount + ", either through a group membership (recommended) or directly";
   }
 }

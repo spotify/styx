@@ -299,9 +299,14 @@ public interface ServiceAccountUsageAuthorizer {
         return TRUE.equals(isMember);
       } catch (ExecutionException e) {
         final Throwable cause = e.getCause();
-        if (cause instanceof GoogleJsonResponseException
-            && ((GoogleJsonResponseException) cause).getStatusCode() == 404) {
-          return false;
+        if (cause instanceof GoogleJsonResponseException) {
+          final int statusCode = ((GoogleJsonResponseException) cause).getStatusCode();
+          // hasMember API returns 404 if the group does not exist, while returning 400 if the principal
+          // email does not exist or does not have the same domain as the group if it is enforced
+          if (statusCode == 400 || statusCode == 404) {
+            log.info("Failed to check membership for {} against group {}", principalEmail, group, cause);
+            return false;
+          }
         }
         throw new RuntimeException(e);
       } catch (RetryException e) {
