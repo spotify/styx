@@ -192,7 +192,7 @@ public interface ServiceAccountUsageAuthorizer {
           .accessMessage(firstPresent(
               // Check if the principal has been granted the service account user role in the project of the SA
               () -> projectPolicyAccess(projectId, principalEmail)
-                  .map(type -> String.format("Principal %s has role %s on project %s %s",
+                  .map(type -> String.format("Principal %s has role %s in project %s %s",
                       principalEmail, serviceAccountUserRole, projectId, type)),
 
               // Check if the principal has been granted the service account user role on the SA itself
