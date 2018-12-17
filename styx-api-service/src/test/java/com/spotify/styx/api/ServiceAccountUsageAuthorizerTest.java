@@ -80,6 +80,7 @@ public class ServiceAccountUsageAuthorizerTest {
   private static final String SERVICE_ACCOUNT_PROJECT = "bar";
   private static final String SERVICE_ACCOUNT_USER_ROLE = "organizations/3141592/roles/StyxWorkflowServiceAccountUser";
   private static final int RETRY_ATTEMPTS = 3;
+  private static final String DOCS_MESSAGE = "See more at https://example.com/docs/styx/authorization.";
 
   @Mock private AuthorizationPolicy authorizationPolicy;
   @Mock private PrivateKey privateKey;
@@ -127,7 +128,7 @@ public class ServiceAccountUsageAuthorizerTest {
             .setEmail(MANAGED_SERVICE_ACCOUNT)
             .setProjectId(SERVICE_ACCOUNT_PROJECT));
     sut = new ServiceAccountUsageAuthorizer.Impl(iam, crm, directory, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy,
-        StopStrategies.stopAfterAttempt(RETRY_ATTEMPTS));
+        StopStrategies.stopAfterAttempt(RETRY_ATTEMPTS), DOCS_MESSAGE);
   }
 
   @Test
@@ -372,7 +373,7 @@ public class ServiceAccountUsageAuthorizerTest {
         .setServiceAccountId("styx@bar.iam.gserviceaccount.com")
         .build();
     final ServiceAccountUsageAuthorizer sut = ServiceAccountUsageAuthorizer.create(
-        SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, "gsuite-user@example.com", "foo");
+        SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, "gsuite-user@example.com", "foo", DOCS_MESSAGE);
     assertThat(sut, is(notNullValue()));
   }
 
@@ -435,6 +436,6 @@ public class ServiceAccountUsageAuthorizerTest {
   private static String deniedMessage(String serviceAccount) {
     return "The user " + PRINCIPAL_EMAIL + " must have the role " +
            SERVICE_ACCOUNT_USER_ROLE + " in the project " + SERVICE_ACCOUNT_PROJECT + " or on the service account " +
-           serviceAccount + ", either through a group membership or directly";
+           serviceAccount + ", either through a group membership or directly. " + DOCS_MESSAGE;
   }
 }
