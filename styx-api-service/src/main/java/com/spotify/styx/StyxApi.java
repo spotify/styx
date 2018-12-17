@@ -91,7 +91,7 @@ public class StyxApi implements AppInit {
   public static final String AUTHORIZATION_GSUITE_USER_CONFIG = "styx.authorization.gsuite-user";
   public static final String AUTHORIZATION_REQUIRE_ALL_CONFIG = "styx.authorization.require.all";
   public static final String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorization.require.workflows";
-  public static final String AUTHORIZATION_DOCS_MESSAGE_CONFIG = "styx.authorization.message";
+  public static final String AUTHORIZATION_MESSAGE_CONFIG = "styx.authorization.message";
 
   private final String serviceName;
   private final StorageFactory storageFactory;
@@ -235,8 +235,8 @@ public class StyxApi implements AppInit {
     if (config.hasPath(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)) {
       final String role = config.getString(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG);
       final String gsuiteUserEmail = config.getString(AUTHORIZATION_GSUITE_USER_CONFIG);
-      final String docsMessage = config.hasPath(AUTHORIZATION_DOCS_MESSAGE_CONFIG)
-                                 ? config.getString(AUTHORIZATION_DOCS_MESSAGE_CONFIG)
+      final String docsMessage = config.hasPath(AUTHORIZATION_MESSAGE_CONFIG)
+                                 ? config.getString(AUTHORIZATION_MESSAGE_CONFIG)
                                  : "";
       authorizer = ServiceAccountUsageAuthorizer.create(
           role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, docsMessage);
