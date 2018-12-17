@@ -235,11 +235,11 @@ public class StyxApi implements AppInit {
     if (config.hasPath(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)) {
       final String role = config.getString(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG);
       final String gsuiteUserEmail = config.getString(AUTHORIZATION_GSUITE_USER_CONFIG);
-      final String docsMessage = config.hasPath(AUTHORIZATION_MESSAGE_CONFIG)
-                                 ? config.getString(AUTHORIZATION_MESSAGE_CONFIG)
-                                 : "";
+      final String message = config.hasPath(AUTHORIZATION_MESSAGE_CONFIG)
+                             ? config.getString(AUTHORIZATION_MESSAGE_CONFIG)
+                             : "";
       authorizer = ServiceAccountUsageAuthorizer.create(
-          role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, docsMessage);
+          role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message);
     } else {
       authorizer = ServiceAccountUsageAuthorizer.NOP;
     }

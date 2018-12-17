@@ -114,7 +114,7 @@ public interface ServiceAccountUsageAuthorizer {
     private final String serviceAccountUserRole;
     private final AuthorizationPolicy authorizationPolicy;
     private final StopStrategy retryStopStrategy;
-    private final String docsMessage;
+    private final String message;
 
     /**
      * (principalEmail, serviceAccount) -> Either[Response, Result]
@@ -126,14 +126,14 @@ public interface ServiceAccountUsageAuthorizer {
             .build();
 
     Impl(Iam iam, CloudResourceManager crm, Directory directory, String serviceAccountUserRole,
-         AuthorizationPolicy authorizationPolicy, StopStrategy retryStopStrategy, String docsMessage) {
+         AuthorizationPolicy authorizationPolicy, StopStrategy retryStopStrategy, String message) {
       this.iam = Objects.requireNonNull(iam, "iam");
       this.crm = Objects.requireNonNull(crm, "crm");
       this.directory = Objects.requireNonNull(directory, "directory");
       this.serviceAccountUserRole = Objects.requireNonNull(serviceAccountUserRole, "serviceAccountUserRole");
       this.authorizationPolicy = Objects.requireNonNull(authorizationPolicy, "authorizationPolicy");
       this.retryStopStrategy = Objects.requireNonNull(retryStopStrategy, "retryStopStrategy");
-      this.docsMessage = Objects.requireNonNull(docsMessage, "docsMessage");
+      this.message = Objects.requireNonNull(message, "message");
     }
 
     @Override
@@ -208,7 +208,7 @@ public interface ServiceAccountUsageAuthorizer {
       return new ResponseException(Response.forStatus(
           FORBIDDEN.withReasonPhrase("The user " + principalEmail + " must have the role " + serviceAccountUserRole
                                      + " in the project " + projectId + " or on the service account " + serviceAccount
-                                     + ", either through a group membership or directly. " + docsMessage)));
+                                     + ", either through a group membership or directly. " + message)));
     }
 
     private void logDenial(WorkflowId workflowId, String serviceAccount, boolean enforce, String principalEmail,
@@ -405,7 +405,7 @@ public interface ServiceAccountUsageAuthorizer {
                                               GoogleCredential credential,
                                               String gsuiteUserEmail,
                                               String serviceName,
-                                              String docsMessage) {
+                                              String message) {
 
     final HttpTransport httpTransport;
     try {
@@ -444,7 +444,7 @@ public interface ServiceAccountUsageAuthorizer {
         .build();
 
     return new Impl(iam, crm, directory, serviceAccountUserRole, authorizationPolicy,
-        Impl.DEFAULT_RETRY_STOP_STRATEGY, docsMessage);
+        Impl.DEFAULT_RETRY_STOP_STRATEGY, message);
   }
 
   /**
