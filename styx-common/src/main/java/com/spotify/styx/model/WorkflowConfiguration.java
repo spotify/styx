@@ -23,6 +23,7 @@ package com.spotify.styx.model;
 import com.spotify.styx.model.Schedule.WellKnown;
 import com.spotify.styx.util.TimeUtil;
 import io.norberg.automatter.AutoMatter;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -59,6 +60,8 @@ public interface WorkflowConfiguration {
   Optional<Secret> secret();
 
   Optional<String> serviceAccount();
+
+  Optional<Duration> runningTimeout();
 
   List<String> resources();
 

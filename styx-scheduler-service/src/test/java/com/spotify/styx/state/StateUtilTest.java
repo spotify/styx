@@ -27,14 +27,17 @@ import static com.spotify.styx.testdata.TestData.RESOURCE_IDS;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_ID;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_WITH_RESOURCES;
+import static com.spotify.styx.testdata.TestData.WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT;
 import static java.util.Collections.emptyMap;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.WorkflowResourceDecorator;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -76,7 +79,6 @@ public class StateUtilTest {
         RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
     when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
     when(storage.config()).thenReturn(config);
-    when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(2L));
     when(workflowCache.get()).thenReturn(ImmutableMap.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES));
   }
 
@@ -96,18 +98,13 @@ public class StateUtilTest {
         RunState.create(WORKFLOW_INSTANCE, RunState.State.QUEUED, Instant.ofEpochMilli(10L));
 
     when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
-    when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(2L));
-
-    final Map<String, Long> resourcesUsageMap = getResourcesUsageMap();
-
-    assertThat(resourcesUsageMap, is(ImmutableMap.of()));
+    assertThat(getResourcesUsageMap(), is(ImmutableMap.of()));
   }
 
   @Test
   public void shouldGetUsedResourcesNoStates() throws IOException {
     when(storage.readActiveStates()).thenReturn(emptyMap());
-    final Map<String, Long> resourcesUsageMap = getResourcesUsageMap();
-    assertThat(resourcesUsageMap, is(ImmutableMap.of()));
+    assertThat(getResourcesUsageMap(), is(ImmutableMap.of()));
   }
 
   @Test(expected = IOException.class)
@@ -124,17 +121,6 @@ public class StateUtilTest {
     assertTrue(StateUtil.isConsumingResources(RunState.State.RUNNING));
   }
 
-  private Map<String, Long> getResourcesUsageMap() throws IOException {
-    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
-    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
-    boolean globalConcurrencyEnabled = storage.config().globalConcurrency().isPresent();
-    final Set<WorkflowInstance> timedOutInstances =
-        getTimedOutInstances(activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig);
-
-    return StateUtil.getResourceUsage(globalConcurrencyEnabled,
-        activeInstanceStates, timedOutInstances, resourceDecorator, workflowCache.get());
-  }
-
   @Test
   public void shouldNotConsumeResource() {
     assertFalse(StateUtil.isConsumingResources(RunState.State.NEW));
@@ -143,5 +129,74 @@ public class StateUtilTest {
     assertFalse(StateUtil.isConsumingResources(RunState.State.FAILED));
     assertFalse(StateUtil.isConsumingResources(RunState.State.ERROR));
     assertFalse(StateUtil.isConsumingResources(RunState.State.DONE));
+  }
+
+  @Test
+  public void shouldGetTimedOutRunningInstances() throws IOException {
+    final RunState runState =
+        RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
+    when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(3L));
+    when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
+    when(workflowCache.get()).thenReturn(ImmutableMap.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT));
+
+    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
+    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
+    final Set<WorkflowInstance> timedOutInstances =
+        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(12L), timeoutConfig);
+    assertThat(timedOutInstances, contains(WORKFLOW_INSTANCE));
+  }
+
+  @Test
+  public void shouldGetTimedOutRunningInstancesForInvalidCustomTimeout() throws IOException {
+    final RunState runState =
+        RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
+    when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(1L));
+    when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
+    when(workflowCache.get()).thenReturn(ImmutableMap.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT));
+
+    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
+    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
+    final Set<WorkflowInstance> timedOutInstances =
+        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig);
+    assertThat(timedOutInstances, contains(WORKFLOW_INSTANCE));
+  }
+
+  @Test
+  public void shouldGetTimedOutQueuingInstances() throws IOException {
+    final RunState runState =
+        RunState.create(WORKFLOW_INSTANCE, RunState.State.QUEUED, Instant.ofEpochMilli(10L));
+    when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(1L));
+    when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
+    when(workflowCache.get()).thenReturn(ImmutableMap.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT));
+
+    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
+    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
+    final Set<WorkflowInstance> timedOutInstances =
+        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig);
+    assertThat(timedOutInstances, contains(WORKFLOW_INSTANCE));
+  }
+
+  @Test
+  public void shouldNotGetTimedOutRunningInstances() throws IOException {
+    final RunState runState =
+        RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
+    when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(2L));
+    when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
+    when(workflowCache.get()).thenReturn(ImmutableMap.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES));
+
+    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
+    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
+    final Set<WorkflowInstance> timedOutInstances =
+        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig);
+    assertThat(timedOutInstances.isEmpty(), is(true));
+  }
+
+  private Map<String, Long> getResourcesUsageMap() throws IOException {
+    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
+    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
+    boolean globalConcurrencyEnabled = storage.config().globalConcurrency().isPresent();
+
+    return StateUtil.getResourceUsage(globalConcurrencyEnabled,
+        activeInstanceStates, ImmutableSet.of(), resourceDecorator, workflowCache.get());
   }
 }

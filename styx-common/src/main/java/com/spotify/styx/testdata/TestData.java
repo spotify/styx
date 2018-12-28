@@ -33,6 +33,7 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import java.time.Duration;
 import java.util.Set;
 
 public final class TestData {
@@ -129,6 +130,16 @@ public final class TestData {
           .serviceAccount("foo@bar.baz.quux")
           .build();
 
+  public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_RUNNING_TIMEOUT =
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .dockerImage("busybox")
+          .schedule(HOURS)
+          .resources(RESOURCE_IDS)
+          .runningTimeout(Duration.ofMillis(2L))
+          .build();
+
   public static final ExecutionDescription EXECUTION_DESCRIPTION =
       ExecutionDescription.builder()
           .dockerImage("busybox:1.1")
@@ -142,6 +153,9 @@ public final class TestData {
 
   public static final Workflow WORKFLOW_WITH_RESOURCES_2 = Workflow.create(WORKFLOW_ID_2.componentId(),
       HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_2);
+
+  public static final Workflow WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT = Workflow.create(WORKFLOW_ID.componentId(),
+      HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_RUNNING_TIMEOUT);
 
   private TestData() {
     throw new UnsupportedOperationException();

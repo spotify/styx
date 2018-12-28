@@ -56,11 +56,13 @@ public final class StateUtil {
         .collect(toList());
   }
 
-  public static Set<WorkflowInstance> getTimedOutInstances(List<InstanceState> activeStates,
+  public static Set<WorkflowInstance> getTimedOutInstances(Map<WorkflowId, Workflow> workflows,
+                                                           List<InstanceState> activeStates,
                                                            Instant instant,
                                                            TimeoutConfig ttl) {
     return activeStates.parallelStream()
-        .filter(entry -> hasTimedOut(entry.runState(), instant, ttl.ttlOf(entry.runState().state())))
+        .filter(entry -> hasTimedOut(workflows.get(entry.workflowInstance().workflowId()), entry.runState(), instant,
+            ttl.ttlOf(entry.runState().state())))
         .map(InstanceState::workflowInstance)
         .collect(toSet());
   }
@@ -105,14 +107,19 @@ public final class StateUtil {
     return builder.build();
   }
 
-  private static boolean hasTimedOut(RunState runState, Instant instant, Duration timeout) {
+  private static boolean hasTimedOut(Workflow workflow, RunState runState, Instant instant, Duration timeout) {
     if (runState.state().isTerminal()) {
       return false;
     }
 
+    final Duration effectiveTimeout = runState.state() == RunState.State.RUNNING
+                                      ? workflow.configuration().runningTimeout().orElse(timeout)
+                                      : timeout;
+    final Duration sanitizedTimeout = effectiveTimeout.compareTo(timeout) < 0 ? effectiveTimeout : timeout;
+
     final Instant deadline = Instant
         .ofEpochMilli(runState.timestamp())
-        .plus(timeout);
+        .plus(sanitizedTimeout);
 
     return !deadline.isAfter(instant);
   }

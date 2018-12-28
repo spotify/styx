@@ -102,6 +102,8 @@ public class WorkflowValidator {
       e.add("invalid schedule");
     }
 
+    // TODO: validate runningTimeout value? Not trivial due to ttls are configured only for scheduler not api.
+
     return e;
   }
 
