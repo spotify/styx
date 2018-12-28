@@ -282,6 +282,8 @@ public class Scheduler {
       return;
     }
 
+    instanceResourceRefs.forEach(stats::recordResourceDemanded);
+
     // Check resource limits. This is racy and can give false positives but the transactional
     // checking happens later. This is just intended to avoid spinning on exhausted resources.
     final List<String> depletedResources = instanceResourceRefs.stream()

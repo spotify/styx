@@ -84,6 +84,9 @@ public final class MetricsStats implements Stats {
   static final MetricId RESOURCE_USED = BASE
       .tagged("what", "resource-used");
 
+  static final MetricId RESOURCE_DEMANDED = BASE
+      .tagged("what", "resource-demanded");
+
   static final MetricId EXIT_CODE_RATE = BASE
       .tagged("what", "exit-code-rate");
 
@@ -190,6 +193,7 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<Tuple3<String, String, Integer>, Meter> dockerOperationErrorMeters;
   private final ConcurrentMap<String, Histogram> resourceConfiguredHistograms;
   private final ConcurrentMap<String, Histogram> resourceUsedHistograms;
+  private final ConcurrentMap<String, Meter> resourceDemandedMeters;
   private final ConcurrentMap<String, Meter> eventConsumerErrorMeters;
   private final ConcurrentMap<String, Meter> eventConsumerMeters;
   private final ConcurrentMap<String, Meter> publishingMeters;
@@ -226,6 +230,7 @@ public final class MetricsStats implements Stats {
     this.dockerOperationErrorMeters = new ConcurrentHashMap<>();
     this.resourceConfiguredHistograms = new ConcurrentHashMap<>();
     this.resourceUsedHistograms = new ConcurrentHashMap<>();
+    this.resourceDemandedMeters = new ConcurrentHashMap<>();
     this.eventConsumerErrorMeters = new ConcurrentHashMap<>();
     this.eventConsumerMeters = new ConcurrentHashMap<>();
     this.publishingMeters = new ConcurrentHashMap<>();
@@ -327,6 +332,11 @@ public final class MetricsStats implements Stats {
   @Override
   public void recordResourceUsed(String resource, long used) {
     resourceUsedHistogram(resource).update(used);
+  }
+
+  @Override
+  public void recordResourceDemanded(String resource) {
+    resourceDemandedMeter(resource).mark();
   }
 
   @Override
@@ -444,6 +454,11 @@ public final class MetricsStats implements Stats {
   private Histogram resourceUsedHistogram(String resource) {
     return resourceUsedHistograms.computeIfAbsent(
         resource, (op) -> registry.getOrAdd(RESOURCE_USED.tagged("resource", resource), HISTOGRAM));
+  }
+
+  private Meter resourceDemandedMeter(String resource) {
+    return resourceDemandedMeters.computeIfAbsent(
+        resource, (op) -> registry.meter(RESOURCE_DEMANDED.tagged("resource", resource)));
   }
 
   private Meter eventConsumerMeter(SequenceEvent sequenceEvent) {

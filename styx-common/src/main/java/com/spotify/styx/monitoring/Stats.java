@@ -66,6 +66,8 @@ public interface Stats {
 
   void recordResourceUsed(String resource, long used);
 
+  void recordResourceDemanded(String resource);
+
   void recordEventConsumer(SequenceEvent event);
 
   void recordEventConsumerError(SequenceEvent event);
