@@ -118,6 +118,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
           .commitSha("00000ef508c1cb905e360590ce3e7e9193f6b370")
           .dockerImage("bar-dummy:dummy")
           .serviceAccount(SERVICE_ACCOUNT)
+          .env("FOO", "foo", "BAR", "bar")
+          .runningTimeout(Duration.parse("PT23H"))
           .build();
 
   private static final Workflow WORKFLOW =

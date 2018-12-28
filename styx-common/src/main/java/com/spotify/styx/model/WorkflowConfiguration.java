@@ -61,11 +61,11 @@ public interface WorkflowConfiguration {
 
   Optional<String> serviceAccount();
 
-  Optional<Duration> runningTimeout();
-
   List<String> resources();
 
   Map<String, String> env();
+
+  Optional<Duration> runningTimeout();
 
   default Instant addOffset(Instant next) {
     final String offset = offset().orElseGet(this::defaultOffset);

@@ -46,6 +46,7 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -274,6 +275,7 @@ class PrettyCliOutput implements CliOutput {
     System.out.println(" Svc Acct: " + wf.configuration().serviceAccount().orElse(""));
     System.out.println("Resources: " + wf.configuration().resources());
     System.out.println("      Env: " + Joiner.on(' ').withKeyValueSeparator('=').join(wf.configuration().env()));
+    System.out.println("  Timeout: " + wf.configuration().runningTimeout().map(Duration::toString).orElse(""));
     System.out.println("   Commit: " + wf.configuration().commitSha().orElse(""));
     System.out.println("  Enabled: " + state.enabled().map(Object::toString).orElse(""));
     System.out.println("     Trig: " + state.nextNaturalTrigger().map(Object::toString).orElse(""));

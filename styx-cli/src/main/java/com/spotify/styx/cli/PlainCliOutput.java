@@ -34,6 +34,7 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.SortedMap;
@@ -133,6 +134,7 @@ class PlainCliOutput implements CliOutput {
         wf.configuration().serviceAccount().map(Object::toString).orElse(""),
         wf.configuration().resources(),
         wf.configuration().env(),
+        wf.configuration().runningTimeout().map(Duration::toString).orElse(""),
         wf.configuration().commitSha().orElse(""),
         state.enabled().map(Object::toString).orElse(""),
         state.nextNaturalTrigger().map(Object::toString).orElse(""),
