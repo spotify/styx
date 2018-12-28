@@ -33,8 +33,6 @@ import com.spotify.styx.WorkflowResourceDecorator;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.storage.Storage;
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -42,7 +40,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Supplier;
+import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Stream;
 
 public final class StateUtil {
@@ -67,11 +65,11 @@ public final class StateUtil {
         .collect(toSet());
   }
 
-  public static ConcurrentHashMap<String, Long> getResourceUsage(boolean globalConcurrencyEnabled,
-                                                                 List<InstanceState> activeStates,
-                                                                 Set<WorkflowInstance> timedOutInstances,
-                                                                 WorkflowResourceDecorator resourceDecorator,
-                                                                 Map<WorkflowId, Workflow> workflows) {
+  public static ConcurrentMap<String, Long> getResourceUsage(boolean globalConcurrencyEnabled,
+                                                             List<InstanceState> activeStates,
+                                                             Set<WorkflowInstance> timedOutInstances,
+                                                             WorkflowResourceDecorator resourceDecorator,
+                                                             Map<WorkflowId, Workflow> workflows) {
     return activeStates.parallelStream()
         .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
         .filter(entry -> isConsumingResources(entry.runState().state()))
@@ -81,20 +79,6 @@ public final class StateUtil {
             ResourceWithInstance::resource,
             ConcurrentHashMap::new,
             counting()));
-  }
-
-  public static Map<String, Long> getResourcesUsageMap(Storage storage, TimeoutConfig timeoutConfig,
-                                                       Supplier<Map<WorkflowId, Workflow>> workflowCache,
-                                                       Instant instant,
-                                                       WorkflowResourceDecorator resourceDecorator)
-      throws IOException {
-    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
-    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
-    boolean globalConcurrencyEnabled = storage.config().globalConcurrency().isPresent();
-    final Set<WorkflowInstance> timedOutInstances =
-        getTimedOutInstances(activeInstanceStates, instant, timeoutConfig);
-    return getResourceUsage(globalConcurrencyEnabled,
-        activeInstanceStates, timedOutInstances, resourceDecorator, workflowCache.get());
   }
 
   private static Stream<ResourceWithInstance> pairWithResources(boolean globalConcurrencyEnabled,

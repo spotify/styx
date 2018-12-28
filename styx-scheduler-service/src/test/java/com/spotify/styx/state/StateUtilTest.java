@@ -20,6 +20,8 @@
 
 package com.spotify.styx.state;
 
+import static com.spotify.styx.state.StateUtil.getActiveInstanceStates;
+import static com.spotify.styx.state.StateUtil.getTimedOutInstances;
 import static com.spotify.styx.storage.Storage.GLOBAL_RESOURCE_ID;
 import static com.spotify.styx.testdata.TestData.RESOURCE_IDS;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_ID;
@@ -37,12 +39,15 @@ import com.spotify.styx.WorkflowResourceDecorator;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -77,8 +82,7 @@ public class StateUtilTest {
 
   @Test
   public void shouldGetUsedResources() throws IOException {
-    final Map<String, Long> resourcesUsageMap = StateUtil.getResourcesUsageMap(storage,
-        timeoutConfig, workflowCache, Instant.ofEpochMilli(11L), resourceDecorator);
+    final Map<String, Long> resourcesUsageMap = getResourcesUsageMap();
     final Map<String, Long> expectedResourcesUsageMap =
         RESOURCE_IDS.stream().collect(Collectors.toMap(Function.identity(), item -> 1L));
     expectedResourcesUsageMap.put(GLOBAL_RESOURCE_ID, 1L);
@@ -94,8 +98,7 @@ public class StateUtilTest {
     when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
     when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(2L));
 
-    final Map<String, Long> resourcesUsageMap = StateUtil.getResourcesUsageMap(storage,
-        timeoutConfig, workflowCache, Instant.ofEpochMilli(11L), resourceDecorator);
+    final Map<String, Long> resourcesUsageMap = getResourcesUsageMap();
 
     assertThat(resourcesUsageMap, is(ImmutableMap.of()));
   }
@@ -103,16 +106,14 @@ public class StateUtilTest {
   @Test
   public void shouldGetUsedResourcesNoStates() throws IOException {
     when(storage.readActiveStates()).thenReturn(emptyMap());
-    final Map<String, Long> resourcesUsageMap = StateUtil.getResourcesUsageMap(storage,
-        timeoutConfig, workflowCache, Instant.ofEpochMilli(11L), resourceDecorator);
+    final Map<String, Long> resourcesUsageMap = getResourcesUsageMap();
     assertThat(resourcesUsageMap, is(ImmutableMap.of()));
   }
 
   @Test(expected = IOException.class)
   public void shouldGetUsedResourcesStorageException() throws IOException {
     when(storage.readActiveStates()).thenThrow(new IOException());
-    StateUtil.getResourcesUsageMap(storage, timeoutConfig, workflowCache,
-        Instant.ofEpochMilli(11L), resourceDecorator);
+    getResourcesUsageMap();
   }
 
   @Test
@@ -121,6 +122,17 @@ public class StateUtilTest {
     assertTrue(StateUtil.isConsumingResources(RunState.State.SUBMITTING));
     assertTrue(StateUtil.isConsumingResources(RunState.State.SUBMITTED));
     assertTrue(StateUtil.isConsumingResources(RunState.State.RUNNING));
+  }
+
+  private Map<String, Long> getResourcesUsageMap() throws IOException {
+    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
+    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
+    boolean globalConcurrencyEnabled = storage.config().globalConcurrency().isPresent();
+    final Set<WorkflowInstance> timedOutInstances =
+        getTimedOutInstances(activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig);
+
+    return StateUtil.getResourceUsage(globalConcurrencyEnabled,
+        activeInstanceStates, timedOutInstances, resourceDecorator, workflowCache.get());
   }
 
   @Test
