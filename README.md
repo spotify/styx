@@ -200,6 +200,10 @@ the [Service Account] that Styx itself runs as should be granted `Service Accoun
 role for the `service_account` of the workflow. This can be done by following
 [Granting Roles to Service Accounts].
 
+#### `running_timeout` **[string]**
+An [ISO 8601 Duration] specification for timing out container execution. Defaults to 24 hours that also
+serves as the upper boundary.
+
 ### Triggering and executions
 
 Each time a Workflow Schedule is triggered, Styx will treat that trigger as a first class entity.
