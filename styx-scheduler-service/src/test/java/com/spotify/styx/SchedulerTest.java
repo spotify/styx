@@ -422,6 +422,7 @@ public class SchedulerTest {
 
     scheduler.tick();
 
+    verify(stats).recordResourceDemanded("r1");
     verify(stats).recordResourceUsed("r1", 2L);
   }
 
@@ -450,6 +451,7 @@ public class SchedulerTest {
     verify(shardedCounter, times(1)).counterHasSpareCapacity("r1");
     assertThat(eventCaptor.getAllValues().stream()
         .anyMatch(e -> EventUtil.name(e).equals("dequeue")), is(false));
+    verify(stats).recordResourceDemanded("r1");
     verify(stats).recordResourceUsed("r1", 3L);
 
     scheduler.tick();
@@ -458,6 +460,7 @@ public class SchedulerTest {
     verify(shardedCounter, times(2)).counterHasSpareCapacity("r1");
     assertThat(eventCaptor.getAllValues().stream()
         .anyMatch(e -> EventUtil.name(e).equals("dequeue")), is(false));
+    verify(stats, times(2)).recordResourceDemanded("r1");
     verify(stats, times(2)).recordResourceUsed("r1", 3L);
   }
 

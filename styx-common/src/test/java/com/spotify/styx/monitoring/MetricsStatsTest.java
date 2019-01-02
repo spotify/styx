@@ -37,6 +37,7 @@ import static com.spotify.styx.monitoring.MetricsStats.PUBLISHING_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.PULL_IMAGE_ERROR_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.QUEUED_EVENTS;
 import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_CONFIGURED;
+import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_DEMANDED;
 import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_USED;
 import static com.spotify.styx.monitoring.MetricsStats.STORAGE_DURATION;
 import static com.spotify.styx.monitoring.MetricsStats.STORAGE_RATE;
@@ -234,6 +235,14 @@ public class MetricsStatsTest {
     when(registry.getOrAdd(RESOURCE_USED.tagged("resource", resource), HISTOGRAM)).thenReturn(histogram);
     stats.recordResourceUsed(resource, 100L);
     verify(histogram).update(100L);
+  }
+
+  @Test
+  public void shouldRecordResourceDemanded() {
+    String resource = "resource";
+    when(registry.meter(RESOURCE_DEMANDED.tagged("resource", resource))).thenReturn(meter);
+    stats.recordResourceDemanded(resource);
+    verify(meter).mark();
   }
 
   @Test

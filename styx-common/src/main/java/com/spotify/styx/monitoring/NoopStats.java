@@ -114,6 +114,11 @@ final class NoopStats implements Stats {
   }
 
   @Override
+  public void recordResourceDemanded(String resource) {
+    // nop
+  }
+
+  @Override
   public void recordEventConsumer(SequenceEvent event) {
     // nop
   }
