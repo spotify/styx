@@ -36,6 +36,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -130,6 +131,7 @@ public class PlainCliOutputTest {
         .serviceAccount("foo@bar.baz")
         .resources("r1", "r2")
         .env("FOO", "foo", "BAR", "bar")
+        .runningTimeout(Duration.parse("PT20H"))
         .commitSha("deadbeef")
         .build());
     final WorkflowState state = WorkflowState.builder()
@@ -139,7 +141,8 @@ public class PlainCliOutputTest {
         .build();
     cliOutput.printWorkflow(workflow, state);
     assertThat(outContent.toString(), is(
-        "foo1 bar1 DAYS 6h foo/bar:baz [foo, the, bar] true secret-foo:/foo-secret foo@bar.baz [r1, r2] {BAR=bar, FOO=foo} deadbeef true 2018-01-02T03:04:05.000000006Z 2018-01-02T09:04:05.000000006Z\n"));
+        "foo1 bar1 DAYS 6h foo/bar:baz [foo, the, bar] true secret-foo:/foo-secret foo@bar.baz [r1, r2] {BAR=bar, "
+        + "FOO=foo} PT20H deadbeef true 2018-01-02T03:04:05.000000006Z 2018-01-02T09:04:05.000000006Z\n"));
 
   }
 }

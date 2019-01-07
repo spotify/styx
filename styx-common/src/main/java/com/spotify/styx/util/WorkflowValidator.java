@@ -24,6 +24,7 @@ import static java.lang.String.format;
 
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -42,6 +43,7 @@ public class WorkflowValidator {
   static final long MAX_SERVICE_ACCOUNT_LENGTH = 256;
   static final long MAX_ENV_VARS = 128;
   static final long MAX_ENV_SIZE = 16 * 1024;
+  static final long MIN_RUNNING_TIMEOUT_SECONDS = 60;
 
   private final DockerImageValidator dockerImageValidator;
 
@@ -59,21 +61,21 @@ public class WorkflowValidator {
 
     // TODO: validate more of the contents
 
-    limit(e, cfg.id().length(),
+    upperLimit(e, cfg.id().length(),
         MAX_ID_LENGTH, "id too long");
-    limit(e, cfg.commitSha().map(String::length).orElse(0),
+    upperLimit(e, cfg.commitSha().map(String::length).orElse(0),
         MAX_COMMIT_SHA_LENGTH, "commitSha too long");
-    limit(e, cfg.secret().map(s -> s.name().length()).orElse(0),
+    upperLimit(e, cfg.secret().map(s -> s.name().length()).orElse(0),
         MAX_SECRET_NAME_LENGTH, "secret name too long");
-    limit(e, cfg.secret().map(s -> s.mountPath().length()).orElse(0),
+    upperLimit(e, cfg.secret().map(s -> s.mountPath().length()).orElse(0),
         MAX_SECRET_MOUNT_PATH_LENGTH, "secret mount path too long");
-    limit(e, cfg.serviceAccount().map(String::length).orElse(0),
+    upperLimit(e, cfg.serviceAccount().map(String::length).orElse(0),
         MAX_SERVICE_ACCOUNT_LENGTH, "service account too long");
-    limit(e, cfg.resources().size(),
+    upperLimit(e, cfg.resources().size(),
         MAX_RESOURCES, "too many resources");
-    limit(e, cfg.env().size(),
+    upperLimit(e, cfg.env().size(),
         MAX_ENV_VARS, "too many env vars");
-    limit(e, cfg.env().entrySet().stream()
+    upperLimit(e, cfg.env().entrySet().stream()
             .mapToLong(entry -> entry.getKey().length() + entry.getValue().length()).sum(),
         MAX_ENV_SIZE, "env too big");
 
@@ -83,9 +85,9 @@ public class WorkflowValidator {
             .forEach(e::add));
 
     cfg.resources().stream().map(String::length).forEach(v ->
-        limit(e, v, MAX_RESOURCE_LENGTH, "resource name too long"));
+        upperLimit(e, v, MAX_RESOURCE_LENGTH, "resource name too long"));
 
-    limit(e, cfg.dockerArgs().map(args -> args.size() + args.stream().mapToLong(String::length).sum()),
+    upperLimit(e, cfg.dockerArgs().map(args -> args.size() + args.stream().mapToLong(String::length).sum()),
         MAX_DOCKER_ARGS_TOTAL, "docker args is too large");
 
     cfg.offset().ifPresent(offset -> {
@@ -102,15 +104,29 @@ public class WorkflowValidator {
       e.add("invalid schedule");
     }
 
+    // TODO: validate runningTimeout value? Not trivial due to ttls are configured only for scheduler not api.
+    lowerLimit(e, cfg.runningTimeout().map(Duration::getSeconds),
+        MIN_RUNNING_TIMEOUT_SECONDS, "running timeout is too small");
+
     return e;
   }
 
-  private void limit(List<String> errors, Optional<Long> value, long limit, String message) {
-    value.ifPresent(v -> limit(errors, v, limit, message));
+  private void upperLimit(List<String> errors, Optional<Long> value, long limit, String message) {
+    value.ifPresent(v -> upperLimit(errors, v, limit, message));
   }
 
-  private void limit(List<String> errors, long value, long limit, String message) {
+  private void upperLimit(List<String> errors, long value, long limit, String message) {
     if (value > limit) {
+      errors.add(message + ": " + value + ", limit = " + limit);
+    }
+  }
+
+  private void lowerLimit(List<String> errors, Optional<Long> value, long limit, String message) {
+    value.ifPresent(v -> lowerLimit(errors, v, limit, message));
+  }
+
+  private void lowerLimit(List<String> errors, long value, long limit, String message) {
+    if (value < limit) {
       errors.add(message + ": " + value + ", limit = " + limit);
     }
   }

@@ -23,6 +23,7 @@ package com.spotify.styx.model;
 import com.spotify.styx.model.Schedule.WellKnown;
 import com.spotify.styx.util.TimeUtil;
 import io.norberg.automatter.AutoMatter;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -63,6 +64,8 @@ public interface WorkflowConfiguration {
   List<String> resources();
 
   Map<String, String> env();
+
+  Optional<Duration> runningTimeout();
 
   default Instant addOffset(Instant next) {
     final String offset = offset().orElseGet(this::defaultOffset);

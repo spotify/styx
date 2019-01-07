@@ -48,6 +48,7 @@ import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -282,6 +283,7 @@ public class PrettyCliOutputTest {
         .serviceAccount("foo@bar.baz")
         .resources("r1", "r2")
         .env("FOO", "foo", "BAR", "bar")
+        .runningTimeout(Duration.parse("PT23H"))
         .commitSha("deadbeef")
         .build());
     final WorkflowState state = WorkflowState.builder()
@@ -302,6 +304,7 @@ public class PrettyCliOutputTest {
             + " Svc Acct: foo@bar.baz\n"
             + "Resources: [r1, r2]\n"
             + "      Env: BAR=bar FOO=foo\n"
+            + "  Timeout: PT23H\n"
             + "   Commit: deadbeef\n"
             + "  Enabled: true\n"
             + "     Trig: 2018-01-02T03:04:05.000000006Z\n"

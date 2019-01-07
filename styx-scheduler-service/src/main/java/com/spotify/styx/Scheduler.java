@@ -156,9 +156,9 @@ public class Scheduler {
     final Map<WorkflowInstance, RunState> activeStatesMap = stateManager.getActiveStates();
     final List<InstanceState> activeStates = getActiveInstanceStates(activeStatesMap);
 
-    final Set<WorkflowInstance> timedOutInstances = getTimedOutInstances(activeStates, time.get(), ttls);
-
     final Map<WorkflowId, Workflow> workflows = getWorkflows(activeStates);
+
+    final Set<WorkflowInstance> timedOutInstances = getTimedOutInstances(workflows, activeStates, time.get(), ttls);
 
     final Map<WorkflowId, Set<String>> workflowResourceReferences =
         activeStates.parallelStream()

@@ -29,6 +29,7 @@ import static com.spotify.styx.util.WorkflowValidator.MAX_RESOURCE_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_SECRET_MOUNT_PATH_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_SECRET_NAME_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_SERVICE_ACCOUNT_LENGTH;
+import static com.spotify.styx.util.WorkflowValidator.MIN_RUNNING_TIMEOUT_SECONDS;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static org.hamcrest.Matchers.contains;
@@ -48,6 +49,7 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.testdata.TestData;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -75,7 +77,7 @@ public class WorkflowValidatorTest {
   }
 
   @Test
-  public void validateValidWorkflow() throws Exception {
+  public void validateValidWorkflow() {
     assertThat(sut.validateWorkflowConfiguration(TestData.FULL_WORKFLOW_CONFIGURATION), is(empty()));
   }
 
@@ -90,7 +92,7 @@ public class WorkflowValidatorTest {
       "@annually", "annually", "@yearly",
       "yearly", "years",
   })
-  public void validateValidCron(String expression) throws Exception {
+  public void validateValidCron(String expression) {
     assertThat(sut.validateWorkflowConfiguration(
         WorkflowConfigurationBuilder.from(TestData.FULL_WORKFLOW_CONFIGURATION)
             .schedule(Schedule.parse(expression))
@@ -99,7 +101,7 @@ public class WorkflowValidatorTest {
   }
 
   @Test
-  public void validateInvalidOffset() throws Exception {
+  public void validateInvalidOffset() {
     final List<String> errors = sut.validateWorkflowConfiguration(
         TestData.HOURLY_WORKFLOW_CONFIGURATION_WITH_INVALID_OFFSET);
     assertThat(errors, hasSize(1));
@@ -107,7 +109,7 @@ public class WorkflowValidatorTest {
   }
 
   @Test
-  public void validateInvalidDockerImage() throws Exception {
+  public void validateInvalidDockerImage() {
     when(dockerImageValidator.validateImageReference(anyString())).thenReturn(ImmutableList.of("foo", "bar"));
     final List<String> errors = sut.validateWorkflowConfiguration(TestData.FULL_WORKFLOW_CONFIGURATION);
     assertThat(errors, contains("invalid image: foo", "invalid image: bar"));
@@ -115,7 +117,7 @@ public class WorkflowValidatorTest {
 
 
   @Test
-  public void validateInvalidWorkflow() throws Exception {
+  public void validateInvalidWorkflow() {
     final String id = Strings.repeat("id", 1024);
     final String schedule = Strings.repeat("schedule", 1024);
     final String offset = Strings.repeat("offset", 1024);
@@ -128,6 +130,7 @@ public class WorkflowValidatorTest {
     final Map<String, String> env = IntStream.range(0, 2000).boxed()
         .collect(toMap(i -> "env-var-" + i, i -> "env-val-" + i));
     final long envSize = env.entrySet().stream().mapToLong(e -> e.getKey().length() + e.getValue().length()).sum();
+    final Duration runningTimeout = Duration.ofSeconds(59L);
 
     final WorkflowConfiguration invalidConfiguration = WorkflowConfiguration.builder()
         .id(id)
@@ -140,6 +143,7 @@ public class WorkflowValidatorTest {
         .resources(resources)
         .serviceAccount(serviceAccount)
         .env(env)
+        .runningTimeout(runningTimeout)
         .build();
 
     final List<String> errors = sut.validateWorkflowConfiguration(invalidConfiguration);
@@ -157,6 +161,7 @@ public class WorkflowValidatorTest {
         .add("invalid offset: Text cannot be parsed to a Period")
         .add(limit("too many env vars", env.size(), MAX_ENV_VARS))
         .add(limit("env too big", envSize, MAX_ENV_SIZE))
+        .add(limit("running timeout is too small", runningTimeout.getSeconds(), MIN_RUNNING_TIMEOUT_SECONDS))
         .build();
 
     assertThat(errors, containsInAnyOrder(expectedErrors.toArray()));
