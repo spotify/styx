@@ -96,6 +96,7 @@ public interface ServiceAccountUsageAuthorizer {
   String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorizaton.require.workflows";
   String AUTHORIZATION_GSUITE_USER_CONFIG = "styx.authorization.gsuite-user";
   String AUTHORIZATION_MESSAGE_CONFIG = "styx.authorization.message";
+  String AUTHORIZATION_ADMINISTRATORS_CONFIG = "styx.authorization.administrators";
 
   void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount,
       GoogleIdToken idToken);
@@ -122,6 +123,7 @@ public interface ServiceAccountUsageAuthorizer {
     private final AuthorizationPolicy authorizationPolicy;
     private final StopStrategy retryStopStrategy;
     private final String message;
+    private final List<String> administrators;
 
     /**
      * (principalEmail, serviceAccount) -> Either[Response, Result]
@@ -133,7 +135,8 @@ public interface ServiceAccountUsageAuthorizer {
             .build();
 
     Impl(Iam iam, CloudResourceManager crm, Directory directory, String serviceAccountUserRole,
-         AuthorizationPolicy authorizationPolicy, StopStrategy retryStopStrategy, String message) {
+         AuthorizationPolicy authorizationPolicy, StopStrategy retryStopStrategy, String message,
+         List<String> administrators) {
       this.iam = Objects.requireNonNull(iam, "iam");
       this.crm = Objects.requireNonNull(crm, "crm");
       this.directory = Objects.requireNonNull(directory, "directory");
@@ -141,6 +144,7 @@ public interface ServiceAccountUsageAuthorizer {
       this.authorizationPolicy = Objects.requireNonNull(authorizationPolicy, "authorizationPolicy");
       this.retryStopStrategy = Objects.requireNonNull(retryStopStrategy, "retryStopStrategy");
       this.message = Objects.requireNonNull(message, "message");
+      this.administrators = Objects.requireNonNull(administrators, "administrators");
     }
 
     @Override
@@ -199,6 +203,10 @@ public interface ServiceAccountUsageAuthorizer {
       return ServiceAccountUsageAuthorizationResult.builder()
           .serviceAccountProjectId(projectId)
           .accessMessage(firstPresent(
+              // Check if the principal is an admin
+              () -> memberStatus(principalEmail, administrators)
+                  .map(status -> String.format("Principal %s is an admin %s", principalEmail, status)),
+
               // Check if the principal has been granted the service account user role in the project of the SA
               () -> projectPolicyAccess(projectId, principalEmail)
                   .map(type -> String.format("Principal %s has role %s in project %s %s",
@@ -428,8 +436,11 @@ public interface ServiceAccountUsageAuthorizer {
       final String message = config.hasPath(AUTHORIZATION_MESSAGE_CONFIG)
                              ? config.getString(AUTHORIZATION_MESSAGE_CONFIG)
                              : "";
+      final List<String> administrators = config.hasPath(AUTHORIZATION_ADMINISTRATORS_CONFIG)
+                                  ? config.getStringList(AUTHORIZATION_ADMINISTRATORS_CONFIG)
+                                  : Collections.emptyList();
       authorizer = ServiceAccountUsageAuthorizer.create(
-          role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message);
+          role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message, administrators);
     } else {
       authorizer = ServiceAccountUsageAuthorizer.nop();
     }
@@ -446,7 +457,8 @@ public interface ServiceAccountUsageAuthorizer {
                                               GoogleCredential credential,
                                               String gsuiteUserEmail,
                                               String serviceName,
-                                              String message) {
+                                              String message,
+                                              List<String> administrators) {
 
     final HttpTransport httpTransport;
     try {
@@ -486,7 +498,7 @@ public interface ServiceAccountUsageAuthorizer {
         .build();
 
     return new Impl(iam, crm, directory, serviceAccountUserRole, authorizationPolicy,
-        Impl.DEFAULT_RETRY_STOP_STRATEGY, message);
+        Impl.DEFAULT_RETRY_STOP_STRATEGY, message, administrators);
   }
 
   static GoogleCredential defaultCredential() {
