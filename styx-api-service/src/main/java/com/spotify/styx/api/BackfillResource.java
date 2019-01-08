@@ -20,7 +20,6 @@
 
 package com.spotify.styx.api;
 
-import static com.spotify.apollo.Status.NOT_FOUND;
 import static com.spotify.apollo.StatusType.Family.SUCCESSFUL;
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.api.Middlewares.authedEntity;
@@ -211,7 +210,7 @@ public final class BackfillResource implements Closeable {
       return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Error in internal storage"));
     }
     if (!backfillOpt.isPresent()) {
-      return Response.forStatus(NOT_FOUND);
+      return Response.forStatus(Status.NOT_FOUND);
     }
     final Backfill backfill = backfillOpt.get();
     if (includeStatuses) {
@@ -236,7 +235,7 @@ public final class BackfillResource implements Closeable {
         return haltActiveBackfillInstances(backfill, rc.requestScopedClient());
       } else {
         return CompletableFuture.completedFuture(
-            Response.forStatus(NOT_FOUND.withReasonPhrase("backfill not found")));
+            Response.forStatus(Status.NOT_FOUND.withReasonPhrase("backfill not found")));
       }
     } catch (IOException e) {
       return CompletableFuture.completedFuture(Response.forStatus(
@@ -334,7 +333,7 @@ public final class BackfillResource implements Closeable {
     try {
       workflow = storage.workflow(workflowId)
           .orElseThrow(() -> new ResponseException(
-              Response.forStatus(NOT_FOUND.withReasonPhrase("workflow not found"))));
+              Response.forStatus(Status.NOT_FOUND.withReasonPhrase("workflow not found"))));
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -417,7 +416,7 @@ public final class BackfillResource implements Closeable {
         return tx.store(backfillBuilder.build());
       });
     } catch (ResourceNotFoundException e) {
-      return Response.forStatus(NOT_FOUND.withReasonPhrase(e.getMessage()));
+      return Response.forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
       return Response.forStatus(
           Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Failed to store backfill."));
