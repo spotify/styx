@@ -85,6 +85,15 @@ public class WorkflowActionAuthorizerTest {
   }
 
   @Test
+  public void authorizeWorkflowActionWithIdShouldPass() throws IOException {
+    when(storage.workflow(any())).thenReturn(Optional.of(WORKFLOW));
+    when(ac.user()).thenReturn(Optional.of(idToken));
+    assertThat(Try.run(() -> sut.authorizeWorkflowAction(ac, WORKFLOW.id())).isSuccess(), is(true));
+    verify(authorizer).authorizeServiceAccountUsage(
+        WORKFLOW.id(), WORKFLOW.configuration().serviceAccount().get(), idToken);
+  }
+
+  @Test
   public void authorizeWorkflowActionShouldFailIfNoUser() {
     when(ac.user()).thenReturn(Optional.empty());
     exception.expect(AssertionError.class);
