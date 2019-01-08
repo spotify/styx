@@ -37,7 +37,6 @@ import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.entity.EntityCodec;
-import com.spotify.apollo.entity.EntityMiddleware;
 import com.spotify.apollo.entity.EntityMiddleware.EntityResponseHandler;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
@@ -244,16 +243,6 @@ public final class Middlewares {
 
   }
 
-  public static Middleware<Requested<Authenticated<Response<?>>>, AsyncHandler<Response<ByteString>>> authedJson(
-      RequestAuthenticator authenticator) {
-    return ar -> jsonAsync().apply(requestContext -> {
-      final Response<?> payload = ar
-          .apply(requestContext)
-          .apply(auth(requestContext, authenticator));
-      return completedFuture(payload);
-    });
-  }
-
   public static <T> Middleware<Requested<Authenticated<EntityResponseHandler<T, T>>>, SyncHandler<Response<ByteString>>> authedEntity(
       EntityCodec codec,
       RequestAuthenticator authenticator,
@@ -301,31 +290,15 @@ public final class Middlewares {
 
   public static <E, R> Middleware<Authenticated<EntityResponseHandler<E, R>>, SyncHandler<Response<ByteString>>> authedEntity(
       Middleware<EntityResponseHandler<E, R>, SyncHandler<Response<ByteString>>> entityMiddleware,
-      Middleware<Requested<Authenticated<Response<ByteString>>>, SyncHandler<Response<ByteString>>> authed) {
-    // TODO: there must be some better way to compose the entity and authed middlewares
-    return ar -> rc -> authed.apply(__ ->
-        ac -> entityMiddleware.apply(ar.apply(ac)).invoke(rc)).invoke(rc);
+      Middleware<Requested<Authenticated<Response<ByteString>>>,
+          SyncHandler<Response<ByteString>>> authed) {
+    return ar -> rc -> authed.apply(r -> ac -> entityMiddleware.apply(ar.apply(ac)).invoke(rc)).invoke(rc);
   }
 
   public static <E, R> Middleware<Authenticated<EntityResponseHandler<E, R>>, SyncHandler<Response<ByteString>>> authedEntity(
       RequestAuthenticator authenticator,
       Middleware<EntityResponseHandler<E, R>, SyncHandler<Response<ByteString>>> entityMiddleware) {
     return authedEntity(entityMiddleware, authed(authenticator));
-  }
-
-  public static <E, R> Middleware<Authenticated<EntityResponseHandler<E, R>>, SyncHandler<Response<ByteString>>> authedEntity(
-      EntityMiddleware em,
-      Class<E> requestEntityClass,
-      Class<R> responseEntityClass,
-      RequestAuthenticator authenticator) {
-    return authedEntity(em.response(requestEntityClass, responseEntityClass), authed(authenticator));
-  }
-
-  public static <E> Middleware<Authenticated<EntityResponseHandler<E, E>>, SyncHandler<Response<ByteString>>> authedEntity(
-      EntityMiddleware em,
-      Class<E> entityClass,
-      RequestAuthenticator authenticator) {
-    return authedEntity(em.response(entityClass), authed(authenticator));
   }
 
   private static AuthContext auth(RequestContext requestContext,

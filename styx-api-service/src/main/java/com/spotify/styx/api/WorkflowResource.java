@@ -21,7 +21,6 @@
 package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V3;
-import static com.spotify.styx.api.Middlewares.authedJson;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
@@ -99,7 +98,7 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>",
             rc -> workflows(arg("cid", rc))),
         Route.with(
-            authedJson(requestAuthenticator), "POST", BASE + "/<cid>",
+            Middlewares.<Workflow>authed(requestAuthenticator).and(json()), "POST", BASE + "/<cid>",
             rc -> ac -> createOrUpdateWorkflow(arg("cid", rc), rc, ac)),
         Route.with(
             json(), "DELETE", BASE + "/<cid>/<wfid>",
@@ -114,7 +113,7 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>/<wfid>/state",
             rc -> state(arg("cid", rc), arg("wfid", rc))),
         Route.with(
-            authedJson(requestAuthenticator), "PATCH", BASE + "/<cid>/<wfid>/state",
+            Middlewares.<WorkflowState>authed(requestAuthenticator).and(json()), "PATCH", BASE + "/<cid>/<wfid>/state",
             rc -> ac -> patchState(arg("cid", rc), arg("wfid", rc), rc.request(), ac))
     );
 

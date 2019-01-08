@@ -54,9 +54,6 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.request.RequestContexts;
 import com.spotify.apollo.request.RequestMetadataImpl;
 import com.spotify.apollo.route.AsyncHandler;
-import com.spotify.styx.api.Middlewares.Authenticated;
-import com.spotify.styx.api.Middlewares.Requested;
-import com.spotify.styx.serialization.Json;
 import com.spotify.styx.util.ClassEnforcer;
 import com.spotify.styx.util.MockSpan;
 import io.opencensus.trace.SpanBuilder;
@@ -499,13 +496,11 @@ public class MiddlewaresTest {
     when(requestContext.request()).thenReturn(request);
     when(authenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
 
-    final Requested<Authenticated<Response<?>>> handler = rc -> ac ->
-        Response.forPayload(ac.user().map(idToken::equals).orElse(false));
-    final Response<ByteString> response = awaitResponse(Middlewares.authedJson(authenticator)
-        .apply(handler)
-        .invoke(requestContext));
+    final Response<Boolean> response = Middlewares.<Boolean>authed(authenticator)
+        .apply(rc -> ac -> Response.forPayload(ac.user().map(idToken::equals).orElse(false)))
+        .invoke(requestContext);
 
-    assertThat(Json.deserialize(response.payload().get(), Boolean.class), is(true));
+    assertThat(response.payload(), is(Optional.of(true)));
   }
 
   @Test

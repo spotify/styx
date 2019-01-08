@@ -24,7 +24,6 @@ import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.CONFLICT;
 import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
 import static com.spotify.apollo.Status.OK;
-import static com.spotify.styx.api.Middlewares.authed;
 import static com.spotify.styx.api.Middlewares.authedEntity;
 import static com.spotify.styx.util.ExceptionUtil.findCause;
 import static com.spotify.styx.util.ParameterUtil.parseAlignedInstant;
@@ -98,19 +97,19 @@ public class SchedulerResource {
 
     return Stream.of(
         Route.with(
-            authedEntity(em.response(Event.class), authed(authenticator)),
+            authedEntity(authenticator, em.response(Event.class)),
             "POST", BASE + "/events",
             ac -> rc -> event -> injectEvent(ac, event)),
         Route.with(
-            authedEntity(em.response(TriggerRequest.class), authed(authenticator)),
+            authedEntity(authenticator, em.response(TriggerRequest.class)),
             "POST", BASE + "/trigger",
             ac -> rc -> payload -> triggerWorkflowInstance(ac, rc, payload)),
         Route.with(
-            authedEntity(em.response(WorkflowInstance.class), authed(authenticator)),
+            authedEntity(authenticator, em.response(WorkflowInstance.class)),
             "POST", BASE + "/retry",
             ac -> rc -> payload -> retryWorkflowInstanceAfter(ac, rc, payload)),
         Route.with(
-            authedEntity(em.response(WorkflowInstance.class), authed(authenticator)),
+            authedEntity(authenticator, em.response(WorkflowInstance.class)),
             "POST", BASE + "/halt",
             ac -> rc -> workflowInstance -> haltWorkflowInstance(ac, workflowInstance))
     )
