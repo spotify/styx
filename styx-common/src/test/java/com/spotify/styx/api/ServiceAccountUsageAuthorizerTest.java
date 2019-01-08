@@ -97,6 +97,8 @@ public class ServiceAccountUsageAuthorizerTest {
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Iam iam;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Directory directory;
 
+  private GoogleCredential credential;
+
   private final com.google.api.services.cloudresourcemanager.model.Binding projectBinding =
       new com.google.api.services.cloudresourcemanager.model.Binding();
   private final com.google.api.services.iam.v1.model.Binding saBinding =
@@ -134,6 +136,10 @@ public class ServiceAccountUsageAuthorizerTest {
         .thenReturn(new ServiceAccount()
             .setEmail(MANAGED_SERVICE_ACCOUNT)
             .setProjectId(SERVICE_ACCOUNT_PROJECT));
+    credential = new GoogleCredential.Builder()
+        .setServiceAccountPrivateKey(privateKey)
+        .setServiceAccountId("styx@bar.iam.gserviceaccount.com")
+        .build();
     sut = new ServiceAccountUsageAuthorizer.Impl(iam, crm, directory, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy,
         StopStrategies.stopAfterAttempt(RETRY_ATTEMPTS), MESSAGE);
   }
@@ -375,10 +381,6 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Test
   public void testCreate() {
-    final GoogleCredential credential = new GoogleCredential.Builder()
-        .setServiceAccountPrivateKey(privateKey)
-        .setServiceAccountId("styx@bar.iam.gserviceaccount.com")
-        .build();
     final ServiceAccountUsageAuthorizer sut = ServiceAccountUsageAuthorizer.create(
         SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, "gsuite-user@example.com", "foo", MESSAGE);
     assertThat(sut, is(notNullValue()));
