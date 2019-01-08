@@ -96,10 +96,6 @@ public interface ServiceAccountUsageAuthorizer {
   String AUTHORIZATION_GSUITE_USER_CONFIG = "styx.authorization.gsuite-user";
   String AUTHORIZATION_MESSAGE_CONFIG = "styx.authorization.message";
 
-  ServiceAccountUsageAuthorizer NOP = (x, y, z) -> {
-    // nop
-  };
-
   void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount,
       GoogleIdToken idToken);
 
@@ -450,7 +446,7 @@ public interface ServiceAccountUsageAuthorizer {
       authorizer = ServiceAccountUsageAuthorizer.create(
           role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message);
     } else {
-      authorizer = ServiceAccountUsageAuthorizer.NOP;
+      authorizer = ServiceAccountUsageAuthorizer.nop();
     }
     return authorizer;
 
