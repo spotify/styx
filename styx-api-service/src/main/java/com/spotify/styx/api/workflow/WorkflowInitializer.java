@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,17 +47,18 @@ public class WorkflowInitializer {
     this.time = Objects.requireNonNull(time);
   }
 
-  public Optional<Workflow> store(Workflow workflow)
+  public Optional<Workflow> store(Workflow workflow, Consumer<Optional<Workflow>> guard)
       throws WorkflowInitializationException {
     try {
-      return storage.runInTransaction(tx -> store(tx, workflow));
+      return storage.runInTransaction(tx -> store(tx, workflow, guard));
     } catch (IOException e) {
       LOG.warn("failed to write workflow {} to storage", workflow.id(), e);
       throw new RuntimeException(e);
     }
   }
 
-  private Optional<Workflow> store(StorageTransaction tx, Workflow workflow)
+  private Optional<Workflow> store(StorageTransaction tx, Workflow workflow,
+                                   Consumer<Optional<Workflow>> guard)
       throws WorkflowInitializationException, IOException {
     final Optional<Workflow> previous;
     try {
@@ -65,6 +67,8 @@ public class WorkflowInitializer {
       LOG.warn("failed to read workflow {} from storage", workflow.id(), e);
       throw new RuntimeException(e);
     }
+
+    guard.accept(previous);
 
     final Optional<TriggerInstantSpec> nextSpec;
 

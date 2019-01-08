@@ -101,8 +101,8 @@ public final class WorkflowResource {
             Middlewares.<Workflow>authed(requestAuthenticator).and(json()), "POST", BASE + "/<cid>",
             rc -> ac -> createOrUpdateWorkflow(arg("cid", rc), rc, ac)),
         Route.with(
-            json(), "DELETE", BASE + "/<cid>/<wfid>",
-            rc -> deleteWorkflow(arg("cid", rc),arg("wfid", rc))),
+            Middlewares.<ByteString>authed(requestAuthenticator).and(json()), "DELETE", BASE + "/<cid>/<wfid>",
+            rc -> ac -> deleteWorkflow(arg("cid", rc),arg("wfid", rc), ac)),
         Route.with(
             json(), "GET", BASE + "/<cid>/<wfid>/instances",
             rc -> instances(arg("cid", rc), arg("wfid", rc), rc.request())),
@@ -120,7 +120,7 @@ public final class WorkflowResource {
     return Api.prefixRoutes(routes, V3);
   }
 
-  private Response<ByteString> deleteWorkflow(String cid, String wfid) {
+  private Response<ByteString> deleteWorkflow(String cid, String wfid, AuthContext ac) {
     final WorkflowId workflowId = WorkflowId.create(cid, wfid);
     final Optional<Workflow> workflow;
     try {
@@ -135,6 +135,10 @@ public final class WorkflowResource {
     if (!workflow.isPresent()) {
       return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Workflow does not exist"));
     }
+
+    // TODO: run in transaction
+
+    workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow.get());
 
     try {
       storage.delete(workflowId);
@@ -166,6 +170,7 @@ public final class WorkflowResource {
     }
 
     final Workflow workflow = Workflow.create(componentId, workflowConfig);
+
     workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow);
 
     final Collection<String> errors =
@@ -177,7 +182,9 @@ public final class WorkflowResource {
 
     final Optional<Workflow> oldWorkflowOptional;
     try {
-      oldWorkflowOptional = workflowInitializer.store(workflow);
+      oldWorkflowOptional = workflowInitializer.store(workflow, existingWorkflowOpt ->
+          existingWorkflowOpt.ifPresent(existingWorkflow ->
+              workflowActionAuthorizer.authorizeWorkflowAction(ac, existingWorkflow)));
     } catch (WorkflowInitializationException e) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(e.getMessage()));
     }
