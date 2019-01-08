@@ -386,7 +386,7 @@ public class StyxScheduler implements AppInit {
         new TerminationHandler(retryUtil, stateManager),
         new MonitoringHandler(stats),
         new PublisherHandler(publisher, stats),
-        new ExecutionDescriptionHandler(storage, stateManager, new WorkflowValidator(new DockerImageValidator()))));
+        new ExecutionDescriptionHandler(timeoutConfig, storage, stateManager, new WorkflowValidator(new DockerImageValidator()))));
 
     final TriggerListener trigger =
         new StateInitializingTrigger(stateManager);

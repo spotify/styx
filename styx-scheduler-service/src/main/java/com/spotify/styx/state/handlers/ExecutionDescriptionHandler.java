@@ -31,8 +31,10 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.MissingRequiredPropertyException;
@@ -56,14 +58,17 @@ public class ExecutionDescriptionHandler implements OutputHandler {
 
   private static final String STYX_RUN = "styx-run";
 
+  private final TimeoutConfig timeouts;
   private final Storage storage;
   private final StateManager stateManager;
   private final WorkflowValidator validator;
 
   public ExecutionDescriptionHandler(
+      TimeoutConfig timeouts,
       Storage storage,
       StateManager stateManager,
       WorkflowValidator validator) {
+    this.timeouts = timeouts;
     this.storage = requireNonNull(storage);
     this.stateManager = requireNonNull(stateManager);
     this.validator = requireNonNull(validator);
@@ -122,7 +127,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
     // also validate running timeout value
     final Optional<Duration> runningTimeout = workflow.configuration().runningTimeout();
     runningTimeout.ifPresent(timeout -> {
-      final Duration upperLimit = Duration.ofHours(24);
+      final Duration upperLimit = timeouts.ttlOf(State.RUNNING);
       if (timeout.compareTo(upperLimit) > 0) {
         errors.add("running_timeout is too large" + ": " + timeout.toString() + ", upperLimit = "
             + upperLimit.toString());

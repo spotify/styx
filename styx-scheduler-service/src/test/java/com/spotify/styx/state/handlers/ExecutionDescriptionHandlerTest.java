@@ -44,6 +44,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
@@ -79,13 +80,15 @@ public class ExecutionDescriptionHandlerTest {
   @Captor ArgumentCaptor<Event> eventCaptor;
 
   @Mock WorkflowValidator workflowValidator;
+  @Mock TimeoutConfig timeouts;
 
   @Before
   public void setUp() throws Exception {
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
+    when(timeouts.ttlOf(any())).thenReturn(Duration.ofHours(24));
 
     when(stateManager.receive(any())).thenReturn(CompletableFuture.completedFuture(null));
-    toTest = new ExecutionDescriptionHandler(storage, stateManager, workflowValidator);
+    toTest = new ExecutionDescriptionHandler(timeouts, storage, stateManager, workflowValidator);
   }
 
   @Test
