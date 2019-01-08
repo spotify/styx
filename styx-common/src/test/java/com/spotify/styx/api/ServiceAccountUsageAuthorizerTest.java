@@ -31,6 +31,7 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
@@ -387,6 +388,18 @@ public class ServiceAccountUsageAuthorizerTest {
     final ServiceAccountUsageAuthorizer sut = ServiceAccountUsageAuthorizer.create(
         SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, GSUITE_USER_EMAIL, "foo", MESSAGE);
     assertThat(sut, is(notNullValue()));
+  }
+
+  @Test
+  public void createShouldFailIfCredentialIsNotAServiceAccount() {
+    credential = new GoogleCredential.Builder().build();
+    try {
+      ServiceAccountUsageAuthorizer.create(
+          SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, GSUITE_USER_EMAIL, "foo", MESSAGE);
+      fail();
+    } catch (IllegalArgumentException e) {
+      assertThat(e.getMessage(), is("Credential must be a service account"));
+    }
   }
 
   @Test
