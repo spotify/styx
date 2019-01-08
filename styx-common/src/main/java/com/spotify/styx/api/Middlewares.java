@@ -36,7 +36,6 @@ import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
-import com.spotify.apollo.entity.EntityCodec;
 import com.spotify.apollo.entity.EntityMiddleware.EntityResponseHandler;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
@@ -45,7 +44,6 @@ import com.spotify.styx.util.MDCUtil;
 import io.norberg.automatter.AutoMatter;
 import io.opencensus.trace.Span;
 import io.opencensus.trace.Tracer;
-import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -241,44 +239,6 @@ public final class Middlewares {
 
   interface Requested<T> extends Function<RequestContext, T> {
 
-  }
-
-  public static <T> Middleware<Requested<Authenticated<EntityResponseHandler<T, T>>>, SyncHandler<Response<ByteString>>> authedEntity(
-      EntityCodec codec,
-      RequestAuthenticator authenticator,
-      Class<T> cls) {
-    return ar -> rc -> {
-      final EntityResponseHandler<T, T> h = ar
-          .apply(rc)
-          .apply(auth(rc, authenticator));
-
-      if (!rc.request().payload().isPresent()) {
-        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload"));
-      }
-
-      final T requestPayload;
-      try {
-        requestPayload = codec.read(rc.request().payload().get(), cls);
-      } catch (IOException e) {
-        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Payload parsing failed: " + e.getMessage()));
-      }
-
-      final Response<T> response = h.apply(rc).apply(requestPayload);
-      if (!response.payload().isPresent()) {
-        //noinspection unchecked
-        return (Response<ByteString>) response;
-      }
-
-      final ByteString responsePayload;
-      try {
-        responsePayload = codec.write(response.payload().get(), cls);
-      } catch (IOException e) {
-        return Response.forStatus(
-            Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Payload serialization failed: " + e.getMessage()));
-      }
-
-      return response.withPayload(responsePayload);
-    };
   }
 
   public static <T> Middleware<Requested<Authenticated<Response<T>>>, SyncHandler<Response<T>>> authed(
