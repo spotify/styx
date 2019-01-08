@@ -487,6 +487,7 @@ public interface ServiceAccountUsageAuthorizer {
         .build();
 
     if (credential.getServiceAccountId() == null) {
+      // TODO: Allow GCE default service accounts and look up the ID using the tokeninfo endpoint
       throw new IllegalArgumentException("Credential must be a service account");
     }
 
