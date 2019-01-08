@@ -61,7 +61,6 @@ public class WorkflowActionAuthorizer {
     if (!serviceAccount.isPresent()) {
       return;
     }
-    serviceAccountUsageAuthorizer
-        .authorizeServiceAccountUsage(workflow.id(), serviceAccount.get(), idToken);
+    serviceAccountUsageAuthorizer.authorizeServiceAccountUsage(workflow.id(), serviceAccount.get(), idToken);
   }
 }
