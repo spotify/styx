@@ -624,6 +624,29 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldFailHaltBackfillIfNotAuthorized() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    serviceHelper.stubClient()
+        .respond(Response.forStatus(Status.ACCEPTED))
+        .to(SCHEDULER_BASE + "/api/v0/events");
+
+    storage.storeBackfill(BACKFILL_1);
+
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(WorkflowId.class));
+
+    reset(storage);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("DELETE", path("/" + BACKFILL_1.id())));
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verify(storage, never()).storeBackfill(any());
+  }
+
+  @Test
   public void shouldFailUpdateBackfillIfNotAuthorized() throws Exception {
     sinceVersion(Api.Version.V3);
 

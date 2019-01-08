@@ -147,7 +147,7 @@ public final class BackfillResource implements Closeable {
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Collections.singletonList(
         Route.async(
             "DELETE", BASE + "/<bid>",
-            rc -> haltBackfill(rc.pathArgs().get("bid"), rc))
+            rc -> haltBackfill(rc.pathArgs().get("bid"), rc, authenticator))
     );
 
     return Streams.concat(
@@ -226,11 +226,15 @@ public final class BackfillResource implements Closeable {
     return schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + "/" + String.join("/", parts);
   }
 
-  private CompletionStage<Response<ByteString>> haltBackfill(String id, RequestContext rc) {
+  private CompletionStage<Response<ByteString>> haltBackfill(String id, RequestContext rc,
+                                                             RequestAuthenticator authenticator) {
+    final AuthContext authContext = authenticator.authenticate(rc.request());
     try {
+      // TODO: run in transction
       final Optional<Backfill> backfillOptional = storage.backfill(id);
       if (backfillOptional.isPresent()) {
         final Backfill backfill = backfillOptional.get();
+        workflowActionAuthorizer.authorizeWorkflowAction(authContext, backfill.workflowId());
         storage.storeBackfill(backfill.builder().halted(true).build());
         return haltActiveBackfillInstances(backfill, rc.requestScopedClient());
       } else {
