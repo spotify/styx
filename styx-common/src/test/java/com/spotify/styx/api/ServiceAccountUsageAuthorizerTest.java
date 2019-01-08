@@ -23,6 +23,7 @@ package com.spotify.styx.api;
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.FORBIDDEN;
 import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.AUTHORIZATION_GSUITE_USER_CONFIG;
+import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.AUTHORIZATION_MESSAGE_CONFIG;
 import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.AUTHORIZATION_REQUIRE_ALL_CONFIG;
 import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.AUTHORIZATION_REQUIRE_WORKFLOWS;
 import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG;
@@ -416,10 +417,11 @@ public class ServiceAccountUsageAuthorizerTest {
   }
 
   @Test
-  public void shouldCreateServiceAccountUsageAuthorizerWithRole() {
+  public void shouldCreateConfiguredServiceAccountUsageAuthorizer() {
     final Config config = ConfigFactory.parseMap(ImmutableMap.of(
         AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG, SERVICE_ACCOUNT_USER_ROLE,
-        AUTHORIZATION_GSUITE_USER_CONFIG, GSUITE_USER_EMAIL));
+        AUTHORIZATION_GSUITE_USER_CONFIG, GSUITE_USER_EMAIL,
+        AUTHORIZATION_MESSAGE_CONFIG, MESSAGE));
     final ServiceAccountUsageAuthorizer authorizer = ServiceAccountUsageAuthorizer.create(config, "foo", credential);
     assertThat(authorizer, is(instanceOf(ServiceAccountUsageAuthorizer.Impl.class)));
   }
