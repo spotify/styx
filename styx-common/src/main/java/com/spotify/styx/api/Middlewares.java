@@ -250,8 +250,7 @@ public final class Middlewares {
 
   public static <E, R> Middleware<Authenticated<EntityResponseHandler<E, R>>, SyncHandler<Response<ByteString>>> authedEntity(
       Middleware<EntityResponseHandler<E, R>, SyncHandler<Response<ByteString>>> entityMiddleware,
-      Middleware<Requested<Authenticated<Response<ByteString>>>,
-          SyncHandler<Response<ByteString>>> authed) {
+      Middleware<Requested<Authenticated<Response<ByteString>>>, SyncHandler<Response<ByteString>>> authed) {
     return ar -> rc -> authed.apply(r -> ac -> entityMiddleware.apply(ar.apply(ac)).invoke(rc)).invoke(rc);
   }
 
