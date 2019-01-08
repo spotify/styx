@@ -75,6 +75,7 @@ import java.util.stream.Stream;
 import javaslang.Tuple;
 import javaslang.Tuple2;
 import javaslang.control.Either;
+import javaslang.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -456,13 +457,13 @@ public interface ServiceAccountUsageAuthorizer {
 
     final JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
 
-    final CloudResourceManager crm =
-        new CloudResourceManager.Builder(httpTransport, jsonFactory, credential)
-            .setApplicationName(serviceName)
-            .build();
+    final CloudResourceManager crm = new CloudResourceManager.Builder(
+        httpTransport, jsonFactory, credential.createScoped(IamScopes.all()))
+        .setApplicationName(serviceName)
+        .build();
 
     final Iam iam = new Iam.Builder(
-        httpTransport, jsonFactory, credential)
+        httpTransport, jsonFactory, credential.createScoped(IamScopes.all()))
         .setApplicationName(serviceName)
         .build();
 
@@ -489,14 +490,7 @@ public interface ServiceAccountUsageAuthorizer {
   }
 
   static GoogleCredential defaultCredential() {
-    final GoogleCredential credential;
-    try {
-      credential = GoogleCredential.getApplicationDefault()
-          .createScoped(IamScopes.all());
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-    return credential;
+    return Try.of(GoogleCredential::getApplicationDefault).get();
   }
 
   static ServiceAccountUsageAuthorizer nop() {
