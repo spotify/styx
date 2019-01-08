@@ -39,11 +39,13 @@ import com.spotify.styx.util.MissingRequiredPropertyException;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -116,7 +118,17 @@ public class ExecutionDescriptionHandler implements OutputHandler {
                                                           workflowInstance))
     );
 
-    final Collection<String> errors = validator.validateWorkflow(workflow);
+    Collection<String> errors = validator.validateWorkflow(workflow);
+    // also validate running timeout value
+    final Optional<Duration> runningTimeout = workflow.configuration().runningTimeout();
+    runningTimeout.ifPresent(timeout -> {
+      final Duration upperLimit = Duration.ofHours(24);
+      if (timeout.compareTo(upperLimit) > 0) {
+        errors.add("running_timeout is too large" + ": " + timeout.toString() + ", upperLimit = "
+            + upperLimit.toString());
+      }
+    });
+
     if (!errors.isEmpty()) {
       throw new MissingRequiredPropertyException(format(
           "%s configuration is invalid, halting %s. Errors: %s",
@@ -138,6 +150,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         .serviceAccount(workflow.configuration().serviceAccount())
         .commitSha(workflow.configuration().commitSha())
         .env(env)
+        .runningTimeout(runningTimeout)
         .build();
   }
 

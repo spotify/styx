@@ -47,6 +47,8 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Optional;
@@ -107,6 +109,7 @@ public class ExecutionDescriptionHandlerTest {
     assertThat(executionDescriptionCaptor.getValue().dockerImage(), is(DOCKER_IMAGE));
     assertThat(executionDescriptionCaptor.getValue().dockerArgs(), hasSize(0));
     assertThat(executionDescriptionCaptor.getValue().commitSha(), hasValue(COMMIT_SHA));
+    assertThat(executionDescriptionCaptor.getValue().runningTimeout(), hasValue(Duration.ofMinutes(5)));
   }
 
   @Test
@@ -193,6 +196,23 @@ public class ExecutionDescriptionHandlerTest {
     verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance));
   }
 
+  @Test
+  public void shouldHalthIfRunningTimeoutInvalid() throws Exception {
+    when(workflowValidator.validateWorkflow(any())).thenReturn(new ArrayList<>());
+
+    final WorkflowConfiguration invalidTimeoutConfig = WorkflowConfigurationBuilder
+        .from(FULL_WORKFLOW_CONFIGURATION).runningTimeout(Duration.ofHours(25)).build();
+    Workflow workflow = Workflow.create("id", invalidTimeoutConfig);
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
+    RunState runState = RunState.create(workflowInstance, PREPARE);
+
+    when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
+
+    toTest.transitionInto(runState);
+
+    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance));
+  }
+
   private WorkflowConfiguration workflowConfiguration(String... args) {
     return WorkflowConfiguration.builder()
         .id("styx.TestEndpoint")
@@ -200,6 +220,7 @@ public class ExecutionDescriptionHandlerTest {
         .commitSha(COMMIT_SHA)
         .dockerImage(DOCKER_IMAGE)
         .dockerArgs(Arrays.asList(args))
+        .runningTimeout(Duration.ofMinutes(5))
         .build();
   }
 }
