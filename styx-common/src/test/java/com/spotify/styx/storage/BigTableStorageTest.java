@@ -20,12 +20,15 @@
 
 package com.spotify.styx.storage;
 
+import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.ExecutionDescriptionBuilder;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowId;
@@ -33,12 +36,14 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.data.ExecStatus;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.SortedSet;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.Rule;
 import org.junit.Test;
@@ -216,6 +221,31 @@ public class BigTableStorageTest {
                    .get(0), is(ExecStatus.create(Instant.ofEpochMilli(1L), "SUBMITTED", Optional.empty())));
     assertThat(workflowInstanceExecutionData.get(0).triggers().get(0).executions().get(0).statuses()
                    .get(1), is(ExecStatus.create(Instant.ofEpochMilli(2L), "STARTED", Optional.empty())));
+  }
+
+  @Test
+  public void shouldReturnExpectedInfoMessageForEventSubmit() throws Exception {
+    setUp(0);
+    final ExecutionDescription execDesc = ExecutionDescriptionBuilder
+        .from(EXECUTION_DESCRIPTION)
+        .runningTimeout(Duration.ofHours(2))
+        .build();
+    storage.writeEvent(SequenceEvent.create(Event.submit(WFI1, execDesc, "execId1"), 1L, 1L));
+
+    final SortedSet<SequenceEvent> events = storage.readEvents(WFI1);
+
+    assertThat(events.size(), is(1));
+    assertThat(EventUtil.info(events.last().event()), is(
+        "Execution description: ExecutionDescription{dockerImage=busybox:1.1, "
+            + "dockerArgs=[foo, bar], "
+            + "dockerTerminationLogging=false, "
+            + "secret=Optional[WorkflowConfiguration.Secret{name=secret, "
+            + "mountPath=/dev/null}], "
+            + "serviceAccount=Optional.empty, "
+            + "commitSha=Optional[00000ef508c1cb905e360590ce3e7e9193f6b370], "
+            + "env={}, "
+            + "runningTimeout=Optional[PT2H]}, "
+            + "id: execId1"));
   }
 
   @Test
