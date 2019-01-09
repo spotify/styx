@@ -25,6 +25,9 @@ import static com.github.rholder.retry.WaitStrategies.randomWait;
 import static com.google.api.services.admin.directory.DirectoryScopes.ADMIN_DIRECTORY_GROUP_MEMBER_READONLY;
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.FORBIDDEN;
+import static com.spotify.styx.util.ConfigUtil.get;
+import static com.spotify.styx.util.ConfigUtil.getString;
+import static com.spotify.styx.util.ConfigUtil.getStrings;
 import static java.lang.Boolean.TRUE;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
@@ -426,26 +429,16 @@ public interface ServiceAccountUsageAuthorizer {
   }
 
   static ServiceAccountUsageAuthorizer create(Config config, String serviceName, GoogleCredential credential) {
-
-    final AuthorizationPolicy authorizationPolicy = AuthorizationPolicy.fromConfig(config);
-
-    final ServiceAccountUsageAuthorizer authorizer;
-    if (config.hasPath(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)) {
-      final String role = config.getString(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG);
-      final String gsuiteUserEmail = config.getString(AUTHORIZATION_GSUITE_USER_CONFIG);
-      final String message = config.hasPath(AUTHORIZATION_MESSAGE_CONFIG)
-                             ? config.getString(AUTHORIZATION_MESSAGE_CONFIG)
-                             : "";
-      final List<String> administrators = config.hasPath(AUTHORIZATION_ADMINISTRATORS_CONFIG)
-                                  ? config.getStringList(AUTHORIZATION_ADMINISTRATORS_CONFIG)
-                                  : Collections.emptyList();
-      authorizer = ServiceAccountUsageAuthorizer.create(
-          role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message, administrators);
-    } else {
-      authorizer = ServiceAccountUsageAuthorizer.nop();
-    }
-    return authorizer;
-
+    return getString(config, AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)
+        .map(role -> {
+          final AuthorizationPolicy authorizationPolicy = AuthorizationPolicy.fromConfig(config);
+          final String gsuiteUserEmail = config.getString(AUTHORIZATION_GSUITE_USER_CONFIG);
+          final String message = get(config, AUTHORIZATION_MESSAGE_CONFIG, "");
+          final List<String> administrators = getStrings(config, AUTHORIZATION_ADMINISTRATORS_CONFIG);
+          return ServiceAccountUsageAuthorizer.create(
+              role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message, administrators);
+        })
+        .orElse(ServiceAccountUsageAuthorizer.nop());
   }
 
   static ServiceAccountUsageAuthorizer create(Config config, String serviceName) {
@@ -521,32 +514,21 @@ public interface ServiceAccountUsageAuthorizer {
 
     static AuthorizationPolicy fromConfig(Config config) {
       final AuthorizationPolicy authorizationPolicy;
-      if (config.hasPath(AUTHORIZATION_REQUIRE_ALL_CONFIG) &&
-          config.getBoolean(AUTHORIZATION_REQUIRE_ALL_CONFIG)) {
+      if (get(config, config::getBoolean, AUTHORIZATION_REQUIRE_ALL_CONFIG, false)) {
         authorizationPolicy = new ServiceAccountUsageAuthorizer.AllAuthorizationPolicy();
-      } else if (config.hasPath(AUTHORIZATION_REQUIRE_WORKFLOWS)) {
-        final List<WorkflowId> ids = config.getStringList(AUTHORIZATION_REQUIRE_WORKFLOWS).stream()
+      } else {
+        final List<WorkflowId> ids = get(config, config::getStringList, AUTHORIZATION_REQUIRE_WORKFLOWS,
+            Collections.<String>emptyList())
+            .stream()
             .map(WorkflowId::parseKey)
             .collect(Collectors.toList());
         authorizationPolicy = new ServiceAccountUsageAuthorizer.WhitelistAuthorizationPolicy(ids);
-      } else {
-        authorizationPolicy = new ServiceAccountUsageAuthorizer.NoAuthorizationPolicy();
       }
       return authorizationPolicy;
     }
   }
 
   /**
-   * A policy that does not enforce any authorization.
-   */
-  class NoAuthorizationPolicy implements AuthorizationPolicy {
-
-    @Override
-    public boolean shouldEnforceAuthorization(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
-      return false;
-    }
-  }
-
   /**
    * A policy that always enforces authorization.
    */
