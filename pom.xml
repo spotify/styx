@@ -704,7 +704,9 @@
           <excludes>
             <exclude>**/AutoValue_*.class</exclude>
             <exclude>**/*Builder.class</exclude>
+            <exclude>**/*Builder$Value.class</exclude>
             <exclude>com/spotify/styx/model/Event.class</exclude>
+            <exclude>com/spotify/styx/model/Event$*EventAcceptor.class</exclude>
             <exclude>com/spotify/styx/state/Trigger.class</exclude>
             <exclude>com/spotify/styx/monitoring/NoopStats.class</exclude>
           </excludes>
