@@ -35,6 +35,7 @@ import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.AtomicLongMap;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.WorkflowExecutionGate.ExecutionBlocker;
 import com.spotify.styx.model.Event;
@@ -175,6 +176,7 @@ public class Scheduler {
     final Map<String, Long> currentResourceUsage =
         getResourceUsage(globalConcurrency.isPresent(), activeStates, timedOutInstances,
             resourceDecorator, workflows);
+    final AtomicLongMap<String> currentResourceDemand = AtomicLongMap.create();
 
     // this reflects resource usage since last tick, so a couple of minutes delay
     updateResourceStats(resources, currentResourceUsage);
@@ -194,7 +196,9 @@ public class Scheduler {
     timedOutInstances.forEach(wfi -> this.sendTimeout(wfi, activeStatesMap.get(wfi)));
 
     dequeueInstances(config, resources, workflowResourceReferences,
-        workflows, eligibleInstances);
+        workflows, eligibleInstances, currentResourceDemand);
+
+    currentResourceDemand.asMap().forEach(stats::recordResourceDemanded);
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
     stats.recordTickDuration(TICK_TYPE, durationMillis);
@@ -220,7 +224,8 @@ public class Scheduler {
       Map<String, Resource> resources,
       Map<WorkflowId, Set<String>> workflowResourceReferences,
       Map<WorkflowId, Workflow> workflows,
-      List<InstanceState> eligibleInstances) {
+      List<InstanceState> eligibleInstances,
+      AtomicLongMap<String> currentResourceDemand) {
 
     final ConcurrentMap<String, Boolean> resourceExhaustedCache = new ConcurrentHashMap<>();
 
@@ -230,7 +235,7 @@ public class Scheduler {
             instanceState -> CompletableFuture.runAsync(() ->
                 dequeueInstance(config, resources, workflowResourceReferences,
                     Optional.ofNullable(workflows.get(instanceState.workflowInstance().workflowId())),
-                    instanceState, resourceExhaustedCache), executor)));
+                    instanceState, resourceExhaustedCache, currentResourceDemand), executor)));
 
     futures.forEach((instance, future) -> {
       try {
@@ -246,19 +251,21 @@ public class Scheduler {
   }
 
   private void dequeueInstance(StyxConfig config, Map<String, Resource> resources,
-      Map<WorkflowId, Set<String>> workflowResourceReferences,
-      Optional<Workflow> workflowOpt, InstanceState instanceState,
-      ConcurrentMap<String, Boolean> resourceExhaustedCache) {
+                               Map<WorkflowId, Set<String>> workflowResourceReferences,
+                               Optional<Workflow> workflowOpt, InstanceState instanceState,
+                               ConcurrentMap<String, Boolean> resourceExhaustedCache,
+                               AtomicLongMap<String> currentResourceDemand) {
     tracer.spanBuilder("dequeueInstance").startSpanAndRun(() ->
         dequeueInstance0(config, resources, workflowResourceReferences, workflowOpt, instanceState,
-            resourceExhaustedCache));
+            resourceExhaustedCache, currentResourceDemand));
   }
 
   private void dequeueInstance0(final StyxConfig config, Map<String, Resource> resources,
-      Map<WorkflowId, Set<String>> workflowResourceReferences,
-      Optional<Workflow> workflowOpt,
-      InstanceState instanceState,
-      ConcurrentMap<String, Boolean> resourceExhaustedCache) {
+                                Map<WorkflowId, Set<String>> workflowResourceReferences,
+                                Optional<Workflow> workflowOpt,
+                                InstanceState instanceState,
+                                ConcurrentMap<String, Boolean> resourceExhaustedCache,
+                                AtomicLongMap<String> currentResourceDemand) {
 
     LOG.debug("Evaluating instance for dequeue: {}", instanceState.workflowInstance());
 
@@ -282,7 +289,7 @@ public class Scheduler {
       return;
     }
 
-    instanceResourceRefs.forEach(stats::recordResourceDemanded);
+    instanceResourceRefs.forEach(currentResourceDemand::incrementAndGet);
 
     // Check resource limits. This is racy and can give false positives but the transactional
     // checking happens later. This is just intended to avoid spinning on exhausted resources.
