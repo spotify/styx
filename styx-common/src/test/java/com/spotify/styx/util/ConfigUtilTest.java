@@ -1,14 +1,31 @@
+/*-
+ * -\-\-
+ * Spotify Styx Common
+ * --
+ * Copyright (C) 2016 - 2019 Spotify AB
+ * --
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * -/-/-
+ */
+
 package com.spotify.styx.util;
 
-import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
-import java.util.List;
 import java.util.Optional;
 import org.junit.Test;
 
@@ -17,55 +34,6 @@ public class ConfigUtilTest {
   @Test
   public void shouldNotBeInstantiable() throws ReflectiveOperationException {
     ClassEnforcer.assertNotInstantiable(ConfigUtil.class);
-  }
-
-  @Test
-  public void getWithDefaultShouldReturnValue() {
-    final Config config = ConfigFactory.parseMap(ImmutableMap.of("foo.bar", "baz"));
-    assertThat(ConfigUtil.get(config, "foo.bar", "quux"), is("baz"));
-  }
-
-  @Test
-  public void getWithDefaultShouldReturnDefault() {
-    final Config config = ConfigFactory.empty();
-    assertThat(ConfigUtil.get(config, "foo.bar", "quux"), is("quux"));
-  }
-
-  @Test
-  public void getStringShouldReturnValue() {
-    final Config config = ConfigFactory.parseMap(ImmutableMap.of("foo.bar", "baz"));
-    assertThat(ConfigUtil.getString(config, "foo.bar"), is(Optional.of("baz")));
-  }
-
-  @Test
-  public void getStringShouldReturnEmpty() {
-    final Config config = ConfigFactory.empty();
-    assertThat(ConfigUtil.getString(config, "foo.bar"), is(Optional.empty()));
-  }
-
-  @Test
-  public void getStringsShouldReturnValue() {
-    final List<String> value = ImmutableList.of("a", "b");
-    final Config config = ConfigFactory.parseMap(ImmutableMap.of("foo.bar", value));
-    assertThat(ConfigUtil.getStrings(config, "foo.bar"), is(value));
-  }
-
-  @Test
-  public void getStringsShouldReturnEmpty() {
-    final Config config = ConfigFactory.empty();
-    assertThat(ConfigUtil.getStrings(config, "foo.bar"), is(empty()));
-  }
-
-  @Test
-  public void getWithGetterShouldReturnValue() {
-    final Config config = ConfigFactory.parseMap(ImmutableMap.of("foo.bar", "baz"));
-    assertThat(ConfigUtil.get(config, config::getString, "foo.bar", "quux"), is("baz"));
-  }
-
-  @Test
-  public void getWithGetterShouldReturnDefault() {
-    final Config config = ConfigFactory.empty();
-    assertThat(ConfigUtil.get(config, config::getString, "foo.bar", "quux"), is("quux"));
   }
 
   @Test

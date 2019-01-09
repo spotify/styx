@@ -168,8 +168,8 @@ public class StyxApi implements AppInit {
   @Override
   public void create(Environment environment) {
     final Config config = environment.config();
-    final String schedulerServiceBaseUrl = get(config, SCHEDULER_SERVICE_BASE_URL, DEFAULT_SCHEDULER_SERVICE_BASE_URL);
-
+    final String schedulerServiceBaseUrl = get(config, config::getString, SCHEDULER_SERVICE_BASE_URL)
+        .orElse(DEFAULT_SCHEDULER_SERVICE_BASE_URL);
 
     final Stats stats = statsFactory.apply(environment);
     final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment, stats), stats, time);

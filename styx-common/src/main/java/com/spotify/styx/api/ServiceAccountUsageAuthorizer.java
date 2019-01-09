@@ -26,8 +26,6 @@ import static com.google.api.services.admin.directory.DirectoryScopes.ADMIN_DIRE
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.FORBIDDEN;
 import static com.spotify.styx.util.ConfigUtil.get;
-import static com.spotify.styx.util.ConfigUtil.getString;
-import static com.spotify.styx.util.ConfigUtil.getStrings;
 import static java.lang.Boolean.TRUE;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
@@ -429,12 +427,13 @@ public interface ServiceAccountUsageAuthorizer {
   }
 
   static ServiceAccountUsageAuthorizer create(Config config, String serviceName, GoogleCredential credential) {
-    return getString(config, AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)
+    return get(config, config::getString, AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)
         .map(role -> {
           final AuthorizationPolicy authorizationPolicy = AuthorizationPolicy.fromConfig(config);
           final String gsuiteUserEmail = config.getString(AUTHORIZATION_GSUITE_USER_CONFIG);
-          final String message = get(config, AUTHORIZATION_MESSAGE_CONFIG, "");
-          final List<String> administrators = getStrings(config, AUTHORIZATION_ADMINISTRATORS_CONFIG);
+          final String message = get(config, config::getString, AUTHORIZATION_MESSAGE_CONFIG).orElse("");
+          final List<String> administrators = get(config, config::getStringList, AUTHORIZATION_ADMINISTRATORS_CONFIG)
+              .orElse(Collections.emptyList());
           return ServiceAccountUsageAuthorizer.create(
               role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message, administrators);
         })
@@ -514,11 +513,11 @@ public interface ServiceAccountUsageAuthorizer {
 
     static AuthorizationPolicy fromConfig(Config config) {
       final AuthorizationPolicy authorizationPolicy;
-      if (get(config, config::getBoolean, AUTHORIZATION_REQUIRE_ALL_CONFIG, false)) {
+      if (get(config, config::getBoolean, AUTHORIZATION_REQUIRE_ALL_CONFIG).orElse(false)) {
         authorizationPolicy = new ServiceAccountUsageAuthorizer.AllAuthorizationPolicy();
       } else {
-        final List<WorkflowId> ids = get(config, config::getStringList, AUTHORIZATION_REQUIRE_WORKFLOWS,
-            Collections.<String>emptyList())
+        final List<WorkflowId> ids = get(config, config::getStringList, AUTHORIZATION_REQUIRE_WORKFLOWS)
+            .orElse(Collections.emptyList())
             .stream()
             .map(WorkflowId::parseKey)
             .collect(Collectors.toList());
