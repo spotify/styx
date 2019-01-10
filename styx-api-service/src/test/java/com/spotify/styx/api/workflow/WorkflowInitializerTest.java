@@ -90,9 +90,10 @@ public class WorkflowInitializerTest {
     when(transaction.workflow(HOURLY_WORKFLOW_WITH_VALID_OFFSET.id())).thenReturn(Optional.empty());
     workflowInitializer.store(HOURLY_WORKFLOW_WITH_VALID_OFFSET);
 
-    final Instant nextTrigger = nextInstant(NOW, Schedule.HOURS);
+    final Instant offsetNow = HOURLY_WORKFLOW_WITH_VALID_OFFSET.configuration().subtractOffset(NOW);
+    final Instant nextTrigger = nextInstant(offsetNow, Schedule.HOURS);
     final Instant nextWithOffset = HOURLY_WORKFLOW_WITH_VALID_OFFSET.configuration().addOffset(nextTrigger);
-    TriggerInstantSpec expectedTriggerInstantSpec = TriggerInstantSpec.create(nextTrigger, nextTrigger);
+    TriggerInstantSpec expectedTriggerInstantSpec = TriggerInstantSpec.create(nextTrigger, nextWithOffset);
 
     verify(transaction, never()).store(any(Workflow.class));
     verify(transaction, never()).updateNextNaturalTrigger(any(), any());
