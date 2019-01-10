@@ -24,6 +24,7 @@ import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.model.Schedule.MONTHS;
 import static com.spotify.styx.model.Schedule.WEEKS;
+import static com.spotify.styx.model.Schedule.YEARS;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -117,6 +118,14 @@ public final class TestData {
           .commitSha(VALID_SHA)
           .dockerImage("busybox")
           .schedule(MONTHS)
+          .build();
+
+  public static final WorkflowConfiguration YEARLY_WORKFLOW_CONFIGURATION =
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .dockerImage("busybox")
+          .schedule(YEARS)
           .build();
 
   public static final WorkflowConfiguration FULL_WORKFLOW_CONFIGURATION =
