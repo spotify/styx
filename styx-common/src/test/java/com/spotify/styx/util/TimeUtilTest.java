@@ -473,4 +473,9 @@ public class TimeUtilTest {
 
     offsetInstant(parse("2016-01-19T09:10:00.00Z"), Schedule.HOURS, 0);
   }
+
+  @Test
+  public void shouldNotBeInstantiable() throws ReflectiveOperationException {
+    ClassEnforcer.assertNotInstantiable(TimeUtil.class);
+  }
 }
