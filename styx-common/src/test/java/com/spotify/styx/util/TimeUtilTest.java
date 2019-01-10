@@ -485,6 +485,6 @@ public class TimeUtilTest {
 
   @Test
   public void shouldNotBeInstantiable() throws ReflectiveOperationException {
-    ClassEnforcer.assertNotInstantiable(TimeUtil.class);
+    assertThat(ClassEnforcer.assertNotInstantiable(TimeUtil.class), is(true));
   }
 }
