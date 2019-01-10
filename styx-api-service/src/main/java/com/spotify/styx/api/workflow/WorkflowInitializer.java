@@ -21,7 +21,6 @@
 package com.spotify.styx.api.workflow;
 
 import static com.spotify.styx.util.TimeUtil.lastInstant;
-import static com.spotify.styx.util.TimeUtil.nextInstant;
 
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
