@@ -336,7 +336,7 @@ public final class MetricsStats implements Stats {
 
   @Override
   public void recordResourceDemanded(String resource, long demanded) {
-    resourceDemandedMeter(resource).update(demanded);
+    resourceDemandedHistogram(resource).update(demanded);
   }
 
   @Override
@@ -456,7 +456,7 @@ public final class MetricsStats implements Stats {
         resource, (op) -> registry.getOrAdd(RESOURCE_USED.tagged("resource", resource), HISTOGRAM));
   }
 
-  private Histogram resourceDemandedMeter(String resource) {
+  private Histogram resourceDemandedHistogram(String resource) {
     return resourceDemandedMeters.computeIfAbsent(
         resource, (op) -> registry.getOrAdd(RESOURCE_DEMANDED.tagged("resource", resource), HISTOGRAM));
   }
