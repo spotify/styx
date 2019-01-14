@@ -22,6 +22,7 @@ package com.spotify.styx.util;
 
 import static java.lang.String.format;
 
+import com.google.common.base.Preconditions;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import java.time.Duration;
@@ -46,9 +47,20 @@ public class WorkflowValidator {
   static final long MIN_RUNNING_TIMEOUT_SECONDS = 60;
 
   private final DockerImageValidator dockerImageValidator;
+  private final Duration maxRunningTimeout;
 
-  public WorkflowValidator(DockerImageValidator dockerImageValidator) {
+  private WorkflowValidator(DockerImageValidator dockerImageValidator, Duration maxRunningTimeout) {
+    Preconditions.checkArgument(maxRunningTimeout == null || !maxRunningTimeout.isNegative(), "Max Running timeout should be positive");
     this.dockerImageValidator = dockerImageValidator;
+    this.maxRunningTimeout = maxRunningTimeout;
+  }
+
+  public static WorkflowValidator createWithRunningTimeoutLimit(DockerImageValidator dockerImageValidator, Duration maxRunningTimeout) {
+    return new WorkflowValidator(dockerImageValidator, maxRunningTimeout);
+  }
+
+  public static WorkflowValidator create(DockerImageValidator dockerImageValidator) {
+    return new WorkflowValidator(dockerImageValidator, null);
   }
 
   public List<String> validateWorkflow(Workflow workflow) {
@@ -104,19 +116,28 @@ public class WorkflowValidator {
       e.add("invalid schedule");
     }
 
-    // TODO: validate runningTimeout value? Not trivial due to ttls are configured only for scheduler not api.
     lowerLimit(e, cfg.runningTimeout().map(Duration::getSeconds),
         MIN_RUNNING_TIMEOUT_SECONDS, "running timeout is too small");
+
+    if (maxRunningTimeout != null) {
+      upperLimit(e, cfg.runningTimeout(), maxRunningTimeout, "running timeout is too big");
+    }
 
     return e;
   }
 
-  private void upperLimit(List<String> errors, Optional<Long> value, long limit, String message) {
+  private void upperLimit(List<String> errors, long value, long limit, String message) {
+    if (value > limit) {
+      errors.add(message + ": " + value + ", limit = " + limit);
+    }
+  }
+
+  private <T extends Comparable<T>>  void upperLimit(List<String> errors, Optional<T> value, T limit, String message) {
     value.ifPresent(v -> upperLimit(errors, v, limit, message));
   }
 
-  private void upperLimit(List<String> errors, long value, long limit, String message) {
-    if (value > limit) {
+  private <T extends Comparable<T>>  void upperLimit(List<String> errors, T value, T limit, String message) {
+    if (value.compareTo(limit) > 0) {
       errors.add(message + ": " + value + ", limit = " + limit);
     }
   }

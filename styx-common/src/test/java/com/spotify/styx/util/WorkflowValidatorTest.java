@@ -66,6 +66,7 @@ import org.mockito.MockitoAnnotations;
 public class WorkflowValidatorTest {
 
   @Mock DockerImageValidator dockerImageValidator;
+  private static final Duration MAX_RUNTIME_TIMEOUT = Duration.ofHours(24);
 
   private WorkflowValidator sut;
 
@@ -73,7 +74,7 @@ public class WorkflowValidatorTest {
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
     when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Collections.emptyList());
-    sut = new WorkflowValidator(dockerImageValidator);
+    sut = WorkflowValidator.createWithRunningTimeoutLimit(dockerImageValidator, MAX_RUNTIME_TIMEOUT);
   }
 
   @Test
@@ -167,7 +168,33 @@ public class WorkflowValidatorTest {
     assertThat(errors, containsInAnyOrder(expectedErrors.toArray()));
   }
 
-  private String limit(String msg, long value, long limit) {
+  @Test
+  public void validateRunningTimeoutUpperBoundIsEnforced() {
+    final Duration timeout = Duration.ofDays(5);
+
+    final List<String> errors = sut.validateWorkflowConfiguration(
+            WorkflowConfigurationBuilder.from(TestData.FULL_WORKFLOW_CONFIGURATION)
+                    .runningTimeout(timeout)
+                    .build());
+
+    assertThat(errors, contains(limit("running timeout is too big", timeout, MAX_RUNTIME_TIMEOUT)));
+  }
+
+  @Test
+  public void shouldSkipRunningTimeoutUpperBoundValidation() {
+    final Duration timeout = Duration.ofDays(5);
+    sut = WorkflowValidator.create(dockerImageValidator);
+
+    final List<String> errors = sut.validateWorkflowConfiguration(
+            WorkflowConfigurationBuilder.from(TestData.FULL_WORKFLOW_CONFIGURATION)
+                    .runningTimeout(timeout)
+                    .build());
+
+    assertThat(errors, empty());
+  }
+
+
+  private String limit(String msg, Object value, Object limit) {
     return msg + ": " + value + ", limit = " + limit;
   }
 }
