@@ -379,6 +379,10 @@ public class StyxScheduler implements AppInit {
 
     final RateLimiter dequeueRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
 
+    Duration runningStateTtl = timeoutConfig.ttlOf(State.RUNNING);
+    WorkflowValidator workflowValidator = WorkflowValidator.create(new DockerImageValidator())
+        .withMaxRunningTimeoutLimit(runningStateTtl);
+
     outputHandlers.addAll(ImmutableList.of(
         new TransitionLogger(""),
         new DockerRunnerHandler(
@@ -386,7 +390,7 @@ public class StyxScheduler implements AppInit {
         new TerminationHandler(retryUtil, stateManager),
         new MonitoringHandler(stats),
         new PublisherHandler(publisher, stats),
-        new ExecutionDescriptionHandler(storage, stateManager, new WorkflowValidator(new DockerImageValidator()))));
+        new ExecutionDescriptionHandler(storage, stateManager, workflowValidator)));
 
     final TriggerListener trigger =
         new StateInitializingTrigger(stateManager);
@@ -419,8 +423,7 @@ public class StyxScheduler implements AppInit {
     setupMetrics(queuedStateManager, workflowCache, storage, dequeueRateLimiter, stats, time);
 
     final SchedulerResource schedulerResource =
-        new SchedulerResource(stateManager, trigger, storage, time,
-            new WorkflowValidator(new DockerImageValidator()));
+        new SchedulerResource(stateManager, trigger, storage, time, workflowValidator);
 
     final RequestAuthenticator requestAuthenticator = new RequestAuthenticator(
         authenticatorFactory.apply(AuthenticatorConfiguration.fromConfig(config, serviceName)));

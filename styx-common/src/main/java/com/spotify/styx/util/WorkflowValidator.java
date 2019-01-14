@@ -22,6 +22,7 @@ package com.spotify.styx.util;
 
 import static java.lang.String.format;
 
+import com.google.common.base.Preconditions;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import java.time.Duration;
@@ -29,26 +30,37 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 public class WorkflowValidator {
 
-  static final long MAX_ID_LENGTH = 256;
-  static final long MAX_DOCKER_ARGS_TOTAL = 1000000;
-  static final long MAX_RESOURCES = 5;
-  static final long MAX_RESOURCE_LENGTH = 256;
-  static final long MAX_COMMIT_SHA_LENGTH = 256;
-  static final long MAX_SECRET_NAME_LENGTH = 253;
-  static final long MAX_SECRET_MOUNT_PATH_LENGTH = 1024;
-  static final long MAX_SERVICE_ACCOUNT_LENGTH = 256;
-  static final long MAX_ENV_VARS = 128;
-  static final long MAX_ENV_SIZE = 16 * 1024;
-  static final long MIN_RUNNING_TIMEOUT_SECONDS = 60;
+  static final int MAX_ID_LENGTH = 256;
+  static final int MAX_DOCKER_ARGS_TOTAL = 1000000;
+  static final int MAX_RESOURCES = 5;
+  static final int MAX_RESOURCE_LENGTH = 256;
+  static final int MAX_COMMIT_SHA_LENGTH = 256;
+  static final int MAX_SECRET_NAME_LENGTH = 253;
+  static final int MAX_SECRET_MOUNT_PATH_LENGTH = 1024;
+  static final int MAX_SERVICE_ACCOUNT_LENGTH = 256;
+  static final int MAX_ENV_VARS = 128;
+  static final int MAX_ENV_SIZE = 16 * 1024;
+  static final Duration MIN_RUNNING_TIMEOUT = Duration.ofMinutes(1);
 
   private final DockerImageValidator dockerImageValidator;
+  private final Duration maybeMaxRunningTimeout;
 
-  public WorkflowValidator(DockerImageValidator dockerImageValidator) {
+  private WorkflowValidator(DockerImageValidator dockerImageValidator, Duration maybeMaxRunningTimeout) {
+    Preconditions.checkArgument(maybeMaxRunningTimeout == null || !maybeMaxRunningTimeout.isNegative(),
+        "Max Running timeout should be positive");
     this.dockerImageValidator = dockerImageValidator;
+    this.maybeMaxRunningTimeout = maybeMaxRunningTimeout;
+  }
+
+  public static WorkflowValidator create(DockerImageValidator dockerImageValidator) {
+    return new WorkflowValidator(dockerImageValidator, null);
+  }
+
+  public WorkflowValidator withMaxRunningTimeoutLimit(Duration maxRunningTimeout) {
+    return new WorkflowValidator(this.dockerImageValidator, maxRunningTimeout);
   }
 
   public List<String> validateWorkflow(Workflow workflow) {
@@ -76,7 +88,7 @@ public class WorkflowValidator {
     upperLimit(e, cfg.env().size(),
         MAX_ENV_VARS, "too many env vars");
     upperLimit(e, cfg.env().entrySet().stream()
-            .mapToLong(entry -> entry.getKey().length() + entry.getValue().length()).sum(),
+            .mapToInt(entry -> entry.getKey().length() + entry.getValue().length()).sum(),
         MAX_ENV_SIZE, "env too big");
 
     cfg.dockerImage().ifPresent(image ->
@@ -87,8 +99,10 @@ public class WorkflowValidator {
     cfg.resources().stream().map(String::length).forEach(v ->
         upperLimit(e, v, MAX_RESOURCE_LENGTH, "resource name too long"));
 
-    upperLimit(e, cfg.dockerArgs().map(args -> args.size() + args.stream().mapToLong(String::length).sum()),
-        MAX_DOCKER_ARGS_TOTAL, "docker args is too large");
+    cfg.dockerArgs().ifPresent(args -> {
+      final int dockerArgs = args.size() + args.stream().mapToInt(String::length).sum();
+      upperLimit(e, dockerArgs, MAX_DOCKER_ARGS_TOTAL, "docker args is too large");
+    });
 
     cfg.offset().ifPresent(offset -> {
       try {
@@ -104,29 +118,26 @@ public class WorkflowValidator {
       e.add("invalid schedule");
     }
 
-    // TODO: validate runningTimeout value? Not trivial due to ttls are configured only for scheduler not api.
-    lowerLimit(e, cfg.runningTimeout().map(Duration::getSeconds),
-        MIN_RUNNING_TIMEOUT_SECONDS, "running timeout is too small");
+    cfg.runningTimeout().ifPresent(timeout -> {
+      lowerLimit(e, timeout, MIN_RUNNING_TIMEOUT, "running timeout is too small");
+      if (maybeMaxRunningTimeout != null) {
+        upperLimit(e, timeout, maybeMaxRunningTimeout, "running timeout is too big");
+      }
+    });
 
     return e;
   }
 
-  private void upperLimit(List<String> errors, Optional<Long> value, long limit, String message) {
-    value.ifPresent(v -> upperLimit(errors, v, limit, message));
+  private <T extends Comparable<T>> void lowerLimit(List<String> errors, T value, T limit, String message) {
+    limit(errors,value.compareTo(limit) < 0, value, limit, message);
   }
 
-  private void upperLimit(List<String> errors, long value, long limit, String message) {
-    if (value > limit) {
-      errors.add(message + ": " + value + ", limit = " + limit);
-    }
+  private <T extends Comparable<T>> void upperLimit(List<String> errors, T value, T limit, String message) {
+    limit(errors,value.compareTo(limit) > 0, value, limit, message);
   }
 
-  private void lowerLimit(List<String> errors, Optional<Long> value, long limit, String message) {
-    value.ifPresent(v -> lowerLimit(errors, v, limit, message));
-  }
-
-  private void lowerLimit(List<String> errors, long value, long limit, String message) {
-    if (value < limit) {
+  private <T extends Comparable<T>> void limit(List<String> errors, boolean isError, T value, T limit, String message) {
+    if (isError) {
       errors.add(message + ": " + value + ", limit = " + limit);
     }
   }

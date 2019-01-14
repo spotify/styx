@@ -29,7 +29,7 @@ import static com.spotify.styx.util.WorkflowValidator.MAX_RESOURCE_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_SECRET_MOUNT_PATH_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_SECRET_NAME_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_SERVICE_ACCOUNT_LENGTH;
-import static com.spotify.styx.util.WorkflowValidator.MIN_RUNNING_TIMEOUT_SECONDS;
+import static com.spotify.styx.util.WorkflowValidator.MIN_RUNNING_TIMEOUT;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static org.hamcrest.Matchers.contains;
@@ -39,7 +39,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
-import static org.mockito.Matchers.anyString;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 import com.google.common.base.Strings;
@@ -65,7 +65,14 @@ import org.mockito.MockitoAnnotations;
 @RunWith(JUnitParamsRunner.class)
 public class WorkflowValidatorTest {
 
-  @Mock DockerImageValidator dockerImageValidator;
+  private static final Duration EXCESSIVE_TIMEOUT = Duration.ofDays(365);
+  private static final WorkflowConfiguration CONFIGURATION_WITH_EXCESSIVE_RUNTIME_TIMEOUT =
+      WorkflowConfigurationBuilder.from(TestData.FULL_WORKFLOW_CONFIGURATION)
+          .runningTimeout(EXCESSIVE_TIMEOUT)
+          .build();
+
+  @Mock
+  private DockerImageValidator dockerImageValidator;
 
   private WorkflowValidator sut;
 
@@ -73,7 +80,7 @@ public class WorkflowValidatorTest {
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
     when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Collections.emptyList());
-    sut = new WorkflowValidator(dockerImageValidator);
+    sut = WorkflowValidator.create(dockerImageValidator);
   }
 
   @Test
@@ -161,13 +168,32 @@ public class WorkflowValidatorTest {
         .add("invalid offset: Text cannot be parsed to a Period")
         .add(limit("too many env vars", env.size(), MAX_ENV_VARS))
         .add(limit("env too big", envSize, MAX_ENV_SIZE))
-        .add(limit("running timeout is too small", runningTimeout.getSeconds(), MIN_RUNNING_TIMEOUT_SECONDS))
+        .add(limit("running timeout is too small", runningTimeout, MIN_RUNNING_TIMEOUT))
         .build();
 
     assertThat(errors, containsInAnyOrder(expectedErrors.toArray()));
   }
 
-  private String limit(String msg, long value, long limit) {
+  @Test
+  public void shouldSkipMaxRunningTimeoutValidationByDefault() {
+    final List<String> errors = sut.validateWorkflowConfiguration(CONFIGURATION_WITH_EXCESSIVE_RUNTIME_TIMEOUT);
+
+    assertThat(errors, empty());
+  }
+
+  @Test
+  public void shouldEnforceMaxRunningTimeoutLimitWhenSpecified() {
+    final Duration maxRunningTimeout = Duration.ofHours(24);
+    WorkflowValidator sut = WorkflowValidator.create(dockerImageValidator)
+        .withMaxRunningTimeoutLimit(maxRunningTimeout);
+
+    final List<String> errors = sut.validateWorkflowConfiguration(CONFIGURATION_WITH_EXCESSIVE_RUNTIME_TIMEOUT);
+
+    assertThat(errors, contains(limit("running timeout is too big", EXCESSIVE_TIMEOUT, maxRunningTimeout)));
+  }
+
+
+  private String limit(String msg, Object value, Object limit) {
     return msg + ": " + value + ", limit = " + limit;
   }
 }
