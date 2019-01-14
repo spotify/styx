@@ -15,7 +15,7 @@
 
   <properties>
     <apollo.version>1.3.2</apollo.version>
-    <jackson.version>2.9.7</jackson.version>
+    <jackson.version>2.9.8</jackson.version>
     <checkstyle.config.location>checkstyle.xml</checkstyle.config.location>
     <checkstyle.version>2.17</checkstyle.version>
     <semantic-metrics.version>0.11.5</semantic-metrics.version>
