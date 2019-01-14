@@ -240,9 +240,9 @@ public class MetricsStatsTest {
   @Test
   public void shouldRecordResourceDemanded() {
     String resource = "resource";
-    when(registry.meter(RESOURCE_DEMANDED.tagged("resource", resource))).thenReturn(meter);
-    stats.recordResourceDemanded(resource);
-    verify(meter).mark();
+    when(registry.getOrAdd(RESOURCE_DEMANDED.tagged("resource", resource), HISTOGRAM)).thenReturn(histogram);
+    stats.recordResourceDemanded(resource, 17);
+    verify(histogram).update(17L);
   }
 
   @Test

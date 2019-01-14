@@ -114,7 +114,7 @@ final class NoopStats implements Stats {
   }
 
   @Override
-  public void recordResourceDemanded(String resource) {
+  public void recordResourceDemanded(String resource, long demanded) {
     // nop
   }
 
