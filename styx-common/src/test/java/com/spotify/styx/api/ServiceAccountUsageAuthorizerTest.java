@@ -61,7 +61,6 @@ import com.google.common.collect.ImmutableMap;
 import com.spotify.apollo.Response;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.AllAuthorizationPolicy;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.AuthorizationPolicy;
-import com.spotify.styx.api.ServiceAccountUsageAuthorizer.NoAuthorizationPolicy;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.WhitelistAuthorizationPolicy;
 import com.spotify.styx.model.WorkflowId;
 import com.typesafe.config.Config;
@@ -441,12 +440,6 @@ public class ServiceAccountUsageAuthorizerTest {
   }
 
   @Test
-  public void noAuthorizationPolicyShouldNotEnforce() {
-    final AuthorizationPolicy policy = new NoAuthorizationPolicy();
-    assertThat(policy.shouldEnforceAuthorization(WORKFLOW_ID, SERVICE_ACCOUNT, idToken), is(false));
-  }
-
-  @Test
   public void allAuthorizationPolicyShouldEnforce() {
     final AuthorizationPolicy policy = new AllAuthorizationPolicy();
     assertThat(policy.shouldEnforceAuthorization(WORKFLOW_ID, SERVICE_ACCOUNT, idToken), is(true));
@@ -492,13 +485,6 @@ public class ServiceAccountUsageAuthorizerTest {
     final AuthorizationPolicy policy = AuthorizationPolicy.fromConfig(config);
     assertThat(policy, is(instanceOf(ServiceAccountUsageAuthorizer.WhitelistAuthorizationPolicy.class)));
   }
-
-  @Test
-  public void shouldCreateNoAuthorizationPolicy() {
-    final AuthorizationPolicy policy = AuthorizationPolicy.fromConfig(ConfigFactory.empty());
-    assertThat(policy, is(instanceOf(ServiceAccountUsageAuthorizer.NoAuthorizationPolicy.class)));
-  }
-
 
   private void assertCachedSuccess(Runnable r) {
     r.run();

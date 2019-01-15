@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.util.ConfigUtil.get;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
@@ -167,9 +168,8 @@ public class StyxApi implements AppInit {
   @Override
   public void create(Environment environment) {
     final Config config = environment.config();
-    final String schedulerServiceBaseUrl = config.hasPath(SCHEDULER_SERVICE_BASE_URL)
-                                           ? config.getString(SCHEDULER_SERVICE_BASE_URL)
-                                           : DEFAULT_SCHEDULER_SERVICE_BASE_URL;
+    final String schedulerServiceBaseUrl = get(config, config::getString, SCHEDULER_SERVICE_BASE_URL)
+        .orElse(DEFAULT_SCHEDULER_SERVICE_BASE_URL);
 
     final Stats stats = statsFactory.apply(environment);
     final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment, stats), stats, time);
