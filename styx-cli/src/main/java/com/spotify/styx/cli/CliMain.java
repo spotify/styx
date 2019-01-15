@@ -1094,7 +1094,7 @@ public final class CliMain {
 
       @Override
       public WorkflowValidator workflowValidator() {
-        return WorkflowValidator.create(new DockerImageValidator());
+        return WorkflowValidator.newBuilder(new DockerImageValidator()).build();
       }
     };
   }

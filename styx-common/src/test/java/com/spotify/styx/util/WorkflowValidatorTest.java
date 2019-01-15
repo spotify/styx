@@ -80,7 +80,7 @@ public class WorkflowValidatorTest {
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
     when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Collections.emptyList());
-    sut = WorkflowValidator.create(dockerImageValidator);
+    sut = WorkflowValidator.newBuilder(dockerImageValidator).build();
   }
 
   @Test
@@ -184,8 +184,9 @@ public class WorkflowValidatorTest {
   @Test
   public void shouldEnforceMaxRunningTimeoutLimitWhenSpecified() {
     final Duration maxRunningTimeout = Duration.ofHours(24);
-    WorkflowValidator sut = WorkflowValidator.create(dockerImageValidator)
-        .withMaxRunningTimeoutLimit(maxRunningTimeout);
+    WorkflowValidator sut = WorkflowValidator.newBuilder(dockerImageValidator)
+        .withMaxRunningTimeoutLimit(maxRunningTimeout)
+        .build();
 
     final List<String> errors = sut.validateWorkflowConfiguration(CONFIGURATION_WITH_EXCESSIVE_RUNTIME_TIMEOUT);
 

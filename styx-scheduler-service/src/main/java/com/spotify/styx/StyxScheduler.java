@@ -380,8 +380,9 @@ public class StyxScheduler implements AppInit {
     final RateLimiter dequeueRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
 
     Duration runningStateTtl = timeoutConfig.ttlOf(State.RUNNING);
-    WorkflowValidator workflowValidator = WorkflowValidator.create(new DockerImageValidator())
-        .withMaxRunningTimeoutLimit(runningStateTtl);
+    WorkflowValidator workflowValidator = WorkflowValidator.newBuilder(new DockerImageValidator())
+        .withMaxRunningTimeoutLimit(runningStateTtl)
+        .build();
 
     outputHandlers.addAll(ImmutableList.of(
         new TransitionLogger(""),

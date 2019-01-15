@@ -197,8 +197,9 @@ public class StyxApi implements AppInit {
     final ServiceAccountUsageAuthorizer authorizer =
         serviceAccountUsageAuthorizer(config, credential, serviceName);
 
-    WorkflowValidator workflowValidator = WorkflowValidator.create(new DockerImageValidator())
-        .withMaxRunningTimeoutLimit(runningStateTtl);
+    WorkflowValidator workflowValidator = WorkflowValidator.newBuilder(new DockerImageValidator())
+        .withMaxRunningTimeoutLimit(runningStateTtl)
+        .build();
     final WorkflowResource workflowResource = new WorkflowResource(storage, workflowValidator,
             new WorkflowInitializer(storage, time), workflowConsumer, authorizer);
 

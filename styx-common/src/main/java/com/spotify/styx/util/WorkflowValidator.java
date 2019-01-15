@@ -55,12 +55,8 @@ public class WorkflowValidator {
     this.maybeMaxRunningTimeout = maybeMaxRunningTimeout;
   }
 
-  public static WorkflowValidator create(DockerImageValidator dockerImageValidator) {
-    return new WorkflowValidator(dockerImageValidator, null);
-  }
-
-  public WorkflowValidator withMaxRunningTimeoutLimit(Duration maxRunningTimeout) {
-    return new WorkflowValidator(this.dockerImageValidator, maxRunningTimeout);
+  public static Builder newBuilder(DockerImageValidator dockerImageValidator) {
+    return new Builder(dockerImageValidator);
   }
 
   public List<String> validateWorkflow(Workflow workflow) {
@@ -139,6 +135,24 @@ public class WorkflowValidator {
   private <T extends Comparable<T>> void limit(List<String> errors, boolean isError, T value, T limit, String message) {
     if (isError) {
       errors.add(message + ": " + value + ", limit = " + limit);
+    }
+  }
+
+  public static class Builder {
+    private final DockerImageValidator dockerImageValidator;
+    private Duration maxRunningTimeout;
+
+    public Builder(DockerImageValidator dockerImageValidator) {
+      this.dockerImageValidator = dockerImageValidator;
+    }
+
+    public Builder withMaxRunningTimeoutLimit(Duration maxRunningTimeout) {
+      this.maxRunningTimeout = maxRunningTimeout;
+      return this;
+    }
+
+    public WorkflowValidator build() {
+      return new WorkflowValidator(dockerImageValidator, maxRunningTimeout);
     }
   }
 }
