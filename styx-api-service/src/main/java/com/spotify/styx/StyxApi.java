@@ -83,15 +83,18 @@ public class StyxApi implements AppInit {
 
   public static final String SERVICE_NAME = "styx-api";
 
-  public static final String SCHEDULER_SERVICE_BASE_URL = "styx.scheduler.base-url";
-  public static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
+  static final String SCHEDULER_SERVICE_BASE_URL = "styx.scheduler.base-url";
+  static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
-  public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
-  public static final String AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG = "styx.authorization.service-account-user-role";
-  public static final String AUTHORIZATION_GSUITE_USER_CONFIG = "styx.authorization.gsuite-user";
-  public static final String AUTHORIZATION_REQUIRE_ALL_CONFIG = "styx.authorization.require.all";
-  public static final String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorization.require.workflows";
-  public static final String AUTHORIZATION_MESSAGE_CONFIG = "styx.authorization.message";
+  static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
+  static final String AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG = "styx.authorization.service-account-user-role";
+  static final String AUTHORIZATION_GSUITE_USER_CONFIG = "styx.authorization.gsuite-user";
+  static final String AUTHORIZATION_REQUIRE_ALL_CONFIG = "styx.authorization.require.all";
+  static final String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorization.require.workflows";
+  static final String AUTHORIZATION_MESSAGE_CONFIG = "styx.authorization.message";
+
+  static final String STYX_RUNNING_STATE_TTL_CONFIG = "styx.stale-state-ttls.running";
+  static final String DEFAULT_STYX_RUNNING_STATE_TTL = "PT24H";
 
   private final String serviceName;
   private final StorageFactory storageFactory;
@@ -99,6 +102,7 @@ public class StyxApi implements AppInit {
   private final StatsFactory statsFactory;
   private final AuthenticatorFactory authenticatorFactory;
   private final Time time;
+  private final GoogleCredential credential;
 
   public interface WorkflowConsumerFactory
       extends BiFunction<Environment, Stats, BiConsumer<Optional<Workflow>, Optional<Workflow>>> { }
@@ -111,6 +115,7 @@ public class StyxApi implements AppInit {
     private StatsFactory statsFactory = StyxApi::stats;
     private AuthenticatorFactory authenticatorFactory = AuthenticatorFactory.DEFAULT;
     private Time time = Instant::now;
+    private GoogleCredential credential;
 
     public Builder setServiceName(String serviceName) {
       this.serviceName = serviceName;
@@ -143,6 +148,11 @@ public class StyxApi implements AppInit {
       return this;
     }
 
+    public Builder setCredential(GoogleCredential credential) {
+      this.credential = credential;
+      return this;
+    }
+
     public StyxApi build() {
       return new StyxApi(this);
     }
@@ -163,14 +173,15 @@ public class StyxApi implements AppInit {
     this.statsFactory = requireNonNull(builder.statsFactory);
     this.authenticatorFactory = requireNonNull(builder.authenticatorFactory);
     this.time = requireNonNull(builder.time);
+    this.credential = (builder.credential != null) ? builder.credential : defaultCredential();
   }
 
   @Override
   public void create(Environment environment) {
     final Config config = environment.config();
-    final String schedulerServiceBaseUrl = config.hasPath(SCHEDULER_SERVICE_BASE_URL)
-                                           ? config.getString(SCHEDULER_SERVICE_BASE_URL)
-                                           : DEFAULT_SCHEDULER_SERVICE_BASE_URL;
+    final String schedulerServiceBaseUrl = getConfigWithDefault(config, SCHEDULER_SERVICE_BASE_URL, DEFAULT_SCHEDULER_SERVICE_BASE_URL);
+    final Duration runningStateTtl = Duration.parse(
+            getConfigWithDefault(config, STYX_RUNNING_STATE_TTL_CONFIG, DEFAULT_STYX_RUNNING_STATE_TTL));
 
     final Stats stats = statsFactory.apply(environment);
     final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment, stats), stats, time);
@@ -184,17 +195,16 @@ public class StyxApi implements AppInit {
     // in later Apollo version.
 
     final ServiceAccountUsageAuthorizer authorizer =
-        serviceAccountUsageAuthorizer(config, defaultCredential(), serviceName);
+        serviceAccountUsageAuthorizer(config, credential, serviceName);
 
-    final WorkflowResource workflowResource = new WorkflowResource(storage,
-        new WorkflowValidator(new DockerImageValidator()),
-        new WorkflowInitializer(storage, time),
-        workflowConsumer, authorizer);
+    WorkflowValidator workflowValidator = WorkflowValidator.newBuilder(new DockerImageValidator())
+        .withMaxRunningTimeoutLimit(runningStateTtl)
+        .build();
+    final WorkflowResource workflowResource = new WorkflowResource(storage, workflowValidator,
+            new WorkflowInitializer(storage, time), workflowConsumer, authorizer);
 
-    final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
-        storage,
-        new WorkflowValidator(new DockerImageValidator()),
-        time);
+    final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl, storage,
+            workflowValidator, time);
     environment.closer().register(backfillResource);
 
     final ResourceResource resourceResource = new ResourceResource(storage);
@@ -224,6 +234,10 @@ public class StyxApi implements AppInit {
             requestAuthenticator, serviceName));
   }
 
+  private static String getConfigWithDefault(Config config, String key, String defaultValue) {
+    return config.hasPath(key) ? config.getString(key) : defaultValue;
+  }
+
   @VisibleForTesting
   static ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer(Config config,
                                                                      GoogleCredential credential,
@@ -235,9 +249,7 @@ public class StyxApi implements AppInit {
     if (config.hasPath(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)) {
       final String role = config.getString(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG);
       final String gsuiteUserEmail = config.getString(AUTHORIZATION_GSUITE_USER_CONFIG);
-      final String message = config.hasPath(AUTHORIZATION_MESSAGE_CONFIG)
-                             ? config.getString(AUTHORIZATION_MESSAGE_CONFIG)
-                             : "";
+      final String message = getConfigWithDefault(config, AUTHORIZATION_MESSAGE_CONFIG, "");
       authorizer = ServiceAccountUsageAuthorizer.create(
           role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message);
     } else {
