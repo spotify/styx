@@ -21,7 +21,6 @@
 package com.spotify.styx;
 
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
-import static com.spotify.hamcrest.future.CompletableFutureMatchers.stageWillCompleteWithValueThat;
 import static com.spotify.styx.StyxApi.AUTHORIZATION_GSUITE_USER_CONFIG;
 import static com.spotify.styx.StyxApi.AUTHORIZATION_REQUIRE_ALL_CONFIG;
 import static com.spotify.styx.StyxApi.AUTHORIZATION_REQUIRE_WORKFLOWS;
@@ -47,7 +46,6 @@ import com.spotify.styx.storage.Storage;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import java.security.PrivateKey;
-import java.util.concurrent.CompletionStage;
 import okio.ByteString;
 import org.junit.Before;
 import org.junit.Test;
@@ -124,9 +122,11 @@ public class StyxApiTest {
                                       .startTimeoutSeconds(30);
     serviceHelper.start();
 
-    CompletionStage<Response<ByteString>> response = serviceHelper.serviceClient().send(Request.forUri("/ping"));
+    Response<ByteString> response = serviceHelper.serviceClient().send(Request.forUri("/ping"))
+        .toCompletableFuture()
+        .get();
 
-    assertThat(response, stageWillCompleteWithValueThat(hasStatus(equalTo(Status.OK))));
+    assertThat(response, hasStatus(equalTo(Status.OK)));
 
     serviceHelper.close();
   }
