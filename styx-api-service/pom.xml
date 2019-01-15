@@ -120,5 +120,10 @@
       <artifactId>JUnitParams</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>hamcrest-future</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>

@@ -102,6 +102,7 @@ public class StyxApi implements AppInit {
   private final StatsFactory statsFactory;
   private final AuthenticatorFactory authenticatorFactory;
   private final Time time;
+  private final GoogleCredential credential;
 
   public interface WorkflowConsumerFactory
       extends BiFunction<Environment, Stats, BiConsumer<Optional<Workflow>, Optional<Workflow>>> { }
@@ -114,6 +115,7 @@ public class StyxApi implements AppInit {
     private StatsFactory statsFactory = StyxApi::stats;
     private AuthenticatorFactory authenticatorFactory = AuthenticatorFactory.DEFAULT;
     private Time time = Instant::now;
+    private GoogleCredential credential;
 
     public Builder setServiceName(String serviceName) {
       this.serviceName = serviceName;
@@ -146,6 +148,11 @@ public class StyxApi implements AppInit {
       return this;
     }
 
+    public Builder setCredential(GoogleCredential credential) {
+      this.credential = credential;
+      return this;
+    }
+
     public StyxApi build() {
       return new StyxApi(this);
     }
@@ -166,6 +173,7 @@ public class StyxApi implements AppInit {
     this.statsFactory = requireNonNull(builder.statsFactory);
     this.authenticatorFactory = requireNonNull(builder.authenticatorFactory);
     this.time = requireNonNull(builder.time);
+    this.credential = (builder.credential != null) ? builder.credential : defaultCredential();
   }
 
   @Override
@@ -187,7 +195,7 @@ public class StyxApi implements AppInit {
     // in later Apollo version.
 
     final ServiceAccountUsageAuthorizer authorizer =
-        serviceAccountUsageAuthorizer(config, defaultCredential(), serviceName);
+        serviceAccountUsageAuthorizer(config, credential, serviceName);
 
     WorkflowValidator workflowValidator = WorkflowValidator.create(new DockerImageValidator())
         .withMaxRunningTimeoutLimit(runningStateTtl);
