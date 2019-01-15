@@ -93,7 +93,7 @@ public class StyxApi implements AppInit {
   static final String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorization.require.workflows";
   static final String AUTHORIZATION_MESSAGE_CONFIG = "styx.authorization.message";
 
-  static final String STYX_RUNNING_STATE_TTL_CONFIG = "styx.running-state-ttl";
+  static final String STYX_RUNNING_STATE_TTL_CONFIG = "styx.stale-state-ttls.running";
   static final String DEFAULT_STYX_RUNNING_STATE_TTL = "PT24H";
 
   private final String serviceName;
