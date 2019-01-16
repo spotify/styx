@@ -24,7 +24,6 @@ import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
 
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.cloud.datastore.Datastore;
 import com.google.common.collect.Streams;
 import com.google.common.io.Closer;
@@ -68,7 +67,6 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
-import javaslang.control.Try;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 
@@ -249,9 +247,5 @@ public class StyxApi implements AppInit {
 
   private static Stats stats(Environment environment) {
     return new MetricsStats(environment.resolve(SemanticMetricRegistry.class), Instant::now);
-  }
-
-  private static GoogleCredential defaultCredential() {
-    return Try.of(GoogleCredential::getApplicationDefault).get();
   }
 }
