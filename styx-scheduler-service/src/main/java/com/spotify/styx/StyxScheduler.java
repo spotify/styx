@@ -23,6 +23,7 @@ package com.spotify.styx;
 import static com.spotify.apollo.environment.ConfigUtil.optionalInt;
 import static com.spotify.styx.state.OutputHandler.fanOutput;
 import static com.spotify.styx.util.CloserUtil.closeable;
+import static com.spotify.styx.util.ConfigUtil.get;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.GuardedRunnable.runGuarded;
@@ -55,6 +56,8 @@ import com.spotify.styx.api.AuthenticatorConfiguration;
 import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.api.RequestAuthenticator;
 import com.spotify.styx.api.SchedulerResource;
+import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
+import com.spotify.styx.api.WorkflowActionAuthorizer;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
@@ -182,6 +185,7 @@ public class StyxScheduler implements AppInit {
   private final EventConsumerFactory eventConsumerFactory;
   private final WorkflowExecutionGateFactory executionGateFactory;
   private final AuthenticatorFactory authenticatorFactory;
+  private final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory;
 
   private StateManager stateManager;
   private Scheduler scheduler;
@@ -225,6 +229,8 @@ public class StyxScheduler implements AppInit {
     private EventConsumerFactory eventConsumerFactory = (env, stats) -> (event, state) -> { };
     private WorkflowExecutionGateFactory executionGateFactory = (env, storage) -> WorkflowExecutionGate.NOOP;
     private AuthenticatorFactory authenticatorFactory = AuthenticatorFactory.DEFAULT;
+    private ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory =
+        ServiceAccountUsageAuthorizer.Factory.DEFAULT;
 
     public Builder setServiceName(String serviceName) {
       this.serviceName = serviceName;
@@ -290,6 +296,12 @@ public class StyxScheduler implements AppInit {
     public StyxScheduler build() {
       return new StyxScheduler(this);
     }
+
+    public Builder setServiceAccountUsageAuthorizerFactory(
+        final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory) {
+      this.serviceAccountUsageAuthorizerFactory = serviceAccountUsageAuthorizerFactory;
+      return this;
+    }
   }
 
   public static Builder newBuilder() {
@@ -315,6 +327,7 @@ public class StyxScheduler implements AppInit {
     this.eventConsumerFactory = requireNonNull(builder.eventConsumerFactory);
     this.executionGateFactory = requireNonNull(builder.executionGateFactory);
     this.authenticatorFactory = requireNonNull(builder.authenticatorFactory);
+    this.serviceAccountUsageAuthorizerFactory = requireNonNull(builder.serviceAccountUsageAuthorizerFactory);
   }
 
   @Override
@@ -379,6 +392,11 @@ public class StyxScheduler implements AppInit {
 
     final RateLimiter dequeueRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
 
+    Duration runningStateTtl = timeoutConfig.ttlOf(State.RUNNING);
+    WorkflowValidator workflowValidator = WorkflowValidator.newBuilder(new DockerImageValidator())
+        .withMaxRunningTimeoutLimit(runningStateTtl)
+        .build();
+
     outputHandlers.addAll(ImmutableList.of(
         new TransitionLogger(""),
         new DockerRunnerHandler(
@@ -386,7 +404,7 @@ public class StyxScheduler implements AppInit {
         new TerminationHandler(retryUtil, stateManager),
         new MonitoringHandler(stats),
         new PublisherHandler(publisher, stats),
-        new ExecutionDescriptionHandler(storage, stateManager, new WorkflowValidator(new DockerImageValidator()))));
+        new ExecutionDescriptionHandler(storage, stateManager, workflowValidator)));
 
     final TriggerListener trigger =
         new StateInitializingTrigger(stateManager);
@@ -401,13 +419,11 @@ public class StyxScheduler implements AppInit {
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
-    final Duration schedulerTickInterval = config.hasPath(STYX_SCHEDULER_TICK_INTERVAL)
-        ? config.getDuration(STYX_SCHEDULER_TICK_INTERVAL)
-        : DEFAULT_SCHEDULER_TICK_INTERVAL;
+    final Duration schedulerTickInterval = get(config, config::getDuration, STYX_SCHEDULER_TICK_INTERVAL)
+        .orElse(DEFAULT_SCHEDULER_TICK_INTERVAL);
 
-    final Duration triggerTickInterval = config.hasPath(STYX_TRIGGER_TICK_INTERVAL)
-        ? config.getDuration(STYX_TRIGGER_TICK_INTERVAL)
-        : DEFAULT_TRIGGER_TICK_INTERVAL;
+    final Duration triggerTickInterval = get(config, config::getDuration, STYX_TRIGGER_TICK_INTERVAL)
+        .orElse(DEFAULT_TRIGGER_TICK_INTERVAL);
 
     dockerRunner.restore();
     startTriggerManager(triggerManager, tickExecutor, triggerTickInterval);
@@ -418,15 +434,18 @@ public class StyxScheduler implements AppInit {
 
     setupMetrics(queuedStateManager, workflowCache, storage, dequeueRateLimiter, stats, time);
 
+    final ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer =
+        serviceAccountUsageAuthorizerFactory.apply(config, serviceName);
+    final WorkflowActionAuthorizer workflowActionAuthorizer =
+        new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer);
     final SchedulerResource schedulerResource =
-        new SchedulerResource(stateManager, trigger, storage, time,
-            new WorkflowValidator(new DockerImageValidator()));
+        new SchedulerResource(stateManager, trigger, storage, time, workflowValidator, workflowActionAuthorizer);
 
     final RequestAuthenticator requestAuthenticator = new RequestAuthenticator(
         authenticatorFactory.apply(AuthenticatorConfiguration.fromConfig(config, serviceName)));
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
-        .registerRoutes(Api.withCommonMiddleware(schedulerResource.routes(),
+        .registerRoutes(Api.withCommonMiddleware(schedulerResource.routes(requestAuthenticator),
             requestAuthenticator, serviceName));
 
     this.stateManager = stateManager;
@@ -672,9 +691,8 @@ public class StyxScheduler implements AppInit {
           .withClientCertData(cluster.getMasterAuth().getClientCertificate())
           .withClientKeyData(cluster.getMasterAuth().getClientKey())
           .withNamespace(config.getString(GKE_CLUSTER_NAMESPACE))
-          .withRequestTimeout(rootConfig.hasPath(KUBERNETES_REQUEST_TIMEOUT)
-              ? rootConfig.getInt(KUBERNETES_REQUEST_TIMEOUT)
-              : DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS)
+          .withRequestTimeout(get(rootConfig, rootConfig::getInt, KUBERNETES_REQUEST_TIMEOUT)
+              .orElse(DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS))
           .build();
 
       final OkHttpClient httpClient = HttpClientUtils.createHttpClient(kubeConfig).newBuilder()

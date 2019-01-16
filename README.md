@@ -261,11 +261,11 @@ All other APIs are considered unstable and can change at any time. E.g. the `Sty
 
 ### Code Coverage
 
-An aggregate code coverage report for the entire project is created by the `report` submodule.
+An aggregate code coverage report for the entire project is created by the `styx-report` submodule.
 
 ```bash
 > mvn clean verify
-> open report/target/site/jacoco-aggregate/index.html
+> open styx-report/target/site/jacoco-aggregate/index.html
 ```
 
 CircleCI builds submit code coverage reports to [codecov.io]. In addition, the aggregate

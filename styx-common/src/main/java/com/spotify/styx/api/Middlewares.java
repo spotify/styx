@@ -36,6 +36,7 @@ import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
+import com.spotify.apollo.entity.EntityMiddleware.EntityResponseHandler;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.SyncHandler;
@@ -240,14 +241,23 @@ public final class Middlewares {
 
   }
 
-  public static Middleware<Requested<Authenticated<Response<?>>>, AsyncHandler<Response<ByteString>>> authed(
+  public static <T> Middleware<Requested<Authenticated<Response<T>>>, SyncHandler<Response<T>>> authed(
       RequestAuthenticator authenticator) {
-    return ar -> jsonAsync().apply(requestContext -> {
-      final Response<?> payload = ar
-          .apply(requestContext)
-          .apply(auth(requestContext, authenticator));
-      return completedFuture(payload);
-    });
+    return ar -> rc -> ar
+        .apply(rc)
+        .apply(auth(rc, authenticator));
+  }
+
+  public static <E, R> Middleware<Authenticated<EntityResponseHandler<E, R>>, SyncHandler<Response<ByteString>>> authedEntity(
+      Middleware<EntityResponseHandler<E, R>, SyncHandler<Response<ByteString>>> entityMiddleware,
+      Middleware<Requested<Authenticated<Response<ByteString>>>, SyncHandler<Response<ByteString>>> authed) {
+    return ar -> rc -> authed.apply(r -> ac -> entityMiddleware.apply(ar.apply(ac)).invoke(rc)).invoke(rc);
+  }
+
+  public static <E, R> Middleware<Authenticated<EntityResponseHandler<E, R>>, SyncHandler<Response<ByteString>>> authedEntity(
+      RequestAuthenticator authenticator,
+      Middleware<EntityResponseHandler<E, R>, SyncHandler<Response<ByteString>>> entityMiddleware) {
+    return authedEntity(entityMiddleware, authed(authenticator));
   }
 
   private static AuthContext auth(RequestContext requestContext,
