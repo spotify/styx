@@ -194,15 +194,12 @@ public class StyxApi implements AppInit {
       .withMaxRunningTimeoutLimit(runningStateTtl)
       .build();
 
-    final WorkflowResource workflowResource = new WorkflowResource(storage,
-        workflowValidator,
-        new WorkflowInitializer(storage, time),
-        workflowConsumer, workflowActionAuthorizer);
+    final WorkflowResource workflowResource = new WorkflowResource(storage, workflowValidator,
+        new WorkflowInitializer(storage, time), workflowConsumer, workflowActionAuthorizer);
 
-    final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
-        storage,
-        workflowValidator,
-        time, workflowActionAuthorizer);
+    final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl, storage,
+        workflowValidator, time, workflowActionAuthorizer);
+
     environment.closer().register(backfillResource);
 
     final ResourceResource resourceResource = new ResourceResource(storage);
