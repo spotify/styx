@@ -22,9 +22,16 @@ package com.spotify.styx.api;
 
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.FORBIDDEN;
+import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.AUTHORIZATION_GSUITE_USER_CONFIG;
+import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.AUTHORIZATION_MESSAGE_CONFIG;
+import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.AUTHORIZATION_REQUIRE_ALL_CONFIG;
+import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.AUTHORIZATION_REQUIRE_WORKFLOWS;
+import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
@@ -49,12 +56,15 @@ import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.model.ServiceAccount;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.spotify.apollo.Response;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.AllAuthorizationPolicy;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.AuthorizationPolicy;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.NoAuthorizationPolicy;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.WhitelistAuthorizationPolicy;
 import com.spotify.styx.model.WorkflowId;
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
 import java.io.IOException;
 import java.security.PrivateKey;
 import java.util.ArrayList;
@@ -81,6 +91,7 @@ public class ServiceAccountUsageAuthorizerTest {
   private static final String SERVICE_ACCOUNT_USER_ROLE = "organizations/3141592/roles/StyxWorkflowServiceAccountUser";
   private static final int RETRY_ATTEMPTS = 3;
   private static final String MESSAGE = "See more at https://example.com/docs/styx/authorization.";
+  private static final String GSUITE_USER_EMAIL = "gsuite-user@example.com";
 
   @Mock private AuthorizationPolicy authorizationPolicy;
   @Mock private PrivateKey privateKey;
@@ -89,6 +100,8 @@ public class ServiceAccountUsageAuthorizerTest {
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private CloudResourceManager crm;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Iam iam;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Directory directory;
+
+  private GoogleCredential credential;
 
   private final com.google.api.services.cloudresourcemanager.model.Binding projectBinding =
       new com.google.api.services.cloudresourcemanager.model.Binding();
@@ -127,6 +140,10 @@ public class ServiceAccountUsageAuthorizerTest {
         .thenReturn(new ServiceAccount()
             .setEmail(MANAGED_SERVICE_ACCOUNT)
             .setProjectId(SERVICE_ACCOUNT_PROJECT));
+    credential = new GoogleCredential.Builder()
+        .setServiceAccountPrivateKey(privateKey)
+        .setServiceAccountId("styx@bar.iam.gserviceaccount.com")
+        .build();
     sut = new ServiceAccountUsageAuthorizer.Impl(iam, crm, directory, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy,
         StopStrategies.stopAfterAttempt(RETRY_ATTEMPTS), MESSAGE);
   }
@@ -368,18 +385,26 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Test
   public void testCreate() {
-    final GoogleCredential credential = new GoogleCredential.Builder()
-        .setServiceAccountPrivateKey(privateKey)
-        .setServiceAccountId("styx@bar.iam.gserviceaccount.com")
-        .build();
     final ServiceAccountUsageAuthorizer sut = ServiceAccountUsageAuthorizer.create(
-        SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, "gsuite-user@example.com", "foo", MESSAGE);
+        SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, GSUITE_USER_EMAIL, "foo", MESSAGE);
     assertThat(sut, is(notNullValue()));
   }
 
   @Test
+  public void createShouldFailIfCredentialIsNotAServiceAccount() {
+    credential = new GoogleCredential.Builder().build();
+    try {
+      ServiceAccountUsageAuthorizer.create(
+          SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, GSUITE_USER_EMAIL, "foo", MESSAGE);
+      fail();
+    } catch (IllegalArgumentException e) {
+      assertThat(e.getMessage(), is("Credential must be a service account"));
+    }
+  }
+
+  @Test
   public void testNop() {
-    final ServiceAccountUsageAuthorizer sut = ServiceAccountUsageAuthorizer.NOP;
+    final ServiceAccountUsageAuthorizer sut = ServiceAccountUsageAuthorizer.nop();
     assertThat(Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).isSuccess(),
         is(true));
   }
@@ -403,6 +428,45 @@ public class ServiceAccountUsageAuthorizerTest {
     assertThat(policy.shouldEnforceAuthorization(WorkflowId.create("another", "workflow"), SERVICE_ACCOUNT, idToken),
         is(false));
   }
+
+  @Test
+  public void shouldCreateConfiguredServiceAccountUsageAuthorizer() {
+    final Config config = ConfigFactory.parseMap(ImmutableMap.of(
+        AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG, SERVICE_ACCOUNT_USER_ROLE,
+        AUTHORIZATION_GSUITE_USER_CONFIG, GSUITE_USER_EMAIL,
+        AUTHORIZATION_MESSAGE_CONFIG, MESSAGE));
+    final ServiceAccountUsageAuthorizer authorizer = ServiceAccountUsageAuthorizer.create(config, "foo", credential);
+    assertThat(authorizer, is(instanceOf(ServiceAccountUsageAuthorizer.Impl.class)));
+  }
+
+  @Test
+  public void shouldCreateNopServiceAccountUsageAuthorizer() {
+    final Config config = ConfigFactory.parseMap(ImmutableMap.of());
+    final ServiceAccountUsageAuthorizer authorizer = ServiceAccountUsageAuthorizer.create(config, "foo", credential);
+    assertThat(authorizer, is(ServiceAccountUsageAuthorizer.nop()));
+  }
+
+  @Test
+  public void shouldCreateAllAuthorizationPolicy() {
+    final Config config = ConfigFactory.parseMap(ImmutableMap.of(AUTHORIZATION_REQUIRE_ALL_CONFIG, "true"));
+    final AuthorizationPolicy policy = AuthorizationPolicy.fromConfig(config);
+    assertThat(policy, is(instanceOf(ServiceAccountUsageAuthorizer.AllAuthorizationPolicy.class)));
+  }
+
+  @Test
+  public void shouldCreateWhitelistAuthorizationPolicy() {
+    final Config config = ConfigFactory.parseMap(ImmutableMap.of(AUTHORIZATION_REQUIRE_WORKFLOWS,
+        ImmutableList.of("foo#bar", "baz#quux")));
+    final AuthorizationPolicy policy = AuthorizationPolicy.fromConfig(config);
+    assertThat(policy, is(instanceOf(ServiceAccountUsageAuthorizer.WhitelistAuthorizationPolicy.class)));
+  }
+
+  @Test
+  public void shouldCreateNoAuthorizationPolicy() {
+    final AuthorizationPolicy policy = AuthorizationPolicy.fromConfig(ConfigFactory.empty());
+    assertThat(policy, is(instanceOf(ServiceAccountUsageAuthorizer.NoAuthorizationPolicy.class)));
+  }
+
 
   private void assertCachedSuccess(Runnable r) {
     r.run();

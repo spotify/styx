@@ -20,8 +20,10 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.apollo.Status.FORBIDDEN;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.belongsToFamily;
+import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.api.JsonMatchers.assertNoJson;
 import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
@@ -29,17 +31,20 @@ import static com.spotify.styx.testdata.TestData.RESOURCE_IDS;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.internal.verification.VerificationModeFactory.times;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -84,6 +89,7 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 public class BackfillResourceTest extends VersionedApiTest {
@@ -100,11 +106,20 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   private Storage storage;
 
+  @Mock private WorkflowActionAuthorizer workflowActionAuthorizer;
+  @Mock private GoogleIdToken idToken;
+  @Mock private RequestAuthenticator requestAuthenticator;
+
+  private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
+
+  private static final WorkflowId WORKFLOW_ID_1 = WorkflowId.create("component", "workflow1");
+  private static final WorkflowId WORKFLOW_ID_2 = WorkflowId.create("component", "workflow2");
+
   private static final Backfill BACKFILL_1 = Backfill.newBuilder()
       .id("backfill-1")
       .start(Instant.parse("2017-01-01T00:00:00Z"))
       .end(Instant.parse("2017-01-02T00:00:00Z"))
-      .workflowId(WorkflowId.create("component", "workflow1"))
+      .workflowId(WORKFLOW_ID_1)
       .concurrency(1)
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
       .schedule(Schedule.HOURS)
@@ -115,7 +130,7 @@ public class BackfillResourceTest extends VersionedApiTest {
       .start(Instant.parse("2017-01-01T00:00:00Z"))
       .end(Instant.parse("2017-01-02T00:00:00Z"))
       .reverse(true)
-      .workflowId(WorkflowId.create("component", "workflow1"))
+      .workflowId(WORKFLOW_ID_1)
       .concurrency(1)
       .nextTrigger(Instant.parse("2017-01-01T23:00:00Z"))
       .schedule(Schedule.HOURS)
@@ -125,7 +140,7 @@ public class BackfillResourceTest extends VersionedApiTest {
       .id("backfill-3")
       .start(Instant.parse("2017-01-01T00:00:00Z"))
       .end(Instant.parse("2017-01-02T00:00:00Z"))
-      .workflowId(WorkflowId.create("component", "workflow2"))
+      .workflowId(WORKFLOW_ID_2)
       .concurrency(2)
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
       .schedule(Schedule.HOURS)
@@ -164,11 +179,13 @@ public class BackfillResourceTest extends VersionedApiTest {
     storage = spy(new AggregateStorage(bigtable, localDatastore.getOptions().getService(),
         Duration.ZERO));
 
+    when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     final BackfillResource backfillResource = closer.register(
         new BackfillResource(SCHEDULER_BASE, storage, workflowValidator,
-            () -> Instant.parse("2018-10-17T00:00:00.000Z")));
+            () -> Instant.parse("2018-10-17T00:00:00.000Z"), workflowActionAuthorizer));
     environment.routingEngine()
-        .registerRoutes(backfillResource.routes());
+        .registerRoutes(backfillResource.routes(requestAuthenticator).map(r ->
+            r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));
   }
 
   @BeforeClass
@@ -202,6 +219,7 @@ public class BackfillResourceTest extends VersionedApiTest {
             .id(BACKFILL_1.workflowId().id())
             .schedule(Schedule.HOURS)
             .dockerImage("foobar")
+            .serviceAccount(SERVICE_ACCOUNT)
             .build()));
     storage.storeWorkflow(Workflow.create(
         BACKFILL_3.workflowId().componentId(),
@@ -209,12 +227,14 @@ public class BackfillResourceTest extends VersionedApiTest {
             .id(BACKFILL_3.workflowId().id())
             .schedule(Schedule.HOURS)
             .dockerImage("foobar")
+            .serviceAccount(SERVICE_ACCOUNT)
             .build()));
     storage.storeWorkflow(Workflow.create(
         BACKFILL_4.workflowId().componentId(),
         WorkflowConfiguration.builder()
             .id(BACKFILL_4.workflowId().id())
             .schedule(Schedule.HOURS)
+            .serviceAccount(SERVICE_ACCOUNT)
             .build()));
     storage.storeBackfill(BACKFILL_1);
   }
@@ -573,6 +593,80 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(postedBackfill.halted(), equalTo(false));
     assertThat(postedBackfill.reverse(), equalTo(false));
   }
+
+  @Test
+  public void shouldFailPostBackfillIfNotAuthorized() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final int backfillsBefore = storage.backfillsForWorkflowId(true, WORKFLOW_ID_2).size();
+
+    final BackfillInput input = BackfillInput.newBuilder()
+        .start(Instant.parse("2017-01-01T00:00:00Z"))
+        .end(Instant.parse("2017-02-01T00:00:00Z"))
+        .component(WORKFLOW_ID_2.componentId())
+        .workflow(WORKFLOW_ID_2.id())
+        .concurrency(1)
+        .description("")
+        .build();
+
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(Workflow.class));
+
+    reset(storage);
+
+    final Response<ByteString> response =
+        awaitResponse(serviceHelper.request("POST", path(""), Json.serialize(input)));
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    final int backfillsAfter = storage.backfillsForWorkflowId(true, WORKFLOW_ID_2).size();
+    assertThat(backfillsBefore, is(backfillsAfter));
+  }
+
+  @Test
+  public void shouldFailHaltBackfillIfNotAuthorized() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    serviceHelper.stubClient()
+        .respond(Response.forStatus(Status.ACCEPTED))
+        .to(SCHEDULER_BASE + "/api/v0/events");
+
+    storage.storeBackfill(BACKFILL_1);
+
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(WorkflowId.class));
+
+    reset(storage);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("DELETE", path("/" + BACKFILL_1.id())));
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verify(storage, never()).storeBackfill(any());
+  }
+
+  @Test
+  public void shouldFailUpdateBackfillIfNotAuthorized() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final EditableBackfillInput backfillInput = EditableBackfillInput.newBuilder()
+        .id(BACKFILL_1.id())
+        .description("updated")
+        .build();
+
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(WorkflowId.class));
+
+    reset(storage);
+
+    final Response<ByteString> response =
+        awaitResponse(serviceHelper.request("PUT", path("/" + BACKFILL_1.id()), Json.serialize(backfillInput)));
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+    assertThat(storage.backfill(BACKFILL_1.id()).get().description(), is(not(Optional.of("updated"))));
+  }
+
 
   @Test
   public void shouldPostBackfillReversed() throws Exception {

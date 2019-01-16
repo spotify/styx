@@ -47,12 +47,14 @@ import com.google.api.services.admin.directory.Directory;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.cloudresourcemanager.model.GetIamPolicyRequest;
 import com.google.api.services.iam.v1.Iam;
+import com.google.api.services.iam.v1.IamScopes;
 import com.google.api.services.iam.v1.model.ServiceAccount;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.apollo.Response;
 import com.spotify.styx.model.WorkflowId;
+import com.typesafe.config.Config;
 import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -64,13 +66,16 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javaslang.Tuple;
 import javaslang.Tuple2;
 import javaslang.control.Either;
+import javaslang.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,9 +91,11 @@ import org.slf4j.LoggerFactory;
 @FunctionalInterface
 public interface ServiceAccountUsageAuthorizer {
 
-  ServiceAccountUsageAuthorizer NOP = (x, y, z) -> {
-    // nop
-  };
+  String AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG = "styx.authorizaton.service-account-user-role";
+  String AUTHORIZATION_REQUIRE_ALL_CONFIG = "styx.authorizaton.require.all";
+  String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorizaton.require.workflows";
+  String AUTHORIZATION_GSUITE_USER_CONFIG = "styx.authorization.gsuite-user";
+  String AUTHORIZATION_MESSAGE_CONFIG = "styx.authorization.message";
 
   void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount,
       GoogleIdToken idToken);
@@ -400,6 +407,40 @@ public interface ServiceAccountUsageAuthorizer {
     }
   }
 
+  class Nop implements ServiceAccountUsageAuthorizer {
+
+    static final Nop INSTANCE = new Nop();
+
+    @Override
+    public void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
+      // nop
+    }
+  }
+
+  static ServiceAccountUsageAuthorizer create(Config config, String serviceName, GoogleCredential credential) {
+
+    final AuthorizationPolicy authorizationPolicy = AuthorizationPolicy.fromConfig(config);
+
+    final ServiceAccountUsageAuthorizer authorizer;
+    if (config.hasPath(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)) {
+      final String role = config.getString(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG);
+      final String gsuiteUserEmail = config.getString(AUTHORIZATION_GSUITE_USER_CONFIG);
+      final String message = config.hasPath(AUTHORIZATION_MESSAGE_CONFIG)
+                             ? config.getString(AUTHORIZATION_MESSAGE_CONFIG)
+                             : "";
+      authorizer = ServiceAccountUsageAuthorizer.create(
+          role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message);
+    } else {
+      authorizer = ServiceAccountUsageAuthorizer.nop();
+    }
+    return authorizer;
+
+  }
+
+  static ServiceAccountUsageAuthorizer create(Config config, String serviceName) {
+    return create(config, serviceName, defaultCredential());
+  }
+
   static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole,
                                               AuthorizationPolicy authorizationPolicy,
                                               GoogleCredential credential,
@@ -416,17 +457,18 @@ public interface ServiceAccountUsageAuthorizer {
 
     final JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
 
-    final CloudResourceManager crm =
-        new CloudResourceManager.Builder(httpTransport, jsonFactory, credential)
-            .setApplicationName(serviceName)
-            .build();
+    final CloudResourceManager crm = new CloudResourceManager.Builder(
+        httpTransport, jsonFactory, credential.createScoped(IamScopes.all()))
+        .setApplicationName(serviceName)
+        .build();
 
     final Iam iam = new Iam.Builder(
-        httpTransport, jsonFactory, credential)
+        httpTransport, jsonFactory, credential.createScoped(IamScopes.all()))
         .setApplicationName(serviceName)
         .build();
 
     if (credential.getServiceAccountId() == null) {
+      // TODO: Allow GCE default service accounts and look up the ID using the tokeninfo endpoint
       throw new IllegalArgumentException("Credential must be a service account");
     }
 
@@ -447,6 +489,14 @@ public interface ServiceAccountUsageAuthorizer {
         Impl.DEFAULT_RETRY_STOP_STRATEGY, message);
   }
 
+  static GoogleCredential defaultCredential() {
+    return Try.of(GoogleCredential::getApplicationDefault).get();
+  }
+
+  static ServiceAccountUsageAuthorizer nop() {
+    return Nop.INSTANCE;
+  }
+
   /**
    * A policy that decides whether to enforce an authorization decision.
    */
@@ -456,6 +506,22 @@ public interface ServiceAccountUsageAuthorizer {
      * Returns true if authorization should be enforced, false otherwise.
      */
     boolean shouldEnforceAuthorization(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken);
+
+    static AuthorizationPolicy fromConfig(Config config) {
+      final AuthorizationPolicy authorizationPolicy;
+      if (config.hasPath(AUTHORIZATION_REQUIRE_ALL_CONFIG) &&
+          config.getBoolean(AUTHORIZATION_REQUIRE_ALL_CONFIG)) {
+        authorizationPolicy = new ServiceAccountUsageAuthorizer.AllAuthorizationPolicy();
+      } else if (config.hasPath(AUTHORIZATION_REQUIRE_WORKFLOWS)) {
+        final List<WorkflowId> ids = config.getStringList(AUTHORIZATION_REQUIRE_WORKFLOWS).stream()
+            .map(WorkflowId::parseKey)
+            .collect(Collectors.toList());
+        authorizationPolicy = new ServiceAccountUsageAuthorizer.WhitelistAuthorizationPolicy(ids);
+      } else {
+        authorizationPolicy = new ServiceAccountUsageAuthorizer.NoAuthorizationPolicy();
+      }
+      return authorizationPolicy;
+    }
   }
 
   /**
@@ -507,5 +573,10 @@ public interface ServiceAccountUsageAuthorizer {
     static ServiceAccountUsageAuthorizationResultBuilder builder() {
       return new ServiceAccountUsageAuthorizationResultBuilder();
     }
+  }
+
+  interface Factory extends BiFunction<Config, String, ServiceAccountUsageAuthorizer> {
+
+    Factory DEFAULT = ServiceAccountUsageAuthorizer::create;
   }
 }

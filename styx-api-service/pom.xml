@@ -37,15 +37,6 @@
       <artifactId>auto-value</artifactId>
       <scope>provided</scope>
     </dependency>
-    <dependency>
-      <groupId>io.norberg</groupId>
-      <artifactId>auto-matter</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.google.apis</groupId>
-      <artifactId>google-api-services-admin-directory</artifactId>
-    </dependency>
 
     <dependency>
       <groupId>com.spotify</groupId>

@@ -55,6 +55,8 @@ import com.spotify.styx.api.AuthenticatorConfiguration;
 import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.api.RequestAuthenticator;
 import com.spotify.styx.api.SchedulerResource;
+import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
+import com.spotify.styx.api.WorkflowActionAuthorizer;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
@@ -182,6 +184,7 @@ public class StyxScheduler implements AppInit {
   private final EventConsumerFactory eventConsumerFactory;
   private final WorkflowExecutionGateFactory executionGateFactory;
   private final AuthenticatorFactory authenticatorFactory;
+  private final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory;
 
   private StateManager stateManager;
   private Scheduler scheduler;
@@ -225,6 +228,8 @@ public class StyxScheduler implements AppInit {
     private EventConsumerFactory eventConsumerFactory = (env, stats) -> (event, state) -> { };
     private WorkflowExecutionGateFactory executionGateFactory = (env, storage) -> WorkflowExecutionGate.NOOP;
     private AuthenticatorFactory authenticatorFactory = AuthenticatorFactory.DEFAULT;
+    private ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory =
+        ServiceAccountUsageAuthorizer.Factory.DEFAULT;
 
     public Builder setServiceName(String serviceName) {
       this.serviceName = serviceName;
@@ -290,6 +295,12 @@ public class StyxScheduler implements AppInit {
     public StyxScheduler build() {
       return new StyxScheduler(this);
     }
+
+    public Builder setServiceAccountUsageAuthorizerFactory(
+        final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory) {
+      this.serviceAccountUsageAuthorizerFactory = serviceAccountUsageAuthorizerFactory;
+      return this;
+    }
   }
 
   public static Builder newBuilder() {
@@ -315,6 +326,7 @@ public class StyxScheduler implements AppInit {
     this.eventConsumerFactory = requireNonNull(builder.eventConsumerFactory);
     this.executionGateFactory = requireNonNull(builder.executionGateFactory);
     this.authenticatorFactory = requireNonNull(builder.authenticatorFactory);
+    this.serviceAccountUsageAuthorizerFactory = requireNonNull(builder.serviceAccountUsageAuthorizerFactory);
   }
 
   @Override
@@ -423,14 +435,18 @@ public class StyxScheduler implements AppInit {
 
     setupMetrics(queuedStateManager, workflowCache, storage, dequeueRateLimiter, stats, time);
 
+    final ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer =
+        serviceAccountUsageAuthorizerFactory.apply(config, serviceName);
+    final WorkflowActionAuthorizer workflowActionAuthorizer =
+        new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer);
     final SchedulerResource schedulerResource =
-        new SchedulerResource(stateManager, trigger, storage, time, workflowValidator);
+        new SchedulerResource(stateManager, trigger, storage, time, workflowValidator, workflowActionAuthorizer);
 
     final RequestAuthenticator requestAuthenticator = new RequestAuthenticator(
         authenticatorFactory.apply(AuthenticatorConfiguration.fromConfig(config, serviceName)));
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
-        .registerRoutes(Api.withCommonMiddleware(schedulerResource.routes(),
+        .registerRoutes(Api.withCommonMiddleware(schedulerResource.routes(requestAuthenticator),
             requestAuthenticator, serviceName));
 
     this.stateManager = stateManager;

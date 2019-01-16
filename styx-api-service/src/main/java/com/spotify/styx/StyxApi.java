@@ -24,10 +24,7 @@ import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
 
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
-import com.google.api.services.iam.v1.IamScopes;
 import com.google.cloud.datastore.Datastore;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Streams;
 import com.google.common.io.Closer;
 import com.spotify.apollo.AppInit;
@@ -44,13 +41,12 @@ import com.spotify.styx.api.RequestAuthenticator;
 import com.spotify.styx.api.ResourceResource;
 import com.spotify.styx.api.SchedulerProxyResource;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
-import com.spotify.styx.api.ServiceAccountUsageAuthorizer.AuthorizationPolicy;
 import com.spotify.styx.api.StatusResource;
+import com.spotify.styx.api.WorkflowActionAuthorizer;
 import com.spotify.styx.api.WorkflowResource;
 import com.spotify.styx.api.workflow.WorkflowInitializer;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.monitoring.MeteredStorageProxy;
 import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.Stats;
@@ -63,7 +59,6 @@ import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.WorkflowValidator;
 import com.typesafe.config.Config;
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -71,7 +66,6 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
@@ -87,11 +81,6 @@ public class StyxApi implements AppInit {
   static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
   static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
-  static final String AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG = "styx.authorization.service-account-user-role";
-  static final String AUTHORIZATION_GSUITE_USER_CONFIG = "styx.authorization.gsuite-user";
-  static final String AUTHORIZATION_REQUIRE_ALL_CONFIG = "styx.authorization.require.all";
-  static final String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorization.require.workflows";
-  static final String AUTHORIZATION_MESSAGE_CONFIG = "styx.authorization.message";
 
   static final String STYX_RUNNING_STATE_TTL_CONFIG = "styx.stale-state-ttls.running";
   static final String DEFAULT_STYX_RUNNING_STATE_TTL = "PT24H";
@@ -101,8 +90,8 @@ public class StyxApi implements AppInit {
   private final WorkflowConsumerFactory workflowConsumerFactory;
   private final StatsFactory statsFactory;
   private final AuthenticatorFactory authenticatorFactory;
+  private final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory;
   private final Time time;
-  private final GoogleCredential credential;
 
   public interface WorkflowConsumerFactory
       extends BiFunction<Environment, Stats, BiConsumer<Optional<Workflow>, Optional<Workflow>>> { }
@@ -114,8 +103,9 @@ public class StyxApi implements AppInit {
     private WorkflowConsumerFactory workflowConsumerFactory = (env, stats) -> (oldWorkflow, newWorkflow) -> { };
     private StatsFactory statsFactory = StyxApi::stats;
     private AuthenticatorFactory authenticatorFactory = AuthenticatorFactory.DEFAULT;
+    private ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory =
+        ServiceAccountUsageAuthorizer.Factory.DEFAULT;
     private Time time = Instant::now;
-    private GoogleCredential credential;
 
     public Builder setServiceName(String serviceName) {
       this.serviceName = serviceName;
@@ -143,13 +133,14 @@ public class StyxApi implements AppInit {
       return this;
     }
 
-    public Builder setTime(Time time) {
-      this.time = time;
+    public Builder setServiceAccountUsageAuthorizerFactory(
+        final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory) {
+      this.serviceAccountUsageAuthorizerFactory = serviceAccountUsageAuthorizerFactory;
       return this;
     }
 
-    public Builder setCredential(GoogleCredential credential) {
-      this.credential = credential;
+    public Builder setTime(Time time) {
+      this.time = time;
       return this;
     }
 
@@ -172,8 +163,8 @@ public class StyxApi implements AppInit {
     this.workflowConsumerFactory = requireNonNull(builder.workflowConsumerFactory);
     this.statsFactory = requireNonNull(builder.statsFactory);
     this.authenticatorFactory = requireNonNull(builder.authenticatorFactory);
+    this.serviceAccountUsageAuthorizerFactory = requireNonNull(builder.serviceAccountUsageAuthorizerFactory);
     this.time = requireNonNull(builder.time);
-    this.credential = (builder.credential != null) ? builder.credential : defaultCredential();
   }
 
   @Override
@@ -194,17 +185,21 @@ public class StyxApi implements AppInit {
     // results duplicated headers, and that would make nginx unhappy. This has been fixed
     // in later Apollo version.
 
-    final ServiceAccountUsageAuthorizer authorizer =
-        serviceAccountUsageAuthorizer(config, credential, serviceName);
+    final ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer =
+        serviceAccountUsageAuthorizerFactory.apply(config, serviceName);
+    final WorkflowActionAuthorizer workflowActionAuthorizer =
+        new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer);
 
-    WorkflowValidator workflowValidator = WorkflowValidator.newBuilder(new DockerImageValidator())
-        .withMaxRunningTimeoutLimit(runningStateTtl)
-        .build();
+    final WorkflowValidator workflowValidator = WorkflowValidator.newBuilder(new DockerImageValidator())
+      .withMaxRunningTimeoutLimit(runningStateTtl)
+      .build();
+
     final WorkflowResource workflowResource = new WorkflowResource(storage, workflowValidator,
-            new WorkflowInitializer(storage, time), workflowConsumer, authorizer);
+        new WorkflowInitializer(storage, time), workflowConsumer, workflowActionAuthorizer);
 
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl, storage,
-            workflowValidator, time);
+        workflowValidator, time, workflowActionAuthorizer);
+
     environment.closer().register(backfillResource);
 
     final ResourceResource resourceResource = new ResourceResource(storage);
@@ -222,7 +217,7 @@ public class StyxApi implements AppInit {
 
     final Stream<Route<AsyncHandler<Response<ByteString>>>> routes = Streams.concat(
         workflowResource.routes(requestAuthenticator),
-        backfillResource.routes(),
+        backfillResource.routes(requestAuthenticator),
         resourceResource.routes(),
         statusResource.routes(),
         schedulerProxyResource.routes()
@@ -238,43 +233,6 @@ public class StyxApi implements AppInit {
     return config.hasPath(key) ? config.getString(key) : defaultValue;
   }
 
-  @VisibleForTesting
-  static ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer(Config config,
-                                                                     GoogleCredential credential,
-                                                                     String serviceName) {
-
-    final AuthorizationPolicy authorizationPolicy = authorizationPolicy(config);
-
-    final ServiceAccountUsageAuthorizer authorizer;
-    if (config.hasPath(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)) {
-      final String role = config.getString(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG);
-      final String gsuiteUserEmail = config.getString(AUTHORIZATION_GSUITE_USER_CONFIG);
-      final String message = getConfigWithDefault(config, AUTHORIZATION_MESSAGE_CONFIG, "");
-      authorizer = ServiceAccountUsageAuthorizer.create(
-          role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message);
-    } else {
-      authorizer = ServiceAccountUsageAuthorizer.NOP;
-    }
-    return authorizer;
-  }
-
-  @VisibleForTesting
-  static AuthorizationPolicy authorizationPolicy(Config config) {
-    final AuthorizationPolicy authorizationPolicy;
-    if (config.hasPath(AUTHORIZATION_REQUIRE_ALL_CONFIG) &&
-        config.getBoolean(AUTHORIZATION_REQUIRE_ALL_CONFIG)) {
-      authorizationPolicy = new ServiceAccountUsageAuthorizer.AllAuthorizationPolicy();
-    } else if (config.hasPath(AUTHORIZATION_REQUIRE_WORKFLOWS)) {
-      final List<WorkflowId> ids = config.getStringList(AUTHORIZATION_REQUIRE_WORKFLOWS).stream()
-          .map(WorkflowId::parseKey)
-          .collect(Collectors.toList());
-      authorizationPolicy = new ServiceAccountUsageAuthorizer.WhitelistAuthorizationPolicy(ids);
-    } else {
-      authorizationPolicy = new ServiceAccountUsageAuthorizer.NoAuthorizationPolicy();
-    }
-    return authorizationPolicy;
-  }
-
   private static AggregateStorage storage(Environment environment, Stats stats) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
@@ -286,16 +244,5 @@ public class StyxApi implements AppInit {
 
   private static Stats stats(Environment environment) {
     return new MetricsStats(environment.resolve(SemanticMetricRegistry.class), Instant::now);
-  }
-
-  private static GoogleCredential defaultCredential() {
-    final GoogleCredential credential;
-    try {
-      credential = GoogleCredential.getApplicationDefault()
-          .createScoped(IamScopes.all());
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-    return credential;
   }
 }

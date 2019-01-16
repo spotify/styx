@@ -21,6 +21,7 @@
 package com.spotify.styx.api;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
+import static com.spotify.apollo.Status.FORBIDDEN;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.styx.api.SchedulerResource.BASE;
@@ -34,11 +35,14 @@ import static org.hamcrest.CoreMatchers.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
@@ -97,14 +101,17 @@ public class SchedulerResourceTest {
   private Optional<Workflow> triggeredWorkflow = Optional.empty();
   private Optional<Instant> triggeredInstant = Optional.empty();
 
-  @Mock WorkflowValidator workflowValidator;
+  @Mock private WorkflowValidator workflowValidator;
 
   private final Storage storage = mock(Storage.class);
 
   @Captor ArgumentCaptor<Trigger> triggerCaptor;
 
-  @Mock StateManager stateManager;
-  @Mock TriggerListener triggerListener;
+  @Mock private StateManager stateManager;
+  @Mock private TriggerListener triggerListener;
+  @Mock private WorkflowActionAuthorizer workflowActionAuthorizer;
+  @Mock private GoogleIdToken idToken;
+  @Mock private RequestAuthenticator requestAuthenticator;
 
   @Rule
   public ServiceHelper serviceHelper;
@@ -116,10 +123,12 @@ public class SchedulerResourceTest {
 
   @Before
   public void setUp() throws Exception {
+    when(storage.workflow(WFI.workflowId())).thenReturn(Optional.of(FULL_DAILY_WORKFLOW));
     when(stateManager.receive(any())).thenReturn(CompletableFuture.completedFuture(null));
     when(triggerListener.event(any(), any(), any(), any())).thenReturn(CompletableFuture.completedFuture(null));
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
+    when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
   }
 
   private ServiceHelper getServiceHelper(StateManager stateManager, Storage storage) {
@@ -129,10 +138,11 @@ public class SchedulerResourceTest {
           triggerListener,
           storage,
           () -> Instant.parse("2015-12-31T23:59:10.000Z"),
-          workflowValidator);
+          workflowValidator, workflowActionAuthorizer);
 
       environment.routingEngine()
-          .registerRoutes(schedulerResource.routes());
+          .registerRoutes(schedulerResource.routes(requestAuthenticator).map(r ->
+              r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));
     }, "styx");
   }
 
@@ -143,7 +153,20 @@ public class SchedulerResourceTest {
     CompletionStage<Response<ByteString>> post =
         serviceHelper.request("POST", BASE + "/trigger", eventPayload);
 
-    return post.toCompletableFuture().get();
+    return post.toCompletableFuture().get(1, MINUTES);
+  }
+
+  @Test
+  public void retryShouldFailWithForbiddenIfNotAuthorized() throws Exception {
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(WorkflowId.class));
+
+    final Response<ByteString> response = serviceHelper.request("POST", BASE + "/retry", serialize(WFI))
+        .toCompletableFuture().get(1, MINUTES);
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verifyZeroInteractions(stateManager);
   }
 
   @Test
@@ -183,6 +206,19 @@ public class SchedulerResourceTest {
   }
 
   @Test
+  public void haltShouldFailWithForbiddenIfNotAuthorized() throws Exception {
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(WorkflowId.class));
+
+    final Response<ByteString> response = serviceHelper.request("POST", BASE + "/halt", serialize(WFI))
+        .toCompletableFuture().get(1, MINUTES);
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verifyZeroInteractions(stateManager);
+  }
+
+  @Test
   public void testHalt() throws Exception {
     ByteString wfiPayload = serialize(WFI);
     CompletionStage<Response<ByteString>> post =
@@ -204,6 +240,20 @@ public class SchedulerResourceTest {
     post.toCompletableFuture().get(1, MINUTES); // block until done
 
     verify(stateManager).receive(Event.retryAfter(WFI, 0L));
+  }
+
+  @Test
+  public void testInjectEventShouldFailWithForbiddenIfNotAuthorized() throws Exception {
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(WorkflowId.class));
+
+    final Response<ByteString> response =
+        serviceHelper.request("POST", BASE + "/events", serialize(Event.dequeue(WFI, RESOURCE_IDS)))
+        .toCompletableFuture().get(1, MINUTES);
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verifyZeroInteractions(stateManager);
   }
 
   @Test
@@ -265,6 +315,19 @@ public class SchedulerResourceTest {
         serviceHelper.request("POST", BASE + "/retry", eventPayload);
 
     return post.toCompletableFuture().get();
+  }
+
+  @Test
+  public void testTriggerShouldFailWithForbiddenIfNotAuthorized() throws Exception {
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(Workflow.class));
+
+    final Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(
+        TriggerRequest.of(FULL_DAILY_WORKFLOW.id(), "2014-12-31"));
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verifyZeroInteractions(triggerListener);
   }
 
   @Test

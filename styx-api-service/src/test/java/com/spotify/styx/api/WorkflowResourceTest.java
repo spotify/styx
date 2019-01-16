@@ -21,7 +21,6 @@
 package com.spotify.styx.api;
 
 import static com.spotify.apollo.Status.FORBIDDEN;
-import static com.spotify.apollo.StatusType.Family.SERVER_ERROR;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasHeader;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasNoPayload;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
@@ -31,13 +30,13 @@ import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.model.SequenceEvent.create;
 import static com.spotify.styx.serialization.Json.deserialize;
 import static com.spotify.styx.serialization.Json.serialize;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -45,6 +44,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
@@ -62,6 +62,7 @@ import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
@@ -78,6 +79,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
@@ -105,7 +107,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Mock private WorkflowValidator workflowValidator;
   @Mock private WorkflowInitializer workflowInitializer;
   @Mock private BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
-  @Mock private ServiceAccountUsageAuthorizer serviceAccountUseAuthorizer;
+  @Mock private WorkflowActionAuthorizer workflowActionAuthorizer;
   @Mock private GoogleIdToken idToken;
   @Mock private RequestAuthenticator requestAuthenticator;
 
@@ -124,6 +126,12 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   private static final Workflow WORKFLOW =
       Workflow.create("foo", WORKFLOW_CONFIGURATION);
+
+  private static final Workflow EXISTING_WORKFLOW =
+      Workflow.create("foo", WorkflowConfigurationBuilder
+          .from(WORKFLOW_CONFIGURATION)
+          .dockerImage("earlier:image")
+          .build());
 
   private static final Trigger NATURAL_TRIGGER = Trigger.natural();
   private static final Trigger BACKFILL_TRIGGER = Trigger.backfill("backfill-1");
@@ -155,7 +163,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     WorkflowResource workflowResource =
         new WorkflowResource(storage, workflowValidator, workflowInitializer, workflowConsumer,
-            serviceAccountUseAuthorizer);
+            workflowActionAuthorizer);
 
     environment.routingEngine()
         .registerRoutes(workflowResource.routes(requestAuthenticator).map(r ->
@@ -192,6 +200,21 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void tearDown() throws Exception {
     localDatastore.reset();
     serviceHelper.stubClient().clear();
+  }
+
+  @Test
+  public void patchShouldFailWithForbiddenIfNotAuthorized() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(WorkflowId.class));
+
+    final Response<ByteString> response =
+        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"), STATEPAYLOAD_FULL));
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verify(storage, never()).patchState(any(), any());
   }
 
   @Test
@@ -562,10 +585,43 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void createWorkflowShouldFailWithForbiddenIfNotAuthorized() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(Workflow.class));
+
+    final Response<ByteString> response = awaitResponse(
+        serviceHelper.request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verify(storage, never()).patchState(any(), any());
+
+    verifyZeroInteractions(workflowValidator);
+    verifyZeroInteractions(workflowInitializer);
+    verifyZeroInteractions(workflowConsumer);
+  }
+
+  @Test
+  public void deleteWorkflowShouldFailWithForbiddenIfNotAuthorized() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(Workflow.class));
+
+    final Response<ByteString> response = awaitResponse(serviceHelper.request("DELETE", path("/foo/bar")));
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verify(storage, never()).delete(WORKFLOW.id());
+  }
+
+  @Test
   public void shouldCreateWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(workflowInitializer.store(WORKFLOW)).thenReturn(Optional.empty());
+    when(workflowInitializer.store(eq(WORKFLOW), any())).thenReturn(Optional.empty());
 
     Response<ByteString> response =
         awaitResponse(
@@ -573,7 +629,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
                 .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
 
     verify(workflowValidator).validateWorkflowConfiguration(WORKFLOW_CONFIGURATION);
-    verify(workflowInitializer).store(WORKFLOW);
+    verify(workflowInitializer).store(eq(WORKFLOW), any());
     verify(workflowConsumer).accept(Optional.empty(), Optional.of(WORKFLOW));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
@@ -584,7 +640,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldUpdateWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(workflowInitializer.store(WORKFLOW)).thenReturn(Optional.of(WORKFLOW));
+    when(workflowInitializer.store(eq(WORKFLOW), any())).thenReturn(Optional.of(EXISTING_WORKFLOW));
 
     Response<ByteString> response =
         awaitResponse(
@@ -592,39 +648,30 @@ public class WorkflowResourceTest extends VersionedApiTest {
                 .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
 
     verify(workflowValidator).validateWorkflowConfiguration(WORKFLOW_CONFIGURATION);
-    verify(workflowInitializer).store(WORKFLOW);
-    verify(workflowConsumer).accept(Optional.of(WORKFLOW), Optional.of(WORKFLOW));
+    verify(workflowInitializer).store(eq(WORKFLOW), any());
+    verify(workflowConsumer).accept(Optional.of(EXISTING_WORKFLOW), Optional.of(WORKFLOW));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(deserialize(response.payload().get(), Workflow.class), equalTo(WORKFLOW));
   }
 
   @Test
-  public void shouldHaveAssertionErrorIfMissingAuthContext() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    when(requestAuthenticator.authenticate(any())).thenReturn(Optional::empty);
-
-    final Response<ByteString> response = awaitResponse(
-        serviceHelper.request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
-    assertThat(response.status().family(), is(SERVER_ERROR));
-    assertThat(response.status().reasonPhrase(), containsString("AssertionError"));
-
-    verify(workflowInitializer, never()).store(WORKFLOW);
-  }
-
-  @Test
   public void shouldFailToUpdateWorkflowIfNotAuthorized() throws Exception {
     sinceVersion(Api.Version.V3);
 
+    when(workflowInitializer.store(eq(WORKFLOW), any())).then(a -> {
+      final Consumer<Optional<Workflow>> guard = a.getArgument(1);
+      guard.accept(Optional.of(EXISTING_WORKFLOW));
+      throw new AssertionError("Should not reach here");
+    });
+
     doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
-        .when(serviceAccountUseAuthorizer).authorizeServiceAccountUsage(
-            WorkflowId.create("foo", "bar"), SERVICE_ACCOUNT, idToken);
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), eq(EXISTING_WORKFLOW));
 
     final Response<ByteString> response = awaitResponse(
         serviceHelper.request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
 
-    verify(workflowInitializer, never()).store(WORKFLOW);
+    verify(workflowInitializer).store(eq(WORKFLOW), any());
 
     assertThat(response.status().code(), is(FORBIDDEN.code()));
   }
@@ -633,7 +680,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldReturnErrorMessageWhenFailedToStore() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(workflowInitializer.store(WORKFLOW))
+    when(workflowInitializer.store(eq(WORKFLOW), any()))
         .thenThrow(new WorkflowInitializationException(new Exception()));
 
     Response<ByteString> response =

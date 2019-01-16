@@ -51,11 +51,11 @@ import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
+import com.spotify.apollo.entity.EntityMiddleware;
+import com.spotify.apollo.entity.JacksonEntityCodec;
 import com.spotify.apollo.request.RequestContexts;
 import com.spotify.apollo.request.RequestMetadataImpl;
 import com.spotify.apollo.route.AsyncHandler;
-import com.spotify.styx.api.Middlewares.Authenticated;
-import com.spotify.styx.api.Middlewares.Requested;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.util.ClassEnforcer;
 import com.spotify.styx.util.MockSpan;
@@ -499,13 +499,35 @@ public class MiddlewaresTest {
     when(requestContext.request()).thenReturn(request);
     when(authenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
 
-    final Requested<Authenticated<Response<?>>> handler = rc -> ac ->
-        Response.forPayload(ac.user().map(idToken::equals).orElse(false));
-    final Response<ByteString> response = awaitResponse(Middlewares.authed(authenticator)
-        .apply(handler)
-        .invoke(requestContext));
+    final Response<Boolean> response = Middlewares.<Boolean>authed(authenticator)
+        .apply(rc -> ac -> Response.forPayload(ac.user().map(idToken::equals).orElse(false)))
+        .invoke(requestContext);
 
-    assertThat(Json.deserialize(response.payload().get(), Boolean.class), is(true));
+    assertThat(response.payload(), is(Optional.of(true)));
+  }
+
+  @Test
+  public void testAuthedEntityProvidesIdToken() throws Exception {
+
+    final EntityMiddleware em = EntityMiddleware.forCodec(JacksonEntityCodec.forMapper(Json.OBJECT_MAPPER));
+
+    final RequestContext requestContext = mock(RequestContext.class);
+    final Request request = Request.forUri("/", "PUT")
+        .withPayload(ByteString.encodeUtf8("\"hello \""))
+        .withHeader(HttpHeaders.AUTHORIZATION, "Bearer s3cr3tp455w0rd");
+    when(requestContext.request()).thenReturn(request);
+
+    final String email = "foo@bar.net";
+
+    when(authenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
+    when(idToken.getPayload()).thenReturn(idTokenPayload);
+    when(idTokenPayload.getEmail()).thenReturn(email);
+
+    final Response<ByteString> response = Middlewares.authedEntity(authenticator, em.response(String.class))
+        .apply(ac -> rc -> payload -> Response.forPayload(payload + ac.user().get().getPayload().getEmail()))
+        .invoke(requestContext);
+
+    assertThat(Json.deserialize(response.payload().get(), String.class), is("hello " + email));
   }
 
   @Test
