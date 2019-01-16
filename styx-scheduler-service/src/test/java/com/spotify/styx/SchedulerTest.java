@@ -96,6 +96,8 @@ public class SchedulerTest {
 
   private static final WorkflowId WORKFLOW_ID1 =
       WorkflowId.create("styx1", "example1");
+  private static final WorkflowId WORKFLOW_ID2 =
+      WorkflowId.create("styx2", "example2");
   private static final WorkflowInstance INSTANCE_1 =
       WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T01");
 
@@ -406,14 +408,18 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldCountResourcesOnStatesConsumingResources() throws Exception {
+  public void shouldRecordAggregateResourceUsageAndDemand() throws Exception {
     setUp(20);
     setResourceLimit("r1", 2);
+    setResourceLimit("r2", 3);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
+    initWorkflow(workflowUsingResources(WORKFLOW_ID2, "r2"));
 
     // do not consume resources
     populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i0"), State.NEW, time.get()));
     populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i1"), State.QUEUED, time.get()));
+    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i5"), State.QUEUED, time.get()));
+    populateActiveStates(RunState.create(instance(WORKFLOW_ID2, "i6"), State.QUEUED, time.get()));
     populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i4"), State.TERMINATED, time.get()));
 
     // consume resources
@@ -422,7 +428,8 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    verify(stats).recordResourceDemanded("r1");
+    verify(stats).recordResourceDemanded("r1", 2L);
+    verify(stats).recordResourceDemanded("r2", 1L);
     verify(stats).recordResourceUsed("r1", 2L);
   }
 
@@ -451,7 +458,7 @@ public class SchedulerTest {
     verify(shardedCounter, times(1)).counterHasSpareCapacity("r1");
     assertThat(eventCaptor.getAllValues().stream()
         .anyMatch(e -> EventUtil.name(e).equals("dequeue")), is(false));
-    verify(stats).recordResourceDemanded("r1");
+    verify(stats).recordResourceDemanded("r1", 1L);
     verify(stats).recordResourceUsed("r1", 3L);
 
     scheduler.tick();
@@ -460,7 +467,7 @@ public class SchedulerTest {
     verify(shardedCounter, times(2)).counterHasSpareCapacity("r1");
     assertThat(eventCaptor.getAllValues().stream()
         .anyMatch(e -> EventUtil.name(e).equals("dequeue")), is(false));
-    verify(stats, times(2)).recordResourceDemanded("r1");
+    verify(stats, times(2)).recordResourceDemanded("r1", 1L);
     verify(stats, times(2)).recordResourceUsed("r1", 3L);
   }
 
