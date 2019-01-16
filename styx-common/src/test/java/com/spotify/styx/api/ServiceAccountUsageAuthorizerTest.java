@@ -22,12 +22,6 @@ package com.spotify.styx.api;
 
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.FORBIDDEN;
-import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.AUTHORIZATION_ADMINISTRATORS_CONFIG;
-import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.AUTHORIZATION_GSUITE_USER_CONFIG;
-import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.AUTHORIZATION_MESSAGE_CONFIG;
-import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.AUTHORIZATION_REQUIRE_ALL_CONFIG;
-import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.AUTHORIZATION_REQUIRE_WORKFLOWS;
-import static com.spotify.styx.api.ServiceAccountUsageAuthorizer.AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -96,6 +90,14 @@ public class ServiceAccountUsageAuthorizerTest {
   private static final String ADMIN_EMAIL = "admin@corp.com";
   private static final String ADMIN_AGENT_EMAIL = "admin-agent@corp.gserviceaccount.com";
   private static final String STYX_ADMINS_GROUP_EMAIL = "styx-admins@corp.com";
+  private static final String AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG =
+      "styx.authorization.service-account-user-role";
+  private static final String AUTHORIZATION_REQUIRE_ALL_CONFIG = "styx.authorization.require.all";
+  private static final String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorization.require.workflows";
+  private static final String AUTHORIZATION_GSUITE_USER_CONFIG = "styx.authorization.gsuite-user";
+  private static final String AUTHORIZATION_MESSAGE_CONFIG = "styx.authorization.message";
+  private static final String AUTHORIZATION_ADMINISTRATORS_CONFIG = "styx.authorization.administrators";
+
   private static final List<String> ADMINISTRATORS = ImmutableList.of(
       "user:" + ADMIN_EMAIL,
       "group:" + STYX_ADMINS_GROUP_EMAIL,
