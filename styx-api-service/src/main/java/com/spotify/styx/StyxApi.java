@@ -232,10 +232,6 @@ public class StyxApi implements AppInit {
             requestAuthenticator, serviceName));
   }
 
-  private static String getConfigWithDefault(Config config, String key, String defaultValue) {
-    return config.hasPath(key) ? config.getString(key) : defaultValue;
-  }
-
   private static AggregateStorage storage(Environment environment, Stats stats) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
