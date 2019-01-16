@@ -25,6 +25,7 @@ import static com.github.rholder.retry.WaitStrategies.randomWait;
 import static com.google.api.services.admin.directory.DirectoryScopes.ADMIN_DIRECTORY_GROUP_MEMBER_READONLY;
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.FORBIDDEN;
+import static com.spotify.styx.util.ConfigUtil.get;
 import static java.lang.Boolean.TRUE;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
@@ -96,6 +97,7 @@ public interface ServiceAccountUsageAuthorizer {
   String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorizaton.require.workflows";
   String AUTHORIZATION_GSUITE_USER_CONFIG = "styx.authorization.gsuite-user";
   String AUTHORIZATION_MESSAGE_CONFIG = "styx.authorization.message";
+  String AUTHORIZATION_ADMINISTRATORS_CONFIG = "styx.authorization.administrators";
 
   void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount,
       GoogleIdToken idToken);
@@ -122,6 +124,7 @@ public interface ServiceAccountUsageAuthorizer {
     private final AuthorizationPolicy authorizationPolicy;
     private final StopStrategy retryStopStrategy;
     private final String message;
+    private final List<String> administrators;
 
     /**
      * (principalEmail, serviceAccount) -> Either[Response, Result]
@@ -133,7 +136,8 @@ public interface ServiceAccountUsageAuthorizer {
             .build();
 
     Impl(Iam iam, CloudResourceManager crm, Directory directory, String serviceAccountUserRole,
-         AuthorizationPolicy authorizationPolicy, StopStrategy retryStopStrategy, String message) {
+         AuthorizationPolicy authorizationPolicy, StopStrategy retryStopStrategy, String message,
+         List<String> administrators) {
       this.iam = Objects.requireNonNull(iam, "iam");
       this.crm = Objects.requireNonNull(crm, "crm");
       this.directory = Objects.requireNonNull(directory, "directory");
@@ -141,6 +145,7 @@ public interface ServiceAccountUsageAuthorizer {
       this.authorizationPolicy = Objects.requireNonNull(authorizationPolicy, "authorizationPolicy");
       this.retryStopStrategy = Objects.requireNonNull(retryStopStrategy, "retryStopStrategy");
       this.message = Objects.requireNonNull(message, "message");
+      this.administrators = Objects.requireNonNull(administrators, "administrators");
     }
 
     @Override
@@ -199,6 +204,10 @@ public interface ServiceAccountUsageAuthorizer {
       return ServiceAccountUsageAuthorizationResult.builder()
           .serviceAccountProjectId(projectId)
           .accessMessage(firstPresent(
+              // Check if the principal is an admin
+              () -> memberStatus(principalEmail, administrators)
+                  .map(status -> String.format("Principal %s is an admin %s", principalEmail, status)),
+
               // Check if the principal has been granted the service account user role in the project of the SA
               () -> projectPolicyAccess(projectId, principalEmail)
                   .map(type -> String.format("Principal %s has role %s in project %s %s",
@@ -418,23 +427,17 @@ public interface ServiceAccountUsageAuthorizer {
   }
 
   static ServiceAccountUsageAuthorizer create(Config config, String serviceName, GoogleCredential credential) {
-
-    final AuthorizationPolicy authorizationPolicy = AuthorizationPolicy.fromConfig(config);
-
-    final ServiceAccountUsageAuthorizer authorizer;
-    if (config.hasPath(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)) {
-      final String role = config.getString(AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG);
-      final String gsuiteUserEmail = config.getString(AUTHORIZATION_GSUITE_USER_CONFIG);
-      final String message = config.hasPath(AUTHORIZATION_MESSAGE_CONFIG)
-                             ? config.getString(AUTHORIZATION_MESSAGE_CONFIG)
-                             : "";
-      authorizer = ServiceAccountUsageAuthorizer.create(
-          role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message);
-    } else {
-      authorizer = ServiceAccountUsageAuthorizer.nop();
-    }
-    return authorizer;
-
+    return get(config, config::getString, AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)
+        .map(role -> {
+          final AuthorizationPolicy authorizationPolicy = AuthorizationPolicy.fromConfig(config);
+          final String gsuiteUserEmail = config.getString(AUTHORIZATION_GSUITE_USER_CONFIG);
+          final String message = get(config, config::getString, AUTHORIZATION_MESSAGE_CONFIG).orElse("");
+          final List<String> administrators = get(config, config::getStringList, AUTHORIZATION_ADMINISTRATORS_CONFIG)
+              .orElse(Collections.emptyList());
+          return ServiceAccountUsageAuthorizer.create(
+              role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message, administrators);
+        })
+        .orElse(ServiceAccountUsageAuthorizer.nop());
   }
 
   static ServiceAccountUsageAuthorizer create(Config config, String serviceName) {
@@ -446,7 +449,8 @@ public interface ServiceAccountUsageAuthorizer {
                                               GoogleCredential credential,
                                               String gsuiteUserEmail,
                                               String serviceName,
-                                              String message) {
+                                              String message,
+                                              List<String> administrators) {
 
     final HttpTransport httpTransport;
     try {
@@ -486,7 +490,7 @@ public interface ServiceAccountUsageAuthorizer {
         .build();
 
     return new Impl(iam, crm, directory, serviceAccountUserRole, authorizationPolicy,
-        Impl.DEFAULT_RETRY_STOP_STRATEGY, message);
+        Impl.DEFAULT_RETRY_STOP_STRATEGY, message, administrators);
   }
 
   static GoogleCredential defaultCredential() {
@@ -509,32 +513,21 @@ public interface ServiceAccountUsageAuthorizer {
 
     static AuthorizationPolicy fromConfig(Config config) {
       final AuthorizationPolicy authorizationPolicy;
-      if (config.hasPath(AUTHORIZATION_REQUIRE_ALL_CONFIG) &&
-          config.getBoolean(AUTHORIZATION_REQUIRE_ALL_CONFIG)) {
+      if (get(config, config::getBoolean, AUTHORIZATION_REQUIRE_ALL_CONFIG).orElse(false)) {
         authorizationPolicy = new ServiceAccountUsageAuthorizer.AllAuthorizationPolicy();
-      } else if (config.hasPath(AUTHORIZATION_REQUIRE_WORKFLOWS)) {
-        final List<WorkflowId> ids = config.getStringList(AUTHORIZATION_REQUIRE_WORKFLOWS).stream()
+      } else {
+        final List<WorkflowId> ids = get(config, config::getStringList, AUTHORIZATION_REQUIRE_WORKFLOWS)
+            .orElse(Collections.emptyList())
+            .stream()
             .map(WorkflowId::parseKey)
             .collect(Collectors.toList());
         authorizationPolicy = new ServiceAccountUsageAuthorizer.WhitelistAuthorizationPolicy(ids);
-      } else {
-        authorizationPolicy = new ServiceAccountUsageAuthorizer.NoAuthorizationPolicy();
       }
       return authorizationPolicy;
     }
   }
 
   /**
-   * A policy that does not enforce any authorization.
-   */
-  class NoAuthorizationPolicy implements AuthorizationPolicy {
-
-    @Override
-    public boolean shouldEnforceAuthorization(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
-      return false;
-    }
-  }
-
   /**
    * A policy that always enforces authorization.
    */

@@ -23,6 +23,7 @@ package com.spotify.styx;
 import static com.spotify.apollo.environment.ConfigUtil.optionalInt;
 import static com.spotify.styx.state.OutputHandler.fanOutput;
 import static com.spotify.styx.util.CloserUtil.closeable;
+import static com.spotify.styx.util.ConfigUtil.get;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.GuardedRunnable.runGuarded;
@@ -418,13 +419,11 @@ public class StyxScheduler implements AppInit {
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
-    final Duration schedulerTickInterval = config.hasPath(STYX_SCHEDULER_TICK_INTERVAL)
-        ? config.getDuration(STYX_SCHEDULER_TICK_INTERVAL)
-        : DEFAULT_SCHEDULER_TICK_INTERVAL;
+    final Duration schedulerTickInterval = get(config, config::getDuration, STYX_SCHEDULER_TICK_INTERVAL)
+        .orElse(DEFAULT_SCHEDULER_TICK_INTERVAL);
 
-    final Duration triggerTickInterval = config.hasPath(STYX_TRIGGER_TICK_INTERVAL)
-        ? config.getDuration(STYX_TRIGGER_TICK_INTERVAL)
-        : DEFAULT_TRIGGER_TICK_INTERVAL;
+    final Duration triggerTickInterval = get(config, config::getDuration, STYX_TRIGGER_TICK_INTERVAL)
+        .orElse(DEFAULT_TRIGGER_TICK_INTERVAL);
 
     dockerRunner.restore();
     startTriggerManager(triggerManager, tickExecutor, triggerTickInterval);
@@ -692,9 +691,8 @@ public class StyxScheduler implements AppInit {
           .withClientCertData(cluster.getMasterAuth().getClientCertificate())
           .withClientKeyData(cluster.getMasterAuth().getClientKey())
           .withNamespace(config.getString(GKE_CLUSTER_NAMESPACE))
-          .withRequestTimeout(rootConfig.hasPath(KUBERNETES_REQUEST_TIMEOUT)
-              ? rootConfig.getInt(KUBERNETES_REQUEST_TIMEOUT)
-              : DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS)
+          .withRequestTimeout(get(rootConfig, rootConfig::getInt, KUBERNETES_REQUEST_TIMEOUT)
+              .orElse(DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS))
           .build();
 
       final OkHttpClient httpClient = HttpClientUtils.createHttpClient(kubeConfig).newBuilder()

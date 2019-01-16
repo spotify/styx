@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.util.ConfigUtil.get;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
@@ -83,7 +84,7 @@ public class StyxApi implements AppInit {
   static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
 
   static final String STYX_RUNNING_STATE_TTL_CONFIG = "styx.stale-state-ttls.running";
-  static final String DEFAULT_STYX_RUNNING_STATE_TTL = "PT24H";
+  static final Duration DEFAULT_STYX_RUNNING_STATE_TTL = Duration.ofHours(24);
 
   private final String serviceName;
   private final StorageFactory storageFactory;
@@ -170,9 +171,11 @@ public class StyxApi implements AppInit {
   @Override
   public void create(Environment environment) {
     final Config config = environment.config();
-    final String schedulerServiceBaseUrl = getConfigWithDefault(config, SCHEDULER_SERVICE_BASE_URL, DEFAULT_SCHEDULER_SERVICE_BASE_URL);
-    final Duration runningStateTtl = Duration.parse(
-            getConfigWithDefault(config, STYX_RUNNING_STATE_TTL_CONFIG, DEFAULT_STYX_RUNNING_STATE_TTL));
+    final String schedulerServiceBaseUrl = get(config, config::getString, SCHEDULER_SERVICE_BASE_URL)
+        .orElse(DEFAULT_SCHEDULER_SERVICE_BASE_URL);
+    final Duration runningStateTtl = get(config, config::getString, STYX_RUNNING_STATE_TTL_CONFIG)
+        .map(Duration::parse)
+        .orElse(DEFAULT_STYX_RUNNING_STATE_TTL);
 
     final Stats stats = statsFactory.apply(environment);
     final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment, stats), stats, time);
@@ -227,10 +230,6 @@ public class StyxApi implements AppInit {
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
         .registerRoutes(Api.withCommonMiddleware(routes, clientBlacklistSupplier,
             requestAuthenticator, serviceName));
-  }
-
-  private static String getConfigWithDefault(Config config, String key, String defaultValue) {
-    return config.hasPath(key) ? config.getString(key) : defaultValue;
   }
 
   private static AggregateStorage storage(Environment environment, Stats stats) {

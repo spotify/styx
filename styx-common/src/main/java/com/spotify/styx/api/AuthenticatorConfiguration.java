@@ -20,6 +20,8 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.styx.util.ConfigUtil.get;
+
 import com.google.api.services.cloudresourcemanager.model.ResourceId;
 import com.typesafe.config.Config;
 import io.norberg.automatter.AutoMatter;
@@ -45,17 +47,14 @@ public interface AuthenticatorConfiguration {
     final AuthenticatorConfigurationBuilder builder = AuthenticatorConfiguration.builder()
         .service(serviceName);
 
-    if (config.hasPath(domainWhitelistKey)) {
-      builder.domainWhitelist(config.getStringList(domainWhitelistKey));
-    }
+    get(config, config::getStringList, domainWhitelistKey).ifPresent(builder::domainWhitelist);
 
-    if (config.hasPath(resourceWhitelistKey)) {
-      builder.resourceWhitelist(config.getConfigList(resourceWhitelistKey).stream()
-          .map(item -> new ResourceId()
-              .setType(item.getString("type"))
-              .setId(item.getString("id")))
-          .collect(Collectors.toSet()));
-    }
+    get(config, config::getConfigList, resourceWhitelistKey).ifPresent(resourceWhitelist ->
+        builder.resourceWhitelist(resourceWhitelist.stream()
+            .map(item -> new ResourceId()
+                .setType(item.getString("type"))
+                .setId(item.getString("id")))
+            .collect(Collectors.toSet())));
 
     return builder.build();
   }
