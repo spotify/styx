@@ -92,9 +92,9 @@ import org.slf4j.LoggerFactory;
 @FunctionalInterface
 public interface ServiceAccountUsageAuthorizer {
 
-  String AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG = "styx.authorizaton.service-account-user-role";
-  String AUTHORIZATION_REQUIRE_ALL_CONFIG = "styx.authorizaton.require.all";
-  String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorizaton.require.workflows";
+  String AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG = "styx.authorization.service-account-user-role";
+  String AUTHORIZATION_REQUIRE_ALL_CONFIG = "styx.authorization.require.all";
+  String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorization.require.workflows";
   String AUTHORIZATION_GSUITE_USER_CONFIG = "styx.authorization.gsuite-user";
   String AUTHORIZATION_MESSAGE_CONFIG = "styx.authorization.message";
   String AUTHORIZATION_ADMINISTRATORS_CONFIG = "styx.authorization.administrators";
