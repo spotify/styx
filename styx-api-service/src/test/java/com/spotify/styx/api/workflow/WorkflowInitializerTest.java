@@ -93,7 +93,7 @@ public class WorkflowInitializerTest {
   public void shouldStoreNewWorkflowAndUpdateNextNaturalTriggerWithOffset()
       throws IOException, WorkflowInitializationException {
     when(transaction.workflow(HOURLY_WORKFLOW_WITH_VALID_OFFSET.id())).thenReturn(Optional.empty());
-    workflowInitializer.store(HOURLY_WORKFLOW_WITH_VALID_OFFSET);
+    workflowInitializer.store(HOURLY_WORKFLOW_WITH_VALID_OFFSET, PASS);
 
     final Instant offsetNow = HOURLY_WORKFLOW_WITH_VALID_OFFSET.configuration().subtractOffset(NOW);
     final Instant nextTrigger = nextInstant(offsetNow, Schedule.HOURS);
