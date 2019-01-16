@@ -92,6 +92,8 @@ import org.slf4j.LoggerFactory;
 @FunctionalInterface
 public interface ServiceAccountUsageAuthorizer {
 
+  Logger LOG = LoggerFactory.getLogger(ServiceAccountUsageAuthorizer.class);
+
   String AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG = "styx.authorization.service-account-user-role";
   String AUTHORIZATION_REQUIRE_ALL_CONFIG = "styx.authorization.require.all";
   String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorization.require.workflows";
@@ -437,7 +439,11 @@ public interface ServiceAccountUsageAuthorizer {
           return ServiceAccountUsageAuthorizer.create(
               role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message, administrators);
         })
-        .orElse(ServiceAccountUsageAuthorizer.nop());
+        .orElseGet(() -> {
+          LOG.warn("{} not configured, fallback to nop ServiceAccountUsageAuthorizer",
+              AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG);
+          return ServiceAccountUsageAuthorizer.nop();
+        });
   }
 
   static ServiceAccountUsageAuthorizer create(Config config, String serviceName) {
