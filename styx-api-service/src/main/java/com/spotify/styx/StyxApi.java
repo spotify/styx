@@ -24,6 +24,7 @@ import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static java.util.Objects.requireNonNull;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.cloud.datastore.Datastore;
 import com.google.common.collect.Streams;
 import com.google.common.io.Closer;
@@ -67,6 +68,7 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+import javaslang.control.Try;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 
@@ -77,10 +79,13 @@ public class StyxApi implements AppInit {
 
   public static final String SERVICE_NAME = "styx-api";
 
-  public static final String SCHEDULER_SERVICE_BASE_URL = "styx.scheduler.base-url";
-  public static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
+  static final String SCHEDULER_SERVICE_BASE_URL = "styx.scheduler.base-url";
+  static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
-  public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
+  static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
+
+  static final String STYX_RUNNING_STATE_TTL_CONFIG = "styx.stale-state-ttls.running";
+  static final String DEFAULT_STYX_RUNNING_STATE_TTL = "PT24H";
 
   private final String serviceName;
   private final StorageFactory storageFactory;
@@ -167,9 +172,9 @@ public class StyxApi implements AppInit {
   @Override
   public void create(Environment environment) {
     final Config config = environment.config();
-    final String schedulerServiceBaseUrl = config.hasPath(SCHEDULER_SERVICE_BASE_URL)
-                                           ? config.getString(SCHEDULER_SERVICE_BASE_URL)
-                                           : DEFAULT_SCHEDULER_SERVICE_BASE_URL;
+    final String schedulerServiceBaseUrl = getConfigWithDefault(config, SCHEDULER_SERVICE_BASE_URL, DEFAULT_SCHEDULER_SERVICE_BASE_URL);
+    final Duration runningStateTtl = Duration.parse(
+            getConfigWithDefault(config, STYX_RUNNING_STATE_TTL_CONFIG, DEFAULT_STYX_RUNNING_STATE_TTL));
 
     final Stats stats = statsFactory.apply(environment);
     final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment, stats), stats, time);
@@ -187,14 +192,18 @@ public class StyxApi implements AppInit {
     final WorkflowActionAuthorizer workflowActionAuthorizer =
         new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer);
 
+    final WorkflowValidator workflowValidator = WorkflowValidator.newBuilder(new DockerImageValidator())
+      .withMaxRunningTimeoutLimit(runningStateTtl)
+      .build();
+
     final WorkflowResource workflowResource = new WorkflowResource(storage,
-        new WorkflowValidator(new DockerImageValidator()),
+        workflowValidator,
         new WorkflowInitializer(storage, time),
         workflowConsumer, workflowActionAuthorizer);
 
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl,
         storage,
-        new WorkflowValidator(new DockerImageValidator()),
+        workflowValidator,
         time, workflowActionAuthorizer);
     environment.closer().register(backfillResource);
 
@@ -225,6 +234,10 @@ public class StyxApi implements AppInit {
             requestAuthenticator, serviceName));
   }
 
+  private static String getConfigWithDefault(Config config, String key, String defaultValue) {
+    return config.hasPath(key) ? config.getString(key) : defaultValue;
+  }
+
   private static AggregateStorage storage(Environment environment, Stats stats) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
@@ -236,5 +249,9 @@ public class StyxApi implements AppInit {
 
   private static Stats stats(Environment environment) {
     return new MetricsStats(environment.resolve(SemanticMetricRegistry.class), Instant::now);
+  }
+
+  private static GoogleCredential defaultCredential() {
+    return Try.of(GoogleCredential::getApplicationDefault).get();
   }
 }

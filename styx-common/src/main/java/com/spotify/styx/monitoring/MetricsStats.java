@@ -193,7 +193,7 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<Tuple3<String, String, Integer>, Meter> dockerOperationErrorMeters;
   private final ConcurrentMap<String, Histogram> resourceConfiguredHistograms;
   private final ConcurrentMap<String, Histogram> resourceUsedHistograms;
-  private final ConcurrentMap<String, Meter> resourceDemandedMeters;
+  private final ConcurrentMap<String, Histogram> resourceDemandedHistograms;
   private final ConcurrentMap<String, Meter> eventConsumerErrorMeters;
   private final ConcurrentMap<String, Meter> eventConsumerMeters;
   private final ConcurrentMap<String, Meter> publishingMeters;
@@ -230,7 +230,7 @@ public final class MetricsStats implements Stats {
     this.dockerOperationErrorMeters = new ConcurrentHashMap<>();
     this.resourceConfiguredHistograms = new ConcurrentHashMap<>();
     this.resourceUsedHistograms = new ConcurrentHashMap<>();
-    this.resourceDemandedMeters = new ConcurrentHashMap<>();
+    this.resourceDemandedHistograms = new ConcurrentHashMap<>();
     this.eventConsumerErrorMeters = new ConcurrentHashMap<>();
     this.eventConsumerMeters = new ConcurrentHashMap<>();
     this.publishingMeters = new ConcurrentHashMap<>();
@@ -335,8 +335,8 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
-  public void recordResourceDemanded(String resource) {
-    resourceDemandedMeter(resource).mark();
+  public void recordResourceDemanded(String resource, long demanded) {
+    resourceDemandedHistogram(resource).update(demanded);
   }
 
   @Override
@@ -456,9 +456,9 @@ public final class MetricsStats implements Stats {
         resource, (op) -> registry.getOrAdd(RESOURCE_USED.tagged("resource", resource), HISTOGRAM));
   }
 
-  private Meter resourceDemandedMeter(String resource) {
-    return resourceDemandedMeters.computeIfAbsent(
-        resource, (op) -> registry.meter(RESOURCE_DEMANDED.tagged("resource", resource)));
+  private Histogram resourceDemandedHistogram(String resource) {
+    return resourceDemandedHistograms.computeIfAbsent(
+        resource, (op) -> registry.getOrAdd(RESOURCE_DEMANDED.tagged("resource", resource), HISTOGRAM));
   }
 
   private Meter eventConsumerMeter(SequenceEvent sequenceEvent) {
