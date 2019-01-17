@@ -119,7 +119,8 @@ or updated. Note that a non-null value is required for docker_image.
           "env": {"FOO": "bar"},
           "secret": null,
           "service_account": null,
-          "resources": []
+          "resources": [],
+          "running_timeout": "PT2H"
         }
 
 + Response 200 (application/json)
@@ -143,7 +144,8 @@ or updated. Note that a non-null value is required for docker_image.
             "env": {"FOO": "bar"},
             "secret": null,
             "service_account": null,
-            "resources": []
+            "resources": [],
+            "running_timeout": "PT2H"
           },
           "__from_api": "V3"
         }
@@ -179,7 +181,8 @@ or updated. Note that a non-null value is required for docker_image.
                 "docker_termination_logging": false,
                 "env": {"FOO": "bar"},
                 "secret": null,
-                "resources": []
+                "resources": [],
+                "running_timeout": "PT2H"
               }
         }
 
