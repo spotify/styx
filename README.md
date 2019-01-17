@@ -207,6 +207,10 @@ existing instance and create backfill) on the workflow. To authorize an account,
 For information on how to grant an account a role in a [Service Account], follow this
 guide: [Granting Roles to Service Accounts].
 
+#### `env` **[dictionary]**
+
+Custom environment variables to be injected into running container.
+
 #### `running_timeout` **[string]**
 An [ISO 8601 Duration] specification for timing out container execution. Defaults to 24 hours that also
 serves as the upper boundary.
