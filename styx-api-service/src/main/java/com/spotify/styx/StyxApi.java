@@ -206,7 +206,7 @@ public class StyxApi implements AppInit {
     environment.closer().register(backfillResource);
 
     final ResourceResource resourceResource = new ResourceResource(storage);
-    final StatusResource statusResource = new StatusResource(storage);
+    final StatusResource statusResource = new StatusResource(storage, serviceAccountUsageAuthorizer);
     final SchedulerProxyResource schedulerProxyResource = new SchedulerProxyResource(
         schedulerServiceBaseUrl, environment.client());
 

@@ -46,6 +46,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
+import javaslang.control.Either;
 import okio.ByteString;
 
 /**
@@ -56,9 +57,11 @@ public class StatusResource {
   static final String BASE = "/status";
 
   private final Storage storage;
+  private final ServiceAccountUsageAuthorizer accountUsageAuthorizer;
 
-  public StatusResource(Storage storage) {
+  public StatusResource(Storage storage, ServiceAccountUsageAuthorizer accountUsageAuthorizer) {
     this.storage = Objects.requireNonNull(storage);
+    this.accountUsageAuthorizer = accountUsageAuthorizer;
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -73,12 +76,38 @@ public class StatusResource {
         Route.with(
             em.serializerDirect(EventsPayload.class),
             "GET", BASE + "/events/<cid>/<wfid>/<iid>",
-            rc -> eventsForWorkflowInstance(arg("cid", rc), arg("wfid", rc), arg("iid", rc))))
+            rc -> eventsForWorkflowInstance(arg("cid", rc), arg("wfid", rc), arg("iid", rc))),
+        Route.with(
+            em.response(TestServiceAccountUsageAuthorizationRequest.class,
+                TestServiceAccountUsageAuthorizationResponse.class),
+            "POST", BASE + "/testServiceAccountUsageAuthorization",
+            rc -> this::testServiceAccountUsageAuthorization)
+    )
 
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
         .collect(toList());
 
     return Api.prefixRoutes(routes, V3);
+  }
+
+  private Response<TestServiceAccountUsageAuthorizationResponse> testServiceAccountUsageAuthorization(TestServiceAccountUsageAuthorizationRequest p) {
+    final Either<Response<?>, ServiceAccountUsageAuthorizer.ServiceAccountUsageAuthorizationResult> maybeResult =
+        accountUsageAuthorizer.authorizeServiceAccountUsage(p.serviceAccount(), p.principal())._2;
+
+    if (maybeResult.isLeft()) {
+      throw new ResponseException(maybeResult.left().get());
+    }
+
+    final ServiceAccountUsageAuthorizer.ServiceAccountUsageAuthorizationResult result = maybeResult.right().get();
+
+    final TestServiceAccountUsageAuthorizationResponse response =
+        new TestServiceAccountUsageAuthorizationResponseBuilder()
+            .serviceAccount(p.serviceAccount())
+            .principal(p.principal())
+            .accessReason(result.accessMessage())
+            .build();
+
+    return Response.forPayload(response);
   }
 
   private static String arg(String name, RequestContext rc) {

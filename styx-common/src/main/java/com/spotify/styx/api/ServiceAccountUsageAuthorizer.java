@@ -50,6 +50,7 @@ import com.google.api.services.cloudresourcemanager.model.GetIamPolicyRequest;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.IamScopes;
 import com.google.api.services.iam.v1.model.ServiceAccount;
+import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableSet;
@@ -89,7 +90,6 @@ import org.slf4j.LoggerFactory;
  * <li> GSuite: {@code https://www.googleapis.com/auth/admin.directory.group.member.readonly}
  * </ul></p>
  */
-@FunctionalInterface
 public interface ServiceAccountUsageAuthorizer {
 
   Logger LOG = LoggerFactory.getLogger(ServiceAccountUsageAuthorizer.class);
@@ -103,6 +103,9 @@ public interface ServiceAccountUsageAuthorizer {
 
   void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount,
       GoogleIdToken idToken);
+
+  Tuple2<Boolean, Either<Response<?>, ServiceAccountUsageAuthorizationResult>> authorizeServiceAccountUsage(
+      String serviceAccount, String principalEmail);
 
   class Impl implements ServiceAccountUsageAuthorizer {
 
@@ -154,55 +157,68 @@ public interface ServiceAccountUsageAuthorizer {
     public void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
       final String principalEmail = idToken.getPayload().getEmail();
 
-      final AtomicBoolean cached = new AtomicBoolean(true);
-
       final boolean enforce = authorizationPolicy.shouldEnforceAuthorization(workflowId, serviceAccount, idToken);
 
       // Cached authorization check
-      final Either<Response<?>, ServiceAccountUsageAuthorizationResult> maybeResult;
+      final Tuple2<Boolean, Either<Response<?>, ServiceAccountUsageAuthorizationResult>> maybeResult;
       try {
-        maybeResult = cache.get(Tuple.of(principalEmail, serviceAccount), () -> {
-          cached.set(false);
-          try {
-            return Either.right(authorizationCheck(workflowId, serviceAccount, principalEmail));
-          } catch (ResponseException e) {
-            return Either.left(e.getResponse());
-          }
-        });
+        maybeResult = authorizeServiceAccountUsage(serviceAccount, principalEmail);
       } catch (Exception e) {
         log.warn("Authorization failure for service account {} used by {} (enforce: {})",
             serviceAccount, principalEmail, enforce, e);
         if (enforce) {
+          Throwables.throwIfUnchecked(e);
           throw new RuntimeException(e);
         } else {
           return;
         }
       }
 
+      final boolean cached = maybeResult._1;
+
       // Propagate response exception
-      if (maybeResult.isLeft()) {
-        throw new ResponseException(maybeResult.left().get());
+      if (maybeResult._2.isLeft()) {
+        throw new ResponseException(maybeResult._2.left().get());
       }
 
-      final ServiceAccountUsageAuthorizationResult result = maybeResult.right().get();
+      final ServiceAccountUsageAuthorizationResult result = maybeResult._2.right().get();
 
       // Grant access?
       if (result.accessMessage().isPresent()) {
-        logAuthorization(workflowId, serviceAccount, enforce, result.accessMessage().get(), cached.get());
+        logAuthorization(workflowId, serviceAccount, enforce, result.accessMessage().get(), cached);
         return;
       }
 
       // Deny access?
-      logDenial(workflowId, serviceAccount, enforce, principalEmail, cached.get());
+      logDenial(workflowId, serviceAccount, enforce, principalEmail, cached);
       if (enforce) {
         throw denialResponseException(serviceAccount, principalEmail, result.serviceAccountProjectId());
       }
     }
 
-    private ServiceAccountUsageAuthorizationResult authorizationCheck(WorkflowId workflowId,
-                                                                      String serviceAccount,
+    @Override
+    public Tuple2<Boolean, Either<Response<?>, ServiceAccountUsageAuthorizationResult>> authorizeServiceAccountUsage(
+        String serviceAccount, String principalEmail) {
+      AtomicBoolean cached = new AtomicBoolean();
+      try {
+        final Either<Response<?>, ServiceAccountUsageAuthorizationResult> result = cache.get(Tuple.of(principalEmail, serviceAccount),
+            () -> {
+          cached.set(false);
+          try {
+            return Either.right(authorizationCheck(serviceAccount, principalEmail));
+          } catch (ResponseException e) {
+            return Either.left(e.getResponse());
+          }
+        });
+        return Tuple.of(cached.get(), result);
+      } catch (ExecutionException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    private ServiceAccountUsageAuthorizationResult authorizationCheck(String serviceAccount,
                                                                       String principalEmail) {
-      final String projectId = serviceAccountProjectId(workflowId, serviceAccount);
+      final String projectId = serviceAccountProjectId(serviceAccount);
       return ServiceAccountUsageAuthorizationResult.builder()
           .serviceAccountProjectId(projectId)
           .accessMessage(firstPresent(
@@ -241,12 +257,11 @@ public interface ServiceAccountUsageAuthorizer {
           accessMessage, serviceAccount, workflowId.toKey(), enforce, cached ? CACHE_HIT : CACHE_MISS);
     }
 
-    private String serviceAccountProjectId(WorkflowId workflowId, String serviceAccount) {
+    private String serviceAccountProjectId(String serviceAccount) {
       final Matcher matcher = USER_CREATED_SERVICE_ACCOUNT_PATTERN.matcher(serviceAccount);
       if (matcher.matches()) {
         return matcher.group(1);
       }
-      log.info("Workflow {} uses non user created service account {}", workflowId.toKey(), serviceAccount);
       return lookupServiceAccountProjectId(serviceAccount);
     }
 
@@ -425,6 +440,13 @@ public interface ServiceAccountUsageAuthorizer {
     @Override
     public void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
       // nop
+    }
+
+    @Override
+    public Tuple2<Boolean, Either<Response<?>, ServiceAccountUsageAuthorizationResult>> authorizeServiceAccountUsage(
+        String serviceAccount, String principalEmail) {
+      return Tuple.of(false,
+          Either.right(ServiceAccountUsageAuthorizationResult.builder().accessMessage("nop").build()));
     }
   }
 
