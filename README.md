@@ -197,8 +197,11 @@ Styx will refuse to trigger the workflow.
 
 In order for Styx to be able to create/delete keys for the `service_account` of a workflow,
 the [Service Account] that Styx itself runs as should be granted `Service Account Key Admin`
-role for the `service_account` of the workflow. This can be done by following
-[Granting Roles to Service Accounts].
+role for the `service_account` of the workflow.
+
+If authorization is enabled for the service, the `service_account` will be used to authorize deployments and actions on the workflow. To authorize an account, grant it the [configured role](./styx-standalone-service/src/main/resources/styx-standalone.conf#L66) for the [Service Account] of the workflow.
+
+For information on how to grant an account a role in a [Service Account], follow this guide: [Granting Roles to Service Accounts].
 
 #### `running_timeout` **[string]**
 An [ISO 8601 Duration] specification for timing out container execution. Defaults to 24 hours that also
