@@ -85,6 +85,7 @@ public class StatusResourceTest extends VersionedApiTest {
   private Connection bigtable = setupBigTableMockTable();
 
   private Storage storage;
+  private ServiceAccountUsageAuthorizer accountUsageAuthorizer;
 
   public StatusResourceTest(Api.Version version) {
     super(StatusResource.BASE, version);
@@ -118,9 +119,10 @@ public class StatusResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
+    accountUsageAuthorizer = mock(ServiceAccountUsageAuthorizer.class);
     storage = spy(new AggregateStorage(bigtable, localDatastore.getOptions().getService(),
         Duration.ZERO));
-    final StatusResource statusResource = new StatusResource(storage);
+    final StatusResource statusResource = new StatusResource(storage, accountUsageAuthorizer);
 
     environment.routingEngine()
         .registerRoutes(statusResource.routes());
