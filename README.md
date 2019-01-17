@@ -246,6 +246,12 @@ For each execution, Styx will inject a set of environment variables into the Doc
 Since version 2.0, Styx supports full HA (High Availability) where both [styx-api-service] and [styx-scheduler-service] can be set up
 to have multiple instances.
 
+### Authorization
+
+Enabling authorization means that any workflow with a configured `service_account` will only allow authorized users to deploy and manage it.
+
+You can enable authorization in your configuration, either for [all workflows](./styx-standalone-service/src/main/resources/styx-standalone.conf#L73) or a [subset of workflows](./styx-standalone-service/src/main/resources/styx-standalone.conf#L77). You will also need to provide the [name of the role](./styx-standalone-service/src/main/resources/styx-standalone.conf#L66) to use for determining if an account is an authorized user of the `service_account` or not. [Read more about how to authorize accounts for a service account here](#service_account-email-address).
+
 ## Development
 
 ### Backwards Compatibility & API Stability
