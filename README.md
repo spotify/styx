@@ -197,8 +197,15 @@ Styx will refuse to trigger the workflow.
 
 In order for Styx to be able to create/delete keys for the `service_account` of a workflow,
 the [Service Account] that Styx itself runs as should be granted `Service Account Key Admin`
-role for the `service_account` of the workflow. This can be done by following
-[Granting Roles to Service Accounts].
+role for the `service_account` of the workflow.
+
+If authorization is enabled for the service, the `service_account` will be used to authorize
+deployments and actions (create/modify/delete, trigger a new instance, retry/halt an
+existing instance and create backfill) on the workflow. To authorize an account, grant it the
+[configured role]) for the [Service Account] of the workflow.
+
+For information on how to grant an account a role in a [Service Account], follow this
+guide: [Granting Roles to Service Accounts].
 
 #### `running_timeout` **[string]**
 An [ISO 8601 Duration] specification for timing out container execution. Defaults to 24 hours that also
@@ -242,6 +249,15 @@ For each execution, Styx will inject a set of environment variables into the Doc
 
 Since version 2.0, Styx supports full HA (High Availability) where both [styx-api-service] and [styx-scheduler-service] can be set up
 to have multiple instances.
+
+### Authorization
+
+Enabling authorization means that any workflow with a configured `service_account` will only allow authorized
+users to deploy and manage it.
+
+You can enable authorization in your configuration, either for [all workflows] or a [subset of workflows].
+You will also need to provide the [name of the role][configured role] to use for determining if an account is an authorized
+user of the `service_account` or not. [Read more about how to authorize accounts for a service account here](#service_account-email-address).
 
 ## Development
 
@@ -291,3 +307,6 @@ expected to honor this code.
 [codecov.io]: https://codecov.io/gh/spotify/styx
 [styx-api-service]: https://github.com/spotify/styx/tree/master/styx-api-service
 [styx-scheduler-service]: https://github.com/spotify/styx/tree/master/styx-scheduler-service
+[configured role]: ./styx-standalone-service/src/main/resources/styx-standalone.conf#L66
+[all workflows]: ./styx-standalone-service/src/main/resources/styx-standalone.conf#L73
+[subset of workflows]: ./styx-standalone-service/src/main/resources/styx-standalone.conf#L77
