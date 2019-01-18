@@ -21,10 +21,10 @@
 package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V3;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 import com.google.api.client.util.Lists;
-import com.google.common.base.Throwables;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.entity.EntityMiddleware;
@@ -42,7 +42,6 @@ import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -60,8 +59,8 @@ public class StatusResource {
   private final ServiceAccountUsageAuthorizer accountUsageAuthorizer;
 
   public StatusResource(Storage storage, ServiceAccountUsageAuthorizer accountUsageAuthorizer) {
-    this.storage = Objects.requireNonNull(storage);
-    this.accountUsageAuthorizer = accountUsageAuthorizer;
+    this.storage = requireNonNull(storage);
+    this.accountUsageAuthorizer = requireNonNull(accountUsageAuthorizer);
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -92,7 +91,7 @@ public class StatusResource {
 
   private Response<TestServiceAccountUsageAuthorizationResponse> testServiceAccountUsageAuthorization(TestServiceAccountUsageAuthorizationRequest p) {
     final Either<Response<?>, ServiceAccountUsageAuthorizer.ServiceAccountUsageAuthorizationResult> maybeResult =
-        accountUsageAuthorizer.authorizeServiceAccountUsage(p.serviceAccount(), p.principal())._2;
+        accountUsageAuthorizer.authorizeServiceAccountUsage(p.serviceAccount(), p.principal());
 
     if (maybeResult.isLeft()) {
       throw new ResponseException(maybeResult.left().get());
@@ -156,7 +155,7 @@ public class StatusResource {
 
       return EventsPayload.create(timestampedEvents);
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
   }
 }
