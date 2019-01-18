@@ -26,9 +26,11 @@ import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
 import static org.hamcrest.Matchers.any;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -37,7 +39,9 @@ import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
+import com.spotify.apollo.StatusType;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
+import com.spotify.styx.api.ServiceAccountUsageAuthorizer.ServiceAccountUsageAuthorizationResult;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.TriggerParameters;
@@ -56,6 +60,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.logging.Level;
+import javaslang.control.Either;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -85,6 +90,11 @@ public class StatusResourceTest extends VersionedApiTest {
   private Connection bigtable = setupBigTableMockTable();
 
   private Storage storage;
+
+  private static final String AUTH_SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccounts.com";
+  private static final String AUTH_PRINCIPAL = "bar@example.com";
+  private static final ByteString AUTH_PAYLOAD2 = ByteString.encodeUtf8(
+      String.format("{\"service_account\":\"%s\",\"principal\":\"%s\"}", AUTH_SERVICE_ACCOUNT, AUTH_PRINCIPAL));
   private ServiceAccountUsageAuthorizer accountUsageAuthorizer;
 
   public StatusResourceTest(Api.Version version) {
@@ -217,6 +227,51 @@ public class StatusResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
     assertThat(response, hasStatus(withReasonPhrase(is(": \"" + ioException.toString() + "\""))));
+  }
+
+  @Test
+  public void testAuthEndpointShouldFordwardAuthorizerResponse() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    String message = "Some access message";
+    when(accountUsageAuthorizer.authorizeServiceAccountUsage(AUTH_SERVICE_ACCOUNT, AUTH_PRINCIPAL))
+        .thenReturn(Either.right(ServiceAccountUsageAuthorizationResult.builder()
+            .accessMessage(message)
+            .serviceAccountProjectId("project")
+            .build()));
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request(
+            "POST",
+            path("/testServiceAccountUsageAuthorization"),
+            AUTH_PAYLOAD2));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+
+    String json = response.payload().get().utf8();
+    TestServiceAccountUsageAuthorizationResponse
+        parsed = Json.OBJECT_MAPPER.readValue(json, TestServiceAccountUsageAuthorizationResponse.class);
+
+    assertThat(parsed.serviceAccount(), equalTo(AUTH_SERVICE_ACCOUNT));
+    assertThat(parsed.principal(), equalTo(AUTH_PRINCIPAL));
+    assertThat(parsed.accessReason().get(), equalTo(message));
+  }
+
+  @Test
+  public void testAuthEndpointShouldInternalErrorWhenAuthorizerReturnsError() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    StatusType statusCode = Status.BAD_REQUEST.withReasonPhrase("Project does not exist: baz");
+    when(accountUsageAuthorizer.authorizeServiceAccountUsage(anyString(), anyString()))
+        .thenReturn(Either.left(Response.forStatus(statusCode)));
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request(
+            "POST",
+            path("/testServiceAccountUsageAuthorization"),
+            AUTH_PAYLOAD2));
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
   }
 
   private Connection setupBigTableMockTable() {

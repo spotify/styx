@@ -56,6 +56,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.apollo.Response;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.util.MaybeCachedValue;
 import com.typesafe.config.Config;
 import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
@@ -104,7 +105,7 @@ public interface ServiceAccountUsageAuthorizer {
   void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount,
       GoogleIdToken idToken);
 
-  Tuple2<Boolean, Either<Response<?>, ServiceAccountUsageAuthorizationResult>> authorizeServiceAccountUsage(
+  Either<Response<?>, ServiceAccountUsageAuthorizationResult> authorizeServiceAccountUsage(
       String serviceAccount, String principalEmail);
 
   class Impl implements ServiceAccountUsageAuthorizer {
@@ -160,9 +161,9 @@ public interface ServiceAccountUsageAuthorizer {
       final boolean enforce = authorizationPolicy.shouldEnforceAuthorization(workflowId, serviceAccount, idToken);
 
       // Cached authorization check
-      final Tuple2<Boolean, Either<Response<?>, ServiceAccountUsageAuthorizationResult>> maybeResult;
+      final MaybeCachedValue<Either<Response<?>, ServiceAccountUsageAuthorizationResult>> maybeResult;
       try {
-        maybeResult = authorizeServiceAccountUsage(serviceAccount, principalEmail);
+        maybeResult = authorizeServiceAccountUsagePossiblyFromCache(serviceAccount, principalEmail);
       } catch (Exception e) {
         log.warn("Authorization failure for service account {} used by {} (enforce: {})",
             serviceAccount, principalEmail, enforce, e);
@@ -174,14 +175,14 @@ public interface ServiceAccountUsageAuthorizer {
         }
       }
 
-      final boolean cached = maybeResult._1;
+      final boolean cached = maybeResult.isCached();
 
       // Propagate response exception
-      if (maybeResult._2.isLeft()) {
-        throw new ResponseException(maybeResult._2.left().get());
+      if (maybeResult.value().isLeft()) {
+        throw new ResponseException(maybeResult.value().left().get());
       }
 
-      final ServiceAccountUsageAuthorizationResult result = maybeResult._2.right().get();
+      final ServiceAccountUsageAuthorizationResult result = maybeResult.value().right().get();
 
       // Grant access?
       if (result.accessMessage().isPresent()) {
@@ -197,9 +198,14 @@ public interface ServiceAccountUsageAuthorizer {
     }
 
     @Override
-    public Tuple2<Boolean, Either<Response<?>, ServiceAccountUsageAuthorizationResult>> authorizeServiceAccountUsage(
+    public Either<Response<?>, ServiceAccountUsageAuthorizationResult> authorizeServiceAccountUsage(
         String serviceAccount, String principalEmail) {
-      AtomicBoolean cached = new AtomicBoolean();
+      return authorizeServiceAccountUsagePossiblyFromCache(serviceAccount, principalEmail).value();
+    }
+
+    private MaybeCachedValue<Either<Response<?>, ServiceAccountUsageAuthorizationResult>>
+    authorizeServiceAccountUsagePossiblyFromCache(String serviceAccount, String principalEmail) {
+      AtomicBoolean cached = new AtomicBoolean(true);
       try {
         final Either<Response<?>, ServiceAccountUsageAuthorizationResult> result = cache.get(Tuple.of(principalEmail, serviceAccount),
             () -> {
@@ -210,7 +216,7 @@ public interface ServiceAccountUsageAuthorizer {
             return Either.left(e.getResponse());
           }
         });
-        return Tuple.of(cached.get(), result);
+        return MaybeCachedValue.create(cached.get(), result);
       } catch (ExecutionException e) {
         throw new RuntimeException(e);
       }
@@ -443,10 +449,9 @@ public interface ServiceAccountUsageAuthorizer {
     }
 
     @Override
-    public Tuple2<Boolean, Either<Response<?>, ServiceAccountUsageAuthorizationResult>> authorizeServiceAccountUsage(
+    public Either<Response<?>, ServiceAccountUsageAuthorizationResult> authorizeServiceAccountUsage(
         String serviceAccount, String principalEmail) {
-      return Tuple.of(false,
-          Either.right(ServiceAccountUsageAuthorizationResult.builder().accessMessage("nop").build()));
+      return Either.right(ServiceAccountUsageAuthorizationResult.builder().accessMessage("nop").build());
     }
   }
 
@@ -574,7 +579,7 @@ public interface ServiceAccountUsageAuthorizer {
 
     private final Set<WorkflowId> whitelist;
 
-    public WhitelistAuthorizationPolicy(Iterable<WorkflowId> whitelist) {
+    WhitelistAuthorizationPolicy(Iterable<WorkflowId> whitelist) {
       this.whitelist = ImmutableSet.copyOf(whitelist);
     }
 
