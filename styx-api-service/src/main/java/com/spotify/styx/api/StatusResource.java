@@ -89,9 +89,10 @@ public class StatusResource {
     return Api.prefixRoutes(routes, V3);
   }
 
-  private Response<TestServiceAccountUsageAuthorizationResponse> testServiceAccountUsageAuthorization(TestServiceAccountUsageAuthorizationRequest p) {
+  private Response<TestServiceAccountUsageAuthorizationResponse> testServiceAccountUsageAuthorization(
+      TestServiceAccountUsageAuthorizationRequest request) {
     final Either<Response<?>, ServiceAccountUsageAuthorizer.ServiceAccountUsageAuthorizationResult> maybeResult =
-        accountUsageAuthorizer.authorizeServiceAccountUsage(p.serviceAccount(), p.principal());
+        accountUsageAuthorizer.authorizeServiceAccountUsage(request.serviceAccount(), request.principal());
 
     if (maybeResult.isLeft()) {
       throw new ResponseException(maybeResult.left().get());
@@ -101,8 +102,8 @@ public class StatusResource {
 
     final TestServiceAccountUsageAuthorizationResponse response =
         new TestServiceAccountUsageAuthorizationResponseBuilder()
-            .serviceAccount(p.serviceAccount())
-            .principal(p.principal())
+            .serviceAccount(request.serviceAccount())
+            .principal(request.principal())
             .accessReason(result.accessMessage())
             .build();
 
