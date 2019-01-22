@@ -161,7 +161,8 @@ public interface ServiceAccountUsageAuthorizer {
       final boolean enforce = authorizationPolicy.shouldEnforceAuthorization(workflowId, serviceAccount, idToken);
 
       // Cached authorization check
-      final MaybeCachedValue<Either<Response<?>, ServiceAccountUsageAuthorizationResult>> maybeResult;      try {
+      final MaybeCachedValue<Either<Response<?>, ServiceAccountUsageAuthorizationResult>> maybeResult;
+      try {
         maybeResult = authorizeServiceAccountUsagePossiblyFromCache(serviceAccount, principalEmail);
       } catch (Exception e) {
         log.warn("Authorization failure for service account {} used by {} (enforce: {})",
