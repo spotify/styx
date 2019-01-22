@@ -259,7 +259,7 @@ public class StatusResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void testAuthEndpointShouldInternalErrorWhenAuthorizerReturnsError() throws Exception {
+  public void testAuthEndpointShouldReturnBadRequestIfProjectDoesNotExist() throws Exception {
     sinceVersion(Api.Version.V3);
 
     StatusType statusCode = Status.BAD_REQUEST.withReasonPhrase("Project does not exist: baz");
