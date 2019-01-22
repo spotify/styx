@@ -135,7 +135,8 @@ public class StatusResourceTest extends VersionedApiTest {
     final StatusResource statusResource = new StatusResource(storage, accountUsageAuthorizer);
 
     environment.routingEngine()
-        .registerRoutes(statusResource.routes());
+        .registerRoutes(statusResource.routes().map(r ->
+            r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));
   }
 
   @Test
@@ -271,7 +272,7 @@ public class StatusResourceTest extends VersionedApiTest {
             path("/testServiceAccountUsageAuthorization"),
             AUTH_PAYLOAD2));
 
-    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
   }
 
   private Connection setupBigTableMockTable() {
