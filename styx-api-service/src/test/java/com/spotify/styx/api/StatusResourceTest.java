@@ -23,9 +23,9 @@ package com.spotify.styx.api;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasPayload;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
-import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
 import static org.hamcrest.Matchers.any;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
@@ -227,7 +227,7 @@ public class StatusResourceTest extends VersionedApiTest {
         awaitResponse(serviceHelper.request("GET", path("/activeStates")));
 
     assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
-    assertThat(response, hasStatus(withReasonPhrase(is(": \"" + ioException.toString() + "\""))));
+    assertThat(response.status().reasonPhrase(), containsString(": " + ioException.toString()));
   }
 
   @Test
