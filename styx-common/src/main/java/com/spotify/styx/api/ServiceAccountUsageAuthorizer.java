@@ -586,12 +586,12 @@ public interface ServiceAccountUsageAuthorizer {
     Optional<Response<?>> errorResponse();
 
     /**
-     * Authorized?
+     * Successfully authorized?
      */
     boolean authorized();
 
     /**
-     * A message describing the access or denial reason.
+     * A message describing the authorization or denial reason.
      */
     Optional<String> message();
 
