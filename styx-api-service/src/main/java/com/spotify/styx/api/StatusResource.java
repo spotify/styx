@@ -98,6 +98,7 @@ public class StatusResource {
 
     final TestServiceAccountUsageAuthorizationResponse response =
         new TestServiceAccountUsageAuthorizationResponseBuilder()
+            .authorized(result.authorized())
             .serviceAccount(request.serviceAccount())
             .principal(request.principal())
             .message(result.message())
