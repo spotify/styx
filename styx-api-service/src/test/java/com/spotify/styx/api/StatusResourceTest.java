@@ -234,7 +234,7 @@ public class StatusResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     String message = "Some access message";
-    when(accountUsageAuthorizer.authorizeServiceAccountUsage(AUTH_SERVICE_ACCOUNT, AUTH_PRINCIPAL))
+    when(accountUsageAuthorizer.checkServiceAccountUsageAuthorization(AUTH_SERVICE_ACCOUNT, AUTH_PRINCIPAL))
         .thenReturn(ServiceAccountUsageAuthorizationResult.builder()
             .accessMessage(message)
             .serviceAccountProjectId("project")
@@ -262,7 +262,7 @@ public class StatusResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     StatusType statusCode = Status.BAD_REQUEST.withReasonPhrase("Project does not exist: baz");
-    when(accountUsageAuthorizer.authorizeServiceAccountUsage(anyString(), anyString()))
+    when(accountUsageAuthorizer.checkServiceAccountUsageAuthorization(anyString(), anyString()))
         .thenReturn(ServiceAccountUsageAuthorizationResult.ofErrorResponse(Response.forStatus(statusCode)));
 
     Response<ByteString> response =
