@@ -234,7 +234,7 @@ public interface ServiceAccountUsageAuthorizer {
     }
 
     private String denialMessage(String serviceAccount, String principalEmail, String projectId) {
-      return "The user " + principalEmail + " must have the role " + serviceAccountUserRole
+      return "The principal " + principalEmail + " must have the role " + serviceAccountUserRole
              + " in the project " + projectId + " or on the "
              + "service account " + serviceAccount
              + ", either through a group membership or directly. " + message;
