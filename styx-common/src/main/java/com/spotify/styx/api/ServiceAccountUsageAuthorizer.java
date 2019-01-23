@@ -190,15 +190,15 @@ public interface ServiceAccountUsageAuthorizer {
       result.errorResponse().ifPresent(e -> { throw new ResponseException(e); });
 
       // Grant access?
-      if (result.accessMessage().isPresent()) {
-        logAuthorization(workflowId, serviceAccount, enforce, result.accessMessage().get(), cached.get());
+      if (result.authorized()) {
+        logAuthorization(workflowId, serviceAccount, enforce, result.message().orElse(""), cached.get());
         return;
       }
 
       // Deny access?
       logDenial(workflowId, serviceAccount, enforce, principalEmail, cached.get());
       if (enforce) {
-        throw denialResponseException(result.denialMessage());
+        throw denialResponseException(result.message().orElse(""));
       }
     }
 
@@ -223,17 +223,14 @@ public interface ServiceAccountUsageAuthorizer {
 
       final ServiceAccountUsageAuthorizationResultBuilder result = ServiceAccountUsageAuthorizationResult.builder()
               .serviceAccountProjectId(projectId)
-              .accessMessage(accessMessage);
-
-      if (!accessMessage.isPresent()) {
-        result.denialMessage(denialMessage(serviceAccount, principalEmail, projectId));
-      }
+              .authorized(accessMessage.isPresent())
+              .message(accessMessage.orElseGet(() -> denialMessage(serviceAccount, principalEmail, projectId)));
 
       return result.build();
     }
 
-    private ResponseException denialResponseException(Optional<String> message) {
-      return new ResponseException(Response.forStatus(FORBIDDEN.withReasonPhrase(message.orElse(""))));
+    private ResponseException denialResponseException(String message) {
+      return new ResponseException(Response.forStatus(FORBIDDEN.withReasonPhrase(message)));
     }
 
     private String denialMessage(String serviceAccount, String principalEmail, String projectId) {
@@ -443,7 +440,7 @@ public interface ServiceAccountUsageAuthorizer {
     @Override
     public ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(
         String serviceAccount, String principal) {
-      return ServiceAccountUsageAuthorizationResult.builder().accessMessage("nop").build();
+      return ServiceAccountUsageAuthorizationResult.builder().authorized(true).build();
     }
   }
 
@@ -589,14 +586,14 @@ public interface ServiceAccountUsageAuthorizer {
     Optional<Response<?>> errorResponse();
 
     /**
-     * A message describing the access reason, if successfully authorized.
+     * Authorized?
      */
-    Optional<String> accessMessage();
+    boolean authorized();
 
     /**
-     * A message describing the denial reason, if not successfully authorized.
+     * A message describing the access or denial reason.
      */
-    Optional<String> denialMessage();
+    Optional<String> message();
 
     /**
      * The project ID of the service account, if successfully resolved.

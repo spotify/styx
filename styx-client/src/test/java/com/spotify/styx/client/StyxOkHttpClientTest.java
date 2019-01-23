@@ -756,8 +756,7 @@ public class StyxOkHttpClientTest {
 
     final TestServiceAccountUsageAuthorizationResponse expectedResponse = TestServiceAccountUsageAuthorizationResponse
         .builder()
-        .accessReason("foo")
-        .errorMessage("bar")
+        .message("foo")
         .serviceAccount(serviceAccount)
         .principal(principal)
         .build();

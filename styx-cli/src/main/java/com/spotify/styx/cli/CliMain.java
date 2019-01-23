@@ -660,12 +660,12 @@ public final class CliMain {
     final TestServiceAccountUsageAuthorizationResponse response = styxClient.testServiceAccountUsageAuthorization(
         serviceAccount, principal).toCompletableFuture().get();
 
-    if (response.accessReason().isPresent()) {
+    if (response.authorized()) {
       cliOutput.printMessage("The principal " + principal + " is authorized to use the service account "
-                             + serviceAccount + ". " + response.accessReason().get());
+                             + serviceAccount + ". " + response.message().orElse(""));
     } else {
       cliOutput.printMessage("The principal " + principal + " is not authorized to use the service account "
-                             + serviceAccount + ". " + response.errorMessage().orElse(""));
+                             + serviceAccount + ". " + response.message().orElse(""));
       throw CliExitException.of(ExitStatus.UnknownError);
     }
   }
