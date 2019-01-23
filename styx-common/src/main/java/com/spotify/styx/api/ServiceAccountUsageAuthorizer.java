@@ -198,7 +198,7 @@ public interface ServiceAccountUsageAuthorizer {
       // Deny access?
       logDenial(workflowId, serviceAccount, enforce, principalEmail, cached.get());
       if (enforce) {
-        throw denialResponseException(serviceAccount, principalEmail, result.serviceAccountProjectId());
+        throw denialResponseException(result.denialMessage());
       }
     }
 
@@ -206,31 +206,41 @@ public interface ServiceAccountUsageAuthorizer {
     public ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(String serviceAccount,
                                                                                         String principalEmail) {
       final String projectId = serviceAccountProjectId(serviceAccount);
-      return ServiceAccountUsageAuthorizationResult.builder()
-          .serviceAccountProjectId(projectId)
-          .accessMessage(firstPresent(
-              // Check if the principal is an admin
-              () -> memberStatus(principalEmail, administrators)
-                  .map(status -> String.format("Principal %s is an admin %s", principalEmail, status)),
+      final Optional<String> accessMessage = firstPresent(
+          // Check if the principal is an admin
+          () -> memberStatus(principalEmail, administrators)
+              .map(status -> String.format("Principal %s is an admin %s", principalEmail, status)),
 
-              // Check if the principal has been granted the service account user role in the project of the SA
-              () -> projectPolicyAccess(projectId, principalEmail)
-                  .map(type -> String.format("Principal %s has role %s in project %s %s",
-                      principalEmail, serviceAccountUserRole, projectId, type)),
+          // Check if the principal has been granted the service account user role in the project of the SA
+          () -> projectPolicyAccess(projectId, principalEmail)
+              .map(type -> String.format("Principal %s has role %s in project %s %s",
+                  principalEmail, serviceAccountUserRole, projectId, type)),
 
-              // Check if the principal has been granted the service account user role on the SA itself
-              () -> serviceAccountPolicyAccess(serviceAccount, principalEmail)
-                  .map(type -> String.format("Principal %s has role %s on service account %s %s",
-                      principalEmail, serviceAccountUserRole, serviceAccount, type))))
-          .build();
+          // Check if the principal has been granted the service account user role on the SA itself
+          () -> serviceAccountPolicyAccess(serviceAccount, principalEmail)
+              .map(type -> String.format("Principal %s has role %s on service account %s %s",
+                  principalEmail, serviceAccountUserRole, serviceAccount, type)));
+
+      final ServiceAccountUsageAuthorizationResultBuilder result = ServiceAccountUsageAuthorizationResult.builder()
+              .serviceAccountProjectId(projectId)
+              .accessMessage(accessMessage);
+
+      if (!accessMessage.isPresent()) {
+        result.denialMessage(denialMessage(serviceAccount, principalEmail, projectId));
+      }
+
+      return result.build();
     }
 
-    private ResponseException denialResponseException(String serviceAccount, String principalEmail, Optional<String> projectId) {
-      return new ResponseException(Response.forStatus(
-          FORBIDDEN.withReasonPhrase("The user " + principalEmail + " must have the role " + serviceAccountUserRole
-                                     + " in the project " + projectId.orElse("of the service account") + " or on the "
-                                     + "service account " + serviceAccount
-                                     + ", either through a group membership or directly. " + message)));
+    private ResponseException denialResponseException(Optional<String> message) {
+      return new ResponseException(Response.forStatus(FORBIDDEN.withReasonPhrase(message.orElse(""))));
+    }
+
+    private String denialMessage(String serviceAccount, String principalEmail, String projectId) {
+      return "The user " + principalEmail + " must have the role " + serviceAccountUserRole
+             + " in the project " + projectId + " or on the "
+             + "service account " + serviceAccount
+             + ", either through a group membership or directly. " + message;
     }
 
     private void logDenial(WorkflowId workflowId, String serviceAccount, boolean enforce, String principalEmail,
@@ -582,6 +592,11 @@ public interface ServiceAccountUsageAuthorizer {
      * A message describing the access reason, if successfully authorized.
      */
     Optional<String> accessMessage();
+
+    /**
+     * A message describing the denial reason, if not successfully authorized.
+     */
+    Optional<String> denialMessage();
 
     /**
      * The project ID of the service account, if successfully resolved.

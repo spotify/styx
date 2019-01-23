@@ -25,7 +25,12 @@ import java.util.Optional;
 
 @AutoMatter
 public interface TestServiceAccountUsageAuthorizationResponse {
+  Optional<String> errorMessage();
   Optional<String> accessReason();
   String serviceAccount();
   String principal();
+
+  static TestServiceAccountUsageAuthorizationResponseBuilder builder() {
+    return new TestServiceAccountUsageAuthorizationResponseBuilder();
+  }
 }
