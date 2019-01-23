@@ -518,7 +518,7 @@ public class ServiceAccountUsageAuthorizerTest {
   }
 
   private static String deniedMessage(String serviceAccount) {
-    return "The user " + PRINCIPAL_EMAIL + " must have the role " +
+    return "The principal " + PRINCIPAL_EMAIL + " must have the role " +
            SERVICE_ACCOUNT_USER_ROLE + " in the project " + SERVICE_ACCOUNT_PROJECT + " or on the service account " +
            serviceAccount + ", either through a group membership or directly. " + MESSAGE;
   }
