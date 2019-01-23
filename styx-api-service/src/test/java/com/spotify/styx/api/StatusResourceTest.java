@@ -92,7 +92,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
   private static final String AUTH_SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccounts.com";
   private static final String AUTH_PRINCIPAL = "bar@example.com";
-  private static final ByteString AUTH_PAYLOAD2 = ByteString.encodeUtf8(
+  private static final ByteString AUTH_PAYLOAD = ByteString.encodeUtf8(
       String.format("{\"service_account\":\"%s\",\"principal\":\"%s\"}", AUTH_SERVICE_ACCOUNT, AUTH_PRINCIPAL));
   private ServiceAccountUsageAuthorizer accountUsageAuthorizer;
 
@@ -245,7 +245,7 @@ public class StatusResourceTest extends VersionedApiTest {
         awaitResponse(serviceHelper.request(
             "POST",
             path("/testServiceAccountUsageAuthorization"),
-            AUTH_PAYLOAD2));
+            AUTH_PAYLOAD));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
 
@@ -271,7 +271,7 @@ public class StatusResourceTest extends VersionedApiTest {
         awaitResponse(serviceHelper.request(
             "POST",
             path("/testServiceAccountUsageAuthorization"),
-            AUTH_PAYLOAD2));
+            AUTH_PAYLOAD));
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
   }
