@@ -100,8 +100,7 @@ public class StatusResource {
         new TestServiceAccountUsageAuthorizationResponseBuilder()
             .serviceAccount(request.serviceAccount())
             .principal(request.principal())
-            .accessReason(result.accessMessage())
-            .errorMessage(result.denialMessage())
+            .message(result.message())
             .build();
 
     return Response.forPayload(response);

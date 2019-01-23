@@ -236,7 +236,8 @@ public class StatusResourceTest extends VersionedApiTest {
     String message = "Some access message";
     when(accountUsageAuthorizer.checkServiceAccountUsageAuthorization(AUTH_SERVICE_ACCOUNT, AUTH_PRINCIPAL))
         .thenReturn(ServiceAccountUsageAuthorizationResult.builder()
-            .accessMessage(message)
+            .authorized(true)
+            .message(message)
             .serviceAccountProjectId("project")
             .build());
 
@@ -252,9 +253,10 @@ public class StatusResourceTest extends VersionedApiTest {
     TestServiceAccountUsageAuthorizationResponse
         parsed = Json.OBJECT_MAPPER.readValue(json, TestServiceAccountUsageAuthorizationResponse.class);
 
+    assertThat(parsed.authorized(), is(true));
     assertThat(parsed.serviceAccount(), equalTo(AUTH_SERVICE_ACCOUNT));
     assertThat(parsed.principal(), equalTo(AUTH_PRINCIPAL));
-    assertThat(parsed.accessReason().get(), equalTo(message));
+    assertThat(parsed.message().get(), equalTo(message));
   }
 
   @Test

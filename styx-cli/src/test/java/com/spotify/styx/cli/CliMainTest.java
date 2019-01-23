@@ -917,9 +917,10 @@ public class CliMainTest {
     final String principal = "baz@example.com";
 
     final TestServiceAccountUsageAuthorizationResponse response = TestServiceAccountUsageAuthorizationResponse.builder()
+        .authorized(true)
         .serviceAccount(serviceAccount)
         .principal(principal)
-        .accessReason("Because success.")
+        .message("foobar")
         .build();
 
     when(client.testServiceAccountUsageAuthorization(serviceAccount, principal))
@@ -929,7 +930,7 @@ public class CliMainTest {
 
     verify(client).testServiceAccountUsageAuthorization(serviceAccount, principal);
     verify(cliOutput).printMessage("The principal " + principal + " is authorized to use the service account "
-                                   + serviceAccount + ". " + response.accessReason().get());
+                                   + serviceAccount + ". " + response.message().get());
   }
 
   @Test
@@ -938,9 +939,10 @@ public class CliMainTest {
     final String principal = "baz@example.com";
 
     final TestServiceAccountUsageAuthorizationResponse response = TestServiceAccountUsageAuthorizationResponse.builder()
+        .authorized(false)
         .serviceAccount(serviceAccount)
         .principal(principal)
-        .errorMessage("Because failure.")
+        .message("foobar")
         .build();
 
     when(client.testServiceAccountUsageAuthorization(serviceAccount, principal))
@@ -955,7 +957,7 @@ public class CliMainTest {
 
     verify(client).testServiceAccountUsageAuthorization(serviceAccount, principal);
     verify(cliOutput).printMessage("The principal " + principal + " is not authorized to use the service account "
-                                   + serviceAccount + ". " + response.errorMessage().orElse(""));
+                                   + serviceAccount + ". " + response.message().orElse(""));
   }
 
   private Path fileFromResource(String name) throws IOException {
