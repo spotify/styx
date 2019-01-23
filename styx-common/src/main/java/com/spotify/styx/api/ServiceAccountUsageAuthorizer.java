@@ -56,7 +56,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.apollo.Response;
 import com.spotify.styx.model.WorkflowId;
-import com.spotify.styx.util.MaybeCachedValue;
 import com.typesafe.config.Config;
 import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
@@ -77,7 +76,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javaslang.Tuple;
 import javaslang.Tuple2;
-import javaslang.control.Either;
 import javaslang.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -102,11 +100,9 @@ public interface ServiceAccountUsageAuthorizer {
   String AUTHORIZATION_MESSAGE_CONFIG = "styx.authorization.message";
   String AUTHORIZATION_ADMINISTRATORS_CONFIG = "styx.authorization.administrators";
 
-  void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount,
-      GoogleIdToken idToken);
+  void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken);
 
-  Either<Response<?>, ServiceAccountUsageAuthorizationResult> authorizeServiceAccountUsage(
-      String serviceAccount, String principalEmail);
+  ServiceAccountUsageAuthorizationResult authorizeServiceAccountUsage(String serviceAccount, String principalEmail);
 
   class Impl implements ServiceAccountUsageAuthorizer {
 
@@ -133,9 +129,9 @@ public interface ServiceAccountUsageAuthorizer {
     private final List<String> administrators;
 
     /**
-     * (principalEmail, serviceAccount) -> Either[Response, Result]
+     * (principalEmail, serviceAccount) -> ServiceAccountUsageAuthorizationResult
      */
-    private final Cache<Tuple2<String, String>, Either<Response<?>, ServiceAccountUsageAuthorizationResult>> cache =
+    private final Cache<Tuple2<String, String>, ServiceAccountUsageAuthorizationResult> cache =
         CacheBuilder.newBuilder()
             .expireAfterWrite(60, SECONDS)
             .maximumSize(10_000)
@@ -161,9 +157,9 @@ public interface ServiceAccountUsageAuthorizer {
       final boolean enforce = authorizationPolicy.shouldEnforceAuthorization(workflowId, serviceAccount, idToken);
 
       // Cached authorization check
-      final MaybeCachedValue<Either<Response<?>, ServiceAccountUsageAuthorizationResult>> maybeResult;
+      final ServiceAccountUsageAuthorizationResult result;
       try {
-        maybeResult = cachedAuthorizationCheck(serviceAccount, principalEmail);
+        result = authorizeServiceAccountUsage(serviceAccount, principalEmail);
       } catch (Exception e) {
         log.warn("Authorization failure for service account {} used by {} (enforce: {})",
             serviceAccount, principalEmail, enforce, e);
@@ -175,48 +171,35 @@ public interface ServiceAccountUsageAuthorizer {
         }
       }
 
-      final boolean cached = maybeResult.isCached();
-
       // Propagate response exception
-      if (maybeResult.value().isLeft()) {
-        throw new ResponseException(maybeResult.value().left().get());
-      }
-
-      final ServiceAccountUsageAuthorizationResult result = maybeResult.value().right().get();
+      result.errorResponse().ifPresent(e -> { throw new ResponseException(e); });
 
       // Grant access?
       if (result.accessMessage().isPresent()) {
-        logAuthorization(workflowId, serviceAccount, enforce, result.accessMessage().get(), cached);
+        logAuthorization(workflowId, serviceAccount, enforce, result.accessMessage().get(), result.cacheHit());
         return;
       }
 
       // Deny access?
-      logDenial(workflowId, serviceAccount, enforce, principalEmail, cached);
+      logDenial(workflowId, serviceAccount, enforce, principalEmail, result.cacheHit());
       if (enforce) {
         throw denialResponseException(serviceAccount, principalEmail, result.serviceAccountProjectId());
       }
     }
 
     @Override
-    public Either<Response<?>, ServiceAccountUsageAuthorizationResult> authorizeServiceAccountUsage(
+    public ServiceAccountUsageAuthorizationResult authorizeServiceAccountUsage(
         String serviceAccount, String principalEmail) {
-      return cachedAuthorizationCheck(serviceAccount, principalEmail).value();
-    }
-
-    private MaybeCachedValue<Either<Response<?>, ServiceAccountUsageAuthorizationResult>>
-    cachedAuthorizationCheck(String serviceAccount, String principalEmail) {
-      AtomicBoolean cached = new AtomicBoolean(true);
+      final AtomicBoolean cached = new AtomicBoolean(true);
       try {
-        final Either<Response<?>, ServiceAccountUsageAuthorizationResult> result =
-            cache.get(Tuple.of(principalEmail, serviceAccount), () -> {
-              cached.set(false);
-              try {
-                return Either.right(authorizationCheck(serviceAccount, principalEmail));
-              } catch (ResponseException e) {
-                return Either.left(e.getResponse());
-              }
-            });
-        return MaybeCachedValue.create(cached.get(), result);
+        return cache.get(Tuple.of(principalEmail, serviceAccount), () -> {
+          cached.set(false);
+          try {
+            return authorizationCheck(serviceAccount, principalEmail);
+          } catch (ResponseException e) {
+            return ServiceAccountUsageAuthorizationResult.ofErrorResponse(e.getResponse());
+          }
+        }).withCacheHit(cached.get());
       } catch (ExecutionException e) {
         throw new RuntimeException(e);
       }
@@ -244,10 +227,11 @@ public interface ServiceAccountUsageAuthorizer {
           .build();
     }
 
-    private ResponseException denialResponseException(String serviceAccount, String principalEmail, String projectId) {
+    private ResponseException denialResponseException(String serviceAccount, String principalEmail, Optional<String> projectId) {
       return new ResponseException(Response.forStatus(
           FORBIDDEN.withReasonPhrase("The user " + principalEmail + " must have the role " + serviceAccountUserRole
-                                     + " in the project " + projectId + " or on the service account " + serviceAccount
+                                     + " in the project " + projectId.orElse("of the service account") + " or on the "
+                                     + "service account " + serviceAccount
                                      + ", either through a group membership or directly. " + message)));
     }
 
@@ -449,9 +433,9 @@ public interface ServiceAccountUsageAuthorizer {
     }
 
     @Override
-    public Either<Response<?>, ServiceAccountUsageAuthorizationResult> authorizeServiceAccountUsage(
+    public ServiceAccountUsageAuthorizationResult authorizeServiceAccountUsage(
         String serviceAccount, String principalEmail) {
-      return Either.right(ServiceAccountUsageAuthorizationResult.builder().accessMessage("nop").build());
+      return ServiceAccountUsageAuthorizationResult.builder().accessMessage("nop").build();
     }
   }
 
@@ -561,7 +545,6 @@ public interface ServiceAccountUsageAuthorizer {
   }
 
   /**
-  /**
    * A policy that always enforces authorization.
    */
   class AllAuthorizationPolicy implements AuthorizationPolicy {
@@ -592,12 +575,38 @@ public interface ServiceAccountUsageAuthorizer {
   @AutoMatter
   interface ServiceAccountUsageAuthorizationResult {
 
+    /**
+     * Was this result served from the cache?
+     */
+    boolean cacheHit();
+
+    /**
+     * A response describing any error encountered during the authorization check.
+     */
+    Optional<Response<?>> errorResponse();
+
+    /**
+     * A message describing the access reason, if successfully authorized.
+     */
     Optional<String> accessMessage();
 
-    String serviceAccountProjectId();
+    /**
+     * The project ID of the service account, if successfully resolved.
+     */
+    Optional<String> serviceAccountProjectId();
+
+    default ServiceAccountUsageAuthorizationResult withCacheHit(boolean cacheHit) {
+      return ServiceAccountUsageAuthorizationResultBuilder.from(this)
+          .cacheHit(cacheHit)
+          .build();
+    }
 
     static ServiceAccountUsageAuthorizationResultBuilder builder() {
       return new ServiceAccountUsageAuthorizationResultBuilder();
+    }
+
+    static ServiceAccountUsageAuthorizationResult ofErrorResponse(Response<?> response) {
+      return builder().errorResponse(response).build();
     }
   }
 
