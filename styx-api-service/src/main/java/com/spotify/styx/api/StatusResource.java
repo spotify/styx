@@ -33,6 +33,7 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
+import com.spotify.styx.api.ServiceAccountUsageAuthorizer.ServiceAccountUsageAuthorizationResult;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -45,7 +46,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
-import javaslang.control.Either;
 import okio.ByteString;
 
 /**
@@ -91,14 +91,10 @@ public class StatusResource {
 
   private Response<TestServiceAccountUsageAuthorizationResponse> testServiceAccountUsageAuthorization(
       TestServiceAccountUsageAuthorizationRequest request) {
-    final Either<Response<?>, ServiceAccountUsageAuthorizer.ServiceAccountUsageAuthorizationResult> maybeResult =
+    final ServiceAccountUsageAuthorizationResult result =
         accountUsageAuthorizer.authorizeServiceAccountUsage(request.serviceAccount(), request.principal());
 
-    if (maybeResult.isLeft()) {
-      throw new ResponseException(maybeResult.left().get());
-    }
-
-    final ServiceAccountUsageAuthorizer.ServiceAccountUsageAuthorizationResult result = maybeResult.right().get();
+    result.errorResponse().ifPresent(e -> { throw new ResponseException(e); });
 
     final TestServiceAccountUsageAuthorizationResponse response =
         new TestServiceAccountUsageAuthorizationResponseBuilder()

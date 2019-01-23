@@ -60,7 +60,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.logging.Level;
-import javaslang.control.Either;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -236,10 +235,10 @@ public class StatusResourceTest extends VersionedApiTest {
 
     String message = "Some access message";
     when(accountUsageAuthorizer.authorizeServiceAccountUsage(AUTH_SERVICE_ACCOUNT, AUTH_PRINCIPAL))
-        .thenReturn(Either.right(ServiceAccountUsageAuthorizationResult.builder()
+        .thenReturn(ServiceAccountUsageAuthorizationResult.builder()
             .accessMessage(message)
             .serviceAccountProjectId("project")
-            .build()));
+            .build());
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request(
@@ -264,7 +263,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
     StatusType statusCode = Status.BAD_REQUEST.withReasonPhrase("Project does not exist: baz");
     when(accountUsageAuthorizer.authorizeServiceAccountUsage(anyString(), anyString()))
-        .thenReturn(Either.left(Response.forStatus(statusCode)));
+        .thenReturn(ServiceAccountUsageAuthorizationResult.ofErrorResponse(Response.forStatus(statusCode)));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request(
