@@ -101,6 +101,7 @@ public class StatusResource {
             .serviceAccount(request.serviceAccount())
             .principal(request.principal())
             .accessReason(result.accessMessage())
+            .errorMessage(result.denialMessage())
             .build();
 
     return Response.forPayload(response);

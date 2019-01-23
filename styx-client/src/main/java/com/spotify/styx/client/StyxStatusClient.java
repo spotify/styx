@@ -21,6 +21,7 @@
 package com.spotify.styx.client;
 
 import com.spotify.styx.api.RunStateDataPayload;
+import com.spotify.styx.api.TestServiceAccountUsageAuthorizationResponse;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.data.EventInfo;
@@ -56,6 +57,12 @@ public interface StyxStatusClient extends AutoCloseable {
   CompletionStage<List<EventInfo>> eventsForWorkflowInstance(String componentId,
                                                              String workflowId,
                                                              String parameter);
+
+  /**
+   * Test if a principal is authorized to use a service account.
+   */
+  CompletionStage<TestServiceAccountUsageAuthorizationResponse> testServiceAccountUsageAuthorization(
+      String serviceAccountEmail, String principalEmail);
 
   @Override
   void close();

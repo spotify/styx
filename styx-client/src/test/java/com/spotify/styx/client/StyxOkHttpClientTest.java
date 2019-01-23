@@ -30,6 +30,7 @@ import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static java.net.HttpURLConnection.HTTP_INTERNAL_ERROR;
 import static java.net.HttpURLConnection.HTTP_NO_CONTENT;
 import static java.net.HttpURLConnection.HTTP_OK;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
@@ -46,6 +47,8 @@ import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.EventsPayload;
 import com.spotify.styx.api.RunStateDataPayload;
+import com.spotify.styx.api.TestServiceAccountUsageAuthorizationRequest;
+import com.spotify.styx.api.TestServiceAccountUsageAuthorizationResponse;
 import com.spotify.styx.client.auth.GoogleIdTokenAuth;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
@@ -744,5 +747,33 @@ public class StyxOkHttpClientTest {
     assertThat(request.method(), is("POST"));
     assertThat(Json.deserialize(bytesOfRequestBody(request), TriggerRequest.class),
         equalTo(triggerRequest));
+  }
+
+  @Test
+  public void shouldTestServiceAccountUsageAuthorization() throws Exception {
+    final String serviceAccount = "foo@bar.iam.gserviceaccount.com";
+    final String principal = "baz@example.com";
+
+    final TestServiceAccountUsageAuthorizationResponse expectedResponse = TestServiceAccountUsageAuthorizationResponse
+        .builder()
+        .accessReason("foo")
+        .errorMessage("bar")
+        .serviceAccount(serviceAccount)
+        .principal(principal)
+        .build();
+
+    when(client.send(any())).thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, expectedResponse)));
+    final TestServiceAccountUsageAuthorizationResponse response =
+        styx.testServiceAccountUsageAuthorization(serviceAccount, principal).toCompletableFuture().get(30, SECONDS);
+
+    verify(client).send(requestCaptor.capture());
+    final Request request = requestCaptor.getValue();
+    assertThat(request.url().toString(), is(API_URL + "/status/testServiceAccountUsageAuthorization"));
+    assertThat(request.method(), is("POST"));
+    final TestServiceAccountUsageAuthorizationRequest requestPayload =
+        Json.deserialize(bytesOfRequestBody(request), TestServiceAccountUsageAuthorizationRequest.class);
+    assertThat(requestPayload.serviceAccount(), is(serviceAccount));
+    assertThat(requestPayload.principal(), is(principal));
+    assertThat(response, is(expectedResponse));
   }
 }

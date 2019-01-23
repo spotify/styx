@@ -41,6 +41,7 @@ import com.google.common.io.Resources;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.RunStateDataPayload;
+import com.spotify.styx.api.TestServiceAccountUsageAuthorizationResponse;
 import com.spotify.styx.cli.CliExitException.ExitStatus;
 import com.spotify.styx.cli.CliMain.CliContext;
 import com.spotify.styx.cli.CliMain.CliContext.Output;
@@ -908,6 +909,53 @@ public class CliMainTest {
     when(client.workflows()).thenReturn(CompletableFuture.completedFuture(Collections.emptyList()));
     CliMain.run(cliContext, argLine.split(" "));
     verify(cliContext).createClient("https://foo.bar");
+  }
+
+  @Test
+  public void testAuthTestServiceAccountUsageSuccess() {
+    final String serviceAccount = "foo@bar.iam.gserviceaccount.com";
+    final String principal = "baz@example.com";
+
+    final TestServiceAccountUsageAuthorizationResponse response = TestServiceAccountUsageAuthorizationResponse.builder()
+        .serviceAccount(serviceAccount)
+        .principal(principal)
+        .accessReason("Because success.")
+        .build();
+
+    when(client.testServiceAccountUsageAuthorization(serviceAccount, principal))
+        .thenReturn(CompletableFuture.completedFuture(response));
+
+    CliMain.run(cliContext, "auth", "test", "--service-account", serviceAccount, "--principal", principal);
+
+    verify(client).testServiceAccountUsageAuthorization(serviceAccount, principal);
+    verify(cliOutput).printMessage("The principal " + principal + " is authorized to use the service account "
+                                   + serviceAccount + ". " + response.accessReason().get());
+  }
+
+  @Test
+  public void testAuthTestServiceAccountUsageFailure() {
+    final String serviceAccount = "foo@bar.iam.gserviceaccount.com";
+    final String principal = "baz@example.com";
+
+    final TestServiceAccountUsageAuthorizationResponse response = TestServiceAccountUsageAuthorizationResponse.builder()
+        .serviceAccount(serviceAccount)
+        .principal(principal)
+        .errorMessage("Because failure.")
+        .build();
+
+    when(client.testServiceAccountUsageAuthorization(serviceAccount, principal))
+        .thenReturn(CompletableFuture.completedFuture(response));
+
+    try {
+      CliMain.run(cliContext, "auth", "test", "--service-account", serviceAccount, "--principal", principal);
+      fail();
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.UnknownError));
+    }
+
+    verify(client).testServiceAccountUsageAuthorization(serviceAccount, principal);
+    verify(cliOutput).printMessage("The principal " + principal + " is not authorized to use the service account "
+                                   + serviceAccount + ". " + response.errorMessage().orElse(""));
   }
 
   private Path fileFromResource(String name) throws IOException {
