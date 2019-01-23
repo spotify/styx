@@ -24,6 +24,14 @@ import io.norberg.automatter.AutoMatter;
 
 @AutoMatter
 public interface TestServiceAccountUsageAuthorizationRequest {
+
+  /**
+   * The service account to test usage authorization against.
+   */
   String serviceAccount();
+
+  /**
+   * The principal (user) to test service account usage authorization for.
+   */
   String principal();
 }

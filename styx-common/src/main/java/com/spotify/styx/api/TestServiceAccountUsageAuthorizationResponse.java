@@ -25,9 +25,25 @@ import java.util.Optional;
 
 @AutoMatter
 public interface TestServiceAccountUsageAuthorizationResponse {
+
+  /**
+   * Successfully authorized?
+   */
   boolean authorized();
+
+  /**
+   * A message describing the authorization or denial reason.
+   */
   Optional<String> message();
+
+  /**
+   * The service account that usage authorization was tested against.
+   */
   String serviceAccount();
+
+  /**
+   * The principal (user) that service account usage authorization was tested for.
+   */
   String principal();
 
   static TestServiceAccountUsageAuthorizationResponseBuilder builder() {
