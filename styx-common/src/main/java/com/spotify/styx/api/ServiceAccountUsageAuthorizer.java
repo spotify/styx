@@ -207,15 +207,15 @@ public interface ServiceAccountUsageAuthorizer {
     authorizeServiceAccountUsagePossiblyFromCache(String serviceAccount, String principalEmail) {
       AtomicBoolean cached = new AtomicBoolean(true);
       try {
-        final Either<Response<?>, ServiceAccountUsageAuthorizationResult> result = cache.get(Tuple.of(principalEmail, serviceAccount),
-            () -> {
-          cached.set(false);
-          try {
-            return Either.right(authorizationCheck(serviceAccount, principalEmail));
-          } catch (ResponseException e) {
-            return Either.left(e.getResponse());
-          }
-        });
+        final Either<Response<?>, ServiceAccountUsageAuthorizationResult> result =
+            cache.get(Tuple.of(principalEmail, serviceAccount), () -> {
+              cached.set(false);
+              try {
+                return Either.right(authorizationCheck(serviceAccount, principalEmail));
+              } catch (ResponseException e) {
+                return Either.left(e.getResponse());
+              }
+            });
         return MaybeCachedValue.create(cached.get(), result);
       } catch (ExecutionException e) {
         throw new RuntimeException(e);
