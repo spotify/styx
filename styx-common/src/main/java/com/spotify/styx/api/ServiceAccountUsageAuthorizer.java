@@ -163,7 +163,7 @@ public interface ServiceAccountUsageAuthorizer {
       // Cached authorization check
       final MaybeCachedValue<Either<Response<?>, ServiceAccountUsageAuthorizationResult>> maybeResult;
       try {
-        maybeResult = authorizeServiceAccountUsagePossiblyFromCache(serviceAccount, principalEmail);
+        maybeResult = cachedAuthorizationCheck(serviceAccount, principalEmail);
       } catch (Exception e) {
         log.warn("Authorization failure for service account {} used by {} (enforce: {})",
             serviceAccount, principalEmail, enforce, e);
@@ -200,11 +200,11 @@ public interface ServiceAccountUsageAuthorizer {
     @Override
     public Either<Response<?>, ServiceAccountUsageAuthorizationResult> authorizeServiceAccountUsage(
         String serviceAccount, String principalEmail) {
-      return authorizeServiceAccountUsagePossiblyFromCache(serviceAccount, principalEmail).value();
+      return cachedAuthorizationCheck(serviceAccount, principalEmail).value();
     }
 
     private MaybeCachedValue<Either<Response<?>, ServiceAccountUsageAuthorizationResult>>
-    authorizeServiceAccountUsagePossiblyFromCache(String serviceAccount, String principalEmail) {
+    cachedAuthorizationCheck(String serviceAccount, String principalEmail) {
       AtomicBoolean cached = new AtomicBoolean(true);
       try {
         final Either<Response<?>, ServiceAccountUsageAuthorizationResult> result =
