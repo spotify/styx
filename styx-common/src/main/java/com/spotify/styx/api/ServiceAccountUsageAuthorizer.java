@@ -100,9 +100,16 @@ public interface ServiceAccountUsageAuthorizer {
   String AUTHORIZATION_MESSAGE_CONFIG = "styx.authorization.message";
   String AUTHORIZATION_ADMINISTRATORS_CONFIG = "styx.authorization.administrators";
 
+  /**
+   * Authorize service account usage by a principal in a workflow.
+   * @throws ResponseException if not authorized.
+   */
   void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken);
 
-  ServiceAccountUsageAuthorizationResult authorizeServiceAccountUsage(String serviceAccount, String principalEmail);
+  /**
+   * Check if a principal is authorized to use a service account.
+   */
+  ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(String serviceAccount, String principal);
 
   class Impl implements ServiceAccountUsageAuthorizer {
 
@@ -157,9 +164,17 @@ public interface ServiceAccountUsageAuthorizer {
       final boolean enforce = authorizationPolicy.shouldEnforceAuthorization(workflowId, serviceAccount, idToken);
 
       // Cached authorization check
+      final AtomicBoolean cached = new AtomicBoolean(true);
       final ServiceAccountUsageAuthorizationResult result;
       try {
-        result = authorizeServiceAccountUsage(serviceAccount, principalEmail);
+        result = cache.get(Tuple.of(principalEmail, serviceAccount), () -> {
+          cached.set(false);
+          try {
+            return checkServiceAccountUsageAuthorization(serviceAccount, principalEmail);
+          } catch (ResponseException e) {
+            return ServiceAccountUsageAuthorizationResult.ofErrorResponse(e.getResponse());
+          }
+        });
       } catch (Exception e) {
         log.warn("Authorization failure for service account {} used by {} (enforce: {})",
             serviceAccount, principalEmail, enforce, e);
@@ -176,37 +191,20 @@ public interface ServiceAccountUsageAuthorizer {
 
       // Grant access?
       if (result.accessMessage().isPresent()) {
-        logAuthorization(workflowId, serviceAccount, enforce, result.accessMessage().get(), result.cacheHit());
+        logAuthorization(workflowId, serviceAccount, enforce, result.accessMessage().get(), cached.get());
         return;
       }
 
       // Deny access?
-      logDenial(workflowId, serviceAccount, enforce, principalEmail, result.cacheHit());
+      logDenial(workflowId, serviceAccount, enforce, principalEmail, cached.get());
       if (enforce) {
         throw denialResponseException(serviceAccount, principalEmail, result.serviceAccountProjectId());
       }
     }
 
     @Override
-    public ServiceAccountUsageAuthorizationResult authorizeServiceAccountUsage(
-        String serviceAccount, String principalEmail) {
-      final AtomicBoolean cached = new AtomicBoolean(true);
-      try {
-        return cache.get(Tuple.of(principalEmail, serviceAccount), () -> {
-          cached.set(false);
-          try {
-            return authorizationCheck(serviceAccount, principalEmail);
-          } catch (ResponseException e) {
-            return ServiceAccountUsageAuthorizationResult.ofErrorResponse(e.getResponse());
-          }
-        }).withCacheHit(cached.get());
-      } catch (ExecutionException e) {
-        throw new RuntimeException(e);
-      }
-    }
-
-    private ServiceAccountUsageAuthorizationResult authorizationCheck(String serviceAccount,
-                                                                      String principalEmail) {
+    public ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(String serviceAccount,
+                                                                                        String principalEmail) {
       final String projectId = serviceAccountProjectId(serviceAccount);
       return ServiceAccountUsageAuthorizationResult.builder()
           .serviceAccountProjectId(projectId)
@@ -433,8 +431,8 @@ public interface ServiceAccountUsageAuthorizer {
     }
 
     @Override
-    public ServiceAccountUsageAuthorizationResult authorizeServiceAccountUsage(
-        String serviceAccount, String principalEmail) {
+    public ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(
+        String serviceAccount, String principal) {
       return ServiceAccountUsageAuthorizationResult.builder().accessMessage("nop").build();
     }
   }
@@ -576,11 +574,6 @@ public interface ServiceAccountUsageAuthorizer {
   interface ServiceAccountUsageAuthorizationResult {
 
     /**
-     * Was this result served from the cache?
-     */
-    boolean cacheHit();
-
-    /**
      * A response describing any error encountered during the authorization check.
      */
     Optional<Response<?>> errorResponse();
@@ -594,12 +587,6 @@ public interface ServiceAccountUsageAuthorizer {
      * The project ID of the service account, if successfully resolved.
      */
     Optional<String> serviceAccountProjectId();
-
-    default ServiceAccountUsageAuthorizationResult withCacheHit(boolean cacheHit) {
-      return ServiceAccountUsageAuthorizationResultBuilder.from(this)
-          .cacheHit(cacheHit)
-          .build();
-    }
 
     static ServiceAccountUsageAuthorizationResultBuilder builder() {
       return new ServiceAccountUsageAuthorizationResultBuilder();

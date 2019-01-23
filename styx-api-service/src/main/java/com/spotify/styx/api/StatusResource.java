@@ -92,7 +92,7 @@ public class StatusResource {
   private Response<TestServiceAccountUsageAuthorizationResponse> testServiceAccountUsageAuthorization(
       TestServiceAccountUsageAuthorizationRequest request) {
     final ServiceAccountUsageAuthorizationResult result =
-        accountUsageAuthorizer.authorizeServiceAccountUsage(request.serviceAccount(), request.principal());
+        accountUsageAuthorizer.checkServiceAccountUsageAuthorization(request.serviceAccount(), request.principal());
 
     result.errorResponse().ifPresent(e -> { throw new ResponseException(e); });
 
