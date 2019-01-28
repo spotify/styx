@@ -61,8 +61,11 @@ public final class StateUtil {
                                                            Instant instant,
                                                            TimeoutConfig ttl) {
     return activeStates.parallelStream()
-        .filter(entry -> hasTimedOut(workflows.get(entry.workflowInstance().workflowId()), entry.runState(), instant,
-            ttl.ttlOf(entry.runState().state())))
+        .filter(entry -> {
+          final Optional<Workflow> workflowOpt =
+              Optional.ofNullable(workflows.get(entry.workflowInstance().workflowId()));
+          return hasTimedOut(workflowOpt, entry.runState(), instant, ttl.ttlOf(entry.runState().state()));
+        })
         .map(InstanceState::workflowInstance)
         .collect(toSet());
   }
@@ -107,13 +110,16 @@ public final class StateUtil {
     return builder.build();
   }
 
-  private static boolean hasTimedOut(Workflow workflow, RunState runState, Instant instant, Duration timeout) {
+  private static boolean hasTimedOut(Optional<Workflow> workflowOpt, RunState runState, Instant instant,
+                                     Duration timeout) {
     if (runState.state().isTerminal()) {
       return false;
     }
 
     final Duration effectiveTimeout = runState.state() == RunState.State.RUNNING
-                                      ? workflow.configuration().runningTimeout().orElse(timeout)
+                                      ? workflowOpt
+                                          .flatMap(workflow -> workflow.configuration().runningTimeout())
+                                          .orElse(timeout)
                                       : timeout;
     final Duration sanitizedTimeout = effectiveTimeout.compareTo(timeout) < 0 ? effectiveTimeout : timeout;
 
