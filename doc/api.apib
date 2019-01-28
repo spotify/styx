@@ -27,6 +27,16 @@ in those requests.
 To know more details, please check
 [Google documentation](https://developers.google.com/identity/sign-in/web/backend-auth).
 
+## Authorization
+
+If authorization is enabled for the Styx service, any workflow with a `service_account`
+configured can only be updated by an authorized user of that `service_account`.
+
+Updates include deploying, enabling/disabling and triggering the workflow.
+
+In order to authorize an account, you need to grant it the [configured role](https://github.com/spotify/styx/blob/master/styx-standalone-service/src/main/resources/styx-standalone.conf#L66)
+for the workflow `service_account`. For more information, see [Granting Roles to Service Accounts](https://cloud.google.com/iam/docs/granting-roles-to-service-accounts).
+
 # Group Workflows
 
 Resources related to the Workflows registered in Styx.
@@ -119,7 +129,8 @@ or updated. Note that a non-null value is required for docker_image.
           "env": {"FOO": "bar"},
           "secret": null,
           "service_account": null,
-          "resources": []
+          "resources": [],
+          "running_timeout": "PT2H"
         }
 
 + Response 200 (application/json)
@@ -143,7 +154,8 @@ or updated. Note that a non-null value is required for docker_image.
             "env": {"FOO": "bar"},
             "secret": null,
             "service_account": null,
-            "resources": []
+            "resources": [],
+            "running_timeout": "PT2H"
           },
           "__from_api": "V3"
         }
@@ -179,7 +191,8 @@ or updated. Note that a non-null value is required for docker_image.
                 "docker_termination_logging": false,
                 "env": {"FOO": "bar"},
                 "secret": null,
-                "resources": []
+                "resources": [],
+                "running_timeout": "PT2H"
               }
         }
 

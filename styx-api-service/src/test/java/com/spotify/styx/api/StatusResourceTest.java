@@ -23,12 +23,14 @@ package com.spotify.styx.api;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasPayload;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
-import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
 import static org.hamcrest.Matchers.any;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -37,7 +39,9 @@ import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
+import com.spotify.apollo.StatusType;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
+import com.spotify.styx.api.ServiceAccountUsageAuthorizer.ServiceAccountUsageAuthorizationResult;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.TriggerParameters;
@@ -86,6 +90,12 @@ public class StatusResourceTest extends VersionedApiTest {
 
   private Storage storage;
 
+  private static final String AUTH_SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccounts.com";
+  private static final String AUTH_PRINCIPAL = "bar@example.com";
+  private static final ByteString AUTH_PAYLOAD = ByteString.encodeUtf8(
+      String.format("{\"service_account\":\"%s\",\"principal\":\"%s\"}", AUTH_SERVICE_ACCOUNT, AUTH_PRINCIPAL));
+  private ServiceAccountUsageAuthorizer accountUsageAuthorizer;
+
   public StatusResourceTest(Api.Version version) {
     super(StatusResource.BASE, version);
   }
@@ -118,12 +128,14 @@ public class StatusResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
+    accountUsageAuthorizer = mock(ServiceAccountUsageAuthorizer.class);
     storage = spy(new AggregateStorage(bigtable, localDatastore.getOptions().getService(),
         Duration.ZERO));
-    final StatusResource statusResource = new StatusResource(storage);
+    final StatusResource statusResource = new StatusResource(storage, accountUsageAuthorizer);
 
     environment.routingEngine()
-        .registerRoutes(statusResource.routes());
+        .registerRoutes(statusResource.routes().map(r ->
+            r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));
   }
 
   @Test
@@ -214,7 +226,54 @@ public class StatusResourceTest extends VersionedApiTest {
         awaitResponse(serviceHelper.request("GET", path("/activeStates")));
 
     assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
-    assertThat(response, hasStatus(withReasonPhrase(is(": \"" + ioException.toString() + "\""))));
+    assertThat(response.status().reasonPhrase(), containsString(": " + ioException.toString()));
+  }
+
+  @Test
+  public void testAuthEndpointShouldFordwardAuthorizerResponse() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    String message = "Some access message";
+    when(accountUsageAuthorizer.checkServiceAccountUsageAuthorization(AUTH_SERVICE_ACCOUNT, AUTH_PRINCIPAL))
+        .thenReturn(ServiceAccountUsageAuthorizationResult.builder()
+            .authorized(true)
+            .message(message)
+            .serviceAccountProjectId("project")
+            .build());
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request(
+            "POST",
+            path("/testServiceAccountUsageAuthorization"),
+            AUTH_PAYLOAD));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+
+    String json = response.payload().get().utf8();
+    TestServiceAccountUsageAuthorizationResponse
+        parsed = Json.OBJECT_MAPPER.readValue(json, TestServiceAccountUsageAuthorizationResponse.class);
+
+    assertThat(parsed.authorized(), is(true));
+    assertThat(parsed.serviceAccount(), equalTo(AUTH_SERVICE_ACCOUNT));
+    assertThat(parsed.principal(), equalTo(AUTH_PRINCIPAL));
+    assertThat(parsed.message().get(), equalTo(message));
+  }
+
+  @Test
+  public void testAuthEndpointShouldReturnBadRequestIfProjectDoesNotExist() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    StatusType statusCode = Status.BAD_REQUEST.withReasonPhrase("Project does not exist: baz");
+    when(accountUsageAuthorizer.checkServiceAccountUsageAuthorization(anyString(), anyString()))
+        .thenReturn(ServiceAccountUsageAuthorizationResult.ofErrorResponse(Response.forStatus(statusCode)));
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request(
+            "POST",
+            path("/testServiceAccountUsageAuthorization"),
+            AUTH_PAYLOAD));
+
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
   }
 
   private Connection setupBigTableMockTable() {

@@ -30,6 +30,9 @@ import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.ResourcesPayload;
 import com.spotify.styx.api.RunStateDataPayload;
+import com.spotify.styx.api.TestServiceAccountUsageAuthorizationRequest;
+import com.spotify.styx.api.TestServiceAccountUsageAuthorizationRequestBuilder;
+import com.spotify.styx.api.TestServiceAccountUsageAuthorizationResponse;
 import com.spotify.styx.client.auth.GoogleIdTokenAuth;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
@@ -148,6 +151,16 @@ class StyxOkHttpClient implements StyxClient {
               })
               .collect(Collectors.toList());
         });
+  }
+
+  @Override
+  public CompletionStage<TestServiceAccountUsageAuthorizationResponse> testServiceAccountUsageAuthorization(
+      String serviceAccountEmail, String principalEmail) {
+    final TestServiceAccountUsageAuthorizationRequest request = new TestServiceAccountUsageAuthorizationRequestBuilder()
+        .serviceAccount(serviceAccountEmail)
+        .principal(principalEmail).build();
+    return execute(forUri(urlBuilder("status", "testServiceAccountUsageAuthorization"), "POST", request),
+        TestServiceAccountUsageAuthorizationResponse.class);
   }
 
   @Override

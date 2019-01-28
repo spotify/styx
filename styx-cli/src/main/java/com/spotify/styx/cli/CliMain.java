@@ -41,6 +41,7 @@ import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.ResourcesPayload;
 import com.spotify.styx.api.RunStateDataPayload;
+import com.spotify.styx.api.TestServiceAccountUsageAuthorizationResponse;
 import com.spotify.styx.cli.CliExitException.ExitStatus;
 import com.spotify.styx.cli.CliMain.CliContext.Output;
 import com.spotify.styx.client.ApiErrorException;
@@ -282,6 +283,20 @@ public final class CliMain {
               // parsing unknown command will fail so this would only catch non-exhaustive switches
               throw new ArgumentParserException(
                   String.format("Unrecognized command: %s %s", command, workflowCommand),
+                  parser.parser);
+          }
+          break;
+
+        case AUTH:
+          final AuthCommand authCommand = namespace.get(SUBCOMMAND_DEST);
+          switch (authCommand) {
+            case TEST:
+              authTestServiceAccountUsage();
+              break;
+            default:
+              // parsing unknown command will fail so this would only catch non-exhaustive switches
+              throw new ArgumentParserException(
+                  String.format("Unrecognized command: %s %s", command, authCommand),
                   parser.parser);
           }
           break;
@@ -638,6 +653,23 @@ public final class CliMain {
                            + "` to check active workflow instances.");
   }
 
+  private void authTestServiceAccountUsage() throws ExecutionException, InterruptedException {
+    final String serviceAccount = namespace.getString(parser.authServiceAccount.getDest());
+    final String principal = namespace.getString(parser.authPrincipal.getDest());
+
+    final TestServiceAccountUsageAuthorizationResponse response = styxClient.testServiceAccountUsageAuthorization(
+        serviceAccount, principal).toCompletableFuture().get();
+
+    if (response.authorized()) {
+      cliOutput.printMessage("The principal " + principal + " is authorized to use the service account "
+                             + serviceAccount + ". " + response.message().orElse(""));
+    } else {
+      cliOutput.printMessage("The principal " + principal + " is not authorized to use the service account "
+                             + serviceAccount + ". " + response.message().orElse(""));
+      throw CliExitException.of(ExitStatus.UnknownError);
+    }
+  }
+
   private static class ParserBase {
     final CliContext cliContext;
 
@@ -805,6 +837,18 @@ public final class CliMain {
     final Subparser halt = addWorkflowInstanceArguments(Command.HALT.parser(subCommands, cliContext));
     final Subparser retry = addWorkflowInstanceArguments(Command.RETRY.parser(subCommands, cliContext));
 
+    final Subparsers authParser =
+        Command.AUTH.parser(subCommands, cliContext)
+            .addSubparsers().title("commands").metavar(" ");
+
+    final Subparser testServiceAccountUsage = AuthCommand.TEST.parser(authParser, cliContext);
+    final Argument authServiceAccount = testServiceAccountUsage
+        .addArgument("-a", "--service-account")
+        .help("The service account to test usage authorization against");
+    final Argument authPrincipal = testServiceAccountUsage
+        .addArgument("-u", "--principal")
+        .help("The principal (user) to test for service account usage authorization");
+
     final GlobalOptions globalOptions = GlobalOptions.add(parser, cliContext, false);
 
     final Argument version = parser.addArgument("--version").action(Arguments.version());
@@ -848,7 +892,8 @@ public final class CliMain {
     RETRY("r", "Retry a workflow instance that is in a waiting state"),
     RESOURCE(null, "Commands related to resources"),
     BACKFILL(null, "Commands related to backfills"),
-    WORKFLOW(null, "Commands related to workflows");
+    WORKFLOW(null, "Commands related to workflows"),
+    AUTH(null, "Commands related to authentication and authorization");
 
     private final String alias;
     private final String description;
@@ -982,6 +1027,31 @@ public final class CliMain {
     private final String description;
 
     WorkflowCommand(String alias, String description) {
+      this.alias = alias;
+      this.description = description;
+    }
+
+    public Subparser parser(Subparsers subCommands, CliContext cliContext) {
+      final Subparser subparser = addSubparser(subCommands, name().toLowerCase(), cliContext)
+          .setDefault(SUBCOMMAND_DEST, this)
+          .description(description)
+          .help(description);
+
+      if (alias != null && !alias.isEmpty()) {
+        subparser.aliases(alias);
+      }
+
+      return subparser;
+    }
+  }
+
+  private enum AuthCommand {
+    TEST("", "Test authorization");
+
+    private final String alias;
+    private final String description;
+
+    AuthCommand(String alias, String description) {
       this.alias = alias;
       this.description = description;
     }

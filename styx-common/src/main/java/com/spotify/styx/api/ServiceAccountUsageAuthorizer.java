@@ -50,6 +50,7 @@ import com.google.api.services.cloudresourcemanager.model.GetIamPolicyRequest;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.IamScopes;
 import com.google.api.services.iam.v1.model.ServiceAccount;
+import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableSet;
@@ -75,7 +76,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javaslang.Tuple;
 import javaslang.Tuple2;
-import javaslang.control.Either;
 import javaslang.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,18 +89,27 @@ import org.slf4j.LoggerFactory;
  * <li> GSuite: {@code https://www.googleapis.com/auth/admin.directory.group.member.readonly}
  * </ul></p>
  */
-@FunctionalInterface
 public interface ServiceAccountUsageAuthorizer {
 
-  String AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG = "styx.authorizaton.service-account-user-role";
-  String AUTHORIZATION_REQUIRE_ALL_CONFIG = "styx.authorizaton.require.all";
-  String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorizaton.require.workflows";
+  Logger LOG = LoggerFactory.getLogger(ServiceAccountUsageAuthorizer.class);
+
+  String AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG = "styx.authorization.service-account-user-role";
+  String AUTHORIZATION_REQUIRE_ALL_CONFIG = "styx.authorization.require.all";
+  String AUTHORIZATION_REQUIRE_WORKFLOWS = "styx.authorization.require.workflows";
   String AUTHORIZATION_GSUITE_USER_CONFIG = "styx.authorization.gsuite-user";
   String AUTHORIZATION_MESSAGE_CONFIG = "styx.authorization.message";
   String AUTHORIZATION_ADMINISTRATORS_CONFIG = "styx.authorization.administrators";
 
-  void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount,
-      GoogleIdToken idToken);
+  /**
+   * Authorize service account usage by a principal in a workflow.
+   * @throws ResponseException if not authorized.
+   */
+  void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken);
+
+  /**
+   * Check if a principal is authorized to use a service account.
+   */
+  ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(String serviceAccount, String principal);
 
   class Impl implements ServiceAccountUsageAuthorizer {
 
@@ -127,9 +136,9 @@ public interface ServiceAccountUsageAuthorizer {
     private final List<String> administrators;
 
     /**
-     * (principalEmail, serviceAccount) -> Either[Response, Result]
+     * (principalEmail, serviceAccount) -> ServiceAccountUsageAuthorizationResult
      */
-    private final Cache<Tuple2<String, String>, Either<Response<?>, ServiceAccountUsageAuthorizationResult>> cache =
+    private final Cache<Tuple2<String, String>, ServiceAccountUsageAuthorizationResult> cache =
         CacheBuilder.newBuilder()
             .expireAfterWrite(60, SECONDS)
             .maximumSize(10_000)
@@ -152,25 +161,25 @@ public interface ServiceAccountUsageAuthorizer {
     public void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
       final String principalEmail = idToken.getPayload().getEmail();
 
-      final AtomicBoolean cached = new AtomicBoolean(true);
-
       final boolean enforce = authorizationPolicy.shouldEnforceAuthorization(workflowId, serviceAccount, idToken);
 
       // Cached authorization check
-      final Either<Response<?>, ServiceAccountUsageAuthorizationResult> maybeResult;
+      final AtomicBoolean cached = new AtomicBoolean(true);
+      final ServiceAccountUsageAuthorizationResult result;
       try {
-        maybeResult = cache.get(Tuple.of(principalEmail, serviceAccount), () -> {
+        result = cache.get(Tuple.of(principalEmail, serviceAccount), () -> {
           cached.set(false);
           try {
-            return Either.right(authorizationCheck(workflowId, serviceAccount, principalEmail));
+            return checkServiceAccountUsageAuthorization(serviceAccount, principalEmail);
           } catch (ResponseException e) {
-            return Either.left(e.getResponse());
+            return ServiceAccountUsageAuthorizationResult.ofErrorResponse(e.getResponse());
           }
         });
       } catch (Exception e) {
         log.warn("Authorization failure for service account {} used by {} (enforce: {})",
             serviceAccount, principalEmail, enforce, e);
         if (enforce) {
+          Throwables.throwIfUnchecked(e);
           throw new RuntimeException(e);
         } else {
           return;
@@ -178,53 +187,57 @@ public interface ServiceAccountUsageAuthorizer {
       }
 
       // Propagate response exception
-      if (maybeResult.isLeft()) {
-        throw new ResponseException(maybeResult.left().get());
-      }
-
-      final ServiceAccountUsageAuthorizationResult result = maybeResult.right().get();
+      result.errorResponse().ifPresent(e -> { throw new ResponseException(e); });
 
       // Grant access?
-      if (result.accessMessage().isPresent()) {
-        logAuthorization(workflowId, serviceAccount, enforce, result.accessMessage().get(), cached.get());
+      if (result.authorized()) {
+        logAuthorization(workflowId, serviceAccount, enforce, result.message().orElse(""), cached.get());
         return;
       }
 
       // Deny access?
       logDenial(workflowId, serviceAccount, enforce, principalEmail, cached.get());
       if (enforce) {
-        throw denialResponseException(serviceAccount, principalEmail, result.serviceAccountProjectId());
+        throw denialResponseException(result.message().orElse(""));
       }
     }
 
-    private ServiceAccountUsageAuthorizationResult authorizationCheck(WorkflowId workflowId,
-                                                                      String serviceAccount,
-                                                                      String principalEmail) {
-      final String projectId = serviceAccountProjectId(workflowId, serviceAccount);
-      return ServiceAccountUsageAuthorizationResult.builder()
-          .serviceAccountProjectId(projectId)
-          .accessMessage(firstPresent(
-              // Check if the principal is an admin
-              () -> memberStatus(principalEmail, administrators)
-                  .map(status -> String.format("Principal %s is an admin %s", principalEmail, status)),
+    @Override
+    public ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(String serviceAccount,
+                                                                                        String principalEmail) {
+      final String projectId = serviceAccountProjectId(serviceAccount);
+      final Optional<String> accessMessage = firstPresent(
+          // Check if the principal is an admin
+          () -> memberStatus(principalEmail, administrators)
+              .map(status -> String.format("Principal %s is an admin %s", principalEmail, status)),
 
-              // Check if the principal has been granted the service account user role in the project of the SA
-              () -> projectPolicyAccess(projectId, principalEmail)
-                  .map(type -> String.format("Principal %s has role %s in project %s %s",
-                      principalEmail, serviceAccountUserRole, projectId, type)),
+          // Check if the principal has been granted the service account user role in the project of the SA
+          () -> projectPolicyAccess(projectId, principalEmail)
+              .map(type -> String.format("Principal %s has role %s in project %s %s",
+                  principalEmail, serviceAccountUserRole, projectId, type)),
 
-              // Check if the principal has been granted the service account user role on the SA itself
-              () -> serviceAccountPolicyAccess(serviceAccount, principalEmail)
-                  .map(type -> String.format("Principal %s has role %s on service account %s %s",
-                      principalEmail, serviceAccountUserRole, serviceAccount, type))))
-          .build();
+          // Check if the principal has been granted the service account user role on the SA itself
+          () -> serviceAccountPolicyAccess(serviceAccount, principalEmail)
+              .map(type -> String.format("Principal %s has role %s on service account %s %s",
+                  principalEmail, serviceAccountUserRole, serviceAccount, type)));
+
+      final ServiceAccountUsageAuthorizationResultBuilder result = ServiceAccountUsageAuthorizationResult.builder()
+              .serviceAccountProjectId(projectId)
+              .authorized(accessMessage.isPresent())
+              .message(accessMessage.orElseGet(() -> denialMessage(serviceAccount, principalEmail, projectId)));
+
+      return result.build();
     }
 
-    private ResponseException denialResponseException(String serviceAccount, String principalEmail, String projectId) {
-      return new ResponseException(Response.forStatus(
-          FORBIDDEN.withReasonPhrase("The user " + principalEmail + " must have the role " + serviceAccountUserRole
-                                     + " in the project " + projectId + " or on the service account " + serviceAccount
-                                     + ", either through a group membership or directly. " + message)));
+    private ResponseException denialResponseException(String message) {
+      return new ResponseException(Response.forStatus(FORBIDDEN.withReasonPhrase(message)));
+    }
+
+    private String denialMessage(String serviceAccount, String principalEmail, String projectId) {
+      return "The principal " + principalEmail + " must have the role " + serviceAccountUserRole
+             + " in the project " + projectId + " or on the "
+             + "service account " + serviceAccount
+             + ", either through a group membership or directly. " + message;
     }
 
     private void logDenial(WorkflowId workflowId, String serviceAccount, boolean enforce, String principalEmail,
@@ -239,12 +252,11 @@ public interface ServiceAccountUsageAuthorizer {
           accessMessage, serviceAccount, workflowId.toKey(), enforce, cached ? CACHE_HIT : CACHE_MISS);
     }
 
-    private String serviceAccountProjectId(WorkflowId workflowId, String serviceAccount) {
+    private String serviceAccountProjectId(String serviceAccount) {
       final Matcher matcher = USER_CREATED_SERVICE_ACCOUNT_PATTERN.matcher(serviceAccount);
       if (matcher.matches()) {
         return matcher.group(1);
       }
-      log.info("Workflow {} uses non user created service account {}", workflowId.toKey(), serviceAccount);
       return lookupServiceAccountProjectId(serviceAccount);
     }
 
@@ -424,6 +436,12 @@ public interface ServiceAccountUsageAuthorizer {
     public void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
       // nop
     }
+
+    @Override
+    public ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(
+        String serviceAccount, String principal) {
+      return ServiceAccountUsageAuthorizationResult.builder().authorized(true).build();
+    }
   }
 
   static ServiceAccountUsageAuthorizer create(Config config, String serviceName, GoogleCredential credential) {
@@ -437,7 +455,11 @@ public interface ServiceAccountUsageAuthorizer {
           return ServiceAccountUsageAuthorizer.create(
               role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message, administrators);
         })
-        .orElse(ServiceAccountUsageAuthorizer.nop());
+        .orElseGet(() -> {
+          LOG.warn("{} not configured, fallback to nop ServiceAccountUsageAuthorizer",
+              AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG);
+          return ServiceAccountUsageAuthorizer.nop();
+        });
   }
 
   static ServiceAccountUsageAuthorizer create(Config config, String serviceName) {
@@ -528,7 +550,6 @@ public interface ServiceAccountUsageAuthorizer {
   }
 
   /**
-  /**
    * A policy that always enforces authorization.
    */
   class AllAuthorizationPolicy implements AuthorizationPolicy {
@@ -546,7 +567,7 @@ public interface ServiceAccountUsageAuthorizer {
 
     private final Set<WorkflowId> whitelist;
 
-    public WhitelistAuthorizationPolicy(Iterable<WorkflowId> whitelist) {
+    WhitelistAuthorizationPolicy(Iterable<WorkflowId> whitelist) {
       this.whitelist = ImmutableSet.copyOf(whitelist);
     }
 
@@ -559,12 +580,32 @@ public interface ServiceAccountUsageAuthorizer {
   @AutoMatter
   interface ServiceAccountUsageAuthorizationResult {
 
-    Optional<String> accessMessage();
+    /**
+     * A response describing any error encountered during the authorization check.
+     */
+    Optional<Response<?>> errorResponse();
 
-    String serviceAccountProjectId();
+    /**
+     * Successfully authorized?
+     */
+    boolean authorized();
+
+    /**
+     * A message describing the authorization or denial reason.
+     */
+    Optional<String> message();
+
+    /**
+     * The project ID of the service account, if successfully resolved.
+     */
+    Optional<String> serviceAccountProjectId();
 
     static ServiceAccountUsageAuthorizationResultBuilder builder() {
       return new ServiceAccountUsageAuthorizationResultBuilder();
+    }
+
+    static ServiceAccountUsageAuthorizationResult ofErrorResponse(Response<?> response) {
+      return builder().errorResponse(response).build();
     }
   }
 

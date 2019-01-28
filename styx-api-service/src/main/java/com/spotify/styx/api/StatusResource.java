@@ -21,10 +21,10 @@
 package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V3;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 import com.google.api.client.util.Lists;
-import com.google.common.base.Throwables;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.entity.EntityMiddleware;
@@ -33,6 +33,7 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
+import com.spotify.styx.api.ServiceAccountUsageAuthorizer.ServiceAccountUsageAuthorizationResult;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -42,7 +43,6 @@ import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -56,9 +56,11 @@ public class StatusResource {
   static final String BASE = "/status";
 
   private final Storage storage;
+  private final ServiceAccountUsageAuthorizer accountUsageAuthorizer;
 
-  public StatusResource(Storage storage) {
-    this.storage = Objects.requireNonNull(storage);
+  public StatusResource(Storage storage, ServiceAccountUsageAuthorizer accountUsageAuthorizer) {
+    this.storage = requireNonNull(storage);
+    this.accountUsageAuthorizer = requireNonNull(accountUsageAuthorizer);
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -73,12 +75,36 @@ public class StatusResource {
         Route.with(
             em.serializerDirect(EventsPayload.class),
             "GET", BASE + "/events/<cid>/<wfid>/<iid>",
-            rc -> eventsForWorkflowInstance(arg("cid", rc), arg("wfid", rc), arg("iid", rc))))
+            rc -> eventsForWorkflowInstance(arg("cid", rc), arg("wfid", rc), arg("iid", rc))),
+        Route.with(
+            em.response(TestServiceAccountUsageAuthorizationRequest.class,
+                TestServiceAccountUsageAuthorizationResponse.class),
+            "POST", BASE + "/testServiceAccountUsageAuthorization",
+            rc -> this::testServiceAccountUsageAuthorization)
+    )
 
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
         .collect(toList());
 
     return Api.prefixRoutes(routes, V3);
+  }
+
+  private Response<TestServiceAccountUsageAuthorizationResponse> testServiceAccountUsageAuthorization(
+      TestServiceAccountUsageAuthorizationRequest request) {
+    final ServiceAccountUsageAuthorizationResult result =
+        accountUsageAuthorizer.checkServiceAccountUsageAuthorization(request.serviceAccount(), request.principal());
+
+    result.errorResponse().ifPresent(e -> { throw new ResponseException(e); });
+
+    final TestServiceAccountUsageAuthorizationResponse response =
+        new TestServiceAccountUsageAuthorizationResponseBuilder()
+            .authorized(result.authorized())
+            .serviceAccount(request.serviceAccount())
+            .principal(request.principal())
+            .message(result.message())
+            .build();
+
+    return Response.forPayload(response);
   }
 
   private static String arg(String name, RequestContext rc) {
@@ -127,7 +153,7 @@ public class StatusResource {
 
       return EventsPayload.create(timestampedEvents);
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
   }
 }
