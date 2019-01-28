@@ -65,8 +65,15 @@ public final class StateUtil {
                                                            Instant instant,
                                                            TimeoutConfig ttl) {
     return activeStates.parallelStream()
-        .filter(entry -> hasTimedOut(workflows.get(entry.workflowInstance().workflowId()), entry.runState(), instant,
-            ttl.ttlOf(entry.runState().state())))
+        .filter(entry -> {
+          try {
+            return hasTimedOut(workflows.get(entry.workflowInstance().workflowId()), entry.runState(), instant,
+                ttl.ttlOf(entry.runState().state()));
+          } catch (Throwable e) {
+            logger.error("Failed to check timeout for entry {}", entry, e);
+            return false;
+          }
+        })
         .map(InstanceState::workflowInstance)
         .collect(toSet());
   }
@@ -112,25 +119,20 @@ public final class StateUtil {
   }
 
   private static boolean hasTimedOut(Workflow workflow, RunState runState, Instant instant, Duration timeout) {
-    try {
-      if (runState.state().isTerminal()) {
-        return false;
-      }
-
-      final Duration effectiveTimeout = runState.state() == RunState.State.RUNNING
-                                        ? workflow.configuration().runningTimeout().orElse(timeout)
-                                        : timeout;
-      final Duration sanitizedTimeout = effectiveTimeout.compareTo(timeout) < 0 ? effectiveTimeout : timeout;
-
-      final Instant deadline = Instant
-          .ofEpochMilli(runState.timestamp())
-          .plus(sanitizedTimeout);
-
-      return !deadline.isAfter(instant);
-    } catch (Throwable e) {
-      logger.error("Failed to check timeout for workflow instance {}", runState.workflowInstance().toKey(), e);
+    if (runState.state().isTerminal()) {
       return false;
     }
+
+    final Duration effectiveTimeout = runState.state() == RunState.State.RUNNING
+                                      ? workflow.configuration().runningTimeout().orElse(timeout)
+                                      : timeout;
+    final Duration sanitizedTimeout = effectiveTimeout.compareTo(timeout) < 0 ? effectiveTimeout : timeout;
+
+    final Instant deadline = Instant
+        .ofEpochMilli(runState.timestamp())
+        .plus(sanitizedTimeout);
+
+    return !deadline.isAfter(instant);
   }
 
   static boolean isConsumingResources(RunState.State state) {
