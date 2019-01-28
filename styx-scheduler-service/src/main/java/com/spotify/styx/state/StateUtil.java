@@ -128,7 +128,7 @@ public final class StateUtil {
 
       return !deadline.isAfter(instant);
     } catch (Throwable e) {
-      logger.error("Failed to check timeout", e);
+      logger.error("Failed to check timeout for workflow instance {}", runState.workflowInstance().toKey(), e);
       return false;
     }
   }
