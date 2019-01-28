@@ -42,8 +42,12 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class StateUtil {
+
+  private static final Logger logger = LoggerFactory.getLogger(StateUtil.class);
 
   private StateUtil() {
     throw new UnsupportedOperationException();
@@ -108,20 +112,25 @@ public final class StateUtil {
   }
 
   private static boolean hasTimedOut(Workflow workflow, RunState runState, Instant instant, Duration timeout) {
-    if (runState.state().isTerminal()) {
+    try {
+      if (runState.state().isTerminal()) {
+        return false;
+      }
+
+      final Duration effectiveTimeout = runState.state() == RunState.State.RUNNING
+                                        ? workflow.configuration().runningTimeout().orElse(timeout)
+                                        : timeout;
+      final Duration sanitizedTimeout = effectiveTimeout.compareTo(timeout) < 0 ? effectiveTimeout : timeout;
+
+      final Instant deadline = Instant
+          .ofEpochMilli(runState.timestamp())
+          .plus(sanitizedTimeout);
+
+      return !deadline.isAfter(instant);
+    } catch (Throwable e) {
+      logger.error("Failed to check timeout", e);
       return false;
     }
-
-    final Duration effectiveTimeout = runState.state() == RunState.State.RUNNING
-                                      ? workflow.configuration().runningTimeout().orElse(timeout)
-                                      : timeout;
-    final Duration sanitizedTimeout = effectiveTimeout.compareTo(timeout) < 0 ? effectiveTimeout : timeout;
-
-    final Instant deadline = Instant
-        .ofEpochMilli(runState.timestamp())
-        .plus(sanitizedTimeout);
-
-    return !deadline.isAfter(instant);
   }
 
   static boolean isConsumingResources(RunState.State state) {
