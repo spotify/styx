@@ -147,6 +147,20 @@ public class StateUtilTest {
   }
 
   @Test
+  public void shouldGetTimedOutRunningInstancesBaseOnGlobalTimeoutIfWorkflowNotFound() throws IOException {
+    final RunState runState =
+        RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
+    when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(3L));
+    when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
+
+    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
+    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
+    final Set<WorkflowInstance> timedOutInstances =
+        getTimedOutInstances(ImmutableMap.of(), activeInstanceStates, Instant.ofEpochMilli(13L), timeoutConfig);
+    assertThat(timedOutInstances, contains(WORKFLOW_INSTANCE));
+  }
+
+  @Test
   public void shouldGetTimedOutRunningInstancesForInvalidCustomTimeout() throws IOException {
     final RunState runState =
         RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
