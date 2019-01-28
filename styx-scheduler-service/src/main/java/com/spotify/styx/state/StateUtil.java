@@ -42,12 +42,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Stream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public final class StateUtil {
-
-  private static final Logger logger = LoggerFactory.getLogger(StateUtil.class);
 
   private StateUtil() {
     throw new UnsupportedOperationException();
@@ -65,15 +61,8 @@ public final class StateUtil {
                                                            Instant instant,
                                                            TimeoutConfig ttl) {
     return activeStates.parallelStream()
-        .filter(entry -> {
-          try {
-            return hasTimedOut(workflows.get(entry.workflowInstance().workflowId()), entry.runState(), instant,
-                ttl.ttlOf(entry.runState().state()));
-          } catch (Throwable e) {
-            logger.error("Failed to check timeout for entry {}", entry, e);
-            return false;
-          }
-        })
+        .filter(entry -> hasTimedOut(workflows.get(entry.workflowInstance().workflowId()), entry.runState(), instant,
+            ttl.ttlOf(entry.runState().state())))
         .map(InstanceState::workflowInstance)
         .collect(toSet());
   }
