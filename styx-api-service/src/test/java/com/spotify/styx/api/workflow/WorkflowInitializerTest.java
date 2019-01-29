@@ -53,7 +53,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class WorkflowInitializerTest {
 
-  public static final Instant NOW = Instant.parse("2015-12-31T23:59:10.000Z");
+  private static final Instant NOW = Instant.parse("2015-12-31T23:59:10.000Z");
   private static final Consumer<Optional<Workflow>> PASS = wf -> {};
   private final Workflow HOURLY_WORKFLOW = Workflow.create("styx",
       TestData.HOURLY_WORKFLOW_CONFIGURATION);
@@ -73,20 +73,6 @@ public class WorkflowInitializerTest {
     workflowInitializer = new WorkflowInitializer(storage, () -> NOW);
     when(storage.runInTransaction(any())).then(a ->
         a.<TransactionFunction>getArgument(0).apply(transaction));
-  }
-
-  @Test
-  public void shouldStoreNewWorkflowAndUpdateNextNaturalTrigger() throws IOException, WorkflowInitializationException {
-    when(transaction.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.empty());
-    workflowInitializer.store(HOURLY_WORKFLOW, PASS);
-
-    final Instant nextTrigger = lastInstant(NOW, Schedule.HOURS);
-    final Instant nextWithOffset = HOURLY_WORKFLOW.configuration().addOffset(nextTrigger);
-    TriggerInstantSpec expectedTriggerInstantSpec = TriggerInstantSpec.create(nextTrigger, nextWithOffset);
-
-    verify(transaction, never()).store(any(Workflow.class));
-    verify(transaction, never()).updateNextNaturalTrigger(any(), any());
-    verify(transaction).storeWorkflowWithNextNaturalTrigger(HOURLY_WORKFLOW, expectedTriggerInstantSpec);
   }
 
   @Test
@@ -115,6 +101,22 @@ public class WorkflowInitializerTest {
     verify(transaction).store(HOURLY_WORKFLOW);
     verify(transaction, never()).updateNextNaturalTrigger(any(), any());
     verify(transaction, never()).storeWorkflowWithNextNaturalTrigger(any(), any());
+  }
+
+  @Test
+  public void shouldUpdateExistingWorkflowAndWithNewNextNaturalTrigger()
+      throws IOException, WorkflowInitializationException {
+    when(transaction.workflow(HOURLY_WORKFLOW_WITH_VALID_OFFSET.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
+    workflowInitializer.store(HOURLY_WORKFLOW_WITH_VALID_OFFSET, PASS);
+
+    final Instant nextTrigger = lastInstant(NOW, Schedule.HOURS);
+    final Instant nextWithOffset = HOURLY_WORKFLOW_WITH_VALID_OFFSET.configuration().addOffset(nextTrigger);
+    TriggerInstantSpec expectedTriggerInstantSpec = TriggerInstantSpec.create(nextTrigger, nextWithOffset);
+
+    verify(transaction, never()).store(any(Workflow.class));
+    verify(transaction, never()).updateNextNaturalTrigger(any(), any());
+    verify(transaction).storeWorkflowWithNextNaturalTrigger(
+        HOURLY_WORKFLOW_WITH_VALID_OFFSET, expectedTriggerInstantSpec);
   }
 
   @Test

@@ -20,6 +20,7 @@
 
 package com.spotify.styx.api.workflow;
 
+import static com.spotify.styx.util.TimeUtil.lastInstant;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
 
 import com.spotify.styx.model.Schedule;
@@ -75,17 +76,18 @@ public class WorkflowInitializer {
     // either the workflow is completely new, or the schedule/offset has changed
     final Schedule newSchedule = workflow.configuration().schedule();
     final Optional<String> newOffset = workflow.configuration().offset();
-    if (!previous.isPresent()
-        || !previous.get().configuration().schedule().equals(newSchedule)
-        || !previous.get().configuration().offset().equals(newOffset)) {
-      try {
+    try {
+      if (!previous.isPresent()) {
         nextSpec = Optional.of(initializeNaturalTrigger(workflow));
-      } catch (Exception e) {
-        LOG.info("could not compute next natural trigger for workflow {}", workflow, e);
-        throw new WorkflowInitializationException(e);
+      } else if (!previous.get().configuration().schedule().equals(newSchedule)
+                 || !previous.get().configuration().offset().equals(newOffset)) {
+        nextSpec = Optional.of(updateNaturalTrigger(workflow));
+      } else {
+        nextSpec = Optional.empty();
       }
-    } else {
-      nextSpec = Optional.empty();
+    } catch (Exception e) {
+      LOG.info("could not compute next natural trigger for workflow {}", workflow, e);
+      throw new WorkflowInitializationException(e);
     }
 
     if (nextSpec.isPresent()) {
@@ -102,6 +104,15 @@ public class WorkflowInitializer {
     final Instant offsetNow = workflow.configuration().subtractOffset(now);
     final Schedule schedule = workflow.configuration().schedule();
     final Instant nextTrigger = nextInstant(offsetNow, schedule);
+    final Instant nextWithOffset = workflow.configuration().addOffset(nextTrigger);
+    return TriggerInstantSpec.create(nextTrigger, nextWithOffset);
+  }
+
+  private TriggerInstantSpec updateNaturalTrigger(Workflow workflow) {
+    final Instant now = time.get();
+
+    final Schedule schedule = workflow.configuration().schedule();
+    final Instant nextTrigger = lastInstant(now, schedule);
     final Instant nextWithOffset = workflow.configuration().addOffset(nextTrigger);
     return TriggerInstantSpec.create(nextTrigger, nextWithOffset);
   }
