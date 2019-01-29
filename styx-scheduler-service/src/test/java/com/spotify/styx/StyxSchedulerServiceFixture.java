@@ -315,8 +315,8 @@ public class StyxSchedulerServiceFixture {
     final Instant now = time.get();
     final Instant offsetNow = workflow.configuration().subtractOffset(now);
     final Schedule schedule = workflow.configuration().schedule();
-    final Instant nextTrigger = nextInstant(offsetNow, schedule); // Next trigger instant, rounded off by schedule
-    final Instant nextWithOffset = workflow.configuration().addOffset(nextTrigger); // gives offset by date
+    final Instant nextTrigger = nextInstant(offsetNow, schedule);
+    final Instant nextWithOffset = workflow.configuration().addOffset(nextTrigger);
     return TriggerInstantSpec.create(nextTrigger, nextWithOffset);
   }
 
