@@ -844,9 +844,11 @@ public final class CliMain {
     final Subparser testServiceAccountUsage = AuthCommand.TEST.parser(authParser, cliContext);
     final Argument authServiceAccount = testServiceAccountUsage
         .addArgument("-a", "--service-account")
+        .required(true)
         .help("The service account to test usage authorization against");
     final Argument authPrincipal = testServiceAccountUsage
         .addArgument("-u", "--principal")
+        .required(true)
         .help("The principal (user) to test for service account usage authorization");
 
     final GlobalOptions globalOptions = GlobalOptions.add(parser, cliContext, false);

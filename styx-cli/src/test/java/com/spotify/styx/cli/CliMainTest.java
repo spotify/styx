@@ -960,6 +960,22 @@ public class CliMainTest {
                                    + serviceAccount + ". " + response.message().orElse(""));
   }
 
+  @Test
+  @Parameters({
+      "auth test --service-account foo@bar.iam.gserviceaccount.com",
+      "auth test --principal baz@example.com",
+      "auth test"
+  })
+  public void testAuthTestServiceAccountUsageMissingRequiredArgument(final String argLine) {
+    when(client.workflows()).thenReturn(CompletableFuture.completedFuture(Collections.emptyList()));
+    try {
+      CliMain.run(cliContext, argLine.split(" "));
+      fail();
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.ArgumentError));
+    }
+  }
+
   private Path fileFromResource(String name) throws IOException {
     final File workflowsFile = temporaryFolder.newFile();
     try (OutputStream os = Files.newOutputStream(workflowsFile.toPath())) {
