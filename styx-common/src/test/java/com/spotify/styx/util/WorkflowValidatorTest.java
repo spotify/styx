@@ -165,7 +165,7 @@ public class WorkflowValidatorTest {
         .add(limit("too many resources", resources.size(), MAX_RESOURCES))
         .add(resources.stream().map(r ->
             limit("resource name too long", r.length(), MAX_RESOURCE_LENGTH)).toArray(String[]::new))
-        .add("invalid offset: Text cannot be parsed to a Period")
+        .add("invalid offset: Unable to parse offset period")
         .add(limit("too many env vars", env.size(), MAX_ENV_VARS))
         .add(limit("env too big", envSize, MAX_ENV_SIZE))
         .add(limit("running timeout is too small", runningTimeout, MIN_RUNNING_TIMEOUT))
