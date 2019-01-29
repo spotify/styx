@@ -22,7 +22,6 @@ package com.spotify.styx.monitoring;
 
 import com.codahale.metrics.Gauge;
 import com.spotify.styx.model.SequenceEvent;
-import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
 
 /**
@@ -50,7 +49,7 @@ public interface Stats {
 
   void recordRunning(String executionId);
 
-  void recordExitCode(WorkflowId workflowId, int exitCode);
+  void recordExitCode(int exitCode);
 
   void recordPullImageError();
 

@@ -31,7 +31,6 @@ import com.spotify.metrics.core.MetricId;
 import com.spotify.metrics.core.SemanticMetricBuilder;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.model.SequenceEvent;
-import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.Time;
@@ -189,7 +188,7 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Meter> storageOperationMeters;
   private final ConcurrentMap<String, Histogram> dockerOperationHistograms;
   private final ConcurrentMap<String, Meter> dockerOperationMeters;
-  private final ConcurrentMap<Tuple2<WorkflowId, Integer>, Meter> exitCodePerWorkflowMeters;
+  private final ConcurrentMap<Integer, Meter> exitCodeMeters;
   private final ConcurrentMap<Tuple3<String, String, Integer>, Meter> dockerOperationErrorMeters;
   private final ConcurrentMap<String, Histogram> resourceConfiguredHistograms;
   private final ConcurrentMap<String, Histogram> resourceUsedHistograms;
@@ -226,7 +225,7 @@ public final class MetricsStats implements Stats {
     this.storageOperationMeters = new ConcurrentHashMap<>();
     this.dockerOperationHistograms = new ConcurrentHashMap<>();
     this.dockerOperationMeters = new ConcurrentHashMap<>();
-    this.exitCodePerWorkflowMeters = new ConcurrentHashMap<>();
+    this.exitCodeMeters = new ConcurrentHashMap<>();
     this.dockerOperationErrorMeters = new ConcurrentHashMap<>();
     this.resourceConfiguredHistograms = new ConcurrentHashMap<>();
     this.resourceUsedHistograms = new ConcurrentHashMap<>();
@@ -295,8 +294,8 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
-  public void recordExitCode(WorkflowId workflowId, int exitCode) {
-    exitCodeMeter(workflowId, exitCode).mark();
+  public void recordExitCode(int exitCode) {
+    exitCodeMeter(exitCode).mark();
   }
 
   @Override
@@ -408,13 +407,10 @@ public final class MetricsStats implements Stats {
     datastoreOperationMeter(operation, kind).mark(n);
   }
 
-  private Meter exitCodeMeter(WorkflowId workflowId, int exitCode) {
-    return exitCodePerWorkflowMeters
-        .computeIfAbsent(Tuple.of(workflowId, exitCode), (tuple) ->
-            registry.meter(EXIT_CODE_RATE.tagged(
-                "component-id", tuple._1.componentId(),
-                "workflow-id", tuple._1.id(),
-                "exit-code", String.valueOf(tuple._2))));
+  private Meter exitCodeMeter(int exitCode) {
+    return exitCodeMeters
+        .computeIfAbsent(exitCode, ignore -> registry.meter(EXIT_CODE_RATE.tagged(
+            "exit-code", Integer.toString(exitCode))));
   }
 
   private Meter dockerOpErrorMeter(String operation, String type, int code) {
