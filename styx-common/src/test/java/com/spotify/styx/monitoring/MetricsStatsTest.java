@@ -175,11 +175,8 @@ public class MetricsStatsTest {
   @Test
   public void shouldRecordExitCode() {
     WorkflowId workflowId = WorkflowId.create("component", "workflow");
-    when(registry.meter(EXIT_CODE_RATE.tagged(
-        "component-id", workflowId.componentId(),
-        "workflow-id", workflowId.id(),
-        "exit-code", "0"))).thenReturn(meter);
-    stats.recordExitCode(workflowId, 0);
+    when(registry.meter(EXIT_CODE_RATE.tagged("exit-code", "0"))).thenReturn(meter);
+    stats.recordExitCode(0);
     verify(meter).mark();
   }
 
