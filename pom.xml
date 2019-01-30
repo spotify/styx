@@ -20,8 +20,8 @@
     <checkstyle.version>2.17</checkstyle.version>
     <semantic-metrics.version>0.11.5</semantic-metrics.version>
     <metrics.version>3.2.6</metrics.version>
-    <opencensus.version>0.14.0</opencensus.version>
-    <google.client.lib.version>1.25.0</google.client.lib.version>
+    <opencensus.version>0.19.0</opencensus.version>
+    <google.client.lib.version>1.28.0</google.client.lib.version>
   </properties>
 
   <repositories>
@@ -108,7 +108,7 @@
       <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
-        <version>24.1-jre</version>
+        <version>27.0.1-jre</version>
       </dependency>
       <dependency>
         <groupId>com.github.rholder</groupId>
@@ -250,6 +250,11 @@
         <version>${opencensus.version}</version>
         <scope>runtime</scope>
       </dependency>
+      <dependency>
+        <groupId>io.opencensus</groupId>
+        <artifactId>opencensus-contrib-http-util</artifactId>
+        <version>${opencensus.version}</version>
+      </dependency>
 
       <!-- cli -->
       <dependency>
@@ -289,27 +294,27 @@
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-iam</artifactId>
-        <version>v1-rev265-${google.client.lib.version}</version>
+        <version>v1-rev20190111-${google.client.lib.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-container</artifactId>
-        <version>v1beta1-rev65-${google.client.lib.version}</version>
+        <version>v1-rev20181211-${google.client.lib.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-admin-directory</artifactId>
-        <version>directory_v1-rev105-${google.client.lib.version}</version>
+        <version>directory_v1-rev105-1.25.0</version>
       </dependency>
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-cloudresourcemanager</artifactId>
-        <version>v1-rev513-${google.client.lib.version}</version>
+        <version>v1-rev20181015-${google.client.lib.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-datastore</artifactId>
-        <version>1.25.0</version>
+        <version>1.61.0</version>
       </dependency>
       <dependency>
         <groupId>com.google.cloud.bigtable</groupId>
@@ -324,7 +329,7 @@
       <dependency>
         <groupId>com.google.api</groupId>
         <artifactId>api-common</artifactId>
-        <version>1.5.0</version>
+        <version>1.7.0</version>
       </dependency>
 
       <!-- test libs -->
@@ -470,7 +475,7 @@
       <dependency>
         <groupId>com.google.protobuf</groupId>
         <artifactId>protobuf-java</artifactId>
-        <version>3.5.1</version>
+        <version>3.6.1</version>
       </dependency>
       <dependency>
         <groupId>com.google.code.findbugs</groupId>
@@ -490,22 +495,22 @@
       <dependency>
         <groupId>io.grpc</groupId>
         <artifactId>grpc-core</artifactId>
-        <version>1.12.0</version>
+        <version>1.18.0</version>
       </dependency>
       <dependency>
         <groupId>io.grpc</groupId>
         <artifactId>grpc-context</artifactId>
-        <version>1.12.0</version>
+        <version>1.18.0</version>
       </dependency>
       <dependency>
         <groupId>com.google.auth</groupId>
         <artifactId>google-auth-library-oauth2-http</artifactId>
-        <version>0.9.1</version>
+        <version>0.13.0</version>
       </dependency>
       <dependency>
         <groupId>com.google.auth</groupId>
         <artifactId>google-auth-library-credentials</artifactId>
-        <version>0.9.1</version>
+        <version>0.13.0</version>
       </dependency>
       <dependency>
         <groupId>ch.qos.logback</groupId>

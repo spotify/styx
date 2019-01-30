@@ -35,9 +35,9 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.codahale.metrics.Gauge;
-import com.google.api.services.container.v1beta1.Container;
-import com.google.api.services.container.v1beta1.model.Cluster;
-import com.google.api.services.container.v1beta1.model.MasterAuth;
+import com.google.api.services.container.Container;
+import com.google.api.services.container.model.Cluster;
+import com.google.api.services.container.model.MasterAuth;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Resources;
