@@ -423,10 +423,13 @@ public class InstrumentedDatastoreTest {
       QueryResults<T> delegate) {
     when(delegate.hasNext()).thenReturn(true);
     when(delegate.next()).thenReturn((T) entity);
+    when(delegate.getSkippedResults()).thenReturn(17);
     assertThat(instrumented.hasNext(), is(true));
     verify(delegate).hasNext();
     assertThat(instrumented.next(), is(entity));
     verify(delegate).next();
+    assertThat(instrumented.getSkippedResults(), is(17));
+    verify(delegate).getSkippedResults();
     verify(stats).recordDatastoreEntityReads(TEST_KIND, 1);
   }
 

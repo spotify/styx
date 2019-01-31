@@ -69,6 +69,11 @@ class InstrumentedQueryResults<T> implements QueryResults<T> {
   }
 
   @Override
+  public int getSkippedResults() {
+    return results.getSkippedResults();
+  }
+
+  @Override
   public boolean hasNext() {
     return results.hasNext();
   }
