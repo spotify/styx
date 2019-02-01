@@ -232,6 +232,12 @@
         <artifactId>javaspecialists</artifactId>
         <version>055ddfd5d6d9</version>
       </dependency>
+      <!-- to support list in env var -->
+      <dependency>
+        <groupId>com.typesafe</groupId>
+        <artifactId>config</artifactId>
+        <version>1.3.3</version>
+      </dependency>
 
       <!-- tracing -->
       <dependency>
