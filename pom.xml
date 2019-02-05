@@ -584,9 +584,6 @@
                      -Xep:WildcardImport:ERROR
                      -XepDisableWarningsInGeneratedCode
                      -XepExcludedPaths:.*/generated-(test-)?sources/.*
-                     -Xep:Var:OFF
-                     -Xep:StaticOrDefaultInterfaceMethod:OFF
-                     -Xep:NullableDereference:OFF
                   </arg>
                   <arg>-Xlint:all</arg>
                 </compilerArgs>
