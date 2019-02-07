@@ -14,6 +14,7 @@
   <version>2.1.1-SNAPSHOT</version>
 
   <properties>
+    <maven.compiler.version>3.8.0</maven.compiler.version>
     <maven.compiler.release>11</maven.compiler.release>
     <maven.compiler.source>11</maven.compiler.source>
     <maven.compiler.target>11</maven.compiler.target>
@@ -563,8 +564,11 @@
           <plugins>
             <plugin>
               <artifactId>maven-compiler-plugin</artifactId>
-              <version>3.8.0</version>
+              <version>${maven.compiler.version}</version>
               <configuration>
+                <source>${maven.compiler.source}</source>
+                <target>${maven.compiler.target}</target>
+                <release>${maven.compiler.release}</release>
                 <showWarnings>true</showWarnings>
                 <forceJavacCompilerUse>true</forceJavacCompilerUse>
                 <compilerArgs>
@@ -620,6 +624,21 @@
     </profile>
     <profile>
       <id>disable-static-analysis</id>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <artifactId>maven-compiler-plugin</artifactId>
+              <version>${maven.compiler.version}</version>
+              <configuration>
+                <source>${maven.compiler.source}</source>
+                <target>${maven.compiler.target}</target>
+                <release>${maven.compiler.release}</release>
+              </configuration>
+            </plugin>
+          </plugins>
+        </pluginManagement>
+      </build>
     </profile>
   </profiles>
 
