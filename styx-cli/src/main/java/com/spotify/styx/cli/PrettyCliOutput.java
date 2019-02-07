@@ -264,22 +264,22 @@ class PrettyCliOutput implements CliOutput {
 
   @Override
   public void printWorkflow(Workflow wf, WorkflowState state) {
-    System.out.println("Component: " + wf.componentId());
-    System.out.println(" Workflow: " + wf.workflowId());
-    System.out.println(" Schedule: " + wf.configuration().schedule());
-    System.out.println("   Offset: " + wf.configuration().offset().orElse(""));
-    System.out.println("    Image: " + wf.configuration().dockerImage().orElse(""));
-    System.out.println("     Args: " + wf.configuration().dockerArgs().orElse(Collections.emptyList()));
-    System.out.println("  TermLog: " + wf.configuration().dockerTerminationLogging());
-    System.out.println("   Secret: " + wf.configuration().secret().map(s -> s.name() + ':' + s.mountPath()).orElse(""));
-    System.out.println(" Svc Acct: " + wf.configuration().serviceAccount().orElse(""));
-    System.out.println("Resources: " + wf.configuration().resources());
-    System.out.println("      Env: " + Joiner.on(' ').withKeyValueSeparator('=').join(wf.configuration().env()));
-    System.out.println("  Timeout: " + wf.configuration().runningTimeout().map(Duration::toString).orElse(""));
-    System.out.println("   Commit: " + wf.configuration().commitSha().orElse(""));
-    System.out.println("  Enabled: " + state.enabled().map(Object::toString).orElse(""));
-    System.out.println("     Trig: " + state.nextNaturalTrigger().map(Object::toString).orElse(""));
-    System.out.println("Ofst Trig: " + state.nextNaturalOffsetTrigger().map(Object::toString).orElse(""));
+    System.out.println("Component:           " + wf.componentId());
+    System.out.println("Workflow:            " + wf.workflowId());
+    System.out.println("Schedule:            " + wf.configuration().schedule());
+    System.out.println("Offset:              " + wf.configuration().offset().orElse(""));
+    System.out.println("Docker Image:        " + wf.configuration().dockerImage().orElse(""));
+    System.out.println("Docker Arguments:    " + wf.configuration().dockerArgs().orElse(Collections.emptyList()));
+    System.out.println("Termination Logging: " + wf.configuration().dockerTerminationLogging());
+    System.out.println("Secret:              " + wf.configuration().secret().map(s -> s.name() + ':' + s.mountPath()).orElse(""));
+    System.out.println("Service Account:     " + wf.configuration().serviceAccount().orElse(""));
+    System.out.println("Resources:           " + wf.configuration().resources());
+    System.out.println("Environment:         " + Joiner.on(' ').withKeyValueSeparator('=').join(wf.configuration().env()));
+    System.out.println("Timeout:             " + wf.configuration().runningTimeout().map(Duration::toString).orElse(""));
+    System.out.println("Commit:              " + wf.configuration().commitSha().orElse(""));
+    System.out.println("Enabled:             " + state.enabled().map(Object::toString).orElse(""));
+    System.out.println("Trigger:             " + state.nextNaturalTrigger().map(Object::toString).orElse(""));
+    System.out.println("Trigger (offset):    " + state.nextNaturalOffsetTrigger().map(Object::toString).orElse(""));
   }
 
   @Override
