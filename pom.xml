@@ -565,6 +565,9 @@
               <artifactId>maven-compiler-plugin</artifactId>
               <version>3.8.0</version>
               <configuration>
+                <source>${maven.compiler.source}</source>
+                <target>${maven.compiler.target}</target>
+                <release>${maven.compiler.release}</release>
                 <showWarnings>true</showWarnings>
                 <forceJavacCompilerUse>true</forceJavacCompilerUse>
                 <compilerArgs>
