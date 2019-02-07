@@ -99,6 +99,7 @@ public interface ServiceAccountUsageAuthorizer {
   String AUTHORIZATION_GSUITE_USER_CONFIG = "styx.authorization.gsuite-user";
   String AUTHORIZATION_MESSAGE_CONFIG = "styx.authorization.message";
   String AUTHORIZATION_ADMINISTRATORS_CONFIG = "styx.authorization.administrators";
+  String AUTHORIZATION_BLACKLIST_CONFIG = "styx.authorization.blacklist";
 
   /**
    * Authorize service account usage by a principal in a workflow.
@@ -134,6 +135,7 @@ public interface ServiceAccountUsageAuthorizer {
     private final StopStrategy retryStopStrategy;
     private final String message;
     private final List<String> administrators;
+    private final List<String> blacklist;
 
     /**
      * (principalEmail, serviceAccount) -> ServiceAccountUsageAuthorizationResult
@@ -146,7 +148,7 @@ public interface ServiceAccountUsageAuthorizer {
 
     Impl(Iam iam, CloudResourceManager crm, Directory directory, String serviceAccountUserRole,
          AuthorizationPolicy authorizationPolicy, StopStrategy retryStopStrategy, String message,
-         List<String> administrators) {
+         List<String> administrators, List<String> blacklist) {
       this.iam = Objects.requireNonNull(iam, "iam");
       this.crm = Objects.requireNonNull(crm, "crm");
       this.directory = Objects.requireNonNull(directory, "directory");
@@ -155,6 +157,7 @@ public interface ServiceAccountUsageAuthorizer {
       this.retryStopStrategy = Objects.requireNonNull(retryStopStrategy, "retryStopStrategy");
       this.message = Objects.requireNonNull(message, "message");
       this.administrators = Objects.requireNonNull(administrators, "administrators");
+      this.blacklist = Objects.requireNonNull(blacklist, "blacklist");
     }
 
     @Override
@@ -206,6 +209,22 @@ public interface ServiceAccountUsageAuthorizer {
     public ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(String serviceAccount,
                                                                                         String principalEmail) {
       final String projectId = serviceAccountProjectId(serviceAccount);
+
+      // First check if principal is blacklisted
+      return memberStatus(principalEmail, blacklist)
+          .map(status -> ServiceAccountUsageAuthorizationResult.builder()
+              .serviceAccountProjectId(projectId)
+              .authorized(false)
+              .blacklisted(true)
+              .message(blacklistedDenialMessage(principalEmail))
+              .build())
+          // Then continue authorization check
+          .orElseGet(() -> checkServiceAccountUsageAuthorization0(serviceAccount, principalEmail, projectId));
+    }
+
+    private ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization0(String serviceAccount,
+                                                                                          String principalEmail,
+                                                                                          String projectId) {
       final Optional<String> accessMessage = firstPresent(
           // Check if the principal is an admin
           () -> memberStatus(principalEmail, administrators)
@@ -231,6 +250,10 @@ public interface ServiceAccountUsageAuthorizer {
 
     private ResponseException denialResponseException(String message) {
       return new ResponseException(Response.forStatus(FORBIDDEN.withReasonPhrase(message)));
+    }
+
+    private String blacklistedDenialMessage(String principalEmail) {
+      return "The principal " + principalEmail + " is blacklisted. " + message;
     }
 
     private String denialMessage(String serviceAccount, String principalEmail, String projectId) {
@@ -452,8 +475,10 @@ public interface ServiceAccountUsageAuthorizer {
           final String message = get(config, config::getString, AUTHORIZATION_MESSAGE_CONFIG).orElse("");
           final List<String> administrators = get(config, config::getStringList, AUTHORIZATION_ADMINISTRATORS_CONFIG)
               .orElse(Collections.emptyList());
+          final List<String> blacklist = get(config, config::getStringList, AUTHORIZATION_BLACKLIST_CONFIG)
+              .orElse(Collections.emptyList());
           return ServiceAccountUsageAuthorizer.create(
-              role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message, administrators);
+              role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message, administrators, blacklist);
         })
         .orElseGet(() -> {
           LOG.warn("{} not configured, fallback to nop ServiceAccountUsageAuthorizer",
@@ -472,7 +497,7 @@ public interface ServiceAccountUsageAuthorizer {
                                               String gsuiteUserEmail,
                                               String serviceName,
                                               String message,
-                                              List<String> administrators) {
+                                              List<String> administrators, List<String> blacklist) {
 
     final HttpTransport httpTransport;
     try {
@@ -512,7 +537,7 @@ public interface ServiceAccountUsageAuthorizer {
         .build();
 
     return new Impl(iam, crm, directory, serviceAccountUserRole, authorizationPolicy,
-        Impl.DEFAULT_RETRY_STOP_STRATEGY, message, administrators);
+        Impl.DEFAULT_RETRY_STOP_STRATEGY, message, administrators, blacklist);
   }
 
   static GoogleCredential defaultCredential() {
@@ -589,6 +614,11 @@ public interface ServiceAccountUsageAuthorizer {
      * Successfully authorized?
      */
     boolean authorized();
+
+    /**
+     * Blacklisted?
+     */
+    boolean blacklisted();
 
     /**
      * A message describing the authorization or denial reason.

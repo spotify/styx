@@ -26,7 +26,6 @@ import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static org.hamcrest.Matchers.any;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
@@ -231,15 +230,18 @@ public class StatusResourceTest extends VersionedApiTest {
 
   @Test
   public void testAuthEndpointShouldFordwardAuthorizerResponse() throws Exception {
+
+    final ServiceAccountUsageAuthorizationResult result = ServiceAccountUsageAuthorizationResult.builder()
+        .authorized(true)
+        .blacklisted(true)
+        .message("Some access message")
+        .serviceAccountProjectId("project")
+        .build();
+
     sinceVersion(Api.Version.V3);
 
-    String message = "Some access message";
     when(accountUsageAuthorizer.checkServiceAccountUsageAuthorization(AUTH_SERVICE_ACCOUNT, AUTH_PRINCIPAL))
-        .thenReturn(ServiceAccountUsageAuthorizationResult.builder()
-            .authorized(true)
-            .message(message)
-            .serviceAccountProjectId("project")
-            .build());
+        .thenReturn(result);
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request(
@@ -253,10 +255,11 @@ public class StatusResourceTest extends VersionedApiTest {
     TestServiceAccountUsageAuthorizationResponse
         parsed = Json.OBJECT_MAPPER.readValue(json, TestServiceAccountUsageAuthorizationResponse.class);
 
-    assertThat(parsed.authorized(), is(true));
-    assertThat(parsed.serviceAccount(), equalTo(AUTH_SERVICE_ACCOUNT));
-    assertThat(parsed.principal(), equalTo(AUTH_PRINCIPAL));
-    assertThat(parsed.message().get(), equalTo(message));
+    assertThat(parsed.authorized(), is(result.authorized()));
+    assertThat(parsed.blacklisted(), is(result.blacklisted()));
+    assertThat(parsed.serviceAccount(), is(AUTH_SERVICE_ACCOUNT));
+    assertThat(parsed.principal(), is(AUTH_PRINCIPAL));
+    assertThat(parsed.message(), is(result.message()));
   }
 
   @Test

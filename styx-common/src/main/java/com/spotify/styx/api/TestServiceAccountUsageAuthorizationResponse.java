@@ -32,6 +32,11 @@ public interface TestServiceAccountUsageAuthorizationResponse {
   boolean authorized();
 
   /**
+   * Blacklisted?
+   */
+  boolean blacklisted();
+
+  /**
    * A message describing the authorization or denial reason.
    */
   Optional<String> message();
