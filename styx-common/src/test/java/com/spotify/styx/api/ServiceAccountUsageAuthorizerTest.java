@@ -30,6 +30,9 @@ import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
@@ -97,11 +100,21 @@ public class ServiceAccountUsageAuthorizerTest {
   private static final String AUTHORIZATION_GSUITE_USER_CONFIG = "styx.authorization.gsuite-user";
   private static final String AUTHORIZATION_MESSAGE_CONFIG = "styx.authorization.message";
   private static final String AUTHORIZATION_ADMINISTRATORS_CONFIG = "styx.authorization.administrators";
+  private static final String AUTHORIZATION_BLACKLIST_CONFIG = "styx.authorization.blacklist";
 
   private static final List<String> ADMINISTRATORS = ImmutableList.of(
       "user:" + ADMIN_EMAIL,
       "group:" + STYX_ADMINS_GROUP_EMAIL,
       "serviceAccount:" + ADMIN_AGENT_EMAIL);
+
+  private static final String BLACKLISTED_USER_EMAIL = "blacklisted-user@corp.com";
+  private static final String BLACKLISTED_GROUP_EMAIL = "blacklisted-group@corp.com";
+  private static final String BLACKLISTED_SA_EMAIL = "blacklisted-sa@bar.iam.gserviceaccount.com";
+
+  private static final List<String> BLACKLIST = ImmutableList.of(
+      "user:" + BLACKLISTED_USER_EMAIL,
+      "group:" + BLACKLISTED_GROUP_EMAIL,
+      "serviceAccount:" + BLACKLISTED_SA_EMAIL);
 
   @Mock private AuthorizationPolicy authorizationPolicy;
   @Mock private PrivateKey privateKey;
@@ -109,7 +122,10 @@ public class ServiceAccountUsageAuthorizerTest {
   @Mock private GoogleIdToken.Payload idTokenPayload;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private CloudResourceManager crm;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Iam iam;
-  @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Directory directory;
+  @Mock private Directory directory;
+  @Mock private Directory.Members members;
+  @Mock private Directory.Members.HasMember isMember;
+  @Mock private Directory.Members.HasMember isNotMember;
 
   private GoogleCredential credential;
 
@@ -144,8 +160,10 @@ public class ServiceAccountUsageAuthorizerTest {
     when(idTokenPayload.getEmail()).thenReturn(PRINCIPAL_EMAIL);
     when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenReturn(projectPolicy);
     when((Object) iam.projects().serviceAccounts().getIamPolicy(any()).execute()).thenReturn(saPolicy);
-    when((Object) directory.members().hasMember(any(), any()).execute())
-        .thenReturn(new MembersHasMember().setIsMember(false));
+    doReturn(members).when(directory).members();
+    doReturn(isNotMember).when(members).hasMember(any(), any());
+    doReturn(new MembersHasMember().setIsMember(true)).when(isMember).execute();
+    doReturn(new MembersHasMember().setIsMember(false)).when(isNotMember).execute();
     when((Object) iam.projects().serviceAccounts().get(any()).execute())
         .thenReturn(new ServiceAccount()
             .setEmail(MANAGED_SERVICE_ACCOUNT)
@@ -155,8 +173,37 @@ public class ServiceAccountUsageAuthorizerTest {
         .setServiceAccountId("styx@bar.iam.gserviceaccount.com")
         .build();
     sut = new ServiceAccountUsageAuthorizer.Impl(iam, crm, directory, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy,
-        StopStrategies.stopAfterAttempt(RETRY_ATTEMPTS), MESSAGE, ADMINISTRATORS);
+        StopStrategies.stopAfterAttempt(RETRY_ATTEMPTS), MESSAGE, ADMINISTRATORS, BLACKLIST);
   }
+
+  @Test
+  public void shouldDenyAccessIfPrincipalIsBlacklisted() throws IOException {
+    reset(iam);
+    reset(crm);
+    reset(directory);
+
+    when(idTokenPayload.getEmail()).thenReturn(BLACKLISTED_SA_EMAIL);
+    var response = assertThrowsResponseException(() ->
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
+
+    verify(authorizationPolicy).shouldEnforceAuthorization(WORKFLOW_ID, SERVICE_ACCOUNT, idToken);
+    assertThat(response.status().code(), is(FORBIDDEN.code()));
+    assertThat(response.status().reasonPhrase(), is(blacklistedMessage(BLACKLISTED_SA_EMAIL)));
+
+    var expectedResult = ServiceAccountUsageAuthorizer.ServiceAccountUsageAuthorizationResult.builder()
+        .authorized(false)
+        .blacklisted(true)
+        .message(blacklistedMessage(BLACKLISTED_SA_EMAIL))
+        .serviceAccountProjectId(SERVICE_ACCOUNT_PROJECT)
+        .build();
+    var result = sut.checkServiceAccountUsageAuthorization(SERVICE_ACCOUNT, BLACKLISTED_SA_EMAIL);
+    assertThat(result, is(expectedResult));
+
+    verifyZeroInteractions(iam);
+    verifyZeroInteractions(crm);
+    verifyZeroInteractions(directory);
+  }
+
 
   @Test
   public void shouldDenyAccessIfNoPolicyBinding() throws IOException {
@@ -175,6 +222,19 @@ public class ServiceAccountUsageAuthorizerTest {
 
     verify(directory.members(), never()).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     verify(directory.members(), never()).hasMember(SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
+
+    verifyCheckFails();
+  }
+
+  private void verifyCheckFails() {
+    var expectedResult = ServiceAccountUsageAuthorizer.ServiceAccountUsageAuthorizationResult.builder()
+        .authorized(false)
+        .blacklisted(false)
+        .message(deniedMessage(SERVICE_ACCOUNT))
+        .serviceAccountProjectId(SERVICE_ACCOUNT_PROJECT)
+        .build();
+    var result = sut.checkServiceAccountUsageAuthorization(SERVICE_ACCOUNT, PRINCIPAL_EMAIL);
+    assertThat(result, is(expectedResult));
   }
 
   @Test
@@ -189,6 +249,8 @@ public class ServiceAccountUsageAuthorizerTest {
     verify(crm.projects().getIamPolicy(eq(SERVICE_ACCOUNT_PROJECT), any())).execute();
     verify(directory.members()).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     verify(directory.members()).hasMember(SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
+
+    verifyCheckFails();
   }
 
   @Test
@@ -281,16 +343,14 @@ public class ServiceAccountUsageAuthorizerTest {
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
   public void shouldAuthorizeIfPrincipalIsAdminViaGroup(String serviceAccount) throws IOException {
-    when((Object) directory.members().hasMember(STYX_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute())
-        .thenReturn(new MembersHasMember().setIsMember(true));
+    doReturn(isMember).when(members).hasMember(STYX_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
   }
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnProjectViaGroup(String serviceAccount) throws IOException {
-    when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute())
-        .thenReturn(new MembersHasMember().setIsMember(true));
+    doReturn(isMember).when(members).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
   }
 
@@ -298,12 +358,15 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void shouldDenyAccessIfPrincipalHasUserRoleOnProjectViaNonexistGroup(String serviceAccount)
       throws IOException {
-    final Throwable cause = googleJsonResponseException(404);
-    when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute()).thenThrow(cause);
+    var notFoundRequest = mock(Directory.Members.HasMember.class);
+    doThrow(googleJsonResponseException(404)).when(notFoundRequest).execute();
+    doReturn(notFoundRequest).when(members).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     final Response<?> response =
         assertThrowsResponseException(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
     assertThat(response.status().code(), is(FORBIDDEN.code()));
     assertThat(response.status().reasonPhrase(), is(deniedMessage(serviceAccount)));
+
+    verifyCheckFails();
   }
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
@@ -311,7 +374,9 @@ public class ServiceAccountUsageAuthorizerTest {
   public void shouldDenyAccessIfGroupMemberCheckReturnClientError(String serviceAccount)
       throws IOException {
     final Throwable cause = googleJsonResponseException(400);
-    when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute()).thenThrow(cause);
+    var errorRequest = mock(Directory.Members.HasMember.class);
+    doThrow(cause).when(errorRequest).execute();
+    doReturn(errorRequest).when(members).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     final Response<?> response =
         assertThrowsResponseException(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
     assertThat(response.status().code(), is(FORBIDDEN.code()));
@@ -323,7 +388,9 @@ public class ServiceAccountUsageAuthorizerTest {
   public void shouldFailIfGroupMemberCheckFails(String serviceAccount)
       throws IOException {
     final Throwable cause = googleJsonResponseException(418);
-    when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute()).thenThrow(cause);
+    var errorRequest = mock(Directory.Members.HasMember.class);
+    doThrow(cause).when(errorRequest).execute();
+    doReturn(errorRequest).when(members).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     assertThat(Throwables.getRootCause(Try.run(() ->
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
   }
@@ -333,7 +400,9 @@ public class ServiceAccountUsageAuthorizerTest {
   public void shouldFailIfGroupMemberCheckFailsForNonGoogleJsonResponseException(String serviceAccount)
       throws IOException {
     final Throwable cause = new IllegalStateException();
-    when((Object) directory.members().hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute()).thenThrow(cause);
+    var errorRequest = mock(Directory.Members.HasMember.class);
+    doThrow(cause).when(errorRequest).execute();
+    doReturn(errorRequest).when(members).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     assertThat(Throwables.getRootCause(Try.run(() ->
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
   }
@@ -348,8 +417,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnServiceAccountViaGroup(String serviceAccount) throws IOException {
-    when((Object) directory.members().hasMember(SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL).execute())
-        .thenReturn(new MembersHasMember().setIsMember(true));
+    doReturn(isMember).when(members).hasMember(SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
   }
 
@@ -418,7 +486,8 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void testCreate() {
     final ServiceAccountUsageAuthorizer sut = ServiceAccountUsageAuthorizer.create(
-        SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, GSUITE_USER_EMAIL, "foo", MESSAGE, ADMINISTRATORS);
+        SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, GSUITE_USER_EMAIL, "foo", MESSAGE, ADMINISTRATORS,
+        BLACKLIST);
     assertThat(sut, is(notNullValue()));
   }
 
@@ -427,7 +496,7 @@ public class ServiceAccountUsageAuthorizerTest {
     credential = new GoogleCredential.Builder().build();
     try {
       ServiceAccountUsageAuthorizer.create(SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential,
-          GSUITE_USER_EMAIL, "foo", MESSAGE, ADMINISTRATORS);
+          GSUITE_USER_EMAIL, "foo", MESSAGE, ADMINISTRATORS, BLACKLIST);
       fail();
     } catch (IllegalArgumentException e) {
       assertThat(e.getMessage(), is("Credential must be a service account"));
@@ -461,7 +530,8 @@ public class ServiceAccountUsageAuthorizerTest {
         AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG, SERVICE_ACCOUNT_USER_ROLE,
         AUTHORIZATION_GSUITE_USER_CONFIG, GSUITE_USER_EMAIL,
         AUTHORIZATION_MESSAGE_CONFIG, MESSAGE,
-        AUTHORIZATION_ADMINISTRATORS_CONFIG, ADMINISTRATORS));
+        AUTHORIZATION_ADMINISTRATORS_CONFIG, ADMINISTRATORS,
+        AUTHORIZATION_BLACKLIST_CONFIG, BLACKLIST));
     final ServiceAccountUsageAuthorizer authorizer = ServiceAccountUsageAuthorizer.create(config, "foo", credential);
     assertThat(authorizer, is(instanceOf(ServiceAccountUsageAuthorizer.Impl.class)));
   }
@@ -521,5 +591,9 @@ public class ServiceAccountUsageAuthorizerTest {
     return "The principal " + PRINCIPAL_EMAIL + " must have the role " +
            SERVICE_ACCOUNT_USER_ROLE + " in the project " + SERVICE_ACCOUNT_PROJECT + " or on the service account " +
            serviceAccount + ", either through a group membership or directly. " + MESSAGE;
+  }
+
+  private static String blacklistedMessage(String email) {
+    return "The principal " + email + " is blacklisted. " + MESSAGE;
   }
 }

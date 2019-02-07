@@ -99,6 +99,7 @@ public class StatusResource {
     final TestServiceAccountUsageAuthorizationResponse response =
         new TestServiceAccountUsageAuthorizationResponseBuilder()
             .authorized(result.authorized())
+            .blacklisted(result.blacklisted())
             .serviceAccount(request.serviceAccount())
             .principal(request.principal())
             .message(result.message())
