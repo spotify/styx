@@ -265,7 +265,7 @@ class PrettyCliOutput implements CliOutput {
   @Override
   public void printWorkflow(Workflow wf, WorkflowState state) {
     System.out.println("Component: " + wf.componentId());
-    System.out.println(" Workflow: " + wf.id().id());
+    System.out.println(" Workflow: " + wf.workflowId());
     System.out.println(" Schedule: " + wf.configuration().schedule());
     System.out.println("   Offset: " + wf.configuration().offset().orElse(""));
     System.out.println("    Image: " + wf.configuration().dockerImage().orElse(""));
