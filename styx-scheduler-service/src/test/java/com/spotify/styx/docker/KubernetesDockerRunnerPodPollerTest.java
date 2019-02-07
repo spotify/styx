@@ -29,7 +29,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
@@ -53,6 +52,7 @@ import io.fabric8.kubernetes.client.dsl.MixedOperation;
 import io.fabric8.kubernetes.client.dsl.PodResource;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
@@ -191,13 +191,13 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(namedPod2.get()).thenReturn(createdPod2);
 
     createdPod1.setStatus(podStatus1);
-    when(podStatus1.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus1));
+    when(podStatus1.getContainerStatuses()).thenReturn(List.of(containerStatus1));
     when(containerStatus1.getName()).thenReturn(RUN_SPEC.executionId());
     when(containerStatus1.getState()).thenReturn(containerState1);
     when(containerState1.getTerminated()).thenReturn(containerStateTerminated);
 
     createdPod2.setStatus(podStatus2);
-    when(podStatus2.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus2));
+    when(podStatus2.getContainerStatuses()).thenReturn(List.of(containerStatus2));
     when(containerStatus2.getName()).thenReturn(RUN_SPEC_2.executionId());
     when(containerStatus2.getState()).thenReturn(containerState2);
     when(containerState2.getTerminated()).thenReturn(containerStateTerminated);

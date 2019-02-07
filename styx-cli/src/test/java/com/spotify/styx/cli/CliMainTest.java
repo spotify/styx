@@ -35,8 +35,6 @@ import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Resources;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
@@ -67,6 +65,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -104,7 +103,7 @@ public class CliMainTest {
     when(cliContext.createClient(any())).thenReturn(client);
     when(cliContext.output(any())).thenReturn(cliOutput);
     when(cliContext.env()).thenReturn(
-        ImmutableMap.of("STYX_CLI_HOST", "https://styx.foo.bar:4711"));
+        Map.of("STYX_CLI_HOST", "https://styx.foo.bar:4711"));
   }
 
   @Test
@@ -166,7 +165,7 @@ public class CliMainTest {
 
     for (WorkflowConfiguration configuration : expected) {
       when(validator.validateWorkflowConfiguration(configuration)).thenReturn(
-          ImmutableList.of("bad-" + configuration.id(), "cfg-" + configuration.id()));
+          List.of("bad-" + configuration.id(), "cfg-" + configuration.id()));
     }
 
     try {
@@ -498,7 +497,7 @@ public class CliMainTest {
         .build();
     
     final BackfillsPayload backfillsPayload = BackfillsPayload.create(
-        ImmutableList.of(BackfillPayload.create(backfill, Optional.empty())));
+        List.of(BackfillPayload.create(backfill, Optional.empty())));
 
     when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false))
         .thenReturn(CompletableFuture.completedFuture(backfillsPayload));
@@ -528,7 +527,7 @@ public class CliMainTest {
         .build();
     
     final BackfillsPayload backfillsPayload = BackfillsPayload.create(
-        ImmutableList.of(BackfillPayload.create(backfill, Optional.empty())));
+        List.of(BackfillPayload.create(backfill, Optional.empty())));
 
     when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false))
         .thenReturn(CompletableFuture.completedFuture(backfillsPayload));

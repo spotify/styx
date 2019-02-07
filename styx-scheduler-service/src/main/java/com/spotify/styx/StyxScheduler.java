@@ -43,7 +43,6 @@ import com.google.api.services.iam.v1.IamScopes;
 import com.google.cloud.datastore.Datastore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -397,7 +396,7 @@ public class StyxScheduler implements AppInit {
         .withMaxRunningTimeoutLimit(runningStateTtl)
         .build();
 
-    outputHandlers.addAll(ImmutableList.of(
+    outputHandlers.addAll(List.of(
         new TransitionLogger(""),
         new DockerRunnerHandler(
             dockerRunner, stateManager),

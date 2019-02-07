@@ -30,7 +30,6 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.TriggerParameters;
@@ -45,6 +44,7 @@ import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -201,6 +201,6 @@ public class TriggerManagerTest {
     TriggerInstantSpec spec = TriggerInstantSpec.create(nextNaturalTrigger, offset);
 
     when(storage.workflowsWithNextNaturalTrigger())
-        .thenReturn(ImmutableMap.of(WORKFLOW_DAILY, spec));
+        .thenReturn(Map.of(WORKFLOW_DAILY, spec));
   }
 }

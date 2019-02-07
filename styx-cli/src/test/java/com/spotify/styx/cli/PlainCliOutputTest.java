@@ -24,7 +24,6 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
-import com.google.common.collect.ImmutableList;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Schedule;
@@ -40,6 +39,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import org.junit.After;
 import org.junit.Before;
@@ -90,9 +90,7 @@ public class PlainCliOutputTest {
 
   @Test
   public void shouldPrintBackfills() {
-    cliOutput.printBackfills(
-        ImmutableList.of(BackfillPayload.create(BACKFILL, Optional.empty())),
-        true);
+    cliOutput.printBackfills(List.of(BackfillPayload.create(BACKFILL, Optional.empty())), true);
     assertEquals(EXPECTED_OUTPUT,
         outContent.toString());
   }
@@ -114,7 +112,7 @@ public class PlainCliOutputTest {
         .id("bar2")
         .schedule(Schedule.DAYS)
         .build());
-    cliOutput.printWorkflows(ImmutableList.of(foo1, foo2));
+    cliOutput.printWorkflows(List.of(foo1, foo2));
     assertThat(outContent.toString(), is(String.format("foo1#bar1%nfoo2#bar2%n")));
   }
 
@@ -125,7 +123,7 @@ public class PlainCliOutputTest {
         .schedule(Schedule.DAYS)
         .offset("6h")
         .dockerImage("foo/bar:baz")
-        .dockerArgs(ImmutableList.of("foo", "the", "bar"))
+        .dockerArgs(List.of("foo", "the", "bar"))
         .dockerTerminationLogging(true)
         .secret(Secret.create("secret-foo", "/foo-secret"))
         .serviceAccount("foo@bar.baz")

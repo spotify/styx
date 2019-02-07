@@ -36,7 +36,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.WorkflowResourceDecorator;
 import com.spotify.styx.model.StyxConfig;
@@ -77,9 +76,9 @@ public class StateUtilTest {
   public void setUp() throws IOException {
     final RunState runState =
         RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
-    when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
+    when(storage.readActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
     when(storage.config()).thenReturn(config);
-    when(workflowCache.get()).thenReturn(ImmutableMap.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES));
+    when(workflowCache.get()).thenReturn(Map.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES));
   }
 
   @Test
@@ -97,14 +96,14 @@ public class StateUtilTest {
     final RunState runState =
         RunState.create(WORKFLOW_INSTANCE, RunState.State.QUEUED, Instant.ofEpochMilli(10L));
 
-    when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
-    assertThat(getResourcesUsageMap(), is(ImmutableMap.of()));
+    when(storage.readActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
+    assertThat(getResourcesUsageMap(), is(Map.of()));
   }
 
   @Test
   public void shouldGetUsedResourcesNoStates() throws IOException {
     when(storage.readActiveStates()).thenReturn(emptyMap());
-    assertThat(getResourcesUsageMap(), is(ImmutableMap.of()));
+    assertThat(getResourcesUsageMap(), is(Map.of()));
   }
 
   @Test(expected = IOException.class)
@@ -136,8 +135,8 @@ public class StateUtilTest {
     final RunState runState =
         RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
     when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(3L));
-    when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
-    when(workflowCache.get()).thenReturn(ImmutableMap.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT));
+    when(storage.readActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
+    when(workflowCache.get()).thenReturn(Map.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT));
 
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
     final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
@@ -151,12 +150,12 @@ public class StateUtilTest {
     final RunState runState =
         RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
     when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(3L));
-    when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
+    when(storage.readActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
 
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
     final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
     final Set<WorkflowInstance> timedOutInstances =
-        getTimedOutInstances(ImmutableMap.of(), activeInstanceStates, Instant.ofEpochMilli(13L), timeoutConfig);
+        getTimedOutInstances(Map.of(), activeInstanceStates, Instant.ofEpochMilli(13L), timeoutConfig);
     assertThat(timedOutInstances, contains(WORKFLOW_INSTANCE));
   }
 
@@ -165,8 +164,8 @@ public class StateUtilTest {
     final RunState runState =
         RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
     when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(1L));
-    when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
-    when(workflowCache.get()).thenReturn(ImmutableMap.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT));
+    when(storage.readActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
+    when(workflowCache.get()).thenReturn(Map.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT));
 
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
     final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
@@ -180,8 +179,8 @@ public class StateUtilTest {
     final RunState runState =
         RunState.create(WORKFLOW_INSTANCE, RunState.State.QUEUED, Instant.ofEpochMilli(10L));
     when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(1L));
-    when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
-    when(workflowCache.get()).thenReturn(ImmutableMap.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT));
+    when(storage.readActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
+    when(workflowCache.get()).thenReturn(Map.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT));
 
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
     final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
@@ -195,8 +194,8 @@ public class StateUtilTest {
     final RunState runState =
         RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
     when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(2L));
-    when(storage.readActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
-    when(workflowCache.get()).thenReturn(ImmutableMap.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES));
+    when(storage.readActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
+    when(workflowCache.get()).thenReturn(Map.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES));
 
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
     final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);

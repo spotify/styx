@@ -196,8 +196,8 @@ public class StyxSchedulerTest {
         .build());
 
     when(time.get()).thenReturn(Instant.now());
-    when(stateManager.getActiveStates()).thenReturn(ImmutableMap.of(wfi1, rs1, wfi2, rs2));
-    when(workflowCache.get()).thenReturn(ImmutableMap.of(wfid1, wf1, wfid2, wf2));
+    when(stateManager.getActiveStates()).thenReturn(Map.of(wfi1, rs1, wfi2, rs2));
+    when(workflowCache.get()).thenReturn(Map.of(wfid1, wf1, wfid2, wf2));
     when(storage.enabled()).thenReturn(ImmutableSet.of(wfid1));
 
     StyxScheduler.setupMetrics(stateManager, workflowCache, storage, submissionRateLimiter, stats, time);
@@ -232,8 +232,8 @@ public class StyxSchedulerTest {
 
   @Test
   public void shouldReflectDevMode() {
-    final Config devConfig = ConfigFactory.parseMap(ImmutableMap.of("styx.mode", "development"));
-    final Config prodConfig = ConfigFactory.parseMap(ImmutableMap.of("styx.mode", "production"));
+    final Config devConfig = ConfigFactory.parseMap(Map.of("styx.mode", "development"));
+    final Config prodConfig = ConfigFactory.parseMap(Map.of("styx.mode", "production"));
     assertThat(StyxScheduler.isDevMode(devConfig), is(true));
     assertThat(StyxScheduler.isDevMode(prodConfig), is(false));
   }

@@ -23,8 +23,8 @@ package com.spotify.styx.state.handlers;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
-import com.google.common.collect.ImmutableList;
 import com.spotify.styx.util.ClassEnforcer;
+import java.util.List;
 import org.junit.Test;
 
 public class HandlerUtilTest {
@@ -35,13 +35,13 @@ public class HandlerUtilTest {
   
   @Test
   public void shouldReplaceArgs() {
-    assertThat(HandlerUtil.argsReplace(ImmutableList.of("foo", "bar", "{}"), "foobar"),
-        is(ImmutableList.of("foo", "bar", "foobar")));
+    assertThat(HandlerUtil.argsReplace(List.of("foo", "bar", "{}"), "foobar"),
+        is(List.of("foo", "bar", "foobar")));
   }
 
   @Test
   public void shouldDoNothingIfNoPlaceholder() {
-    assertThat(HandlerUtil.argsReplace(ImmutableList.of("foo", "bar", "foobar"), "barfoo"),
-        is(ImmutableList.of("foo", "bar", "foobar")));
+    assertThat(HandlerUtil.argsReplace(List.of("foo", "bar", "foobar"), "barfoo"),
+        is(List.of("foo", "bar", "foobar")));
   }
 }

@@ -28,7 +28,6 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
-import com.google.common.collect.ImmutableList;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
@@ -46,7 +45,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class MessageUtilTest {
 
-  private static final List<String> DEPLETED_RESOURCES = ImmutableList.of("foo", "bar"); // Unordered
+  private static final List<String> DEPLETED_RESOURCES = List.of("foo", "bar"); // Unordered
   private static final Message MESSAGE = Message.info("Resource limit reached for: [bar, foo]");
   private static final Message STALE_MESSAGE = Message.info("Resource limit reached for: [baz]");
   private static final Event INFO = Event.info(WORKFLOW_INSTANCE, MESSAGE);

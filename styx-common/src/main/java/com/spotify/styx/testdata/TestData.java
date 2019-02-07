@@ -26,7 +26,6 @@ import static com.spotify.styx.model.Schedule.MONTHS;
 import static com.spotify.styx.model.Schedule.WEEKS;
 import static com.spotify.styx.model.Schedule.YEARS;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Workflow;
@@ -35,6 +34,7 @@ import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 
 public final class TestData {
@@ -134,7 +134,7 @@ public final class TestData {
           .commitSha(VALID_SHA)
           .schedule(DAYS)
           .dockerImage("busybox")
-          .dockerArgs(ImmutableList.of("x", "y"))
+          .dockerArgs(List.of("x", "y"))
           .secret(Secret.create("name", "/path"))
           .serviceAccount("foo@bar.baz.quux")
           .build();

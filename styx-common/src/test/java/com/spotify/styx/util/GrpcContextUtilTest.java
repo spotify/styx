@@ -25,7 +25,6 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.verify;
 
-import com.google.common.collect.ImmutableList;
 import io.grpc.Context;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -107,7 +106,7 @@ public class GrpcContextUtilTest {
   public void invokeAllShouldPropagateContext() throws Exception {
     final Callable<String> callable = TEST_KEY::get;
     final List<Future<String>> futures = Context.current().withValue(TEST_KEY, "foobar")
-        .call(() -> sut.invokeAll(ImmutableList.of(callable)));
+        .call(() -> sut.invokeAll(List.of(callable)));
     assertThat(futures.get(0).get(30, SECONDS), is("foobar"));
   }
 
@@ -115,7 +114,7 @@ public class GrpcContextUtilTest {
   public void invokeAllWithTimeoutShouldPropagateContext() throws Exception {
     final Callable<String> callable = TEST_KEY::get;
     final List<Future<String>> futures = Context.current().withValue(TEST_KEY, "foobar")
-        .call(() -> sut.invokeAll(ImmutableList.of(callable), 30, SECONDS));
+        .call(() -> sut.invokeAll(List.of(callable), 30, SECONDS));
     assertThat(futures.get(0).get(30, SECONDS), is("foobar"));
   }
 
@@ -123,7 +122,7 @@ public class GrpcContextUtilTest {
   public void invokeAnyShouldPropagateContext() throws Exception {
     final Callable<String> callable = TEST_KEY::get;
     final String result = Context.current().withValue(TEST_KEY, "foobar")
-        .call(() -> sut.invokeAny(ImmutableList.of(callable)));
+        .call(() -> sut.invokeAny(List.of(callable)));
     assertThat(result, is("foobar"));
   }
 
@@ -131,7 +130,7 @@ public class GrpcContextUtilTest {
   public void invokeAnyWithTimeoutShouldPropagateContext() throws Exception {
     final Callable<String> callable = TEST_KEY::get;
     final String result = Context.current().withValue(TEST_KEY, "foobar")
-        .call(() -> sut.invokeAny(ImmutableList.of(callable), 30, SECONDS));
+        .call(() -> sut.invokeAny(List.of(callable), 30, SECONDS));
     assertThat(result, is("foobar"));
   }
 
