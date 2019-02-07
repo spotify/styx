@@ -497,7 +497,8 @@ public interface ServiceAccountUsageAuthorizer {
                                               String gsuiteUserEmail,
                                               String serviceName,
                                               String message,
-                                              List<String> administrators, List<String> blacklist) {
+                                              List<String> administrators,
+                                              List<String> blacklist) {
 
     final HttpTransport httpTransport;
     try {
