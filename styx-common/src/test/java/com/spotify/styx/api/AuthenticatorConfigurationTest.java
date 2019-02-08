@@ -26,7 +26,6 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.typesafe.config.Config;
 import java.util.List;
@@ -54,8 +53,8 @@ public class AuthenticatorConfigurationTest {
     when(resourceConfig2.getString("type")).thenReturn("type2");
     when(resourceConfig2.getString("id")).thenReturn("2");
 
-    final List<String> domainWhitelist = ImmutableList.of("foo.com", "bar.com");
-    final List<? extends Config> resourceWhitelist = ImmutableList.of(resourceConfig1,
+    final List<String> domainWhitelist = List.of("foo.com", "bar.com");
+    final List<? extends Config> resourceWhitelist = List.of(resourceConfig1,
         resourceConfig2);
     
     when(config.hasPath(DOMAIN_WHITELIST_KEY)).thenReturn(true);

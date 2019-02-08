@@ -67,8 +67,6 @@ import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
@@ -419,7 +417,7 @@ public class DatastoreStorageTest {
     storage.writeActiveState(WORKFLOW_INSTANCE2, RUN_STATE2);
 
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
-    assertThat(activeStates, is(ImmutableMap.of(
+    assertThat(activeStates, is(Map.of(
         WORKFLOW_INSTANCE1, RUN_STATE,
         WORKFLOW_INSTANCE2, RUN_STATE2)));
   }
@@ -434,7 +432,7 @@ public class DatastoreStorageTest {
     final Map<WorkflowInstance, RunState> activeStates =
         storage.readActiveStates(WORKFLOW_ID1.componentId());
 
-    assertThat(activeStates, is(ImmutableMap.of(WORKFLOW_INSTANCE2, RUN_STATE2)));
+    assertThat(activeStates, is(Map.of(WORKFLOW_INSTANCE2, RUN_STATE2)));
   }
 
   @Test
@@ -454,7 +452,7 @@ public class DatastoreStorageTest {
     final Map<WorkflowInstance, RunState> activeStates =
         storage.activeStatesByTriggerId("foobar");
 
-    assertThat(activeStates, is(ImmutableMap.of(WORKFLOW_INSTANCE, FULLY_POPULATED_RUNSTATE)));
+    assertThat(activeStates, is(Map.of(WORKFLOW_INSTANCE, FULLY_POPULATED_RUNSTATE)));
   }
 
   @Test
@@ -521,7 +519,7 @@ public class DatastoreStorageTest {
   public void shouldReturnEmptyClientBlacklist() throws IOException {
     Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
-            ImmutableList.of()).build();
+            List.of()).build();
     helper.getOptions().getService().put(config);
     assertThat(storage.config().clientBlacklist(), is(empty()));
   }
@@ -530,7 +528,7 @@ public class DatastoreStorageTest {
   public void shouldReturnClientBlacklist() throws IOException {
     Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
-            ImmutableList.of(StringValue.of("v1"), StringValue.of("v2"), StringValue.of("v3")))
+            List.of(StringValue.of("v1"), StringValue.of("v2"), StringValue.of("v3")))
         .build();
     helper.getOptions().getService().put(config);
     List<String> blacklist = storage.config().clientBlacklist();
@@ -877,7 +875,7 @@ public class DatastoreStorageTest {
       tx.store(RESOURCE2);
       return null;
     });
-    assertThat(storage.getResources(), is(ImmutableList.of(RESOURCE1, RESOURCE2)));
+    assertThat(storage.getResources(), is(List.of(RESOURCE1, RESOURCE2)));
   }
 
   @Test
@@ -887,8 +885,8 @@ public class DatastoreStorageTest {
       return null;
     });
     storage.deleteResource(RESOURCE1.id());
-    assertThat(storage.getResources(), is(ImmutableList.of()));
-    assertThat(storage.shardsForCounter(RESOURCE1.id()), is(ImmutableMap.of()));
+    assertThat(storage.getResources(), is(List.of()));
+    assertThat(storage.shardsForCounter(RESOURCE1.id()), is(Map.of()));
   }
 
   @Test

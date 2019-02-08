@@ -43,8 +43,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.auto.value.AutoValue;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.net.HttpHeaders;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
@@ -65,6 +63,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -235,7 +234,7 @@ public class MiddlewaresTest {
 
   @Test
   public void testValidClient() throws Exception {
-    Supplier<List<String>> supplier = () -> ImmutableList.of("Styx CLI 0.1.0");
+    Supplier<List<String>> supplier = () -> List.of("Styx CLI 0.1.0");
     RequestContext requestContext = mockRequestContext(true);
     Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)
         .apply(mockInnerHandler(requestContext))
@@ -245,7 +244,7 @@ public class MiddlewaresTest {
 
   @Test
   public void testValidClientNoHeader() throws Exception {
-    Supplier<List<String>> supplier = () -> ImmutableList.of("Styx CLI 0.1.0");
+    Supplier<List<String>> supplier = () -> List.of("Styx CLI 0.1.0");
     RequestContext requestContext = mockRequestContext(false);
     Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)
         .apply(mockInnerHandler(requestContext))
@@ -255,7 +254,7 @@ public class MiddlewaresTest {
 
   @Test
   public void testInvalidClient() throws Exception {
-    Supplier<List<String>> supplier = () -> ImmutableList.of("Styx CLI 0.1.1");
+    Supplier<List<String>> supplier = () -> List.of("Styx CLI 0.1.1");
     RequestContext requestContext = mockRequestContext(true);
 
     Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)
@@ -553,8 +552,8 @@ public class MiddlewaresTest {
         request.method(),
         request.uri(),
         email,
-        ImmutableMap.of(HttpHeaders.AUTHORIZATION, "<hidden>"),
-        ImmutableMap.of(),
+        Map.of(HttpHeaders.AUTHORIZATION, "<hidden>"),
+        Map.of(),
         request.payload().get().utf8());
   }
 

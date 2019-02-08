@@ -31,10 +31,10 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -53,7 +53,7 @@ public class CloserUtilTest {
   public void shouldCloseRegisteredExecutorService() throws IOException, InterruptedException {
     final ExecutorService registeredExecutorService = CloserUtil.register(closer, executorService, "foobar");
     assertThat(registeredExecutorService, is(executorService));
-    when(executorService.shutdownNow()).thenReturn(ImmutableList.of(runnable));
+    when(executorService.shutdownNow()).thenReturn(List.of(runnable));
     closer.close();
     verifyShutdown(executorService);
   }
@@ -61,7 +61,7 @@ public class CloserUtilTest {
   @Test
   public void closeableShouldCloseExecutorService() throws IOException, InterruptedException {
     final Closeable closeable = CloserUtil.closeable(executorService, "foobar");
-    when(executorService.shutdownNow()).thenReturn(ImmutableList.of(runnable));
+    when(executorService.shutdownNow()).thenReturn(List.of(runnable));
     closeable.close();
     verifyShutdown(executorService);
   }
@@ -73,7 +73,7 @@ public class CloserUtilTest {
     // https://bugs.openjdk.java.net/browse/JDK-8154017
     assumeThat("should be Java 9+", isJava9OrGreater(), is(true));
     final Closeable closeable = CloserUtil.closeable(executorService, "foobar");
-    when(executorService.shutdownNow()).thenReturn(ImmutableList.of(runnable));
+    when(executorService.shutdownNow()).thenReturn(List.of(runnable));
     doThrow(new InterruptedException()).when(executorService).awaitTermination(anyLong(), any());
     closeable.close();
     assertThat(Thread.currentThread().isInterrupted(), is(true));

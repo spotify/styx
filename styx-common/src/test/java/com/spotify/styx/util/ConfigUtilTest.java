@@ -23,9 +23,9 @@ package com.spotify.styx.util;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
-import com.google.common.collect.ImmutableMap;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.Test;
 
@@ -38,7 +38,7 @@ public class ConfigUtilTest {
 
   @Test
   public void getShouldReturnValue() {
-    final Config config = ConfigFactory.parseMap(ImmutableMap.of("foo.bar", "baz"));
+    final Config config = ConfigFactory.parseMap(Map.of("foo.bar", "baz"));
     assertThat(ConfigUtil.get(config, config::getString, "foo.bar"), is(Optional.of("baz")));
   }
 

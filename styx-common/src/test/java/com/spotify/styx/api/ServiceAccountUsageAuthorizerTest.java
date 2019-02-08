@@ -53,8 +53,6 @@ import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.model.ServiceAccount;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.spotify.apollo.Response;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.AllAuthorizationPolicy;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.AuthorizationPolicy;
@@ -66,6 +64,7 @@ import java.io.IOException;
 import java.security.PrivateKey;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javaslang.control.Try;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -102,7 +101,7 @@ public class ServiceAccountUsageAuthorizerTest {
   private static final String AUTHORIZATION_ADMINISTRATORS_CONFIG = "styx.authorization.administrators";
   private static final String AUTHORIZATION_BLACKLIST_CONFIG = "styx.authorization.blacklist";
 
-  private static final List<String> ADMINISTRATORS = ImmutableList.of(
+  private static final List<String> ADMINISTRATORS = List.of(
       "user:" + ADMIN_EMAIL,
       "group:" + STYX_ADMINS_GROUP_EMAIL,
       "serviceAccount:" + ADMIN_AGENT_EMAIL);
@@ -518,7 +517,7 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Test
   public void whitelistAuthorizationPolicyShouldEnforceWhitelist() {
-    final AuthorizationPolicy policy = new WhitelistAuthorizationPolicy(ImmutableList.of(WORKFLOW_ID));
+    final AuthorizationPolicy policy = new WhitelistAuthorizationPolicy(List.of(WORKFLOW_ID));
     assertThat(policy.shouldEnforceAuthorization(WORKFLOW_ID, SERVICE_ACCOUNT, idToken), is(true));
     assertThat(policy.shouldEnforceAuthorization(WorkflowId.create("another", "workflow"), SERVICE_ACCOUNT, idToken),
         is(false));
@@ -526,7 +525,7 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Test
   public void shouldCreateConfiguredServiceAccountUsageAuthorizer() {
-    final Config config = ConfigFactory.parseMap(ImmutableMap.of(
+    final Config config = ConfigFactory.parseMap(Map.of(
         AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG, SERVICE_ACCOUNT_USER_ROLE,
         AUTHORIZATION_GSUITE_USER_CONFIG, GSUITE_USER_EMAIL,
         AUTHORIZATION_MESSAGE_CONFIG, MESSAGE,
@@ -538,22 +537,22 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Test
   public void shouldCreateNopServiceAccountUsageAuthorizer() {
-    final Config config = ConfigFactory.parseMap(ImmutableMap.of());
+    final Config config = ConfigFactory.parseMap(Map.of());
     final ServiceAccountUsageAuthorizer authorizer = ServiceAccountUsageAuthorizer.create(config, "foo", credential);
     assertThat(authorizer, is(ServiceAccountUsageAuthorizer.nop()));
   }
 
   @Test
   public void shouldCreateAllAuthorizationPolicy() {
-    final Config config = ConfigFactory.parseMap(ImmutableMap.of(AUTHORIZATION_REQUIRE_ALL_CONFIG, "true"));
+    final Config config = ConfigFactory.parseMap(Map.of(AUTHORIZATION_REQUIRE_ALL_CONFIG, "true"));
     final AuthorizationPolicy policy = AuthorizationPolicy.fromConfig(config);
     assertThat(policy, is(instanceOf(ServiceAccountUsageAuthorizer.AllAuthorizationPolicy.class)));
   }
 
   @Test
   public void shouldCreateWhitelistAuthorizationPolicy() {
-    final Config config = ConfigFactory.parseMap(ImmutableMap.of(AUTHORIZATION_REQUIRE_WORKFLOWS,
-        ImmutableList.of("foo#bar", "baz#quux")));
+    final Config config = ConfigFactory.parseMap(Map.of(AUTHORIZATION_REQUIRE_WORKFLOWS,
+        List.of("foo#bar", "baz#quux")));
     final AuthorizationPolicy policy = AuthorizationPolicy.fromConfig(config);
     assertThat(policy, is(instanceOf(ServiceAccountUsageAuthorizer.WhitelistAuthorizationPolicy.class)));
   }

@@ -26,7 +26,6 @@ import com.google.api.services.iam.v1.model.ServiceAccountKey;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hashing;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.spotify.styx.ServiceAccountKeyManager;
@@ -182,12 +181,12 @@ class KubernetesGCPServiceAccountSecretManager {
       throw e;
     }
 
-    final Map<String, String> keys = ImmutableMap.of(
+    final Map<String, String> keys = Map.of(
         STYX_WORKFLOW_SA_JSON_KEY, jsonKey.getPrivateKeyData(),
         STYX_WORKFLOW_SA_P12_KEY, p12Key.getPrivateKeyData()
     );
 
-    final Map<String, String> annotations = ImmutableMap.of(
+    final Map<String, String> annotations = Map.of(
         STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION, jsonKey.getName(),
         STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION, p12Key.getName(),
         STYX_WORKFLOW_SA_ID_ANNOTATION, serviceAccount,

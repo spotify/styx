@@ -23,6 +23,7 @@ package com.spotify.styx.state;
 import com.google.common.collect.ImmutableMap;
 import com.typesafe.config.Config;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -32,10 +33,10 @@ public class TimeoutConfig {
 
   public static final String DEFAULT_TTL_KEY = "default";
 
-  private final ImmutableMap<RunState.State, Duration> ttls;
+  private final Map<RunState.State, Duration> ttls;
   private final Duration defaultTtl;
 
-  private TimeoutConfig(ImmutableMap<RunState.State, Duration> ttls, Duration defaultTtl) {
+  private TimeoutConfig(Map<RunState.State, Duration> ttls, Duration defaultTtl) {
     this.ttls = Objects.requireNonNull(ttls);
     this.defaultTtl = Objects.requireNonNull(defaultTtl);
   }
@@ -56,7 +57,7 @@ public class TimeoutConfig {
   }
 
   public static TimeoutConfig createWithDefaultTtl(Duration defaultTtl) {
-    return new TimeoutConfig(ImmutableMap.of(), defaultTtl);
+    return new TimeoutConfig(Map.of(), defaultTtl);
   }
 
   public Duration ttlOf(RunState.State state) {

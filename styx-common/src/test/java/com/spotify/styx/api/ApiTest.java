@@ -28,7 +28,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
@@ -44,7 +43,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class ApiTest {
 
-  private static final List<Route<AsyncHandler<Response<ByteString>>>> ROUTES = ImmutableList.of(
+  private static final List<Route<AsyncHandler<Response<ByteString>>>> ROUTES = List.of(
       Route.create("GET", "/foo", rc -> null),
       Route.create("GET", "/bar", rc -> null));
 
@@ -67,7 +66,7 @@ public class ApiTest {
     final List<String> prefixedUris = Api.prefixRoutes(ROUTES, Api.Version.V3)
         .map(Route::uri)
         .collect(toList());
-    assertThat(prefixedUris, is(ImmutableList.of("/api/v3/foo", "/api/v3/bar")));
+    assertThat(prefixedUris, is(List.of("/api/v3/foo", "/api/v3/bar")));
   }
 
   @Test
@@ -75,7 +74,7 @@ public class ApiTest {
   public void shouldHaveCorrectNumberOfMiddlewares() {
     when(route.withMiddleware(any(Middleware.class))).thenReturn(route);
 
-    final List<Route<AsyncHandler<Response<ByteString>>>> originalRoutes = ImmutableList.of(route);
+    final List<Route<AsyncHandler<Response<ByteString>>>> originalRoutes = List.of(route);
     final List<Route<AsyncHandler<Response<ByteString>>>> routes =
         Api.withCommonMiddleware(originalRoutes.stream(), requestAuthenticator, "test").collect(toList());
     verify(route, times(5)).withMiddleware(any(Middleware.class));

@@ -41,8 +41,6 @@ import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpResponseException;
 import com.google.api.services.iam.v1.model.ServiceAccountKey;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hashing;
 import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
@@ -69,6 +67,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.IntSummaryStatistics;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -139,7 +139,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     when(k8sClient.inNamespace(any(String.class))).thenReturn(k8sClient);
     when(k8sClient.pods()).thenReturn(pods);
     when(pods.list()).thenReturn(podList);
-    when(podList.getItems()).thenReturn(ImmutableList.of());
+    when(podList.getItems()).thenReturn(List.of());
 
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(null);
@@ -285,10 +285,10 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
-    when(secretList.getItems()).thenReturn(ImmutableList.of(secret));
+    when(secretList.getItems()).thenReturn(List.of(secret));
 
     // Verify that an unused service account key secret is deleted
-    when(podList.getItems()).thenReturn(ImmutableList.of());
+    when(podList.getItems()).thenReturn(List.of());
     sut.cleanup();
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key"));
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key"));
@@ -303,7 +303,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
-    when(secretList.getItems()).thenReturn(ImmutableList.of(secret));
+    when(secretList.getItems()).thenReturn(List.of(secret));
 
     final KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
         .serviceAccountSecret(secret.getMetadata().getName())
@@ -313,7 +313,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     final PodStatus podStatus = podStatus(phase);
     pod.setStatus(podStatus);
 
-    when(podList.getItems()).thenReturn(ImmutableList.of());
+    when(podList.getItems()).thenReturn(List.of());
     sut.cleanup();
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key"));
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key"));
@@ -329,10 +329,10 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     final Secret secret3 = fakeServiceAccountKeySecret(
         SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-3", "p12-key-3", EXPIRED_CREATION_TIMESTAMP.toString());
 
-    when(podList.getItems()).thenReturn(ImmutableList.of());
+    when(podList.getItems()).thenReturn(List.of());
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
-    when(secretList.getItems()).thenReturn(ImmutableList.of(secret1, secret2, secret3));
+    when(secretList.getItems()).thenReturn(List.of(secret1, secret2, secret3));
 
     when(secrets.delete(secret1)).thenThrow(new KubernetesClientException("fail delete secret1"));
     doThrow(new IOException("fail delete json-key-2")).when(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT,"json-key-2"));
@@ -360,14 +360,14 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
-    when(secretList.getItems()).thenReturn(ImmutableList.of(secret));
+    when(secretList.getItems()).thenReturn(List.of(secret));
 
     final KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
         .serviceAccountSecret(secret.getMetadata().getName())
         .build();
     final Pod pod = createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
     pod.setStatus(podStatus("Running"));
-    when(podList.getItems()).thenReturn(ImmutableList.of(pod));
+    when(podList.getItems()).thenReturn(List.of(pod));
     sut.cleanup();
     verify(serviceAccountKeyManager, never()).deleteKey(anyString());
     verify(secrets, never()).delete(any(Secret.class));
@@ -380,8 +380,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
-    when(secretList.getItems()).thenReturn(ImmutableList.of(secret));
-    when(podList.getItems()).thenReturn(ImmutableList.of());
+    when(secretList.getItems()).thenReturn(List.of(secret));
+    when(podList.getItems()).thenReturn(List.of());
 
     sut.cleanup();
 
@@ -400,7 +400,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
-    when(secretList.getItems()).thenReturn(ImmutableList.of(secret1, secret2));
+    when(secretList.getItems()).thenReturn(List.of(secret1, secret2));
 
     sut.cleanup();
 
@@ -486,7 +486,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   public void shouldCreateNewServiceAccountKeysIfKeysAreDeleted() throws IOException {
 
     final ObjectMeta metadata = new ObjectMeta();
-    metadata.setAnnotations(ImmutableMap.of("styx-wf-sa", SERVICE_ACCOUNT));
+    metadata.setAnnotations(Map.of("styx-wf-sa", SERVICE_ACCOUNT));
 
     final String jsonKeyId = "json-key";
     final String p12KeyId = "p12-key";
@@ -561,14 +561,14 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     final ObjectMeta metadata = new ObjectMeta();
     metadata.setCreationTimestamp(creationTimestamp);
     metadata.setName("styx-wf-sa-keys-" + epoch + "-" + Hashing.sha256().hashString(serviceAccount, UTF_8));
-    metadata.setAnnotations(ImmutableMap.of(
+    metadata.setAnnotations(Map.of(
         "styx-wf-sa", serviceAccount,
         "styx-wf-sa-json-key-name", jsonKeyName,
         "styx-wf-sa-p12-key-name", p12KeyName));
 
     return new SecretBuilder()
         .withMetadata(metadata)
-        .withData(ImmutableMap.of(
+        .withData(Map.of(
             "styx-wf-sa.json", "json-private-key-data",
             "styx-wf-sa.p12", "p12-private-key-data"))
         .build();

@@ -40,7 +40,6 @@ import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.hamcrest.MockitoHamcrest.argThat;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -321,7 +320,7 @@ public class SchedulerTest {
   public void shouldDequeueEvenWhenMissingWorkflows() throws Exception {
     setUp(20);
 
-    when(storage.workflows(anySetOf(WorkflowId.class))).thenReturn(ImmutableMap.of());
+    when(storage.workflows(anySetOf(WorkflowId.class))).thenReturn(Map.of());
 
     StateData stateData = StateData.newBuilder().tries(0).build();
 
@@ -386,7 +385,7 @@ public class SchedulerTest {
     StateData stateDataWithoutInfo = StateData.newBuilder()
         .build();
     RunState rsWithoutInfo = RunState.create(INSTANCE_1, State.QUEUED, stateDataWithoutInfo, time.get(), 17);
-    when(stateManager.getActiveStates()).thenReturn(ImmutableMap.of(INSTANCE_1, rsWithoutInfo));
+    when(stateManager.getActiveStates()).thenReturn(Map.of(INSTANCE_1, rsWithoutInfo));
 
     scheduler.tick();
 
@@ -399,7 +398,7 @@ public class SchedulerTest {
         .addMessage(Message.info("Resource limit reached for: [r1]"))
         .build();
     when(stateManager.getActiveStates()).thenReturn(
-        ImmutableMap.of(INSTANCE_1, RunState.create(INSTANCE_1, State.QUEUED, stateDataWithInfo, time.get())));
+        Map.of(INSTANCE_1, RunState.create(INSTANCE_1, State.QUEUED, stateDataWithInfo, time.get())));
 
     scheduler.tick();
 

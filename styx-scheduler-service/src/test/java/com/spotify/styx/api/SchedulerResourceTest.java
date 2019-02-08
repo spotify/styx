@@ -43,7 +43,6 @@ import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.StatusType;
@@ -68,6 +67,7 @@ import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -536,7 +536,7 @@ public class SchedulerResourceTest {
 
   @Test
   public void testTriggerInvalidWorkflowConfiguration() throws Exception {
-    when(workflowValidator.validateWorkflow(DAILY_WORKFLOW)).thenReturn(ImmutableList.of("bad", "f00d"));
+    when(workflowValidator.validateWorkflow(DAILY_WORKFLOW)).thenReturn(List.of("bad", "f00d"));
 
     when(storage.workflow(DAILY_WORKFLOW.id())).thenReturn(Optional.of(DAILY_WORKFLOW));
     TriggerRequest toTrigger = TriggerRequest.of(DAILY_WORKFLOW.id(), "2015-12-31");

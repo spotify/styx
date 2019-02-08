@@ -155,7 +155,7 @@ final class KubernetesPodEventTranslator {
       return handleStarted(workflowInstance, state);
     }
 
-    return ImmutableList.of();
+    return List.of();
   }
 
   private static List<Event> handleExited(WorkflowInstance workflowInstance, RunState state,
@@ -188,10 +188,10 @@ final class KubernetesPodEventTranslator {
     switch (state.state()) {
       case PREPARE:
       case SUBMITTED:
-        return ImmutableList.of(Event.started(workflowInstance));
+        return List.of(Event.started(workflowInstance));
 
       default:
-        return ImmutableList.of();
+        return List.of();
     }
   }
 
@@ -200,10 +200,10 @@ final class KubernetesPodEventTranslator {
       case PREPARE:
       case SUBMITTED:
       case RUNNING:
-        return ImmutableList.of(event);
+        return List.of(event);
 
       default:
-        return ImmutableList.of();
+        return List.of();
     }
   }
 

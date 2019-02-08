@@ -37,9 +37,9 @@ import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.EntityQuery;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.QueryResults;
-import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.List;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.junit.Before;
@@ -141,13 +141,13 @@ public class CheckedDatastoreReaderWriterTest {
     when(rw.get(key1, key2)).thenThrow(CAUSE);
     exception.expect(IOException.class);
     exception.expectCause(is((Throwable) CAUSE));
-    sut.get(ImmutableList.of(key1, key2), entity -> fail());
+    sut.get(List.of(key1, key2), entity -> fail());
   }
 
   @Test
   public void getAndConsume() throws IOException {
     when(rw.get(key1, key2)).thenReturn(Stream.of(entity1, entity2).iterator());
-    sut.get(ImmutableList.of(key1, key2), entityConsumer);
+    sut.get(List.of(key1, key2), entityConsumer);
     verify(rw).get(key1, key2);
     verify(entityConsumer).accept(entity1);
     verify(entityConsumer).accept(entity2);
@@ -158,7 +158,7 @@ public class CheckedDatastoreReaderWriterTest {
     final IOException cause = new IOException("foo");
     doReturn(Stream.of(entity1, entity2).iterator()).when(rw).get(key1, key2);
     exception.expect(is(cause));
-    sut.get(ImmutableList.of(key1, key2), entity -> { throw cause; });
+    sut.get(List.of(key1, key2), entity -> { throw cause; });
   }
 
   @Test
@@ -167,7 +167,7 @@ public class CheckedDatastoreReaderWriterTest {
     doReturn(entityIterator).when(rw).get(key1, key2);
     exception.expect(IOException.class);
     exception.expectCause(is((Throwable) CAUSE));
-    sut.get(ImmutableList.of(key1, key2), entity -> fail());
+    sut.get(List.of(key1, key2), entity -> fail());
   }
 
   @Test
@@ -175,13 +175,13 @@ public class CheckedDatastoreReaderWriterTest {
     when(rw.get(key1, key2)).thenThrow(CAUSE);
     exception.expect(IOException.class);
     exception.expectCause(is((Throwable) CAUSE));
-    sut.get(ImmutableList.of(key1, key2));
+    sut.get(List.of(key1, key2));
   }
 
   @Test
   public void getList() throws IOException {
     when(rw.get(key1, key2)).thenReturn(Stream.of(entity1, entity2).iterator());
-    assertThat(sut.get(ImmutableList.of(key1, key2)), is(ImmutableList.of(entity1, entity2)));
+    assertThat(sut.get(List.of(key1, key2)), is(List.of(entity1, entity2)));
     verify(rw).get(key1, key2);
   }
 

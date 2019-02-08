@@ -30,7 +30,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
@@ -61,7 +60,7 @@ public class StateInitializingTriggerTest {
       .build();
 
   private static final Map<Schedule, String> SCHEDULE_ARG_EXPECTS =
-      ImmutableMap.of(
+      Map.of(
           WEEKS, "2016-01-18",
           DAYS, "2016-01-18",
           HOURS, "2016-01-18T09",

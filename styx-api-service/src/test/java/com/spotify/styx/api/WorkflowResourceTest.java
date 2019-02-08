@@ -51,7 +51,6 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
@@ -77,6 +76,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -752,7 +752,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldFailInvalidWorkflowImage() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(ImmutableList.of("bad", "image"));
+    when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(List.of("bad", "image"));
 
     Response<ByteString> response = awaitResponse(serviceHelper
         .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));

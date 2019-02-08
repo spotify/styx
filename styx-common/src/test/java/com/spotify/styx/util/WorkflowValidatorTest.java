@@ -117,7 +117,7 @@ public class WorkflowValidatorTest {
 
   @Test
   public void validateInvalidDockerImage() {
-    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(ImmutableList.of("foo", "bar"));
+    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(List.of("foo", "bar"));
     final List<String> errors = sut.validateWorkflowConfiguration(TestData.FULL_WORKFLOW_CONFIGURATION);
     assertThat(errors, contains("invalid image: foo", "invalid image: bar"));
   }

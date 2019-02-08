@@ -33,7 +33,6 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
@@ -49,6 +48,7 @@ import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.junit.Before;
@@ -180,7 +180,7 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldHaltIfInvalidConfiguration() throws Exception {
-    when(workflowValidator.validateWorkflow(any())).thenReturn(ImmutableList.of("foo", "bar"));
+    when(workflowValidator.validateWorkflow(any())).thenReturn(List.of("foo", "bar"));
 
     Workflow workflow = Workflow.create("id", FULL_WORKFLOW_CONFIGURATION);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");

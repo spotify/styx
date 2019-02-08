@@ -25,7 +25,6 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import java.io.IOException;
@@ -69,7 +68,7 @@ public class AggregateStorageTest {
   @Test
   public void readActiveWorkflowInstances() throws Exception {
     final Map<WorkflowInstance, RunState> activeStates =
-        ImmutableMap.of(workflowInstance, runState);
+        Map.of(workflowInstance, runState);
     when(datastore.readActiveStates()).thenReturn(activeStates);
     assertThat(sut.readActiveStates(), is(activeStates));
     verify(datastore).readActiveStates();
@@ -85,7 +84,7 @@ public class AggregateStorageTest {
   @Test
   public void readActiveWorkflowInstancesForComponent() throws Exception {
     final Map<WorkflowInstance, RunState> activeStates =
-        ImmutableMap.of(workflowInstance, runState);
+        Map.of(workflowInstance, runState);
     when(datastore.readActiveStates(COMPONENT)).thenReturn(activeStates);
     assertThat(sut.readActiveStates(COMPONENT), is(activeStates));
     verify(datastore).readActiveStates(COMPONENT);

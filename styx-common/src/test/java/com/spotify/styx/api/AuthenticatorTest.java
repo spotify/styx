@@ -51,7 +51,6 @@ import com.google.api.services.cloudresourcemanager.model.Project;
 import com.google.api.services.cloudresourcemanager.model.ResourceId;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.model.ServiceAccount;
-import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.List;
@@ -76,10 +75,10 @@ public class AuthenticatorTest {
   private static final Project BAZ_PROJECT = new Project().setProjectId("baz");
   private static final Project EXTERNAL_PROJECT = new Project().setProjectId("external");
 
-  private static final List<Project> PROJECTS = ImmutableList.of(
+  private static final List<Project> PROJECTS = List.of(
       FOO_PROJECT, BAR_PROJECT, BAZ_PROJECT, EXTERNAL_PROJECT);
 
-  private static final List<ResourceId> WHITELIST = ImmutableList.of(
+  private static final List<ResourceId> WHITELIST = List.of(
       ORGANIZATION_RESOURCE, FOLDER_RESOURCE, resourceId(BAZ_PROJECT));
 
   private static final String DOMAIN1 = "example.com";

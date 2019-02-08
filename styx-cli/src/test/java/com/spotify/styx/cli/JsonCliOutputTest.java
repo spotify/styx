@@ -26,8 +26,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
@@ -113,9 +111,7 @@ public class JsonCliOutputTest {
 
   @Test
   public void shouldPrintBackfills() {
-    cliOutput.printBackfills(
-        ImmutableList.of(BackfillPayload.create(BACKFILL, Optional.empty())),
-        true);
+    cliOutput.printBackfills(List.of(BackfillPayload.create(BACKFILL, Optional.empty())), true);
     assertEquals("[" + EXPECTED_OUTPUT_WITH_STATUS + "]\n", outContent.toString());
   }
 
@@ -135,10 +131,10 @@ public class JsonCliOutputTest {
         StateData.newBuilder().executionId("foo-e").build());
     final RunStateData barRunStateData = RunStateData.create(barWorkflowInstance, "RUNNING",
         StateData.newBuilder().executionId("bar-e").build());
-    cliOutput.printStates(RunStateDataPayload.create(ImmutableList.of(fooRunStateData, barRunStateData)));
-    final Map<String, List<RunStateData>> expectedOutput = ImmutableMap.of(
-        fooWorkflowId.toKey(), ImmutableList.of(fooRunStateData),
-        barWorkflowId.toKey(), ImmutableList.of(barRunStateData));
+    cliOutput.printStates(RunStateDataPayload.create(List.of(fooRunStateData, barRunStateData)));
+    final Map<String, List<RunStateData>> expectedOutput = Map.of(
+        fooWorkflowId.toKey(), List.of(fooRunStateData),
+        barWorkflowId.toKey(), List.of(barRunStateData));
     final Map<String, List<RunStateData>> output = OBJECT_MAPPER.readValue(outContent.toString(),
         new TypeReference<Map<String, List<RunStateData>>>() { });
     assertThat(output, is(expectedOutput));
@@ -154,7 +150,7 @@ public class JsonCliOutputTest {
         .id("bar2")
         .schedule(Schedule.DAYS)
         .build());
-    final List<Workflow> workflows = ImmutableList.of(foo1, foo2);
+    final List<Workflow> workflows = List.of(foo1, foo2);
     cliOutput.printWorkflows(workflows);
     assertThat(OBJECT_MAPPER.readValue(outContent.toString(), new TypeReference<List<Workflow>>() { }),
         is(workflows));
@@ -167,7 +163,7 @@ public class JsonCliOutputTest {
         .schedule(Schedule.DAYS)
         .offset("6h")
         .dockerImage("foo/bar:baz")
-        .dockerArgs(ImmutableList.of("foo", "the", "bar"))
+        .dockerArgs(List.of("foo", "the", "bar"))
         .dockerTerminationLogging(true)
         .secret(Secret.create("secret-foo", "/foo-secret"))
         .serviceAccount("foo@bar.baz")

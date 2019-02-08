@@ -47,7 +47,6 @@ import static org.mockito.internal.verification.VerificationModeFactory.times;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
@@ -80,6 +79,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.logging.Level;
 import okio.ByteString;
@@ -963,15 +963,10 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldReturnServerErrorIfFailedToSend() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    serviceHelper.stubClient().respond(Responses.sequence(ImmutableList.of(ResponseWithDelay
-                                                                               .forResponse(Response
-                                                                                                .forStatus(
-                                                                                                    Status.INTERNAL_SERVER_ERROR)),
-                                                                           ResponseWithDelay
-                                                                               .forResponse(Response
-                                                                                                .forStatus(
-                                                                                                    Status.ACCEPTED)))))
-        .to(SCHEDULER_BASE + "/api/v0/events");
+    serviceHelper.stubClient().respond(Responses.sequence(List.of(
+        ResponseWithDelay.forResponse(Response.forStatus(Status.INTERNAL_SERVER_ERROR)),
+        ResponseWithDelay.forResponse(Response.forStatus(Status.ACCEPTED))))
+    ).to(SCHEDULER_BASE + "/api/v0/events");
 
     WorkflowInstance wfi1 = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
     WorkflowInstance wfi2 = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T02");
@@ -1030,7 +1025,7 @@ public class BackfillResourceTest extends VersionedApiTest {
         "\"workflow\":\"workflow2\","+
         "\"concurrency\":1}";
 
-    when(workflowValidator.validateWorkflow(any())).thenReturn(ImmutableList.of("bad", "f00d"));
+    when(workflowValidator.validateWorkflow(any())).thenReturn(List.of("bad", "f00d"));
 
     final Response<ByteString> response = awaitResponse(
         serviceHelper.request("POST", path(""), ByteString.encodeUtf8(json)));

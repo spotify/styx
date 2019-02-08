@@ -44,8 +44,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.QuietDeterministicScheduler;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
@@ -94,6 +92,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -199,7 +198,7 @@ public class KubernetesDockerRunnerTest {
     when(k8sClient.pods()).thenReturn(pods);
 
     when(pods.list()).thenReturn(podList);
-    when(podList.getItems()).thenReturn(ImmutableList.of(createdPod));
+    when(podList.getItems()).thenReturn(List.of(createdPod));
     when(podList.getMetadata()).thenReturn(listMeta);
     when(listMeta.getResourceVersion()).thenReturn("1000");
 
@@ -226,7 +225,7 @@ public class KubernetesDockerRunnerTest {
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
     RunState runState = RunState.create(WORKFLOW_INSTANCE, State.SUBMITTED, stateData);
 
-    when(stateManager.getActiveStates()).thenReturn(ImmutableMap.of(WORKFLOW_INSTANCE, runState));
+    when(stateManager.getActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
     when(stateManager.getActiveState(WORKFLOW_INSTANCE)).thenReturn(Optional.of(runState));
   }
 
@@ -275,7 +274,7 @@ public class KubernetesDockerRunnerTest {
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
-    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(keepaliveContainerStatus, containerStatus));
+    when(podStatus.getContainerStatuses()).thenReturn(List.of(keepaliveContainerStatus, containerStatus));
     when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
@@ -295,7 +294,7 @@ public class KubernetesDockerRunnerTest {
     when(namedPod.get()).thenReturn(createdPod);
 
     createdPod.setStatus(podStatus);
-    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
+    when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
     when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
@@ -314,7 +313,7 @@ public class KubernetesDockerRunnerTest {
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
-    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
+    when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
     when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
@@ -359,7 +358,7 @@ public class KubernetesDockerRunnerTest {
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
-    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
+    when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
     when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
@@ -378,7 +377,7 @@ public class KubernetesDockerRunnerTest {
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
-    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
+    when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
     when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
 
@@ -396,7 +395,7 @@ public class KubernetesDockerRunnerTest {
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
-    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
+    when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
 
     when(stateManager.getActiveStates()).thenReturn(Collections.emptyMap());
 
@@ -415,7 +414,7 @@ public class KubernetesDockerRunnerTest {
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
-    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
+    when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
 
     when(stateManager.getActiveStates()).thenReturn(Collections.emptyMap());
 
@@ -432,7 +431,7 @@ public class KubernetesDockerRunnerTest {
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
-    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
+    when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
     when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
 
@@ -448,7 +447,7 @@ public class KubernetesDockerRunnerTest {
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
-    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
+    when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
     when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
@@ -508,7 +507,7 @@ public class KubernetesDockerRunnerTest {
 
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
-    when(podStatus.getContainerStatuses()).thenReturn(ImmutableList.of(containerStatus, keepaliveContainerStatus));
+    when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
     when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
     when(containerStatus.getState()).thenReturn(containerState);
     when(containerState.getTerminated()).thenReturn(containerStateTerminated);
@@ -828,7 +827,7 @@ public class KubernetesDockerRunnerTest {
     final Pod terminatedPod = new PodBuilder(createdPod)
         .withStatus(terminated("Succeeded", 20, null))
         .build();
-    when(podList.getItems()).thenReturn(ImmutableList.of(terminatedPod));
+    when(podList.getItems()).thenReturn(List.of(terminatedPod));
 
     // Make time pass so the runner polls
     executor.tick(POLL_INTERVAL_SECONDS, TimeUnit.SECONDS);
@@ -846,14 +845,14 @@ public class KubernetesDockerRunnerTest {
   public void shouldHandlePodWithoutAnnotationsWhenPolling()  {
     // Create a pod instance with null `annotations` field - not possible through builder
     final Pod pod = Json.OBJECT_MAPPER.convertValue(
-        ImmutableMap.of("metadata",
-            ImmutableMap.of("name", "foobar")), Pod.class);
+        Map.of("metadata",
+            Map.of("name", "foobar")), Pod.class);
 
     assertThat(pod.getMetadata().getAnnotations(), is(nullValue()));
 
     when(k8sClient.pods().withName("foobar")).thenReturn(namedPod);
     when(namedPod.get()).thenReturn(pod);
-    when(podList.getItems()).thenReturn(ImmutableList.of(pod));
+    when(podList.getItems()).thenReturn(List.of(pod));
 
     assertThat(Try.run(() -> kdr.tryPollPods()).isSuccess(), is(true));
   }
@@ -862,8 +861,8 @@ public class KubernetesDockerRunnerTest {
   public void shouldHandlePodWithoutAnnotationsWhenWatching()  {
     // Create a pod instance with null `annotations` field - not possible through builder
     final Pod pod = Json.OBJECT_MAPPER.convertValue(
-        ImmutableMap.of("metadata",
-            ImmutableMap.of("name", "foobar")), Pod.class);
+        Map.of("metadata",
+            Map.of("name", "foobar")), Pod.class);
 
     final PodWatcher watcher = kdr.new PodWatcher();
     assertThat(Try.run(() -> watcher.eventReceived(Action.MODIFIED, pod)).isSuccess(), is(true));

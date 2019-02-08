@@ -31,7 +31,6 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -64,14 +63,14 @@ public class FutureUtilTest {
 
   @Test
   public void gatherIOShouldReturnValues() throws IOException {
-    final List<Future<String>> futures = ImmutableList.of(completedFuture("foo"), completedFuture("bar"));
+    final List<Future<String>> futures = List.of(completedFuture("foo"), completedFuture("bar"));
     assertThat(FutureUtil.gatherIO(futures, 30, TimeUnit.SECONDS), contains("foo", "bar"));
   }
 
   @Test
   public void gatherIOShouldPropagateIOException() throws IOException {
     final IOException cause = new IOException("foo");
-    final List<Future<String>> futures = ImmutableList.of(completedFuture("foo"), exceptionallyCompletedFuture(cause));
+    final List<Future<String>> futures = List.of(completedFuture("foo"), exceptionallyCompletedFuture(cause));
     exception.expect(is(cause));
     FutureUtil.gatherIO(futures, 30, TimeUnit.SECONDS);
   }
@@ -79,7 +78,7 @@ public class FutureUtilTest {
   @Test
   public void gatherIOShouldPropagateException() throws IOException {
     final Exception cause = new Exception("foo");
-    final List<Future<String>> futures = ImmutableList.of(completedFuture("foo"), exceptionallyCompletedFuture(cause));
+    final List<Future<String>> futures = List.of(completedFuture("foo"), exceptionallyCompletedFuture(cause));
     exception.expect(RuntimeException.class);
     exception.expectCause(is(cause));
     FutureUtil.gatherIO(futures, 30, TimeUnit.SECONDS);
@@ -90,7 +89,7 @@ public class FutureUtilTest {
       throws IOException, InterruptedException, ExecutionException, TimeoutException {
     final TimeoutException cause = new TimeoutException();
     when(future.get(anyLong(), any())).thenThrow(cause);
-    final List<Future<String>> futures = ImmutableList.of(completedFuture("foo"), future);
+    final List<Future<String>> futures = List.of(completedFuture("foo"), future);
     exception.expect(IOException.class);
     exception.expectCause(is(cause));
     FutureUtil.gatherIO(futures, 30, TimeUnit.SECONDS);
@@ -102,7 +101,7 @@ public class FutureUtilTest {
     assumeThat("should be Java 9+", isJava9OrGreater(), is(true));
     final InterruptedException cause = new InterruptedException();
     when(future.get(anyLong(), any())).thenThrow(cause);
-    final List<Future<String>> futures = ImmutableList.of(completedFuture("foo"), future);
+    final List<Future<String>> futures = List.of(completedFuture("foo"), future);
     try {
       FutureUtil.gatherIO(futures, 30, TimeUnit.SECONDS);
       fail();

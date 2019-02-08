@@ -27,7 +27,6 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
 import com.google.auto.value.AutoValue;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.WorkflowResourceDecorator;
 import com.spotify.styx.model.Workflow;
@@ -131,7 +130,7 @@ public final class StateUtil {
   }
 
   static boolean isConsumingResources(RunState.State state) {
-    return ImmutableList.of(
+    return List.of(
         RunState.State.PREPARE,
         RunState.State.SUBMITTING,
         RunState.State.SUBMITTED,

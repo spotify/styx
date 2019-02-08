@@ -31,7 +31,6 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
-import com.google.common.collect.ImmutableList;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
@@ -52,6 +51,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import org.junit.After;
 import org.junit.Before;
@@ -187,7 +187,7 @@ public class PrettyCliOutputTest {
   @Test
   public void shouldPrintBackfills() {
     cliOutput.printBackfills(
-        ImmutableList.of(BackfillPayload.create(backfill(LONG_DESCRIPTION), Optional.empty())),
+        List.of(BackfillPayload.create(backfill(LONG_DESCRIPTION), Optional.empty())),
         false);
     assertEquals(EXPECTED_HEADER_WITH_TRUNCATED_DESCRIPTION
                  + "                  backfill-2   false          false            2  "
@@ -199,7 +199,7 @@ public class PrettyCliOutputTest {
   @Test
   public void shouldPrintBackfillsWithoutTruncating() {
     cliOutput.printBackfills(
-        ImmutableList.of(BackfillPayload.create(backfill(LONG_DESCRIPTION), Optional.empty())),
+        List.of(BackfillPayload.create(backfill(LONG_DESCRIPTION), Optional.empty())),
         true);
     assertEquals(EXPECTED_HEADER_WITH_FULL_DESCRIPTION
                  + "                  backfill-2   false          false            2  "
@@ -211,7 +211,7 @@ public class PrettyCliOutputTest {
   @Test
   public void shouldPrintNAWhenBackfillLacksDescription() {
     cliOutput.printBackfills(
-        ImmutableList.of(BackfillPayload.create(backfill(null), Optional.empty()))
+        List.of(BackfillPayload.create(backfill(null), Optional.empty()))
         , false);
     assertEquals(EXPECTED_HEADER
                  + "                  backfill-2   false          false            2  "
@@ -222,7 +222,7 @@ public class PrettyCliOutputTest {
 
   @Test
   public void shouldPrintStates() {
-    final RunStateDataPayload states = RunStateDataPayload.create(ImmutableList.of(
+    final RunStateDataPayload states = RunStateDataPayload.create(List.of(
         RunStateData.create(
             WorkflowInstance.create(WorkflowId.create("c0", "w0"), "2016-09-01"),
             "QUEUED",
@@ -262,7 +262,7 @@ public class PrettyCliOutputTest {
         .id("bar2")
         .schedule(Schedule.DAYS)
         .build());
-    cliOutput.printWorkflows(ImmutableList.of(foo1, foo2));
+    cliOutput.printWorkflows(List.of(foo1, foo2));
     assertThat(outContent.toString(), is(String.format(
         "COMPONENT  WORKFLOW%n"
            + "foo1  bar1%n"
@@ -277,7 +277,7 @@ public class PrettyCliOutputTest {
         .schedule(Schedule.DAYS)
         .offset("6h")
         .dockerImage("foo/bar:baz")
-        .dockerArgs(ImmutableList.of("foo", "the", "bar"))
+        .dockerArgs(List.of("foo", "the", "bar"))
         .dockerTerminationLogging(true)
         .secret(Secret.create("secret-foo", "/foo-secret"))
         .serviceAccount("foo@bar.baz")
