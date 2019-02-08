@@ -110,7 +110,7 @@ public class ServiceAccountUsageAuthorizerTest {
   private static final String BLACKLISTED_GROUP_EMAIL = "blacklisted-group@corp.com";
   private static final String BLACKLISTED_SA_EMAIL = "blacklisted-sa@bar.iam.gserviceaccount.com";
 
-  private static final List<String> BLACKLIST = ImmutableList.of(
+  private static final List<String> BLACKLIST = List.of(
       "user:" + BLACKLISTED_USER_EMAIL,
       "group:" + BLACKLISTED_GROUP_EMAIL,
       "serviceAccount:" + BLACKLISTED_SA_EMAIL);
