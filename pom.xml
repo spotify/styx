@@ -618,6 +618,24 @@
                 </execution>
               </executions>
             </plugin>
+            <plugin>
+              <artifactId>maven-javadoc-plugin</artifactId>
+              <version>3.0.1</version>
+              <configuration>
+                <failOnError>false</failOnError>
+                <additionalOptions>
+                  <additionalOption>-Xdoclint:none</additionalOption>
+                </additionalOptions>
+              </configuration>
+              <executions>
+                <execution>
+                  <id>attach-javadocs</id>
+                  <goals>
+                    <goal>jar</goal>
+                  </goals>
+                </execution>
+              </executions>
+            </plugin>
           </plugins>
         </pluginManagement>
       </build>
