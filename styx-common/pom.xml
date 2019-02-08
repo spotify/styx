@@ -41,6 +41,10 @@
       <artifactId>auto-matter</artifactId>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>com.typesafe</groupId>
+      <artifactId>config</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>com.github.sviperll</groupId>
