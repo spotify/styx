@@ -124,7 +124,7 @@ class PlainCliOutput implements CliOutput {
   public void printWorkflow(Workflow wf, WorkflowState state) {
     System.out.println(Joiner.on(' ').join(
         wf.componentId(),
-        wf.id().id(),
+        wf.workflowId(),
         wf.configuration().schedule(),
         wf.configuration().offset().orElse(""),
         wf.configuration().dockerImage().orElse(""),
@@ -143,7 +143,7 @@ class PlainCliOutput implements CliOutput {
 
   @Override
   public void printWorkflows(List<Workflow> workflows) {
-    workflows.forEach(wf -> System.out.println(wf.id().toKey()));
+    workflows.forEach(wf -> System.out.println(wf.componentId() + " " + wf.workflowId()));
   }
 
   @Override

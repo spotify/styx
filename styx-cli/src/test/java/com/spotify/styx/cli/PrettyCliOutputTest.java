@@ -293,22 +293,22 @@ public class PrettyCliOutputTest {
         .build();
     cliOutput.printWorkflow(workflow, state);
     assertThat(outContent.toString(), is(
-              "Component: foo1\n"
-            + " Workflow: bar1\n"
-            + " Schedule: DAYS\n"
-            + "   Offset: 6h\n"
-            + "    Image: foo/bar:baz\n"
-            + "     Args: [foo, the, bar]\n"
-            + "  TermLog: true\n"
-            + "   Secret: secret-foo:/foo-secret\n"
-            + " Svc Acct: foo@bar.baz\n"
-            + "Resources: [r1, r2]\n"
-            + "      Env: BAR=bar FOO=foo\n"
-            + "  Timeout: PT23H\n"
-            + "   Commit: deadbeef\n"
-            + "  Enabled: true\n"
-            + "     Trig: 2018-01-02T03:04:05.000000006Z\n"
-            + "Ofst Trig: 2018-01-02T09:04:05.000000006Z\n"));
+              "Component:             foo1\n"
+            + "Workflow:              bar1\n"
+            + "Schedule:              DAYS\n"
+            + "Offset:                6h\n"
+            + "Docker Image:          foo/bar:baz\n"
+            + "Docker Arguments:      [foo, the, bar]\n"
+            + "Termination Logging:   true\n"
+            + "Secret:                secret-foo:/foo-secret\n"
+            + "Service Account:       foo@bar.baz\n"
+            + "Resources:             [r1, r2]\n"
+            + "Environment:           BAR=bar FOO=foo\n"
+            + "Timeout:               PT23H\n"
+            + "Commit:                deadbeef\n"
+            + "Enabled:               true\n"
+            + "Next Trigger:          2018-01-02T03:04:05.000000006Z\n"
+            + "Next Trigger (offset): 2018-01-02T09:04:05.000000006Z\n"));
 
   }
 }

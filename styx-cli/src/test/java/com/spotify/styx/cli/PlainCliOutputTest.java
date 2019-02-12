@@ -113,7 +113,7 @@ public class PlainCliOutputTest {
         .schedule(Schedule.DAYS)
         .build());
     cliOutput.printWorkflows(List.of(foo1, foo2));
-    assertThat(outContent.toString(), is(String.format("foo1#bar1%nfoo2#bar2%n")));
+    assertThat(outContent.toString(), is(String.format("foo1 bar1%nfoo2 bar2%n")));
   }
 
   @Test
