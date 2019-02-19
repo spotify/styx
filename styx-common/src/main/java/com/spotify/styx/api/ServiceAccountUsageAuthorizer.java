@@ -37,6 +37,7 @@ import com.github.rholder.retry.RetryerBuilder;
 import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.StopStrategy;
 import com.github.rholder.retry.WaitStrategies;
+import com.github.rholder.retry.WaitStrategy;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
@@ -122,6 +123,9 @@ public interface ServiceAccountUsageAuthorizer {
     private static final Pattern USER_CREATED_SERVICE_ACCOUNT_PATTERN =
         Pattern.compile("^.+@(.+)\\.iam\\.gserviceaccount\\.com$");
 
+    private static final WaitStrategy DEFAULT_WAIT_STRATEGY =
+        WaitStrategies.join(exponentialWait(), randomWait(1, SECONDS));
+
     private static final StopStrategy DEFAULT_RETRY_STOP_STRATEGY = StopStrategies.stopAfterDelay(10, SECONDS);
 
     private static final String CACHE_HIT = "hit";
@@ -132,6 +136,7 @@ public interface ServiceAccountUsageAuthorizer {
     private final Directory directory;
     private final String serviceAccountUserRole;
     private final AuthorizationPolicy authorizationPolicy;
+    private final WaitStrategy waitStrategy;
     private final StopStrategy retryStopStrategy;
     private final String message;
     private final List<String> administrators;
@@ -147,13 +152,14 @@ public interface ServiceAccountUsageAuthorizer {
             .build();
 
     Impl(Iam iam, CloudResourceManager crm, Directory directory, String serviceAccountUserRole,
-         AuthorizationPolicy authorizationPolicy, StopStrategy retryStopStrategy, String message,
-         List<String> administrators, List<String> blacklist) {
+         AuthorizationPolicy authorizationPolicy, WaitStrategy waitStrategy, StopStrategy retryStopStrategy,
+         String message, List<String> administrators, List<String> blacklist) {
       this.iam = Objects.requireNonNull(iam, "iam");
       this.crm = Objects.requireNonNull(crm, "crm");
       this.directory = Objects.requireNonNull(directory, "directory");
       this.serviceAccountUserRole = Objects.requireNonNull(serviceAccountUserRole, "serviceAccountUserRole");
       this.authorizationPolicy = Objects.requireNonNull(authorizationPolicy, "authorizationPolicy");
+      this.waitStrategy = Objects.requireNonNull(waitStrategy, "waitStrategy");
       this.retryStopStrategy = Objects.requireNonNull(retryStopStrategy, "retryStopStrategy");
       this.message = Objects.requireNonNull(message, "message");
       this.administrators = Objects.requireNonNull(administrators, "administrators");
@@ -404,7 +410,7 @@ public interface ServiceAccountUsageAuthorizer {
     private <T> T retry(Callable<T> f) throws ExecutionException, RetryException {
       final Retryer<T> retryer = RetryerBuilder.<T>newBuilder()
           .retryIfException(Impl::isRetryableException)
-          .withWaitStrategy(WaitStrategies.join(exponentialWait(), randomWait(1, SECONDS)))
+          .withWaitStrategy(waitStrategy)
           .withStopStrategy(retryStopStrategy)
           .withRetryListener(Impl::onRequestAttempt)
           .build();
@@ -538,7 +544,7 @@ public interface ServiceAccountUsageAuthorizer {
         .build();
 
     return new Impl(iam, crm, directory, serviceAccountUserRole, authorizationPolicy,
-        Impl.DEFAULT_RETRY_STOP_STRATEGY, message, administrators, blacklist);
+        Impl.DEFAULT_WAIT_STRATEGY, Impl.DEFAULT_RETRY_STOP_STRATEGY, message, administrators, blacklist);
   }
 
   static GoogleCredential defaultCredential() {
