@@ -353,7 +353,7 @@ public class QueuedStateManagerTest {
       return a.<TransactionFunction>getArgument(0).apply(transaction);
     });
 
-    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()))
+    CompletableFuture<RunState> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()))
         .toCompletableFuture();
 
     CompletableFuture.runAsync(() -> {
@@ -474,7 +474,7 @@ public class QueuedStateManagerTest {
         RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW.minusMillis(1), 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
-    CompletableFuture<Void> f = stateManager.receive(Event.terminate(INSTANCE, Optional.empty()))
+    CompletableFuture<RunState> f = stateManager.receive(Event.terminate(INSTANCE, Optional.empty()))
         .toCompletableFuture();
 
     try {
@@ -642,7 +642,7 @@ public class QueuedStateManagerTest {
     final IOException exception = new IOException();
     Optional<RunState> runState = Optional.of(RunState.create(INSTANCE, State.NEW, NOW, -1));
     doThrow(exception).when(storage).runInTransaction(any());
-    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of())).toCompletableFuture();
+    CompletableFuture<RunState> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()));
     try {
       f.get(1, MINUTES);
       fail();

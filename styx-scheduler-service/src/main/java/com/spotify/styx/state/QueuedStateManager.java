@@ -51,7 +51,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
@@ -115,7 +114,7 @@ public class QueuedStateManager implements StateManager {
   }
 
   @Override
-  public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger, TriggerParameters parameters)
+  public CompletableFuture<RunState> trigger(WorkflowInstance workflowInstance, Trigger trigger, TriggerParameters parameters)
       throws IsClosedException {
     ensureRunning();
     log.debug("Trigger {}", workflowInstance);
@@ -140,12 +139,12 @@ public class QueuedStateManager implements StateManager {
   }
 
   @Override
-  public CompletableFuture<Void> receive(Event event) throws IsClosedException {
+  public CompletableFuture<RunState> receive(Event event) throws IsClosedException {
     return receive(event, Long.MAX_VALUE);
   }
 
   @Override
-  public CompletableFuture<Void> receive(Event event, long expectedCounter) throws IsClosedException {
+  public CompletableFuture<RunState> receive(Event event, long expectedCounter) throws IsClosedException {
     ensureRunning();
     log.info("Received event {}", event);
 
@@ -154,7 +153,10 @@ public class QueuedStateManager implements StateManager {
     queuedEvents.increment();
     return Striping.supplyAsyncStriped(() ->
         transition(event, expectedCounter), event.workflowInstance(), eventProcessingExecutor)
-        .thenAccept((tuple) -> postTransition(tuple._1, tuple._2));
+        .thenApply((tuple) -> {
+          postTransition(tuple._1, tuple._2);
+          return tuple._2;
+        });
   }
 
   private void initialize(WorkflowInstance workflowInstance) {

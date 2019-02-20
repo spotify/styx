@@ -448,7 +448,7 @@ public class StyxScheduler implements AppInit {
   }
 
   @VisibleForTesting
-  CompletionStage<Void> receive(Event event) throws IsClosedException {
+  CompletionStage<RunState> receive(Event event) throws IsClosedException {
     return stateManager.receive(event);
   }
 

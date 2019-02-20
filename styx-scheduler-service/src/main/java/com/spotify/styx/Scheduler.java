@@ -49,6 +49,7 @@ import com.spotify.styx.state.InstanceState;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
+import com.spotify.styx.state.StaleEventException;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
@@ -138,10 +139,11 @@ public class Scheduler {
         .setSampler(Samplers.alwaysSample())
         .startScopedSpan()) {
       tick0();
+    } catch (IsClosedException ignore) {
     }
   }
 
-  private void tick0() {
+  private void tick0() throws IsClosedException {
     final Instant t0 = time.get();
 
     final Map<String, Resource> resources;
@@ -215,27 +217,55 @@ public class Scheduler {
     dequeueInstances(config, resources, workflowResourceReferences,
         workflows, dequeueEligibleInstances, currentResourceDemand);
 
+    processExecutingInstances(executingInstances);
+
     currentResourceDemand.asMap().forEach(stats::recordResourceDemanded);
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
     stats.recordTickDuration(TICK_TYPE, durationMillis);
   }
 
-  private void processExecutingInstances(List<InstanceState> instances) {
+  private void processExecutingInstances(List<InstanceState> instances) throws IsClosedException {
     for (InstanceState instance : instances) {
-      // TODO: have handlers register their state interests and avoid having to loop through all of them
-      // TODO: we really want just one event here...?
-      for (OutputHandler outputHandler : outputHandlers) {
-        final Optional<Event> event = outputHandler.transitionInto(instance.runState());
-        if (event.isPresent()) {
-          try {
-            stateManager.receive(event.get());
-          } catch (IsClosedException e) {
-            return;
-          }
+      processExecutingInstance(instance);
+    }
+  }
+
+  /**
+   * Run the instance state machine forward until it stops.
+   */
+  private void processExecutingInstance(InstanceState instance) throws IsClosedException {
+    RunState state = instance.runState();
+    while (true) {
+      final Optional<Event> event = findTransition(state);
+      if (event.isEmpty()) {
+        return;
+      }
+      try {
+        state = stateManager.receive(event.get(), state.counter()).toCompletableFuture()
+            .get(30, TimeUnit.SECONDS);
+      } catch (InterruptedException | TimeoutException e) {
+        throw new RuntimeException(e);
+      } catch (ExecutionException e) {
+        if (e.getCause() instanceof StaleEventException) {
+          // We lost a race and someone else made a state transition, back out
+          return;
         }
+        throw new RuntimeException(e);
       }
     }
+  }
+
+  private Optional<Event> findTransition(RunState state) {
+    // TODO: have handlers register their state interests and avoid having to loop through all of them
+    // TODO: we really want just one event here.
+    for (OutputHandler outputHandler : outputHandlers) {
+      final Optional<Event> event = outputHandler.transitionInto(state);
+      if (event.isPresent()) {
+        return event;
+      }
+    }
+    return Optional.empty();
   }
 
   private void updateResourceStats(Map<String, Resource> resources,

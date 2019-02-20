@@ -62,7 +62,8 @@ final class StateInitializingTrigger implements TriggerListener {
     final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), parameter);
 
     try {
-      return stateManager.trigger(workflowInstance, trigger, parameters);
+      return stateManager.trigger(workflowInstance, trigger, parameters)
+          .thenApply(ignore -> null);
     } catch (IsClosedException isClosedException) {
       LOG.warn("State receiver is closed when processing workflow {} for trigger {} at {}",
                workflow, trigger, instant, isClosedException);
