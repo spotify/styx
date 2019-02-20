@@ -37,6 +37,7 @@ import static java.util.stream.Collectors.toSet;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.AtomicLongMap;
 import com.google.common.util.concurrent.RateLimiter;
+import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.WorkflowExecutionGate.ExecutionBlocker;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
@@ -225,16 +226,21 @@ public class Scheduler {
     stats.recordTickDuration(TICK_TYPE, durationMillis);
   }
 
-  private void processExecutingInstances(List<InstanceState> instances) throws IsClosedException {
-    for (InstanceState instance : instances) {
-      processExecutingInstance(instance);
+  private void processExecutingInstances(List<InstanceState> instances) {
+    final List<CompletableFuture<Void>> futures = instances.stream()
+        .map(instance -> CompletableFuture.runAsync(() -> processExecutingInstance(instance), executor))
+        .collect(toList());
+    try {
+      CompletableFutures.allAsList(futures).get();
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
     }
   }
 
   /**
    * Run the instance state machine forward until it stops.
    */
-  private void processExecutingInstance(InstanceState instance) throws IsClosedException {
+  private void processExecutingInstance(InstanceState instance)  {
     RunState state = instance.runState();
     while (true) {
       final Optional<Event> event = findTransition(state);
@@ -252,6 +258,8 @@ public class Scheduler {
           return;
         }
         throw new RuntimeException(e);
+      } catch (IsClosedException e) {
+        return;
       }
     }
   }
