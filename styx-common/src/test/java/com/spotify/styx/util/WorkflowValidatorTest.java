@@ -21,13 +21,17 @@
 package com.spotify.styx.util;
 
 import static com.spotify.styx.util.WorkflowValidator.MAX_COMMIT_SHA_LENGTH;
+import static com.spotify.styx.util.WorkflowValidator.MAX_ENV_SIZE;
+import static com.spotify.styx.util.WorkflowValidator.MAX_ENV_VARS;
 import static com.spotify.styx.util.WorkflowValidator.MAX_ID_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_RESOURCES;
 import static com.spotify.styx.util.WorkflowValidator.MAX_RESOURCE_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_SECRET_MOUNT_PATH_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_SECRET_NAME_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_SERVICE_ACCOUNT_LENGTH;
+import static com.spotify.styx.util.WorkflowValidator.MIN_RUNNING_TIMEOUT;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
@@ -35,7 +39,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
-import static org.mockito.Matchers.anyString;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 import com.google.common.base.Strings;
@@ -45,8 +49,10 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.testdata.TestData;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.IntStream;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -59,7 +65,14 @@ import org.mockito.MockitoAnnotations;
 @RunWith(JUnitParamsRunner.class)
 public class WorkflowValidatorTest {
 
-  @Mock DockerImageValidator dockerImageValidator;
+  private static final Duration EXCESSIVE_TIMEOUT = Duration.ofDays(365);
+  private static final WorkflowConfiguration CONFIGURATION_WITH_EXCESSIVE_RUNTIME_TIMEOUT =
+      WorkflowConfigurationBuilder.from(TestData.FULL_WORKFLOW_CONFIGURATION)
+          .runningTimeout(EXCESSIVE_TIMEOUT)
+          .build();
+
+  @Mock
+  private DockerImageValidator dockerImageValidator;
 
   private WorkflowValidator sut;
 
@@ -67,11 +80,11 @@ public class WorkflowValidatorTest {
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
     when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Collections.emptyList());
-    sut = new WorkflowValidator(dockerImageValidator);
+    sut = WorkflowValidator.newBuilder(dockerImageValidator).build();
   }
 
   @Test
-  public void validateValidWorkflow() throws Exception {
+  public void validateValidWorkflow() {
     assertThat(sut.validateWorkflowConfiguration(TestData.FULL_WORKFLOW_CONFIGURATION), is(empty()));
   }
 
@@ -86,7 +99,7 @@ public class WorkflowValidatorTest {
       "@annually", "annually", "@yearly",
       "yearly", "years",
   })
-  public void validateValidCron(String expression) throws Exception {
+  public void validateValidCron(String expression) {
     assertThat(sut.validateWorkflowConfiguration(
         WorkflowConfigurationBuilder.from(TestData.FULL_WORKFLOW_CONFIGURATION)
             .schedule(Schedule.parse(expression))
@@ -95,7 +108,7 @@ public class WorkflowValidatorTest {
   }
 
   @Test
-  public void validateInvalidOffset() throws Exception {
+  public void validateInvalidOffset() {
     final List<String> errors = sut.validateWorkflowConfiguration(
         TestData.HOURLY_WORKFLOW_CONFIGURATION_WITH_INVALID_OFFSET);
     assertThat(errors, hasSize(1));
@@ -103,15 +116,15 @@ public class WorkflowValidatorTest {
   }
 
   @Test
-  public void validateInvalidDockerImage() throws Exception {
-    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(ImmutableList.of("foo", "bar"));
+  public void validateInvalidDockerImage() {
+    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(List.of("foo", "bar"));
     final List<String> errors = sut.validateWorkflowConfiguration(TestData.FULL_WORKFLOW_CONFIGURATION);
     assertThat(errors, contains("invalid image: foo", "invalid image: bar"));
   }
 
 
   @Test
-  public void validateInvalidWorkflow() throws Exception {
+  public void validateInvalidWorkflow() {
     final String id = Strings.repeat("id", 1024);
     final String schedule = Strings.repeat("schedule", 1024);
     final String offset = Strings.repeat("offset", 1024);
@@ -121,6 +134,10 @@ public class WorkflowValidatorTest {
     final String serviceAccount = Strings.repeat("account", 1024);
     final List<String> resources = IntStream.range(0, 10)
         .mapToObj(i -> Strings.repeat("res-" + i, 100)).collect(toList());
+    final Map<String, String> env = IntStream.range(0, 2000).boxed()
+        .collect(toMap(i -> "env-var-" + i, i -> "env-val-" + i));
+    final long envSize = env.entrySet().stream().mapToLong(e -> e.getKey().length() + e.getValue().length()).sum();
+    final Duration runningTimeout = Duration.ofSeconds(59L);
 
     final WorkflowConfiguration invalidConfiguration = WorkflowConfiguration.builder()
         .id(id)
@@ -132,6 +149,8 @@ public class WorkflowValidatorTest {
         .serviceAccount(serviceAccount)
         .resources(resources)
         .serviceAccount(serviceAccount)
+        .env(env)
+        .runningTimeout(runningTimeout)
         .build();
 
     final List<String> errors = sut.validateWorkflowConfiguration(invalidConfiguration);
@@ -146,13 +165,36 @@ public class WorkflowValidatorTest {
         .add(limit("too many resources", resources.size(), MAX_RESOURCES))
         .add(resources.stream().map(r ->
             limit("resource name too long", r.length(), MAX_RESOURCE_LENGTH)).toArray(String[]::new))
-        .add("invalid offset: Text cannot be parsed to a Period")
+        .add("invalid offset: Unable to parse offset period")
+        .add(limit("too many env vars", env.size(), MAX_ENV_VARS))
+        .add(limit("env too big", envSize, MAX_ENV_SIZE))
+        .add(limit("running timeout is too small", runningTimeout, MIN_RUNNING_TIMEOUT))
         .build();
 
     assertThat(errors, containsInAnyOrder(expectedErrors.toArray()));
   }
 
-  private String limit(String msg, int value, int limit) {
+  @Test
+  public void shouldSkipMaxRunningTimeoutValidationByDefault() {
+    final List<String> errors = sut.validateWorkflowConfiguration(CONFIGURATION_WITH_EXCESSIVE_RUNTIME_TIMEOUT);
+
+    assertThat(errors, empty());
+  }
+
+  @Test
+  public void shouldEnforceMaxRunningTimeoutLimitWhenSpecified() {
+    final Duration maxRunningTimeout = Duration.ofHours(24);
+    WorkflowValidator sut = WorkflowValidator.newBuilder(dockerImageValidator)
+        .withMaxRunningTimeoutLimit(maxRunningTimeout)
+        .build();
+
+    final List<String> errors = sut.validateWorkflowConfiguration(CONFIGURATION_WITH_EXCESSIVE_RUNTIME_TIMEOUT);
+
+    assertThat(errors, contains(limit("running timeout is too big", EXCESSIVE_TIMEOUT, maxRunningTimeout)));
+  }
+
+
+  private String limit(String msg, Object value, Object limit) {
     return msg + ": " + value + ", limit = " + limit;
   }
 }

@@ -22,7 +22,9 @@ package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V3;
 
+import com.google.common.collect.ImmutableSortedMap;
 import com.spotify.apollo.Client;
+import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.route.AsyncHandler;
@@ -32,7 +34,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Stream;
+import okhttp3.HttpUrl;
 import okio.ByteString;
+import org.slf4j.MDC;
 
 /**
  * API endpoints for scheduler
@@ -73,7 +77,25 @@ public class SchedulerProxyResource {
   }
 
   private CompletionStage<Response<ByteString>> proxyToScheduler(String path, RequestContext rc) {
-    return client.send(rc.request()
-        .withUri(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + path));
+    final HttpUrl.Builder builder =
+        Objects.requireNonNull(HttpUrl.parse(schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + path))
+            .newBuilder();
+    ImmutableSortedMap.copyOf(rc.request().parameters()).forEach((name, values) ->
+        values.forEach(value -> builder.addQueryParameter(name, value)));
+
+    return client.send(withRequestId(rc.request().withUri(builder.build().toString())));
+  }
+
+  private Request withRequestId(Request request) {
+    if (request.headers().containsKey("X-Request-Id")) {
+      return request;
+    }
+    // Unfortunately it is not possible for middleware to set headers on
+    // incoming requests so we manually propagate it here from the MDC.
+    final String requestId = MDC.get("request-id");
+    if (requestId == null) {
+      return request;
+    }
+    return request.withHeader("X-Request-Id", requestId);
   }
 }

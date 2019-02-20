@@ -50,6 +50,14 @@ public interface StorageTransaction {
   WorkflowId store(Workflow workflow) throws IOException;
 
   /**
+   * Stores a Workflow definition with a next natural trigger.
+   *
+   * @param workflow the workflow to store
+   */
+  WorkflowId storeWorkflowWithNextNaturalTrigger(Workflow workflow, TriggerInstantSpec triggerInstantSpec)
+      throws IOException;
+
+  /**
    * Get a {@link Workflow} definition.
    *
    * @param workflowId  The workflow to get
@@ -62,7 +70,7 @@ public interface StorageTransaction {
    * @param id Id of the backfill
    * @return Optionally a backfill, if one was found for the given id
    */
-  Optional<Backfill> backfill(String id);
+  Optional<Backfill> backfill(String id) throws IOException;
 
   /**
    * Updates the next natural trigger for a {@link Workflow}.
@@ -103,14 +111,14 @@ public interface StorageTransaction {
   /**
    * Remove an active workflow instance state.
    */
-  WorkflowInstance deleteActiveState(WorkflowInstance instance);
+  WorkflowInstance deleteActiveState(WorkflowInstance instance) throws IOException;
 
   /**
    * Stores a backfill
    *
    * @param backfill the backfill to store
    */
-  Backfill store(Backfill backfill);
+  Backfill store(Backfill backfill) throws IOException;
 
   /**
    * Commit all the storage operations previously called.
@@ -134,30 +142,25 @@ public interface StorageTransaction {
   /**
    * Update counter by delta for the specified resource.
    */
-  void updateCounter(ShardedCounter shardedCounter, String resource, int delta);
+  void updateCounter(ShardedCounter shardedCounter, String resource, int delta) throws IOException;
 
   /**
    * Reads a counter shard
    */
-  Optional<Shard> shard(String counterId, int shardIndex);
+  Optional<Shard> shard(String counterId, int shardIndex) throws IOException;
 
   /**
    * Stores a shard
    */
-  void store(Shard shard);
+  void store(Shard shard) throws IOException;
 
   /**
    * Updates the limit for the given counter
    */
-  void updateLimitForCounter(String counterId, long limit);
+  void updateLimitForCounter(String counterId, long limit) throws IOException;
 
   /**
    * Stores a resource
    */
-  void store(Resource resource);
-
-  /**
-   * Deletes the limit configured for the given counter
-   */
-  void deleteCounterLimit(String counterId);
+  void store(Resource resource) throws IOException;
 }

@@ -20,20 +20,18 @@
 
 package com.spotify.styx.state;
 
+import static com.spotify.styx.storage.Storage.GLOBAL_RESOURCE_ID;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingByConcurrent;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
 import com.google.auto.value.AutoValue;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.WorkflowResourceDecorator;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.storage.Storage;
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -41,12 +39,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Supplier;
+import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Stream;
 
 public final class StateUtil {
-
-  public static final String GLOBAL_RESOURCE_ID = "GLOBAL_STYX_CLUSTER";
 
   private StateUtil() {
     throw new UnsupportedOperationException();
@@ -59,20 +55,25 @@ public final class StateUtil {
         .collect(toList());
   }
 
-  public static Set<WorkflowInstance> getTimedOutInstances(List<InstanceState> activeStates,
+  public static Set<WorkflowInstance> getTimedOutInstances(Map<WorkflowId, Workflow> workflows,
+                                                           List<InstanceState> activeStates,
                                                            Instant instant,
                                                            TimeoutConfig ttl) {
     return activeStates.parallelStream()
-        .filter(entry -> hasTimedOut(entry.runState(), instant, ttl.ttlOf(entry.runState().state())))
+        .filter(entry -> {
+          final Optional<Workflow> workflowOpt =
+              Optional.ofNullable(workflows.get(entry.workflowInstance().workflowId()));
+          return hasTimedOut(workflowOpt, entry.runState(), instant, ttl.ttlOf(entry.runState().state()));
+        })
         .map(InstanceState::workflowInstance)
         .collect(toSet());
   }
 
-  public static ConcurrentHashMap<String, Long> getResourceUsage(boolean globalConcurrencyEnabled,
-                                                                 List<InstanceState> activeStates,
-                                                                 Set<WorkflowInstance> timedOutInstances,
-                                                                 WorkflowResourceDecorator resourceDecorator,
-                                                                 Map<WorkflowId, Workflow> workflows) {
+  public static ConcurrentMap<String, Long> getResourceUsage(boolean globalConcurrencyEnabled,
+                                                             List<InstanceState> activeStates,
+                                                             Set<WorkflowInstance> timedOutInstances,
+                                                             WorkflowResourceDecorator resourceDecorator,
+                                                             Map<WorkflowId, Workflow> workflows) {
     return activeStates.parallelStream()
         .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
         .filter(entry -> isConsumingResources(entry.runState().state()))
@@ -82,20 +83,6 @@ public final class StateUtil {
             ResourceWithInstance::resource,
             ConcurrentHashMap::new,
             counting()));
-  }
-
-  public static Map<String, Long> getResourcesUsageMap(Storage storage, TimeoutConfig timeoutConfig,
-                                                       Supplier<Map<WorkflowId, Workflow>> workflowCache,
-                                                       Instant instant,
-                                                       WorkflowResourceDecorator resourceDecorator)
-      throws IOException {
-    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
-    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
-    boolean globalConcurrencyEnabled = storage.config().globalConcurrency().isPresent();
-    final Set<WorkflowInstance> timedOutInstances =
-        getTimedOutInstances(activeInstanceStates, instant, timeoutConfig);
-    return getResourceUsage(globalConcurrencyEnabled,
-        activeInstanceStates, timedOutInstances, resourceDecorator, workflowCache.get());
   }
 
   private static Stream<ResourceWithInstance> pairWithResources(boolean globalConcurrencyEnabled,
@@ -122,20 +109,28 @@ public final class StateUtil {
     return builder.build();
   }
 
-  private static boolean hasTimedOut(RunState runState, Instant instant, Duration timeout) {
+  private static boolean hasTimedOut(Optional<Workflow> workflowOpt, RunState runState, Instant instant,
+                                     Duration timeout) {
     if (runState.state().isTerminal()) {
       return false;
     }
 
+    final Duration effectiveTimeout = runState.state() == RunState.State.RUNNING
+                                      ? workflowOpt
+                                          .flatMap(workflow -> workflow.configuration().runningTimeout())
+                                          .orElse(timeout)
+                                      : timeout;
+    final Duration sanitizedTimeout = effectiveTimeout.compareTo(timeout) < 0 ? effectiveTimeout : timeout;
+
     final Instant deadline = Instant
         .ofEpochMilli(runState.timestamp())
-        .plus(timeout);
+        .plus(sanitizedTimeout);
 
     return !deadline.isAfter(instant);
   }
 
   static boolean isConsumingResources(RunState.State state) {
-    return ImmutableList.of(
+    return List.of(
         RunState.State.PREPARE,
         RunState.State.SUBMITTING,
         RunState.State.SUBMITTED,

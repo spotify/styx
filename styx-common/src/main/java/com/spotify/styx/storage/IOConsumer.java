@@ -1,8 +1,8 @@
-/*-
+/*
  * -\-\-
- * Spotify styx
+ * Spotify Styx Scheduler Service
  * --
- * Copyright (C) 2017 Spotify AB
+ * Copyright (C) 2018 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,16 +17,27 @@
  * limitations under the License.
  * -/-/-
  */
-package com.spotify.styx.api;
 
-import static org.junit.Assert.assertEquals;
+package com.spotify.styx.storage;
 
-import org.junit.Test;
+import java.io.IOException;
+import java.util.function.Consumer;
 
-public class ApiVersionTest {
+/**
+ * A variant of {@link Consumer} that can throw {@link IOException}.
+ */
+@FunctionalInterface
+public interface IOConsumer<T> {
 
-  @Test
-  public void prefixShouldWork() throws Exception {
-    assertEquals("/api/v3", Api.Version.V3.prefix());
+  void accept(T t) throws IOException;
+
+  static <T> Consumer<T> unchecked(IOConsumer<T> f) {
+    return t -> {
+      try {
+        f.accept(t);
+      } catch (IOException e) {
+        throw new RuntimeIOException(e);
+      }
+    };
   }
 }

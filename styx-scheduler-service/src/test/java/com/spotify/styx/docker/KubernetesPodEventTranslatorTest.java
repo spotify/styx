@@ -20,27 +20,29 @@
 
 package com.spotify.styx.docker;
 
+import static com.spotify.styx.docker.KubernetesDockerRunner.KEEPALIVE_CONTAINER_NAME;
+import static com.spotify.styx.docker.KubernetesDockerRunner.MAIN_CONTAINER_NAME;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
-import static java.util.Collections.emptyList;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.junit.Assert.assertThat;
 
-import com.google.common.collect.Lists;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.testdata.TestData;
 import io.fabric8.kubernetes.api.model.ContainerState;
 import io.fabric8.kubernetes.api.model.ContainerStateRunning;
 import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
 import io.fabric8.kubernetes.api.model.ContainerStateWaiting;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
+import io.fabric8.kubernetes.api.model.ContainerStatusBuilder;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodStatus;
-import io.fabric8.kubernetes.client.Watcher;
+import io.fabric8.kubernetes.api.model.PodStatusBuilder;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -55,11 +57,13 @@ public class KubernetesPodEventTranslatorTest {
   private static final String MESSAGE_FORMAT = "{\"rfu\":{\"dum\":\"my\"},\"component_id\":\"dummy\",\"workflow_id\":\"dummy\",\"parameter\":\"dummy\",\"execution_id\":\"dummy\",\"event\":\"dummy\",\"exit_code\":%d}\n";
   private static final KubernetesSecretSpec SECRET_SPEC = KubernetesSecretSpec.builder().build();
 
-  Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC, SECRET_SPEC);
+  private static final String STYX_ENVIRONMENT = "testing";
+
+  private Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC, SECRET_SPEC, STYX_ENVIRONMENT);
 
   @Test
-  public void terminateOnSuccessfulTermination() throws Exception {
-    pod.setStatus(terminated("Succeeded", 20, null));
+  public void terminateOnSuccessfulTermination() {
+    setTerminated(pod, "Succeeded", 20, null);
 
     assertGeneratesEventsAndTransitions(
         RunState.State.RUNNING, pod,
@@ -67,8 +71,8 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void startedAndTerminatedOnFromSubmitted() throws Exception {
-    pod.setStatus(terminated("Succeeded", 0, null));
+  public void startedAndTerminatedOnFromSubmitted() {
+    setTerminated(pod, "Succeeded", 0, null);
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -77,16 +81,16 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void shouldNotGenerateStartedWhenContainerIsNotReady() throws Exception {
-    pod.setStatus(running(/* ready= */ false));
+  public void shouldNotGenerateStartedWhenContainerIsNotReady() {
+    setRunning(pod, /* ready= */ false);
 
     assertGeneratesNoEvents(
         RunState.State.SUBMITTED, pod);
   }
 
   @Test
-  public void shouldGenerateStartedWhenContainerIsReady() throws Exception {
-    pod.setStatus(running(/* ready= */ true));
+  public void shouldGenerateStartedWhenContainerIsReady() {
+    setRunning(pod, /* ready= */ true);
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -94,8 +98,8 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void runErrorOnErrImagePull() throws Exception {
-    pod.setStatus(waiting("Pending", "ErrImagePull"));
+  public void runErrorOnErrImagePull() {
+    setWaiting(pod, "Pending", "ErrImagePull");
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -103,7 +107,7 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void runErrorOnUnknownPhaseEntered() throws Exception {
+  public void runErrorOnUnknownPhaseEntered() {
     pod.setStatus(podStatusNoContainer("Unknown"));
 
     assertGeneratesEventsAndTransitions(
@@ -112,7 +116,7 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void runErrorOnMissingContainer() throws Exception {
+  public void runErrorOnMissingContainer() {
     pod.setStatus(podStatusNoContainer("Succeeded"));
 
     assertGeneratesEventsAndTransitions(
@@ -121,18 +125,27 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void runErrorOnUnexpectedTerminatedStatus() throws Exception {
-    pod.setStatus(waiting("Failed", ""));
+  public void runErrorOnUnexpectedTerminatedStatus() {
+    setWaiting(pod, "Failed", "");
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.runError(WFI, "Unexpected null terminated status"));
   }
+  @Test
+  public void runErrorOnNodeLost() {
+    setRunning(pod, true);
+    pod.getStatus().setReason("NodeLost");
+
+    assertGeneratesEventsAndTransitions(
+        State.RUNNING, pod,
+        Event.runError(WFI, "Lost node running pod"));
+  }
 
   @Test
-  public void errorExitCodeOnTerminationLoggingButNoMessage() throws Exception {
+  public void errorExitCodeOnTerminationLoggingButNoMessage() {
     Pod pod = podWithTerminationLogging();
-    pod.setStatus(terminated("Succeeded", 0, null));
+    setTerminated(pod, "Succeeded", 0, null);
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -141,9 +154,9 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void errorExitCodeOnTerminationLoggingButInvalidJson() throws Exception {
+  public void errorExitCodeOnTerminationLoggingButInvalidJson() {
     Pod pod = podWithTerminationLogging();
-    pod.setStatus(terminated("Succeeded", 0, "SUCCESS"));
+    setTerminated(pod, "Succeeded", 0, "SUCCESS");
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -152,9 +165,9 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void errorExitCodeOnTerminationLoggingButPartialJson() throws Exception {
+  public void errorExitCodeOnTerminationLoggingButPartialJson() {
     Pod pod = podWithTerminationLogging();
-    pod.setStatus(terminated("Succeeded", 0, "{\"workflow_id\":\"dummy\"}"));
+    setTerminated(pod, "Succeeded", 0, "{\"workflow_id\":\"dummy\"}");
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -163,9 +176,9 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void errorExitCodeOnTerminationLoggingButK8sFallback() throws Exception {
+  public void errorExitCodeOnTerminationLoggingButK8sFallback() {
     Pod pod = podWithTerminationLogging();
-    pod.setStatus(terminated("Failed", 17, "{\"workflow_id\":\"dummy\"}"));
+    setTerminated(pod, "Failed", 17, "{\"workflow_id\":\"dummy\"}");
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -174,9 +187,9 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void errorContainerExitCodeAndUnparsableTerminationLog() throws Exception {
+  public void errorContainerExitCodeAndUnparsableTerminationLog() {
     Pod pod = podWithTerminationLogging();
-    pod.setStatus(terminated("Failed", 17, "{\"workf"));
+    setTerminated(pod, "Failed", 17, "{\"workf");
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -185,9 +198,9 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void zeroContainerExitCodeAndInvalidTerminationLog() throws Exception {
+  public void zeroContainerExitCodeAndInvalidTerminationLog() {
     Pod pod = podWithTerminationLogging();
-    pod.setStatus(terminated("Failed", 0, "{\"workflow_id\":\"dummy\"}"));
+    setTerminated(pod, "Failed", 0, "{\"workflow_id\":\"dummy\"}");
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -196,9 +209,9 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void zeroContainerExitCodeAndUnparsableTerminationLog() throws Exception {
+  public void zeroContainerExitCodeAndUnparsableTerminationLog() {
     Pod pod = podWithTerminationLogging();
-    pod.setStatus(terminated("Failed", 0, "{\"workflo"));
+    setTerminated(pod, "Failed", 0, "{\"workflo");
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -207,9 +220,9 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void exitCodeFromMessageOnTerminationLoggingAndZeroExitCode() throws Exception {
+  public void exitCodeFromMessageOnTerminationLoggingAndZeroExitCode() {
     Pod pod = podWithTerminationLogging();
-    pod.setStatus(terminated("Succeeded", 0, String.format(MESSAGE_FORMAT, 1)));
+    setTerminated(pod, "Succeeded", 0, String.format(MESSAGE_FORMAT, 1));
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -218,9 +231,9 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void noExitCodeFromEitherMessageOnTerminationLoggingNorDocker() throws Exception {
+  public void noExitCodeFromEitherMessageOnTerminationLoggingNorDocker() {
     Pod pod = podWithTerminationLogging();
-    pod.setStatus(terminated("Succeeded", null, null));
+    setTerminated(pod, "Succeeded", null, null);
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -229,9 +242,9 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void exitCodeFromMessageOnTerminationLoggingAndNonzeroExitCode() throws Exception {
+  public void exitCodeFromMessageOnTerminationLoggingAndNonzeroExitCode() {
     Pod pod = podWithTerminationLogging();
-    pod.setStatus(terminated("Failed", 2, String.format(MESSAGE_FORMAT, 3)));
+    setTerminated(pod, "Failed", 2, String.format(MESSAGE_FORMAT, 3));
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -240,9 +253,9 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void zeroExitCodeFromTerminationLogAndNonZeroContainerExitCode() throws Exception {
+  public void zeroExitCodeFromTerminationLogAndNonZeroContainerExitCode() {
     Pod pod = podWithTerminationLogging();
-    pod.setStatus(terminated("Failed", 2, String.format(MESSAGE_FORMAT, 0)));
+    setTerminated(pod, "Failed", 2, String.format(MESSAGE_FORMAT, 0));
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
@@ -251,26 +264,37 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   @Test
-  public void noEventsWhenStateInTerminated() throws Exception {
+  public void zeroExitCodeFailedPhaseWithoutTerminationLog() {
+    pod.setStatus(terminated("Failed", 0, null));
+
+    assertGeneratesEventsAndTransitions(
+        RunState.State.SUBMITTED, pod,
+        Event.started(WFI),
+        Event.terminate(WFI, Optional.empty()));
+  }
+  
+  @Test
+  public void nonZeroExitCodeFailedPhaseWithoutTerminationLog() {
+    pod.setStatus(terminated("Failed", 2, null));
+
+    assertGeneratesEventsAndTransitions(
+        RunState.State.SUBMITTED, pod,
+        Event.started(WFI),
+        Event.terminate(WFI, Optional.of(2)));
+  }
+
+  @Test
+  public void noEventsWhenStateInTerminated() {
     pod.setStatus(podStatusNoContainer("Unknown"));
 
     assertGeneratesNoEvents(RunState.State.TERMINATED, pod);
   }
 
   @Test
-  public void noEventsWhenStateInFailed() throws Exception {
+  public void noEventsWhenStateInFailed() {
     pod.setStatus(podStatusNoContainer("Unknown"));
 
     assertGeneratesNoEvents(RunState.State.FAILED, pod);
-  }
-
-  @Test
-  public void shouldIgnoreDeletedEvents() throws Exception {
-    pod.setStatus(terminated("Succeeded", 0, null));
-    RunState state = RunState.create(WFI, RunState.State.TERMINATED);
-
-    List<Event> events = translate(WFI, state, Watcher.Action.DELETED, pod, Stats.NOOP);
-    assertThat(events, empty());
   }
 
   private void assertGeneratesEventsAndTransitions(
@@ -279,7 +303,7 @@ public class KubernetesPodEventTranslatorTest {
       Event... expectedEvents) {
 
     RunState state = RunState.create(WFI, initialState);
-    List<Event> events = translate(WFI, state, Watcher.Action.MODIFIED, pod, Stats.NOOP);
+    List<Event> events = translate(WFI, state, pod, Stats.NOOP);
     assertThat(events, contains(expectedEvents));
 
     // ensure no exceptions are thrown when transitioning
@@ -293,42 +317,63 @@ public class KubernetesPodEventTranslatorTest {
       Pod pod) {
 
     RunState state = RunState.create(WFI, initialState);
-    List<Event> events = translate(WFI, state, Watcher.Action.MODIFIED, pod, Stats.NOOP);
+    List<Event> events = translate(WFI, state, pod, Stats.NOOP);
 
     assertThat(events, empty());
   }
 
+  static void setRunning(Pod pod, boolean ready) {
+    pod.setStatus(running(ready));
+  }
+
   static PodStatus running(boolean ready) {
-    return podStatus("Running", ready, new ContainerState(
-        new ContainerStateRunning("2016-05-30T09:46:48Z"),
-        null,
-        null));
+    return podStatus("Running", ready, runningContainerState());
+  }
+
+  private static ContainerState runningContainerState() {
+    return new ContainerState(new ContainerStateRunning("2016-05-30T09:46:48Z"), null, null);
+  }
+
+  static void setTerminated(Pod pod, String phase, Integer exitCode, String message) {
+    pod.setStatus(terminated(phase, exitCode, message));
   }
 
   static PodStatus terminated(String phase, Integer exitCode, String message) {
-    return podStatus(phase, true, new ContainerState(
-        null,
-        new ContainerStateTerminated("", exitCode, "", message, "", 0, ""),
-        null));
+    return podStatus(phase, true, terminatedContainerState(exitCode, message));
+  }
+
+  static ContainerState terminatedContainerState(Integer exitCode, String message) {
+    return new ContainerState(null, new ContainerStateTerminated("", exitCode, "", message, "", 0, ""), null);
+  }
+
+  static void setWaiting(Pod pod, String phase, String reason) {
+    pod.setStatus(waiting(phase, reason));
   }
 
   static PodStatus waiting(String phase, String reason) {
-    return podStatus(phase, true, new ContainerState(
-        null,
-        null,
-        new ContainerStateWaiting("", reason)));
+    return podStatus(phase, true, waitingContainerState(reason));
+  }
+
+  private static ContainerState waitingContainerState(String reason) {
+    return new ContainerState(null, null, new ContainerStateWaiting("", reason));
   }
 
   static PodStatus podStatus(String phase, boolean ready, ContainerState containerState) {
     PodStatus podStatus = podStatusNoContainer(phase);
     podStatus.getContainerStatuses()
         .add(new ContainerStatus("foo", "", "", containerState,
-                                 "bar", ready, 0, containerState));
+                                 MAIN_CONTAINER_NAME, ready, 0, containerState));
+    podStatus.getContainerStatuses()
+        .add(new ContainerStatusBuilder().withName(KEEPALIVE_CONTAINER_NAME)
+            .withNewState().withNewRunning().endRunning().endState()
+            .build());
     return podStatus;
   }
 
   static PodStatus podStatusNoContainer(String phase) {
-    return new PodStatus(emptyList(), Lists.newArrayList(), "", "", phase, "", "", "");
+    return new PodStatusBuilder()
+        .withPhase(phase)
+        .build();
   }
 
   private Pod podWithTerminationLogging() {
@@ -338,6 +383,7 @@ public class KubernetesPodEventTranslatorTest {
             .executionId("eid")
             .imageName("busybox")
             .terminationLogging(true).build(),
-        SECRET_SPEC);
+        SECRET_SPEC,
+        STYX_ENVIRONMENT);
   }
 }

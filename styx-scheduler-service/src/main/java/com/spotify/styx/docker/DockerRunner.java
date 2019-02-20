@@ -32,6 +32,7 @@ import io.norberg.automatter.AutoMatter;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
@@ -97,6 +98,8 @@ public interface DockerRunner extends Closeable {
 
     Optional<String> memLimit();
 
+    Map<String, String> env();
+
     static RunSpecBuilder builder() {
       return new RunSpecBuilder();
     }
@@ -119,12 +122,16 @@ public interface DockerRunner extends Closeable {
     return new LocalDockerRunner(executorService, stateManager);
   }
 
-  static DockerRunner kubernetes(NamespacedKubernetesClient kubernetesClient, StateManager stateManager,
-      Stats stats, ServiceAccountKeyManager serviceAccountKeyManager, Debug debug) {
+  static DockerRunner kubernetes(NamespacedKubernetesClient kubernetesClient,
+                                 StateManager stateManager,
+                                 Stats stats, ServiceAccountKeyManager serviceAccountKeyManager,
+                                 Debug debug,
+                                 String styxEnvironment) {
     final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager =
         new KubernetesGCPServiceAccountSecretManager(kubernetesClient, serviceAccountKeyManager);
     final KubernetesDockerRunner dockerRunner =
-        new KubernetesDockerRunner(kubernetesClient, stateManager, stats, serviceAccountSecretManager, debug);
+        new KubernetesDockerRunner(kubernetesClient, stateManager, stats,
+            serviceAccountSecretManager, debug, styxEnvironment);
 
     dockerRunner.init();
 

@@ -21,6 +21,8 @@
 package com.spotify.styx.monitoring;
 
 import static com.spotify.styx.monitoring.MetricsStats.ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER;
+import static com.spotify.styx.monitoring.MetricsStats.COUNTER_CACHE_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.DATASTORE_OPERATION_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.DOCKER_DURATION;
 import static com.spotify.styx.monitoring.MetricsStats.DOCKER_ERROR_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.DOCKER_RATE;
@@ -28,10 +30,14 @@ import static com.spotify.styx.monitoring.MetricsStats.EVENT_CONSUMER_ERROR_RATE
 import static com.spotify.styx.monitoring.MetricsStats.EVENT_CONSUMER_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_MISMATCH;
 import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.HISTOGRAM;
 import static com.spotify.styx.monitoring.MetricsStats.NATURAL_TRIGGER_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.PUBLISHING_ERROR_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.PUBLISHING_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.PULL_IMAGE_ERROR_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.QUEUED_EVENTS;
 import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_CONFIGURED;
+import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_DEMANDED;
 import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_USED;
 import static com.spotify.styx.monitoring.MetricsStats.STORAGE_DURATION;
 import static com.spotify.styx.monitoring.MetricsStats.STORAGE_RATE;
@@ -44,6 +50,10 @@ import static com.spotify.styx.monitoring.MetricsStats.WORKFLOW_CONSUMER_ERROR_R
 import static com.spotify.styx.monitoring.MetricsStats.WORKFLOW_CONSUMER_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.WORKFLOW_COUNT;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
+import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,17 +64,17 @@ import com.codahale.metrics.Meter;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Time;
-import java.time.Instant;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class MetricsStatsTest {
@@ -88,15 +98,15 @@ public class MetricsStatsTest {
   @Before
   public void setUp() {
     when(time.nanoTime()).then(a -> System.nanoTime());
-    when(time.get()).then(a -> Instant.now());
-    when(registry.histogram(TRANSITIONING_DURATION)).thenReturn(histogram);
+    when(registry.getOrAdd(TRANSITIONING_DURATION, HISTOGRAM)).thenReturn(histogram);
     when(registry.meter(PULL_IMAGE_ERROR_RATE)).thenReturn(meter);
     when(registry.meter(NATURAL_TRIGGER_RATE)).thenReturn(meter);
     when(registry.meter(TERMINATION_LOG_MISSING)).thenReturn(meter);
     when(registry.meter(TERMINATION_LOG_INVALID)).thenReturn(meter);
     when(registry.meter(EXIT_CODE_MISMATCH)).thenReturn(meter);
     when(registry.meter(WORKFLOW_CONSUMER_ERROR_RATE)).thenReturn(meter);
-    when(registry.histogram(TICK_DURATION)).thenReturn(histogram);
+    when(registry.meter(COUNTER_CACHE_RATE.tagged("result", "miss"))).thenReturn(meter);
+    when(registry.meter(COUNTER_CACHE_RATE.tagged("result", "hit"))).thenReturn(meter);
     stats = new MetricsStats(registry, time);
   }
 
@@ -104,7 +114,7 @@ public class MetricsStatsTest {
   public void shouldRecordStorageOperation() {
     String operation = "write";
     String status = "success";
-    when(registry.histogram(STORAGE_DURATION.tagged("operation", operation, "status", status))).thenReturn(histogram);
+    when(registry.getOrAdd(STORAGE_DURATION.tagged("operation", operation, "status", status), HISTOGRAM)).thenReturn(histogram);
     when(registry.meter(STORAGE_RATE.tagged("operation", operation, "status", status))).thenReturn(meter);
     stats.recordStorageOperation(operation, 1000L, status);
     verify(histogram).update(1000L);
@@ -115,7 +125,7 @@ public class MetricsStatsTest {
   public void shouldRecordDockerOperation() {
     String operation = "start";
     String status = "success";
-    when(registry.histogram(DOCKER_DURATION.tagged("operation", operation, "status", status))).thenReturn(histogram);
+    when(registry.getOrAdd(DOCKER_DURATION.tagged("operation", operation, "status", status), HISTOGRAM)).thenReturn(histogram);
     when(registry.meter(DOCKER_RATE.tagged("operation", operation, "status", status))).thenReturn(meter);
     stats.recordDockerOperation(operation, 1000L, status);
     verify(histogram).update(1000L);
@@ -165,11 +175,8 @@ public class MetricsStatsTest {
   @Test
   public void shouldRecordExitCode() {
     WorkflowId workflowId = WorkflowId.create("component", "workflow");
-    when(registry.meter(EXIT_CODE_RATE.tagged(
-        "component-id", workflowId.componentId(),
-        "workflow-id", workflowId.id(),
-        "exit-code", "0"))).thenReturn(meter);
-    stats.recordExitCode(workflowId, 0);
+    when(registry.meter(EXIT_CODE_RATE.tagged("exit-code", "0"))).thenReturn(meter);
+    stats.recordExitCode(0);
     verify(meter).mark();
   }
 
@@ -214,7 +221,7 @@ public class MetricsStatsTest {
   @Test
   public void shouldRecordResourceConfigured() {
     String resource = "resource";
-    when(registry.histogram(RESOURCE_CONFIGURED.tagged("resource", resource))).thenReturn(histogram);
+    when(registry.getOrAdd(RESOURCE_CONFIGURED.tagged("resource", resource), HISTOGRAM)).thenReturn(histogram);
     stats.recordResourceConfigured(resource, 100L);
     verify(histogram).update(100L);
   }
@@ -222,15 +229,23 @@ public class MetricsStatsTest {
   @Test
   public void shouldRecordResourceUsed() {
     String resource = "resource";
-    when(registry.histogram(RESOURCE_USED.tagged("resource", resource))).thenReturn(histogram);
+    when(registry.getOrAdd(RESOURCE_USED.tagged("resource", resource), HISTOGRAM)).thenReturn(histogram);
     stats.recordResourceUsed(resource, 100L);
     verify(histogram).update(100L);
   }
 
   @Test
+  public void shouldRecordResourceDemanded() {
+    String resource = "resource";
+    when(registry.getOrAdd(RESOURCE_DEMANDED.tagged("resource", resource), HISTOGRAM)).thenReturn(histogram);
+    stats.recordResourceDemanded(resource, 17);
+    verify(histogram).update(17L);
+  }
+
+  @Test
   public void shouldRecordEventConsumer() {
-    final SequenceEvent event = SequenceEvent
-        .create(Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural()), 0L, 0L);
+    final SequenceEvent event = SequenceEvent.create(
+        Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural(), TriggerParameters.zero()), 0L, 0L);
     when(registry.meter(EVENT_CONSUMER_RATE.tagged("event-type", "triggerExecution"))).thenReturn(meter);
     stats.recordEventConsumer(event);
     verify(meter).mark();
@@ -238,8 +253,8 @@ public class MetricsStatsTest {
 
   @Test
   public void shouldRecordEventConsumerError() {
-    final SequenceEvent event = SequenceEvent
-        .create(Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural()), 0L, 0L);
+    final SequenceEvent event = SequenceEvent.create(
+        Event.triggerExecution(TestData.WORKFLOW_INSTANCE, Trigger.natural(), TriggerParameters.zero()), 0L, 0L);
     when(registry.meter(EVENT_CONSUMER_ERROR_RATE.tagged("event-type", "triggerExecution"))).thenReturn(meter);
     stats.recordEventConsumerError(event);
     verify(meter).mark();
@@ -259,10 +274,71 @@ public class MetricsStatsTest {
   }
 
   @Test
+  public void shouldRecordPublishing() {
+    when(registry.meter(PUBLISHING_RATE.tagged("type", "deploying", "state", "SUBMITTED"))).thenReturn(meter);
+    stats.recordPublishing("deploying", "SUBMITTED");
+    verify(meter).mark();
+  }
+
+  @Test
+  public void shouldRecordPublishingError() {
+    when(registry.meter(PUBLISHING_ERROR_RATE.tagged("type", "deploying", "state", "SUBMITTED"))).thenReturn(meter);
+    stats.recordPublishingError("deploying", "SUBMITTED");
+    verify(meter).mark();
+  }
+
+  @Test
   public void shouldRecordTickDuration() {
     String type = "dummy-tick";
-    when(registry.histogram(TICK_DURATION.tagged("type", type))).thenReturn(histogram);
+    when(registry.getOrAdd(TICK_DURATION.tagged("type", type), HISTOGRAM)).thenReturn(histogram);
     stats.recordTickDuration(type, 100L);
     verify(histogram).update(100L);
+  }
+
+  @Test
+  public void shouldRecordDatastoreEntityReads() {
+    when(registry.meter(DATASTORE_OPERATION_RATE.tagged("operation", "read", "kind", "foobar"))).thenReturn(meter);
+    stats.recordDatastoreEntityReads("foobar", 17);
+    verify(meter).mark(17);
+  }
+
+  @Test
+  public void shouldRecordDatastoreEntityWrites() {
+    when(registry.meter(DATASTORE_OPERATION_RATE.tagged("operation", "write", "kind", "foobar"))).thenReturn(meter);
+    stats.recordDatastoreEntityWrites("foobar", 17);
+    verify(meter).mark(17);
+  }
+
+  @Test
+  public void shouldRecordDatastoreEntityDeletes() {
+    when(registry.meter(DATASTORE_OPERATION_RATE.tagged("operation", "delete", "kind", "foobar"))).thenReturn(meter);
+    stats.recordDatastoreEntityDeletes("foobar", 17);
+    verify(meter).mark(17);
+  }
+
+  @Test
+  public void shouldRecordDatastoreEntityQueries() {
+    when(registry.meter(DATASTORE_OPERATION_RATE.tagged("operation", "query", "kind", "foobar"))).thenReturn(meter);
+    stats.recordDatastoreQueries("foobar", 17);
+    verify(meter).mark(17);
+  }
+
+  @Test
+  public void shouldRecordCounterCacheHit() {
+    stats.recordCounterCacheHit();
+    verify(meter).mark();
+  }
+
+  @Test
+  public void shouldRecordCounterCacheMiss() {
+    stats.recordCounterCacheMiss();
+    verify(meter).mark();
+  }
+
+  @Test
+  public void shouldCreateHistogram() {
+    final Histogram histogram = HISTOGRAM.newMetric();
+    assertThat(histogram, is(not(nullValue())));
+    assertThat(HISTOGRAM.isInstance(histogram), is(true));
   }
 }

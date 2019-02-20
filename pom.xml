@@ -6,19 +6,26 @@
   <parent>
     <groupId>com.spotify</groupId>
     <artifactId>foss-root</artifactId>
-    <version>5</version>
+    <version>9</version>
   </parent>
 
   <artifactId>styx</artifactId>
   <packaging>pom</packaging>
-  <version>2.0.1-SNAPSHOT</version>
+  <version>2.1.7-SNAPSHOT</version>
 
   <properties>
+    <maven.compiler.version>3.8.0</maven.compiler.version>
+    <maven.compiler.release>11</maven.compiler.release>
+    <maven.compiler.source>11</maven.compiler.source>
+    <maven.compiler.target>11</maven.compiler.target>
     <apollo.version>1.3.2</apollo.version>
-    <jackson.version>2.8.8</jackson.version>
+    <jackson.version>2.9.8</jackson.version>
     <checkstyle.config.location>checkstyle.xml</checkstyle.config.location>
     <checkstyle.version>2.17</checkstyle.version>
-    <semantic-metrics.version>0.11.2</semantic-metrics.version>
+    <semantic-metrics.version>0.11.5</semantic-metrics.version>
+    <metrics.version>3.2.6</metrics.version>
+    <opencensus.version>0.19.0</opencensus.version>
+    <google.client.lib.version>1.28.0</google.client.lib.version>
   </properties>
 
   <repositories>
@@ -105,7 +112,7 @@
       <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
-        <version>19.0</version>
+        <version>27.0.1-jre</version>
       </dependency>
       <dependency>
         <groupId>com.github.rholder</groupId>
@@ -120,7 +127,7 @@
       <dependency>
         <groupId>io.norberg</groupId>
         <artifactId>auto-matter</artifactId>
-        <version>0.14.1</version>
+        <version>0.15.1</version>
       </dependency>
       <dependency>
         <groupId>com.github.sviperll</groupId>
@@ -180,7 +187,7 @@
       <dependency>
         <groupId>io.norberg</groupId>
         <artifactId>auto-matter-jackson</artifactId>
-        <version>0.14.1</version>
+        <version>0.15.1</version>
       </dependency>
       <dependency>
         <groupId>com.cronutils</groupId>
@@ -196,16 +203,67 @@
         <groupId>com.spotify.metrics</groupId>
         <artifactId>semantic-metrics-core</artifactId>
         <version>${semantic-metrics.version}</version>
+        <exclusions>
+          <exclusion>
+          <groupId>com.codahale.metrics</groupId>
+          <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.spotify.metrics</groupId>
         <artifactId>semantic-metrics-ffwd-reporter</artifactId>
         <version>${semantic-metrics.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.codahale.metrics</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard.metrics</groupId>
+        <artifactId>metrics-core</artifactId>
+        <version>${metrics.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard.metrics</groupId>
+        <artifactId>metrics-jvm</artifactId>
+        <version>${metrics.version}</version>
       </dependency>
       <dependency>
         <groupId>com.github.kabutz</groupId>
         <artifactId>javaspecialists</artifactId>
         <version>055ddfd5d6d9</version>
+      </dependency>
+      <!-- to support list in env var -->
+      <dependency>
+        <groupId>com.typesafe</groupId>
+        <artifactId>config</artifactId>
+        <version>1.3.3</version>
+      </dependency>
+
+      <!-- tracing -->
+      <dependency>
+        <groupId>io.opencensus</groupId>
+        <artifactId>opencensus-api</artifactId>
+        <version>${opencensus.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.opencensus</groupId>
+        <artifactId>opencensus-exporter-trace-stackdriver</artifactId>
+        <version>${opencensus.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.opencensus</groupId>
+        <artifactId>opencensus-impl</artifactId>
+        <version>${opencensus.version}</version>
+        <scope>runtime</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.opencensus</groupId>
+        <artifactId>opencensus-contrib-http-util</artifactId>
+        <version>${opencensus.version}</version>
       </dependency>
 
       <!-- cli -->
@@ -220,16 +278,16 @@
         <version>0.7.0</version>
       </dependency>
       <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-simple</artifactId>
-        <version>1.7.25</version>
+        <groupId>com.spotify</groupId>
+        <artifactId>logging</artifactId>
+        <version>2.2.4</version>
       </dependency>
 
       <!-- styx client libs -->
       <dependency>
         <groupId>com.squareup.okhttp3</groupId>
         <artifactId>okhttp</artifactId>
-        <version>3.9.0</version>
+        <version>3.11.0</version>
       </dependency>
 
       <!-- external clients libs -->
@@ -241,43 +299,47 @@
       <dependency>
         <groupId>io.fabric8</groupId>
         <artifactId>kubernetes-client</artifactId>
-        <version>2.2.13</version>
+        <version>4.1.0</version>
       </dependency>
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-iam</artifactId>
-        <version>v1-rev205-1.22.0</version>
-        <exclusions>
-          <exclusion>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava-jdk5</artifactId>
-          </exclusion>
-        </exclusions>
+        <version>v1-rev20190111-${google.client.lib.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-container</artifactId>
-        <version>v1beta1-rev38-1.22.0</version>
+        <version>v1-rev20181211-${google.client.lib.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.apis</groupId>
+        <artifactId>google-api-services-admin-directory</artifactId>
+        <version>directory_v1-rev105-1.25.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.apis</groupId>
+        <artifactId>google-api-services-cloudresourcemanager</artifactId>
+        <version>v1-rev20181015-${google.client.lib.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-datastore</artifactId>
-        <version>1.0.0</version>
+        <version>1.61.0</version>
       </dependency>
       <dependency>
         <groupId>com.google.cloud.bigtable</groupId>
-        <artifactId>bigtable-hbase-1.2</artifactId>
-        <version>0.9.6.2</version>
+        <artifactId>bigtable-hbase-1.x</artifactId>
+        <version>1.3.0</version>
       </dependency>
       <dependency>
         <groupId>io.netty</groupId>
         <artifactId>netty-tcnative-boringssl-static</artifactId>
-        <version>1.1.33.Fork26</version>
+        <version>2.0.7.Final</version>
       </dependency>
       <dependency>
         <groupId>com.google.api</groupId>
         <artifactId>api-common</artifactId>
-        <version>1.1.0</version>
+        <version>1.7.0</version>
       </dependency>
 
       <!-- test libs -->
@@ -289,7 +351,7 @@
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-core</artifactId>
-        <version>1.10.19</version>
+        <version>2.21.0</version>
       </dependency>
       <dependency>
         <groupId>org.hamcrest</groupId>
@@ -330,6 +392,24 @@
         <version>1.1.0</version>
         <scope>test</scope>
       </dependency>
+      <dependency>
+        <groupId>com.github.cbismuth</groupId>
+        <artifactId>junit-repeat-rule</artifactId>
+        <version>1.1.2</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.github.stefanbirkner</groupId>
+        <artifactId>system-rules</artifactId>
+        <version>1.18.0</version>
+        <scope>test</scope>
+        <exclusions>
+          <exclusion>
+            <groupId>junit</groupId>
+            <artifactId>junit-dep</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
 
       <!-- version resolution -->
       <dependency>
@@ -350,7 +430,7 @@
       <dependency>
         <groupId>commons-codec</groupId>
         <artifactId>commons-codec</artifactId>
-        <version>1.9</version>
+        <version>1.10</version>
       </dependency>
       <dependency>
         <groupId>commons-collections</groupId>
@@ -360,12 +440,12 @@
       <dependency>
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpclient</artifactId>
-        <version>4.5</version>
+        <version>4.5.5</version>
       </dependency>
       <dependency>
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpcore</artifactId>
-        <version>4.4.1</version>
+        <version>4.4.9</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -375,7 +455,7 @@
       <dependency>
         <groupId>com.squareup.okio</groupId>
         <artifactId>okio</artifactId>
-        <version>1.13.0</version>
+        <version>2.1.0</version>
       </dependency>
       <dependency>
         <groupId>com.squareup.okhttp</groupId>
@@ -385,49 +465,219 @@
       <dependency>
         <groupId>com.google.api-client</groupId>
         <artifactId>google-api-client</artifactId>
-        <version>1.22.0</version>
+        <version>${google.client.lib.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.oauth-client</groupId>
         <artifactId>google-oauth-client</artifactId>
-        <version>1.22.0</version>
+        <version>${google.client.lib.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.http-client</groupId>
         <artifactId>google-http-client</artifactId>
-        <version>1.22.0</version>
+        <version>${google.client.lib.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.http-client</groupId>
         <artifactId>google-http-client-jackson2</artifactId>
-        <version>1.22.0</version>
+        <version>${google.client.lib.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.protobuf</groupId>
         <artifactId>protobuf-java</artifactId>
-        <version>3.2.0</version>
+        <version>3.6.1</version>
       </dependency>
       <dependency>
         <groupId>com.google.code.findbugs</groupId>
         <artifactId>jsr305</artifactId>
-        <version>3.0.1</version>
+        <version>3.0.2</version>
       </dependency>
       <dependency>
         <groupId>javax.annotation</groupId>
         <artifactId>javax.annotation-api</artifactId>
         <version>1.3.1</version>
       </dependency>
+      <dependency>
+        <groupId>com.google.errorprone</groupId>
+        <artifactId>error_prone_core</artifactId>
+        <version>2.3.2</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.errorprone</groupId>
+        <artifactId>error_prone_annotations</artifactId>
+        <version>2.3.2</version>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-core</artifactId>
+        <version>1.18.0</version>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-context</artifactId>
+        <version>1.18.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.auth</groupId>
+        <artifactId>google-auth-library-oauth2-http</artifactId>
+        <version>0.13.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.auth</groupId>
+        <artifactId>google-auth-library-credentials</artifactId>
+        <version>0.13.0</version>
+      </dependency>
+      <dependency>
+        <groupId>ch.qos.logback</groupId>
+        <artifactId>logback-classic</artifactId>
+        <version>1.2.3</version>
+      </dependency>
+      <dependency>
+        <groupId>ch.qos.logback</groupId>
+        <artifactId>logback-core</artifactId>
+        <version>1.2.3</version>
+      </dependency>
+      <dependency>
+        <groupId>org.checkerframework</groupId>
+        <artifactId>checker-qual</artifactId>
+        <version>2.6.0</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
+  <dependencies>
+    <dependency>
+      <groupId>com.google.errorprone</groupId>
+      <artifactId>error_prone_core</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <profiles>
+    <profile>
+      <id>default</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <artifactId>maven-compiler-plugin</artifactId>
+              <version>${maven.compiler.version}</version>
+              <configuration>
+                <source>${maven.compiler.source}</source>
+                <target>${maven.compiler.target}</target>
+                <release>${maven.compiler.release}</release>
+                <showWarnings>true</showWarnings>
+                <forceJavacCompilerUse>true</forceJavacCompilerUse>
+                <compilerArgs>
+                  <arg>-XDcompilePolicy=simple</arg>
+                  <!--
+                  all flags to errorprone should be passed in the same <arg> as -Xplugin.
+                  -->
+                  <arg>
+                     -Xplugin:ErrorProne
+                     -Xep:RemoveUnusedImports:ERROR
+                     -Xep:PrivateConstructorForUtilityClass:ERROR
+                     -Xep:FieldMissingNullable:ERROR
+                     -Xep:MultipleTopLevelClasses:ERROR
+                     -Xep:MultipleUnaryOperatorsInMethodCall:ERROR
+                     -Xep:PackageLocation:ERROR
+                     -Xep:SwitchDefault:ERROR
+                     -Xep:ThrowsUncheckedException:ERROR
+                     -Xep:TypeParameterNaming:ERROR
+                     -Xep:UngroupedOverloads:WARN
+                     -Xep:UnnecessaryStaticImport:ERROR
+                     -Xep:WildcardImport:ERROR
+                     -XepDisableWarningsInGeneratedCode
+                     -XepExcludedPaths:.*/generated-(test-)?sources/.*
+                  </arg>
+                  <arg>-Xlint:all</arg>
+                </compilerArgs>
+              </configuration>
+            </plugin>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-checkstyle-plugin</artifactId>
+              <version>${checkstyle.version}</version>
+              <executions>
+                <execution>
+                  <id>validate</id>
+                  <phase>validate</phase>
+                  <configuration>
+                    <configLocation>${checkstyle.config.location}</configLocation>
+                    <encoding>UTF-8</encoding>
+                    <consoleOutput>true</consoleOutput>
+                    <!-- Remove or switch to false to keep building even with checkstyle errors -->
+                    <failsOnError>true</failsOnError>
+                  </configuration>
+                  <goals>
+                    <goal>check</goal>
+                  </goals>
+                </execution>
+              </executions>
+            </plugin>
+            <plugin>
+              <artifactId>maven-javadoc-plugin</artifactId>
+              <version>3.0.1</version>
+              <configuration>
+                <failOnError>false</failOnError>
+                <additionalOptions>
+                  <additionalOption>-Xdoclint:none</additionalOption>
+                </additionalOptions>
+              </configuration>
+              <executions>
+                <execution>
+                  <id>attach-javadocs</id>
+                  <goals>
+                    <goal>jar</goal>
+                  </goals>
+                </execution>
+              </executions>
+            </plugin>
+          </plugins>
+        </pluginManagement>
+      </build>
+    </profile>
+    <profile>
+      <id>disable-static-analysis</id>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <artifactId>maven-compiler-plugin</artifactId>
+              <version>${maven.compiler.version}</version>
+              <configuration>
+                <source>${maven.compiler.source}</source>
+                <target>${maven.compiler.target}</target>
+                <release>${maven.compiler.release}</release>
+              </configuration>
+            </plugin>
+          </plugins>
+        </pluginManagement>
+      </build>
+    </profile>
+  </profiles>
+
   <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>0.8.2</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>2.19.1</version>
         <configuration>
-          <argLine>-Xmx256m ${argLine}</argLine>
+          <!-- TODO: remove -D after openjdk fixes the bug https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=911925 -->
+          <argLine>-Xmx256m -Djdk.net.URLClassPath.disableClassPathURLCheck=true ${argLine}</argLine>
           <reuseForks>false</reuseForks>
           <forkCount>1</forkCount>
           <excludes>
@@ -437,29 +687,23 @@
       </plugin>
 
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>${checkstyle.version}</version>
+        <artifactId>maven-enforcer-plugin</artifactId>
         <executions>
           <execution>
-            <id>validate</id>
-            <phase>validate</phase>
-            <configuration>
-              <configLocation>${checkstyle.config.location}</configLocation>
-              <encoding>UTF-8</encoding>
-              <consoleOutput>true</consoleOutput>
-              <!-- Remove or switch to false to keep building even with checkstyle errors -->
-              <failsOnError>true</failsOnError>
-            </configuration>
             <goals>
-              <goal>check</goal>
+              <goal>enforce</goal>
             </goals>
+            <configuration>
+              <rules>
+                <bannedDependencies>
+                  <excludes>
+                    <exclude>com.codahale.metrics:*</exclude>
+                  </excludes>
+                </bannedDependencies>
+              </rules>
+            </configuration>
           </execution>
         </executions>
-      </plugin>
-
-      <plugin>
-        <artifactId>maven-enforcer-plugin</artifactId>
       </plugin>
 
       <plugin>
@@ -469,14 +713,15 @@
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.7.9</version>
         <configuration>
           <excludes>
             <exclude>**/AutoValue_*.class</exclude>
             <exclude>**/*Builder.class</exclude>
-            <exclude>**/*$*.class</exclude>
+            <exclude>**/*Builder$Value.class</exclude>
             <exclude>com/spotify/styx/model/Event.class</exclude>
+            <exclude>com/spotify/styx/model/Event$*EventAcceptor.class</exclude>
             <exclude>com/spotify/styx/state/Trigger.class</exclude>
+            <exclude>com/spotify/styx/monitoring/NoopStats.class</exclude>
           </excludes>
         </configuration>
         <executions>
@@ -494,47 +739,6 @@
             </goals>
           </execution>
         </executions>
-      </plugin>
-
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.7.0</version>
-        <configuration>
-          <compilerId>javac-with-errorprone</compilerId>
-          <forceJavacCompilerUse>true</forceJavacCompilerUse>
-          <source>1.8</source>
-          <target>1.8</target>
-          <showWarnings>true</showWarnings>
-          <compilerArgs>
-            <arg>-Xlint:all</arg>
-            <arg>-Xep:RemoveUnusedImports:ERROR</arg>
-            <arg>-Xep:PrivateConstructorForUtilityClass:ERROR</arg>
-            <arg>-Xep:FieldMissingNullable:ERROR</arg>
-            <arg>-Xep:MultipleTopLevelClasses:ERROR</arg>
-            <arg>-Xep:MultipleUnaryOperatorsInMethodCall:ERROR</arg>
-            <arg>-Xep:PackageLocation:ERROR</arg>
-            <arg>-Xep:SwitchDefault:ERROR</arg>
-            <arg>-Xep:ThrowsUncheckedException:ERROR</arg>
-            <arg>-Xep:TypeParameterNaming:ERROR</arg>
-            <arg>-Xep:UngroupedOverloads:WARN</arg>
-            <arg>-Xep:UnnecessaryStaticImport:ERROR</arg>
-            <arg>-Xep:WildcardImport:ERROR</arg>
-            <ark>-XepExcludedPaths:.*/target/generated.*</ark>
-          </compilerArgs>
-        </configuration>
-        <dependencies>
-          <dependency>
-            <groupId>org.codehaus.plexus</groupId>
-            <artifactId>plexus-compiler-javac-errorprone</artifactId>
-            <version>2.8.2</version>
-          </dependency>
-          <dependency>
-            <groupId>com.google.errorprone</groupId>
-            <artifactId>error_prone_core</artifactId>
-            <version>2.2.0</version>
-          </dependency>
-        </dependencies>
       </plugin>
     </plugins>
   </build>

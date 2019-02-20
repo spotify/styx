@@ -45,6 +45,12 @@ import java.util.SortedSet;
 public interface Storage extends Closeable {
 
   /**
+   * ID of the global resource that limits global resource usage across
+   * all workflows
+   */
+  String GLOBAL_RESOURCE_ID = "GLOBAL_STYX_CLUSTER";
+
+  /**
    * Returns all {@link SequenceEvent} for a {@link WorkflowInstance} in time order.
    *
    * @param workflowInstance  The workflow instance to get the events for
@@ -273,15 +279,13 @@ public interface Storage extends Closeable {
 
   List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId) throws IOException;
 
-  Optional<Backfill> backfill(String id);
+  Optional<Backfill> backfill(String id) throws IOException;
 
   void storeBackfill(Backfill backfill) throws IOException;
 
-  Map<Integer, Long> shardsForCounter(String counterId);
+  Map<Integer, Long> shardsForCounter(String counterId) throws IOException;
 
-  void deleteShardsForCounter(String counterId);
-
-  long getLimitForCounter(String counterId);
+  long getLimitForCounter(String counterId) throws IOException;
 
   /**
    * Run a function in a transaction that is committed if successful. Any exception thrown by the
@@ -289,8 +293,4 @@ public interface Storage extends Closeable {
    */
   <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
       throws IOException, E;
-
-  void deleteLimitForCounter(String counterId) throws IOException;
-
-  void updateLimitForCounter(String counterId, long limit) throws IOException;
 }

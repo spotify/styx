@@ -21,24 +21,27 @@
 package com.spotify.styx.cli;
 
 import static com.google.common.base.Throwables.getStackTraceAsString;
-import static com.spotify.apollo.Status.NOT_FOUND;
-import static com.spotify.apollo.Status.UNAUTHORIZED;
+import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static java.net.HttpURLConnection.HTTP_UNAUTHORIZED;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
+import static net.sourceforge.argparse4j.impl.Arguments.append;
 import static net.sourceforge.argparse4j.impl.Arguments.fileType;
 
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectReader;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-import com.spotify.apollo.Client;
-import com.spotify.apollo.core.Service;
-import com.spotify.apollo.core.Services;
-import com.spotify.apollo.environment.ApolloEnvironmentModule;
-import com.spotify.apollo.http.client.HttpClientModule;
+import com.spotify.logging.LoggingConfigurator;
+import com.spotify.logging.LoggingConfigurator.Level;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.ResourcesPayload;
 import com.spotify.styx.api.RunStateDataPayload;
+import com.spotify.styx.api.TestServiceAccountUsageAuthorizationResponse;
 import com.spotify.styx.cli.CliExitException.ExitStatus;
 import com.spotify.styx.cli.CliMain.CliContext.Output;
 import com.spotify.styx.client.ApiErrorException;
@@ -46,7 +49,9 @@ import com.spotify.styx.client.ClientErrorException;
 import com.spotify.styx.client.StyxClient;
 import com.spotify.styx.client.StyxClientFactory;
 import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowState;
@@ -57,6 +62,7 @@ import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -74,8 +80,10 @@ import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.inf.Argument;
 import net.sourceforge.argparse4j.inf.ArgumentAction;
+import net.sourceforge.argparse4j.inf.ArgumentGroup;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
+import net.sourceforge.argparse4j.inf.FeatureControl;
 import net.sourceforge.argparse4j.inf.Namespace;
 import net.sourceforge.argparse4j.inf.Subparser;
 import net.sourceforge.argparse4j.inf.Subparsers;
@@ -97,24 +105,24 @@ public final class CliMain {
   private final StyxCliParser parser;
   private final Namespace namespace;
   private final String apiHost;
-  private final Service cliService;
   private final CliOutput cliOutput;
   private final CliContext cliContext;
+  private final boolean debug;
   private StyxClient styxClient;
 
   private CliMain(
       StyxCliParser parser,
       Namespace namespace,
       String apiHost,
-      Service cliService,
       CliOutput cliOutput,
-      CliContext cliContext) {
+      CliContext cliContext,
+      boolean debug) {
     this.parser = Objects.requireNonNull(parser);
     this.namespace = Objects.requireNonNull(namespace);
     this.apiHost = Objects.requireNonNull(apiHost);
-    this.cliService = Objects.requireNonNull(cliService);
     this.cliOutput = Objects.requireNonNull(cliOutput);
     this.cliContext = Objects.requireNonNull(cliContext);
+    this.debug = debug;
   }
 
   public static void main(String... args) {
@@ -141,7 +149,7 @@ public final class CliMain {
 
     try {
       namespace = parser.parser.parseArgs(args.toArray(new String[0]));
-      apiHost = namespace.getString(parser.host.getDest());
+      apiHost = namespace.getString(parser.globalOptions.host.getDest());
       if (apiHost == null) {
         throw new ArgumentParserException("Styx API host not set", parser.parser);
       }
@@ -152,14 +160,8 @@ public final class CliMain {
       throw CliExitException.of(ExitStatus.ArgumentError);
     }
 
-    final Service cliService = Services.usingName("styx-cli")
-        .withEnvVarPrefix(ENV_VAR_PREFIX)
-        .withModule(ApolloEnvironmentModule.create())
-        .withModule(HttpClientModule.create())
-        .build();
-
-    final boolean plainOutput = namespace.getBoolean(parser.plain.getDest());
-    final boolean jsonOutput = namespace.getBoolean(parser.json.getDest());
+    final boolean plainOutput = Objects.equals(namespace.getBoolean(parser.globalOptions.plain.getDest()), true);
+    final boolean jsonOutput = Objects.equals(namespace.getBoolean(parser.globalOptions.json.getDest()), true);
     final CliOutput cliOutput;
     if (jsonOutput) {
       cliOutput = cliContext.output(Output.JSON);
@@ -169,15 +171,22 @@ public final class CliMain {
       cliOutput = cliContext.output(Output.PRETTY);
     }
 
-    new CliMain(parser, namespace, apiHost, cliService, cliOutput, cliContext).run();
+    final boolean debug = Objects.equals(namespace.getBoolean(parser.globalOptions.debug.getDest()), true);
+
+    if (debug) {
+      LoggingConfigurator.configureDefaults("styx-cli", Level.DEBUG);
+    } else {
+      LoggingConfigurator.configureNoLogging();
+    }
+
+    new CliMain(parser, namespace, apiHost, cliOutput, cliContext, debug).run();
   }
 
   private void run() {
     final Command command = namespace.get(COMMAND_DEST);
 
-    try (Service.Instance instance = cliService.start()) {
-      final Client client = ApolloEnvironmentModule.environment(instance).environment().client();
-      styxClient = cliContext.createClient(client, apiHost);
+    try {
+      styxClient = cliContext.createClient(apiHost);
 
       switch (command) {
         case LIST:
@@ -252,6 +261,9 @@ public final class CliMain {
         case WORKFLOW:
           final WorkflowCommand workflowCommand = namespace.get(SUBCOMMAND_DEST);
           switch (workflowCommand) {
+            case LIST:
+              workflowList();
+              break;
             case SHOW:
               workflowShow();
               break;
@@ -275,6 +287,20 @@ public final class CliMain {
           }
           break;
 
+        case AUTH:
+          final AuthCommand authCommand = namespace.get(SUBCOMMAND_DEST);
+          switch (authCommand) {
+            case TEST:
+              authTestServiceAccountUsage();
+              break;
+            default:
+              // parsing unknown command will fail so this would only catch non-exhaustive switches
+              throw new ArgumentParserException(
+                  String.format("Unrecognized command: %s %s", command, authCommand),
+                  parser.parser);
+          }
+          break;
+
         default:
           // parsing unknown command will fail so this would only catch non-exhaustive switches
           throw new ArgumentParserException("Unrecognized command: " + command, parser.parser);
@@ -284,12 +310,16 @@ public final class CliMain {
       throw CliExitException.of(ExitStatus.ArgumentError);
     } catch (ExecutionException e) {
       final Throwable cause = e.getCause();
+      if (debug) {
+        cliOutput.printError(getStackTraceAsString(cause));
+      }
       if (cause instanceof ApiErrorException) {
         final ApiErrorException apiError = (ApiErrorException) cause;
-        if (apiError.getCode() == UNAUTHORIZED.code()) {
+        if (apiError.getCode() == HTTP_UNAUTHORIZED) {
           if (!apiError.isAuthenticated()) {
             cliOutput.printError(
-                "API error: Unauthorized: Please set up Application Default Credentials or set the "
+                "API error: Unauthorized: " + apiError.getMessage() + "\n"
+                    + "Please set up Application Default Credentials or set the "
                     + "GOOGLE_APPLICATION_CREDENTIALS env var to point to a file defining the "
                     + "credentials.\n"
                     + "\n"
@@ -297,15 +327,17 @@ public final class CliMain {
                     + "\n"
                     + "\t$ gcloud auth application-default login");
           } else {
-            cliOutput.printError("API error: Unauthorized");
+            cliOutput.printError("API error: Unauthorized: " + apiError.getMessage());
           }
           throw CliExitException.of(ExitStatus.AuthError);
         } else {
-          cliOutput.printError("API error: " + cause.getMessage());
+          cliOutput.printError("API error: " + apiError.getMessage());
           throw CliExitException.of(ExitStatus.ApiError);
         }
       } else if (cause instanceof ClientErrorException) {
-        cliOutput.printError("Client error: " + cause.getMessage());
+        final Throwable rootCause = Throwables.getRootCause(cause);
+        cliOutput.printError("Client error: " + cause.getMessage() + ": "
+            + rootCause.getClass().getSimpleName() + ": " + rootCause.getMessage());
         throw CliExitException.of(ExitStatus.ClientError);
       } else {
         cliOutput.printError(getStackTraceAsString(cause));
@@ -316,6 +348,8 @@ public final class CliMain {
     } catch (Exception e) {
       cliOutput.printError(getStackTraceAsString(e));
       throw CliExitException.of(ExitStatus.UnknownError);
+    } finally {
+      styxClient.close();
     }
   }
 
@@ -436,7 +470,7 @@ public final class CliMain {
     final Throwable cause = e.getCause();
     if (cause instanceof ApiErrorException) {
       final ApiErrorException apiError = (ApiErrorException) cause;
-      if (apiError.getCode() == NOT_FOUND.code()) {
+      if (apiError.getCode() == HTTP_NOT_FOUND) {
         cliOutput.printMessage("Workflow " + workflow + " in component " + component + " not found.");
       } else {
         throw e;
@@ -451,11 +485,25 @@ public final class CliMain {
     final String workflow = namespace.getString(parser.backfillCreateWorkflow.getDest());
     final String start = namespace.getString(parser.backfillCreateStart.getDest());
     final String end = namespace.getString(parser.backfillCreateEnd.getDest());
+    final boolean reverse = namespace.getBoolean(parser.backfillCreateReverse.getDest());
     final int concurrency = namespace.getInt(parser.backfillCreateConcurrency.getDest());
     final String description = namespace.getString(parser.backfillCreateDescription.getDest());
-    final Backfill backfill =
-        styxClient.backfillCreate(component, workflow, start, end, concurrency, description)
-            .toCompletableFuture().get();
+    final TriggerParameters triggerParameters = TriggerParameters.builder()
+        .env(parser.getEnvVars(namespace, parser.backfillCreateEnv))
+        .build();
+    final BackfillInput configuration = BackfillInput.newBuilder()
+        .component(component)
+        .workflow(workflow)
+        .start(Instant.parse(start))
+        .end(Instant.parse(end))
+        .reverse(reverse)
+        .concurrency(concurrency)
+        .description(description)
+        .triggerParameters(triggerParameters)
+        .build();
+    final boolean allowFuture = namespace.getBoolean(parser.backfillCreateAllowFuture.getDest());
+    final Backfill backfill = styxClient.backfillCreate(configuration, allowFuture)
+        .toCompletableFuture().get();
     cliOutput.printBackfill(backfill, true);
   }
 
@@ -546,6 +594,10 @@ public final class CliMain {
     cliOutput.printWorkflow(tuple._1, tuple._2);
   }
 
+  private void workflowList() throws ExecutionException, InterruptedException {
+    cliOutput.printWorkflows(styxClient.workflows().toCompletableFuture().get());
+  }
+
   private void activeStates() throws ExecutionException, InterruptedException {
     final Optional<String> component =
         Optional.ofNullable(namespace.getString(parser.listComponent.getDest()));
@@ -570,8 +622,13 @@ public final class CliMain {
     final String component = namespace.getString(COMPONENT_DEST);
     final String workflow = namespace.getString(WORKFLOW_DEST);
     final String parameter = namespace.getString(PARAMETER_DEST);
+    final TriggerParameters parameters = TriggerParameters.builder()
+        .env(parser.getEnvVars(namespace, parser.triggerEnv))
+        .build();
+    final boolean allowFuture = namespace.getBoolean(parser.triggerAllowFuture.getDest());
 
-    styxClient.triggerWorkflowInstance(component, workflow, parameter).toCompletableFuture().get();
+    styxClient.triggerWorkflowInstance(component, workflow, parameter, parameters, allowFuture)
+        .toCompletableFuture().get();
     cliOutput.printMessage("Triggered! Use `styx ls -c " + component
                            + "` to check active workflow instances.");
   }
@@ -596,7 +653,32 @@ public final class CliMain {
                            + "` to check active workflow instances.");
   }
 
-  private static class StyxCliParser {
+  private void authTestServiceAccountUsage() throws ExecutionException, InterruptedException {
+    final String serviceAccount = namespace.getString(parser.authServiceAccount.getDest());
+    final String principal = namespace.getString(parser.authPrincipal.getDest());
+
+    final TestServiceAccountUsageAuthorizationResponse response = styxClient.testServiceAccountUsageAuthorization(
+        serviceAccount, principal).toCompletableFuture().get();
+
+    if (response.authorized()) {
+      cliOutput.printMessage("The principal " + principal + " is authorized to use the service account "
+                             + serviceAccount + ". " + response.message().orElse(""));
+    } else {
+      cliOutput.printMessage("The principal " + principal + " is not authorized to use the service account "
+                             + serviceAccount + ". " + response.message().orElse(""));
+      throw CliExitException.of(ExitStatus.UnknownError);
+    }
+  }
+
+  private static class ParserBase {
+    final CliContext cliContext;
+
+    protected ParserBase(CliContext cliContext) {
+      this.cliContext = cliContext;
+    }
+  }
+
+  private static class StyxCliParser extends ParserBase {
 
     final ArgumentParser parser = ArgumentParsers.newArgumentParser("styx")
         .description("Styx CLI")
@@ -607,10 +689,10 @@ public final class CliMain {
     final Subparsers subCommands = parser.addSubparsers().title("commands").metavar(" ");
 
     final Subparsers backfillParser =
-        Command.BACKFILL.parser(subCommands)
+        Command.BACKFILL.parser(subCommands, cliContext)
             .addSubparsers().title("commands").metavar(" ");
 
-    final Subparser backfillShow = BackfillCommand.SHOW.parser(backfillParser);
+    final Subparser backfillShow = BackfillCommand.SHOW.parser(backfillParser, cliContext);
     final Argument backfillShowId =
         backfillShow.addArgument("backfill").help("Backfill ID");
     final Argument backfillShowNoTruncate = backfillShow
@@ -619,18 +701,18 @@ public final class CliMain {
         .action(Arguments.storeTrue())
         .help("don't truncate output (only for pretty printing)");
 
-    final Subparser backfillEdit = BackfillCommand.EDIT.parser(backfillParser);
+    final Subparser backfillEdit = BackfillCommand.EDIT.parser(backfillParser, cliContext);
     final Argument backfillEditId =
         backfillEdit.addArgument("backfill").help("Backfill ID");
     final Argument backfillEditConcurrency =
         backfillEdit.addArgument("--concurrency").help("set the concurrency value for the backfill")
             .type(Integer.class);
 
-    final Subparser backfillHalt = BackfillCommand.HALT.parser(backfillParser);
+    final Subparser backfillHalt = BackfillCommand.HALT.parser(backfillParser, cliContext);
     final Argument backfillHaltId =
         backfillHalt.addArgument("backfill").help("Backfill ID");
 
-    final Subparser backfillList = BackfillCommand.LIST.parser(backfillParser);
+    final Subparser backfillList = BackfillCommand.LIST.parser(backfillParser, cliContext);
     final Argument backfillListWorkflow =
         backfillList.addArgument("-w", "--workflow").help("only show backfills for WORKFLOW");
     final Argument backfillListComponent =
@@ -646,7 +728,7 @@ public final class CliMain {
             .action(Arguments.storeTrue())
             .help("don't truncate output (only for pretty printing)");
 
-    final Subparser backfillCreate = BackfillCommand.CREATE.parser(backfillParser);
+    final Subparser backfillCreate = BackfillCommand.CREATE.parser(backfillParser, cliContext);
     final Argument backfillCreateComponent =
         backfillCreate.addArgument("component").help("Component ID");
     final Argument backfillCreateWorkflow =
@@ -655,21 +737,31 @@ public final class CliMain {
         backfillCreate.addArgument("start").help("Start date/datehour (inclusive)").action(partitionAction);
     final Argument backfillCreateEnd =
         backfillCreate.addArgument("end").help("End date/datehour (exclusive)").action(partitionAction);
+    final Argument backfillCreateReverse =
+        backfillCreate.addArgument("--reverse")
+            .setDefault(false)
+            .help("Run backfill in reverse, from end (exclusive) to beginning (inclusive)")
+            .action(Arguments.storeTrue());
     final Argument backfillCreateConcurrency =
         backfillCreate.addArgument("concurrency").help("The number of jobs to run in parallel").type(Integer.class);
     final Argument backfillCreateDescription =
         backfillCreate.addArgument("-d", "--description")
             .help("a description of the backfill");
+    final Argument backfillCreateEnv = addEnvVarArgument(backfillCreate, "-e", "--env");
+    final Argument backfillCreateAllowFuture = addEnvVarArgument(backfillCreate, "--allow-future")
+        .help("Allow backfilling future partitions")
+        .setDefault(false)
+        .action(Arguments.storeTrue());
 
     final Subparsers resourceParser =
-        Command.RESOURCE.parser(subCommands)
+        Command.RESOURCE.parser(subCommands, cliContext)
             .addSubparsers().title("commands").metavar(" ");
 
-    final Subparser resourceShow = ResourceCommand.SHOW.parser(resourceParser);
+    final Subparser resourceShow = ResourceCommand.SHOW.parser(resourceParser, cliContext);
     final Argument resourceShowId =
         resourceShow.addArgument("id").help("Resource ID");
 
-    final Subparser resourceEdit = ResourceCommand.EDIT.parser(resourceParser);
+    final Subparser resourceEdit = ResourceCommand.EDIT.parser(resourceParser, cliContext);
     final Argument resourceEditId =
         resourceEdit.addArgument("id").help("Resource ID");
     final Argument resourceEditConcurrency =
@@ -677,9 +769,9 @@ public final class CliMain {
             .help("set the concurrency value for the resource")
             .type(Integer.class);
 
-    final Subparser resourceList = ResourceCommand.LIST.parser(resourceParser);
+    final Subparser resourceList = ResourceCommand.LIST.parser(resourceParser, cliContext);
 
-    final Subparser resourceCreate = ResourceCommand.CREATE.parser(resourceParser);
+    final Subparser resourceCreate = ResourceCommand.CREATE.parser(resourceParser, cliContext);
     final Argument resourceCreateId =
         resourceCreate.addArgument("id").help("Resource ID");
     final Argument resourceCreateConcurrency =
@@ -688,16 +780,18 @@ public final class CliMain {
             .type(Integer.class);
 
     final Subparsers workflowParser =
-        Command.WORKFLOW.parser(subCommands)
+        Command.WORKFLOW.parser(subCommands, cliContext)
             .addSubparsers().title("commands").metavar(" ");
 
-    final Subparser workflowShow = WorkflowCommand.SHOW.parser(workflowParser);
+    final Subparser workflowList = WorkflowCommand.LIST.parser(workflowParser, cliContext);
+
+    final Subparser workflowShow = WorkflowCommand.SHOW.parser(workflowParser, cliContext);
     final Argument workflowShowComponentId =
         workflowShow.addArgument("component").help("Component ID");
     final Argument workflowShowWorkflowId =
         workflowShow.addArgument("workflow").help("Workflow ID");
 
-    final Subparser workflowCreate = WorkflowCommand.CREATE.parser(workflowParser);
+    final Subparser workflowCreate = WorkflowCommand.CREATE.parser(workflowParser, cliContext);
     final Argument workflowCreateComponentId =
         workflowCreate.addArgument("component").help("Component ID");
     final Argument workflowCreateFile =
@@ -705,7 +799,7 @@ public final class CliMain {
             .type(fileType().acceptSystemIn().verifyCanRead())
             .help("Workflow configuration file");
 
-    final Subparser workflowDelete = WorkflowCommand.DELETE.parser(workflowParser);
+    final Subparser workflowDelete = WorkflowCommand.DELETE.parser(workflowParser, cliContext);
     final Argument workflowDeleteComponentId =
         workflowDelete.addArgument("component").help("Component ID");
     final Argument workflowDeleteWorkflowId =
@@ -716,45 +810,53 @@ public final class CliMain {
             .setDefault(false)
             .action(Arguments.storeTrue());
 
-    final Subparser workflowEnable = WorkflowCommand.ENABLE.parser(workflowParser);
+    final Subparser workflowEnable = WorkflowCommand.ENABLE.parser(workflowParser, cliContext);
     final Argument workflowEnableComponentId =
         workflowEnable.addArgument("component").help("Component ID");
     final Argument workflowEnableWorkflowId =
         workflowEnable.addArgument("workflow").nargs("+").help("Workflow IDs");
 
-    final Subparser workflowDisable = WorkflowCommand.DISABLE.parser(workflowParser);
+    final Subparser workflowDisable = WorkflowCommand.DISABLE.parser(workflowParser, cliContext);
     final Argument workflowDisableComponentId =
         workflowDisable.addArgument("component").help("Component ID");
     final Argument workflowDisableWorkflowId =
         workflowDisable.addArgument("workflow").nargs("+").help("Workflow IDs");
 
-    final Subparser list = Command.LIST.parser(subCommands);
+    final Subparser list = Command.LIST.parser(subCommands, cliContext);
     final Argument listComponent = list.addArgument("-c", "--component")
         .help("only show instances for COMPONENT");
 
-    final Subparser events = addWorkflowInstanceArguments(Command.EVENTS.parser(subCommands));
-    final Subparser trigger = addWorkflowInstanceArguments(Command.TRIGGER.parser(subCommands));
-    final Subparser halt = addWorkflowInstanceArguments(Command.HALT.parser(subCommands));
-    final Subparser retry = addWorkflowInstanceArguments(Command.RETRY.parser(subCommands));
-
-    final Argument host = parser.addArgument("-H", "--host")
-        .help("Styx API host (can also be set with environment variable " + ENV_VAR_PREFIX + "_HOST)")
-        .action(Arguments.store());
-
-    final Argument json = parser.addArgument("--json")
-        .help("json output")
+    final Subparser events = addWorkflowInstanceArguments(Command.EVENTS.parser(subCommands, cliContext));
+    final Subparser trigger = addWorkflowInstanceArguments(Command.TRIGGER.parser(subCommands, cliContext));
+    final Argument triggerEnv = addEnvVarArgument(trigger, "-e", "--env");
+    final Argument triggerAllowFuture = addEnvVarArgument(trigger, "--allow-future")
+        .help("Allow triggering future partition")
         .setDefault(false)
         .action(Arguments.storeTrue());
 
-    final Argument plain = parser.addArgument("-p", "--plain")
-        .help("plain output")
-        .setDefault(false)
-        .action(Arguments.storeTrue());
+    final Subparser halt = addWorkflowInstanceArguments(Command.HALT.parser(subCommands, cliContext));
+    final Subparser retry = addWorkflowInstanceArguments(Command.RETRY.parser(subCommands, cliContext));
+
+    final Subparsers authParser =
+        Command.AUTH.parser(subCommands, cliContext)
+            .addSubparsers().title("commands").metavar(" ");
+
+    final Subparser testServiceAccountUsage = AuthCommand.TEST.parser(authParser, cliContext);
+    final Argument authServiceAccount = testServiceAccountUsage
+        .addArgument("-a", "--service-account")
+        .required(true)
+        .help("The service account to test usage authorization against");
+    final Argument authPrincipal = testServiceAccountUsage
+        .addArgument("-u", "--principal")
+        .required(true)
+        .help("The principal (user) to test for service account usage authorization");
+
+    final GlobalOptions globalOptions = GlobalOptions.add(parser, cliContext, false);
 
     final Argument version = parser.addArgument("--version").action(Arguments.version());
 
     private StyxCliParser(CliContext cliContext) {
-      host.setDefault(cliContext.env().get(ENV_VAR_PREFIX + "_HOST"));
+      super(cliContext);
     }
 
     private static Subparser addWorkflowInstanceArguments(Subparser subparser) {
@@ -766,17 +868,34 @@ public final class CliMain {
           .help("Parameter identifying the workflow instance, e.g. '2016-09-14' or '2016-09-14T17'");
       return subparser;
     }
+
+    private Argument addEnvVarArgument(ArgumentParser parser, String... flags) {
+      return parser.addArgument(flags).type(String.class)
+          .action(append())
+          .help("Environment variables");
+    }
+
+    private Map<String, String> getEnvVars(Namespace namespace, Argument argument) {
+      final List<String> args = namespace.getList(argument.getDest());
+      return args == null
+          ? Collections.emptyMap()
+          : args.stream()
+              .map(s -> Splitter.on('=').splitToList(s))
+              .peek(kv -> Preconditions.checkArgument(kv.size() == 2))
+              .collect(toMap(kv -> kv.get(0), kv -> kv.get(1)));
+    }
   }
 
   private enum Command {
     LIST("ls", "List active workflow instances"),
     EVENTS("e", "List events for a workflow instance"),
     HALT("h", "Halt a workflow instance"),
-    TRIGGER("t", "Trigger a completed workflow instance"),
+    TRIGGER("t", "Trigger a workflow instance, fail if the instance is already active"),
     RETRY("r", "Retry a workflow instance that is in a waiting state"),
     RESOURCE(null, "Commands related to resources"),
     BACKFILL(null, "Commands related to backfills"),
-    WORKFLOW(null, "Commands related to workflows");
+    WORKFLOW(null, "Commands related to workflows"),
+    AUTH(null, "Commands related to authentication and authorization");
 
     private final String alias;
     private final String description;
@@ -786,9 +905,8 @@ public final class CliMain {
       this.description = description;
     }
 
-    public Subparser parser(Subparsers subCommands) {
-      Subparser subparser = subCommands
-          .addParser(name().toLowerCase())
+    public Subparser parser(Subparsers subCommands, CliContext cliContext) {
+      final Subparser subparser = addSubparser(subCommands, name().toLowerCase(), cliContext)
           .setDefault(COMMAND_DEST, this)
           .description(description)
           .help(description);
@@ -798,6 +916,47 @@ public final class CliMain {
       }
 
       return subparser;
+    }
+
+  }
+
+  private static Subparser addSubparser(Subparsers subCommands, String name, CliContext cliContext) {
+    final Subparser parser = subCommands.addParser(name);
+    GlobalOptions.add(parser, cliContext, true);
+    return parser;
+  }
+
+  private static class GlobalOptions {
+
+    final Argument host;
+    final Argument json;
+    final Argument plain;
+    final Argument debug;
+    final ArgumentGroup options;
+
+    private GlobalOptions(ArgumentParser parser, CliContext cliContext, boolean subCommand) {
+      this.options = parser.addArgumentGroup("global options");
+      this.host = options.addArgument("-H", "--host")
+          .help("Styx API host (can also be set with environment variable " + ENV_VAR_PREFIX + "_HOST)")
+          .setDefault(subCommand ? FeatureControl.SUPPRESS : null)
+          .setDefault(cliContext.env().get(ENV_VAR_PREFIX + "_HOST"))
+          .action(Arguments.store());
+      this.json = options.addArgument("--json")
+          .help("json output")
+          .setDefault(subCommand ? FeatureControl.SUPPRESS : null)
+          .action(Arguments.storeTrue());
+      this.plain = options.addArgument("-p", "--plain")
+          .help("plain output")
+          .setDefault(subCommand ? FeatureControl.SUPPRESS : null)
+          .action(Arguments.storeTrue());
+      this.debug = options.addArgument("--debug")
+          .help("debug output")
+          .setDefault(subCommand ? FeatureControl.SUPPRESS : null)
+          .action(Arguments.storeTrue());
+    }
+
+    static GlobalOptions add(ArgumentParser parser, CliContext cliContext, boolean subCommand) {
+      return new GlobalOptions(parser, cliContext, subCommand);
     }
   }
 
@@ -816,9 +975,8 @@ public final class CliMain {
       this.description = description;
     }
 
-    public Subparser parser(Subparsers subCommands) {
-      final Subparser subparser = subCommands
-          .addParser(name().toLowerCase())
+    public Subparser parser(Subparsers subCommands, CliContext cliContext) {
+      final Subparser subparser = addSubparser(subCommands, name().toLowerCase(), cliContext)
           .setDefault(SUBCOMMAND_DEST, this)
           .description(description)
           .help(description);
@@ -845,9 +1003,8 @@ public final class CliMain {
       this.description = description;
     }
 
-    public Subparser parser(Subparsers subCommands) {
-      final Subparser subparser = subCommands
-          .addParser(name().toLowerCase())
+    public Subparser parser(Subparsers subCommands, CliContext cliContext) {
+      final Subparser subparser = addSubparser(subCommands, name().toLowerCase(), cliContext)
           .setDefault(SUBCOMMAND_DEST, this)
           .description(description)
           .help(description);
@@ -861,6 +1018,7 @@ public final class CliMain {
   }
 
   private enum WorkflowCommand {
+    LIST("ls", "List all workflows"),
     SHOW("get", "Show info about a specific workflow"),
     CREATE("", "Create or update workflow(s)"),
     DELETE("", "Delete workflow(s)"),
@@ -875,9 +1033,33 @@ public final class CliMain {
       this.description = description;
     }
 
-    public Subparser parser(Subparsers subCommands) {
-      final Subparser subparser = subCommands
-          .addParser(name().toLowerCase())
+    public Subparser parser(Subparsers subCommands, CliContext cliContext) {
+      final Subparser subparser = addSubparser(subCommands, name().toLowerCase(), cliContext)
+          .setDefault(SUBCOMMAND_DEST, this)
+          .description(description)
+          .help(description);
+
+      if (alias != null && !alias.isEmpty()) {
+        subparser.aliases(alias);
+      }
+
+      return subparser;
+    }
+  }
+
+  private enum AuthCommand {
+    TEST("", "Test authorization");
+
+    private final String alias;
+    private final String description;
+
+    AuthCommand(String alias, String description) {
+      this.alias = alias;
+      this.description = description;
+    }
+
+    public Subparser parser(Subparsers subCommands, CliContext cliContext) {
+      final Subparser subparser = addSubparser(subCommands, name().toLowerCase(), cliContext)
           .setDefault(SUBCOMMAND_DEST, this)
           .description(description)
           .help(description);
@@ -936,7 +1118,7 @@ public final class CliMain {
 
     Map<String, String> env();
 
-    StyxClient createClient(Client client, String host);
+    StyxClient createClient(String host);
 
     boolean hasConsole();
 
@@ -946,8 +1128,8 @@ public final class CliMain {
 
     CliContext DEFAULT = new CliContext() {
       @Override
-      public StyxClient createClient(Client client, String host) {
-        return StyxClientFactory.create(client, host);
+      public StyxClient createClient(String host) {
+        return StyxClientFactory.create(host);
       }
 
       @Override
@@ -984,7 +1166,7 @@ public final class CliMain {
 
       @Override
       public WorkflowValidator workflowValidator() {
-        return new WorkflowValidator(new DockerImageValidator());
+        return WorkflowValidator.newBuilder(new DockerImageValidator()).build();
       }
     };
   }

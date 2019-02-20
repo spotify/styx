@@ -30,6 +30,7 @@ import static org.mockito.Mockito.verify;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
@@ -43,7 +44,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class ShardedCounterSnapshotFactoryTest {
@@ -82,8 +83,9 @@ public class ShardedCounterSnapshotFactoryTest {
   }
 
   @Before
-  public void setUp() {
+  public void setUp() throws IOException {
     counterSnapshotFactory = spy(new ShardedCounterSnapshotFactory(storage));
+    storage.storeResource(Resource.create(RESOURCE_ID, 10L));
   }
 
   @After
@@ -92,7 +94,7 @@ public class ShardedCounterSnapshotFactoryTest {
   }
 
   @Test
-  public void testCreate() {
+  public void testCreate() throws IOException {
     counterSnapshotFactory.create(RESOURCE_ID);
     assertEquals(128, storage.shardsForCounter(RESOURCE_ID).size());
   }
@@ -103,5 +105,4 @@ public class ShardedCounterSnapshotFactoryTest {
     verify(storage, times(NUM_SHARDS / TRANSACTION_GROUP_SIZE + 1)).runInTransaction(any());
     assertEquals(128, storage.shardsForCounter(RESOURCE_ID).size());
   }
-
 }

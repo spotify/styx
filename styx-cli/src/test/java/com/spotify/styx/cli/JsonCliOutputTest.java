@@ -26,20 +26,25 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
+import com.spotify.styx.cli.JsonCliOutput.WorkflowWithState;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.state.StateData;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -48,7 +53,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class JsonCliOutputTest {
-  
+
   private static final Backfill BACKFILL = Backfill.newBuilder()
       .id("backfill-2")
       .start(Instant.parse("2017-01-01T00:00:00Z"))
@@ -58,20 +63,23 @@ public class JsonCliOutputTest {
       .description("Description")
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
       .schedule(Schedule.DAYS)
+      .reverse(true)
       .build();
-  
-  private static final String EXPECTED_OUTPUT = "{\"id\":\"backfill-2\"," 
-                                               + "\"start\":\"2017-01-01T00:00:00Z\"," 
-                                               + "\"end\":\"2017-01-02T00:00:00Z\"," 
-                                               + "\"workflow_id\":" 
-                                               + "{\"component_id\":\"component\"," 
-                                               + "\"id\":\"workflow2\"}," 
-                                               + "\"concurrency\":2," 
-                                               + "\"description\":\"Description\"," 
-                                               + "\"next_trigger\":\"2017-01-01T00:00:00Z\"," 
-                                               + "\"schedule\":\"days\"," 
-                                               + "\"all_triggered\":false," 
-                                               + "\"halted\":false}";
+
+  private static final String EXPECTED_OUTPUT = "{\"id\":\"backfill-2\","
+                                               + "\"start\":\"2017-01-01T00:00:00Z\","
+                                               + "\"end\":\"2017-01-02T00:00:00Z\","
+                                               + "\"workflow_id\":"
+                                               + "{\"component_id\":\"component\","
+                                               + "\"id\":\"workflow2\"},"
+                                               + "\"concurrency\":2,"
+                                               + "\"description\":\"Description\","
+                                               + "\"next_trigger\":\"2017-01-01T00:00:00Z\","
+                                               + "\"schedule\":\"days\","
+                                               + "\"all_triggered\":false,"
+                                               + "\"halted\":false,"
+                                               + "\"reverse\":true,"
+                                               + "\"trigger_parameters\":null}";
 
   private static final String EXPECTED_OUTPUT_WITH_STATUS = "{\"backfill\":"
                                                             + EXPECTED_OUTPUT
@@ -103,9 +111,7 @@ public class JsonCliOutputTest {
 
   @Test
   public void shouldPrintBackfills() {
-    cliOutput.printBackfills(
-        ImmutableList.of(BackfillPayload.create(BACKFILL, Optional.empty())),
-        true);
+    cliOutput.printBackfills(List.of(BackfillPayload.create(BACKFILL, Optional.empty())), true);
     assertEquals("[" + EXPECTED_OUTPUT_WITH_STATUS + "]\n", outContent.toString());
   }
 
@@ -125,12 +131,54 @@ public class JsonCliOutputTest {
         StateData.newBuilder().executionId("foo-e").build());
     final RunStateData barRunStateData = RunStateData.create(barWorkflowInstance, "RUNNING",
         StateData.newBuilder().executionId("bar-e").build());
-    cliOutput.printStates(RunStateDataPayload.create(ImmutableList.of(fooRunStateData, barRunStateData)));
-    final Map<String, List<RunStateData>> expectedOutput = ImmutableMap.of(
-        fooWorkflowId.toKey(), ImmutableList.of(fooRunStateData),
-        barWorkflowId.toKey(), ImmutableList.of(barRunStateData));
+    cliOutput.printStates(RunStateDataPayload.create(List.of(fooRunStateData, barRunStateData)));
+    final Map<String, List<RunStateData>> expectedOutput = Map.of(
+        fooWorkflowId.toKey(), List.of(fooRunStateData),
+        barWorkflowId.toKey(), List.of(barRunStateData));
     final Map<String, List<RunStateData>> output = OBJECT_MAPPER.readValue(outContent.toString(),
         new TypeReference<Map<String, List<RunStateData>>>() { });
     assertThat(output, is(expectedOutput));
   }
+
+  @Test
+  public void shouldPrintWorkflows() throws IOException {
+    final Workflow foo1 = Workflow.create("foo1", WorkflowConfiguration.builder()
+        .id("bar1")
+        .schedule(Schedule.DAYS)
+        .build());
+    final Workflow foo2 = Workflow.create("foo2", WorkflowConfiguration.builder()
+        .id("bar2")
+        .schedule(Schedule.DAYS)
+        .build());
+    final List<Workflow> workflows = List.of(foo1, foo2);
+    cliOutput.printWorkflows(workflows);
+    assertThat(OBJECT_MAPPER.readValue(outContent.toString(), new TypeReference<List<Workflow>>() { }),
+        is(workflows));
+  }
+
+  @Test
+  public void shouldPrintWorkflow() throws IOException {
+    final Workflow workflow = Workflow.create("foo1", WorkflowConfiguration.builder()
+        .id("bar1")
+        .schedule(Schedule.DAYS)
+        .offset("6h")
+        .dockerImage("foo/bar:baz")
+        .dockerArgs(List.of("foo", "the", "bar"))
+        .dockerTerminationLogging(true)
+        .secret(Secret.create("secret-foo", "/foo-secret"))
+        .serviceAccount("foo@bar.baz")
+        .resources("r1", "r2")
+        .env("FOO", "foo", "BAR", "bar")
+        .commitSha("deadbeef")
+        .build());
+    final WorkflowState state = WorkflowState.builder()
+        .enabled(true)
+        .nextNaturalTrigger(OffsetDateTime.of(2018, 1, 2, 3, 4, 5, 6, ZoneOffset.UTC).toInstant())
+        .nextNaturalOffsetTrigger(OffsetDateTime.of(2018, 1, 2, 9, 4, 5, 6, ZoneOffset.UTC).toInstant())
+        .build();
+    cliOutput.printWorkflow(workflow, state);
+    assertThat(OBJECT_MAPPER.readValue(outContent.toString(), WorkflowWithState.class),
+        is(WorkflowWithState.of(workflow, state)));
+  }
+
 }

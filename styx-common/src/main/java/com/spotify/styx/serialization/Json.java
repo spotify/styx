@@ -21,11 +21,14 @@
 package com.spotify.styx.serialization;
 
 import static com.fasterxml.jackson.databind.DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY;
+import static com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES;
 import static com.fasterxml.jackson.databind.PropertyNamingStrategy.SNAKE_CASE;
+import static com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS;
 import static com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -55,6 +58,7 @@ public final class Json {
       .enable(ACCEPT_SINGLE_VALUE_AS_ARRAY)
       .disable(WRITE_DATES_AS_TIMESTAMPS)
       .registerModule(ADT_MODULE)
+      .disable(FAIL_ON_UNKNOWN_PROPERTIES)
       .registerModule(new JavaTimeModule())
       .registerModule(new Jdk8Module())
       .registerModule(new AutoMatterModule());
@@ -63,6 +67,7 @@ public final class Json {
       .setPropertyNamingStrategy(SNAKE_CASE)
       .enable(ACCEPT_SINGLE_VALUE_AS_ARRAY)
       .disable(WRITE_DATES_AS_TIMESTAMPS)
+      .disable(FAIL_ON_UNKNOWN_PROPERTIES)
       .registerModule(ADT_MODULE)
       .registerModule(new Jdk8Module())
       .registerModule(new JavaTimeModule())
@@ -86,5 +91,14 @@ public final class Json {
 
   public static Trigger deserializeTrigger(ByteString json) throws IOException {
     return OBJECT_MAPPER.readValue(json.toByteArray(), Trigger.class);
+  }
+
+  public static String deterministicStringUnchecked(Object value) {
+    final ObjectWriter writer = Json.OBJECT_MAPPER.writer().with(ORDER_MAP_ENTRIES_BY_KEYS);
+    try {
+      return writer.writeValueAsString(value);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
   }
 }

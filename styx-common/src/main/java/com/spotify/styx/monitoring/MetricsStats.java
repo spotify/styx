@@ -23,12 +23,14 @@ package com.spotify.styx.monitoring;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
+import com.codahale.metrics.Metric;
+import com.codahale.metrics.SlidingTimeWindowArrayReservoir;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.spotify.metrics.core.MetricId;
+import com.spotify.metrics.core.SemanticMetricBuilder;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.model.SequenceEvent;
-import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.Time;
@@ -41,6 +43,23 @@ import javaslang.Tuple2;
 import javaslang.Tuple3;
 
 public final class MetricsStats implements Stats {
+
+  /**
+   * A variant of {@link SemanticMetricBuilder#HISTOGRAMS} that uses {@link SlidingTimeWindowArrayReservoir}
+   * instead of {@link com.codahale.metrics.ExponentiallyDecayingReservoir}.
+   */
+  static final SemanticMetricBuilder<Histogram> HISTOGRAM = new SemanticMetricBuilder<Histogram>() {
+    @Override
+    public Histogram newMetric() {
+      // TODO: What time window do we want?
+      return new Histogram(new SlidingTimeWindowArrayReservoir(30, TimeUnit.SECONDS));
+    }
+
+    @Override
+    public boolean isInstance(Metric metric) {
+      return metric instanceof Histogram;
+    }
+  };
 
   private static final String UNIT_SECOND = "s";
   private static final String UNIT_MILLISECOND = "ms";
@@ -63,6 +82,9 @@ public final class MetricsStats implements Stats {
 
   static final MetricId RESOURCE_USED = BASE
       .tagged("what", "resource-used");
+
+  static final MetricId RESOURCE_DEMANDED = BASE
+      .tagged("what", "resource-demanded");
 
   static final MetricId EXIT_CODE_RATE = BASE
       .tagged("what", "exit-code-rate");
@@ -128,11 +150,27 @@ public final class MetricsStats implements Stats {
       .tagged("what", "workflow-consumer-error-rate")
       .tagged("unit", "error");
 
+  static final MetricId PUBLISHING_RATE = BASE
+      .tagged("what", "publishing-rate");
+
+  static final MetricId PUBLISHING_ERROR_RATE = BASE
+      .tagged("what", "publishing-error-rate")
+      .tagged("unit", "error");
+
   static final MetricId TICK_DURATION = BASE
       .tagged("what", "tick-duration")
       .tagged("unit", UNIT_MILLISECOND);
 
+  static final MetricId DATASTORE_OPERATION_RATE = BASE
+      .tagged("what", "datastore-operation-rate");
+
+  static final MetricId COUNTER_CACHE_RATE = BASE
+      .tagged("what", "counter-cache-rate");
+
   private static final String STATUS = "status";
+  private static final String COUNTER_CACHE_RESULT = "result";
+  private static final String COUNTER_CACHE_HIT = "hit";
+  private static final String COUNTER_CACHE_MISS = "miss";
 
   private final SemanticMetricRegistry registry;
   private final Time time;
@@ -144,18 +182,24 @@ public final class MetricsStats implements Stats {
   private final Meter terminationLogInvalid;
   private final Meter exitCodeMismatch;
   private final Meter workflowConsumerErrorMeter;
+  private final Meter counterCacheHitMeter;
+  private final Meter counterCacheMissMeter;
   private final ConcurrentMap<String, Histogram> storageOperationHistograms;
   private final ConcurrentMap<String, Meter> storageOperationMeters;
   private final ConcurrentMap<String, Histogram> dockerOperationHistograms;
   private final ConcurrentMap<String, Meter> dockerOperationMeters;
-  private final ConcurrentMap<Tuple2<WorkflowId, Integer>, Meter> exitCodePerWorkflowMeters;
+  private final ConcurrentMap<Integer, Meter> exitCodeMeters;
   private final ConcurrentMap<Tuple3<String, String, Integer>, Meter> dockerOperationErrorMeters;
   private final ConcurrentMap<String, Histogram> resourceConfiguredHistograms;
   private final ConcurrentMap<String, Histogram> resourceUsedHistograms;
+  private final ConcurrentMap<String, Histogram> resourceDemandedHistograms;
   private final ConcurrentMap<String, Meter> eventConsumerErrorMeters;
   private final ConcurrentMap<String, Meter> eventConsumerMeters;
+  private final ConcurrentMap<String, Meter> publishingMeters;
+  private final ConcurrentMap<String, Meter> publishingErrorMeters;
   private final ConcurrentMap<String, Meter> workflowConsumerMeters;
   private final ConcurrentMap<String, Histogram> tickHistograms;
+  private final ConcurrentMap<Tuple2<String, String>, Meter> datastoreOperationMeters;
 
   /**
    * Submission timestamps (nanotime) keyed on execution id.
@@ -168,25 +212,31 @@ public final class MetricsStats implements Stats {
     this.registry = Objects.requireNonNull(registry);
     this.time = Objects.requireNonNull(time, "time");
 
-    this.submitToRunning = registry.histogram(TRANSITIONING_DURATION);
+    this.submitToRunning = registry.getOrAdd(TRANSITIONING_DURATION, HISTOGRAM);
     this.pullImageErrorMeter = registry.meter(PULL_IMAGE_ERROR_RATE);
     this.naturalTrigger = registry.meter(NATURAL_TRIGGER_RATE);
     this.terminationLogMissing = registry.meter(TERMINATION_LOG_MISSING);
     this.terminationLogInvalid = registry.meter(TERMINATION_LOG_INVALID);
     this.exitCodeMismatch = registry.meter(EXIT_CODE_MISMATCH);
     this.workflowConsumerErrorMeter = registry.meter(WORKFLOW_CONSUMER_ERROR_RATE);
+    this.counterCacheHitMeter = registry.meter(COUNTER_CACHE_RATE.tagged(COUNTER_CACHE_RESULT, COUNTER_CACHE_HIT));
+    this.counterCacheMissMeter = registry.meter(COUNTER_CACHE_RATE.tagged(COUNTER_CACHE_RESULT, COUNTER_CACHE_MISS));
     this.storageOperationHistograms = new ConcurrentHashMap<>();
     this.storageOperationMeters = new ConcurrentHashMap<>();
     this.dockerOperationHistograms = new ConcurrentHashMap<>();
     this.dockerOperationMeters = new ConcurrentHashMap<>();
-    this.exitCodePerWorkflowMeters = new ConcurrentHashMap<>();
+    this.exitCodeMeters = new ConcurrentHashMap<>();
     this.dockerOperationErrorMeters = new ConcurrentHashMap<>();
     this.resourceConfiguredHistograms = new ConcurrentHashMap<>();
     this.resourceUsedHistograms = new ConcurrentHashMap<>();
+    this.resourceDemandedHistograms = new ConcurrentHashMap<>();
     this.eventConsumerErrorMeters = new ConcurrentHashMap<>();
     this.eventConsumerMeters = new ConcurrentHashMap<>();
+    this.publishingMeters = new ConcurrentHashMap<>();
+    this.publishingErrorMeters = new ConcurrentHashMap<>();
     this.workflowConsumerMeters = new ConcurrentHashMap<>();
     this.tickHistograms = new ConcurrentHashMap<>();
+    this.datastoreOperationMeters = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -244,8 +294,8 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
-  public void recordExitCode(WorkflowId workflowId, int exitCode) {
-    exitCodeMeter(workflowId, exitCode).mark();
+  public void recordExitCode(int exitCode) {
+    exitCodeMeter(exitCode).mark();
   }
 
   @Override
@@ -284,6 +334,11 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
+  public void recordResourceDemanded(String resource, long demanded) {
+    resourceDemandedHistogram(resource).update(demanded);
+  }
+
+  @Override
   public void recordEventConsumer(SequenceEvent event) {
     eventConsumerMeter(event).mark();
   }
@@ -304,17 +359,58 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
+  public void recordPublishing(String type, String state) {
+    publishingMeter(type, state).mark();
+  }
+
+  @Override
+  public void recordPublishingError(String type, String state) {
+    publishingErrorMeter(type, state).mark();
+  }
+
+  @Override
   public void recordTickDuration(String type, long duration) {
     tickHistogram(type).update(duration);
   }
 
-  private Meter exitCodeMeter(WorkflowId workflowId, int exitCode) {
-    return exitCodePerWorkflowMeters
-        .computeIfAbsent(Tuple.of(workflowId, exitCode), (tuple) ->
-            registry.meter(EXIT_CODE_RATE.tagged(
-                "component-id", tuple._1.componentId(),
-                "workflow-id", tuple._1.id(),
-                "exit-code", String.valueOf(tuple._2))));
+  @Override
+  public void recordDatastoreEntityReads(String kind, int n) {
+    recordDatastoreOperations("read", kind, n);
+  }
+
+  @Override
+  public void recordDatastoreEntityWrites(String kind, int n) {
+    recordDatastoreOperations("write", kind, n);
+  }
+
+  @Override
+  public void recordDatastoreEntityDeletes(String kind, int n) {
+    recordDatastoreOperations("delete", kind, n);
+  }
+
+  @Override
+  public void recordDatastoreQueries(String kind, int n) {
+    recordDatastoreOperations("query", kind, n);
+  }
+
+  @Override
+  public void recordCounterCacheHit() {
+    counterCacheHitMeter.mark();
+  }
+
+  @Override
+  public void recordCounterCacheMiss() {
+    counterCacheMissMeter.mark();
+  }
+
+  private void recordDatastoreOperations(String operation, String kind, int n) {
+    datastoreOperationMeter(operation, kind).mark(n);
+  }
+
+  private Meter exitCodeMeter(int exitCode) {
+    return exitCodeMeters
+        .computeIfAbsent(exitCode, ignore -> registry.meter(EXIT_CODE_RATE.tagged(
+            "exit-code", Integer.toString(exitCode))));
   }
 
   private Meter dockerOpErrorMeter(String operation, String type, int code) {
@@ -328,7 +424,7 @@ public final class MetricsStats implements Stats {
 
   private Histogram storageOpHistogram(String operation, String status) {
     return storageOperationHistograms.computeIfAbsent(
-        operation, (op) -> registry.histogram(STORAGE_DURATION.tagged(OPERATION, op, STATUS, status)));
+        operation, (op) -> registry.getOrAdd(STORAGE_DURATION.tagged(OPERATION, op, STATUS, status), HISTOGRAM));
   }
 
   private Meter storageOpMeter(String operation, String status) {
@@ -338,7 +434,7 @@ public final class MetricsStats implements Stats {
 
   private Histogram dockerOpHistogram(String operation, String status) {
     return dockerOperationHistograms.computeIfAbsent(
-        operation, (op) -> registry.histogram(DOCKER_DURATION.tagged(OPERATION, op, STATUS, status)));
+        operation, (op) -> registry.getOrAdd(DOCKER_DURATION.tagged(OPERATION, op, STATUS, status), HISTOGRAM));
   }
 
   private Meter dockerOpMeter(String operation, String status) {
@@ -348,12 +444,17 @@ public final class MetricsStats implements Stats {
 
   private Histogram resourceConfiguredHistogram(String resource) {
     return resourceConfiguredHistograms.computeIfAbsent(
-        resource, (op) -> registry.histogram(RESOURCE_CONFIGURED.tagged("resource", resource)));
+        resource, (op) -> registry.getOrAdd(RESOURCE_CONFIGURED.tagged("resource", resource), HISTOGRAM));
   }
 
   private Histogram resourceUsedHistogram(String resource) {
     return resourceUsedHistograms.computeIfAbsent(
-        resource, (op) -> registry.histogram(RESOURCE_USED.tagged("resource", resource)));
+        resource, (op) -> registry.getOrAdd(RESOURCE_USED.tagged("resource", resource), HISTOGRAM));
+  }
+
+  private Histogram resourceDemandedHistogram(String resource) {
+    return resourceDemandedHistograms.computeIfAbsent(
+        resource, (op) -> registry.getOrAdd(RESOURCE_DEMANDED.tagged("resource", resource), HISTOGRAM));
   }
 
   private Meter eventConsumerMeter(SequenceEvent sequenceEvent) {
@@ -373,8 +474,23 @@ public final class MetricsStats implements Stats {
         action, (op) -> registry.meter(WORKFLOW_CONSUMER_RATE.tagged("action", action)));
   }
 
+  private Meter publishingMeter(String type, String state) {
+    return publishingMeters.computeIfAbsent(
+        type, (op) -> registry.meter(PUBLISHING_RATE.tagged("type", type, "state", state)));
+  }
+
+  private Meter publishingErrorMeter(String type, String state) {
+    return publishingErrorMeters.computeIfAbsent(
+        type, (op) -> registry.meter(PUBLISHING_ERROR_RATE.tagged("type", type, "state", state)));
+  }
+
   private Histogram tickHistogram(String type) {
     return tickHistograms.computeIfAbsent(
-        type, (op) -> registry.histogram(TICK_DURATION.tagged("type", type)));
+        type, (op) -> registry.getOrAdd(TICK_DURATION.tagged("type", type), HISTOGRAM));
+  }
+
+  private Meter datastoreOperationMeter(String operation, String kind) {
+    return datastoreOperationMeters.computeIfAbsent(Tuple.of(operation, kind),
+        t -> registry.meter(DATASTORE_OPERATION_RATE.tagged("operation", operation, "kind", kind)));
   }
 }

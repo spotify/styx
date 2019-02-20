@@ -28,13 +28,21 @@ import com.cronutils.model.CronType;
 import com.cronutils.model.definition.CronDefinition;
 import com.cronutils.model.time.ExecutionTime;
 import com.cronutils.parser.CronParser;
+import com.google.common.base.Preconditions;
 import com.spotify.styx.model.Schedule;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.Period;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
+import java.time.temporal.UnsupportedTemporalTypeException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Static utility functions for manipulating time based on {@link Schedule} and offsets.
@@ -46,6 +54,9 @@ public class TimeUtil {
   private static final String WEEKLY_CRON = "0 0 * * MON";
   private static final String MONTHLY_CRON = "0 0 1 * *";
   private static final String YEARLY_CRON = "0 0 1 1 *";
+
+  private static final Pattern OFFSET_PATTERN = Pattern.compile(
+      "([-+]?)P([-+0-9YMWD]+)?(T([-+0-9HMS.,]+)?)?", Pattern.CASE_INSENSITIVE);
 
   private TimeUtil() {
     throw new UnsupportedOperationException();
@@ -104,35 +115,68 @@ public class TimeUtil {
   }
 
   /**
-   * Gets the number of workflow instances between firstInstant (inclusive) and lastInstant (exclusive)
-   * according to the workflow's schedule.
+   * Gets an ordered list of instants between firstInstant (inclusive) and lastInstant (exclusive)
+   * according to the {@link Schedule}.
    *
    * @param firstInstant The first instant
    * @param lastInstant  The last instant
    * @param schedule     The schedule of the workflow
-   * @return the number of instances within the range
+   * @return instants within the range
    */
-  public static int instancesInRange(Instant firstInstant, Instant lastInstant, Schedule schedule) {
-    if (!isAligned(firstInstant, schedule) || !isAligned(lastInstant, schedule)) {
-      throw new IllegalArgumentException("unaligned instant");
-    }
-
-    if (lastInstant.isBefore(firstInstant)) {
-      throw new IllegalArgumentException("last instant should not be before first instant");
-    }
+  public static List<Instant> instantsInRange(Instant firstInstant, Instant lastInstant,
+                                              Schedule schedule) {
+    Preconditions.checkArgument(
+        isAligned(firstInstant, schedule) && isAligned(lastInstant, schedule),
+        "unaligned instant");
+    Preconditions.checkArgument(!lastInstant.isBefore(firstInstant),
+        "last instant should not be before first instant");
 
     final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
+    final List<Instant> instants = new ArrayList<>();
 
     Instant currentInstant = firstInstant;
-    int number = 0;
     while (currentInstant.isBefore(lastInstant)) {
+      instants.add(currentInstant);
       final ZonedDateTime utcDateTime = currentInstant.atZone(UTC);
       currentInstant = executionTime.nextExecution(utcDateTime)
           .orElseThrow(IllegalArgumentException::new) // with unix cron, this should not happen
           .toInstant();
-      number++;
     }
-    return number;
+
+    return instants;
+  }
+
+  /**
+   * Gets an ordered list instants between firstInstant (inclusive) and lastInstant (exclusive)
+   * according to the {@link Schedule}. This works in a reversed order, meaning firstInstant should
+   * be after lastInstant.
+   *
+   * @param firstInstant The first instant
+   * @param lastInstant  The last instant
+   * @param schedule     The schedule of the workflow
+   * @return instants within the range
+   */
+  public static List<Instant> instantsInReversedRange(Instant firstInstant, Instant lastInstant,
+                                                      Schedule schedule) {
+    Preconditions.checkArgument(
+        isAligned(firstInstant, schedule) && isAligned(lastInstant, schedule),
+        "unaligned instant");
+    Preconditions.checkArgument(!lastInstant.isAfter(firstInstant),
+        "last instant should not be after first instant");
+
+    final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
+    final List<Instant> instants = new ArrayList<>();
+
+    Instant currentInstant = firstInstant;
+    while (currentInstant.isAfter(lastInstant)) {
+      instants.add(currentInstant);
+      final ZonedDateTime utcDateTime = currentInstant.atZone(UTC);
+      currentInstant = executionTime.lastExecution(utcDateTime)
+          .orElseThrow(IllegalArgumentException::new) // with unix cron, this should not happen
+          .toInstant();
+    }
+
+    return instants;
   }
 
   /**
@@ -171,34 +215,29 @@ public class TimeUtil {
    * @return A zoned date time with the offset applied
    */
   public static ZonedDateTime addOffset(ZonedDateTime time, String offset) {
-    final int tPos = offset.indexOf('T');
-    final String periodOffset;
-    final String durationOffset;
+    final Matcher matcher = OFFSET_PATTERN.matcher(offset);
 
-    switch (tPos) {
-      case -1:
-        periodOffset = offset;
-        break;
-
-      case 1:
-        periodOffset = "P0D";
-        break;
-
-      default:
-        periodOffset = offset.substring(0, tPos);
-        break;
+    if (!matcher.matches()) {
+      throw new DateTimeParseException("Unable to parse offset period", offset, 0);
     }
+    final String sign = matcher.group(1);
 
-    if (tPos == -1) {
-      durationOffset = "PT0S";
-    } else {
-      durationOffset = "P" + offset.substring(tPos);
-    }
+    final String periodOffset = sign + "P" + Optional.ofNullable(matcher.group(2)).orElse("0D");
+    final String durationOffset = sign + "PT" + Optional.ofNullable(matcher.group(4)).orElse("0S");
 
     final TemporalAmount dateAmount = Period.parse(periodOffset);
     final TemporalAmount timeAmount = Duration.parse(durationOffset);
 
     return time.plus(dateAmount).plus(timeAmount);
+  }
+
+  public static ZonedDateTime subtractOffset(ZonedDateTime time, String offset) {
+    // Change sign of offset string and add
+    if (offset.startsWith("-")) {
+      return addOffset(time, offset.substring(1));
+    } else {
+      return addOffset(time, "-" + offset);
+    }
   }
 
   public static Cron cron(Schedule schedule) {
@@ -222,5 +261,29 @@ public class TimeUtil {
       default:
         return schedule.expression();
     }
+  }
+
+  public static Instant offsetInstant(Instant origin, Schedule schedule, int offset) {
+    Preconditions.checkArgument(isAligned(origin, schedule), "unaligned origin");
+    return schedule.wellKnown().unit()
+        .map(unit -> {
+          try {
+            return origin.plus(offset, unit);
+          } catch (UnsupportedTemporalTypeException ignored) {
+            return null;
+          }
+        })
+        .orElseGet(() -> {
+          final ExecutionTime executionTime = ExecutionTime.forCron(cron(schedule));
+          ZonedDateTime time = origin.atZone(UTC);
+          for (int i = 0; i < Math.abs(offset); i++) {
+            final Optional<ZonedDateTime> execution = offset <= 0
+                                                      ? executionTime.lastExecution(time)
+                                                      : executionTime.nextExecution(time);
+            time = execution
+                .orElseThrow(AssertionError::new); // with unix cron, this should not happen
+          }
+          return time.toInstant();
+        });
   }
 }

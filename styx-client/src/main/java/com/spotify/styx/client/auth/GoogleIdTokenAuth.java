@@ -35,8 +35,11 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.Objects;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GoogleIdTokenAuth {
+  private static final Logger log = LoggerFactory.getLogger(GoogleIdTokenAuth.class);
   private static final JsonFactory JSON_FACTORY = Utils.getDefaultJsonFactory();
 
   private final HttpTransport httpTransport;
@@ -69,6 +72,7 @@ public class GoogleIdTokenAuth {
 
   private String getServiceAccountToken(GoogleCredential credential, String targetAudience)
       throws IOException, GeneralSecurityException {
+    log.debug("Fetching service account access token for {}", credential.getServiceAccountUser());
     final TokenRequest request = new TokenRequest(
         this.httpTransport, JSON_FACTORY,
         new GenericUrl(credential.getTokenServerEncodedUrl()),
@@ -101,6 +105,7 @@ public class GoogleIdTokenAuth {
   }
 
   private String getUserToken(GoogleCredential credential) throws IOException {
+    log.debug("Fetching user access token");
     final TokenRequest request = new RefreshTokenRequest(
         this.httpTransport, JSON_FACTORY,
         new GenericUrl(credential.getTokenServerEncodedUrl()),

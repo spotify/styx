@@ -20,9 +20,9 @@
 
 package com.spotify.styx.state;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.collect.Iterables;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.TriggerParameters;
 import io.norberg.automatter.AutoMatter;
 import java.util.List;
 import java.util.Optional;
@@ -35,7 +35,6 @@ import java.util.Set;
  * suited for copy-modifying values. Another plus is the boilerplate-free Jackson integration.
  */
 @AutoMatter
-@JsonIgnoreProperties(ignoreUnknown = true)
 public interface StateData {
 
   int tries();
@@ -48,6 +47,7 @@ public interface StateData {
   Optional<String> executionId();
   Optional<ExecutionDescription> executionDescription();
   Optional<Set<String>> resourceIds(); // resources referenced in the workflow configuration at the time of dequeue
+  Optional<TriggerParameters> triggerParameters();
 
   /**
    * This field is deprecated and kept only for backwards compatibility.

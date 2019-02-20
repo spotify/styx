@@ -58,7 +58,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class RunStateTest {
@@ -75,6 +75,8 @@ public class RunStateTest {
       .dockerImage(DOCKER_IMAGE)
       .dockerArgs("--date", "{}", "--bar")
       .build();
+
+  private static final String COMMIT_SHA = "sha_1";
 
   private static final Trigger UNKNOWN_TRIGGER = Trigger.unknown("trig");
   private static final Trigger NATURAL_TRIGGER1 = Trigger.natural();

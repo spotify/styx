@@ -27,8 +27,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * An {@link OutputHandler} handler that reports execution elapsed time between submitted and
- * running {@link RunState} to FastForward.
+ * An {@link OutputHandler} handler that reports workflow exit codes.
  */
 public class MonitoringHandler implements OutputHandler {
 
@@ -43,7 +42,7 @@ public class MonitoringHandler implements OutputHandler {
     switch (state.state()) {
       case TERMINATED:
         if (state.data().lastExit().isPresent()) {
-          stats.recordExitCode(state.workflowInstance().workflowId(), state.data().lastExit().get());
+          stats.recordExitCode(state.data().lastExit().get());
         }
         break;
 

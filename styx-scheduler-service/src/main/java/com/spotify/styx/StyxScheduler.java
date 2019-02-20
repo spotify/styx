@@ -20,25 +20,23 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.state.OutputHandler.fanOutput;
-import static com.spotify.styx.state.StateUtil.getResourcesUsageMap;
+import static com.spotify.apollo.environment.ConfigUtil.optionalInt;
+import static com.spotify.styx.util.CloserUtil.closeable;
+import static com.spotify.styx.util.ConfigUtil.get;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
-import static com.spotify.styx.util.GuardedRunnable.guard;
-import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
+import static com.spotify.styx.util.GuardedRunnable.runGuarded;
 import static java.util.Objects.requireNonNull;
-import static java.util.concurrent.TimeUnit.MINUTES;
-import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
-import com.codahale.metrics.Gauge;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
-import com.google.api.services.container.v1beta1.Container;
-import com.google.api.services.container.v1beta1.ContainerScopes;
-import com.google.api.services.container.v1beta1.model.Cluster;
+import com.google.api.services.container.Container;
+import com.google.api.services.container.ContainerScopes;
+import com.google.api.services.container.model.Cluster;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.IamScopes;
 import com.google.cloud.datastore.Datastore;
@@ -53,10 +51,14 @@ import com.spotify.apollo.Environment;
 import com.spotify.apollo.route.Route;
 import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.api.Api;
+import com.spotify.styx.api.AuthenticatorConfiguration;
+import com.spotify.styx.api.AuthenticatorFactory;
+import com.spotify.styx.api.RequestAuthenticator;
 import com.spotify.styx.api.SchedulerResource;
+import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
+import com.spotify.styx.api.WorkflowActionAuthorizer;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -68,10 +70,12 @@ import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.MonitoringHandler;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.monitoring.StatsFactory;
+import com.spotify.styx.monitoring.TracingProxy;
 import com.spotify.styx.publisher.Publisher;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.QueuedStateManager;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.state.handlers.DockerRunnerHandler;
@@ -88,7 +92,6 @@ import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RetryUtil;
-import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.ShardedCounterSnapshotFactory;
 import com.spotify.styx.util.StorageFactory;
@@ -100,12 +103,16 @@ import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorServic
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
-import java.io.Closeable;
+import io.fabric8.kubernetes.client.utils.HttpClientUtils;
+import io.opencensus.common.Scope;
+import io.opencensus.trace.Tracer;
+import io.opencensus.trace.Tracing;
+import io.opencensus.trace.samplers.Samplers;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -115,10 +122,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import okhttp3.OkHttpClient;
+import okhttp3.Protocol;
 import org.apache.hadoop.hbase.client.Connection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -136,21 +146,32 @@ public class StyxScheduler implements AppInit {
   public static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
   public static final String STYX_MODE = "styx.mode";
   public static final String STYX_MODE_DEVELOPMENT = "development";
+  public static final String STYX_EVENT_PROCESSING_THREADS = "styx.event-processing-threads";
+  public static final String STYX_SCHEDULER_TICK_INTERVAL = "styx.scheduler.tick-interval";
+  public static final String STYX_TRIGGER_TICK_INTERVAL = "styx.trigger.tick-interval";
+  public static final String STYX_SCHEDULER_THREADS = "styx.scheduler-threads";
+  private static final String STYX_ENVIRONMENT = "styx.environment";
+  private static final String KUBERNETES_REQUEST_TIMEOUT = "styx.k8s.request-timeout";
 
-  public static final int SCHEDULER_TICK_INTERVAL_SECONDS = 2;
-  public static final int TRIGGER_MANAGER_TICK_INTERVAL_SECONDS = 1;
-  public static final long CLEANER_TICK_INTERVAL_SECONDS = MINUTES.toSeconds(30);
-  public static final long CONCURRENT_WORKFLOW_INSTANCE_INDEXING_INTERVAL_SECONDS = MINUTES.toSeconds(30);
-  public static final int RUNTIME_CONFIG_UPDATE_INTERVAL_SECONDS = 5;
+  public static final int DEFAULT_STYX_EVENT_PROCESSING_THREADS = 32;
+  public static final int DEFAULT_STYX_SCHEDULER_THREADS = 32;
+  public static final Duration DEFAULT_SCHEDULER_TICK_INTERVAL = Duration.ofSeconds(2);
+  public static final Duration DEFAULT_TRIGGER_TICK_INTERVAL = Duration.ofSeconds(1);
+  public static final Duration CLEANER_TICK_INTERVAL = Duration.ofMinutes(30);
+  public static final Duration RUNTIME_CONFIG_UPDATE_INTERVAL = Duration.ofSeconds(5);
   public static final Duration DEFAULT_RETRY_BASE_DELAY = Duration.ofMinutes(3);
   public static final int DEFAULT_RETRY_MAX_EXPONENT = 4;
   public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
   public static final RetryUtil DEFAULT_RETRY_UTIL =
       new RetryUtil(DEFAULT_RETRY_BASE_DELAY, DEFAULT_RETRY_MAX_EXPONENT);
   public static final double DEFAULT_SUBMISSION_RATE_PER_SEC = 1000D;
+  static final int DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS = 60_000;
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxScheduler.class);
 
+  private static final Tracer tracer = Tracing.getTracer();
+
+  private final String serviceName;
   private final Time time;
   private final StorageFactory storageFactory;
   private final DockerRunnerFactory dockerRunnerFactory;
@@ -161,6 +182,8 @@ public class StyxScheduler implements AppInit {
   private final WorkflowResourceDecorator resourceDecorator;
   private final EventConsumerFactory eventConsumerFactory;
   private final WorkflowExecutionGateFactory executionGateFactory;
+  private final AuthenticatorFactory authenticatorFactory;
+  private final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory;
 
   private StateManager stateManager;
   private Scheduler scheduler;
@@ -192,6 +215,7 @@ public class StyxScheduler implements AppInit {
 
   public static class Builder {
 
+    private String serviceName = "styx-scheduler";
     private Time time = Instant::now;
     private StorageFactory storageFactory = storage(StyxScheduler::storage);
     private DockerRunnerFactory dockerRunnerFactory = StyxScheduler::createDockerRunner;
@@ -202,6 +226,14 @@ public class StyxScheduler implements AppInit {
     private WorkflowResourceDecorator resourceDecorator = WorkflowResourceDecorator.NOOP;
     private EventConsumerFactory eventConsumerFactory = (env, stats) -> (event, state) -> { };
     private WorkflowExecutionGateFactory executionGateFactory = (env, storage) -> WorkflowExecutionGate.NOOP;
+    private AuthenticatorFactory authenticatorFactory = AuthenticatorFactory.DEFAULT;
+    private ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory =
+        ServiceAccountUsageAuthorizer.Factory.DEFAULT;
+
+    public Builder setServiceName(String serviceName) {
+      this.serviceName = serviceName;
+      return this;
+    }
 
     public Builder setTime(Time time) {
       this.time = time;
@@ -253,8 +285,20 @@ public class StyxScheduler implements AppInit {
       return this;
     }
 
+    public Builder setAuthenticatorFactory(
+        AuthenticatorFactory authenticatorFactory) {
+      this.authenticatorFactory = authenticatorFactory;
+      return this;
+    }
+
     public StyxScheduler build() {
       return new StyxScheduler(this);
+    }
+
+    public Builder setServiceAccountUsageAuthorizerFactory(
+        final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory) {
+      this.serviceAccountUsageAuthorizerFactory = serviceAccountUsageAuthorizerFactory;
+      return this;
     }
   }
 
@@ -269,6 +313,7 @@ public class StyxScheduler implements AppInit {
   // ==============================================================================================
 
   private StyxScheduler(Builder builder) {
+    this.serviceName = requireNonNull(builder.serviceName);
     this.time = requireNonNull(builder.time);
     this.storageFactory = requireNonNull(builder.storageFactory);
     this.dockerRunnerFactory = requireNonNull(builder.dockerRunnerFactory);
@@ -279,6 +324,8 @@ public class StyxScheduler implements AppInit {
     this.resourceDecorator = requireNonNull(builder.resourceDecorator);
     this.eventConsumerFactory = requireNonNull(builder.eventConsumerFactory);
     this.executionGateFactory = requireNonNull(builder.executionGateFactory);
+    this.authenticatorFactory = requireNonNull(builder.authenticatorFactory);
+    this.serviceAccountUsageAuthorizerFactory = requireNonNull(builder.serviceAccountUsageAuthorizerFactory);
   }
 
   @Override
@@ -289,49 +336,59 @@ public class StyxScheduler implements AppInit {
     final Thread.UncaughtExceptionHandler uncaughtExceptionHandler =
         (thread, throwable) -> LOG.error("Thread {} threw {}", thread, throwable);
 
-    final ThreadFactory schedulerTf = new ThreadFactoryBuilder()
+    final ThreadFactory tickTf = new ThreadFactoryBuilder()
         .setDaemon(true)
-        .setNameFormat("styx-scheduler-%d")
+        .setNameFormat("styx-tick-%d")
         .setUncaughtExceptionHandler(uncaughtExceptionHandler)
         .build();
 
     final Publisher publisher = publisherFactory.apply(environment);
     closer.register(publisher);
 
-    final ScheduledExecutorService executor = executorFactory.create(3, schedulerTf);
-    closer.register(executorCloser("scheduler", executor));
-    final StripedExecutorService eventTransitionExecutor = new StripedExecutorService(32);
-    closer.register(executorCloser("event-transition", eventTransitionExecutor));
+    // TODO: is the shutdown timeout of 1 second here sane?
+    final ScheduledExecutorService tickExecutor = executorFactory.create(3, tickTf);
+    closer.register(closeable(tickExecutor, "tick-executor", Duration.ofSeconds(1)));
+    final StripedExecutorService eventProcessingExecutor = new StripedExecutorService(
+        optionalInt(config, STYX_EVENT_PROCESSING_THREADS).orElse(DEFAULT_STYX_EVENT_PROCESSING_THREADS));
+    closer.register(closeable(eventProcessingExecutor, "event-processing", Duration.ofSeconds(1)));
     final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
-    closer.register(executorCloser("event-consumer", eventConsumerExecutor));
+    closer.register(closeable(eventConsumerExecutor, "event-consumer", Duration.ofSeconds(1)));
+    final ExecutorService schedulerExecutor = Executors.newWorkStealingPool(
+        optionalInt(config, STYX_SCHEDULER_THREADS).orElse(DEFAULT_STYX_SCHEDULER_THREADS));
+    closer.register(closeable(schedulerExecutor, "scheduler", Duration.ofSeconds(1)));
 
     final Stats stats = statsFactory.apply(environment);
-    final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment), stats, time);
+    final Storage storage = MeteredStorageProxy.instrument(
+        TracingProxy.instrument(Storage.class,
+            storageFactory.apply(environment, stats)), stats, time);
     closer.register(storage);
 
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
-    final ShardedCounter shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
+    final ShardedCounter shardedCounter = new ShardedCounter(stats, counterSnapshotFactory);
 
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
 
     final Supplier<Map<WorkflowId, Workflow>> workflowCache = new CachedSupplier<>(storage::workflows, time);
 
-    initializeResources(storage, shardedCounter, counterSnapshotFactory, timeoutConfig, workflowCache);
-
-    final QueuedStateManager stateManager = closer.register(
-        new QueuedStateManager(time, eventTransitionExecutor, storage,
+    final QueuedStateManager stateManager = closer.register(new QueuedStateManager(time, eventProcessingExecutor, storage,
             eventConsumerFactory.apply(environment, stats), eventConsumerExecutor, shardedCounter));
 
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
     final Supplier<String> dockerId = () -> styxConfig.get().globalDockerRunnerId();
     final Debug debug = () -> styxConfig.get().debugEnabled();
     final DockerRunner routingDockerRunner = DockerRunner.routing(
-        id -> dockerRunnerFactory.create(id, environment, stateManager, executor, stats, debug),
+        id -> dockerRunnerFactory.create(id, environment, stateManager, tickExecutor, stats, debug),
         dockerId);
-    final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(routingDockerRunner, stats, time);
+    final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
+        TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
 
     final RateLimiter dequeueRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
+
+    Duration runningStateTtl = timeoutConfig.ttlOf(State.RUNNING);
+    WorkflowValidator workflowValidator = WorkflowValidator.newBuilder(new DockerImageValidator())
+        .withMaxRunningTimeoutLimit(runningStateTtl)
+        .build();
 
     final List<OutputHandler> outputHandlers = ImmutableList.of(
         new TransitionLogger(""),
@@ -339,38 +396,50 @@ public class StyxScheduler implements AppInit {
             dockerRunner),
         new TerminationHandler(retryUtil),
         new MonitoringHandler(stats),
-        new PublisherHandler(publisher),
-        new ExecutionDescriptionHandler(storage, new WorkflowValidator(new DockerImageValidator())));
+        new PublisherHandler(publisher, stats),
+        new ExecutionDescriptionHandler(storage, workflowValidator));
 
     final TriggerListener trigger =
         new StateInitializingTrigger(stateManager);
     final TriggerManager triggerManager = new TriggerManager(trigger, time, storage, stats);
+    closer.register(triggerManager);
 
     final BackfillTriggerManager backfillTriggerManager =
         new BackfillTriggerManager(stateManager, storage, trigger, stats, time);
 
-    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager,
-                                              storage, resourceDecorator, stats, dequeueRateLimiter,
-                                              executionGateFactory.apply(environment, storage), outputHandlers);
+    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, storage, resourceDecorator, stats,
+        dequeueRateLimiter, executionGateFactory.apply(environment, storage), shardedCounter, schedulerExecutor, outputHandlers);
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
+    final Duration schedulerTickInterval = get(config, config::getDuration, STYX_SCHEDULER_TICK_INTERVAL)
+        .orElse(DEFAULT_SCHEDULER_TICK_INTERVAL);
+
+    final Duration triggerTickInterval = get(config, config::getDuration, STYX_TRIGGER_TICK_INTERVAL)
+        .orElse(DEFAULT_TRIGGER_TICK_INTERVAL);
+
     dockerRunner.restore();
-    startTriggerManager(triggerManager, executor);
-    startBackfillTriggerManager(backfillTriggerManager, executor);
-    startScheduler(scheduler, executor);
-    startRuntimeConfigUpdate(styxConfig, executor, dequeueRateLimiter);
-    startCleaner(cleaner, executor);
+    startTriggerManager(triggerManager, tickExecutor, triggerTickInterval);
+    startBackfillTriggerManager(backfillTriggerManager, tickExecutor, triggerTickInterval);
+    startScheduler(scheduler, tickExecutor, schedulerTickInterval);
+    startRuntimeConfigUpdate(styxConfig, tickExecutor, dequeueRateLimiter);
+    startCleaner(cleaner, tickExecutor);
 
-    setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats);
+    setupMetrics(stateManager, workflowCache, storage, dequeueRateLimiter, stats, time);
 
+    final ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer =
+        serviceAccountUsageAuthorizerFactory.apply(config, serviceName);
+    final WorkflowActionAuthorizer workflowActionAuthorizer =
+        new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer);
     final SchedulerResource schedulerResource =
-        new SchedulerResource(stateManager, trigger, storage, time,
-            new WorkflowValidator(new DockerImageValidator()));
+        new SchedulerResource(stateManager, trigger, storage, time, workflowValidator, workflowActionAuthorizer);
 
+    final RequestAuthenticator requestAuthenticator = new RequestAuthenticator(
+        authenticatorFactory.apply(AuthenticatorConfiguration.fromConfig(config, serviceName)));
     environment.routingEngine()
         .registerAutoRoute(Route.sync("GET", "/ping", rc -> "pong"))
-        .registerRoutes(Api.withCommonMiddleware(schedulerResource.routes()));
+        .registerRoutes(Api.withCommonMiddleware(schedulerResource.routes(requestAuthenticator),
+            requestAuthenticator, serviceName));
 
     this.stateManager = stateManager;
     this.scheduler = scheduler;
@@ -403,142 +472,39 @@ public class StyxScheduler implements AppInit {
     backfillTriggerManager.tick();
   }
 
-  private void initializeResources(Storage storage, ShardedCounter shardedCounter,
-                                   CounterSnapshotFactory counterSnapshotFactory,
-                                   TimeoutConfig timeoutConfig,
-                                   Supplier<Map<WorkflowId, Workflow>> workflowCache) {
-    try {
-      // Initialize resources
-      storage.resources().parallelStream().forEach(
-          resource -> {
-            counterSnapshotFactory.create(resource.id());
-            try {
-              storage.runInTransaction(tx -> {
-                shardedCounter.updateLimit(tx, resource.id(), resource.concurrency());
-                return null;
-              });
-            } catch (IOException e) {
-              LOG.error("Error creating a counter limit for {}", resource, e);
-              throw new RuntimeException(e);
-            }
-          });
-      LOG.info("Finished initializing resources");
-
-      // Sync resources usage
-      if (storage.config().resourcesSyncEnabled()) {
-        // first we reset all shards for each resource
-        storage.resources().parallelStream().forEach(resource -> resetShards(storage, resource));
-        // then we update shards with actual usage
-        try {
-          final Map<String, Long> resourcesUsageMap = getResourcesUsageMap(storage, timeoutConfig,
-              workflowCache, time.get(), resourceDecorator);
-          updateShards(storage, resourcesUsageMap);
-        } catch (Exception e) {
-          LOG.error("Error syncing resources", e);
-          throw new RuntimeException(e);
-        }
-        LOG.info("Finished syncing resources");
-      }
-    } catch (IOException e) {
-      LOG.error("Error while initializing/syncing resources", e);
-      throw new RuntimeException(e);
-    }
-  }
-
-  @VisibleForTesting
-  void resetShards(final Storage storage, final Resource resource) {
-    LOG.info("Resetting shards of resource {}", resource.id());
-    for (int i = 0; i < NUM_SHARDS; i++) {
-      final int index = i;
-      try {
-        storage.runInTransaction(tx -> {
-          tx.store(Shard.create(resource.id(), index, 0));
-          return null;
-        });
-      } catch (IOException e) {
-        LOG.error("Error resetting shards of resource {}", resource, e);
-        throw new RuntimeException(e);
-      }
-    }
-  }
-
-  /**
-   * For each resource, distribute usage value evenly across shards.
-   * For example, with a usage value of 10 and 3 available shards, the latter will be set to:
-   * Shard 1 = 4
-   * Shard 2 = 3
-   * Shard 3 = 3
-   */
-  @VisibleForTesting
-  void updateShards(final Storage storage,
-                    final Map<String, Long> resourceUsage) {
-    resourceUsage.entrySet().parallelStream().forEach(entity -> {
-      final String resource = entity.getKey();
-      final Long usage = entity.getValue();
-      LOG.info("Syncing {} -> {}", resource, usage);
-      try {
-        int result = (int) (usage / NUM_SHARDS);
-        int remainder = (int) (usage % NUM_SHARDS);
-        for (int i = 0; i < NUM_SHARDS; i++) {
-          final int index = i;
-          final int shardValue = remainder <= 0 ? result : result + 1;
-          storage.runInTransaction(tx -> {
-            tx.store(Shard.create(resource, index, shardValue));
-            return null;
-          });
-          remainder--;
-          LOG.info("Stored {}#shard-{} -> {}", resource, index, shardValue);
-        }
-      } catch (IOException e) {
-        LOG.error("Error syncing resource: {}", resource, e);
-        throw new RuntimeException(e);
-      }
-    });
-  }
-
   private static void startCleaner(Cleaner cleaner, ScheduledExecutorService exec) {
-    exec.scheduleWithFixedDelay(
-        guard(cleaner::tick),
-        0,
-        CLEANER_TICK_INTERVAL_SECONDS,
-        SECONDS);
+    scheduleWithJitter(cleaner::tick, exec, CLEANER_TICK_INTERVAL);
   }
 
-  private static void startTriggerManager(TriggerManager triggerManager, ScheduledExecutorService exec) {
-    exec.scheduleWithFixedDelay(
-        guard(triggerManager::tick),
-        TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
-        TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
-        SECONDS);
+  private static void startTriggerManager(TriggerManager triggerManager, ScheduledExecutorService exec,
+      Duration tickInterval) {
+    scheduleWithJitter(triggerManager::tick, exec, tickInterval);
   }
 
   private static void startBackfillTriggerManager(BackfillTriggerManager backfillTriggerManager,
-                                                  ScheduledExecutorService exec) {
-    exec.scheduleWithFixedDelay(
-        guard(backfillTriggerManager::tick),
-        TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
-        TRIGGER_MANAGER_TICK_INTERVAL_SECONDS,
-        SECONDS);
+      ScheduledExecutorService exec, Duration tickInterval) {
+    scheduleWithJitter(backfillTriggerManager::tick, exec, tickInterval);
   }
 
-  private static void startScheduler(Scheduler scheduler, ScheduledExecutorService exec) {
-    exec.scheduleAtFixedRate(
-        guard(scheduler::tick),
-        SCHEDULER_TICK_INTERVAL_SECONDS,
-        SCHEDULER_TICK_INTERVAL_SECONDS,
-        SECONDS);
+  private static void startScheduler(Scheduler scheduler, ScheduledExecutorService exec, Duration tickInterval) {
+    scheduleWithJitter(scheduler::tick, exec, tickInterval);
   }
 
   private static void startRuntimeConfigUpdate(Supplier<StyxConfig> config, ScheduledExecutorService exec,
       RateLimiter submissionRateLimiter) {
-    exec.scheduleAtFixedRate(
-        guard(() -> updateRuntimeConfig(config, submissionRateLimiter)),
-        0,
-        RUNTIME_CONFIG_UPDATE_INTERVAL_SECONDS,
-        SECONDS);
+    scheduleWithJitter(() -> updateRuntimeConfig(config, submissionRateLimiter), exec, RUNTIME_CONFIG_UPDATE_INTERVAL);
   }
 
   private static void updateRuntimeConfig(Supplier<StyxConfig> config, RateLimiter rateLimiter) {
+    try (Scope ss = tracer.spanBuilder("Styx.StyxScheduler.updateRuntimeConfig")
+        .setRecordEvents(true)
+        .setSampler(Samplers.alwaysSample())
+        .startScopedSpan()) {
+      updateRuntimeConfig0(config, rateLimiter);
+    }
+  }
+
+  private static void updateRuntimeConfig0(Supplier<StyxConfig> config, RateLimiter rateLimiter) {
     try {
       double currentRate = rateLimiter.getRate();
       Double updatedRate = config.get().submissionRateLimit().orElse(
@@ -549,16 +515,33 @@ public class StyxScheduler implements AppInit {
       }
     } catch (Exception e) {
       LOG.warn("Failed to fetch the submission rate config from storage, "
-          + "skipping RateLimiter update");
+          + "skipping RateLimiter update", e);
     }
   }
 
-  private void setupMetrics(
+  private static void scheduleWithJitter(Runnable runnable, ScheduledExecutorService exec, Duration tickInterval) {
+    final double jitter = ThreadLocalRandom.current().nextDouble(0.5, 1.5);
+    final long delayMillis = (long) (jitter * tickInterval.toMillis());
+    exec.schedule(() -> {
+      runGuarded(runnable);
+      scheduleWithJitter(runnable, exec, tickInterval);
+    }, delayMillis, MILLISECONDS);
+  }
+
+  @VisibleForTesting
+  static void setupMetrics(
       QueuedStateManager stateManager,
       Supplier<Map<WorkflowId, Workflow>> workflowCache,
       Storage storage,
       RateLimiter submissionRateLimiter,
-      Stats stats) {
+      Stats stats,
+      Time time) {
+
+    // Cache expensive methods
+    final Supplier<Set<WorkflowId>> enabledWorkflowCache =
+        new CachedSupplier<>(storage::enabled, Instant::now);
+    final CachedSupplier<Map<WorkflowInstance, RunState>> activeStatesCache =
+        new CachedSupplier<>(stateManager::getActiveStates, time);
 
     stats.registerQueuedEventsMetric(stateManager::queuedEvents);
 
@@ -569,16 +552,11 @@ public class StyxScheduler implements AppInit {
         .filter(workflow -> workflow.configuration().dockerImage().isPresent())
         .count());
 
-    final Supplier<Gauge<Long>> configuredEnabledWorkflowsCountGaugeSupplier = () -> {
-      final Supplier<Set<WorkflowId>> enabledWorkflowSupplier =
-          new CachedSupplier<>(storage::enabled, Instant::now);
-      return () -> workflowCache.get().values()
-          .stream()
-          .filter(workflow -> workflow.configuration().dockerImage().isPresent())
-          .filter(workflow -> enabledWorkflowSupplier.get().contains(WorkflowId.ofWorkflow(workflow)))
-          .count();
-    };
-    stats.registerWorkflowCountMetric("enabled", configuredEnabledWorkflowsCountGaugeSupplier.get());
+    stats.registerWorkflowCountMetric("enabled", () -> workflowCache.get().values()
+        .stream()
+        .filter(workflow1 -> workflow1.configuration().dockerImage().isPresent())
+        .filter(workflow1 -> enabledWorkflowCache.get().contains(WorkflowId.ofWorkflow(workflow1)))
+        .count());
 
     stats.registerWorkflowCountMetric("docker_termination_logging_enabled", () ->
         workflowCache.get().values()
@@ -587,24 +565,23 @@ public class StyxScheduler implements AppInit {
             .filter(workflow -> workflow.configuration().dockerTerminationLogging())
             .count());
 
-    Arrays.stream(RunState.State.values()).forEach(state -> {
-      TriggerUtil.triggerTypesList().forEach(triggerType ->
-          stats.registerActiveStatesMetric(
-              state,
-              triggerType,
-              () -> stateManager.getActiveStates().values().stream()
-                  .filter(runState -> runState.state().equals(state))
-                  .filter(runState -> runState.data().trigger().isPresent() && triggerType
-                      .equals(TriggerUtil.triggerType(runState.data().trigger().get())))
-                  .count()));
-      stats.registerActiveStatesMetric(
-          state,
-          "none",
-          () -> stateManager.getActiveStates().values().stream()
+    for (State state : State.values()) {
+      for (String triggerType : TriggerUtil.triggerTypesList()) {
+        stats.registerActiveStatesMetric(state, triggerType, () ->
+            activeStatesCache.get().values().stream()
+                .filter(runState -> runState.state().equals(state))
+                .filter(runState -> runState.data().trigger()
+                    .map(TriggerUtil::triggerType)
+                    .map(triggerType::equals)
+                    .orElse(false))
+                .count());
+      }
+      stats.registerActiveStatesMetric(state, "none", () ->
+          activeStatesCache.get().values().stream()
               .filter(runState -> runState.state().equals(state))
               .filter(runState -> !runState.data().trigger().isPresent())
               .count());
-    });
+    }
 
     stats.registerSubmissionRateLimitMetric(submissionRateLimiter::getRate);
   }
@@ -614,22 +591,22 @@ public class StyxScheduler implements AppInit {
   }
 
   private static StorageFactory storage(StorageFactory storage) {
-    return (environment) -> {
+    return (environment, stats) -> {
       if (isDevMode(environment.config())) {
         LOG.info("Running Styx in development mode, will use InMemStorage");
         return new InMemStorage();
       } else {
-        return storage.apply(environment);
+        return storage.apply(environment, stats);
       }
     };
   }
 
-  private static AggregateStorage storage(Environment environment) {
+  private static AggregateStorage storage(Environment environment, Stats stats  ) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
 
     final Connection bigTable = closer.register(createBigTableConnection(config));
-    final Datastore datastore = createDatastore(config);
+    final Datastore datastore = createDatastore(config, stats);
     return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
   }
 
@@ -647,11 +624,12 @@ public class StyxScheduler implements AppInit {
       LOG.info("Creating LocalDockerRunner");
       return closer.register(DockerRunner.local(scheduler, stateManager));
     } else {
+      final String styxEnvironment = config.getString(STYX_ENVIRONMENT);
       final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(
           config, id, createGkeClient(), DefaultKubernetesClient::new));
       final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
       return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats,
-          serviceAccountKeyManager, debug));
+          serviceAccountKeyManager, debug, styxEnvironment));
     }
   }
 
@@ -706,33 +684,25 @@ public class StyxScheduler implements AppInit {
           .withClientCertData(cluster.getMasterAuth().getClientCertificate())
           .withClientKeyData(cluster.getMasterAuth().getClientKey())
           .withNamespace(config.getString(GKE_CLUSTER_NAMESPACE))
+          .withRequestTimeout(get(rootConfig, rootConfig::getInt, KUBERNETES_REQUEST_TIMEOUT)
+              .orElse(DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS))
           .build();
 
-      return clientFactory.apply(kubeConfig);
+      final OkHttpClient httpClient = HttpClientUtils.createHttpClient(kubeConfig).newBuilder()
+          .protocols(Collections.singletonList(Protocol.HTTP_1_1))
+          .build();
+
+      return clientFactory.apply(httpClient, kubeConfig);
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
   }
 
-  private static Closeable executorCloser(String name, ExecutorService executor) {
-    return () -> {
-      LOG.info("Shutting down executor: {}", name);
-      executor.shutdown();
-      try {
-        executor.awaitTermination(1, SECONDS);
-      } catch (InterruptedException ignored) {
-      }
-      final List<Runnable> runnables = executor.shutdownNow();
-      if (!runnables.isEmpty()) {
-        LOG.warn("{} task(s) in {} did not execute", runnables.size(), name);
-      }
-    };
-  }
-
-  private static boolean isDevMode(Config config) {
+  @VisibleForTesting
+  static boolean isDevMode(Config config) {
     return STYX_MODE_DEVELOPMENT.equals(config.getString(STYX_MODE));
   }
 
   interface KubernetesClientFactory
-      extends Function<io.fabric8.kubernetes.client.Config, NamespacedKubernetesClient> { }
+      extends BiFunction<OkHttpClient, io.fabric8.kubernetes.client.Config, NamespacedKubernetesClient> { }
 }

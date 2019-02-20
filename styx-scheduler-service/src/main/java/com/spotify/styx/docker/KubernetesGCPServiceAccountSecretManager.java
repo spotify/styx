@@ -26,7 +26,6 @@ import com.google.api.services.iam.v1.model.ServiceAccountKey;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hashing;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.spotify.styx.ServiceAccountKeyManager;
@@ -116,9 +115,13 @@ class KubernetesGCPServiceAccountSecretManager {
       if (cause instanceof InvalidExecutionException) {
         throw (InvalidExecutionException) cause;
       } else if (GcpUtil.isPermissionDenied(cause)) {
-        throw new InvalidExecutionException("Permission denied to service account: " + serviceAccount);
+        throw new InvalidExecutionException(String.format(
+            "Permission denied when creating keys for service account: %s. Styx needs to be Service Account Key Admin.",
+            serviceAccount));
       } else if (GcpUtil.isResourceExhausted(cause)) {
-        throw new InvalidExecutionException("Maximum number of keys on service account reached: " + serviceAccount);
+        throw new InvalidExecutionException(String.format(
+            "Maximum number of keys on service account reached: %s. Styx requires 4 keys to operate.",
+            serviceAccount));
       } else {
         throw new RuntimeException(e);
       }
@@ -178,12 +181,12 @@ class KubernetesGCPServiceAccountSecretManager {
       throw e;
     }
 
-    final Map<String, String> keys = ImmutableMap.of(
+    final Map<String, String> keys = Map.of(
         STYX_WORKFLOW_SA_JSON_KEY, jsonKey.getPrivateKeyData(),
         STYX_WORKFLOW_SA_P12_KEY, p12Key.getPrivateKeyData()
     );
 
-    final Map<String, String> annotations = ImmutableMap.of(
+    final Map<String, String> annotations = Map.of(
         STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION, jsonKey.getName(),
         STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION, p12Key.getName(),
         STYX_WORKFLOW_SA_ID_ANNOTATION, serviceAccount,
@@ -251,9 +254,9 @@ class KubernetesGCPServiceAccountSecretManager {
         keyManager.deleteKey(annotations.get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION));
         keyManager.deleteKey(annotations.get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION));
         deleteSecret(secret);
-      } catch (KubernetesClientException | IOException ignored) {
+      } catch (KubernetesClientException | IOException e) {
         LOG.warn("Failed to cleanup secret or keys for service account {}",
-            annotations.get(STYX_WORKFLOW_SA_ID_ANNOTATION));
+            annotations.get(STYX_WORKFLOW_SA_ID_ANNOTATION), e);
       }
     }
   }

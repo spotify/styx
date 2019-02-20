@@ -22,6 +22,7 @@ package com.spotify.styx.cli;
 
 import static com.spotify.styx.cli.CliUtil.colored;
 import static com.spotify.styx.cli.CliUtil.coloredBright;
+import static com.spotify.styx.cli.CliUtil.formatMap;
 import static com.spotify.styx.cli.CliUtil.formatTimestamp;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 import static org.fusesource.jansi.Ansi.Color.BLACK;
@@ -32,8 +33,10 @@ import static org.fusesource.jansi.Ansi.Color.GREEN;
 import static org.fusesource.jansi.Ansi.Color.RED;
 import static org.fusesource.jansi.Ansi.Color.YELLOW;
 
+import com.google.common.base.Joiner;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
+import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
@@ -43,6 +46,7 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -52,7 +56,22 @@ import org.fusesource.jansi.Ansi;
 class PrettyCliOutput implements CliOutput {
 
   private static final String BACKFILL_FORMAT =
-      "%28s  %6s  %13s %12s  %-20s  %-20s  %-20s  %-<cid-length>s  %-<wid-length>s %s";
+      "%28s  %6s  %13s %12s  %-20s  %-20s  %-7s  %-20s  %-<cid-length>s  %-<wid-length>s %-<description-length>s %s";
+
+  private static final String WORKFLOW_FORMAT =
+      "%-<cid-length>s  %-<wid-length>s";
+
+  private static final String NA_VALUE = "N/A";
+
+  private static final int TRUNCATED_LENGTH = 20;
+
+  private static final String ELLIPSIS = "...";
+
+  private static final String COMPONENT_HEADER = "COMPONENT";
+
+  private static final String WORKFLOW_HEADER = "WORKFLOW";
+
+  private static final String DESCRIPTION_HEADER = "DESCRIPTION";
 
   @Override
   public void printStates(RunStateDataPayload runStateDataPayload) {
@@ -104,54 +123,93 @@ class PrettyCliOutput implements CliOutput {
   @Override
   public void printBackfill(Backfill backfill, boolean noTruncate) {
     printBackfill(backfill,
-                  backfill.workflowId().componentId().length(),
-                  backfill.workflowId().id().length(),
-                  noTruncate);
+        effectiveLongFieldLength(
+            Optional.ofNullable(backfill.workflowId().componentId()), COMPONENT_HEADER, true),
+        effectiveLongFieldLength(
+            Optional.ofNullable(backfill.workflowId().id()), WORKFLOW_HEADER, true),
+        effectiveLongFieldLength(
+            backfill.description(), DESCRIPTION_HEADER, noTruncate),
+        noTruncate);
   }
 
-  private void printBackfill(Backfill backfill, int cidLength, int widLength, boolean noTruncate) {
+  private void printBackfill(Backfill backfill, int cidLength, int widLength,
+                             int descriptionLength, boolean noTruncate) {
     final Schedule schedule = backfill.schedule();
     final WorkflowId workflowId = backfill.workflowId();
 
     final String format = BACKFILL_FORMAT
         .replaceAll("<cid-length>", String.valueOf(cidLength))
-        .replaceAll("<wid-length>", String.valueOf(widLength));
+        .replaceAll("<wid-length>", String.valueOf(widLength))
+        .replaceAll("<description-length>", String.valueOf(descriptionLength));
 
     System.out.println(String.format(format,
-                                     backfill.id(),
-                                     backfill.halted(),
-                                     backfill.allTriggered(),
-                                     backfill.concurrency(),
-                                     toParameter(schedule, backfill.start()),
-                                     toParameter(schedule, backfill.end()),
-                                     toParameter(schedule, backfill.nextTrigger()),
-                                     workflowId.componentId(),
-                                     workflowId.id(),
-                                     formatDescription(backfill.description(), noTruncate)));
+        backfill.id(),
+        backfill.halted(),
+        backfill.allTriggered(),
+        backfill.concurrency(),
+        toParameter(schedule, backfill.start()),
+        toParameter(schedule, backfill.end()),
+        backfill.reverse(),
+        toParameter(schedule, backfill.nextTrigger()),
+        workflowId.componentId(),
+        workflowId.id(),
+        formatLongField(backfill.description(), noTruncate),
+        formatLongField(backfill.triggerParameters()
+                .map(triggerParameters -> formatMap(triggerParameters.env())),
+            noTruncate)));
   }
 
-  private void printBackfillHeader(int cidLength, int widLength) {
-    final String format = BACKFILL_FORMAT
+  private void printWorkflow(Workflow workflow, int cidLength, int widLength) {
+    final String format = WORKFLOW_FORMAT
         .replaceAll("<cid-length>", String.valueOf(cidLength))
         .replaceAll("<wid-length>", String.valueOf(widLength));
 
     System.out.println(String.format(format,
-                                     "BACKFILL ID",
-                                     "HALTED",
-                                     "ALL TRIGGERED",
-                                     "CONCURRENCY",
-                                     "START (INCL)",
-                                     "END (EXCL)",
-                                     "NEXT TRIGGER",
+                                     workflow.componentId(),
+                                     workflow.workflowId()));
+  }
+
+  private void printBackfillHeader(int cidLength, int widLength, int descriptionLength) {
+    final String format = BACKFILL_FORMAT
+        .replaceAll("<cid-length>", String.valueOf(cidLength))
+        .replaceAll("<wid-length>", String.valueOf(widLength))
+        .replaceAll("<description-length>", String.valueOf(descriptionLength));
+
+    System.out.println(String.format(format,
+        "BACKFILL ID",
+        "HALTED",
+        "ALL TRIGGERED",
+        "CONCURRENCY",
+        "START (INCL)",
+        "END (EXCL)",
+        "REVERSE",
+        "NEXT TRIGGER",
+        COMPONENT_HEADER,
+        WORKFLOW_HEADER,
+        DESCRIPTION_HEADER,
+        "TRIGGER ENV"));
+  }
+
+  private void printWorkflowHeader(int cidLength, int widLength) {
+    final String format = WORKFLOW_FORMAT
+        .replaceAll("<cid-length>", String.valueOf(cidLength))
+        .replaceAll("<wid-length>", String.valueOf(widLength));
+
+    System.out.println(String.format(format,
                                      "COMPONENT",
-                                     "WORKFLOW",
-                                     "DESCRIPTION"));
+                                     "WORKFLOW"));
   }
 
   @Override
   public void printBackfillPayload(BackfillPayload backfillPayload, boolean noTruncate) {
-    printBackfillHeader(backfillPayload.backfill().workflowId().componentId().length(),
-                        backfillPayload.backfill().workflowId().id().length());
+    printBackfillHeader(
+        effectiveLongFieldLength(
+            Optional.ofNullable(backfillPayload.backfill().workflowId().componentId()),
+            COMPONENT_HEADER, true),
+        effectiveLongFieldLength(Optional.ofNullable(backfillPayload.backfill().workflowId().id()),
+            WORKFLOW_HEADER, true),
+        effectiveLongFieldLength(backfillPayload.backfill().description(), DESCRIPTION_HEADER,
+            noTruncate));
 
     printBackfill(backfillPayload.backfill(), noTruncate);
     if (backfillPayload.statuses().isPresent()) {
@@ -164,18 +222,25 @@ class PrettyCliOutput implements CliOutput {
   @Override
   public void printBackfills(List<BackfillPayload> backfills, boolean noTruncate) {
     final int cidLength = backfills.stream()
-        .map(x -> x.backfill().workflowId().componentId().length())
+        .map(x -> effectiveLongFieldLength(
+            Optional.of(x.backfill().workflowId().componentId()), COMPONENT_HEADER, true))
         .max(Comparator.naturalOrder())
         .orElse(1);
     final int widLength = backfills.stream()
-        .map(x -> x.backfill().workflowId().id().length())
+        .map(x -> effectiveLongFieldLength(
+            Optional.of(x.backfill().workflowId().id()), WORKFLOW_HEADER, true))
+        .max(Comparator.naturalOrder())
+        .orElse(1);
+    final int descriptionLength = backfills.stream()
+        .map(x -> effectiveLongFieldLength(
+            x.backfill().description(), DESCRIPTION_HEADER, noTruncate))
         .max(Comparator.naturalOrder())
         .orElse(1);
 
-    printBackfillHeader(cidLength, widLength);
+    printBackfillHeader(cidLength, widLength, descriptionLength);
 
     for (BackfillPayload backfillPayload : backfills) {
-      printBackfill(backfillPayload.backfill(), cidLength, widLength, noTruncate);
+      printBackfill(backfillPayload.backfill(), cidLength, widLength, descriptionLength, noTruncate);
       if (backfillPayload.statuses().isPresent()) {
         System.out.println();
         System.out.println();
@@ -199,20 +264,38 @@ class PrettyCliOutput implements CliOutput {
 
   @Override
   public void printWorkflow(Workflow wf, WorkflowState state) {
-    System.out.println("Component: " + wf.componentId());
-    System.out.println(" Workflow: " + wf.id().id());
-    System.out.println(" Schedule: " + wf.configuration().schedule());
-    System.out.println("   Offset: " + wf.configuration().offset().orElse(""));
-    System.out.println("    Image: " + wf.configuration().dockerImage().orElse(""));
-    System.out.println("     Args: " + wf.configuration().dockerArgs().orElse(Collections.emptyList()));
-    System.out.println("  TermLog: " + wf.configuration().dockerTerminationLogging());
-    System.out.println("   Secret: " + wf.configuration().secret().map(s -> s.name() + ':' + s.mountPath()).orElse(""));
-    System.out.println(" Svc Acct: " + wf.configuration().serviceAccount().orElse(""));
-    System.out.println("Resources: " + wf.configuration().resources());
-    System.out.println("   Commit: " + wf.configuration().commitSha().orElse(""));
-    System.out.println("  Enabled: " + state.enabled().map(Object::toString).orElse(""));
-    System.out.println("     Trig: " + state.nextNaturalTrigger().map(Object::toString).orElse(""));
-    System.out.println("Ofst Trig: " + state.nextNaturalOffsetTrigger().map(Object::toString).orElse(""));
+    System.out.println("Component:             " + wf.componentId());
+    System.out.println("Workflow:              " + wf.workflowId());
+    System.out.println("Schedule:              " + wf.configuration().schedule());
+    System.out.println("Offset:                " + wf.configuration().offset().orElse(""));
+    System.out.println("Docker Image:          " + wf.configuration().dockerImage().orElse(""));
+    System.out.println("Docker Arguments:      " + wf.configuration().dockerArgs().orElse(Collections.emptyList()));
+    System.out.println("Termination Logging:   " + wf.configuration().dockerTerminationLogging());
+    System.out.println("Secret:                " + wf.configuration().secret().map(s -> s.name() + ':' + s.mountPath()).orElse(""));
+    System.out.println("Service Account:       " + wf.configuration().serviceAccount().orElse(""));
+    System.out.println("Resources:             " + wf.configuration().resources());
+    System.out.println("Environment:           " + Joiner.on(' ').withKeyValueSeparator('=').join(wf.configuration().env()));
+    System.out.println("Timeout:               " + wf.configuration().runningTimeout().map(Duration::toString).orElse(""));
+    System.out.println("Commit:                " + wf.configuration().commitSha().orElse(""));
+    System.out.println("Enabled:               " + state.enabled().map(Object::toString).orElse(""));
+    System.out.println("Next Trigger:          " + state.nextNaturalTrigger().map(Object::toString).orElse(""));
+    System.out.println("Next Trigger (offset): " + state.nextNaturalOffsetTrigger().map(Object::toString).orElse(""));
+  }
+
+  @Override
+  public void printWorkflows(List<Workflow> workflows) {
+    final int cidLength = workflows.stream()
+        .map(x -> x.componentId().length())
+        .max(Comparator.naturalOrder())
+        .orElse(1);
+    final int widLength = workflows.stream()
+        .map(x -> x.workflowId().length())
+        .max(Comparator.naturalOrder())
+        .orElse(1);
+
+    printWorkflowHeader(cidLength, widLength);
+
+    workflows.forEach(wf -> printWorkflow(wf, cidLength, widLength));
   }
 
   @Override
@@ -220,17 +303,30 @@ class PrettyCliOutput implements CliOutput {
     System.err.println(message);
   }
 
-  private String formatDescription(Optional<String> description, boolean noTruncate) {
-    return description.map(x -> {
-      if (noTruncate || x.length() <= 20) {
+  private String formatLongField(Optional<String> value, boolean noTruncate) {
+    return value.map(x -> {
+      if (noTruncate || x.length() <= TRUNCATED_LENGTH) {
         return x;
       } else {
-        return x.substring(0, 20) + "...";
+        return x.substring(0, TRUNCATED_LENGTH) + ELLIPSIS;
       }
-    }).orElse("N/A");
+    }).orElse(NA_VALUE);
   }
 
-  private Ansi getAnsiForState(RunStateDataPayload.RunStateData RunStateData) {
+  private int effectiveLongFieldLength(Optional<String> value, String header, boolean noTruncate) {
+    final int length = value.orElse(NA_VALUE).length();
+    if (length <= header.length()) {
+      return header.length();
+    }
+
+    if (!noTruncate && length > (TRUNCATED_LENGTH + ELLIPSIS.length())) {
+      return TRUNCATED_LENGTH + ELLIPSIS.length();
+    } else {
+      return length;
+    }
+  }
+
+  private Ansi getAnsiForState(RunStateData RunStateData) {
     final String state = RunStateData.state();
     switch (state) {
       case "WAITING":    return coloredBright(BLACK, state);

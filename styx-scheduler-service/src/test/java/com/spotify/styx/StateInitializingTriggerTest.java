@@ -30,8 +30,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfigurationBuilder;
@@ -47,7 +47,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class StateInitializingTriggerTest {
@@ -55,9 +55,12 @@ public class StateInitializingTriggerTest {
   private static final Instant TIME = Instant.parse("2016-01-18T09:11:22.333Z");
   private static final Trigger NATURAL_TRIGGER = Trigger.natural();
   private static final Trigger BACKFILL_TRIGGER = Trigger.backfill("trig");
+  private static final TriggerParameters PARAMETERS = TriggerParameters.builder()
+      .env("FOO", "foo", "BAR", "bar")
+      .build();
 
   private static final Map<Schedule, String> SCHEDULE_ARG_EXPECTS =
-      ImmutableMap.of(
+      Map.of(
           WEEKS, "2016-01-18",
           DAYS, "2016-01-18",
           HOURS, "2016-01-18T09",
@@ -77,11 +80,11 @@ public class StateInitializingTriggerTest {
   public void shouldTriggerWorkflowInstance() throws Exception {
     WorkflowConfiguration workflowConfiguration = workflowConfiguration(HOURS);
     Workflow workflow = Workflow.create("id", workflowConfiguration);
-    trigger.event(workflow, NATURAL_TRIGGER, TIME);
+    trigger.event(workflow, NATURAL_TRIGGER, TIME, PARAMETERS);
 
     verify(stateManager).trigger(
         WorkflowInstance.create(workflow.id(), toParameter(workflowConfiguration.schedule(), TIME)),
-        Trigger.natural());
+        Trigger.natural(), PARAMETERS);
   }
 
   @Test
@@ -89,34 +92,34 @@ public class StateInitializingTriggerTest {
     WorkflowConfiguration workflowConfiguration =
         WorkflowConfigurationBuilder.from(workflowConfiguration(HOURS)).dockerArgs(Optional.empty()).build();
     Workflow workflow = Workflow.create("id", workflowConfiguration);
-    trigger.event(workflow, NATURAL_TRIGGER, TIME);
+    trigger.event(workflow, NATURAL_TRIGGER, TIME, PARAMETERS);
 
     WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(),
         toParameter(workflowConfiguration.schedule(), TIME));
 
-    verify(stateManager).trigger(expectedInstance, Trigger.natural());
+    verify(stateManager).trigger(expectedInstance, Trigger.natural(), PARAMETERS);
   }
 
   @Test
   public void shouldInjectTriggerExecutionEventWithNaturalTrigger() throws Exception {
     WorkflowConfiguration workflowConfiguration = workflowConfiguration(HOURS);
     Workflow workflow = Workflow.create("id", workflowConfiguration);
-    trigger.event(workflow, NATURAL_TRIGGER, TIME);
+    trigger.event(workflow, NATURAL_TRIGGER, TIME, PARAMETERS);
 
     WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(), "2016-01-18T09");
 
-    verify(stateManager).trigger(expectedInstance, Trigger.natural());
+    verify(stateManager).trigger(expectedInstance, Trigger.natural(), PARAMETERS);
   }
 
   @Test
   public void shouldInjectTriggerExecutionEventWithBackfillTrigger() throws Exception {
     WorkflowConfiguration workflowConfiguration = workflowConfiguration(HOURS);
     Workflow workflow = Workflow.create("id", workflowConfiguration);
-    trigger.event(workflow, BACKFILL_TRIGGER, TIME);
+    trigger.event(workflow, BACKFILL_TRIGGER, TIME, PARAMETERS);
 
     WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(), "2016-01-18T09");
 
-    verify(stateManager).trigger(expectedInstance, BACKFILL_TRIGGER);
+    verify(stateManager).trigger(expectedInstance, BACKFILL_TRIGGER, PARAMETERS);
   }
 
   @Test
@@ -126,7 +129,7 @@ public class StateInitializingTriggerTest {
             .dockerImage(Optional.empty())
             .build();
     Workflow workflow = Workflow.create("id", configuration);
-    trigger.event(workflow, NATURAL_TRIGGER, TIME);
+    trigger.event(workflow, NATURAL_TRIGGER, TIME, PARAMETERS);
 
     verifyZeroInteractions(stateManager);
   }
@@ -139,11 +142,11 @@ public class StateInitializingTriggerTest {
       WorkflowConfiguration workflowConfiguration = workflowConfiguration(
           scheduleCase.getKey(), "--date", "{}", "--bar");
       Workflow workflow = Workflow.create("id", workflowConfiguration);
-      trigger.event(workflow, NATURAL_TRIGGER, TIME);
+      trigger.event(workflow, NATURAL_TRIGGER, TIME, PARAMETERS);
 
       WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(), scheduleCase.getValue());
 
-      verify(stateManager).trigger(expectedInstance, Trigger.natural());
+      verify(stateManager).trigger(expectedInstance, Trigger.natural(), PARAMETERS);
     }
   }
 

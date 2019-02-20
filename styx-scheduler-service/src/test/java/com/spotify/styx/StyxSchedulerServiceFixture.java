@@ -21,7 +21,7 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
-import static com.spotify.styx.util.TimeUtil.lastInstant;
+import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.time.temporal.ChronoUnit.HOURS;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -36,6 +36,9 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.spotify.apollo.test.ServiceHelper;
+import com.spotify.styx.api.Authenticator;
+import com.spotify.styx.api.AuthenticatorFactory;
+import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
@@ -141,7 +144,7 @@ public class StyxSchedulerServiceFixture {
     datastore = localDatastore.getOptions().getService();
     storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
 
-    StorageFactory storageFactory = (env) -> storage;
+    StorageFactory storageFactory = (env, stats) -> storage;
     StatsFactory statsFactory = (env) -> Stats.NOOP;
     StyxScheduler.ExecutorFactory executorFactory = (ts, tf) -> executor;
     StyxScheduler.PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
@@ -151,7 +154,10 @@ public class StyxSchedulerServiceFixture {
         Sets.union(res, resourceIdsToDecorateWith);
     StyxScheduler.EventConsumerFactory eventConsumerFactory =
         (env, stats) -> (event, state) ->  transitionedEvents.add(Tuple.of(event, state.state()));
+    AuthenticatorFactory authenticatorFactory = (cfg) -> mock(Authenticator.class);
 
+    final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory =
+        (cfg, name) -> ServiceAccountUsageAuthorizer.nop();
     styxScheduler = StyxScheduler.newBuilder()
         .setTime(time)
         .setStorageFactory(storageFactory)
@@ -161,6 +167,8 @@ public class StyxSchedulerServiceFixture {
         .setPublisherFactory(publisherFactory)
         .setResourceDecorator(resourceDecorator)
         .setEventConsumerFactory(eventConsumerFactory)
+        .setAuthenticatorFactory(authenticatorFactory)
+        .setServiceAccountUsageAuthorizerFactory(serviceAccountUsageAuthorizerFactory)
         .build();
 
     serviceHelper = ServiceHelper.create(styxScheduler, StyxScheduler.SERVICE_NAME)
@@ -286,7 +294,6 @@ public class StyxSchedulerServiceFixture {
 
   void givenResource(Resource resource) throws IOException {
     storage.storeResource(resource);
-    storage.updateLimitForCounter(resource.id(), resource.concurrency());
   }
 
   void givenResourceIdsToDecorateWith(Set<String> resourceIds) throws IOException {
@@ -304,9 +311,11 @@ public class StyxSchedulerServiceFixture {
   }
 
   private TriggerInstantSpec initializeNaturalTrigger(Workflow workflow) {
+    // TODO: duplicate of WorkflowInitializer.initializeNaturalTrigger
     final Instant now = time.get();
+    final Instant offsetNow = workflow.configuration().subtractOffset(now);
     final Schedule schedule = workflow.configuration().schedule();
-    final Instant nextTrigger = lastInstant(now, schedule);
+    final Instant nextTrigger = nextInstant(offsetNow, schedule);
     final Instant nextWithOffset = workflow.configuration().addOffset(nextTrigger);
     return TriggerInstantSpec.create(nextTrigger, nextWithOffset);
   }
@@ -323,7 +332,7 @@ public class StyxSchedulerServiceFixture {
   /**
    * Fast forwards the time by executing all tasks in-between according to the executor's delay.
    */
-  void timePasses(int n, TimeUnit unit) {
+  void timePasses(long n, TimeUnit unit) {
     LOG.info("{} {} passes", n, unit);
     now = now.plusMillis(unit.toMillis(n));
     executor.tick(n, unit);

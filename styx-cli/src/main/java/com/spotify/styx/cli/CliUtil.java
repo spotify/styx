@@ -24,6 +24,8 @@ import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toCollection;
 import static org.fusesource.jansi.Ansi.ansi;
 
+import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
@@ -32,6 +34,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
@@ -75,5 +78,10 @@ class CliUtil {
         .atZone(ZoneId.of("UTC"))
         .toLocalDateTime()
         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
+  }
+
+  static String formatMap(Map<String, String> map) {
+    return Joiner.on(" ").withKeyValueSeparator("=")
+        .join(ImmutableSortedMap.copyOf(map));
   }
 }

@@ -22,25 +22,23 @@ package com.spotify.styx.docker;
 
 import static com.spotify.styx.docker.DockerRunner.LOG;
 import static com.spotify.styx.docker.KubernetesDockerRunner.DOCKER_TERMINATION_LOGGING_ANNOTATION;
-import static com.spotify.styx.docker.KubernetesDockerRunner.getStyxContainer;
-import static java.util.Collections.emptyList;
+import static com.spotify.styx.docker.KubernetesDockerRunner.getMainContainerStatus;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.RunState;
+import io.fabric8.kubernetes.api.model.ContainerState;
 import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
 import io.fabric8.kubernetes.api.model.ContainerStateWaiting;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodStatus;
-import io.fabric8.kubernetes.client.Watcher;
-import io.fabric8.kubernetes.client.Watcher.Action;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
@@ -53,7 +51,6 @@ final class KubernetesPodEventTranslator {
     throw new UnsupportedOperationException();
   }
 
-  @JsonIgnoreProperties(ignoreUnknown = true)
   private static class TerminationLogMessage {
     int exitCode;
 
@@ -72,7 +69,9 @@ final class KubernetesPodEventTranslator {
     final ContainerStateTerminated terminated = status.getState().getTerminated();
 
     // Check termination log exit code, if available
-    if ("true".equals(pod.getMetadata().getAnnotations().get(DOCKER_TERMINATION_LOGGING_ANNOTATION))) {
+    if (Optional.ofNullable(pod.getMetadata().getAnnotations())
+        .map(annotations -> "true".equals(annotations.get(DOCKER_TERMINATION_LOGGING_ANNOTATION)))
+        .orElse(false)) {
       if (terminated.getMessage() == null) {
         LOG.warn("Missing termination log message for workflow instance {} container {}",
                  workflowInstance, status.getContainerID());
@@ -127,123 +126,139 @@ final class KubernetesPodEventTranslator {
                status.getContainerID());
       return Optional.empty();
     } else {
+      // there are cases k8s marks the pod failed but with exitCode 0
+      if ("Failed".equals(pod.getStatus().getPhase()) && terminated.getExitCode() == 0) {
+        return Optional.empty();
+      }
       return Optional.of(terminated.getExitCode());
     }
   }
 
-  // TODO: fix NPath complexity
   static List<Event> translate(
       WorkflowInstance workflowInstance,
       RunState state,
-      Action action,
       Pod pod,
       Stats stats) {
 
-    if (action == Watcher.Action.DELETED) {
-      return emptyList();
-    }
+    final Optional<ContainerStatus> mainContainerStatusOpt = getMainContainerStatus(pod);
 
-    final List<Event> generatedEvents = Lists.newArrayList();
-    final Optional<Event> hasError = isInErrorState(workflowInstance, pod);
-
+    final Optional<Event> hasError = isInErrorState(workflowInstance, pod, mainContainerStatusOpt);
     if (hasError.isPresent()) {
-      switch (state.state()) {
-        case PREPARE:
-        case SUBMITTED:
-        case RUNNING:
-          generatedEvents.add(hasError.get());
-          break;
-
-        default:
-          // no event
-          break;
-      }
-
-      return generatedEvents;
+      return handleError(state, hasError.get());
     }
 
-    final PodStatus status = pod.getStatus();
-    final String phase = status.getPhase();
+    if (isExited(pod, mainContainerStatusOpt)) {
+      return handleExited(workflowInstance, state, pod, mainContainerStatusOpt, stats);
+    }
 
-    boolean exited = false;
-    boolean started = false;
-    Optional<Integer> exitCode = Optional.empty();
+    if (isStarted(pod, mainContainerStatusOpt)) {
+      return handleStarted(workflowInstance, state);
+    }
 
-    switch (phase) {
+    return List.of();
+  }
+
+  private static List<Event> handleExited(WorkflowInstance workflowInstance, RunState state,
+                                                Pod pod,
+                                                Optional<ContainerStatus> mainContainerStatusOpt,
+                                                Stats stats) {
+    final List<Event> generatedEvents = Lists.newArrayList();
+
+    switch (state.state()) {
+      case PREPARE:
+      case SUBMITTED:
+        generatedEvents.add(Event.started(workflowInstance));
+        // intentional fall-through
+
+      case RUNNING:
+        final Optional<Integer> exitCode = mainContainerStatusOpt.flatMap(cs ->
+            getExitCodeIfValid(workflowInstance.toKey(), pod, cs, stats));
+        generatedEvents.add(Event.terminate(workflowInstance, exitCode));
+        break;
+
+      default:
+        // no event
+        break;
+    }
+
+    return ImmutableList.copyOf(generatedEvents);
+  }
+
+  private static List<Event> handleStarted(WorkflowInstance workflowInstance, RunState state) {
+    switch (state.state()) {
+      case PREPARE:
+      case SUBMITTED:
+        return List.of(Event.started(workflowInstance));
+
+      default:
+        return List.of();
+    }
+  }
+
+  private static List<Event> handleError(RunState state, Event event) {
+    switch (state.state()) {
+      case PREPARE:
+      case SUBMITTED:
+      case RUNNING:
+        return List.of(event);
+
+      default:
+        return List.of();
+    }
+  }
+
+  private static boolean isExited(Pod pod, Optional<ContainerStatus> mainContainerStatusOpt) {
+    switch (pod.getStatus().getPhase()) {
       case "Running":
-        // check that the styx container is ready
-        started = getStyxContainer(pod)
-            .map(ContainerStatus::getReady)
-            .orElse(false);
+        // Check if the main container has exited
+        if (mainContainerStatusOpt.map(ContainerStatus::getState)
+            .map(ContainerState::getTerminated)
+            .isPresent()) {
+          return true;
+        }
+
         break;
 
       case "Succeeded":
       case "Failed":
-        exited = true;
-        exitCode = getStyxContainer(pod)
-            .flatMap(cs -> getExitCodeIfValid(
-                workflowInstance.toKey(),
-                pod,
-                cs, stats));
-        break;
+        return true;
 
       default:
         // do nothing
         break;
     }
 
-    if (started) {
-      switch (state.state()) {
-        case PREPARE:
-        case SUBMITTED:
-          generatedEvents.add(Event.started(workflowInstance));
-          break;
-
-        default:
-          // no event
-          break;
-      }
-    }
-
-    if (exited) {
-      switch (state.state()) {
-        case PREPARE:
-        case SUBMITTED:
-          generatedEvents.add(Event.started(workflowInstance));
-          // intentional fall-through
-
-        case RUNNING:
-          generatedEvents.add(Event.terminate(workflowInstance, exitCode));
-          break;
-
-        default:
-          // no event
-          break;
-      }
-    }
-
-    return generatedEvents;
+    return false;
   }
 
-  private static Optional<Event> isInErrorState(WorkflowInstance workflowInstance, Pod pod) {
+  private static boolean isStarted(Pod pod, Optional<ContainerStatus> mainContainerStatusOpt) {
+    return "Running".equals(pod.getStatus().getPhase()) && mainContainerStatusOpt
+        .map(ContainerStatus::getReady).orElse(false);
+  }
+
+  private static Optional<Event> isInErrorState(WorkflowInstance workflowInstance, Pod pod,
+                                                Optional<ContainerStatus> mainContainerStatusOpt) {
     final PodStatus status = pod.getStatus();
     final String phase = status.getPhase();
+
+    if ("NodeLost".equals(pod.getStatus().getReason())) {
+      return Optional.of(Event.runError(workflowInstance, "Lost node running pod"));
+    }
 
     switch (phase) {
       case "Pending":
         // check if one or more docker contains failed to pull their image, a possible silent error
-        return getStyxContainer(pod)
+        return mainContainerStatusOpt
             .filter(KubernetesPodEventTranslator::hasPullImageError)
             .map(x -> Event.runError(workflowInstance, "One or more containers failed to pull their image"));
 
       case "Succeeded":
       case "Failed":
-        final Optional<ContainerStatus> containerStatusOpt = getStyxContainer(pod);
-        if (!containerStatusOpt.isPresent()) {
+        if (!mainContainerStatusOpt.isPresent()) {
           return Optional.of(Event.runError(workflowInstance, "Could not find our container in pod"));
         }
 
-        final ContainerStatus containerStatus = containerStatusOpt.get();
+        final ContainerStatus containerStatus = mainContainerStatusOpt.get();
         final ContainerStateTerminated terminated = containerStatus.getState().getTerminated();
         if (terminated == null) {
           return Optional.of(Event.runError(workflowInstance, "Unexpected null terminated status"));
@@ -264,5 +279,15 @@ final class KubernetesPodEventTranslator {
         "PullImageError".equals(waiting.getReason())
         || "ErrImagePull".equals(waiting.getReason())
         || "ImagePullBackOff".equals(waiting.getReason()));
+  }
+
+  static boolean isTerminated(ContainerStatus cs) {
+    return cs.getState().getTerminated() != null;
+  }
+
+  static boolean isTerminated(Pod pod) {
+    return getMainContainerStatus(pod)
+        .map(KubernetesPodEventTranslator::isTerminated)
+        .orElse(false);
   }
 }

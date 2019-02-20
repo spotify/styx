@@ -27,11 +27,13 @@ import static org.mockito.Mockito.mock;
 
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.data.ExecStatus;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -58,6 +60,11 @@ public class BigTableStorageTest {
   private static final Trigger TRIGGER2 = Trigger.unknown("triggerId2");
   private static final Trigger TRIGGER3 = Trigger.unknown("triggerId3");
 
+  private static final TriggerParameters TRIGGER_PARAMETERS = TriggerParameters.builder()
+      .env("FOO", "foo",
+          "BAR", "bar")
+      .build();
+
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 
@@ -80,7 +87,7 @@ public class BigTableStorageTest {
   @Test
   public void shouldReturnExecutionDataForWorkflowInstance() throws Exception {
     setUp(0);
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER), 0L, 0L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER, TRIGGER_PARAMETERS), 0L, 0L));
     storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId", "img"), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI1), 2L, 2L));
 
@@ -97,11 +104,11 @@ public class BigTableStorageTest {
   @Test
   public void shouldReturnExecutionDataForWorkflow() throws Exception {
     setUp(0);
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1), 0L, 0L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1, TRIGGER_PARAMETERS), 0L, 0L));
     storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId1", "img1"), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI1), 2L, 2L));
 
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2), 0L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2, TRIGGER_PARAMETERS), 0L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.created(WFI2, "execId2", "img2"), 1L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI2), 2L, 5L));
 
@@ -129,9 +136,9 @@ public class BigTableStorageTest {
   @Test
   public void shouldPaginateExecutionDataForWorkflow() throws Exception {
     setUp(0);
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1), 0L, 0L));
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2), 0L, 3L));
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI3, TRIGGER3), 0L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1, TRIGGER_PARAMETERS), 0L, 0L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2, TRIGGER_PARAMETERS), 0L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI3, TRIGGER3, TRIGGER_PARAMETERS), 0L, 3L));
 
     List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =
         storage.executionData(WORKFLOW_ID1, WFI2.parameter(), 100);
@@ -143,9 +150,9 @@ public class BigTableStorageTest {
   @Test
   public void shouldLimitExecutionDataForWorkflow() throws Exception {
     setUp(0);
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1), 0L, 0L));
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2), 0L, 3L));
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI3, TRIGGER3), 0L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1, TRIGGER_PARAMETERS), 0L, 0L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2, TRIGGER_PARAMETERS), 0L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI3, TRIGGER3, TRIGGER_PARAMETERS), 0L, 3L));
 
     List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =
         storage.executionData(WORKFLOW_ID1, WFI1.parameter(), 1);
@@ -157,11 +164,11 @@ public class BigTableStorageTest {
   @Test
   public void shouldReturnRangeOfExecutionDataForWorkflow() throws Exception {
     setUp(0);
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1), 0L, 0L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1, TRIGGER_PARAMETERS), 0L, 0L));
     storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId1", "img1"), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI1), 2L, 2L));
 
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2), 0L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2, TRIGGER_PARAMETERS), 0L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.created(WFI2, "execId2", "img2"), 1L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI2), 2L, 5L));
 
@@ -189,11 +196,11 @@ public class BigTableStorageTest {
   @Test
   public void shouldReturnExecutionDataForOneWorkflow() throws Exception {
     setUp(0);
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1), 0L, 0L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1, TRIGGER_PARAMETERS), 0L, 0L));
     storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId1", "img1"), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI1), 2L, 2L));
 
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2), 0L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2, TRIGGER_PARAMETERS), 0L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.created(WFI2, "execId2", "img2"), 1L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI2), 2L, 5L));
 
@@ -226,5 +233,15 @@ public class BigTableStorageTest {
     setUp(BigtableStorage.MAX_BIGTABLE_RETRIES - 1);
 
     storage.writeEvent(SequenceEvent.create(Event.success(WFI1), 1, 0));
+  }
+
+  @Test
+  public void shouldProduceResourceNotFoundExceptionWhenNoExecutionData() throws Exception {
+    setUp(0);
+
+    thrown.expect(ResourceNotFoundException.class);
+    thrown.expectMessage(containsString("Workflow instance not found"));
+
+    storage.executionData(WFI1);
   }
 }

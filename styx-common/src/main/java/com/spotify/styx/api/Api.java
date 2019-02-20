@@ -20,13 +20,17 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.styx.api.Middlewares.authenticator;
 import static com.spotify.styx.api.Middlewares.clientValidator;
-import static com.spotify.styx.api.Middlewares.exceptionHandler;
+import static com.spotify.styx.api.Middlewares.exceptionAndRequestIdHandler;
 import static com.spotify.styx.api.Middlewares.httpLogger;
+import static com.spotify.styx.api.Middlewares.tracer;
 
 import com.spotify.apollo.Response;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
+import io.opencensus.trace.Tracer;
+import io.opencensus.trace.Tracing;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -36,12 +40,19 @@ import okio.ByteString;
 
 public final class Api {
 
+  private static final Tracer tracer = Tracing.getTracer();
+
   public enum Version {
     V3;
 
     public String prefix() {
       return "/api/" + name().toLowerCase();
     }
+
+  }
+
+  private Api() {
+    throw new UnsupportedOperationException();
   }
 
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> prefixRoutes(
@@ -52,18 +63,22 @@ public final class Api {
   }
 
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
-      Stream<Route<AsyncHandler<Response<ByteString>>>> routes) {
-    return withCommonMiddleware(routes, Collections::emptyList);
+      Stream<Route<AsyncHandler<Response<ByteString>>>> routes,
+      RequestAuthenticator authenticator,
+      String service) {
+    return withCommonMiddleware(routes, Collections::emptyList, authenticator, service);
   }
 
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
       Stream<Route<AsyncHandler<Response<ByteString>>>> routes,
-      Supplier<List<String>> clientBlacklistSupplier) {
+      Supplier<List<String>> clientBlacklistSupplier,
+      RequestAuthenticator authenticator,
+      String service) {
     return routes.map(r -> r
-        .withMiddleware(httpLogger())
+        .withMiddleware(httpLogger(authenticator))
+        .withMiddleware(authenticator(authenticator))
         .withMiddleware(clientValidator(clientBlacklistSupplier))
-        .withMiddleware(exceptionHandler()));
-  }
-  private Api() {
+        .withMiddleware(exceptionAndRequestIdHandler())
+        .withMiddleware(tracer(tracer, service)));
   }
 }

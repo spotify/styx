@@ -20,6 +20,7 @@
 
 package com.spotify.styx.cli;
 
+import static com.spotify.styx.cli.CliUtil.formatMap;
 import static com.spotify.styx.cli.CliUtil.formatTimestamp;
 
 import com.google.common.base.Joiner;
@@ -33,6 +34,7 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.SortedMap;
@@ -76,17 +78,20 @@ class PlainCliOutput implements CliOutput {
 
   @Override
   public void printBackfill(Backfill backfill, boolean ignored) {
-    System.out.println(String.format("%s %s %s %s %s %s %s %s %s %s",
-                                     backfill.id(),
-                                     backfill.workflowId().componentId(),
-                                     backfill.workflowId().id(),
-                                     backfill.halted(),
-                                     backfill.allTriggered(),
-                                     backfill.concurrency(),
-                                     backfill.start(),
-                                     backfill.end(),
-                                     backfill.nextTrigger(),
-                                     backfill.description().orElse("")));
+    System.out.println(String.format("%s %s %s %s %s %s %s %s %s %s %s %s",
+        backfill.id(),
+        backfill.workflowId().componentId(),
+        backfill.workflowId().id(),
+        backfill.halted(),
+        backfill.allTriggered(),
+        backfill.concurrency(),
+        backfill.start(),
+        backfill.end(),
+        backfill.reverse(),
+        backfill.nextTrigger(),
+        backfill.description().orElse(""),
+        backfill.triggerParameters().map(triggerParameters -> formatMap(
+            triggerParameters.env())).orElse("")));
   }
 
   @Override
@@ -119,7 +124,7 @@ class PlainCliOutput implements CliOutput {
   public void printWorkflow(Workflow wf, WorkflowState state) {
     System.out.println(Joiner.on(' ').join(
         wf.componentId(),
-        wf.id(),
+        wf.workflowId(),
         wf.configuration().schedule(),
         wf.configuration().offset().orElse(""),
         wf.configuration().dockerImage().orElse(""),
@@ -128,10 +133,17 @@ class PlainCliOutput implements CliOutput {
         wf.configuration().secret().map(s -> s.name() + ':' + s.mountPath()).orElse(""),
         wf.configuration().serviceAccount().map(Object::toString).orElse(""),
         wf.configuration().resources(),
+        wf.configuration().env(),
+        wf.configuration().runningTimeout().map(Duration::toString).orElse(""),
         wf.configuration().commitSha().orElse(""),
         state.enabled().map(Object::toString).orElse(""),
         state.nextNaturalTrigger().map(Object::toString).orElse(""),
         state.nextNaturalOffsetTrigger().map(Object::toString).orElse("")));
+  }
+
+  @Override
+  public void printWorkflows(List<Workflow> workflows) {
+    workflows.forEach(wf -> System.out.println(wf.componentId() + " " + wf.workflowId()));
   }
 
   @Override

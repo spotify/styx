@@ -22,12 +22,11 @@ package com.spotify.styx;
 
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
-import static com.spotify.styx.WorkflowExecutionGate.NOOP;
-import static com.spotify.styx.state.StateUtil.GLOBAL_RESOURCE_ID;
 import static com.spotify.styx.state.StateUtil.getActiveInstanceStates;
 import static com.spotify.styx.state.StateUtil.getResourceUsage;
 import static com.spotify.styx.state.StateUtil.getTimedOutInstances;
 import static com.spotify.styx.state.StateUtil.workflowResources;
+import static com.spotify.styx.storage.Storage.GLOBAL_RESOURCE_ID;
 import static java.util.Collections.emptySet;
 import static java.util.Comparator.comparingLong;
 import static java.util.function.Function.identity;
@@ -35,8 +34,8 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.AtomicLongMap;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.WorkflowExecutionGate.ExecutionBlocker;
 import com.spotify.styx.model.Event;
@@ -54,7 +53,13 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.IsClosedException;
+import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
+import io.grpc.Context;
+import io.opencensus.common.Scope;
+import io.opencensus.trace.Tracer;
+import io.opencensus.trace.Tracing;
+import io.opencensus.trace.samplers.Samplers;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -63,8 +68,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -93,7 +101,7 @@ public class Scheduler {
   private static final String TICK_TYPE = UPPER_CAMEL.to(LOWER_UNDERSCORE,
       Scheduler.class.getSimpleName());
 
-  private static final int SCHEDULING_BATCH_SIZE = 16;
+  private static final Tracer tracer = Tracing.getTracer();
 
   private final Time time;
   private final TimeoutConfig ttls;
@@ -103,12 +111,13 @@ public class Scheduler {
   private final Stats stats;
   private final RateLimiter dequeueRateLimiter;
   private final WorkflowExecutionGate gate;
+  private final ShardedCounter shardedCounter;
+  private final Executor executor;
   private final List<OutputHandler> outputHandlers;
 
-  public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager,
-      Storage storage,
-      WorkflowResourceDecorator resourceDecorator,
-      Stats stats, RateLimiter dequeueRateLimiter, WorkflowExecutionGate gate,
+  public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager, Storage storage,
+      WorkflowResourceDecorator resourceDecorator, Stats stats, RateLimiter dequeueRateLimiter,
+      WorkflowExecutionGate gate, ShardedCounter shardedCounter, Executor executor,
       List<OutputHandler> outputHandlers) {
     this.time = Objects.requireNonNull(time);
     this.ttls = Objects.requireNonNull(ttls);
@@ -118,10 +127,21 @@ public class Scheduler {
     this.stats = Objects.requireNonNull(stats);
     this.dequeueRateLimiter = Objects.requireNonNull(dequeueRateLimiter, "dequeueRateLimiter");
     this.gate = Objects.requireNonNull(gate, "gate");
-    this.outputHandlers = outputHandlers;
+    this.shardedCounter = Objects.requireNonNull(shardedCounter, "shardedCounter");
+    this.executor = Context.currentContextExecutor(Objects.requireNonNull(executor, "executor"));
+    this.outputHandlers = Objects.requireNonNull(outputHandlers, "outputHandlers");
   }
 
   void tick() {
+    try (Scope ss = tracer.spanBuilder("Styx.Scheduler.tick")
+        .setRecordEvents(true)
+        .setSampler(Samplers.alwaysSample())
+        .startScopedSpan()) {
+      tick0();
+    }
+  }
+
+  private void tick0() {
     final Instant t0 = time.get();
 
     final Map<String, Resource> resources;
@@ -144,9 +164,9 @@ public class Scheduler {
     final Map<WorkflowInstance, RunState> activeStatesMap = stateManager.getActiveStates();
     final List<InstanceState> activeStates = getActiveInstanceStates(activeStatesMap);
 
-    final Set<WorkflowInstance> timedOutInstances = getTimedOutInstances(activeStates, time.get(), ttls);
-    
     final Map<WorkflowId, Workflow> workflows = getWorkflows(activeStates);
+
+    final Set<WorkflowInstance> timedOutInstances = getTimedOutInstances(workflows, activeStates, time.get(), ttls);
 
     final Map<WorkflowId, Set<String>> workflowResourceReferences =
         activeStates.parallelStream()
@@ -163,6 +183,7 @@ public class Scheduler {
     final Map<String, Long> currentResourceUsage =
         getResourceUsage(globalConcurrency.isPresent(), activeStates, timedOutInstances,
             resourceDecorator, workflows);
+    final AtomicLongMap<String> currentResourceDemand = AtomicLongMap.create();
 
     // this reflects resource usage since last tick, so a couple of minutes delay
     updateResourceStats(resources, currentResourceUsage);
@@ -184,12 +205,17 @@ public class Scheduler {
         .flatMap(state -> instancesByState.get(state).stream())
         .collect(toList());
 
+    final String message = String.format("Instances: active=%d, alive=%d, dequeueEligible=%d, timedOut=%d",
+        activeStates.size(), aliveInstances.size(), dequeueEligibleInstances.size(), timedOutInstances.size());
+    LOG.info(message);
+    tracer.getCurrentSpan().addAnnotation(message);
+
     timedOutInstances.forEach(wfi -> this.sendTimeout(wfi, activeStatesMap.get(wfi)));
 
-    gateAndDequeueInstances(config, resources, workflowResourceReferences,
-        workflows, dequeueEligibleInstances);
+    dequeueInstances(config, resources, workflowResourceReferences,
+        workflows, dequeueEligibleInstances, currentResourceDemand);
 
-    processExecutingInstances(executingInstances);
+    currentResourceDemand.asMap().forEach(stats::recordResourceDemanded);
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
     stats.recordTickDuration(TICK_TYPE, durationMillis);
@@ -227,59 +253,55 @@ public class Scheduler {
     return storage.workflows(workflowIds);
   }
 
-  private void gateAndDequeueInstances(
+  private void dequeueInstances(
       StyxConfig config,
       Map<String, Resource> resources,
       Map<WorkflowId, Set<String>> workflowResourceReferences,
       Map<WorkflowId, Workflow> workflows,
-      List<InstanceState> eligibleInstances) {
-    // Enable gating unless disabled in runtime config
-    final WorkflowExecutionGate gate = config.executionGatingEnabled() ? this.gate : NOOP;
+      List<InstanceState> eligibleInstances,
+      AtomicLongMap<String> currentResourceDemand) {
 
-    // Process the eligible instances in batches in order to parallelize execution blocker lookup
-    for (List<InstanceState> batch : Lists.partition(eligibleInstances, SCHEDULING_BATCH_SIZE)) {
+    final ConcurrentMap<String, Boolean> resourceExhaustedCache = new ConcurrentHashMap<>();
 
-      // Asynchronously look up execution blockers for a batch of instances
-      final List<CompletionStage<Optional<ExecutionBlocker>>> blockers = batch.stream()
-          .map(InstanceState::workflowInstance)
-          .map(gate::executionBlocker)
-          .collect(toList());
+    final Map<WorkflowInstance, CompletableFuture<Void>> futures = eligibleInstances.stream()
+        .collect(toMap(
+            InstanceState::workflowInstance,
+            instanceState -> CompletableFuture.runAsync(() ->
+                dequeueInstance(config, resources, workflowResourceReferences,
+                    Optional.ofNullable(workflows.get(instanceState.workflowInstance().workflowId())),
+                    instanceState, resourceExhaustedCache, currentResourceDemand), executor)));
 
-      // Evaluate each instance in the batch for dequeuing
-      for (int i = 0; i < batch.size(); i++) {
-        final InstanceState instanceState = batch.get(i);
-        dequeueInstance(resources, workflowResourceReferences,
-            Optional.ofNullable(workflows.get(instanceState.workflowInstance().workflowId())),
-            instanceState, blockers.get(i));
+    futures.forEach((instance, future) -> {
+      try {
+        future.get();
+      } catch (InterruptedException e) {
+        LOG.warn("Interrupted", e);
+        Thread.currentThread().interrupt();
+        throw new RuntimeException(e);
+      } catch (ExecutionException e) {
+        LOG.error("Failed to process instance for dequeue: " + instance, e);
       }
-    }
+    });
   }
 
-  private void dequeueInstance(Map<String, Resource> resources,
+  private void dequeueInstance(StyxConfig config, Map<String, Resource> resources,
                                Map<WorkflowId, Set<String>> workflowResourceReferences,
-                               Optional<Workflow> workflowOpt,
-                               InstanceState instanceState,
-                               CompletionStage<Optional<ExecutionBlocker>> executionBlockerFuture) {
+                               Optional<Workflow> workflowOpt, InstanceState instanceState,
+                               ConcurrentMap<String, Boolean> resourceExhaustedCache,
+                               AtomicLongMap<String> currentResourceDemand) {
+    tracer.spanBuilder("dequeueInstance").startSpanAndRun(() ->
+        dequeueInstance0(config, resources, workflowResourceReferences, workflowOpt, instanceState,
+            resourceExhaustedCache, currentResourceDemand));
+  }
 
-    // Check for execution blocker
-    Optional<ExecutionBlocker> blocker = Optional.empty();
-    try {
-      blocker = executionBlockerFuture.toCompletableFuture().get(10, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      LOG.debug("Thread interrupted");
-      throw new RuntimeException(e);
-    } catch (ExecutionException | TimeoutException e) {
-      LOG.warn("Failed to check execution blocker for {}, assuming there is no blocker",
-          instanceState.workflowInstance(), e);
-    }
+  private void dequeueInstance0(final StyxConfig config, Map<String, Resource> resources,
+                                Map<WorkflowId, Set<String>> workflowResourceReferences,
+                                Optional<Workflow> workflowOpt,
+                                InstanceState instanceState,
+                                ConcurrentMap<String, Boolean> resourceExhaustedCache,
+                                AtomicLongMap<String> currentResourceDemand) {
 
-    if (blocker.isPresent()) {
-      stateManager.receiveIgnoreClosed(Event.retryAfter(instanceState.workflowInstance(),
-          blocker.get().delay().toMillis()),
-          instanceState.runState().counter());
-      LOG.debug("Dequeue rescheduled: {}: {}", instanceState.workflowInstance(), blocker.get());
-      return;
-    }
+    LOG.debug("Evaluating instance for dequeue: {}", instanceState.workflowInstance());
 
     final Set<String> workflowResourceRefs =
         workflowResourceReferences.getOrDefault(instanceState.workflowInstance().workflowId(), emptySet());
@@ -298,16 +320,69 @@ public class Scheduler {
           Event.runError(instanceState.workflowInstance(),
               String.format("Referenced resources not found: %s", unknownResources)),
           instanceState.runState().counter());
-    } else {
-      double sleepingTime = dequeueRateLimiter.acquire();
-      if (sleepingTime > 0.0001) {
-        LOG.debug("Dequeue rate limited and slept for {} ms", sleepingTime * 1000);
+      return;
+    }
+
+    instanceResourceRefs.forEach(currentResourceDemand::incrementAndGet);
+
+    // Check resource limits. This is racy and can give false positives but the transactional
+    // checking happens later. This is just intended to avoid spinning on exhausted resources.
+    final List<String> depletedResources = instanceResourceRefs.stream()
+        .filter(resourceId -> limitReached(resourceId, resourceExhaustedCache))
+        .sorted()
+        .collect(toList());
+    if (!depletedResources.isEmpty()) {
+      LOG.debug("Resource limit reached for instance, not dequeueing: {}: exhausted resources={}",
+          instanceState.workflowInstance(), depletedResources);
+      MessageUtil.emitResourceLimitReachedMessage(stateManager, instanceState.runState(), depletedResources);
+      return;
+    }
+
+    // Check for execution blocker
+    if (config.executionGatingEnabled()) {
+      Optional<ExecutionBlocker> blocker = Optional.empty();
+      try {
+        blocker = gate.executionBlocker(instanceState.workflowInstance())
+            .toCompletableFuture().get(10, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException(e);
+      } catch (ExecutionException | TimeoutException e) {
+        LOG.warn("Failed to check execution blocker for {}, assuming there is no blocker",
+            instanceState.workflowInstance(), e);
       }
 
-      // Racy: some resources may have been removed (become unknown) by now; in that case the
-      // counters code during dequeue will treat them as unlimited...
-      sendDequeue(instanceState, instanceResourceRefs);
+      if (blocker.isPresent()) {
+        stateManager.receiveIgnoreClosed(Event.retryAfter(instanceState.workflowInstance(),
+            blocker.get().delay().toMillis()),
+            instanceState.runState().counter());
+        LOG.debug("Dequeue rescheduled: {}: {}", instanceState.workflowInstance(), blocker.get());
+        return;
+      }
     }
+
+    double sleepingTimeSeconds = dequeueRateLimiter.acquire();
+    if (sleepingTimeSeconds > 0.0001) {
+      final double sleepingTimeMillis = sleepingTimeSeconds * 1000;
+      final String message = "Dequeue rate limited and slept for " + sleepingTimeMillis + " ms";
+      LOG.debug(message, sleepingTimeMillis);
+      tracer.getCurrentSpan().addAnnotation(message);
+    }
+
+    // Racy: some resources may have been removed (become unknown) by now; in that case the
+    // counters code during dequeue will treat them as unlimited...
+    sendDequeue(instanceState, instanceResourceRefs);
+  }
+
+  private boolean limitReached(final String resourceId, ConcurrentMap<String, Boolean> resourceExhaustedCache) {
+    return resourceExhaustedCache.computeIfAbsent(resourceId, k -> {
+      try {
+        return !shardedCounter.counterHasSpareCapacity(resourceId);
+      } catch (RuntimeException | IOException e) {
+        LOG.warn("Failed to check resource counter limit", e);
+        return false;
+      }
+    });
   }
 
   private boolean isDueForDequeue(RunState runState) {
@@ -324,9 +399,9 @@ public class Scheduler {
     final RunState state = instanceState.runState();
 
     if (state.data().tries() == 0) {
-      LOG.info("Executing {}", workflowInstance.toKey());
+      LOG.info("Executing {}", workflowInstance);
     } else {
-      LOG.info("Executing {}, retry #{}", workflowInstance.toKey(), state.data().tries());
+      LOG.info("Executing {}, retry #{}", workflowInstance, state.data().tries());
     }
     stateManager.receiveIgnoreClosed(Event.dequeue(workflowInstance, resourceIds),
         instanceState.runState().counter());

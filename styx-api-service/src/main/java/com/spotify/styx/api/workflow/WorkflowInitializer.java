@@ -20,17 +20,19 @@
 
 package com.spotify.styx.api.workflow;
 
-import static com.spotify.styx.util.TimeUtil.lastInstant;
+import static com.spotify.styx.util.TimeUtil.nextInstant;
 
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,17 +47,30 @@ public class WorkflowInitializer {
     this.time = Objects.requireNonNull(time);
   }
 
-  public Optional<Workflow> store(Workflow workflow)
+  public Optional<Workflow> store(Workflow workflow, Consumer<Optional<Workflow>> guard)
       throws WorkflowInitializationException {
+    try {
+      return storage.runInTransaction(tx -> store(tx, workflow, guard));
+    } catch (IOException e) {
+      LOG.warn("failed to write workflow {} to storage", workflow.id(), e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  private Optional<Workflow> store(StorageTransaction tx, Workflow workflow,
+                                   Consumer<Optional<Workflow>> guard)
+      throws WorkflowInitializationException, IOException {
     final Optional<Workflow> previous;
     try {
-      previous = storage.workflow(workflow.id());
+      previous = tx.workflow(workflow.id());
     } catch (IOException e) {
       LOG.warn("failed to read workflow {} from storage", workflow.id(), e);
       throw new RuntimeException(e);
     }
 
-    Optional<TriggerInstantSpec> nextSpec = Optional.empty();
+    guard.accept(previous);
+
+    final Optional<TriggerInstantSpec> nextSpec;
 
     // either the workflow is completely new, or the schedule/offset has changed
     final Schedule newSchedule = workflow.configuration().schedule();
@@ -69,16 +84,14 @@ public class WorkflowInitializer {
         LOG.info("could not compute next natural trigger for workflow {}", workflow, e);
         throw new WorkflowInitializationException(e);
       }
+    } else {
+      nextSpec = Optional.empty();
     }
 
-    try {
-      storage.storeWorkflow(workflow);
-      if (nextSpec.isPresent()) {
-        storage.updateNextNaturalTrigger(workflow.id(), nextSpec.get());
-      }
-    } catch (IOException e) {
-      LOG.warn("failed to write workflow {} to storage", workflow.id(), e);
-      throw new RuntimeException(e);
+    if (nextSpec.isPresent()) {
+      tx.storeWorkflowWithNextNaturalTrigger(workflow, nextSpec.get());
+    } else {
+      tx.store(workflow);
     }
 
     return previous;
@@ -86,8 +99,9 @@ public class WorkflowInitializer {
 
   private TriggerInstantSpec initializeNaturalTrigger(Workflow workflow) {
     final Instant now = time.get();
+    final Instant offsetNow = workflow.configuration().subtractOffset(now);
     final Schedule schedule = workflow.configuration().schedule();
-    final Instant nextTrigger = lastInstant(now, schedule);
+    final Instant nextTrigger = nextInstant(offsetNow, schedule);
     final Instant nextWithOffset = workflow.configuration().addOffset(nextTrigger);
     return TriggerInstantSpec.create(nextTrigger, nextWithOffset);
   }

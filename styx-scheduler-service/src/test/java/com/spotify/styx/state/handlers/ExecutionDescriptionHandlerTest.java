@@ -30,11 +30,9 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.startsWith;
 import static org.hamcrest.core.Is.is;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
@@ -44,22 +42,20 @@ import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class ExecutionDescriptionHandlerTest {
@@ -70,14 +66,11 @@ public class ExecutionDescriptionHandlerTest {
   private ExecutionDescriptionHandler toTest;
 
   @Mock Storage storage;
-  @Mock StateManager stateManager;
-  @Mock DockerImageValidator dockerImageValidator;
   @Mock EventVisitor<Void> eventVisitor;
 
   @Captor ArgumentCaptor<WorkflowInstance> workflowInstanceCaptor;
   @Captor ArgumentCaptor<ExecutionDescription> executionDescriptionCaptor;
   @Captor ArgumentCaptor<String> executionIdCaptor;
-  @Captor ArgumentCaptor<Event> eventCaptor;
 
   @Mock WorkflowValidator workflowValidator;
 
@@ -85,10 +78,7 @@ public class ExecutionDescriptionHandlerTest {
   public void setUp() throws Exception {
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
 
-    when(stateManager.receive(any())).thenReturn(CompletableFuture.completedFuture(null));
-    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Collections.emptyList());
     toTest = new ExecutionDescriptionHandler(storage, workflowValidator);
-
   }
 
   @Test
@@ -99,11 +89,7 @@ public class ExecutionDescriptionHandlerTest {
 
     when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
 
-    toTest.transitionInto(runState);
-
-    verify(stateManager).receive(eventCaptor.capture());
-
-    final Event event = eventCaptor.getValue();
+    final Event event = toTest.transitionInto(runState).get();
     event.accept(eventVisitor);
     verify(eventVisitor)
         .submit(workflowInstanceCaptor.capture(), executionDescriptionCaptor.capture(), executionIdCaptor.capture());
@@ -122,11 +108,7 @@ public class ExecutionDescriptionHandlerTest {
 
     when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
 
-    toTest.transitionInto(runState);
-
-    verify(stateManager).receive(eventCaptor.capture());
-
-    final Event event = eventCaptor.getValue();
+    final Event event = toTest.transitionInto(runState).get();
     event.accept(eventVisitor);
 
     verify(eventVisitor)
@@ -135,7 +117,7 @@ public class ExecutionDescriptionHandlerTest {
     assertThat(executionIdCaptor.getValue(), startsWith("styx-run-"));
     assertThat(executionDescriptionCaptor.getValue().dockerImage(), is(DOCKER_IMAGE));
     assertThat(executionDescriptionCaptor.getValue().commitSha(), hasValue(COMMIT_SHA));
-    assertThat(executionDescriptionCaptor.getValue().dockerArgs(), contains("--date", "{}", "--bar"));
+    assertThat(executionDescriptionCaptor.getValue().dockerArgs(), contains("--date", "2016-03-14", "--bar"));
   }
 
   @Test
@@ -149,9 +131,8 @@ public class ExecutionDescriptionHandlerTest {
 
     RunState runState = RunState.create(workflowInstance, PREPARE);
 
-    toTest.transitionInto(runState);
-
-    verify(stateManager).receive(Event.runError(workflowInstance, exception.getMessage()));
+    final Event event = toTest.transitionInto(runState).get();
+    assertThat(event, is(Event.runError(workflowInstance, exception.getMessage())));
   }
 
   @Test
@@ -161,9 +142,9 @@ public class ExecutionDescriptionHandlerTest {
 
     when(storage.workflow(any())).thenReturn(Optional.empty());
 
-    toTest.transitionInto(runState);
+    final Event event = toTest.transitionInto(runState).get();
 
-    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance));
+    assertThat(event, is(Event.halt(workflowInstance)));
   }
 
   @Test
@@ -178,14 +159,14 @@ public class ExecutionDescriptionHandlerTest {
 
     when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
 
-    toTest.transitionInto(runState);
+    final Event event = toTest.transitionInto(runState).get();
 
-    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance));
+    assertThat(event, is(Event.halt(workflowInstance)));
   }
 
   @Test
   public void shouldHaltIfInvalidConfiguration() throws Exception {
-    when(workflowValidator.validateWorkflow(any())).thenReturn(ImmutableList.of("foo", "bar"));
+    when(workflowValidator.validateWorkflow(any())).thenReturn(List.of("foo", "bar"));
 
     Workflow workflow = Workflow.create("id", FULL_WORKFLOW_CONFIGURATION);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
@@ -193,9 +174,9 @@ public class ExecutionDescriptionHandlerTest {
 
     when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
 
-    toTest.transitionInto(runState);
+    final Event event = toTest.transitionInto(runState).get();
 
-    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance));
+    assertThat(event, is(Event.halt(workflowInstance)));
   }
 
   private WorkflowConfiguration workflowConfiguration(String... args) {

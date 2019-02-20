@@ -3,7 +3,7 @@
 [![CircleCI](https://circleci.com/gh/spotify/styx/tree/master.svg?style=shield)](https://circleci.com/gh/spotify/styx)
 [![Coverage Status](https://codecov.io/gh/spotify/styx/branch/master/graph/badge.svg)](https://codecov.io/gh/spotify/styx)
 [![License](https://img.shields.io/github/license/spotify/styx.svg)](LICENSE)
-[![Release](https://jitpack.io/v/spotify/styx.svg)](https://jitpack.io/#spotify/styx)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.spotify/styx/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.spotify/styx)
 
 A batch job scheduler for Kubernetes
 
@@ -150,8 +150,8 @@ An [ISO 8601 Duration] specification for offsetting the cron schedule.
 This is useful for when setting up a schedule that needs to be offset in time relative to the
 schedule timestamps. For instance, an hourly schedule that needs to process a bucket of data
 for each hour will not be able to run until at the end of that hour. We can then use an offset
-value of `PT1H`. The injected placeholder would reflect the logical time of the schedule (00,
-01, 02, ...), but it would actually run one hour later (01, 02, 03, ...). This is specially
+value of `PT1H`. The injected placeholder would reflect a logical time of the schedule
+(00, 01, 02, ...) one hour earlier than the actual run time (01, 02, 03, ...). This is specially
 useful for irregular schedules.
 
 In fact, it is so common that we need to use a "last hour" parameter in jobs that we've set the
@@ -197,8 +197,23 @@ Styx will refuse to trigger the workflow.
 
 In order for Styx to be able to create/delete keys for the `service_account` of a workflow,
 the [Service Account] that Styx itself runs as should be granted `Service Account Key Admin`
-role for the `service_account` of the workflow. This can be done by following
-[Granting Roles to Service Accounts].
+role for the `service_account` of the workflow.
+
+If authorization is enabled for the service, the `service_account` will be used to authorize
+deployments and actions (create/modify/delete, trigger a new instance, retry/halt an
+existing instance and create backfill) on the workflow. To authorize an account, grant it the
+[configured role]) for the [Service Account] of the workflow.
+
+For information on how to grant an account a role in a [Service Account], follow this
+guide: [Granting Roles to Service Accounts].
+
+#### `env` **[dictionary]**
+
+Custom environment variables to be injected into running container.
+
+#### `running_timeout` **[string]**
+An [ISO 8601 Duration] specification for timing out container execution. Defaults to 24 hours that also
+serves as the upper boundary.
 
 ### Triggering and executions
 
@@ -229,12 +244,24 @@ For each execution, Styx will inject a set of environment variables into the Doc
 | `STYX_TRIGGER_ID` | The ID of the trigger. |
 | `STYX_TRIGGER_TYPE` | The type of the trigger. Possible values are: `natural`, `adhoc`, `backfill` and `unknown` |
 | `STYX_EXECUTION_ID` | A unique identifier for the execution. This is the execution id used to identify execution attempts of a trigger. |
+| `STYX_LOGGING`  | Container logging format, `text` or `structured`. |
+| `STYX_ENVIRONMENT`  | Styx environment, `staging`, `production`, `testing`, etc. Should be defined in [`styx-standalone.conf`](./styx-standalone-service/src/main/resources/styx-standalone.conf). |
 | `STYX_EXECUTION_COUNTER` | **to be implemented** - A counter indicating which execution this is. Goes from 0..N per trigger. |
+
 
 ### High availability
 
 Since version 2.0, Styx supports full HA (High Availability) where both [styx-api-service] and [styx-scheduler-service] can be set up
 to have multiple instances.
+
+### Authorization
+
+Enabling authorization means that any workflow with a configured `service_account` will only allow authorized
+users to deploy and manage it.
+
+You can enable authorization in your configuration, either for [all workflows] or a [subset of workflows].
+You will also need to provide the [name of the role][configured role] to use for determining if an account is an authorized
+user of the `service_account` or not. [Read more about how to authorize accounts for a service account here](#service_account-email-address).
 
 ## Development
 
@@ -254,11 +281,11 @@ All other APIs are considered unstable and can change at any time. E.g. the `Sty
 
 ### Code Coverage
 
-An aggregate code coverage report for the entire project is created by the `report` submodule.
+An aggregate code coverage report for the entire project is created by the `styx-report` submodule.
 
 ```bash
 > mvn clean verify
-> open report/target/site/jacoco-aggregate/index.html
+> open styx-report/target/site/jacoco-aggregate/index.html
 ```
 
 CircleCI builds submit code coverage reports to [codecov.io]. In addition, the aggregate
@@ -284,3 +311,6 @@ expected to honor this code.
 [codecov.io]: https://codecov.io/gh/spotify/styx
 [styx-api-service]: https://github.com/spotify/styx/tree/master/styx-api-service
 [styx-scheduler-service]: https://github.com/spotify/styx/tree/master/styx-scheduler-service
+[configured role]: ./styx-standalone-service/src/main/resources/styx-standalone.conf#L66
+[all workflows]: ./styx-standalone-service/src/main/resources/styx-standalone.conf#L73
+[subset of workflows]: ./styx-standalone-service/src/main/resources/styx-standalone.conf#L77

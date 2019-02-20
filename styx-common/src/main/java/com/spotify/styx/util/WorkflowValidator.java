@@ -22,13 +22,14 @@ package com.spotify.styx.util;
 
 import static java.lang.String.format;
 
+import com.google.common.base.Preconditions;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 public class WorkflowValidator {
 
@@ -40,11 +41,22 @@ public class WorkflowValidator {
   static final int MAX_SECRET_NAME_LENGTH = 253;
   static final int MAX_SECRET_MOUNT_PATH_LENGTH = 1024;
   static final int MAX_SERVICE_ACCOUNT_LENGTH = 256;
+  static final int MAX_ENV_VARS = 128;
+  static final int MAX_ENV_SIZE = 16 * 1024;
+  static final Duration MIN_RUNNING_TIMEOUT = Duration.ofMinutes(1);
 
   private final DockerImageValidator dockerImageValidator;
+  private final Duration maybeMaxRunningTimeout;
 
-  public WorkflowValidator(DockerImageValidator dockerImageValidator) {
+  private WorkflowValidator(DockerImageValidator dockerImageValidator, Duration maybeMaxRunningTimeout) {
+    Preconditions.checkArgument(maybeMaxRunningTimeout == null || !maybeMaxRunningTimeout.isNegative(),
+        "Max Running timeout should be positive");
     this.dockerImageValidator = dockerImageValidator;
+    this.maybeMaxRunningTimeout = maybeMaxRunningTimeout;
+  }
+
+  public static Builder newBuilder(DockerImageValidator dockerImageValidator) {
+    return new Builder(dockerImageValidator);
   }
 
   public List<String> validateWorkflow(Workflow workflow) {
@@ -57,12 +69,23 @@ public class WorkflowValidator {
 
     // TODO: validate more of the contents
 
-    limit(e, cfg.id().length(), MAX_ID_LENGTH, "id too long");
-    limit(e, cfg.commitSha().map(String::length), MAX_COMMIT_SHA_LENGTH, "commitSha too long");
-    limit(e, cfg.secret().map(s -> s.name().length()), MAX_SECRET_NAME_LENGTH, "secret name too long");
-    limit(e, cfg.secret().map(s -> s.mountPath().length()), MAX_SECRET_MOUNT_PATH_LENGTH, "secret mount path too long");
-    limit(e, cfg.serviceAccount().map(String::length), MAX_SERVICE_ACCOUNT_LENGTH, "service account too long");
-    limit(e, cfg.resources().size(), MAX_RESOURCES, "too many resources");
+    upperLimit(e, cfg.id().length(),
+        MAX_ID_LENGTH, "id too long");
+    upperLimit(e, cfg.commitSha().map(String::length).orElse(0),
+        MAX_COMMIT_SHA_LENGTH, "commitSha too long");
+    upperLimit(e, cfg.secret().map(s -> s.name().length()).orElse(0),
+        MAX_SECRET_NAME_LENGTH, "secret name too long");
+    upperLimit(e, cfg.secret().map(s -> s.mountPath().length()).orElse(0),
+        MAX_SECRET_MOUNT_PATH_LENGTH, "secret mount path too long");
+    upperLimit(e, cfg.serviceAccount().map(String::length).orElse(0),
+        MAX_SERVICE_ACCOUNT_LENGTH, "service account too long");
+    upperLimit(e, cfg.resources().size(),
+        MAX_RESOURCES, "too many resources");
+    upperLimit(e, cfg.env().size(),
+        MAX_ENV_VARS, "too many env vars");
+    upperLimit(e, cfg.env().entrySet().stream()
+            .mapToInt(entry -> entry.getKey().length() + entry.getValue().length()).sum(),
+        MAX_ENV_SIZE, "env too big");
 
     cfg.dockerImage().ifPresent(image ->
         dockerImageValidator.validateImageReference(image).stream()
@@ -70,10 +93,12 @@ public class WorkflowValidator {
             .forEach(e::add));
 
     cfg.resources().stream().map(String::length).forEach(v ->
-        limit(e, v, MAX_RESOURCE_LENGTH, "resource name too long"));
+        upperLimit(e, v, MAX_RESOURCE_LENGTH, "resource name too long"));
 
-    limit(e, cfg.dockerArgs().map(args -> args.size() + args.stream().mapToInt(String::length).sum()),
-        MAX_DOCKER_ARGS_TOTAL, "docker args is too large");
+    cfg.dockerArgs().ifPresent(args -> {
+      final int dockerArgs = args.size() + args.stream().mapToInt(String::length).sum();
+      upperLimit(e, dockerArgs, MAX_DOCKER_ARGS_TOTAL, "docker args is too large");
+    });
 
     cfg.offset().ifPresent(offset -> {
       try {
@@ -89,16 +114,45 @@ public class WorkflowValidator {
       e.add("invalid schedule");
     }
 
+    cfg.runningTimeout().ifPresent(timeout -> {
+      lowerLimit(e, timeout, MIN_RUNNING_TIMEOUT, "running timeout is too small");
+      if (maybeMaxRunningTimeout != null) {
+        upperLimit(e, timeout, maybeMaxRunningTimeout, "running timeout is too big");
+      }
+    });
+
     return e;
   }
 
-  private void limit(List<String> errors, Optional<Integer> value, int limit, String message) {
-    value.ifPresent(v -> limit(errors, v, limit, message));
+  private <T extends Comparable<T>> void lowerLimit(List<String> errors, T value, T limit, String message) {
+    limit(errors,value.compareTo(limit) < 0, value, limit, message);
   }
 
-  private void limit(List<String> errors, int value, int limit, String message) {
-    if (value > limit) {
+  private <T extends Comparable<T>> void upperLimit(List<String> errors, T value, T limit, String message) {
+    limit(errors,value.compareTo(limit) > 0, value, limit, message);
+  }
+
+  private <T extends Comparable<T>> void limit(List<String> errors, boolean isError, T value, T limit, String message) {
+    if (isError) {
       errors.add(message + ": " + value + ", limit = " + limit);
+    }
+  }
+
+  public static class Builder {
+    private final DockerImageValidator dockerImageValidator;
+    private Duration maxRunningTimeout;
+
+    public Builder(DockerImageValidator dockerImageValidator) {
+      this.dockerImageValidator = dockerImageValidator;
+    }
+
+    public Builder withMaxRunningTimeoutLimit(Duration maxRunningTimeout) {
+      this.maxRunningTimeout = maxRunningTimeout;
+      return this;
+    }
+
+    public WorkflowValidator build() {
+      return new WorkflowValidator(dockerImageValidator, maxRunningTimeout);
     }
   }
 }

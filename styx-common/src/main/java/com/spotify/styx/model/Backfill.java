@@ -20,13 +20,11 @@
 
 package com.spotify.styx.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.norberg.automatter.AutoMatter;
 import java.time.Instant;
 import java.util.Optional;
 
 @AutoMatter
-@JsonIgnoreProperties(ignoreUnknown = true)
 public interface Backfill {
 
   String id();
@@ -48,6 +46,10 @@ public interface Backfill {
   boolean allTriggered();
 
   boolean halted();
+
+  boolean reverse();
+
+  Optional<TriggerParameters> triggerParameters();
 
   BackfillBuilder builder();
 

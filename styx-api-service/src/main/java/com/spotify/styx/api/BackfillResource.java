@@ -22,13 +22,18 @@ package com.spotify.styx.api;
 
 import static com.spotify.apollo.StatusType.Family.SUCCESSFUL;
 import static com.spotify.styx.api.Api.Version.V3;
+import static com.spotify.styx.api.Middlewares.authedEntity;
 import static com.spotify.styx.serialization.Json.serialize;
-import static com.spotify.styx.util.ParameterUtil.rangeOfInstants;
+import static com.spotify.styx.util.CloserUtil.register;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
-import static com.spotify.styx.util.StreamUtil.cat;
+import static com.spotify.styx.util.TimeUtil.instantsInRange;
+import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.stream.Collectors.toList;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Streams;
+import com.google.common.io.Closer;
 import com.spotify.apollo.Client;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -40,10 +45,12 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
 import com.spotify.futures.CompletableFutures;
+import com.spotify.styx.api.Middlewares.AuthContext;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.BackfillInput;
+import com.spotify.styx.model.EditableBackfillInput;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
@@ -55,8 +62,11 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.ReplayEvents;
+import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.WorkflowValidator;
+import java.io.Closeable;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collection;
@@ -68,29 +78,48 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public final class BackfillResource {
+public final class BackfillResource implements Closeable {
+
+  private static final Logger log = LoggerFactory.getLogger(WorkflowResource.class);
 
   static final String BASE = "/backfills";
   private static final String SCHEDULER_BASE_PATH = "/api/v0";
   private static final String UNKNOWN = "UNKNOWN";
   private static final String WAITING = "WAITING";
+  private static final int CONCURRENCY = 64;
+
+  private final Closer closer = Closer.create();
 
   private final Storage storage;
   private final String schedulerServiceBaseUrl;
   private final WorkflowValidator workflowValidator;
+  private final Time time;
+
+  private final ForkJoinPool forkJoinPool;
+  private final WorkflowActionAuthorizer workflowActionAuthorizer;
 
   public BackfillResource(String schedulerServiceBaseUrl, Storage storage,
-      WorkflowValidator workflowValidator) {
-    this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
-    this.storage = Objects.requireNonNull(storage);
+                          WorkflowValidator workflowValidator,
+                          Time time,
+                          WorkflowActionAuthorizer workflowActionAuthorizer) {
+    this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl, "schedulerServiceBaseUrl");
+    this.storage = Objects.requireNonNull(storage, "storage");
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
+    this.time = Objects.requireNonNull(time, "time");
+    this.workflowActionAuthorizer = Objects.requireNonNull(workflowActionAuthorizer,
+        "workflowActionAuthorizer");
+    this.forkJoinPool = register(closer, new ForkJoinPool(CONCURRENCY), "backfill-resource");
   }
 
-  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
+  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(RequestAuthenticator authenticator) {
     final EntityMiddleware em =
         EntityMiddleware.forCodec(JacksonEntityCodec.forMapper(Json.OBJECT_MAPPER));
 
@@ -100,17 +129,17 @@ public final class BackfillResource {
             "GET", BASE,
             this::getBackfills),
         Route.with(
-            em.response(BackfillInput.class, Backfill.class),
+            authedEntity(authenticator, em.response(BackfillInput.class, Backfill.class)),
             "POST", BASE,
-            rc -> this::postBackfill),
+            ac -> rc -> payload -> postBackfill(ac, rc, payload)),
         Route.with(
             em.serializerResponse(BackfillPayload.class),
             "GET", BASE + "/<bid>",
             rc -> getBackfill(rc, rc.pathArgs().get("bid"))),
         Route.with(
-            em.response(Backfill.class),
+            authedEntity(authenticator, em.response(EditableBackfillInput.class, Backfill.class)),
             "PUT", BASE + "/<bid>",
-            rc -> payload -> updateBackfill(rc.pathArgs().get("bid"), payload))
+            ac -> rc -> payload -> updateBackfill(ac, rc.pathArgs().get("bid"), payload))
     )
         .map(r -> r.withMiddleware(Middleware::syncToAsync))
         .collect(toList());
@@ -118,16 +147,21 @@ public final class BackfillResource {
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Collections.singletonList(
         Route.async(
             "DELETE", BASE + "/<bid>",
-            rc -> haltBackfill(rc.pathArgs().get("bid"), rc))
+            rc -> haltBackfill(rc.pathArgs().get("bid"), rc, authenticator))
     );
 
-    return cat(
+    return Streams.concat(
         Api.prefixRoutes(entityRoutes, V3),
         Api.prefixRoutes(routes, V3)
     );
   }
 
-  public BackfillsPayload getBackfills(RequestContext rc) {
+  @Override
+  public void close() throws IOException {
+    closer.close();
+  }
+
+  private BackfillsPayload getBackfills(RequestContext rc) {
     final Optional<String> componentOpt = rc.request().parameter("component");
     final Optional<String> workflowOpt = rc.request().parameter("workflow");
     final boolean includeStatuses = rc.request().parameter("status").orElse("false").equals("true");
@@ -151,20 +185,30 @@ public final class BackfillResource {
       throw new RuntimeException(e);
     }
 
-    final List<BackfillPayload> backfillPayloads = backfills.parallel()
-        .map(backfill -> BackfillPayload.create(
+    final List<BackfillPayload> backfillPayloads = backfills
+        .map(backfill -> forkJoinPool.submit(() -> BackfillPayload.create(
             backfill,
             includeStatuses
             ? Optional.of(RunStateDataPayload.create(retrieveBackfillStatuses(backfill)))
-            : Optional.empty()))
+            : Optional.empty())))
+        .collect(toList())
+        .stream()
+        .map(ForkJoinTask::join)
         .collect(toList());
 
     return BackfillsPayload.create(backfillPayloads);
   }
 
-  public Response<BackfillPayload> getBackfill(RequestContext rc, String id) {
+  private Response<BackfillPayload> getBackfill(RequestContext rc, String id) {
     final boolean includeStatuses = rc.request().parameter("status").orElse("true").equals("true");
-    final Optional<Backfill> backfillOpt = storage.backfill(id);
+    final Optional<Backfill> backfillOpt;
+    try {
+      backfillOpt = storage.backfill(id);
+    } catch (IOException e) {
+      final String message = String.format("Couldn't read backfill %s. ", id);
+      log.warn(message, e);
+      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Error in internal storage"));
+    }
     if (!backfillOpt.isPresent()) {
       return Response.forStatus(Status.NOT_FOUND);
     }
@@ -182,11 +226,15 @@ public final class BackfillResource {
     return schedulerServiceBaseUrl + SCHEDULER_BASE_PATH + "/" + String.join("/", parts);
   }
 
-  public CompletionStage<Response<ByteString>> haltBackfill(String id, RequestContext rc) {
+  private CompletionStage<Response<ByteString>> haltBackfill(String id, RequestContext rc,
+                                                             RequestAuthenticator authenticator) {
+    final AuthContext authContext = authenticator.authenticate(rc.request());
     try {
+      // TODO: run in transction
       final Optional<Backfill> backfillOptional = storage.backfill(id);
       if (backfillOptional.isPresent()) {
         final Backfill backfill = backfillOptional.get();
+        workflowActionAuthorizer.authorizeWorkflowAction(authContext, backfill.workflowId());
         storage.storeBackfill(backfill.builder().halted(true).build());
         return haltActiveBackfillInstances(backfill, rc.requestScopedClient());
       } else {
@@ -241,48 +289,78 @@ public final class BackfillResource {
     }
   }
 
-  public Response<Backfill> postBackfill(BackfillInput input) {
-    final BackfillBuilder builder = Backfill.newBuilder();
-
-    final String id = RandomGenerator.DEFAULT.generateUniqueId("backfill");
-    final Schedule schedule;
-
-    final WorkflowId workflowId = WorkflowId.create(input.component(), input.workflow());
-
-    final Workflow workflow;
-    final Set<WorkflowInstance> activeWorkflowInstances;
-    try {
-      activeWorkflowInstances = storage.readActiveStates(input.component()).keySet();
-      final Optional<Workflow> workflowOpt = storage.workflow(workflowId);
-      if (!workflowOpt.isPresent()) {
-        return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("workflow not found"));
-      }
-      workflow = workflowOpt.get();
-      schedule = workflow.configuration().schedule();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+  private Optional<String> validate(RequestContext rc,
+                                             BackfillInput input,
+                                             Workflow workflow) {
     if (!workflow.configuration().dockerImage().isPresent()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing docker image"));
+      return Optional.of("Workflow is missing docker image");
     }
+
     final Collection<String> errors = workflowValidator.validateWorkflow(workflow);
     if (!errors.isEmpty()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
-          + String.join(", ", errors)));
+      return Optional.of("Invalid workflow configuration: " + String.join(", ", errors));
+    }
+
+    final Schedule schedule = workflow.configuration().schedule();
+
+    if (!input.start().isBefore(input.end())) {
+      return Optional.of("start must be before end");
     }
 
     if (!TimeUtil.isAligned(input.start(), schedule)) {
-      return Response.forStatus(
-          Status.BAD_REQUEST.withReasonPhrase("start parameter not aligned with schedule"));
+      return Optional.of("start parameter not aligned with schedule");
     }
 
     if (!TimeUtil.isAligned(input.end(), schedule)) {
-      return Response.forStatus(
-          Status.BAD_REQUEST.withReasonPhrase("end parameter not aligned with schedule"));
+      return Optional.of("end parameter not aligned with schedule");
     }
 
+    final boolean allowFuture =
+        Boolean.parseBoolean(rc.request().parameter("allowFuture").orElse("false"));
+    if (!allowFuture &&
+        (input.start().isAfter(time.get()) ||
+         TimeUtil.previousInstant(input.end(), schedule).isAfter(time.get()))) {
+      return Optional.of("Cannot backfill future partitions");
+    }
+
+    return Optional.empty();
+  }
+
+  private Response<Backfill> postBackfill(AuthContext ac, RequestContext rc,
+      BackfillInput input) {
+    final BackfillBuilder builder = Backfill.newBuilder();
+
+    final String id = RandomGenerator.DEFAULT.generateUniqueId("backfill");
+
+    final WorkflowId workflowId = WorkflowId.create(input.component(), input.workflow());
+    final Workflow workflow;
+    try {
+      workflow = storage.workflow(workflowId)
+          .orElseThrow(() -> new ResponseException(
+              Response.forStatus(Status.NOT_FOUND.withReasonPhrase("workflow not found"))));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+
+    workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow);
+
+    final Set<WorkflowInstance> activeWorkflowInstances;
+    try {
+      activeWorkflowInstances = storage.readActiveStates(input.component()).keySet();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
+    final Optional<String> error = validate(rc, input, workflow);
+    if (error.isPresent()) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(error.get()));
+    }
+
+    final Schedule schedule = workflow.configuration().schedule();
+
+    final List<Instant> instants = instantsInRange(input.start(), input.end(), schedule);
     final List<WorkflowInstance> alreadyActive =
-        rangeOfInstants(input.start(), input.end(), schedule).stream()
+        instants.stream()
             .map(instant -> WorkflowInstance.create(workflowId, toParameter(schedule, instant)))
             .filter(activeWorkflowInstances::contains)
             .collect(toList());
@@ -304,8 +382,12 @@ public final class BackfillResource {
         .start(input.start())
         .end(input.end())
         .schedule(schedule)
-        .nextTrigger(input.start())
+        .nextTrigger(input.reverse()
+                     ? Iterables.getLast(instants)
+                     : input.start())
         .description(input.description())
+        .reverse(input.reverse())
+        .triggerParameters(input.triggerParameters())
         .halted(false);
 
     final Backfill backfill = builder.build();
@@ -319,18 +401,29 @@ public final class BackfillResource {
     return Response.forPayload(backfill);
   }
 
-  public Response<Backfill> updateBackfill(String id, Backfill backfill) {
-    if (!backfill.id().equals(id)) {
+  private Response<Backfill> updateBackfill(AuthContext ac, String id,
+      EditableBackfillInput backfillInput) {
+    if (!backfillInput.id().equals(id)) {
       return Response.forStatus(
           Status.BAD_REQUEST.withReasonPhrase("ID of payload does not match ID in uri."));
     }
 
+    final Backfill backfill;
     try {
-      storage.storeBackfill(backfill);
+      backfill = storage.runInTransaction(tx -> {
+        final Backfill oldBackfill = tx.backfill(id)
+            .orElseThrow(() -> new ResourceNotFoundException(String.format("Backfill %s not found.", id)));
+        workflowActionAuthorizer.authorizeWorkflowAction(ac, oldBackfill.workflowId());
+        final BackfillBuilder backfillBuilder = oldBackfill.builder();
+        backfillInput.concurrency().ifPresent(backfillBuilder::concurrency);
+        backfillInput.description().ifPresent(backfillBuilder::description);
+        return tx.store(backfillBuilder.build());
+      });
+    } catch (ResourceNotFoundException e) {
+      return Response.forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
-      return Response
-          .forStatus(
-              Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Failed to store backfill."));
+      return Response.forStatus(
+          Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Failed to store backfill."));
     }
 
     return Response.forStatus(Status.OK).withPayload(backfill);
@@ -340,35 +433,37 @@ public final class BackfillResource {
     final List<RunStateData> processedStates;
     final List<RunStateData> waitingStates;
 
-    Map<WorkflowInstance, RunState> activeWorkflowInstances;
+    final Map<WorkflowInstance, RunState> activeWorkflowInstances;
     try {
-      activeWorkflowInstances = storage.readActiveStates();
+      // this is weakly consistent and is tolerable in this case because no critical action
+      // depends on this
+      activeWorkflowInstances = storage.readActiveStatesByTriggerId(backfill.id());
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
 
-    final List<Instant> processedInstants = rangeOfInstants(
-        backfill.start(), backfill.nextTrigger(), backfill.schedule());
-    processedStates = processedInstants.parallelStream()
-        .map(instant -> {
-          final WorkflowInstance wfi = WorkflowInstance
-              .create(backfill.workflowId(), toParameter(backfill.schedule(), instant));
-          Optional<RunState> restoredStateOpt = ReplayEvents.getBackfillRunState(
-              wfi,
-              activeWorkflowInstances,
-              storage,
-              backfill.id());
-          if (restoredStateOpt.isPresent()) {
-            RunState state = restoredStateOpt.get();
-            return RunStateData.create(state.workflowInstance(), state.state().name(), state.data());
-          } else {
-            return RunStateData.create(wfi, UNKNOWN, StateData.zero());
-          }
-        })
+    final List<Instant> processedInstants;
+    if (backfill.reverse()) {
+      final Instant firstInstant = nextInstant(backfill.nextTrigger(), backfill.schedule());
+      processedInstants = instantsInRange(firstInstant, backfill.end(), backfill.schedule());
+    } else {
+      processedInstants = instantsInRange(backfill.start(), backfill.nextTrigger(), backfill.schedule());
+    }
+    processedStates = processedInstants.stream()
+        .map(instant -> forkJoinPool.submit(() ->
+            getRunStateData(backfill, activeWorkflowInstances, instant)))
+        .collect(toList())
+        .stream()
+        .map(ForkJoinTask::join)
         .collect(toList());
 
-    final List<Instant> waitingInstants = rangeOfInstants(
-        backfill.nextTrigger(), backfill.end(), backfill.schedule());
+    final List<Instant> waitingInstants;
+    if (backfill.reverse()) {
+      final Instant lastInstant = nextInstant(backfill.nextTrigger(), backfill.schedule());
+      waitingInstants = instantsInRange(backfill.start(), lastInstant, backfill.schedule());
+    } else {
+      waitingInstants = instantsInRange(backfill.nextTrigger(), backfill.end(), backfill.schedule());
+    }
     waitingStates = waitingInstants.stream()
         .map(instant -> {
           final WorkflowInstance wfi = WorkflowInstance.create(
@@ -377,6 +472,28 @@ public final class BackfillResource {
         })
         .collect(toList());
 
-    return Stream.concat(processedStates.stream(), waitingStates.stream()).collect(toList());
+    return backfill.reverse()
+        ? Stream.concat(waitingStates.stream(), processedStates.stream()).collect(toList())
+        : Stream.concat(processedStates.stream(), waitingStates.stream()).collect(toList());
+  }
+
+  private RunStateData getRunStateData(Backfill backfill,
+      Map<WorkflowInstance, RunState> activeWorkflowInstances, Instant instant) {
+
+    final WorkflowInstance wfi = WorkflowInstance
+        .create(backfill.workflowId(), toParameter(backfill.schedule(), instant));
+
+    if (activeWorkflowInstances.containsKey(wfi)) {
+      final RunState state = activeWorkflowInstances.get(wfi);
+      return RunStateData.newBuilder()
+          .workflowInstance(state.workflowInstance())
+          .state(state.state().name())
+          .stateData(state.data())
+          .latestTimestamp(state.timestamp())
+          .build();
+    }
+
+    return ReplayEvents.getBackfillRunStateData(wfi, storage, backfill.id())
+        .orElse(RunStateData.create(wfi, UNKNOWN, StateData.zero()));
   }
 }

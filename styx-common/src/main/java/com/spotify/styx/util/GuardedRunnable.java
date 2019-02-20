@@ -30,12 +30,14 @@ public class GuardedRunnable {
   }
 
   public static Runnable guard(Runnable delegate) {
-    return () -> {
-      try {
-        delegate.run();
-      } catch (Throwable t) {
-        LOG.warn("Guarded runnable threw", t);
-      }
-    };
+    return () -> runGuarded(delegate);
+  }
+
+  public static void runGuarded(Runnable delegate) {
+    try {
+      delegate.run();
+    } catch (Throwable t) {
+      LOG.warn("Guarded runnable threw", t);
+    }
   }
 }

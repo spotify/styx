@@ -22,7 +22,6 @@ package com.spotify.styx.monitoring;
 
 import com.codahale.metrics.Gauge;
 import com.spotify.styx.model.SequenceEvent;
-import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
 
 final class NoopStats implements Stats {
@@ -74,7 +73,7 @@ final class NoopStats implements Stats {
   }
 
   @Override
-  public void recordExitCode(WorkflowId workflowId, int exitCode) {
+  public void recordExitCode(int exitCode) {
     // nop
   }
 
@@ -114,6 +113,11 @@ final class NoopStats implements Stats {
   }
 
   @Override
+  public void recordResourceDemanded(String resource, long demanded) {
+    // nop
+  }
+
+  @Override
   public void recordEventConsumer(SequenceEvent event) {
     // nop
   }
@@ -134,7 +138,47 @@ final class NoopStats implements Stats {
   }
 
   @Override
+  public void recordPublishing(final String type, final String state) {
+    // nop
+  }
+
+  @Override
+  public void recordPublishingError(final String type, final String state) {
+    // nop
+  }
+
+  @Override
   public void recordTickDuration(String type, long duration) {
+    // nop
+  }
+
+  @Override
+  public void recordDatastoreEntityReads(String kind, int n) {
+    // nop
+  }
+
+  @Override
+  public void recordDatastoreQueries(String kind, int n) {
+    // nop
+  }
+
+  @Override
+  public void recordDatastoreEntityWrites(String kind, int n) {
+    // nop
+  }
+
+  @Override
+  public void recordDatastoreEntityDeletes(String kind, int n) {
+    // nop
+  }
+
+  @Override
+  public void recordCounterCacheHit() {
+    // nop
+  }
+
+  @Override
+  public void recordCounterCacheMiss() {
     // nop
   }
 }

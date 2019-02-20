@@ -20,6 +20,7 @@
 
 package com.spotify.styx.state;
 
+import com.spotify.styx.util.MDCUtil;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedRunnable;
 import java.util.concurrent.CompletableFuture;
@@ -34,9 +35,21 @@ class Striping {
     throw new UnsupportedOperationException();
   }
 
-  public static <T> CompletableFuture<T> supplyAsyncStriped(Supplier<T> supplier, Object stripe,
+  static <T> CompletableFuture<T> supplyAsyncStriped(Supplier<T> supplier, Object stripe,
       StripedExecutorService executor) {
-    final CompletableFuture<T> f = new CompletableFuture<>();
+
+    final CompletableFuture<T> future = new CompletableFuture<>();
+
+    // This runnable must be created here on the calling thread
+    final Runnable runnable = MDCUtil.withMDC(() -> {
+      try {
+        future.complete(supplier.get());
+      } catch (Throwable e) {
+        future.completeExceptionally(e);
+      }
+    });
+
+    // The StripedRunnable cannot be wrapped using withMDC as that would hide the stripe
     executor.execute(new StripedRunnable() {
       @Override
       public Object getStripe() {
@@ -45,13 +58,10 @@ class Striping {
 
       @Override
       public void run() {
-        try {
-          f.complete(supplier.get());
-        } catch (Throwable e) {
-          f.completeExceptionally(e);
-        }
+        runnable.run();
       }
     });
-    return f;
+
+    return future;
   }
 }

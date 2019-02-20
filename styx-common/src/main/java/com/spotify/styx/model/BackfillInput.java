@@ -20,13 +20,11 @@
 
 package com.spotify.styx.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.norberg.automatter.AutoMatter;
 import java.time.Instant;
 import java.util.Optional;
 
 @AutoMatter
-@JsonIgnoreProperties(ignoreUnknown = true)
 public interface BackfillInput {
 
   Instant start();
@@ -39,21 +37,13 @@ public interface BackfillInput {
 
   int concurrency();
 
+  boolean reverse();
+
   Optional<String> description();
 
-  BackfillInputBuilder builder();
+  Optional<TriggerParameters> triggerParameters();
 
-  static BackfillInput create(Instant start, Instant end, String component, String workflow,
-                              int concurrency, Optional<String> description) {
-    return newBuilder()
-        .start(start)
-        .end(end)
-        .component(component)
-        .workflow(workflow)
-        .concurrency(concurrency)
-        .description(description)
-        .build();
-  }
+  BackfillInputBuilder builder();
 
   static BackfillInputBuilder newBuilder() {
     return new BackfillInputBuilder();

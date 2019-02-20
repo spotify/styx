@@ -22,7 +22,6 @@ package com.spotify.styx.monitoring;
 
 import com.codahale.metrics.Gauge;
 import com.spotify.styx.model.SequenceEvent;
-import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
 
 /**
@@ -50,7 +49,7 @@ public interface Stats {
 
   void recordRunning(String executionId);
 
-  void recordExitCode(WorkflowId workflowId, int exitCode);
+  void recordExitCode(int exitCode);
 
   void recordPullImageError();
 
@@ -66,6 +65,8 @@ public interface Stats {
 
   void recordResourceUsed(String resource, long used);
 
+  void recordResourceDemanded(String resource, long demanded);
+
   void recordEventConsumer(SequenceEvent event);
 
   void recordEventConsumerError(SequenceEvent event);
@@ -74,5 +75,21 @@ public interface Stats {
 
   void recordWorkflowConsumerError();
 
+  void recordPublishing(String type, String state);
+
+  void recordPublishingError(String type, String state);
+
   void recordTickDuration(String type, long duration);
+
+  void recordDatastoreEntityReads(String kind, int n);
+
+  void recordDatastoreEntityWrites(String kind, int n);
+
+  void recordDatastoreEntityDeletes(String kind, int n);
+
+  void recordDatastoreQueries(String kind, int n);
+
+  void recordCounterCacheHit();
+
+  void recordCounterCacheMiss();
 }

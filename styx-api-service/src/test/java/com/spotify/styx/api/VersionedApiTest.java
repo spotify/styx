@@ -26,6 +26,7 @@ import static com.spotify.styx.api.ApiVersionTestUtils.isAtLeast;
 import static com.spotify.styx.api.ApiVersionTestUtils.isAtMost;
 import static org.junit.Assume.assumeThat;
 
+import com.google.common.io.Closer;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.test.ServiceHelper;
@@ -38,6 +39,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
+import org.junit.After;
 import org.junit.Rule;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -48,8 +50,9 @@ import org.junit.runners.Parameterized;
 @RunWith(Parameterized.class)
 public abstract class VersionedApiTest {
 
-  @Rule
-  public ServiceHelper serviceHelper;
+  protected final Closer closer = Closer.create();
+
+  @Rule public ServiceHelper serviceHelper;
 
   protected final String basePath;
   protected final Api.Version version;
@@ -61,13 +64,13 @@ public abstract class VersionedApiTest {
   protected VersionedApiTest(String basePath, Api.Version version, String serviceName) {
     this.basePath = basePath;
     this.version = version;
-    this.serviceHelper = ServiceHelper.create(this::init, serviceName);
+    this.serviceHelper = closer.register(ServiceHelper.create(this::init, serviceName));
   }
 
   protected VersionedApiTest(String basePath, Api.Version version, String serviceName, StubClient stubClient) {
     this.basePath = basePath;
     this.version = version;
-    this.serviceHelper = ServiceHelper.create(this::init, serviceName, stubClient);
+    this.serviceHelper = closer.register(ServiceHelper.create(this::init, serviceName, stubClient));
   }
 
   @Parameterized.Parameters(name = "{0}")
@@ -75,6 +78,11 @@ public abstract class VersionedApiTest {
     return Stream.of(ALL_VERSIONS)
         .map(v -> new Object[]{v})
         .collect(Collectors.toList());
+  }
+
+  @After
+  public void tearDownCloser() throws Exception {
+    closer.close();
   }
 
   /**

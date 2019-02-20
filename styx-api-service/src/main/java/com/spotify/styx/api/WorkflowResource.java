@@ -25,7 +25,6 @@ import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -33,8 +32,10 @@ import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
+import com.spotify.styx.api.Middlewares.AuthContext;
 import com.spotify.styx.api.workflow.WorkflowInitializationException;
 import com.spotify.styx.api.workflow.WorkflowInitializer;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -42,9 +43,12 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -68,17 +72,21 @@ public final class WorkflowResource {
 
   private final Storage storage;
   private final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
+  private final WorkflowActionAuthorizer workflowActionAuthorizer;
 
   public WorkflowResource(Storage storage, WorkflowValidator workflowValidator,
                           WorkflowInitializer workflowInitializer,
-                          final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer) {
+                          BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer,
+                          WorkflowActionAuthorizer workflowActionAuthorizer) {
     this.storage = Objects.requireNonNull(storage, "storage");
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
     this.workflowInitializer = Objects.requireNonNull(workflowInitializer, "workflowInitializer");
     this.workflowConsumer = Objects.requireNonNull(workflowConsumer, "workflowConsumer");
+    this.workflowActionAuthorizer = Objects.requireNonNull(workflowActionAuthorizer,
+        "workflowActionAuthorizer");
   }
 
-  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
+  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(RequestAuthenticator requestAuthenticator) {
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Arrays.asList(
         Route.with(
             json(), "GET", BASE + "/<cid>/<wfid>",
@@ -90,11 +98,11 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>",
             rc -> workflows(arg("cid", rc))),
         Route.with(
-            json(), "POST", BASE + "/<cid>",
-            rc -> createOrUpdateWorkflow(arg("cid", rc), rc)),
+            Middlewares.<Workflow>authed(requestAuthenticator).and(json()), "POST", BASE + "/<cid>",
+            rc -> ac -> createOrUpdateWorkflow(arg("cid", rc), rc, ac)),
         Route.with(
-            json(), "DELETE", BASE + "/<cid>/<wfid>",
-            rc -> deleteWorkflow(arg("cid", rc),arg("wfid", rc))),
+            Middlewares.<ByteString>authed(requestAuthenticator).and(json()), "DELETE", BASE + "/<cid>/<wfid>",
+            rc -> ac -> deleteWorkflow(arg("cid", rc),arg("wfid", rc), ac)),
         Route.with(
             json(), "GET", BASE + "/<cid>/<wfid>/instances",
             rc -> instances(arg("cid", rc), arg("wfid", rc), rc.request())),
@@ -105,14 +113,14 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>/<wfid>/state",
             rc -> state(arg("cid", rc), arg("wfid", rc))),
         Route.with(
-            json(), "PATCH", BASE + "/<cid>/<wfid>/state",
-            rc -> patchState(arg("cid", rc), arg("wfid", rc), rc.request()))
+            Middlewares.<WorkflowState>authed(requestAuthenticator).and(json()), "PATCH", BASE + "/<cid>/<wfid>/state",
+            rc -> ac -> patchState(arg("cid", rc), arg("wfid", rc), rc.request(), ac))
     );
 
     return Api.prefixRoutes(routes, V3);
   }
 
-  private Response<ByteString> deleteWorkflow(String cid, String wfid) {
+  private Response<ByteString> deleteWorkflow(String cid, String wfid, AuthContext ac) {
     final WorkflowId workflowId = WorkflowId.create(cid, wfid);
     final Optional<Workflow> workflow;
     try {
@@ -127,6 +135,10 @@ public final class WorkflowResource {
     if (!workflow.isPresent()) {
       return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Workflow does not exist"));
     }
+
+    // TODO: run in transaction
+
+    workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow.get());
 
     try {
       storage.delete(workflowId);
@@ -143,7 +155,7 @@ public final class WorkflowResource {
   }
 
   private Response<Workflow> createOrUpdateWorkflow(String componentId,
-                                                    RequestContext rc) {
+      RequestContext rc, AuthContext ac) {
     final Optional<ByteString> payload = rc.request().payload();
     if (!payload.isPresent()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
@@ -157,6 +169,10 @@ public final class WorkflowResource {
           .withReasonPhrase("Invalid payload. " + e.getMessage()));
     }
 
+    final Workflow workflow = Workflow.create(componentId, workflowConfig);
+
+    workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow);
+
     final Collection<String> errors =
         workflowValidator.validateWorkflowConfiguration(workflowConfig);
     if (!errors.isEmpty()) {
@@ -164,10 +180,11 @@ public final class WorkflowResource {
           Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: " + errors));
     }
 
-    final Workflow workflow = Workflow.create(componentId, workflowConfig);
     final Optional<Workflow> oldWorkflowOptional;
     try {
-      oldWorkflowOptional = workflowInitializer.store(workflow);
+      oldWorkflowOptional = workflowInitializer.store(workflow, existingWorkflowOpt ->
+          existingWorkflowOpt.ifPresent(existingWorkflow ->
+              workflowActionAuthorizer.authorizeWorkflowAction(ac, existingWorkflow)));
     } catch (WorkflowInitializationException e) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(e.getMessage()));
     }
@@ -202,13 +219,16 @@ public final class WorkflowResource {
     }
   }
 
-  private Response<WorkflowState> patchState(String componentId, String id, Request request) {
+  private Response<WorkflowState> patchState(String componentId, String id, Request request,
+                                             AuthContext ac) {
     final Optional<ByteString> payload = request.payload();
     if (!payload.isPresent()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
     }
 
     final WorkflowId workflowId = WorkflowId.create(componentId, id);
+    workflowActionAuthorizer.authorizeWorkflowAction(ac, workflowId);
+
     final WorkflowState patchState;
     try {
       final JsonNode json = OBJECT_MAPPER.readTree(payload.get().toByteArray());
@@ -263,10 +283,26 @@ public final class WorkflowResource {
     final int limit = request.parameter("limit").map(Integer::parseInt).orElse(DEFAULT_PAGE_LIMIT);
     final String start = request.parameter("start").orElse("");
     final String stop = request.parameter("stop").orElse("");
+    final boolean tail = Boolean.parseBoolean(request.parameter("tail").orElse(""));
 
     final List<WorkflowInstanceExecutionData> data;
     try {
-      if (Strings.isNullOrEmpty(start)) {
+      if (tail) {
+        final Optional<Workflow> workflow = storage.workflow(workflowId);
+        if (!workflow.isPresent()) {
+          return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Could not find workflow."));
+        }
+        final WorkflowState workflowState = storage.workflowState(workflowId);
+        if (!workflowState.nextNaturalTrigger().isPresent()) {
+          return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("No next natural trigger for workflow."));
+        }
+        final Schedule schedule = workflow.get().configuration().schedule();
+        final Instant nextNaturalTrigger = workflowState.nextNaturalTrigger().get();
+        final Instant startInstant = TimeUtil.offsetInstant(nextNaturalTrigger, schedule, -limit);
+        final String tailStart = ParameterUtil.toParameter(schedule, startInstant);
+        final String tailStop = ParameterUtil.toParameter(schedule, nextNaturalTrigger);
+        data = storage.executionData(workflowId, tailStart, tailStop);
+      } else if (start.isEmpty()) {
         data = storage.executionData(workflowId, offset, limit);
       } else {
         data = storage.executionData(workflowId, start, stop);
@@ -290,6 +326,8 @@ public final class WorkflowResource {
           storage.executionData(workflowInstance);
 
       return Response.forPayload(workflowInstanceExecutionData);
+    } catch (ResourceNotFoundException e) {
+      return Response.forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
       return Response.forStatus(
           Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch execution info."));

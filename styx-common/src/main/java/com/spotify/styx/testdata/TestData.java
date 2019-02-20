@@ -24,8 +24,8 @@ import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.model.Schedule.MONTHS;
 import static com.spotify.styx.model.Schedule.WEEKS;
+import static com.spotify.styx.model.Schedule.YEARS;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Workflow;
@@ -33,6 +33,8 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 
 public final class TestData {
@@ -91,7 +93,7 @@ public final class TestData {
           .commitSha(VALID_SHA)
           .dockerImage("busybox")
           .schedule(HOURS)
-          .offset("P1DT2H")
+          .offset("P30DT30M")
           .build();
 
   public static final WorkflowConfiguration DAILY_WORKFLOW_CONFIGURATION =
@@ -118,15 +120,33 @@ public final class TestData {
           .schedule(MONTHS)
           .build();
 
+  public static final WorkflowConfiguration YEARLY_WORKFLOW_CONFIGURATION =
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .dockerImage("busybox")
+          .schedule(YEARS)
+          .build();
+
   public static final WorkflowConfiguration FULL_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
           .id("styx.TestEndpoint")
           .commitSha(VALID_SHA)
           .schedule(DAYS)
           .dockerImage("busybox")
-          .dockerArgs(ImmutableList.of("x", "y"))
+          .dockerArgs(List.of("x", "y"))
           .secret(Secret.create("name", "/path"))
           .serviceAccount("foo@bar.baz.quux")
+          .build();
+
+  public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_RUNNING_TIMEOUT =
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .dockerImage("busybox")
+          .schedule(HOURS)
+          .resources(RESOURCE_IDS)
+          .runningTimeout(Duration.ofMillis(2L))
           .build();
 
   public static final ExecutionDescription EXECUTION_DESCRIPTION =
@@ -142,6 +162,9 @@ public final class TestData {
 
   public static final Workflow WORKFLOW_WITH_RESOURCES_2 = Workflow.create(WORKFLOW_ID_2.componentId(),
       HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_2);
+
+  public static final Workflow WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT = Workflow.create(WORKFLOW_ID.componentId(),
+      HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_RUNNING_TIMEOUT);
 
   private TestData() {
     throw new UnsupportedOperationException();

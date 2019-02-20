@@ -24,7 +24,6 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.state.StateManager;
 import com.spotify.styx.util.RetryUtil;
 import java.time.Duration;
 import java.util.Objects;

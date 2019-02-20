@@ -20,10 +20,12 @@
 
 package com.spotify.styx.util;
 
+import java.io.IOException;
+
 /**
  * Factory for creating counter snapshot instances
  */
 public interface CounterSnapshotFactory {
 
-  CounterSnapshot create(String counterId);
+  CounterSnapshot create(String counterId) throws IOException;
 }

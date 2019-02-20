@@ -40,6 +40,8 @@ import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 
 import com.google.cloud.datastore.Datastore;
@@ -51,11 +53,14 @@ import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.spotify.styx.model.Resource;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hbase.client.Connection;
@@ -65,8 +70,10 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.InOrder;
+import org.mockito.Mock;
 import org.mockito.Mockito;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class ShardedCounterTest {
@@ -81,6 +88,8 @@ public class ShardedCounterTest {
   private static Storage storage;
   private static Connection connection;
 
+  @Mock private Stats stats;
+
   @BeforeClass
   public static void setUpClass() throws IOException, InterruptedException {
     final java.util.logging.Logger datastoreEmulatorLogger =
@@ -90,9 +99,8 @@ public class ShardedCounterTest {
     helper = LocalDatastoreHelper.create(1.0);
     helper.start();
     datastore = helper.getOptions().getService();
-    connection = Mockito.mock(Connection.class);
+    connection = mock(Connection.class);
     storage = new AggregateStorage(connection, datastore, Duration.ZERO);
-    counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
   }
 
   @AfterClass
@@ -108,8 +116,11 @@ public class ShardedCounterTest {
   }
 
   @Before
-  public void setUp() {
-    shardedCounter = new ShardedCounter(storage, counterSnapshotFactory);
+  public void setUp() throws IOException {
+    counterSnapshotFactory = spy(new ShardedCounterSnapshotFactory(storage));
+    shardedCounter = new ShardedCounter(stats, counterSnapshotFactory);
+    storage.storeResource(Resource.create(COUNTER_ID1, 10L));
+    storage.storeResource(Resource.create(COUNTER_ID2, 10L));
   }
 
   @After
@@ -118,10 +129,12 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shouldCreateCounterEmpty() {
+  public void shouldCreateCounterEmpty() throws IOException {
     assertEquals(shardedCounter.getCounter(COUNTER_ID1), 0L);
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
+
     // assert all shards exist
+    assertThat(shardedCounter.getCounterSnapshot(COUNTER_ID1).getShards().size(), is(128));
     IntStream.range(0, ShardedCounter.NUM_SHARDS).forEach(i -> {
       assertTrue(results.hasNext());
       results.next();
@@ -143,6 +156,7 @@ public class ShardedCounterTest {
 
   @Test
   public void shouldCreateLimit() throws IOException {
+    helper.reset();
     assertNull(getLimitFromStorage(COUNTER_ID1));
 
     storage.runInTransaction(transaction -> {
@@ -154,7 +168,7 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shouldIncrementCounter() {
+  public void shouldIncrementCounter() throws IOException {
     // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
@@ -176,7 +190,7 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shouldDecrementCounter() {
+  public void shouldDecrementCounter() throws IOException {
     // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
@@ -199,7 +213,7 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shouldDecrementShardWithExcessUsage() {
+  public void shouldDecrementShardWithExcessUsage() throws IOException {
     // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
@@ -227,7 +241,35 @@ public class ShardedCounterTest {
   }
 
   @Test
-  public void shouldDecrementShardWithNoExcessUsage() {
+  public void shouldDecrementShardWithALotOfExcessUsage() throws IOException {
+    // init counter
+    assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
+
+    updateShard(COUNTER_ID1, 0, 10);
+    updateShard(COUNTER_ID1, 1, 0);
+    updateLimitInStorage(COUNTER_ID1, 1);
+
+    // Invalidate snapshot to force pull changes from Datastore emulator
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    // assert cache is updated with the new value
+    assertEquals(10L, shardedCounter.getCounter(COUNTER_ID1));
+
+    //decrement counter by 1
+    updateCounterInTransaction(COUNTER_ID1, -1L);
+
+    // assert that the only shard in excess was chosen to be decremented
+    assertEquals(9L, datastore.get(getKey(COUNTER_ID1, 0))
+        .getLong(PROPERTY_SHARD_VALUE));
+    assertEquals(0L, datastore.get(getKey(COUNTER_ID1, 1))
+        .getLong(PROPERTY_SHARD_VALUE));
+
+    // assert cache is updated with the new value
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertEquals(9L, shardedCounter.getCounter(COUNTER_ID1));
+  }
+
+  @Test
+  public void shouldDecrementShardWithNoExcessUsage() throws IOException {
     // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
@@ -253,7 +295,7 @@ public class ShardedCounterTest {
   }
 
   @Test(expected = CounterCapacityException.class)
-  public void shouldFailWhenIncreasingIfChosenShardIsFilledConcurrently() {
+  public void shouldFailWhenIncreasingIfChosenShardIsFilledConcurrently() throws IOException {
     // init counter and limit
     updateLimitInStorage(COUNTER_ID1, 1);
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
@@ -261,8 +303,8 @@ public class ShardedCounterTest {
     shardedCounter = spy(shardedCounter);
 
     doAnswer(invocation -> {
-      final Integer shardIndex = invocation.getArgumentAt(3, Integer.class);
-      final String counterId = invocation.getArgumentAt(1, String.class);
+      final Integer shardIndex = invocation.getArgument(3);
+      final String counterId = invocation.getArgument(1);
       // Fill the chosen shard just before attempting to increment in storage
       updateShard(counterId, shardIndex, 1L);
       invocation.callRealMethod();
@@ -275,7 +317,7 @@ public class ShardedCounterTest {
   }
 
   @Test(expected = ShardNotFoundException.class)
-  public void shouldFailWhenIncreasingIfChosenShardIsMissing() {
+  public void shouldFailWhenIncreasingIfChosenShardIsMissing() throws IOException {
     // init counter and limit
     updateLimitInStorage(COUNTER_ID1, 1);
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
@@ -283,7 +325,7 @@ public class ShardedCounterTest {
     shardedCounter = spy(shardedCounter);
 
     doAnswer(invocation -> {
-      final Integer shardIndex = invocation.getArgumentAt(3, Integer.class);
+      final Integer shardIndex = invocation.getArgument(3);
       datastore.delete(getKey(COUNTER_ID1, shardIndex));
       invocation.callRealMethod();
       return null;
@@ -295,7 +337,7 @@ public class ShardedCounterTest {
   }
 
   @Test(expected = CounterCapacityException.class)
-  public void shouldNotIncrementIfUsageIsAboveLimitAndShardsHaveExcessUsage() {
+  public void shouldNotIncrementIfUsageIsAboveLimitAndShardsHaveExcessUsage() throws IOException {
     // init counter
     assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
 
@@ -314,6 +356,33 @@ public class ShardedCounterTest {
   @Test(expected = CounterCapacityException.class)
   public void shouldFailDecrementingEmptyCounter() {
     //increment counter by 1
+    updateCounterInTransaction(COUNTER_ID1, -1L);
+  }
+
+  @Test(expected = CounterCapacityException.class)
+  public void shouldFailIncrementingFullShard() throws IOException {
+    shardedCounter.getCounter(COUNTER_ID1);
+    updateShard(COUNTER_ID1, 0, 10);
+    storage.runInTransaction(tx -> {
+      shardedCounter.updateCounterShard(tx, COUNTER_ID1, 1, 0, 10);
+      return null;
+    });
+  }
+
+  @Test(expected = CounterCapacityException.class)
+  public void shouldFailDecrementingEmptyShard() throws IOException {
+    shardedCounter.getCounter(COUNTER_ID1);
+
+    storage.runInTransaction(tx -> {
+      shardedCounter.updateCounterShard(tx, COUNTER_ID1, -1, 0, 10);
+      return null;
+    });
+  }
+
+  @Test(expected = ShardNotFoundException.class)
+  public void shouldThrowExceptionOnUninitializedShards() throws IOException {
+    doReturn(new ShardedCounter.Snapshot(COUNTER_ID1, 100, new HashMap<>()))
+        .when(counterSnapshotFactory).create(COUNTER_ID1);
     updateCounterInTransaction(COUNTER_ID1, -1L);
   }
 
@@ -348,6 +417,62 @@ public class ShardedCounterTest {
   }
 
   @Test
+  public void testCounterHasSpareCapacity() throws IOException {
+    assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
+    storage.runInTransaction(transaction -> {
+      shardedCounter.updateLimit(transaction, COUNTER_ID1, 2);
+      return null;
+    });
+
+    //invalidate cache so that the new limit value gets picked up
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+
+    // Check that counter is reported to have spare capacity
+    assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(true));
+
+    // Increment and verify that the counter still has capacity
+    updateCounterInTransaction(COUNTER_ID1, 1L);
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(true));
+
+    // Increment again and verify that the counter is now out of capacity
+    updateCounterInTransaction(COUNTER_ID1, 1L);
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(false));
+
+    // Raise limit and check that the counter again has capacity
+    storage.runInTransaction(transaction -> {
+      shardedCounter.updateLimit(transaction, COUNTER_ID1, 3);
+      return null;
+    });
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(true));
+
+    // Increment and verify that the counter is again out of capacity
+    updateCounterInTransaction(COUNTER_ID1, 1L);
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(false));
+
+    // Lower limit and verify that the counter is still out of capacity
+    storage.runInTransaction(transaction -> {
+      shardedCounter.updateLimit(transaction, COUNTER_ID1, 2);
+      return null;
+    });
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(false));
+
+    // Decrement and verify that the counter is still out of capacity
+    updateCounterInTransaction(COUNTER_ID1, -1L);
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(false));
+
+    // Decrement again and verify that the counter now has capacity
+    updateCounterInTransaction(COUNTER_ID1, -1L);
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(true));
+  }
+
+  @Test
   public void shouldDeleteCounterAndLimit() throws IOException {
     //init counter
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
@@ -357,7 +482,7 @@ public class ShardedCounterTest {
       return null;
     });
 
-    shardedCounter.deleteCounter(COUNTER_ID1);
+    storage.deleteResource(COUNTER_ID1);
 
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
 
@@ -378,7 +503,7 @@ public class ShardedCounterTest {
       return null;
     });
 
-    shardedCounter.deleteCounter(COUNTER_ID1);
+    storage.deleteResource(COUNTER_ID1);
 
     QueryResults<Entity> shardsCounter1 = getShardsForCounter(COUNTER_ID1);
     QueryResults<Entity> shardsCounter2 = getShardsForCounter(COUNTER_ID2);
@@ -392,26 +517,37 @@ public class ShardedCounterTest {
 
   @Test
   public void shouldPassDeletingNonExistingCounterAndLimit() throws IOException {
-    shardedCounter.deleteCounter(COUNTER_ID1);
+    storage.deleteResource(COUNTER_ID1);
 
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
     assertFalse(results.hasNext());
     assertNull(getLimitFromStorage(COUNTER_ID1));
   }
 
-  /**
-   * TODO: We should be able to decrease a counter limit and keep a valid state for the counter shards.
-   *
-   * <p>Ex. Counter is at 75% usage. Decrease the limit for 50%.
-   * That leaves the counter at 25% extra usage (now 50% relative to the new limit).
-   * This state is still valid, but we should not allow further increases, only decreases.
-   * When the counter usage goes below the new limit, then we should allow increase operations again.
-   */
   @Test
-  public void decreaseLimitBelowCurrentCounterValue() {
-    //1. increase counter to an X value
-    //2. lower the limit to a L < X value
-    //3. fail further increases, but allow for decreases of the counter
+  public void shouldReportCacheHitMissMetrics() throws IOException {
+    InOrder inOrder = Mockito.inOrder(stats, counterSnapshotFactory);
+
+    // Verify we get a miss first time
+    shardedCounter.getCounterSnapshot(COUNTER_ID1);
+    inOrder.verify(stats).recordCounterCacheMiss();
+    inOrder.verify(counterSnapshotFactory).create(COUNTER_ID1);
+
+    // Snapshot should be cached now
+    shardedCounter.getCounterSnapshot(COUNTER_ID1);
+    inOrder.verify(stats).recordCounterCacheHit();
+
+    // Snapshot should still be cached
+    shardedCounter.getCounterSnapshot(COUNTER_ID1);
+    inOrder.verify(stats).recordCounterCacheHit();
+
+    // Invalidate the cache and verify we get a miss
+    shardedCounter.inMemSnapshot.invalidate(COUNTER_ID1);
+    shardedCounter.getCounterSnapshot(COUNTER_ID1);
+    inOrder.verify(stats).recordCounterCacheMiss();
+    inOrder.verify(counterSnapshotFactory).create(COUNTER_ID1);
+
+    inOrder.verifyNoMoreInteractions();
   }
 
   private void updateCounterInTransaction(String counterId, long delta) {

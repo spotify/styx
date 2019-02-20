@@ -25,5 +25,8 @@ package com.spotify.styx.client;
  */
 public interface StyxClient
     extends StyxStatusClient, StyxSchedulerClient, StyxResourceClient,
-            StyxBackfillClient, StyxWorkflowClient {
+            StyxBackfillClient, StyxWorkflowClient, AutoCloseable {
+
+  @Override
+  void close();
 }

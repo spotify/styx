@@ -20,6 +20,7 @@
 
 package com.spotify.styx.state.handlers;
 
+import static com.spotify.styx.state.handlers.HandlerUtil.argsReplace;
 import static java.util.Objects.requireNonNull;
 
 import com.spotify.styx.docker.DockerRunner;
@@ -30,8 +31,6 @@ import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.ResourceNotFoundException;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -63,10 +62,10 @@ public class DockerRunnerHandler implements OutputHandler {
         }
 
         try {
-          LOG.info("running:{} image:{} args:{} termination_logging:{}", state.workflowInstance().toKey(),
+          LOG.info("running:{} image:{} args:{} termination_logging:{}", state.workflowInstance(),
               runSpec.imageName(), runSpec.args(), runSpec.terminationLogging());
           dockerRunner.start(state.workflowInstance(), runSpec);
-        } catch (Exception e) {
+        } catch (Throwable e) {
           final String msg = "Failed the docker starting procedure for " + state.workflowInstance().toKey();
           if (isUserError(e)) {
             LOG.info("{}: {}", msg, e.getMessage());
@@ -147,12 +146,10 @@ public class DockerRunnerHandler implements OutputHandler {
     final Optional<ExecutionDescription> executionDescriptionOpt = state.data().executionDescription();
 
     final ExecutionDescription executionDescription = executionDescriptionOpt.orElseThrow(
-        () -> new ResourceNotFoundException("Missing execution description for "
-                                            + state.workflowInstance().toKey()));
+        () -> new ResourceNotFoundException("Missing execution description for " + state.workflowInstance()));
 
     final String executionId = state.data().executionId().orElseThrow(
-        () -> new ResourceNotFoundException("Missing execution id for "
-                                            + state.workflowInstance().toKey()));
+        () -> new ResourceNotFoundException("Missing execution id for " + state.workflowInstance()));
 
     final String dockerImage = executionDescription.dockerImage();
     final List<String> dockerArgs = executionDescription.dockerArgs();
@@ -167,13 +164,7 @@ public class DockerRunnerHandler implements OutputHandler {
         .serviceAccount(executionDescription.serviceAccount())
         .trigger(state.data().trigger())
         .commitSha(state.data().executionDescription().flatMap(ExecutionDescription::commitSha))
+        .env(executionDescription.env())
         .build();
-  }
-
-  private static List<String> argsReplace(List<String> template, String parameter) {
-    List<String> result = new ArrayList<>(template);
-
-    Collections.replaceAll(result, "{}", parameter);
-    return result;
   }
 }

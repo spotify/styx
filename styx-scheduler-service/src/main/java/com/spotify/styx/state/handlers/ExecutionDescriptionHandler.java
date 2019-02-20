@@ -20,6 +20,7 @@
 
 package com.spotify.styx.state.handlers;
 
+import static com.spotify.styx.state.handlers.HandlerUtil.argsReplace;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -30,15 +31,17 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.MissingRequiredPropertyException;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -68,7 +71,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
       case PREPARE:
         try {
           return Optional.of(Event.submit(
-              state.workflowInstance(), getExecDescription(workflowInstance), createExecutionId()));
+              state.workflowInstance(), getExecDescription(workflowInstance, state.data()), createExecutionId()));
         } catch (ResourceNotFoundException e) {
           LOG.info("Workflow {} does not exist, halting {}", workflowInstance.workflowId(),
                    workflowInstance);
@@ -78,7 +81,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
                    + state.workflowInstance().toKey(), e);
           return Optional.of(Event.halt(workflowInstance));
         } catch (IOException e) {
-          LOG.error("Failed to retrieve execution description for " + state.workflowInstance().toKey(), e);
+          LOG.error("Failed to retrieve execution description for " + state.workflowInstance(), e);
           return Optional.of(Event.runError(state.workflowInstance(), e.getMessage()));
         }
 
@@ -87,7 +90,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
     }
   }
 
-  private ExecutionDescription getExecDescription(WorkflowInstance workflowInstance)
+  private ExecutionDescription getExecDescription(WorkflowInstance workflowInstance, StateData data)
       throws IOException, MissingRequiredPropertyException {
     final WorkflowId workflowId = workflowInstance.workflowId();
 
@@ -110,14 +113,19 @@ public class ExecutionDescriptionHandler implements OutputHandler {
 
     final List<String> dockerArgs = workflow.configuration().dockerArgs()
         .orElse(Collections.emptyList());
+    final List<String> command = argsReplace(dockerArgs, workflowInstance.parameter());
+
+    final Map<String, String> env = new HashMap<>(workflow.configuration().env());
+    data.triggerParameters().ifPresent(p -> env.putAll(p.env()));
 
     return ExecutionDescription.builder()
         .dockerImage(dockerImage)
-        .dockerArgs(dockerArgs)
+        .dockerArgs(command)
         .dockerTerminationLogging(workflow.configuration().dockerTerminationLogging())
         .secret(workflow.configuration().secret())
         .serviceAccount(workflow.configuration().serviceAccount())
         .commitSha(workflow.configuration().commitSha())
+        .env(env)
         .build();
   }
 

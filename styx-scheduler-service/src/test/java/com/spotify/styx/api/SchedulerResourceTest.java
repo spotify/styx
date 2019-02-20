@@ -21,6 +21,7 @@
 package com.spotify.styx.api;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
+import static com.spotify.apollo.Status.FORBIDDEN;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.styx.api.SchedulerResource.BASE;
@@ -34,18 +35,23 @@ import static org.hamcrest.CoreMatchers.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
+import com.spotify.apollo.StatusType;
 import com.spotify.apollo.test.ServiceHelper;
 import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.TriggerListener;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.TriggerParameters;
+import com.spotify.styx.model.TriggerRequest;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfigurationBuilder;
@@ -55,11 +61,13 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -93,14 +101,17 @@ public class SchedulerResourceTest {
   private Optional<Workflow> triggeredWorkflow = Optional.empty();
   private Optional<Instant> triggeredInstant = Optional.empty();
 
-  @Mock WorkflowValidator workflowValidator;
+  @Mock private WorkflowValidator workflowValidator;
 
   private final Storage storage = mock(Storage.class);
 
   @Captor ArgumentCaptor<Trigger> triggerCaptor;
 
-  @Mock StateManager stateManager;
-  @Mock TriggerListener triggerListener;
+  @Mock private StateManager stateManager;
+  @Mock private TriggerListener triggerListener;
+  @Mock private WorkflowActionAuthorizer workflowActionAuthorizer;
+  @Mock private GoogleIdToken idToken;
+  @Mock private RequestAuthenticator requestAuthenticator;
 
   @Rule
   public ServiceHelper serviceHelper;
@@ -112,10 +123,12 @@ public class SchedulerResourceTest {
 
   @Before
   public void setUp() throws Exception {
+    when(storage.workflow(WFI.workflowId())).thenReturn(Optional.of(FULL_DAILY_WORKFLOW));
     when(stateManager.receive(any())).thenReturn(CompletableFuture.completedFuture(null));
-    when(triggerListener.event(any(), any(), any())).thenReturn(CompletableFuture.completedFuture(null));
+    when(triggerListener.event(any(), any(), any(), any())).thenReturn(CompletableFuture.completedFuture(null));
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
+    when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
   }
 
   private ServiceHelper getServiceHelper(StateManager stateManager, Storage storage) {
@@ -125,21 +138,35 @@ public class SchedulerResourceTest {
           triggerListener,
           storage,
           () -> Instant.parse("2015-12-31T23:59:10.000Z"),
-          workflowValidator);
+          workflowValidator, workflowActionAuthorizer);
 
       environment.routingEngine()
-          .registerRoutes(schedulerResource.routes());
+          .registerRoutes(schedulerResource.routes(requestAuthenticator).map(r ->
+              r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));
     }, "styx");
   }
 
-  private Response<ByteString> requestAndWaitTriggerWorkflowInstance(WorkflowInstance toTrigger)
+  private Response<ByteString> requestAndWaitTriggerWorkflowInstance(TriggerRequest request)
       throws Exception {
 
-    ByteString eventPayload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(toTrigger));
+    ByteString eventPayload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(request));
     CompletionStage<Response<ByteString>> post =
         serviceHelper.request("POST", BASE + "/trigger", eventPayload);
 
-    return post.toCompletableFuture().get();
+    return post.toCompletableFuture().get(1, MINUTES);
+  }
+
+  @Test
+  public void retryShouldFailWithForbiddenIfNotAuthorized() throws Exception {
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(WorkflowId.class));
+
+    final Response<ByteString> response = serviceHelper.request("POST", BASE + "/retry", serialize(WFI))
+        .toCompletableFuture().get(1, MINUTES);
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verifyZeroInteractions(stateManager);
   }
 
   @Test
@@ -179,6 +206,19 @@ public class SchedulerResourceTest {
   }
 
   @Test
+  public void haltShouldFailWithForbiddenIfNotAuthorized() throws Exception {
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(WorkflowId.class));
+
+    final Response<ByteString> response = serviceHelper.request("POST", BASE + "/halt", serialize(WFI))
+        .toCompletableFuture().get(1, MINUTES);
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verifyZeroInteractions(stateManager);
+  }
+
+  @Test
   public void testHalt() throws Exception {
     ByteString wfiPayload = serialize(WFI);
     CompletionStage<Response<ByteString>> post =
@@ -200,6 +240,20 @@ public class SchedulerResourceTest {
     post.toCompletableFuture().get(1, MINUTES); // block until done
 
     verify(stateManager).receive(Event.retryAfter(WFI, 0L));
+  }
+
+  @Test
+  public void testInjectEventShouldFailWithForbiddenIfNotAuthorized() throws Exception {
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(WorkflowId.class));
+
+    final Response<ByteString> response =
+        serviceHelper.request("POST", BASE + "/events", serialize(Event.dequeue(WFI, RESOURCE_IDS)))
+        .toCompletableFuture().get(1, MINUTES);
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verifyZeroInteractions(stateManager);
   }
 
   @Test
@@ -264,16 +318,30 @@ public class SchedulerResourceTest {
   }
 
   @Test
+  public void testTriggerShouldFailWithForbiddenIfNotAuthorized() throws Exception {
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(Workflow.class));
+
+    final Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(
+        TriggerRequest.of(FULL_DAILY_WORKFLOW.id(), "2014-12-31"));
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verifyZeroInteractions(triggerListener);
+  }
+
+  @Test
   public void testTriggeredWorkflowGeneratesTrigger() throws Exception {
     when(storage.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
-    WorkflowInstance toTrigger = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2014-12-31T23");
+    TriggerParameters expectedParameters = TriggerParameters.zero();
+    TriggerRequest toTrigger = TriggerRequest.of(HOURLY_WORKFLOW.id(), "2014-12-31T23");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
 
     assertThat(response.status(), is(Status.OK));
     final Instant expectedInstant = Instant.parse("2014-12-31T23:00:00.000Z");
-    verify(triggerListener).event(eq(HOURLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant));
+    verify(triggerListener).event(eq(HOURLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant), eq(expectedParameters));
     assertThat(TriggerUtil.triggerType(triggerCaptor.getValue()), is("adhoc"));
     assertThat(TriggerUtil.triggerId(triggerCaptor.getValue()), startsWith("ad-hoc-cli-"));
   }
@@ -281,44 +349,47 @@ public class SchedulerResourceTest {
   @Test
   public void testTriggerWorkflowInstanceHourly() throws Exception {
     when(storage.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
-    WorkflowInstance toTrigger = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2014-12-31T23");
+    TriggerParameters expectedParameters = TriggerParameters.zero();
+    TriggerRequest toTrigger = TriggerRequest.of(HOURLY_WORKFLOW.id(), "2014-12-31T23");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
     assertThat(response.status(), is(Status.OK));
     final Instant expectedInstant = Instant.parse("2014-12-31T23:00:00.000Z");
-    verify(triggerListener).event(eq(HOURLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant));
+    verify(triggerListener).event(eq(HOURLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant), eq(expectedParameters));
   }
 
   @Test
   public void testTriggerWorkflowInstanceDaily() throws Exception {
     when(storage.workflow(DAILY_WORKFLOW.id())).thenReturn(Optional.of(DAILY_WORKFLOW));
-    WorkflowInstance toTrigger = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2014-12-31");
+    TriggerParameters expectedParameters = TriggerParameters.zero();
+    TriggerRequest toTrigger = TriggerRequest.of(DAILY_WORKFLOW.id(), "2014-12-31");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
     assertThat(response.status(), is(Status.OK));
     final Instant expectedInstant = Instant.parse("2014-12-31T00:00:00.00Z");
-    verify(triggerListener).event(eq(DAILY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant));
+    verify(triggerListener).event(eq(DAILY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant), eq(expectedParameters));
   }
 
   @Test
   public void testTriggerWorkflowInstanceWeekly() throws Exception {
     when(storage.workflow(WEEKLY_WORKFLOW.id())).thenReturn(Optional.of(WEEKLY_WORKFLOW));
-    WorkflowInstance toTrigger = WorkflowInstance.create(WEEKLY_WORKFLOW.id(), "2016-01-03");
+    TriggerParameters expectedParameters = TriggerParameters.zero();
+    TriggerRequest toTrigger = TriggerRequest.of(WEEKLY_WORKFLOW.id(), "2016-01-03");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
     assertThat(response.status(), is(Status.OK));
     final Instant expectedInstant = Instant.parse("2015-12-28T00:00:00.000Z");
-    verify(triggerListener).event(eq(WEEKLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant));
+    verify(triggerListener).event(eq(WEEKLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant), eq(expectedParameters));
   }
 
   @Test
   public void testTriggerWorkflowInstanceMissingStorage() throws Exception {
     when(storage.workflow(any())).thenReturn(Optional.empty());
 
-    WorkflowInstance toTrigger = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-12-31T23");
+    TriggerRequest toTrigger = TriggerRequest.of(HOURLY_WORKFLOW.id(), "2016-12-31T23");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
@@ -326,7 +397,7 @@ public class SchedulerResourceTest {
                is(Status.BAD_REQUEST.withReasonPhrase("The specified workflow is not"
                                                       + " found in the scheduler")));
 
-    verify(triggerListener, never()).event(any(), any(), any());
+    verify(triggerListener, never()).event(any(), any(), any(), any());
   }
 
   @Test
@@ -337,7 +408,7 @@ public class SchedulerResourceTest {
     ServiceHelper serviceHelper = getServiceHelper(stateManager, failingStorage);
     serviceHelper.start();
 
-    WorkflowInstance toTrigger = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-12-31T23");
+    TriggerRequest toTrigger = TriggerRequest.of(HOURLY_WORKFLOW.id(), "2016-12-31T23");
     ByteString eventPayload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(toTrigger));
     CompletionStage<Response<ByteString>> post =
         serviceHelper.request("POST", BASE + "/trigger", eventPayload);
@@ -347,51 +418,70 @@ public class SchedulerResourceTest {
                is(Status.INTERNAL_SERVER_ERROR
                       .withReasonPhrase("An error occurred while retrieving "
                                         + "workflow specifications")));
-    verify(triggerListener, never()).event(any(), any(), any());
+    verify(triggerListener, never()).event(any(), any(), any(), any());
   }
 
   @Test
   public void testTriggerWorkflowInstanceUnsupportedSchedule() throws Exception {
     when(storage.workflow(DAILY_WORKFLOW.id())).thenReturn(Optional.of(MONTHLY_WORKFLOW));
-    WorkflowInstance toTrigger = WorkflowInstance.create(MONTHLY_WORKFLOW.id(), "2014-12-01");
+    TriggerParameters expectedParameters = TriggerParameters.zero();
+    TriggerRequest toTrigger = TriggerRequest.of(MONTHLY_WORKFLOW.id(), "2014-12-01");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
     assertThat(response.status(), is(Status.OK));
     final Instant expectedInstant = Instant.parse("2014-12-01T00:00:00.000Z");
-    verify(triggerListener).event(eq(MONTHLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant));
+    verify(triggerListener).event(eq(MONTHLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant), eq(expectedParameters));
   }
 
   @Test
   public void testTriggerWorkflowInstanceFuture() throws Exception {
     when(storage.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
-    WorkflowInstance toTrigger = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2016-12-31T23");
+    TriggerRequest toTrigger = TriggerRequest.of(HOURLY_WORKFLOW.id(), "2016-12-31T23");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
     assertThat(response.status(),
                is(Status.BAD_REQUEST.withReasonPhrase("Cannot trigger an instance of the future")));
 
-    verify(triggerListener, never()).event(any(), any(), any());
+    verify(triggerListener, never()).event(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testTriggerWorkflowInstanceFutureWithAllowFutureFlag() throws Exception {
+    when(storage.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
+    TriggerParameters expectedParameters = TriggerParameters.zero();
+    TriggerRequest toTrigger = TriggerRequest.of(HOURLY_WORKFLOW.id(), "2016-12-31T23");
+
+    ByteString eventPayload = ByteString.of(OBJECT_MAPPER.writeValueAsBytes(toTrigger));
+    CompletionStage<Response<ByteString>> post =
+        serviceHelper.request("POST", BASE + "/trigger?allowFuture=true", eventPayload);
+
+    Response<ByteString> response = post.toCompletableFuture().get();
+
+    assertThat(response.status(), is(Status.OK));
+    final Instant expectedInstant = Instant.parse("2016-12-31T23:00:00.00Z");
+    verify(triggerListener).event(eq(HOURLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant), eq(expectedParameters));
   }
 
   @Test
   public void testTriggerWorkflowInstanceParseDayForHourly() throws Exception {
     when(storage.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
-    WorkflowInstance toTrigger = WorkflowInstance.create(HOURLY_WORKFLOW.id(), "2015-12-31");
+    TriggerParameters expectedParameters = TriggerParameters.zero();
+    TriggerRequest toTrigger = TriggerRequest.of(HOURLY_WORKFLOW.id(), "2015-12-31");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
     assertThat(response.status(), is(Status.OK));
 
     final Instant expectedInstant = Instant.parse("2015-12-31T00:00:00.000Z");
-    verify(triggerListener).event(eq(HOURLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant));
+    verify(triggerListener).event(eq(HOURLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant), eq(expectedParameters));
   }
 
   @Test
   public void testTriggerWorkflowInstanceParseFailure() throws Exception {
     when(storage.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
-    WorkflowInstance toTrigger = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2015");
+    TriggerRequest toTrigger = TriggerRequest.of(DAILY_WORKFLOW.id(), "2015");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
@@ -399,23 +489,32 @@ public class SchedulerResourceTest {
                is(Status.BAD_REQUEST.withReasonPhrase("Cannot parse time parameter 2015 - "
                                                       + "Text '2015' could not be parsed at index 4")));
 
-    verify(triggerListener, never()).event(any(), any(), any());
+    verify(triggerListener, never()).event(any(), any(), any(), any());
   }
 
   @Test
-  public void testTriggerAlreadyActiveWorkflowInstance() throws Exception {
-    final IllegalStateException cause = new IllegalStateException("already active!");
+  public void failTriggeringOnUnknownException() throws Exception {
+    final Exception exception = new Exception("unknown exception!");
+    failtriggeringOnException(DAILY_WORKFLOW, exception, Status.INTERNAL_SERVER_ERROR.withReasonPhrase(exception.getMessage()));
+  }
 
-    when(storage.workflow(DAILY_WORKFLOW.id())).thenReturn(Optional.of(DAILY_WORKFLOW));
-    WorkflowInstance toTrigger = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2015-12-31");
+  @Test
+  public void failTriggeringOnIllegalArgumentException() throws Exception {
+    final IllegalArgumentException exception = new IllegalArgumentException("illegal argument!");
+    failtriggeringOnException(DAILY_WORKFLOW, exception, Status.CONFLICT.withReasonPhrase(exception.getMessage()));
+  }
 
-    when(triggerListener.event(any(), any(), any())).thenReturn(
-        CompletableFutures.exceptionallyCompletedFuture(cause));
+  @Test
+  public void failTriggeringOnIllegalStateException() throws Exception {
+    final IllegalStateException exception = new IllegalStateException("illegal state!");
+    failtriggeringOnException(DAILY_WORKFLOW, exception, Status.CONFLICT.withReasonPhrase(exception.getMessage()));
+  }
 
-    Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
-
-    assertThat(response.status(),
-               is(Status.CONFLICT.withReasonPhrase(cause.getMessage())));
+  @Test
+  public void failTriggeringAlreadyActiveWorkflowInstance() throws Exception {
+    final AlreadyInitializedException exception = new AlreadyInitializedException("already active!");
+    failtriggeringOnException(DAILY_WORKFLOW, exception, Status.CONFLICT.withReasonPhrase(
+        "This workflow instance is already triggered. Did you want to `retry` running it instead?"));
   }
 
   @Test
@@ -425,7 +524,7 @@ public class SchedulerResourceTest {
             .dockerImage(Optional.empty()).build();
     final Workflow workflow = Workflow.create("styx", workflowConfiguration);
     when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
-    WorkflowInstance toTrigger = WorkflowInstance.create(workflow.id(), "2015-12-31");
+    TriggerRequest toTrigger = TriggerRequest.of(workflow.id(), "2015-12-31");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
@@ -437,10 +536,10 @@ public class SchedulerResourceTest {
 
   @Test
   public void testTriggerInvalidWorkflowConfiguration() throws Exception {
-    when(workflowValidator.validateWorkflow(DAILY_WORKFLOW)).thenReturn(ImmutableList.of("bad", "f00d"));
+    when(workflowValidator.validateWorkflow(DAILY_WORKFLOW)).thenReturn(List.of("bad", "f00d"));
 
     when(storage.workflow(DAILY_WORKFLOW.id())).thenReturn(Optional.of(DAILY_WORKFLOW));
-    WorkflowInstance toTrigger = WorkflowInstance.create(DAILY_WORKFLOW.id(), "2015-12-31");
+    TriggerRequest toTrigger = TriggerRequest.of(DAILY_WORKFLOW.id(), "2015-12-31");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
@@ -448,5 +547,17 @@ public class SchedulerResourceTest {
                is(Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: bad, f00d")));
     assertThat(triggeredWorkflow, isEmpty());
     assertThat(triggeredInstant, isEmpty());
+  }
+
+  void failtriggeringOnException(Workflow wf, Exception e, StatusType preferredStatusType) throws Exception {
+    when(storage.workflow(wf.id())).thenReturn(Optional.of(wf));
+    TriggerRequest toTrigger = TriggerRequest.of(wf.id(), "2015-12-31");
+
+    when(triggerListener.event(any(), any(), any(), any())).thenReturn(
+        CompletableFutures.exceptionallyCompletedFuture(e));
+
+    Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
+
+    assertThat(response.status(), is(preferredStatusType));
   }
 }

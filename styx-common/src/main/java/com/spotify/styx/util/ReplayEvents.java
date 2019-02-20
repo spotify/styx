@@ -20,76 +20,105 @@
 
 package com.spotify.styx.util;
 
-import com.google.common.base.Throwables;
+import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Map;
 import java.util.Optional;
 import java.util.SortedSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class ReplayEvents {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ReplayEvents.class);
 
   private ReplayEvents() {
     throw new UnsupportedOperationException();
   }
 
-  // TODO: fix NPath complexity
-  public static Optional<RunState> getBackfillRunState(
+  public static Optional<RunStateData> getBackfillRunStateData(
       WorkflowInstance workflowInstance,
-      Map<WorkflowInstance, RunState> activeWorkflowInstances,
       Storage storage,
       String backfillId) {
-    final SettableTime time = new SettableTime();
-    boolean backfillFound = false;
 
-    final SortedSet<SequenceEvent> sequenceEvents;
-    try {
-      sequenceEvents = storage.readEvents(workflowInstance);
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
-
+    final SortedSet<SequenceEvent> sequenceEvents = getSequenceEvents(workflowInstance, storage);
     if (sequenceEvents.isEmpty()) {
       return Optional.empty();
     }
 
+    final SettableTime time = new SettableTime();
     RunState restoredState = RunState.fresh(workflowInstance, time);
 
-    final long lastConsumedEvent =
-        Optional.ofNullable(activeWorkflowInstances.get(workflowInstance))
-            .map(RunState::counter)
-            .orElse(sequenceEvents.last().counter());
+    boolean backfillFound = false;
 
+    final SettableTime initialTime = new SettableTime();
+    final SettableTime latestTime = new SettableTime();
+
+    // events are written after the datastore transition transaction is successfully
+    // committed, so we can trust the sequence of events faithfully reflect the state
+    // transition if they have all been successfully written to bigtable
     for (SequenceEvent sequenceEvent : sequenceEvents) {
-      // The active state event counters are read before the events themselves and styx is 
-      // concurrently storing events, thus we might encounter an event with a counter value that is
-      // later than the earlier read active state event counter. Events _after_ the active state
-      // event counter might be dropped in some circumstances, hence we stop processing here to
-      // avoid returning phantom data.
-      if (sequenceEvent.counter() > lastConsumedEvent) {
-        break;
-      }
-
       time.set(Instant.ofEpochMilli(sequenceEvent.timestamp()));
-      if ("triggerExecution".equals(EventUtil.name(sequenceEvent.event()))) {
+
+      final boolean triggerExecutionEventMet =
+          "triggerExecution".equals(EventUtil.name(sequenceEvent.event()));
+
+      if (triggerExecutionEventMet) {
         if (backfillFound) {
-          return Optional.of(restoredState);
+          break;
         }
+
         restoredState = RunState.fresh(workflowInstance, time);
+        initialTime.set(time.get());
       }
 
-      restoredState = restoredState.transition(sequenceEvent.event(), time);
-      if ("triggerExecution".equals(EventUtil.name(sequenceEvent.event()))
-          && restoredState.data().trigger().isPresent()
-          && backfillId.equals(TriggerUtil.triggerId(restoredState.data().trigger().get()))) {
+      try {
+        restoredState = restoredState.transition(sequenceEvent.event(), time);
+      } catch (IllegalStateException e) {
+        LOG.warn("failed to transition state, move on to next event", e);
+      }
+
+      latestTime.set(time.get());
+
+      if (backfillFound(triggerExecutionEventMet, backfillId, restoredState)) {
         backfillFound = true;
       }
     }
-    return backfillFound ? Optional.of(restoredState) : Optional.empty();
+
+    if (backfillFound) {
+      final RunStateData runStateData = RunStateData.newBuilder()
+          .workflowInstance(restoredState.workflowInstance())
+          .state(restoredState.state().name())
+          .stateData(restoredState.data())
+          .initialTimestamp(initialTime.get().toEpochMilli())
+          .latestTimestamp(latestTime.get().toEpochMilli())
+          .build();
+      return Optional.of(runStateData);
+    } else {
+      return Optional.empty();
+    }
+  }
+
+  private static SortedSet<SequenceEvent> getSequenceEvents(
+      final WorkflowInstance workflowInstance, final Storage storage) {
+    final SortedSet<SequenceEvent> sequenceEvents;
+    try {
+      sequenceEvents = storage.readEvents(workflowInstance);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return sequenceEvents;
+  }
+
+  private static boolean backfillFound(boolean triggerExecutionEventMet,
+                                       String backfillId, RunState restoredState) {
+    return triggerExecutionEventMet && restoredState.data().trigger()
+        .map(trigger -> backfillId.equals(TriggerUtil.triggerId(trigger)))
+        .orElse(false);
   }
 
   private static final class SettableTime implements Time {

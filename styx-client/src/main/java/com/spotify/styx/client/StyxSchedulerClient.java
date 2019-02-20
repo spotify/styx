@@ -20,13 +20,14 @@
 
 package com.spotify.styx.client;
 
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
 import java.util.concurrent.CompletionStage;
 
 /**
  * Interface for Styx client, scheduler resources.
  */
-public interface StyxSchedulerClient {
+public interface StyxSchedulerClient extends AutoCloseable {
 
   /**
    * Trigger a {@link WorkflowInstance}
@@ -35,9 +36,37 @@ public interface StyxSchedulerClient {
    * @param workflowId  workflow id
    * @param parameter   parameter
    */
-  CompletionStage<Void> triggerWorkflowInstance(final String componentId,
-                                                final String workflowId,
-                                                final String parameter);
+  CompletionStage<Void> triggerWorkflowInstance(String componentId,
+                                                String workflowId,
+                                                String parameter);
+
+  /**
+   * Trigger a {@link WorkflowInstance}
+   *
+   * @param componentId component id
+   * @param workflowId  workflow id
+   * @param parameter   parameter
+   * @param triggerParameters additional parameters for the {@link WorkflowInstance} 
+   */
+  CompletionStage<Void> triggerWorkflowInstance(String componentId,
+                                                String workflowId,
+                                                String parameter,
+                                                TriggerParameters triggerParameters);
+
+  /**
+   * Trigger a {@link WorkflowInstance}
+   *
+   * @param componentId component id
+   * @param workflowId  workflow id
+   * @param parameter   parameter
+   * @param triggerParameters additional parameters for the {@link WorkflowInstance}
+   * @param allowFuture allow triggering future partition
+   */
+  CompletionStage<Void> triggerWorkflowInstance(String componentId,
+                                                String workflowId,
+                                                String parameter,
+                                                TriggerParameters triggerParameters,
+                                                boolean allowFuture);
 
   /**
    * Halt a {@link WorkflowInstance}
@@ -46,9 +75,9 @@ public interface StyxSchedulerClient {
    * @param workflowId  workflow id
    * @param parameter   parameter
    */
-  CompletionStage<Void> haltWorkflowInstance(final String componentId,
-                                             final String workflowId,
-                                             final String parameter);
+  CompletionStage<Void> haltWorkflowInstance(String componentId,
+                                             String workflowId,
+                                             String parameter);
 
   /**
    * Retry a {@link WorkflowInstance}
@@ -57,7 +86,10 @@ public interface StyxSchedulerClient {
    * @param workflowId  workflow id
    * @param parameter   parameter
    */
-  CompletionStage<Void> retryWorkflowInstance(final String componentId,
-                                              final String workflowId,
-                                              final String parameter);
+  CompletionStage<Void> retryWorkflowInstance(String componentId,
+                                              String workflowId,
+                                              String parameter);
+
+  @Override
+  void close();
 }

@@ -24,6 +24,8 @@ import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.CONFLICT;
 import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
 import static com.spotify.apollo.Status.OK;
+import static com.spotify.styx.api.Middlewares.authedEntity;
+import static com.spotify.styx.util.ExceptionUtil.findCause;
 import static com.spotify.styx.util.ParameterUtil.parseAlignedInstant;
 
 import com.spotify.apollo.RequestContext;
@@ -35,13 +37,17 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.TriggerListener;
+import com.spotify.styx.api.Middlewares.AuthContext;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.TriggerParameters;
+import com.spotify.styx.model.TriggerRequest;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RandomGenerator;
@@ -69,53 +75,59 @@ public class SchedulerResource {
   private final WorkflowValidator workflowValidator;
 
   private final RandomGenerator randomGenerator = RandomGenerator.DEFAULT;
+  private final WorkflowActionAuthorizer workflowActionAuthorizer;
 
-  public SchedulerResource(
-      StateManager stateManager,
-      TriggerListener triggerListener,
-      Storage storage,
-      Time time,
-      WorkflowValidator workflowValidator) {
+  public SchedulerResource(StateManager stateManager,
+                           TriggerListener triggerListener,
+                           Storage storage,
+                           Time time,
+                           WorkflowValidator workflowValidator,
+                           WorkflowActionAuthorizer workflowActionAuthorizer) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.triggerListener = Objects.requireNonNull(triggerListener);
     this.storage = Objects.requireNonNull(storage);
     this.time = Objects.requireNonNull(time);
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
+    this.workflowActionAuthorizer = Objects.requireNonNull(workflowActionAuthorizer,
+        "workflowActionAuthorizer");
   }
 
-  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
-    final EntityMiddleware em =
-        EntityMiddleware.forCodec(JacksonEntityCodec.forMapper(Json.OBJECT_MAPPER));
+  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(RequestAuthenticator authenticator) {
+    final EntityMiddleware em = EntityMiddleware.forCodec(JacksonEntityCodec.forMapper(Json.OBJECT_MAPPER));
 
     return Stream.of(
         Route.with(
-            em.response(Event.class),
+            authedEntity(authenticator, em.response(Event.class)),
             "POST", BASE + "/events",
-            rc -> this::injectEvent),
+            ac -> rc -> event -> injectEvent(ac, event)),
         Route.with(
-            em.response(WorkflowInstance.class),
+            authedEntity(authenticator, em.response(TriggerRequest.class)),
             "POST", BASE + "/trigger",
-            rc -> this::triggerWorkflowInstance),
+            ac -> rc -> payload -> triggerWorkflowInstance(ac, rc, payload)),
         Route.with(
-            em.response(WorkflowInstance.class),
+            authedEntity(authenticator, em.response(WorkflowInstance.class)),
             "POST", BASE + "/retry",
-            rc -> payload -> retryWorkflowInstanceAfter(rc, payload)),
+            ac -> rc -> payload -> retryWorkflowInstanceAfter(ac, rc, payload)),
         Route.with(
-            em.response(WorkflowInstance.class),
+            authedEntity(authenticator, em.response(WorkflowInstance.class)),
             "POST", BASE + "/halt",
-            rc -> this::haltWorkflowInstance)
+            ac -> rc -> workflowInstance -> haltWorkflowInstance(ac, workflowInstance))
     )
 
         .map(r -> r.withMiddleware(Middleware::syncToAsync));
   }
 
-  private Response<WorkflowInstance> haltWorkflowInstance(WorkflowInstance workflowInstance) {
+  private Response<WorkflowInstance> haltWorkflowInstance(AuthContext ac,
+      WorkflowInstance workflowInstance) {
+    workflowActionAuthorizer.authorizeWorkflowAction(ac, workflowInstance.workflowId());
     final Event event = Event.halt(workflowInstance);
     return Response.forStatus(eventInjectorHelper(event)).withPayload(workflowInstance);
   }
 
-  private Response<WorkflowInstance> retryWorkflowInstanceAfter(RequestContext rc,
-                                                                WorkflowInstance workflowInstance) {
+  private Response<WorkflowInstance> retryWorkflowInstanceAfter(AuthContext ac,
+      RequestContext rc,
+      WorkflowInstance workflowInstance) {
+    workflowActionAuthorizer.authorizeWorkflowAction(ac, workflowInstance.workflowId());
     final long delay;
     try {
       delay = Long.parseLong(rc.request().parameter("delay").orElse("0"));
@@ -127,7 +139,8 @@ public class SchedulerResource {
     return Response.forStatus(eventInjectorHelper(event)).withPayload(workflowInstance);
   }
 
-  private Response<Event> injectEvent(Event event) {
+  private Response<Event> injectEvent(AuthContext ac, Event event) {
+    workflowActionAuthorizer.authorizeWorkflowAction(ac, event.workflowInstance().workflowId());
     if ("dequeue".equals(EventUtil.name(event))) {
       // For backwards compatibility
       return Response.forStatus(eventInjectorHelper(
@@ -161,9 +174,11 @@ public class SchedulerResource {
     return OK;
   }
 
-  private Response<WorkflowInstance> triggerWorkflowInstance(WorkflowInstance workflowInstance) {
+  private Response<TriggerRequest> triggerWorkflowInstance(
+      AuthContext ac, RequestContext rc, TriggerRequest triggerRequest) {
+    final WorkflowInstance workflowInstance = WorkflowInstance.create(
+        triggerRequest.workflowId(), triggerRequest.parameter());
     final Workflow workflow;
-    final Instant instant;
 
     // Verifying workflow
     try {
@@ -179,6 +194,7 @@ public class SchedulerResource {
           INTERNAL_SERVER_ERROR.withReasonPhrase(
               "An error occurred while retrieving workflow specifications"));
     }
+    workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow);
     if (!workflow.configuration().dockerImage().isPresent()) {
       return Response.forStatus(BAD_REQUEST.withReasonPhrase("Workflow is missing docker image"));
     }
@@ -187,6 +203,8 @@ public class SchedulerResource {
       return Response.forStatus(BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: "
           + String.join(", ", errors)));
     }
+
+    final Instant instant;
 
     // Verifying instant
     try {
@@ -198,13 +216,24 @@ public class SchedulerResource {
     }
 
     // Verifying future
-    if (instant.isAfter(time.get())) {
+    final boolean allowFuture =
+        Boolean.parseBoolean(rc.request().parameter("allowFuture").orElse("false"));
+    if (!allowFuture && instant.isAfter(time.get())) {
       return Response.forStatus(BAD_REQUEST.withReasonPhrase(
           "Cannot trigger an instance of the future"));
     }
 
+    return triggerAndWait(triggerRequest, workflow, instant);
+  }
+
+  private Response<TriggerRequest> triggerAndWait(TriggerRequest triggerRequest,
+                                                  Workflow workflow,
+                                                  Instant instant) {
+    final TriggerParameters parameters =
+        triggerRequest.triggerParameters().orElse(TriggerParameters.zero());
     final String triggerId = randomGenerator.generateUniqueId(AD_HOC_CLI_TRIGGER_PREFIX);
-    final CompletionStage<Void> triggered = triggerListener.event(workflow, Trigger.adhoc(triggerId), instant);
+    final CompletionStage<Void> triggered = triggerListener.event(
+        workflow, Trigger.adhoc(triggerId), instant, parameters);
 
     // TODO: return future instead of blocking
     try {
@@ -213,17 +242,24 @@ public class SchedulerResource {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
     } catch (ExecutionException e) {
-      final Throwable cause = e.getCause();
-      if (cause instanceof IllegalStateException
-          || cause instanceof IllegalArgumentException) {
-        // TODO: propagate error information using a more specific exception type
-        return Response.forStatus(CONFLICT.withReasonPhrase(cause.getMessage()));
-      } else {
-        return Response.forStatus(INTERNAL_SERVER_ERROR);
-      }
+      return handleException(e);
     }
 
     // todo: change payload to a struct returning the triggerId as well so the user can refer to it
-    return Response.forPayload(workflowInstance);
+    return Response.forPayload(triggerRequest);
+  }
+
+  private Response<TriggerRequest> handleException(final ExecutionException e) {
+    Throwable cause;
+    if ((cause = findCause(e, IllegalStateException.class)) != null
+        || (cause = findCause(e, IllegalArgumentException.class)) != null) {
+      // TODO: propagate error information using a more specific exception type
+      return Response.forStatus(CONFLICT.withReasonPhrase(cause.getMessage()));
+    } else if (findCause(e, AlreadyInitializedException.class) != null) {
+      return Response.forStatus(CONFLICT.withReasonPhrase(
+          "This workflow instance is already triggered. Did you want to `retry` running it instead?"));
+    } else {
+      return Response.forStatus(INTERNAL_SERVER_ERROR.withReasonPhrase(e.getCause().getMessage()));
+    }
   }
 }

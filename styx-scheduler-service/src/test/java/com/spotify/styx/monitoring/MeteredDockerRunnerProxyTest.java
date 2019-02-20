@@ -26,7 +26,6 @@ import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
-import com.google.common.collect.ImmutableList;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.InvalidExecutionException;
@@ -45,7 +44,7 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class MeteredDockerRunnerProxyTest {
@@ -106,7 +105,7 @@ public class MeteredDockerRunnerProxyTest {
 
   @Test
   public void reportKubernetesClientTimeoutException() throws Exception {
-    doThrow(new KubernetesClientTimeoutException(ImmutableList.of(), 10L, TimeUnit.SECONDS))
+    doThrow(new KubernetesClientTimeoutException(List.of(), 10L, TimeUnit.SECONDS))
         .when(dockerRunner).start(any(), any());
 
     try {

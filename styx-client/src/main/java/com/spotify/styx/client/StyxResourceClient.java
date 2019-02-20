@@ -27,7 +27,7 @@ import java.util.concurrent.CompletionStage;
 /**
  * Interface for Styx client, Styx resource resources.
  */
-interface StyxResourceClient {
+interface StyxResourceClient extends AutoCloseable {
 
   /**
    * Create a {@link Resource}
@@ -36,8 +36,8 @@ interface StyxResourceClient {
    * @param concurrency resource value
    * @return The created {@link Resource}
    */
-  CompletionStage<Resource> resourceCreate(final String resourceId,
-                                           final int concurrency);
+  CompletionStage<Resource> resourceCreate(String resourceId,
+                                           int concurrency);
 
   /**
    * Edit an existing {@link Resource}
@@ -46,8 +46,8 @@ interface StyxResourceClient {
    * @param concurrency the updated resource value
    * @return The updated{@link Resource}
    */
-  CompletionStage<Resource> resourceEdit(final String resourceId,
-                                         final int concurrency);
+  CompletionStage<Resource> resourceEdit(String resourceId,
+                                         int concurrency);
 
   /**
    * Get an existing {@link Resource}
@@ -55,7 +55,7 @@ interface StyxResourceClient {
    * @param resourceId resource id
    * @return The required {@link Resource}
    */
-  CompletionStage<Resource> resource(final String resourceId);
+  CompletionStage<Resource> resource(String resourceId);
 
   /**
    * List of existing {@link Resource}s
@@ -64,4 +64,6 @@ interface StyxResourceClient {
    */
   CompletionStage<ResourcesPayload> resourceList();
 
+  @Override
+  void close();
 }

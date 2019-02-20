@@ -20,6 +20,7 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.apollo.Status.FORBIDDEN;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasHeader;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasNoPayload;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
@@ -35,18 +36,21 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
@@ -54,22 +58,28 @@ import com.spotify.styx.api.workflow.WorkflowInitializationException;
 import com.spotify.styx.api.workflow.WorkflowInitializer;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowConfigurationBuilder;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
+import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
@@ -83,6 +93,11 @@ import org.mockito.MockitoAnnotations;
 
 public class WorkflowResourceTest extends VersionedApiTest {
 
+  private static final TriggerParameters TRIGGER_PARAMETERS = TriggerParameters.builder()
+      .env("FOO", "foo",
+          "BAR", "bar")
+      .build();
+
   private static LocalDatastoreHelper localDatastore;
 
   private Datastore datastore = localDatastore.getOptions().getService();
@@ -92,6 +107,11 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Mock private WorkflowValidator workflowValidator;
   @Mock private WorkflowInitializer workflowInitializer;
   @Mock private BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
+  @Mock private WorkflowActionAuthorizer workflowActionAuthorizer;
+  @Mock private GoogleIdToken idToken;
+  @Mock private RequestAuthenticator requestAuthenticator;
+
+  private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
@@ -99,10 +119,19 @@ public class WorkflowResourceTest extends VersionedApiTest {
           .schedule(Schedule.DAYS)
           .commitSha("00000ef508c1cb905e360590ce3e7e9193f6b370")
           .dockerImage("bar-dummy:dummy")
+          .serviceAccount(SERVICE_ACCOUNT)
+          .env("FOO", "foo", "BAR", "bar")
+          .runningTimeout(Duration.parse("PT23H"))
           .build();
 
   private static final Workflow WORKFLOW =
       Workflow.create("foo", WORKFLOW_CONFIGURATION);
+
+  private static final Workflow EXISTING_WORKFLOW =
+      Workflow.create("foo", WorkflowConfigurationBuilder
+          .from(WORKFLOW_CONFIGURATION)
+          .dockerImage("earlier:image")
+          .build());
 
   private static final Trigger NATURAL_TRIGGER = Trigger.natural();
   private static final Trigger BACKFILL_TRIGGER = Trigger.backfill("backfill-1");
@@ -131,12 +160,14 @@ public class WorkflowResourceTest extends VersionedApiTest {
     storage = spy(new AggregateStorage(bigtable, datastore, Duration.ZERO));
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
+    when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     WorkflowResource workflowResource =
-        new WorkflowResource(storage, workflowValidator, workflowInitializer, workflowConsumer);
+        new WorkflowResource(storage, workflowValidator, workflowInitializer, workflowConsumer,
+            workflowActionAuthorizer);
 
     environment.routingEngine()
-        .registerRoutes(Api.withCommonMiddleware(
-            workflowResource.routes()));
+        .registerRoutes(workflowResource.routes(requestAuthenticator).map(r ->
+            r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));
   }
 
   @BeforeClass
@@ -169,6 +200,21 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void tearDown() throws Exception {
     localDatastore.reset();
     serviceHelper.stubClient().clear();
+  }
+
+  @Test
+  public void patchShouldFailWithForbiddenIfNotAuthorized() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(WorkflowId.class));
+
+    final Response<ByteString> response =
+        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"), STATEPAYLOAD_FULL));
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verify(storage, never()).patchState(any(), any());
   }
 
   @Test
@@ -312,7 +358,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
-    storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
     storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
     storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
 
@@ -341,7 +387,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
-    storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
     storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
     storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
 
@@ -370,7 +416,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
-    storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
     storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
     storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
 
@@ -399,11 +445,34 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldReturn500WhenFailedToGetWorkflowInstanceData() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
+    doThrow(new IOException()).when(storage).executionData(wfi);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/foo/bar/instances/2016-08-10")));
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
+  }
+
+  @Test
+  public void shouldReturn404WhenWorkflowNotFound() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/foo/bar/instances/2016-08-10")));
+
+    assertThat(response, hasStatus(withCode(Status.NOT_FOUND)));
+  }
+
+  @Test
   public void shouldReturnWorkflowInstanceDataBackfill() throws Exception {
     sinceVersion(Api.Version.V3);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
-    storage.writeEvent(create(Event.triggerExecution(wfi, BACKFILL_TRIGGER), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi, BACKFILL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/foo/bar/instances/2016-08-10")));
@@ -426,9 +495,9 @@ public class WorkflowResourceTest extends VersionedApiTest {
     WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-11");
     WorkflowInstance wfi2 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-12");
     WorkflowInstance wfi3 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-13");
-    storage.writeEvent(create(Event.triggerExecution(wfi1, NATURAL_TRIGGER), 0L, ms("07:00:00")));
-    storage.writeEvent(create(Event.triggerExecution(wfi2, NATURAL_TRIGGER), 0L, ms("07:00:00")));
-    storage.writeEvent(create(Event.triggerExecution(wfi3, NATURAL_TRIGGER), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi1, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi2, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi3, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
 
     Response<ByteString> response = awaitResponse(
         serviceHelper.request("GET", path("/foo/bar/instances?offset=2016-08-12&limit=1")));
@@ -437,6 +506,55 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertJson(response, "[*]", hasSize(1));
     assertJson(response, "[0].workflow_instance.parameter", is("2016-08-12"));
+  }
+
+  @Test
+  public void shouldTailPaginateWorkflowInstancesData() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    // Set the next natural trigger
+    final WorkflowState workflowState = WorkflowState.builder()
+        .nextNaturalTrigger(ParameterUtil.parseDate("2016-08-14"))
+        .build();
+    storage.patchState(WORKFLOW.id(), workflowState);
+
+    WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-11");
+    WorkflowInstance wfi2 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-12");
+    WorkflowInstance wfi3 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-13");
+    storage.writeEvent(create(Event.triggerExecution(wfi1, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi2, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi3, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("/foo/bar/instances?limit=2&tail=true")));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+
+    assertJson(response, "[*]", hasSize(2));
+    assertJson(response, "[0].workflow_instance.parameter", is("2016-08-12"));
+    assertJson(response, "[1].workflow_instance.parameter", is("2016-08-13"));
+  }
+
+  @Test
+  public void shouldReturnEmptyNotFoundForTailWithNoNextNaturalTrigger() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("/foo/bar/instances?limit=2&tail=true")));
+
+    assertThat(response, hasStatus(withCode(Status.NOT_FOUND)));
+  }
+
+  @Test
+  public void shouldReturnNotFoundWhenTailUnknownWorkflowInstancesData() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("/bar/foo/instances?limit=2&tail=true")));
+
+    assertThat(response, hasStatus(withCode(Status.NOT_FOUND)));
+    assertThat(response, hasNoPayload());
+    assertThat(response, hasStatus(withReasonPhrase(equalTo("Could not find workflow."))));
   }
 
   @Test
@@ -467,10 +585,43 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void createWorkflowShouldFailWithForbiddenIfNotAuthorized() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(Workflow.class));
+
+    final Response<ByteString> response = awaitResponse(
+        serviceHelper.request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verify(storage, never()).patchState(any(), any());
+
+    verifyZeroInteractions(workflowValidator);
+    verifyZeroInteractions(workflowInitializer);
+    verifyZeroInteractions(workflowConsumer);
+  }
+
+  @Test
+  public void deleteWorkflowShouldFailWithForbiddenIfNotAuthorized() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(Workflow.class));
+
+    final Response<ByteString> response = awaitResponse(serviceHelper.request("DELETE", path("/foo/bar")));
+
+    assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verify(storage, never()).delete(WORKFLOW.id());
+  }
+
+  @Test
   public void shouldCreateWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(workflowInitializer.store(WORKFLOW)).thenReturn(Optional.empty());
+    when(workflowInitializer.store(eq(WORKFLOW), any())).thenReturn(Optional.empty());
 
     Response<ByteString> response =
         awaitResponse(
@@ -478,7 +629,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
                 .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
 
     verify(workflowValidator).validateWorkflowConfiguration(WORKFLOW_CONFIGURATION);
-    verify(workflowInitializer).store(WORKFLOW);
+    verify(workflowInitializer).store(eq(WORKFLOW), any());
     verify(workflowConsumer).accept(Optional.empty(), Optional.of(WORKFLOW));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
@@ -489,7 +640,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldUpdateWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(workflowInitializer.store(WORKFLOW)).thenReturn(Optional.of(WORKFLOW));
+    when(workflowInitializer.store(eq(WORKFLOW), any())).thenReturn(Optional.of(EXISTING_WORKFLOW));
 
     Response<ByteString> response =
         awaitResponse(
@@ -497,18 +648,39 @@ public class WorkflowResourceTest extends VersionedApiTest {
                 .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
 
     verify(workflowValidator).validateWorkflowConfiguration(WORKFLOW_CONFIGURATION);
-    verify(workflowInitializer).store(WORKFLOW);
-    verify(workflowConsumer).accept(Optional.of(WORKFLOW), Optional.of(WORKFLOW));
+    verify(workflowInitializer).store(eq(WORKFLOW), any());
+    verify(workflowConsumer).accept(Optional.of(EXISTING_WORKFLOW), Optional.of(WORKFLOW));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(deserialize(response.payload().get(), Workflow.class), equalTo(WORKFLOW));
   }
 
   @Test
+  public void shouldFailToUpdateWorkflowIfNotAuthorized() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(workflowInitializer.store(eq(WORKFLOW), any())).then(a -> {
+      final Consumer<Optional<Workflow>> guard = a.getArgument(1);
+      guard.accept(Optional.of(EXISTING_WORKFLOW));
+      throw new AssertionError("Should not reach here");
+    });
+
+    doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
+        .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), eq(EXISTING_WORKFLOW));
+
+    final Response<ByteString> response = awaitResponse(
+        serviceHelper.request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
+
+    verify(workflowInitializer).store(eq(WORKFLOW), any());
+
+    assertThat(response.status().code(), is(FORBIDDEN.code()));
+  }
+
+  @Test
   public void shouldReturnErrorMessageWhenFailedToStore() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(workflowInitializer.store(WORKFLOW))
+    when(workflowInitializer.store(eq(WORKFLOW), any()))
         .thenThrow(new WorkflowInitializationException(new Exception()));
 
     Response<ByteString> response =
@@ -538,8 +710,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Test
   public void shouldReturnErrorWhenDeleteNonexistWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
-    
-    when(storage.workflow(WORKFLOW.id())).thenReturn(Optional.empty());
+
+    doReturn(Optional.empty()).when(storage).workflow(WORKFLOW.id());
 
     Response<ByteString> response =
         awaitResponse(
@@ -580,7 +752,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldFailInvalidWorkflowImage() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(ImmutableList.of("bad", "image"));
+    when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(List.of("bad", "image"));
 
     Response<ByteString> response = awaitResponse(serviceHelper
         .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));

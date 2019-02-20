@@ -24,15 +24,26 @@ import static com.spotify.apollo.test.unit.ResponseMatchers.hasPayload;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static org.hamcrest.Matchers.any;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
+import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
+import com.spotify.apollo.StatusType;
+import com.spotify.styx.api.RunStateDataPayload.RunStateData;
+import com.spotify.styx.api.ServiceAccountUsageAuthorizer.ServiceAccountUsageAuthorizationResult;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
@@ -40,10 +51,19 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
-import com.spotify.styx.storage.InMemStorage;
+import com.spotify.styx.storage.AggregateStorage;
+import com.spotify.styx.storage.BigtableMocker;
+import com.spotify.styx.storage.BigtableStorage;
 import com.spotify.styx.storage.Storage;
+import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.logging.Level;
 import okio.ByteString;
+import org.apache.hadoop.hbase.client.Connection;
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class StatusResourceTest extends VersionedApiTest {
@@ -58,32 +78,70 @@ public class StatusResourceTest extends VersionedApiTest {
   private static final WorkflowInstance OTHER_WFI =
       WorkflowInstance.create(WorkflowId.create(OTHER_COMPONENT_ID, ID), PARAMETER);
 
-  public static final RunState PERSISTENT_STATE = RunState.create(WFI, State.RUNNING,
+  private static final RunState PERSISTENT_STATE = RunState.create(WFI, State.RUNNING,
       StateData.zero(), Instant.now(), 42L);
 
-  public static final RunState OTHER_PERSISTENT_STATE = RunState.create(WFI, State.RUNNING,
+  private static final RunState OTHER_PERSISTENT_STATE = RunState.create(OTHER_WFI, State.RUNNING,
       StateData.zero(), Instant.now(), 84L);
 
-  private Storage storage = new InMemStorage();
+  private static LocalDatastoreHelper localDatastore;
+  private Connection bigtable = setupBigTableMockTable();
+
+  private Storage storage;
+
+  private static final String AUTH_SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccounts.com";
+  private static final String AUTH_PRINCIPAL = "bar@example.com";
+  private static final ByteString AUTH_PAYLOAD = ByteString.encodeUtf8(
+      String.format("{\"service_account\":\"%s\",\"principal\":\"%s\"}", AUTH_SERVICE_ACCOUNT, AUTH_PRINCIPAL));
+  private ServiceAccountUsageAuthorizer accountUsageAuthorizer;
 
   public StatusResourceTest(Api.Version version) {
     super(StatusResource.BASE, version);
   }
 
+  @BeforeClass
+  public static void setUpClass() throws Exception {
+    final java.util.logging.Logger datastoreEmulatorLogger =
+        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
+    datastoreEmulatorLogger.setLevel(Level.OFF);
+
+    localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
+    localDatastore.start();
+  }
+
+  @AfterClass
+  public static void tearDownClass() {
+    if (localDatastore != null) {
+      try {
+        localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
+      } catch (Throwable e) {
+        e.printStackTrace();
+      }
+    }
+  }
+
+  @After
+  public void tearDown() throws Exception {
+    localDatastore.reset();
+  }
+
   @Override
   protected void init(Environment environment) {
-    final StatusResource statusResource = new StatusResource(storage);
+    accountUsageAuthorizer = mock(ServiceAccountUsageAuthorizer.class);
+    storage = spy(new AggregateStorage(bigtable, localDatastore.getOptions().getService(),
+        Duration.ZERO));
+    final StatusResource statusResource = new StatusResource(storage, accountUsageAuthorizer);
 
     environment.routingEngine()
-        .registerRoutes(Api.withCommonMiddleware(
-            statusResource.routes()));
+        .registerRoutes(statusResource.routes().map(r ->
+            r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));
   }
 
   @Test
   public void testEventsRoundtrip() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI, TRIGGER), 0L, 0L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI, TRIGGER, TriggerParameters.zero()), 0L, 0L));
     storage.writeEvent(SequenceEvent.create(Event.created(WFI, "exec0", "img0"), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI), 2L, 2L));
 
@@ -116,7 +174,20 @@ public class StatusResourceTest extends VersionedApiTest {
     RunStateDataPayload
         parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
-    assertThat(parsed.activeStates(), hasSize(2));
+    assertThat(parsed.activeStates(), containsInAnyOrder(
+        RunStateData.newBuilder()
+            .workflowInstance(PERSISTENT_STATE.workflowInstance())
+            .state(PERSISTENT_STATE.state().name())
+            .stateData(PERSISTENT_STATE.data())
+            .latestTimestamp(PERSISTENT_STATE.timestamp())
+            .build(),
+        RunStateData.newBuilder()
+            .workflowInstance(OTHER_PERSISTENT_STATE.workflowInstance())
+            .state(OTHER_PERSISTENT_STATE.state().name())
+            .stateData(OTHER_PERSISTENT_STATE.data())
+            .latestTimestamp(OTHER_PERSISTENT_STATE.timestamp())
+            .build()
+    ));
   }
 
   @Test
@@ -141,5 +212,83 @@ public class StatusResourceTest extends VersionedApiTest {
 
     assertThat(parsed.activeStates(), hasSize(1));
     assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().componentId(), is(COMPONENT_ID));
+  }
+
+  @Test
+  public void testGetActiveStatesFailedDueToStorageIOException() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    IOException ioException = new IOException("forced failure");
+    when(storage.readActiveStates()).thenThrow(ioException);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/activeStates")));
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
+    assertThat(response.status().reasonPhrase(), containsString(": " + ioException.toString()));
+  }
+
+  @Test
+  public void testAuthEndpointShouldFordwardAuthorizerResponse() throws Exception {
+
+    final ServiceAccountUsageAuthorizationResult result = ServiceAccountUsageAuthorizationResult.builder()
+        .authorized(true)
+        .blacklisted(true)
+        .message("Some access message")
+        .serviceAccountProjectId("project")
+        .build();
+
+    sinceVersion(Api.Version.V3);
+
+    when(accountUsageAuthorizer.checkServiceAccountUsageAuthorization(AUTH_SERVICE_ACCOUNT, AUTH_PRINCIPAL))
+        .thenReturn(result);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request(
+            "POST",
+            path("/testServiceAccountUsageAuthorization"),
+            AUTH_PAYLOAD));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+
+    String json = response.payload().get().utf8();
+    TestServiceAccountUsageAuthorizationResponse
+        parsed = Json.OBJECT_MAPPER.readValue(json, TestServiceAccountUsageAuthorizationResponse.class);
+
+    assertThat(parsed.authorized(), is(result.authorized()));
+    assertThat(parsed.blacklisted(), is(result.blacklisted()));
+    assertThat(parsed.serviceAccount(), is(AUTH_SERVICE_ACCOUNT));
+    assertThat(parsed.principal(), is(AUTH_PRINCIPAL));
+    assertThat(parsed.message(), is(result.message()));
+  }
+
+  @Test
+  public void testAuthEndpointShouldReturnBadRequestIfProjectDoesNotExist() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    StatusType statusCode = Status.BAD_REQUEST.withReasonPhrase("Project does not exist: baz");
+    when(accountUsageAuthorizer.checkServiceAccountUsageAuthorization(anyString(), anyString()))
+        .thenReturn(ServiceAccountUsageAuthorizationResult.ofErrorResponse(Response.forStatus(statusCode)));
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request(
+            "POST",
+            path("/testServiceAccountUsageAuthorization"),
+            AUTH_PAYLOAD));
+
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
+  }
+
+  private Connection setupBigTableMockTable() {
+    Connection bigtable = mock(Connection.class);
+    try {
+      new BigtableMocker(bigtable)
+          .setNumFailures(0)
+          .setupTable(BigtableStorage.EVENTS_TABLE_NAME)
+          .finalizeMocking();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return bigtable;
   }
 }

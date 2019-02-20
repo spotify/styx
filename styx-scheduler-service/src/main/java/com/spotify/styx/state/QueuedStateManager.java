@@ -21,14 +21,16 @@
 package com.spotify.styx.state;
 
 import static com.spotify.styx.state.StateUtil.isConsumingResources;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static com.spotify.styx.util.MDCUtil.withMDC;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Throwables;
+import com.spotify.styx.MessageUtil;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState.State;
@@ -43,7 +45,6 @@ import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -70,16 +71,15 @@ import org.slf4j.LoggerFactory;
  */
 public class QueuedStateManager implements StateManager {
 
-  private static final Logger LOG = LoggerFactory.getLogger(QueuedStateManager.class);
+  private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(QueuedStateManager.class);
+  private final Logger log;
 
   private static final long NO_EVENTS_PROCESSED = -1L;
-
-  private static final Duration SHUTDOWN_GRACE_PERIOD = Duration.ofSeconds(5);
 
   private final LongAdder queuedEvents = new LongAdder();
 
   private final Time time;
-  private final StripedExecutorService eventTransitionExecutor;
+  private final StripedExecutorService eventProcessingExecutor;
   private final Storage storage;
   private final BiConsumer<SequenceEvent, RunState> eventConsumer;
   private final Executor eventConsumerExecutor;
@@ -89,38 +89,50 @@ public class QueuedStateManager implements StateManager {
 
   public QueuedStateManager(
       Time time,
-      StripedExecutorService eventTransitionExecutor,
+      StripedExecutorService eventProcessingExecutor,
       Storage storage,
       BiConsumer<SequenceEvent, RunState> eventConsumer,
       Executor eventConsumerExecutor,
       ShardedCounter shardedCounter) {
+    this(time, eventProcessingExecutor, storage, eventConsumer, eventConsumerExecutor, shardedCounter, DEFAULT_LOG);
+  }
+
+  public QueuedStateManager(
+      Time time,
+      StripedExecutorService eventProcessingExecutor,
+      Storage storage,
+      BiConsumer<SequenceEvent, RunState> eventConsumer,
+      Executor eventConsumerExecutor,
+      ShardedCounter shardedCounter,
+      Logger logger) {
     this.time = Objects.requireNonNull(time);
     this.storage = Objects.requireNonNull(storage);
     this.eventConsumer = Objects.requireNonNull(eventConsumer);
     this.eventConsumerExecutor = Objects.requireNonNull(eventConsumerExecutor);
-    this.eventTransitionExecutor = Objects.requireNonNull(eventTransitionExecutor);
+    this.eventProcessingExecutor = Objects.requireNonNull(eventProcessingExecutor);
     this.shardedCounter = Objects.requireNonNull(shardedCounter);
+    this.log = Objects.requireNonNull(logger, "logger");
   }
 
   @Override
-  public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger)
+  public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger, TriggerParameters parameters)
       throws IsClosedException {
     ensureRunning();
-    LOG.debug("Trigger {}", workflowInstance);
+    log.debug("Trigger {}", workflowInstance);
 
     // TODO: optional retry on transaction conflict
 
-    return CompletableFuture.runAsync(() -> initialize(workflowInstance)).thenCompose((ignore) -> {
-      final Event event = Event.triggerExecution(workflowInstance, trigger);
+    return CompletableFuture.runAsync(() -> initialize(workflowInstance), withMDC()).thenCompose((ignore) -> {
+      final Event event = Event.triggerExecution(workflowInstance, trigger, parameters);
       try {
         return receive(event);
       } catch (IsClosedException isClosedException) {
-        LOG.warn("Failed to send 'triggerExecution' event", isClosedException);
+        log.warn("Failed to send 'triggerExecution' event", isClosedException);
         // Best effort attempt to rollback the creation of the NEW state
         try {
           storage.deleteActiveState(workflowInstance);
         } catch (IOException e) {
-          LOG.warn("Failed to remove dangling NEW state for: {}", workflowInstance);
+          log.warn("Failed to remove dangling NEW state for: {}", workflowInstance, e);
         }
         throw new RuntimeException(isClosedException);
       }
@@ -135,13 +147,13 @@ public class QueuedStateManager implements StateManager {
   @Override
   public CompletableFuture<Void> receive(Event event, long expectedCounter) throws IsClosedException {
     ensureRunning();
-    LOG.info("Received event {}", event);
+    log.info("Received event {}", event);
 
     // TODO: optional retry on transaction conflict
 
     queuedEvents.increment();
     return Striping.supplyAsyncStriped(() ->
-        transition(event, expectedCounter), event.workflowInstance(), eventTransitionExecutor)
+        transition(event, expectedCounter), event.workflowInstance(), eventProcessingExecutor)
         .thenAccept((tuple) -> postTransition(tuple._1, tuple._2));
   }
 
@@ -166,17 +178,19 @@ public class QueuedStateManager implements StateManager {
       });
     } catch (TransactionException e) {
       if (e.isAlreadyExists()) {
-        throw new AlreadyInitializedException(
-            "Workflow instance is already triggered: " + workflowInstance.toKey());
+        throw new AlreadyInitializedException("Workflow instance is already triggered: " + workflowInstance);
       } else if (e.isConflict()) {
-        LOG.debug(
-            "Transactional conflict, abort triggering Workflow instance: " + workflowInstance
-                .toKey());
+        log.debug("Transaction conflict when triggering workflow instance. Aborted: {}",
+            workflowInstance);
         throw new RuntimeException(e);
       } else {
+        log.debug("Transaction failure when triggering workflow instance: {}: {}",
+            workflowInstance, e.getMessage(), e);
         throw new RuntimeException(e);
       }
-    } catch (IOException e) {
+    } catch (Exception e) {
+      log.debug("Failure when triggering workflow instance: {}: {}", workflowInstance, e.getMessage(), e);
+      Throwables.throwIfUnchecked(e);
       throw new RuntimeException(e);
     }
   }
@@ -191,12 +205,13 @@ public class QueuedStateManager implements StateManager {
             tx.readActiveState(event.workflowInstance());
         if (!currentRunState.isPresent()) {
           String message = "Received event for unknown workflow instance: " + event;
-          LOG.warn(message);
+          log.warn(message);
           throw new IllegalArgumentException(message);
         }
 
         // Verify counters for in-order event processing
         verifyCounter(event, expectedCounter, currentRunState.get());
+        log.info("Received event (verified) {}", event);
 
         final RunState nextRunState;
         try {
@@ -204,9 +219,12 @@ public class QueuedStateManager implements StateManager {
         } catch (IllegalStateException e) {
           // TODO: illegal state transitions might become common as multiple scheduler
           //       instances concurrently consume events from k8s.
-          LOG.warn("Illegal state transition", e);
+          log.warn("Illegal state transition", e);
           throw e;
         }
+
+        // Resource limiting occurs by throwing here, or by failing the commit with a conflict.
+        updateResourceCounters(tx, event, currentRunState.get(), nextRunState);
 
         // Write new state to datastore (or remove it if terminal)
         if (nextRunState.state().isTerminal()) {
@@ -215,21 +233,31 @@ public class QueuedStateManager implements StateManager {
           tx.updateActiveState(event.workflowInstance(), nextRunState);
         }
 
-        // Resource limiting occurs by throwing here, or by failing the commit with a conflict.
-        updateResourceCounters(tx, event, currentRunState.get(), nextRunState);
-
         final SequenceEvent sequenceEvent =
             SequenceEvent.create(event, nextRunState.counter(), nextRunState.timestamp());
 
         return Tuple.of(sequenceEvent, nextRunState);
       });
-    } catch (IOException e) {
+    } catch (TransactionException e) {
+      if (e.isConflict()) {
+        log.debug("Transaction conflict during workflow instance transition. Aborted: {}, counter={}",
+            event, expectedCounter);
+        throw new RuntimeException(e);
+      } else {
+        log.debug("Transaction failure during workflow instance transition: {}, counter={}",
+            event, expectedCounter, e);
+        throw new RuntimeException(e);
+      }
+    } catch (Exception e) {
+      log.debug("Failure during workflow instance transition: {}, counter={}",
+          event, expectedCounter, e);
+      Throwables.throwIfUnchecked(e);
       throw new RuntimeException(e);
     }
   }
 
   private void updateResourceCounters(StorageTransaction tx, Event event,
-                                      RunState currentRunState, RunState nextRunState) {
+                                      RunState currentRunState, RunState nextRunState) throws IOException {
     // increment counters if event is dequeue
     if (isDequeue(event) && nextRunState.data().resourceIds().isPresent()) {
       tryUpdatingCounter(currentRunState, tx, nextRunState.data().resourceIds().get());
@@ -244,7 +272,7 @@ public class QueuedStateManager implements StateManager {
           tx.updateCounter(shardedCounter, resource, -1);
         }
       } else {
-        LOG.error("Resource ids are missing for {} when transitioning from {} to {}.",
+        log.error("Resource ids are missing for {} when transitioning from {} to {}.",
             nextRunState.workflowInstance(), currentRunState, nextRunState);
       }
     }
@@ -266,20 +294,21 @@ public class QueuedStateManager implements StateManager {
         .collect(toList());
 
     if (!depletedResourceIds.isEmpty()) {
-      final List<Resource> depletedResources = depletedResourceIds.stream().map(x ->
-          Resource.create(x, shardedCounter.getCounterSnapshot(x).getLimit()))
-          .collect(toList());
-      final Message message = Message.info(
-          String.format("Resource limit reached for: %s", depletedResources));
-      if (!runState.data().message().map(message::equals).orElse(false)) {
-        receiveIgnoreClosed(Event.info(runState.workflowInstance(), message), runState.counter());
-      }
+      MessageUtil.emitResourceLimitReachedMessage(this, runState, depletedResourceIds);
     }
 
     if (!failedTries.isEmpty()) {
-      throw new RuntimeException(
-          String.format("Failed to update resource counter for workflow instance %s",
-          runState.workflowInstance()));
+      final List<String> failedResources = failedTries.stream()
+          .map(x -> x._1)
+          .sorted()
+          .collect(toList());
+      final RuntimeException exception = new RuntimeException(
+          "Failed to update resource counter for workflow instance: "
+          + runState.workflowInstance() + ": " + failedResources);
+      failedTries.stream()
+          .map(x -> x._2.getCause())
+          .forEach(exception::addSuppressed);
+      throw exception;
     }
   }
 
@@ -297,13 +326,13 @@ public class QueuedStateManager implements StateManager {
       final String message = "Stale event encountered. Expected counter is "
                              + expectedCounter  + " but current counter is "
                              + currentCounter + ". Discarding event " + event;
-      LOG.debug(message);
+      log.debug(message);
       throw new StaleEventException(message);
     } else if (currentCounter < expectedCounter) {
       // This should never happen
       final String message = "Unexpected current counter is less than last observed one for "
                              + currentRunState;
-      LOG.error(message);
+      log.error(message);
       throw new RuntimeException(message);
     }
   }
@@ -313,14 +342,14 @@ public class QueuedStateManager implements StateManager {
     try {
       storage.writeEvent(sequenceEvent);
     } catch (IOException e) {
-      LOG.warn("Error writing event {}", sequenceEvent, e);
+      log.warn("Error writing event {}", sequenceEvent, e);
     }
 
     // Publish event
     try {
-      eventConsumerExecutor.execute(() -> eventConsumer.accept(sequenceEvent, runState));
+      eventConsumerExecutor.execute(withMDC(() -> eventConsumer.accept(sequenceEvent, runState)));
     } catch (Exception e) {
-      LOG.warn("Error while consuming event {}", sequenceEvent, e);
+      log.warn("Error while consuming event {}", sequenceEvent, e);
     }
   }
 
@@ -357,18 +386,6 @@ public class QueuedStateManager implements StateManager {
       return;
     }
     running = false;
-
-    eventTransitionExecutor.shutdown();
-    try {
-      if (!eventTransitionExecutor
-          .awaitTermination(SHUTDOWN_GRACE_PERIOD.toMillis(), MILLISECONDS)) {
-        throw new IOException(
-            "Graceful shutdown failed, event loop did not finish within grace period");
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IOException(e);
-    }
   }
 
   @VisibleForTesting
