@@ -30,6 +30,9 @@ import static com.spotify.styx.storage.Storage.GLOBAL_RESOURCE_ID;
 import static java.util.Collections.emptySet;
 import static java.util.Comparator.comparingLong;
 import static java.util.function.Function.identity;
+import static java.util.function.Predicate.isEqual;
+import static java.util.function.Predicate.not;
+import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
@@ -77,7 +80,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -191,24 +193,27 @@ public class Scheduler {
     // this reflects resource usage since last tick, so a couple of minutes delay
     updateResourceStats(resources, currentResourceUsage);
 
-    final List<InstanceState> aliveInstances = activeStates.parallelStream()
-            .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
-            .collect(toList());
+    var aliveInstances = activeStates.stream()
+        .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
+        .collect(toList());
 
-    final Map<State, List<InstanceState>> instancesByState = aliveInstances.stream()
-        .collect(Collectors.groupingBy(instance -> instance.runState().state()));
+    var instancesByState = aliveInstances.stream()
+        .collect(groupingBy(instance -> instance.runState().state()));
 
-    final List<InstanceState> dequeueEligibleInstances = instancesByState.get(State.QUEUED).stream()
+    var dequeueEligibleInstances = instancesByState.getOrDefault(State.QUEUED, List.of())
+        .stream()
         .filter(entry -> isDueForDequeue(entry.runState()))
         .sorted(comparingLong(i -> i.runState().timestamp()))
         .collect(toList());
 
-    final List<InstanceState> executingInstances = Stream.of(State.values())
-        .filter(state -> state != State.QUEUED && state != State.NEW)
-        .flatMap(state -> instancesByState.get(state).stream())
+    var executingStates = Stream.of(State.values())
+        .filter(not(isEqual(State.QUEUED)))
+        .filter(not(isEqual(State.NEW)));
+    var executingInstances = executingStates
+        .flatMap(state -> instancesByState.getOrDefault(state, List.of()).stream())
         .collect(toList());
 
-    final String message = String.format("Instances: active=%d, alive=%d, dequeueEligible=%d, timedOut=%d",
+    var message = String.format("Instances: active=%d, alive=%d, dequeueEligible=%d, timedOut=%d",
         activeStates.size(), aliveInstances.size(), dequeueEligibleInstances.size(), timedOutInstances.size());
     LOG.info(message);
     tracer.getCurrentSpan().addAnnotation(message);
@@ -227,7 +232,7 @@ public class Scheduler {
   }
 
   private void processExecutingInstances(List<InstanceState> instances) {
-    final List<CompletableFuture<Void>> futures = instances.stream()
+    var futures = instances.stream()
         .map(instance -> CompletableFuture.runAsync(() -> processExecutingInstance(instance), executor))
         .collect(toList());
     try {
@@ -241,14 +246,14 @@ public class Scheduler {
    * Run the instance state machine forward until it stops.
    */
   private void processExecutingInstance(InstanceState instance)  {
-    RunState state = instance.runState();
+    var runState = instance.runState();
     while (true) {
-      final Optional<Event> event = findTransition(state);
+      var event = findTransition(runState);
       if (event.isEmpty()) {
         return;
       }
       try {
-        state = stateManager.receive(event.get(), state.counter()).toCompletableFuture()
+        runState = stateManager.receive(event.get(), runState.counter()).toCompletableFuture()
             .get(30, TimeUnit.SECONDS);
       } catch (InterruptedException | TimeoutException e) {
         throw new RuntimeException(e);
@@ -267,8 +272,8 @@ public class Scheduler {
   private Optional<Event> findTransition(RunState state) {
     // TODO: have handlers register their state interests and avoid having to loop through all of them
     // TODO: we really want just one event here.
-    for (OutputHandler outputHandler : outputHandlers) {
-      final Optional<Event> event = outputHandler.transitionInto(state);
+    for (var outputHandler : outputHandlers) {
+      var event = outputHandler.transitionInto(state);
       if (event.isPresent()) {
         return event;
       }
