@@ -20,14 +20,12 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
-import static com.spotify.styx.model.Schedule.MONTHS;
-import static com.spotify.styx.model.Schedule.WEEKS;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
-import static org.mockito.Mockito.reset;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import com.spotify.styx.model.Schedule;
@@ -36,20 +34,22 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
 import java.time.Instant;
-import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.MockitoAnnotations;
 
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(JUnitParamsRunner.class)
 public class StateInitializingTriggerTest {
 
   private static final Instant TIME = Instant.parse("2016-01-18T09:11:22.333Z");
@@ -59,21 +59,16 @@ public class StateInitializingTriggerTest {
       .env("FOO", "foo", "BAR", "bar")
       .build();
 
-  private static final Map<Schedule, String> SCHEDULE_ARG_EXPECTS =
-      Map.of(
-          WEEKS, "2016-01-18",
-          DAYS, "2016-01-18",
-          HOURS, "2016-01-18T09",
-          MONTHS, "2016-01"
-      );
-
   @Mock StateManager stateManager;
 
   private TriggerListener trigger;
 
   @Before
   public void setUp() throws Exception {
+    MockitoAnnotations.initMocks(this);
     trigger = new StateInitializingTrigger(stateManager);
+    when(stateManager.trigger(any(), any(), any())).then(a ->
+        CompletableFuture.completedFuture(RunState.create(a.<WorkflowInstance>getArgument(0), RunState.State.QUEUED)));
   }
 
   @Test
@@ -134,20 +129,17 @@ public class StateInitializingTriggerTest {
     verifyZeroInteractions(stateManager);
   }
 
+  @Parameters({ "WEEKS, 2016-01-18",
+                "DAYS, 2016-01-18",
+                "HOURS, 2016-01-18T09",
+                "MONTHS, 2016-01" })
   @Test
-  @Parameters()
-  public void shouldCreateWorkflowInstanceParameter() throws Exception {
-    for (Map.Entry<Schedule, String> scheduleCase : SCHEDULE_ARG_EXPECTS.entrySet()) {
-      reset(stateManager);
-      WorkflowConfiguration workflowConfiguration = workflowConfiguration(
-          scheduleCase.getKey(), "--date", "{}", "--bar");
-      Workflow workflow = Workflow.create("id", workflowConfiguration);
-      trigger.event(workflow, NATURAL_TRIGGER, TIME, PARAMETERS);
-
-      WorkflowInstance expectedInstance = WorkflowInstance.create(workflow.id(), scheduleCase.getValue());
-
-      verify(stateManager).trigger(expectedInstance, Trigger.natural(), PARAMETERS);
-    }
+  public void shouldCreateWorkflowInstanceParameter(String schedule, String instance) throws Exception {
+    var workflowConfiguration = workflowConfiguration(Schedule.parse(schedule), "--date", "{}", "--bar");
+    var workflow = Workflow.create("id", workflowConfiguration);
+    trigger.event(workflow, NATURAL_TRIGGER, TIME, PARAMETERS);
+    var expectedInstance = WorkflowInstance.create(workflow.id(), instance);
+    verify(stateManager).trigger(expectedInstance, Trigger.natural(), PARAMETERS);
   }
 
   private WorkflowConfiguration workflowConfiguration(Schedule schedule, String... args) {
