@@ -26,11 +26,16 @@ import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.GenericUrl;
+import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpTransport;
+import com.google.api.client.http.UriTemplate;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.webtoken.JsonWebSignature;
 import com.google.api.client.json.webtoken.JsonWebSignature.Header;
 import com.google.api.client.json.webtoken.JsonWebToken.Payload;
+import com.google.auth.oauth2.ComputeEngineCredentials;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.Objects;
@@ -41,19 +46,32 @@ import org.slf4j.LoggerFactory;
 public class GoogleIdTokenAuth {
   private static final Logger log = LoggerFactory.getLogger(GoogleIdTokenAuth.class);
   private static final JsonFactory JSON_FACTORY = Utils.getDefaultJsonFactory();
+  private static final String DEFAULT_GCE_METADATA_HOST = "http://169.254.169.254";
+  private static final String GCE_METADATA_IDENTITY_PATH =
+      "/computeMetadata/v1/instance/service-accounts/default/identity{?audience,format}";
 
   private final HttpTransport httpTransport;
   private final Optional<GoogleCredential> credential;
+  private final boolean isGCE;
 
   GoogleIdTokenAuth(
       HttpTransport httpTransport,
-      Optional<GoogleCredential> credential) {
+      Optional<GoogleCredential> credential,
+      boolean isGCE) {
     this.httpTransport = Objects.requireNonNull(httpTransport, "httpTransport");
     this.credential = Objects.requireNonNull(credential, "credential");
+    this.isGCE = isGCE;
+  }
+
+  boolean isGCE() {
+    return isGCE;
   }
 
   public Optional<String> getToken(String targetAudience)
       throws IOException, GeneralSecurityException {
+    if (isGCE) {
+      return Optional.of(getDefaultGCEIdToken(targetAudience));
+    }
     return credential.isPresent()
         ? Optional.of(getToken(targetAudience, credential.get()))
         : Optional.empty();
@@ -70,9 +88,24 @@ public class GoogleIdTokenAuth {
     }
   }
 
+  private String getDefaultGCEIdToken(String targetAudience) throws IOException {
+    // https://cloud.google.com/compute/docs/instances/verifying-instance-identity#request_signature
+    final String metadataHost = System.getenv().getOrDefault("GCE_METADATA_HOST", DEFAULT_GCE_METADATA_HOST);
+    final String uriTemplate = "http://" + metadataHost + GCE_METADATA_IDENTITY_PATH;
+    final String identityUri = UriTemplate.expand(uriTemplate, ImmutableMap.of(
+        "audience", targetAudience,
+        "format", "full"),
+        false);
+    return httpTransport.createRequestFactory()
+        .buildGetRequest(new GenericUrl(identityUri))
+        .setHeaders(new HttpHeaders().set("Metadata-Flavor", "Google"))
+        .execute()
+        .parseAsString();
+  }
+
   private String getServiceAccountToken(GoogleCredential credential, String targetAudience)
       throws IOException, GeneralSecurityException {
-    log.debug("Fetching service account access token for {}", credential.getServiceAccountUser());
+    log.debug("Fetching service account id token for {}", credential.getServiceAccountId());
     final TokenRequest request = new TokenRequest(
         this.httpTransport, JSON_FACTORY,
         new GenericUrl(credential.getTokenServerEncodedUrl()),
@@ -105,7 +138,7 @@ public class GoogleIdTokenAuth {
   }
 
   private String getUserToken(GoogleCredential credential) throws IOException {
-    log.debug("Fetching user access token");
+    log.debug("Fetching user id token");
     final TokenRequest request = new RefreshTokenRequest(
         this.httpTransport, JSON_FACTORY,
         new GenericUrl(credential.getTokenServerEncodedUrl()),
@@ -118,7 +151,13 @@ public class GoogleIdTokenAuth {
 
   public static GoogleIdTokenAuth ofDefaultCredential() {
     try {
-      return of(Optional.of(GoogleCredential.getApplicationDefault()));
+      if (isDefaultGCE()) {
+        return new GoogleIdTokenAuth(Utils.getDefaultTransport(),
+            Optional.empty(), true);
+      } else {
+        return new GoogleIdTokenAuth(Utils.getDefaultTransport(),
+            Optional.of(GoogleCredential.getApplicationDefault()), false);
+      }
     } catch (IOException e) {
       return of(Optional.empty());
     }
@@ -133,6 +172,10 @@ public class GoogleIdTokenAuth {
   }
 
   private static GoogleIdTokenAuth of(HttpTransport transport, Optional<GoogleCredential> credential) {
-    return new GoogleIdTokenAuth(transport, credential);
+    return new GoogleIdTokenAuth(transport, credential, false);
+  }
+
+  private static boolean isDefaultGCE() throws IOException {
+    return GoogleCredentials.getApplicationDefault() instanceof ComputeEngineCredentials;
   }
 }
