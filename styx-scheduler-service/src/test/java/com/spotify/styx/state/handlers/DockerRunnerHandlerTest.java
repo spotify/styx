@@ -42,9 +42,8 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
-import com.spotify.styx.state.StateManager;
-import com.spotify.styx.util.IsClosedException;
 import java.io.IOException;
+import java.util.Optional;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -66,13 +65,10 @@ public class DockerRunnerHandlerTest {
       .build();
 
   @Mock DockerRunner dockerRunner;
-  @Mock StateManager stateManager;
   @Mock EventVisitor<Void> eventVisitor;
 
   @Captor ArgumentCaptor<WorkflowInstance> instanceCaptor;
   @Captor ArgumentCaptor<RunSpec> runSpecCaptor;
-  @Captor ArgumentCaptor<Event> eventCaptor;
-  @Captor ArgumentCaptor<Long> counterCaptor;
 
   @Before
   public void setUp() {
@@ -126,10 +122,8 @@ public class DockerRunnerHandlerTest {
         .executionDescription(EXECUTION_DESCRIPTION)
         .build());
 
-    dockerRunnerHandler.transitionInto(runState);
-
-    verify(stateManager, timeout(60_000)).receive(Event.submitted(workflowInstance, TEST_EXECUTION_ID),
-        runState.counter());
+    var event = dockerRunnerHandler.transitionInto(runState).orElseThrow();
+    assertThat(event, is(Event.submitted(workflowInstance, TEST_EXECUTION_ID)));
   }
 
   @Test
@@ -142,40 +136,23 @@ public class DockerRunnerHandlerTest {
     shouldFailIfDockerRunnerRaisesException(new InvalidExecutionException("PEBKAC"));
   }
 
-  void shouldFailIfDockerRunnerRaisesException(Throwable throwable)
-      throws IOException, IsClosedException {
+  private void shouldFailIfDockerRunnerRaisesException(Throwable throwable) throws IOException {
     doThrow(throwable).when(dockerRunner)
         .start(any(WorkflowInstance.class), any(RunSpec.class));
 
     Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, RunState.State.SUBMITTING,
-        StateData.newBuilder()
-            .executionId(TEST_EXECUTION_ID)
-            .executionDescription(EXECUTION_DESCRIPTION)
-            .build());
 
-    dockerRunnerHandler.transitionInto(runState);
+    var stateData = StateData.newBuilder()
+        .executionId(TEST_EXECUTION_ID)
+        .executionDescription(EXECUTION_DESCRIPTION)
+        .build();
+    var runState = RunState.create(workflowInstance, State.SUBMITTING, stateData);
 
-    // Verify that the state manager receives two events:
-    // 1. submitted
-    // 2. runError
-    verify(stateManager, timeout(60_000).times(2))
-        .receive(eventCaptor.capture(), counterCaptor.capture());
+    var event = dockerRunnerHandler.transitionInto(runState).orElseThrow();
 
-    Event event1 = eventCaptor.getAllValues().get(0);
-    Event event2 = eventCaptor.getAllValues().get(1);
-    
-    long counter1 = counterCaptor.getAllValues().get(0);
-    long counter2 = counterCaptor.getAllValues().get(1);
-
-    event1.accept(eventVisitor);
-    verify(eventVisitor).submitted(workflowInstance, TEST_EXECUTION_ID);
-    assertThat(counter1, is(runState.counter()));
-
-    event2.accept(eventVisitor);
+    event.accept(eventVisitor);
     verify(eventVisitor).runError(workflowInstance, throwable.getMessage());
-    assertThat(counter2, is(runState.counter() + 1));
   }
 
   @Test
@@ -186,9 +163,8 @@ public class DockerRunnerHandlerTest {
         .executionId(TEST_EXECUTION_ID)
         .build());
 
-    dockerRunnerHandler.transitionInto(runState);
-
-    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance));
+    var event = dockerRunnerHandler.transitionInto(runState).orElseThrow();
+    assertThat(event, is(Event.halt(workflowInstance)));
   }
 
   @Test
@@ -199,9 +175,8 @@ public class DockerRunnerHandlerTest {
         .executionDescription(EXECUTION_DESCRIPTION)
         .build());
 
-    dockerRunnerHandler.transitionInto(runState);
-
-    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance));
+    var event = dockerRunnerHandler.transitionInto(runState).orElseThrow();
+    assertThat(event, is(Event.halt(workflowInstance)));
   }
 
   @Test
@@ -212,9 +187,10 @@ public class DockerRunnerHandlerTest {
     RunState runState = RunState.create(workflowInstance, RunState.State.FAILED,
         StateData.newBuilder().executionId(TEST_EXECUTION_ID).build());
 
-    dockerRunnerHandler.transitionInto(runState);
+    var event = dockerRunnerHandler.transitionInto(runState);
+    assertThat(event, is(Optional.empty()));
 
-    verify(dockerRunner, timeout(60_000)).cleanup(workflowInstance, TEST_EXECUTION_ID);
+    verify(dockerRunner).cleanup(workflowInstance, TEST_EXECUTION_ID);
   }
 
   @Test
@@ -226,7 +202,8 @@ public class DockerRunnerHandlerTest {
         .executionId(TEST_EXECUTION_ID)
         .build());
 
-    dockerRunnerHandler.transitionInto(runState);
+    var event = dockerRunnerHandler.transitionInto(runState);
+    assertThat(event, is(Optional.empty()));
 
     verify(dockerRunner).cleanup(workflowInstance, TEST_EXECUTION_ID);
   }
