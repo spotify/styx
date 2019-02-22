@@ -77,7 +77,9 @@ public class PublisherHandler implements OutputHandler {
     final WorkflowInstance workflowInstance = state.workflowInstance();
     switch (state.state()) {
       // TODO: Publishing these events might need to be more effectively-once
-      //       Have this be listening for the submitted and started events instead?
+      //       Have this be listening for the submit and started events instead of being a state handler?
+      //       Otherwise events might be emitted multiple times while the instance is in the SUBMITTING and
+      //       SUBMITTED states.
       case SUBMITTING:
         try {
           Preconditions.checkArgument(state.data().executionDescription().isPresent());
@@ -85,7 +87,7 @@ public class PublisherHandler implements OutputHandler {
 
           retrier.runWithRetries(
               meteredPublishing(() -> publisher.deploying(workflowInstance, executionDescription),
-                  stats, DEPLOYING, SUBMITTED.name()));
+                  stats, DEPLOYING, SUBMITTING.name()));
         } catch (Exception e) {
           stats.recordPublishingError(DEPLOYING, SUBMITTING.name());
           LOG.error("Failed to publish event for {} state", SUBMITTING.name(), e);

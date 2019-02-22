@@ -31,7 +31,6 @@ import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
-import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.Retrier;
@@ -49,7 +48,7 @@ public class PublisherHandlerTest {
   private static final String DOCKER_IMAGE = "busybox:1.1";
 
   private Publisher publisher;
-  private OutputHandler outputHandler;
+  private PublisherHandler outputHandler;
 
   @Mock
   private Stats stats;
@@ -61,11 +60,31 @@ public class PublisherHandlerTest {
   }
 
   @Test
-  public void testPublishesRollingOutStateOnSubmitted() throws Exception {
+  public void testPublishesRollingOutStateOnSubmitting() throws Exception {
     ExecutionDescription executionDescription = ExecutionDescription.builder()
         .dockerImage(DOCKER_IMAGE)
         .commitSha(COMMIT_SHA)
         .build();
+    RunState runState = RunState.create(
+        WORKFLOW_INSTANCE,
+        RunState.State.SUBMITTING,
+        StateData.newBuilder()
+            .executionId("exec1")
+            .executionDescription(executionDescription)
+            .build());
+    outputHandler.transitionInto(runState);
+
+    verify(publisher).deploying(WORKFLOW_INSTANCE, executionDescription);
+    verify(stats).recordPublishing("deploying", "SUBMITTING");
+  }
+
+  @Test
+  public void testPublishesDoneStateOnSubmitted() throws Exception {
+    ExecutionDescription executionDescription = ExecutionDescription.builder()
+        .dockerImage(DOCKER_IMAGE)
+        .commitSha(COMMIT_SHA)
+        .build();
+
     RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.SUBMITTED,
@@ -75,28 +94,8 @@ public class PublisherHandlerTest {
             .build());
     outputHandler.transitionInto(runState);
 
-    verify(publisher).deploying(WORKFLOW_INSTANCE, executionDescription);
-    verify(stats).recordPublishing("deploying", "SUBMITTED");
-  }
-
-  @Test
-  public void testPublishesDoneStateOnRunning() throws Exception {
-    ExecutionDescription executionDescription = ExecutionDescription.builder()
-        .dockerImage(DOCKER_IMAGE)
-        .commitSha(COMMIT_SHA)
-        .build();
-
-    RunState runState = RunState.create(
-        WORKFLOW_INSTANCE,
-        RunState.State.RUNNING,
-        StateData.newBuilder()
-            .executionId("exec1")
-            .executionDescription(executionDescription)
-            .build());
-    outputHandler.transitionInto(runState);
-
     verify(publisher).deployed(WORKFLOW_INSTANCE, executionDescription);
-    verify(stats).recordPublishing("deployed", "RUNNING");
+    verify(stats).recordPublishing("deployed", "SUBMITTED");
   }
 
   @Test
@@ -116,14 +115,14 @@ public class PublisherHandlerTest {
             .build());
     outputHandler.transitionInto(runState);
 
-    verify(publisher).deploying(WORKFLOW_INSTANCE, executionDescription);
-    verify(stats, times(2)).recordPublishingError("deploying", "SUBMITTED");
-    verify(stats).recordPublishing("deploying", "SUBMITTED");
+    verify(publisher).deployed(WORKFLOW_INSTANCE, executionDescription);
+    verify(stats, times(2)).recordPublishingError("deployed", "SUBMITTED");
+    verify(stats).recordPublishing("deployed", "SUBMITTED");
   }
 
   @Test
   public void shouldFailEventuallyOnSubmitted() throws Exception {
-    doThrow(new IOException()).when(publisher).deploying(any(), any());
+    doThrow(new IOException()).when(publisher).deployed(any(), any());
     outputHandler = new PublisherHandler(
         publisher, stats,
         Retrier.builder()
@@ -143,12 +142,12 @@ public class PublisherHandlerTest {
             .build());
     outputHandler.transitionInto(runState);
 
-    verify(publisher).deploying(WORKFLOW_INSTANCE, executionDescription);
-    verify(stats, times(2)).recordPublishingError("deploying", "SUBMITTED");
+    verify(publisher).deployed(WORKFLOW_INSTANCE, executionDescription);
+    verify(stats, times(2)).recordPublishingError("deployed", "SUBMITTED");
   }
 
   @Test
-  public void shouldRetryPublishesOnRunning() throws Exception {
+  public void shouldRetryPublishesOnSubmitting() throws Exception {
     outputHandler = new PublisherHandler(new FailingPublisher(publisher, 2), stats);
 
     ExecutionDescription executionDescription = ExecutionDescription.builder()
@@ -157,21 +156,21 @@ public class PublisherHandlerTest {
         .build();
     RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
-        RunState.State.RUNNING,
+        RunState.State.SUBMITTING,
         StateData.newBuilder()
             .executionId("exec1")
             .executionDescription(executionDescription)
             .build());
     outputHandler.transitionInto(runState);
 
-    verify(publisher).deployed(WORKFLOW_INSTANCE, executionDescription);
-    verify(stats, times(2)).recordPublishingError("deployed", "RUNNING");
-    verify(stats).recordPublishing("deployed", "RUNNING");
+    verify(publisher).deploying(WORKFLOW_INSTANCE, executionDescription);
+    verify(stats, times(2)).recordPublishingError("deploying", "SUBMITTING");
+    verify(stats).recordPublishing("deploying", "SUBMITTING");
   }
 
   @Test
-  public void shouldFailEventuallyOnRunning() throws Exception {
-    doThrow(new IOException()).when(publisher).deployed(any(), any());
+  public void shouldFailEventuallyOnSubmitting() throws Exception {
+    doThrow(new IOException()).when(publisher).deploying(any(), any());
     outputHandler = new PublisherHandler(
         publisher, stats,
         Retrier.builder()
@@ -184,15 +183,15 @@ public class PublisherHandlerTest {
         .build();
     RunState runState = RunState.create(
         WORKFLOW_INSTANCE,
-        RunState.State.RUNNING,
+        RunState.State.SUBMITTING,
         StateData.newBuilder()
             .executionId("exec1")
             .executionDescription(executionDescription)
             .build());
     outputHandler.transitionInto(runState);
 
-    verify(publisher).deployed(WORKFLOW_INSTANCE, executionDescription);
-    verify(stats, times(2)).recordPublishingError("deployed", "RUNNING");
+    verify(publisher).deploying(WORKFLOW_INSTANCE, executionDescription);
+    verify(stats, times(2)).recordPublishingError("deploying", "SUBMITTING");
   }
 
   private class FailingPublisher implements Publisher {

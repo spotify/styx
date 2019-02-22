@@ -89,7 +89,7 @@ public class ExecutionDescriptionHandlerTest {
 
     when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
 
-    final Event event = toTest.transitionInto(runState).get();
+    var event = toTest.transitionInto(runState).orElseThrow();
     event.accept(eventVisitor);
     verify(eventVisitor)
         .submit(workflowInstanceCaptor.capture(), executionDescriptionCaptor.capture(), executionIdCaptor.capture());
@@ -108,7 +108,7 @@ public class ExecutionDescriptionHandlerTest {
 
     when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
 
-    final Event event = toTest.transitionInto(runState).get();
+    var event = toTest.transitionInto(runState).orElseThrow();
     event.accept(eventVisitor);
 
     verify(eventVisitor)
@@ -131,7 +131,7 @@ public class ExecutionDescriptionHandlerTest {
 
     RunState runState = RunState.create(workflowInstance, PREPARE);
 
-    final Event event = toTest.transitionInto(runState).get();
+    var event = toTest.transitionInto(runState).orElseThrow();
     assertThat(event, is(Event.runError(workflowInstance, exception.getMessage())));
   }
 
@@ -142,7 +142,7 @@ public class ExecutionDescriptionHandlerTest {
 
     when(storage.workflow(any())).thenReturn(Optional.empty());
 
-    final Event event = toTest.transitionInto(runState).get();
+    var event = toTest.transitionInto(runState).orElseThrow();
 
     assertThat(event, is(Event.halt(workflowInstance)));
   }
@@ -159,7 +159,7 @@ public class ExecutionDescriptionHandlerTest {
 
     when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
 
-    final Event event = toTest.transitionInto(runState).get();
+    var event = toTest.transitionInto(runState).orElseThrow();
 
     assertThat(event, is(Event.halt(workflowInstance)));
   }
@@ -174,7 +174,7 @@ public class ExecutionDescriptionHandlerTest {
 
     when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
 
-    final Event event = toTest.transitionInto(runState).get();
+    var event = toTest.transitionInto(runState).orElseThrow();
 
     assertThat(event, is(Event.halt(workflowInstance)));
   }
