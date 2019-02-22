@@ -41,6 +41,7 @@ import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.github.rholder.retry.StopStrategies;
+import com.github.rholder.retry.WaitStrategies;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.json.GoogleJsonError;
@@ -172,7 +173,7 @@ public class ServiceAccountUsageAuthorizerTest {
         .setServiceAccountId("styx@bar.iam.gserviceaccount.com")
         .build();
     sut = new ServiceAccountUsageAuthorizer.Impl(iam, crm, directory, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy,
-        StopStrategies.stopAfterAttempt(RETRY_ATTEMPTS), MESSAGE, ADMINISTRATORS, BLACKLIST);
+        WaitStrategies.noWait(), StopStrategies.stopAfterAttempt(RETRY_ATTEMPTS), MESSAGE, ADMINISTRATORS, BLACKLIST);
   }
 
   @Test
