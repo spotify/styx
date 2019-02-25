@@ -25,6 +25,7 @@ import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.util.IsClosedException;
 import java.io.Closeable;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
@@ -109,4 +110,6 @@ public interface StateManager extends Closeable {
    * @return The RunState associated with the workflow instance
    */
   Optional<RunState> getActiveState(WorkflowInstance workflowInstance);
+
+  List<WorkflowInstance> listActiveStates();
 }
