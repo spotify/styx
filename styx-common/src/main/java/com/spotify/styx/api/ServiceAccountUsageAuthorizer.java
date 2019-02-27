@@ -214,44 +214,50 @@ public interface ServiceAccountUsageAuthorizer {
     @Override
     public ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(String serviceAccount,
                                                                                         String principalEmail) {
-      final String projectId = serviceAccountProjectId(serviceAccount);
-
       // First check if principal is blacklisted
       return memberStatus(principalEmail, blacklist)
           .map(status -> ServiceAccountUsageAuthorizationResult.builder()
-              .serviceAccountProjectId(projectId)
               .authorized(false)
               .blacklisted(true)
               .message(blacklistedDenialMessage(principalEmail))
               .build())
           // Then continue authorization check
-          .orElseGet(() -> checkServiceAccountUsageAuthorization0(serviceAccount, principalEmail, projectId));
+          .orElseGet(() -> checkServiceAccountUsageAuthorization0(serviceAccount, principalEmail));
     }
 
     private ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization0(String serviceAccount,
-                                                                                          String principalEmail,
-                                                                                          String projectId) {
-      final Optional<String> accessMessage = firstPresent(
-          // Check if the principal is an admin
-          () -> memberStatus(principalEmail, administrators)
-              .map(status -> String.format("Principal %s is an admin %s", principalEmail, status)),
+                                                                                          String principalEmail) {
 
-          // Check if the principal has been granted the service account user role in the project of the SA
-          () -> projectPolicyAccess(projectId, principalEmail)
-              .map(type -> String.format("Principal %s has role %s in project %s %s",
-                  principalEmail, serviceAccountUserRole, projectId, type)),
+      // Check if the principal is an admin first before starting any GCP API interaction
+      return memberStatus(principalEmail, administrators)
+          .map(status -> String.format("Principal %s is an admin %s", principalEmail, status))
+          .map(accessMessage -> ServiceAccountUsageAuthorizationResult.builder()
+              .authorized(true)
+              .message(accessMessage)
+              .build())
+          .orElseGet(() -> {
+            final String projectId = serviceAccountProjectId(serviceAccount);
 
-          // Check if the principal has been granted the service account user role on the SA itself
-          () -> serviceAccountPolicyAccess(serviceAccount, principalEmail)
-              .map(type -> String.format("Principal %s has role %s on service account %s %s",
-                  principalEmail, serviceAccountUserRole, serviceAccount, type)));
+            final Optional<String> accessMessage = firstPresent(
 
-      final ServiceAccountUsageAuthorizationResultBuilder result = ServiceAccountUsageAuthorizationResult.builder()
-              .serviceAccountProjectId(projectId)
-              .authorized(accessMessage.isPresent())
-              .message(accessMessage.orElseGet(() -> denialMessage(serviceAccount, principalEmail, projectId)));
+                // Check if the principal has been granted the service account user role in the project of the SA
+                () -> projectPolicyAccess(projectId, principalEmail)
+                    .map(type -> String.format("Principal %s has role %s in project %s %s",
+                        principalEmail, serviceAccountUserRole, projectId, type)),
 
-      return result.build();
+                // Check if the principal has been granted the service account user role on the SA itself
+                () -> serviceAccountPolicyAccess(serviceAccount, principalEmail)
+                    .map(type -> String.format("Principal %s has role %s on service account %s %s",
+                        principalEmail, serviceAccountUserRole, serviceAccount, type)));
+
+            final ServiceAccountUsageAuthorizationResultBuilder result =
+                ServiceAccountUsageAuthorizationResult.builder()
+                    .serviceAccountProjectId(projectId)
+                    .authorized(accessMessage.isPresent())
+                    .message(accessMessage.orElseGet(() -> denialMessage(serviceAccount, principalEmail, projectId)));
+
+            return result.build();
+          });
     }
 
     private ResponseException denialResponseException(String message) {

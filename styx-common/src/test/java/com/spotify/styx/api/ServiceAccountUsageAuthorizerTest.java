@@ -194,7 +194,6 @@ public class ServiceAccountUsageAuthorizerTest {
         .authorized(false)
         .blacklisted(true)
         .message(blacklistedMessage(BLACKLISTED_SA_EMAIL))
-        .serviceAccountProjectId(SERVICE_ACCOUNT_PROJECT)
         .build();
     var result = sut.checkServiceAccountUsageAuthorization(SERVICE_ACCOUNT, BLACKLISTED_SA_EMAIL);
     assertThat(result, is(expectedResult));
