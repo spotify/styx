@@ -220,11 +220,7 @@ public interface ServiceAccountUsageAuthorizer {
       return checkIsPrincipalBlacklisted(principalEmail)
           .or(() -> checkIsPrincipalAdmin(principalEmail))
           .or(() -> checkRole(serviceAccount, principalEmail, projectIdSupplier))
-          .orElseGet(() -> ServiceAccountUsageAuthorizationResult.builder()
-              .serviceAccountProjectId(projectIdSupplier.get())
-              .authorized(false)
-              .message(denialMessage(serviceAccount, principalEmail, projectIdSupplier.get()))
-              .build());
+          .orElseGet(() -> deny(serviceAccount, principalEmail, projectIdSupplier));
     }
 
     private Optional<ServiceAccountUsageAuthorizationResult> checkIsPrincipalBlacklisted(String principalEmail) {
@@ -267,6 +263,16 @@ public interface ServiceAccountUsageAuthorizer {
                   .message(accessMessage)
                   .build()
           );
+    }
+
+    private ServiceAccountUsageAuthorizationResult deny(String serviceAccount,
+                                                        String principalEmail,
+                                                        Supplier<String> projectIdSupplier) {
+      return ServiceAccountUsageAuthorizationResult.builder()
+          .serviceAccountProjectId(projectIdSupplier.get())
+          .authorized(false)
+          .message(denialMessage(serviceAccount, principalEmail, projectIdSupplier.get()))
+          .build();
     }
 
     private ResponseException denialResponseException(String message) {
