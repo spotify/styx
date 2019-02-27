@@ -51,6 +51,7 @@ import com.google.api.services.cloudresourcemanager.model.GetIamPolicyRequest;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.IamScopes;
 import com.google.api.services.iam.v1.model.ServiceAccount;
+import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -214,21 +215,19 @@ public interface ServiceAccountUsageAuthorizer {
     @Override
     public ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(String serviceAccount,
                                                                                         String principalEmail) {
+      final Supplier<String> projectIdSupplier = Suppliers.memoize(() -> serviceAccountProjectId(serviceAccount));
+
       return checkIsPrincipalBlacklisted(principalEmail)
           .or(() -> checkIsPrincipalAdmin(principalEmail))
-          .orElseGet(() -> {
-            final String projectId = serviceAccountProjectId(serviceAccount);
-            return checkRole(serviceAccount, principalEmail, projectId)
-                .orElseGet(() -> ServiceAccountUsageAuthorizationResult.builder()
-                    .serviceAccountProjectId(projectId)
-                    .authorized(false)
-                    .message(denialMessage(serviceAccount, principalEmail, projectId))
-                    .build());
-          });
+          .or(() -> checkRole(serviceAccount, principalEmail, projectIdSupplier))
+          .orElseGet(() -> ServiceAccountUsageAuthorizationResult.builder()
+              .serviceAccountProjectId(projectIdSupplier.get())
+              .authorized(false)
+              .message(denialMessage(serviceAccount, principalEmail, projectIdSupplier.get()))
+              .build());
     }
 
-    private Optional<ServiceAccountUsageAuthorizationResult> checkIsPrincipalBlacklisted(
-        String principalEmail) {
+    private Optional<ServiceAccountUsageAuthorizationResult> checkIsPrincipalBlacklisted(String principalEmail) {
       return memberStatus(principalEmail, blacklist)
           .map(status -> ServiceAccountUsageAuthorizationResult.builder()
               .authorized(false)
@@ -248,14 +247,14 @@ public interface ServiceAccountUsageAuthorizer {
 
     private Optional<ServiceAccountUsageAuthorizationResult> checkRole(String serviceAccount,
                                                                        String principalEmail,
-                                                                       String projectId) {
+                                                                       Supplier<String> projectIdSupplier) {
 
       return firstPresent(
 
           // Check if the principal has been granted the service account user role in the project of the SA
-          () -> projectPolicyAccess(projectId, principalEmail)
+          () -> projectPolicyAccess(projectIdSupplier.get(), principalEmail)
               .map(type -> String.format("Principal %s has role %s in project %s %s",
-                  principalEmail, serviceAccountUserRole, projectId, type)),
+                  principalEmail, serviceAccountUserRole, projectIdSupplier.get(), type)),
 
           // Check if the principal has been granted the service account user role on the SA itself
           () -> serviceAccountPolicyAccess(serviceAccount, principalEmail)
@@ -263,7 +262,7 @@ public interface ServiceAccountUsageAuthorizer {
                   principalEmail, serviceAccountUserRole, serviceAccount, type)))
           .map(accessMessage ->
               ServiceAccountUsageAuthorizationResult.builder()
-                  .serviceAccountProjectId(projectId)
+                  .serviceAccountProjectId(projectIdSupplier.get())
                   .authorized(true)
                   .message(accessMessage)
                   .build()
