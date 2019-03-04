@@ -37,6 +37,7 @@ import com.github.rholder.retry.RetryerBuilder;
 import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.StopStrategy;
 import com.github.rholder.retry.WaitStrategies;
+import com.github.rholder.retry.WaitStrategy;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
@@ -50,6 +51,7 @@ import com.google.api.services.cloudresourcemanager.model.GetIamPolicyRequest;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.IamScopes;
 import com.google.api.services.iam.v1.model.ServiceAccount;
+import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -122,6 +124,9 @@ public interface ServiceAccountUsageAuthorizer {
     private static final Pattern USER_CREATED_SERVICE_ACCOUNT_PATTERN =
         Pattern.compile("^.+@(.+)\\.iam\\.gserviceaccount\\.com$");
 
+    private static final WaitStrategy DEFAULT_WAIT_STRATEGY =
+        WaitStrategies.join(exponentialWait(), randomWait(1, SECONDS));
+
     private static final StopStrategy DEFAULT_RETRY_STOP_STRATEGY = StopStrategies.stopAfterDelay(10, SECONDS);
 
     private static final String CACHE_HIT = "hit";
@@ -132,6 +137,7 @@ public interface ServiceAccountUsageAuthorizer {
     private final Directory directory;
     private final String serviceAccountUserRole;
     private final AuthorizationPolicy authorizationPolicy;
+    private final WaitStrategy waitStrategy;
     private final StopStrategy retryStopStrategy;
     private final String message;
     private final List<String> administrators;
@@ -147,13 +153,14 @@ public interface ServiceAccountUsageAuthorizer {
             .build();
 
     Impl(Iam iam, CloudResourceManager crm, Directory directory, String serviceAccountUserRole,
-         AuthorizationPolicy authorizationPolicy, StopStrategy retryStopStrategy, String message,
-         List<String> administrators, List<String> blacklist) {
+         AuthorizationPolicy authorizationPolicy, WaitStrategy waitStrategy, StopStrategy retryStopStrategy,
+         String message, List<String> administrators, List<String> blacklist) {
       this.iam = Objects.requireNonNull(iam, "iam");
       this.crm = Objects.requireNonNull(crm, "crm");
       this.directory = Objects.requireNonNull(directory, "directory");
       this.serviceAccountUserRole = Objects.requireNonNull(serviceAccountUserRole, "serviceAccountUserRole");
       this.authorizationPolicy = Objects.requireNonNull(authorizationPolicy, "authorizationPolicy");
+      this.waitStrategy = Objects.requireNonNull(waitStrategy, "waitStrategy");
       this.retryStopStrategy = Objects.requireNonNull(retryStopStrategy, "retryStopStrategy");
       this.message = Objects.requireNonNull(message, "message");
       this.administrators = Objects.requireNonNull(administrators, "administrators");
@@ -208,44 +215,64 @@ public interface ServiceAccountUsageAuthorizer {
     @Override
     public ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(String serviceAccount,
                                                                                         String principalEmail) {
-      final String projectId = serviceAccountProjectId(serviceAccount);
+      final Supplier<String> projectIdSupplier = Suppliers.memoize(() -> serviceAccountProjectId(serviceAccount));
 
-      // First check if principal is blacklisted
+      return checkIsPrincipalBlacklisted(principalEmail)
+          .or(() -> checkIsPrincipalAdmin(principalEmail))
+          .or(() -> checkRole(serviceAccount, principalEmail, projectIdSupplier))
+          .orElseGet(() -> deny(serviceAccount, principalEmail, projectIdSupplier));
+    }
+
+    private Optional<ServiceAccountUsageAuthorizationResult> checkIsPrincipalBlacklisted(String principalEmail) {
       return memberStatus(principalEmail, blacklist)
           .map(status -> ServiceAccountUsageAuthorizationResult.builder()
-              .serviceAccountProjectId(projectId)
               .authorized(false)
               .blacklisted(true)
               .message(blacklistedDenialMessage(principalEmail))
-              .build())
-          // Then continue authorization check
-          .orElseGet(() -> checkServiceAccountUsageAuthorization0(serviceAccount, principalEmail, projectId));
+              .build());
     }
 
-    private ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization0(String serviceAccount,
-                                                                                          String principalEmail,
-                                                                                          String projectId) {
-      final Optional<String> accessMessage = firstPresent(
-          // Check if the principal is an admin
-          () -> memberStatus(principalEmail, administrators)
-              .map(status -> String.format("Principal %s is an admin %s", principalEmail, status)),
+    private Optional<ServiceAccountUsageAuthorizationResult> checkIsPrincipalAdmin(
+        String principalEmail) {
+      return memberStatus(principalEmail, administrators)
+          .map(status -> ServiceAccountUsageAuthorizationResult.builder()
+              .authorized(true)
+              .message(String.format("Principal %s is an admin %s", principalEmail, status))
+              .build());
+    }
+
+    private Optional<ServiceAccountUsageAuthorizationResult> checkRole(String serviceAccount,
+                                                                       String principalEmail,
+                                                                       Supplier<String> projectIdSupplier) {
+
+      return firstPresent(
 
           // Check if the principal has been granted the service account user role in the project of the SA
-          () -> projectPolicyAccess(projectId, principalEmail)
+          () -> projectPolicyAccess(projectIdSupplier.get(), principalEmail)
               .map(type -> String.format("Principal %s has role %s in project %s %s",
-                  principalEmail, serviceAccountUserRole, projectId, type)),
+                  principalEmail, serviceAccountUserRole, projectIdSupplier.get(), type)),
 
           // Check if the principal has been granted the service account user role on the SA itself
           () -> serviceAccountPolicyAccess(serviceAccount, principalEmail)
               .map(type -> String.format("Principal %s has role %s on service account %s %s",
-                  principalEmail, serviceAccountUserRole, serviceAccount, type)));
+                  principalEmail, serviceAccountUserRole, serviceAccount, type)))
+          .map(accessMessage ->
+              ServiceAccountUsageAuthorizationResult.builder()
+                  .serviceAccountProjectId(projectIdSupplier.get())
+                  .authorized(true)
+                  .message(accessMessage)
+                  .build()
+          );
+    }
 
-      final ServiceAccountUsageAuthorizationResultBuilder result = ServiceAccountUsageAuthorizationResult.builder()
-              .serviceAccountProjectId(projectId)
-              .authorized(accessMessage.isPresent())
-              .message(accessMessage.orElseGet(() -> denialMessage(serviceAccount, principalEmail, projectId)));
-
-      return result.build();
+    private ServiceAccountUsageAuthorizationResult deny(String serviceAccount,
+                                                        String principalEmail,
+                                                        Supplier<String> projectIdSupplier) {
+      return ServiceAccountUsageAuthorizationResult.builder()
+          .serviceAccountProjectId(projectIdSupplier.get())
+          .authorized(false)
+          .message(denialMessage(serviceAccount, principalEmail, projectIdSupplier.get()))
+          .build();
     }
 
     private ResponseException denialResponseException(String message) {
@@ -404,7 +431,7 @@ public interface ServiceAccountUsageAuthorizer {
     private <T> T retry(Callable<T> f) throws ExecutionException, RetryException {
       final Retryer<T> retryer = RetryerBuilder.<T>newBuilder()
           .retryIfException(Impl::isRetryableException)
-          .withWaitStrategy(WaitStrategies.join(exponentialWait(), randomWait(1, SECONDS)))
+          .withWaitStrategy(waitStrategy)
           .withStopStrategy(retryStopStrategy)
           .withRetryListener(Impl::onRequestAttempt)
           .build();
@@ -538,7 +565,7 @@ public interface ServiceAccountUsageAuthorizer {
         .build();
 
     return new Impl(iam, crm, directory, serviceAccountUserRole, authorizationPolicy,
-        Impl.DEFAULT_RETRY_STOP_STRATEGY, message, administrators, blacklist);
+        Impl.DEFAULT_WAIT_STRATEGY, Impl.DEFAULT_RETRY_STOP_STRATEGY, message, administrators, blacklist);
   }
 
   static GoogleCredential defaultCredential() {
