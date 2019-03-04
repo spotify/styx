@@ -43,7 +43,7 @@ public class GoogleIdTokenAuthTest {
   @Rule public final EnvironmentVariables environmentVariables = new EnvironmentVariables();
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     metadataServer.setDispatcher(new Dispatcher() {
       @Override
       public MockResponse dispatch(RecordedRequest request) {
@@ -71,7 +71,6 @@ public class GoogleIdTokenAuthTest {
     environmentVariables.set("GOOGLE_APPLICATION_CREDENTIALS", "");
     environmentVariables.set("CLOUDSDK_CONFIG", "/non/existent/path");
     final GoogleIdTokenAuth idTokenAuth = GoogleIdTokenAuth.ofDefaultCredential();
-    assertThat(idTokenAuth.isGCE(), is(true));
     final Optional<String> token = idTokenAuth.getToken("http://styx.foo.bar");
     assertThat(token, is(Optional.of(TEST_ID_TOKEN)));
     final RecordedRequest detectionRequest = metadataServer.takeRequest();
