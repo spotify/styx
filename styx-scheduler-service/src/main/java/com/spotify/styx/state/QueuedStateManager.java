@@ -151,12 +151,15 @@ public class QueuedStateManager implements StateManager {
     // TODO: optional retry on transaction conflict
 
     queuedEvents.increment();
-    return Striping.supplyAsyncStriped(() ->
-        transition(event, expectedCounter), event.workflowInstance(), eventProcessingExecutor)
-        .thenApply((tuple) -> {
-          postTransition(tuple._1, tuple._2);
-          return tuple._2;
-        });
+    return Striping.supplyAsyncStriped(() -> receive0(event, expectedCounter),
+        event.workflowInstance(), eventProcessingExecutor);
+  }
+
+  @Override
+  public RunState receive0(Event event, long expectedCounter) {
+    var transition = transition(event, expectedCounter);
+    postTransition(transition._1, transition._2);
+    return transition._2;
   }
 
   private void initialize(WorkflowInstance workflowInstance) {
@@ -172,7 +175,7 @@ public class QueuedStateManager implements StateManager {
     try {
       storage.runInTransaction(tx -> {
         final Optional<Workflow> workflow = tx.workflow(workflowInstance.workflowId());
-        if (!workflow.isPresent()) {
+        if (workflow.isEmpty()) {
           throw new IllegalArgumentException(
               "Workflow not found: " + workflowInstance.workflowId().toKey());
         }
@@ -380,6 +383,11 @@ public class QueuedStateManager implements StateManager {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  public List<WorkflowInstance> listActiveStates() throws IOException {
+    return storage.listActiveStates();
   }
 
   @Override

@@ -293,4 +293,6 @@ public interface Storage extends Closeable {
    */
   <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
       throws IOException, E;
+
+  List<WorkflowInstance> listActiveStates() throws IOException;
 }

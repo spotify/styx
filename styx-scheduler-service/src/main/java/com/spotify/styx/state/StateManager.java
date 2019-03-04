@@ -20,11 +20,14 @@
 
 package com.spotify.styx.state;
 
+import static java.util.stream.Collectors.toList;
+
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.util.IsClosedException;
 import java.io.Closeable;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -98,6 +101,8 @@ public interface StateManager extends Closeable {
     }
   }
 
+  RunState receive0(Event event, long expectedCounter);
+
   /**
    * Get a map of all active {@link WorkflowInstance} states.
    */
@@ -111,5 +116,33 @@ public interface StateManager extends Closeable {
    */
   Optional<RunState> getActiveState(WorkflowInstance workflowInstance);
 
-  List<WorkflowInstance> listActiveStates();
+  List<WorkflowInstance> listActiveStates() throws IOException;
+
+  default void processExecutingInstance(RunState runState, List<OutputHandler> outputHandlers) {
+    while (true) {
+      var event = findTransition(runState, outputHandlers);
+      if (event.isEmpty()) {
+        return;
+      }
+      try {
+        runState = receive0(event.get(), runState.counter());
+      } catch (StaleEventException e) {
+        // We lost a race and someone else made a state transition, back out
+        return;
+      }
+    }
+  }
+
+  private Optional<Event> findTransition(RunState state,
+                                         List<OutputHandler> outputHandlers) {
+    // TODO: have handlers register their state interests and avoid having to loop through all of them
+    // TODO: we really want just one event here.
+    var events = outputHandlers.stream()
+        .flatMap(h -> h.transitionInto(state).stream())
+        .collect(toList());
+    if (events.size() > 1) {
+      LOG.warn("Got more than one event, discarding");
+    }
+    return events.stream().findFirst();
+  }
 }

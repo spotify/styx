@@ -391,21 +391,10 @@ public class DatastoreStorage implements Closeable {
    * Strongly consistently read all active states
    */
   Map<WorkflowInstance, RunState> readActiveStates() throws IOException {
-    // Strongly read active state keys from index shards in parallel
-    final List<Key> keys = gatherIO(activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
-        .map(key -> asyncIO(() -> datastore.query(Query.newEntityQueryBuilder()
-            .setFilter(PropertyFilter.hasAncestor(key))
-            .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
-            .build())))
-        .collect(toList()), 30, TimeUnit.SECONDS)
-        .stream()
-        .flatMap(Collection::stream)
-        .map(entity -> entity.getKey().getName())
-        .map(name -> activeWorkflowInstanceKey(datastore.newKeyFactory(), name))
-        .collect(toList());
+    final List<WorkflowInstance> workflowInstances = listActiveStates();
 
-    // Strongly consistently read values for the above keys in parallel
-    return gatherIO(Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ).stream()
+    // Strongly consistently read values for the instances in parallel
+    return gatherIO(Lists.partition(workflowInstances, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ).stream()
         .map(batch -> asyncIO(() -> readRunStateBatch(batch)))
         .collect(toList()), 30, TimeUnit.SECONDS)
         .stream()
@@ -416,11 +405,11 @@ public class DatastoreStorage implements Closeable {
   /**
    * Strongly consistently read a batch of {@link RunState}s.
    */
-  private List<RunState> readRunStateBatch(List<Key> keys) throws IOException {
-    assert keys.size() <= MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ;
-    final List<RunState> runStates = new ArrayList<>();
-    datastore.get(keys, entity ->
-        runStates.add(entityToRunState(entity, parseWorkflowInstance(entity))));
+  private List<RunState> readRunStateBatch(List<WorkflowInstance> instances) throws IOException {
+    assert instances.size() <= MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ;
+    var keys = instances.stream().map(this::activeWorkflowInstanceKey).collect(toList());
+    var runStates = new ArrayList<RunState>();
+    datastore.get(keys, entity -> runStates.add(entityToRunState(entity, parseWorkflowInstance(entity))));
     return runStates;
   }
 
@@ -964,5 +953,20 @@ public class DatastoreStorage implements Closeable {
 
   private <T> CompletableFuture<T> asyncIO(IOOperation<T> f) {
     return f.executeAsync(executor);
+  }
+
+  public List<WorkflowInstance> listActiveStates() throws IOException {
+    // Read active state keys from index shards in parallel
+    return gatherIO(activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
+        .map(key -> asyncIO(() -> datastore.query(Query.newEntityQueryBuilder()
+            .setFilter(PropertyFilter.hasAncestor(key))
+            .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
+            .build())))
+        .collect(toList()), 30, TimeUnit.SECONDS)
+        .stream()
+        .flatMap(Collection::stream)
+        .map(entity -> entity.getKey().getName())
+        .map(WorkflowInstance::parseKey)
+        .collect(toList());
   }
 }
