@@ -148,7 +148,7 @@ public class GoogleIdTokenAuth {
 
   public static GoogleIdTokenAuth ofDefaultCredential() {
     try {
-      if (isDefaultGCE()) {
+      if (isGCEDefault()) {
         return new GCEDefaultIdTokenAuth(Utils.getDefaultTransport());
       } else {
         return new GoogleIdTokenAuth(Utils.getDefaultTransport(),
@@ -171,7 +171,7 @@ public class GoogleIdTokenAuth {
     return new GoogleIdTokenAuth(transport, credential);
   }
 
-  private static boolean isDefaultGCE() throws IOException {
+  private static boolean isGCEDefault() throws IOException {
     return GoogleCredentials.getApplicationDefault() instanceof ComputeEngineCredentials;
   }
 }
