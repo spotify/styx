@@ -20,8 +20,22 @@
 
 package com.spotify.styx.client;
 
+import com.google.auth.oauth2.GoogleCredentials;
+
 /**
  * Factory to get a StyxClient implementation.
+ *
+ * <p>Using ImpersonatedCredentials:</p>
+ * <code>
+ *   ImpersonatedCredentials credentials = ImpersonatedCredentials.newBuilder()
+ *         .setScopes(ImmutableList.of("https://www.googleapis.com/auth/cloud-platform"))
+ *         .setSourceCredentials(GoogleCredentials.getApplicationDefault())
+ *         .setTargetPrincipal("target-service-account@example.iam.gserviceaccount.com")
+ *         .setLifetime(300)
+ *         .setDelegates(ImmutableList.of())
+ *         .build();
+ *   StyxClient client = StyxClientFactory.create("https://styx.example.com", credentials)
+ * </code>
  */
 public class StyxClientFactory {
 
@@ -31,6 +45,10 @@ public class StyxClientFactory {
 
   public static StyxClient create(String apiHost) {
     return StyxOkHttpClient.create(apiHost);
+  }
+
+  public static StyxClient create(String apiHost, GoogleCredentials credentials) {
+    return StyxOkHttpClient.create(apiHost, credentials);
   }
 
   public static StyxStatusClient createStatusClient(String apiHost) {
