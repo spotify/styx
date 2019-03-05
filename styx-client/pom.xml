@@ -35,6 +35,10 @@
       <groupId>com.google.apis</groupId>
       <artifactId>google-api-services-iam</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.google.auth</groupId>
+      <artifactId>google-auth-library-oauth2-http</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>com.spotify</groupId>
@@ -60,6 +64,16 @@
     <dependency>
       <groupId>pl.pragmatists</groupId>
       <artifactId>JUnitParams</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.squareup.okhttp3</groupId>
+      <artifactId>mockwebserver</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.github.stefanbirkner</groupId>
+      <artifactId>system-rules</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
