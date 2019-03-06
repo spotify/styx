@@ -28,6 +28,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.google.common.collect.ImmutableList;
 import com.spotify.styx.docker.DockerRunner;
@@ -161,25 +162,16 @@ public class DockerRunnerHandlerTest {
 
     dockerRunnerHandler.transitionInto(runState);
 
-    // Verify that the state manager receives two events:
-    // 1. submitted
-    // 2. runError
-    verify(stateManager, timeout(60_000).times(2))
-        .receive(eventCaptor.capture(), counterCaptor.capture());
+    verify(stateManager).receive(eventCaptor.capture(), counterCaptor.capture());
 
-    Event event1 = eventCaptor.getAllValues().get(0);
-    Event event2 = eventCaptor.getAllValues().get(1);
-    
-    long counter1 = counterCaptor.getAllValues().get(0);
-    long counter2 = counterCaptor.getAllValues().get(1);
+    Event event = eventCaptor.getAllValues().get(0);
+    long counter = counterCaptor.getAllValues().get(0);
 
-    event1.accept(eventVisitor);
-    verify(eventVisitor).submitted(workflowInstance, TEST_EXECUTION_ID);
-    assertThat(counter1, is(runState.counter()));
-
-    event2.accept(eventVisitor);
+    event.accept(eventVisitor);
     verify(eventVisitor).runError(workflowInstance, throwable.getMessage());
-    assertThat(counter2, is(runState.counter() + 1));
+    assertThat(counter, is(runState.counter() + 1));
+
+    verifyNoMoreInteractions(stateManager);
   }
 
   @Test

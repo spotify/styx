@@ -68,15 +68,6 @@ public class DockerRunnerHandler implements OutputHandler {
           return;
         }
 
-        // Emit submitted event first to guarantee it is observed before events from the pod
-        final Event submitted = Event.submitted(state.workflowInstance(), runSpec.executionId());
-        try {
-          stateManager.receive(submitted, state.counter());
-        } catch (IsClosedException isClosedException) {
-          LOG.warn("Could not emit 'submitted' event", isClosedException);
-          return;
-        }
-
         try {
           LOG.info("running:{} image:{} args:{} termination_logging:{}", state.workflowInstance(),
               runSpec.imageName(), runSpec.args(), runSpec.terminationLogging());
@@ -89,17 +80,26 @@ public class DockerRunnerHandler implements OutputHandler {
             } else {
               LOG.error(msg, e);
             }
-            stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()), 
+            stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()),
                 state.counter() + 1);
           } catch (IsClosedException isClosedException) {
             LOG.warn("Failed to send 'runError' event", isClosedException);
           }
+          return;
+        }
+
+        final Event submitted = Event.submitted(state.workflowInstance(), runSpec.executionId());
+        try {
+          stateManager.receive(submitted, state.counter());
+        } catch (IsClosedException isClosedException) {
+          LOG.warn("Could not emit 'submitted' event", isClosedException);
         }
         break;
 
       case TERMINATED:
       case FAILED:
       case ERROR:
+        // TODO: remove this effectively unused cleanup?
         if (state.data().executionId().isPresent()) {
           final String executionId = state.data().executionId().get();
           dockerRunner.cleanup(state.workflowInstance(), executionId);
