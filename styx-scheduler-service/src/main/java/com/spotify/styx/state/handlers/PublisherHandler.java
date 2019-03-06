@@ -26,22 +26,23 @@ import static com.spotify.styx.state.RunState.State.SUBMITTED;
 import com.cronutils.utils.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
-import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.Retrier;
 import com.spotify.styx.util.RunnableWithException;
 import java.time.Duration;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * An {@link OutputHandler} that integrates {@link RunState.State} values with a {@link Publisher}.
+ * An event consumer that integrates {@link RunState.State} values with a {@link Publisher}.
  */
-public class PublisherHandler implements OutputHandler {
+public class PublisherHandler implements BiConsumer<SequenceEvent, RunState> {
 
   private static final Logger LOG = LoggerFactory.getLogger(PublisherHandler.class);
 
@@ -71,7 +72,7 @@ public class PublisherHandler implements OutputHandler {
   }
 
   @Override
-  public void transitionInto(RunState state) {
+  public void accept(SequenceEvent sequenceEvent, RunState state) {
     final WorkflowInstance workflowInstance = state.workflowInstance();
     switch (state.state()) {
       case SUBMITTED:

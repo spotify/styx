@@ -197,11 +197,16 @@ class KubernetesDockerRunner implements DockerRunner {
   @Override
   public void start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
     final KubernetesSecretSpec secretSpec = ensureSecrets(workflowInstance, runSpec);
-    stats.recordSubmission(runSpec.executionId());
     try {
       client.pods().create(createPod(workflowInstance, runSpec, secretSpec, styxEnvironment));
+      stats.recordSubmission(runSpec.executionId());
     } catch (KubernetesClientException kce) {
-      throw new IOException("Failed to create Kubernetes pod", kce);
+      if (kce.getCode() == 409) {
+        // Already launched, success!
+        return;
+      } else {
+        throw new IOException("Failed to create Kubernetes pod", kce);
+      }
     }
   }
 

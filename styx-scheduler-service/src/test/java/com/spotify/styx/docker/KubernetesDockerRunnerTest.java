@@ -42,6 +42,7 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.spotify.styx.QuietDeterministicScheduler;
@@ -80,6 +81,7 @@ import io.fabric8.kubernetes.api.model.SecretBuilder;
 import io.fabric8.kubernetes.api.model.SecretList;
 import io.fabric8.kubernetes.api.model.SecretVolumeSource;
 import io.fabric8.kubernetes.api.model.Volume;
+import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
@@ -232,6 +234,13 @@ public class KubernetesDockerRunnerTest {
   @After
   public void tearDown() throws Exception {
     kdr.close();
+  }
+
+  @Test
+  public void shouldToleratePodAlreadyCreated() throws IOException {
+    when(pods.create(any(Pod.class))).thenThrow(new KubernetesClientException("Already created", 409, null));
+    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    verifyZeroInteractions(stateManager);
   }
 
   @Test
