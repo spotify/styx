@@ -150,6 +150,7 @@ public class StyxScheduler implements AppInit {
   public static final String STYX_EVENT_PROCESSING_THREADS = "styx.event-processing-threads";
   public static final String STYX_SCHEDULER_TICK_INTERVAL = "styx.scheduler.tick-interval";
   public static final String STYX_TRIGGER_TICK_INTERVAL = "styx.trigger.tick-interval";
+  public static final String STYX_STATE_MANAGER_TICK_INTERVAL = "styx.state-manager.tick-interval";
   public static final String STYX_SCHEDULER_THREADS = "styx.scheduler-threads";
   private static final String STYX_ENVIRONMENT = "styx.environment";
   private static final String KUBERNETES_REQUEST_TIMEOUT = "styx.k8s.request-timeout";
@@ -157,6 +158,7 @@ public class StyxScheduler implements AppInit {
   public static final int DEFAULT_STYX_EVENT_PROCESSING_THREADS = 32;
   public static final int DEFAULT_STYX_SCHEDULER_THREADS = 32;
   public static final Duration DEFAULT_SCHEDULER_TICK_INTERVAL = Duration.ofSeconds(2);
+  public static final Duration DEFAULT_STATE_MANAGER_TICK_INTERVAL = Duration.ofSeconds(15);
   public static final Duration DEFAULT_TRIGGER_TICK_INTERVAL = Duration.ofSeconds(1);
   public static final Duration CLEANER_TICK_INTERVAL = Duration.ofMinutes(30);
   public static final Duration RUNTIME_CONFIG_UPDATE_INTERVAL = Duration.ofSeconds(5);
@@ -425,12 +427,16 @@ public class StyxScheduler implements AppInit {
     final Duration triggerTickInterval = get(config, config::getDuration, STYX_TRIGGER_TICK_INTERVAL)
         .orElse(DEFAULT_TRIGGER_TICK_INTERVAL);
 
+    final Duration stateManagerTickInterval = get(config, config::getDuration, STYX_STATE_MANAGER_TICK_INTERVAL)
+        .orElse(DEFAULT_STATE_MANAGER_TICK_INTERVAL);
+
     dockerRunner.restore();
     startTriggerManager(triggerManager, tickExecutor, triggerTickInterval);
     startBackfillTriggerManager(backfillTriggerManager, tickExecutor, triggerTickInterval);
     startScheduler(scheduler, tickExecutor, schedulerTickInterval);
     startRuntimeConfigUpdate(styxConfig, tickExecutor, dequeueRateLimiter);
     startCleaner(cleaner, tickExecutor);
+    scheduleWithJitter(stateManager::tick, tickExecutor, stateManagerTickInterval);
 
     setupMetrics(queuedStateManager, workflowCache, storage, dequeueRateLimiter, stats, time);
 
