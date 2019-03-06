@@ -39,6 +39,12 @@ public interface StateManager extends Closeable {
   Logger LOG = LoggerFactory.getLogger(StateManager.class);
 
   /**
+   * Drive all active instances forward by re-invoking output handlers. Should be called regularly to
+   * ensure instances do not get stuck due to ephemeral output handler failure.
+   */
+  void tick();
+
+  /**
    * Triggers a workflow instance to run.
    *
    * @throws IsClosedException if the state receiver is closed and can not handle events

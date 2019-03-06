@@ -123,6 +123,14 @@ public class QueuedStateManager implements StateManager {
   }
 
   @Override
+  public void tick() {
+    var states = getActiveStates();
+    for (final RunState runState : states.values()) {
+      outputHandler.transitionInto(runState);
+    }
+  }
+
+  @Override
   public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger, TriggerParameters parameters)
       throws IsClosedException {
     ensureRunning();
