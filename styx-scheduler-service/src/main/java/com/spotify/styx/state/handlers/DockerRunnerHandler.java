@@ -64,7 +64,7 @@ public class DockerRunnerHandler implements OutputHandler {
           runSpec = createRunSpec(state);
         } catch (ResourceNotFoundException e) {
           LOG.error("Unable to start docker procedure.", e);
-          stateManager.receiveIgnoreClosed(Event.halt(state.workflowInstance()));
+          stateManager.receiveIgnoreClosed(Event.halt(state.workflowInstance()), state.counter());
           return;
         }
 

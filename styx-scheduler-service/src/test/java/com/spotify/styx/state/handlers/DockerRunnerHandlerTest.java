@@ -45,6 +45,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.util.IsClosedException;
 import java.io.IOException;
+import java.time.Instant;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -55,6 +56,9 @@ import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class DockerRunnerHandlerTest {
+
+  private static final Instant NOW = Instant.now();
+  private static final long COUNTER = 17;
 
   private DockerRunnerHandler dockerRunnerHandler;
 
@@ -184,11 +188,11 @@ public class DockerRunnerHandlerTest {
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, State.SUBMITTING, StateData.newBuilder()
         .executionId(TEST_EXECUTION_ID)
-        .build());
+        .build(), NOW, COUNTER);
 
     dockerRunnerHandler.transitionInto(runState);
 
-    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance));
+    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
   }
 
   @Test
@@ -197,11 +201,11 @@ public class DockerRunnerHandlerTest {
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, State.SUBMITTING, StateData.newBuilder()
         .executionDescription(EXECUTION_DESCRIPTION)
-        .build());
+        .build(), NOW, COUNTER);
 
     dockerRunnerHandler.transitionInto(runState);
 
-    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance));
+    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
   }
 
   @Test

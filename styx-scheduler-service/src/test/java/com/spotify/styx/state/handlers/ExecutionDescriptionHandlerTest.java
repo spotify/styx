@@ -29,6 +29,8 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.startsWith;
 import static org.hamcrest.core.Is.is;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -46,6 +48,7 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -64,6 +67,8 @@ public class ExecutionDescriptionHandlerTest {
 
   private static final String DOCKER_IMAGE = "my_docker_image";
   private static final String COMMIT_SHA = "71d70fca99e29812e81d1ed0a5c9d3559f4118e9";
+  private static final Instant NOW = Instant.now();
+  private static final long COUNTER = 17;
 
   private ExecutionDescriptionHandler toTest;
 
@@ -82,7 +87,7 @@ public class ExecutionDescriptionHandlerTest {
   public void setUp() throws Exception {
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
 
-    when(stateManager.receive(any())).thenReturn(CompletableFuture.completedFuture(null));
+    when(stateManager.receive(any(), anyLong())).thenReturn(CompletableFuture.completedFuture(null));
     toTest = new ExecutionDescriptionHandler(storage, stateManager, workflowValidator);
   }
 
@@ -90,13 +95,13 @@ public class ExecutionDescriptionHandlerTest {
   public void shouldTransitionIntoSubmittingIfMissingDockerArgs() throws Exception {
     Workflow workflow = Workflow.create("id", workflowConfiguration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
-    RunState runState = RunState.create(workflowInstance, PREPARE);
+    RunState runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
 
     when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
 
     toTest.transitionInto(runState);
 
-    verify(stateManager).receive(eventCaptor.capture());
+    verify(stateManager).receive(eventCaptor.capture(), eq(COUNTER));
 
     final Event event = eventCaptor.getValue();
     event.accept(eventVisitor);
@@ -113,13 +118,13 @@ public class ExecutionDescriptionHandlerTest {
   public void shouldTransitionIntoSubmitting() throws Exception {
     Workflow workflow = Workflow.create("id", workflowConfiguration("--date", "{}", "--bar"));
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
-    RunState runState = RunState.create(workflowInstance, PREPARE);
+    RunState runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
 
     when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
 
     toTest.transitionInto(runState);
 
-    verify(stateManager).receive(eventCaptor.capture());
+    verify(stateManager).receive(eventCaptor.capture(), eq(COUNTER));
 
     final Event event = eventCaptor.getValue();
     event.accept(eventVisitor);
@@ -142,23 +147,23 @@ public class ExecutionDescriptionHandlerTest {
     when(storage.workflow(workflow.id()))
         .thenThrow(exception);
 
-    RunState runState = RunState.create(workflowInstance, PREPARE);
+    RunState runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
 
     toTest.transitionInto(runState);
 
-    verify(stateManager).receive(Event.runError(workflowInstance, exception.getMessage()));
+    verify(stateManager).receive(Event.runError(workflowInstance, exception.getMessage()), COUNTER);
   }
 
   @Test
   public void shouldHaltIfMissingWorkflow() throws Exception {
     WorkflowInstance workflowInstance = WorkflowInstance.create(WorkflowId.create("c", "e"), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, PREPARE);
+    RunState runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
 
     when(storage.workflow(any())).thenReturn(Optional.empty());
 
     toTest.transitionInto(runState);
 
-    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance));
+    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
   }
 
   @Test
@@ -169,13 +174,13 @@ public class ExecutionDescriptionHandlerTest {
             .build();
     Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, PREPARE);
+    RunState runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
 
     when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
 
     toTest.transitionInto(runState);
 
-    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance));
+    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
   }
 
   @Test
@@ -184,13 +189,13 @@ public class ExecutionDescriptionHandlerTest {
 
     Workflow workflow = Workflow.create("id", FULL_WORKFLOW_CONFIGURATION);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, PREPARE);
+    RunState runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
 
     when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
 
     toTest.transitionInto(runState);
 
-    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance));
+    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
   }
 
   private WorkflowConfiguration workflowConfiguration(String... args) {
