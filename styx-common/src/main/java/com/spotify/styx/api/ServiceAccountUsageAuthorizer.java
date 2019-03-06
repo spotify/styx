@@ -280,7 +280,7 @@ public interface ServiceAccountUsageAuthorizer {
     }
 
     private String blacklistedDenialMessage(String principalEmail) {
-      return "The principal " + principalEmail + " is blacklisted. " + message;
+      return "The principal " + principalEmail + " is blacklisted. Please use another one. " + message;
     }
 
     private String denialMessage(String serviceAccount, String principalEmail, String projectId) {

@@ -593,6 +593,6 @@ public class ServiceAccountUsageAuthorizerTest {
   }
 
   private static String blacklistedMessage(String email) {
-    return "The principal " + email + " is blacklisted. " + MESSAGE;
+    return "The principal " + email + " is blacklisted. Please use another one. " + MESSAGE;
   }
 }
