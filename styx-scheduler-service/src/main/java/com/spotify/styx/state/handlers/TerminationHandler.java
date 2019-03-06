@@ -56,7 +56,7 @@ public class TerminationHandler implements OutputHandler {
     switch (state.state()) {
       case TERMINATED:
         if (state.data().lastExit().map(v -> v.equals(0)).orElse(false)) {
-          stateManager.receiveIgnoreClosed(Event.success(state.workflowInstance()));
+          stateManager.receiveIgnoreClosed(Event.success(state.workflowInstance()), state.counter());
         } else {
           checkRetry(state);
         }
@@ -77,7 +77,7 @@ public class TerminationHandler implements OutputHandler {
     if (state.data().retryCost() < MAX_RETRY_COST) {
       final Optional<Integer> exitCode = state.data().lastExit();
       if (shouldFailFast(exitCode)) {
-        stateManager.receiveIgnoreClosed(Event.stop(workflowInstance));
+        stateManager.receiveIgnoreClosed(Event.stop(workflowInstance), state.counter());
       } else {
         final long delayMillis;
         if (isMissingDependency(exitCode)) {
@@ -85,10 +85,10 @@ public class TerminationHandler implements OutputHandler {
         } else {
           delayMillis = retryUtil.calculateDelay(state.data().consecutiveFailures()).toMillis();
         }
-        stateManager.receiveIgnoreClosed(Event.retryAfter(workflowInstance, delayMillis));
+        stateManager.receiveIgnoreClosed(Event.retryAfter(workflowInstance, delayMillis), state.counter());
       }
     } else {
-      stateManager.receiveIgnoreClosed(Event.stop(workflowInstance));
+      stateManager.receiveIgnoreClosed(Event.stop(workflowInstance), state.counter());
     }
   }
 

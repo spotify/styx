@@ -77,20 +77,20 @@ public class ExecutionDescriptionHandler implements OutputHandler {
           final Event submitEvent = Event.submit(
               state.workflowInstance(), getExecDescription(workflowInstance, state.data()), createExecutionId());
           try {
-            stateManager.receive(submitEvent);
+            stateManager.receive(submitEvent, state.counter());
           } catch (IsClosedException isClosedException) {
             LOG.warn("Could not send 'submit' event", isClosedException);
           }
         } catch (ResourceNotFoundException e) {
           LOG.info("Halting {}: {}", workflowInstance, e.getMessage());
-          stateManager.receiveIgnoreClosed(Event.halt(workflowInstance));
+          stateManager.receiveIgnoreClosed(Event.halt(workflowInstance), state.counter());
         } catch (MissingRequiredPropertyException e) {
           LOG.warn("Failed to prepare execution description for " + state.workflowInstance(), e);
-          stateManager.receiveIgnoreClosed(Event.halt(workflowInstance));
+          stateManager.receiveIgnoreClosed(Event.halt(workflowInstance), state.counter());
         } catch (IOException e) {
           try {
             LOG.error("Failed to retrieve execution description for " + state.workflowInstance(), e);
-            stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()));
+            stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()), state.counter());
           } catch (IsClosedException isClosedException) {
             LOG.warn("Failed to send 'runError' event", isClosedException);
           }
