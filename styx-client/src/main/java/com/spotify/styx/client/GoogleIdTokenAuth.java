@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.client.auth;
+package com.spotify.styx.client;
 
 import com.google.api.client.auth.oauth2.ClientParametersAuthentication;
 import com.google.api.client.auth.oauth2.RefreshTokenRequest;
@@ -61,7 +61,7 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class GoogleIdTokenAuth {
+class GoogleIdTokenAuth {
 
   private static final Logger log = LoggerFactory.getLogger(GoogleIdTokenAuth.class);
   private static final JsonFactory JSON_FACTORY = Utils.getDefaultJsonFactory();
@@ -73,13 +73,12 @@ public class GoogleIdTokenAuth {
   private final HttpTransport httpTransport;
   private final Optional<GoogleCredentials> credentials;
 
-  GoogleIdTokenAuth(HttpTransport httpTransport,
-                    Optional<GoogleCredentials> credentials) {
+  GoogleIdTokenAuth(HttpTransport httpTransport, Optional<GoogleCredentials> credentials) {
     this.httpTransport = Objects.requireNonNull(httpTransport, "httpTransport");
     this.credentials = Objects.requireNonNull(credentials, "credentials");
   }
 
-  public Optional<String> getToken(String targetAudience)
+  Optional<String> getToken(String targetAudience)
       throws IOException, GeneralSecurityException {
     return credentials.isPresent()
            ? Optional.of(getToken(targetAudience, credentials.get()))
@@ -238,7 +237,7 @@ public class GoogleIdTokenAuth {
     return credentials.createScoped(scopes);
   }
 
-  public static GoogleIdTokenAuth ofDefaultCredential() {
+  static GoogleIdTokenAuth ofDefaultCredential() {
     try {
       return new GoogleIdTokenAuth(Utils.getDefaultTransport(),
           Optional.of(GoogleCredentials.getApplicationDefault()));

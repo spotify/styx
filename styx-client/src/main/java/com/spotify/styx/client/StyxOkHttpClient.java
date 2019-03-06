@@ -34,7 +34,6 @@ import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.api.TestServiceAccountUsageAuthorizationRequest;
 import com.spotify.styx.api.TestServiceAccountUsageAuthorizationRequestBuilder;
 import com.spotify.styx.api.TestServiceAccountUsageAuthorizationResponse;
-import com.spotify.styx.client.auth.GoogleIdTokenAuth;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.EditableBackfillInput;
