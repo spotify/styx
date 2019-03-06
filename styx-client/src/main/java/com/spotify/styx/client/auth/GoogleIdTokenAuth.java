@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
 public class GoogleIdTokenAuth {
   private static final Logger log = LoggerFactory.getLogger(GoogleIdTokenAuth.class);
   private static final JsonFactory JSON_FACTORY = Utils.getDefaultJsonFactory();
-  private static final String DEFAULT_GCE_METADATA_HOST = "http://169.254.169.254";
+  private static final String DEFAULT_GCE_METADATA_HOST = "169.254.169.254";
   private static final String GCE_METADATA_IDENTITY_PATH =
       "/computeMetadata/v1/instance/service-accounts/default/identity{?audience,format}";
 
