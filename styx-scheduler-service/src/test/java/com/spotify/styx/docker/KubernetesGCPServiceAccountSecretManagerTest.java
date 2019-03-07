@@ -27,6 +27,7 @@ import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThan;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doThrow;
@@ -34,6 +35,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.api.client.googleapis.json.GoogleJsonError;
@@ -41,6 +43,7 @@ import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpResponseException;
 import com.google.api.services.iam.v1.model.ServiceAccountKey;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hashing;
 import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
@@ -78,6 +81,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
+import junitparams.converters.Nullable;
+import junitparams.custom.combined.CombinedParameters;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -161,42 +166,35 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     ServiceAccountKey jsonKey = new ServiceAccountKey();
     jsonKey.setName("key.json");
     jsonKey.setPrivateKeyData("json-private-key-data");
-    ServiceAccountKey p12Key = new ServiceAccountKey();
-    p12Key.setName("key.p12");
-    p12Key.setPrivateKeyData("p12-private-key-data");
     when(serviceAccountKeyManager.createJsonKey(any(String.class))).thenReturn(jsonKey);
-    when(serviceAccountKeyManager.createP12Key(any(String.class))).thenReturn(p12Key);
 
     sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(), SERVICE_ACCOUNT);
 
     verify(serviceAccountKeyManager).createJsonKey(SERVICE_ACCOUNT);
-    verify(serviceAccountKeyManager).createP12Key(SERVICE_ACCOUNT);
     verify(secrets).create(secretCaptor.capture());
 
     final Secret createdSecret = secretCaptor.getValue();
     assertThat(createdSecret.getMetadata().getAnnotations(), hasEntry("styx-wf-sa", SERVICE_ACCOUNT));
     assertThat(createdSecret.getData(), hasEntry("styx-wf-sa.json", jsonKey.getPrivateKeyData()));
-    assertThat(createdSecret.getData(), hasEntry("styx-wf-sa.p12", p12Key.getPrivateKeyData()));
   }
 
-  @Test(expected = RuntimeException.class)
-  public void shouldCleanupKeysIfKeyCreationFails() throws IOException {
+  @Test
+  public void shouldNotCreateSecretIfKeyCreationFails() throws IOException {
     when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(true);
 
-    ServiceAccountKey jsonKey = new ServiceAccountKey();
-    jsonKey.setName("key.json");
-    jsonKey.setPrivateKeyData("json-private-key-data");
-    ServiceAccountKey p12Key = new ServiceAccountKey();
-    p12Key.setName("key.p12");
-    p12Key.setPrivateKeyData("p12-private-key-data");
-    when(serviceAccountKeyManager.createJsonKey(any(String.class))).thenReturn(jsonKey);
-    when(serviceAccountKeyManager.createP12Key(any(String.class))).thenThrow(new IOException());
+    when(serviceAccountKeyManager.createJsonKey(any(String.class))).thenThrow(new IOException("fail!"));
 
-    sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(), SERVICE_ACCOUNT);
+    try {
+      sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(), SERVICE_ACCOUNT);
+      fail();
+    } catch (RuntimeException ignore) {
+    }
 
     verify(serviceAccountKeyManager).createJsonKey(SERVICE_ACCOUNT);
-    verify(serviceAccountKeyManager).createP12Key(SERVICE_ACCOUNT);
-    verify(serviceAccountKeyManager).tryDeleteKey(jsonKey.getName());
+    verify(secrets).withName(any());
+    verify(namedResource).get();
+    verifyNoMoreInteractions(secrets);
+    verifyNoMoreInteractions(namedResource);
   }
 
   @Test
@@ -206,20 +204,14 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     ServiceAccountKey jsonKey = new ServiceAccountKey();
     jsonKey.setName("key.json");
     jsonKey.setPrivateKeyData("json-private-key-data");
-    ServiceAccountKey p12Key = new ServiceAccountKey();
-    p12Key.setName("key.p12");
-    p12Key.setPrivateKeyData("p12-private-key-data");
     when(serviceAccountKeyManager.createJsonKey(any(String.class))).thenReturn(jsonKey);
-    when(serviceAccountKeyManager.createP12Key(any(String.class))).thenReturn(p12Key);
     when(k8sClient.secrets().create(any())).thenThrow(new KubernetesClientException(
         "Already exists", 409, new Status()));
 
     sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(), SERVICE_ACCOUNT);
 
     verify(serviceAccountKeyManager).createJsonKey(SERVICE_ACCOUNT);
-    verify(serviceAccountKeyManager).createP12Key(SERVICE_ACCOUNT);
     verify(serviceAccountKeyManager).tryDeleteKey(jsonKey.getName());
-    verify(serviceAccountKeyManager).tryDeleteKey(p12Key.getName());
   }
 
   @Test
@@ -229,9 +221,6 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     final ServiceAccountKey jsonKey = new ServiceAccountKey();
     jsonKey.setName("key.json");
     jsonKey.setPrivateKeyData("json-private-key-data");
-    final ServiceAccountKey p12Key = new ServiceAccountKey();
-    p12Key.setName("key.p12");
-    p12Key.setPrivateKeyData("p12-private-key-data");
 
     when(namedResource.get()).thenReturn(null);
 
@@ -241,7 +230,6 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenAnswer(a -> accountExistsFuture.get());
 
     when(serviceAccountKeyManager.createJsonKey(any(String.class))).thenReturn(jsonKey);
-    when(serviceAccountKeyManager.createP12Key(any(String.class))).thenReturn(p12Key);
 
     // Run two concurrent requests for the same service account secret
     final Future<String> f1 = executor.submit(
@@ -273,15 +261,15 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     assertThat(secret1, is(createdSecret.getMetadata().getName()));
     assertThat(secret2, is(createdSecret.getMetadata().getName()));
 
-    // Check that only one json and one p12 keys were created
+    // Check that only one json key was created
     verify(serviceAccountKeyManager, times(1)).createJsonKey(SERVICE_ACCOUNT);
-    verify(serviceAccountKeyManager, times(1)).createP12Key(SERVICE_ACCOUNT);
   }
 
+  @Parameters({ "p12-key", "null" })
   @Test
-  public void shouldRemoveServiceAccountSecretsAndKeys() throws Exception {
+  public void shouldRemoveServiceAccountSecretsAndKeys(@Nullable String p12KeyId) throws Exception {
     final Secret secret = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", EXPIRED_CREATION_TIMESTAMP.toString());
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", p12KeyId, EXPIRED_CREATION_TIMESTAMP.toString());
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
@@ -291,15 +279,18 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     when(podList.getItems()).thenReturn(List.of());
     sut.cleanup();
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key"));
-    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key"));
+    if (p12KeyId != null) {
+      verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, p12KeyId));
+    }
     verify(secrets).delete(secret);
   }
 
   @Test
-  @Parameters({"Failed", "Succeeded"})
-  public void shouldRemoveServiceAccountSecretsAndKeysUsedByTerminatedPods(String phase) throws Exception {
+  @CombinedParameters({ "Failed, Succeeded", "p12-key, null" })
+  public void shouldRemoveServiceAccountSecretsAndKeysUsedByTerminatedPods(String phase, @Nullable String p12KeyId)
+      throws Exception {
     final Secret secret = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", EXPIRED_CREATION_TIMESTAMP.toString());
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", p12KeyId, EXPIRED_CREATION_TIMESTAMP.toString());
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
@@ -316,7 +307,9 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     when(podList.getItems()).thenReturn(List.of());
     sut.cleanup();
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key"));
-    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key"));
+    if (p12KeyId != null) {
+      verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, p12KeyId));
+    }
     verify(secrets).delete(secret);
   }
 
@@ -353,10 +346,11 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     verify(secrets, never()).delete(secret3);
   }
 
+  @Parameters({ "p12-key", "null" })
   @Test
-  public void shouldNotRemoveServiceAccountSecretsAndKeysInUse() throws Exception {
+  public void shouldNotRemoveServiceAccountSecretsAndKeysInUse(@Nullable String p12KeyId) throws Exception {
     final Secret secret = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", "p12-key", EXPIRED_CREATION_TIMESTAMP.toString());
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key", p12KeyId, EXPIRED_CREATION_TIMESTAMP.toString());
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
@@ -373,10 +367,11 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     verify(secrets, never()).delete(any(Secret.class));
   }
 
+  @Parameters({ "old-p12-key", "null" })
   @Test
-  public void shouldRemoveServiceAccountSecretsInPastEpoch() throws Exception {
+  public void shouldRemoveServiceAccountSecretsInPastEpoch(@Nullable String p12KeyId) throws Exception {
     final Secret secret = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, PAST_SECRET_EPOCH, "old-json-key", "old-p12-key", EXPIRED_CREATION_TIMESTAMP.toString());
+        SERVICE_ACCOUNT, PAST_SECRET_EPOCH, "old-json-key", p12KeyId, EXPIRED_CREATION_TIMESTAMP.toString());
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
@@ -386,7 +381,9 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     sut.cleanup();
 
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "old-json-key"));
-    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "old-p12-key"));
+    if (p12KeyId != null) {
+      verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, p12KeyId));
+    }
     verify(secrets).delete(secret);
   }
 
@@ -394,9 +391,9 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   public void shouldNotRemoveServiceAccountSecretsCreatedWithin48Hours() throws Exception {
     final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(48)).toString();
     final Secret secret1 = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, PAST_SECRET_EPOCH, "json-key-1", "p12-key-1", creationTimestamp);
+        SERVICE_ACCOUNT, PAST_SECRET_EPOCH, "json-key-1", null, creationTimestamp);
     final Secret secret2 = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-2", "p12-key-2", creationTimestamp);
+        SERVICE_ACCOUNT, SECRET_EPOCH, "json-key-2", null, creationTimestamp);
 
     when(k8sClient.secrets()).thenReturn(secrets);
     when(secrets.list()).thenReturn(secretList);
@@ -417,11 +414,10 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
         new GoogleJsonError().set("status", "PERMISSION_DENIED"));
 
     doThrow(permissionDenied).when(serviceAccountKeyManager).createJsonKey(any());
-    doThrow(permissionDenied).when(serviceAccountKeyManager).createP12Key(any());
 
     exception.expect(InvalidExecutionException.class);
     exception.expectMessage(String.format(
-        "Permission denied when creating keys for service account: %s. Styx needs to be Service Account Key Admin.",
+        "Permission denied when creating key for service account: %s. Styx needs to be Service Account Key Admin.",
         SERVICE_ACCOUNT));
 
     sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(), SERVICE_ACCOUNT);
@@ -436,11 +432,10 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
         new GoogleJsonError().set("status", "RESOURCE_EXHAUSTED"));
 
     doThrow(resourceExhausted).when(serviceAccountKeyManager).createJsonKey(any());
-    doThrow(resourceExhausted).when(serviceAccountKeyManager).createP12Key(any());
 
     exception.expect(InvalidExecutionException.class);
     exception.expectMessage(String.format(
-        "Maximum number of keys on service account reached: %s. Styx requires 4 keys to operate.",
+        "Maximum number of keys on service account reached: %s. Styx requires 2 keys to operate.",
         SERVICE_ACCOUNT));
 
     sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(), SERVICE_ACCOUNT);
@@ -450,14 +445,12 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   public void shouldUseExistingServiceAccountSecret() throws IOException {
 
     final String jsonKeyId = "json-key";
-    final String p12KeyId = "p12-key";
 
-    final Secret secret = fakeServiceAccountKeySecret(SERVICE_ACCOUNT, SECRET_EPOCH, jsonKeyId, p12KeyId,
+    final Secret secret = fakeServiceAccountKeySecret(SERVICE_ACCOUNT, SECRET_EPOCH, jsonKeyId, null,
         EXPIRED_CREATION_TIMESTAMP.toString());
 
     when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(true);
     when(serviceAccountKeyManager.keyExists(keyName(SERVICE_ACCOUNT, jsonKeyId))).thenReturn(true);
-    when(serviceAccountKeyManager.keyExists(keyName(SERVICE_ACCOUNT, p12KeyId))).thenReturn(true);
 
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(secret);
@@ -482,16 +475,15 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     sut.ensureServiceAccountKeySecret(WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT);
   }
 
+  @Parameters({ "p12-key", "null" })
   @Test
-  public void shouldCreateNewServiceAccountKeysIfKeysAreDeleted() throws IOException {
+  public void shouldCreateNewServiceAccountKeysIfKeysAreDeleted(@Nullable String p12KeyId) throws IOException {
 
     final ObjectMeta metadata = new ObjectMeta();
     metadata.setAnnotations(Map.of("styx-wf-sa", SERVICE_ACCOUNT));
 
     final String jsonKeyId = "json-key";
-    final String p12KeyId = "p12-key";
     final String newJsonKeyId = "new-json-key";
-    final String newP12KeyId = "new-p12-key";
 
     final String creationTimestamp = CLOCK.instant().minus(Duration.ofDays(1)).toString();
     final Secret secret = fakeServiceAccountKeySecret(
@@ -501,16 +493,13 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
         .setName(newJsonKeyId)
         .setPrivateKeyData("new-json-private-key-data");
 
-    final ServiceAccountKey newP12Key = new ServiceAccountKey()
-        .setName(newP12KeyId)
-        .setPrivateKeyData("new-p12-private-key-data");
-
     when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(true);
     when(serviceAccountKeyManager.keyExists(keyName(SERVICE_ACCOUNT, jsonKeyId))).thenReturn(false);
-    when(serviceAccountKeyManager.keyExists(keyName(SERVICE_ACCOUNT, p12KeyId))).thenReturn(false);
+    if (p12KeyId != null) {
+      when(serviceAccountKeyManager.keyExists(keyName(SERVICE_ACCOUNT, p12KeyId))).thenReturn(false);
+    }
 
     when(serviceAccountKeyManager.createJsonKey(any(String.class))).thenReturn(newJsonKey);
-    when(serviceAccountKeyManager.createP12Key(any(String.class))).thenReturn(newP12Key);
 
     when(secrets.withName(any(String.class))).thenReturn(namedResource);
     when(namedResource.get()).thenReturn(secret);
@@ -518,16 +507,16 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     sut.ensureServiceAccountKeySecret(WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT);
 
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, jsonKeyId));
-    verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, p12KeyId));
+    if (p12KeyId != null) {
+      verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, p12KeyId));
+    }
     verify(serviceAccountKeyManager).createJsonKey(SERVICE_ACCOUNT);
-    verify(serviceAccountKeyManager).createP12Key(SERVICE_ACCOUNT);
     verify(secrets).delete(secret);
     verify(secrets).create(secretCaptor.capture());
 
     final Secret createdSecret = secretCaptor.getValue();
     assertThat(createdSecret.getMetadata().getAnnotations(), hasEntry("styx-wf-sa", SERVICE_ACCOUNT));
     assertThat(createdSecret.getData(), hasEntry("styx-wf-sa.json", newJsonKey.getPrivateKeyData()));
-    assertThat(createdSecret.getData(), hasEntry("styx-wf-sa.p12", newP12Key.getPrivateKeyData()));
   }
 
   @Test
@@ -554,23 +543,28 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   private static Secret fakeServiceAccountKeySecret(String serviceAccount, long epoch, String jsonKeyId,
-      String p12KeyId, String creationTimestamp) {
-    final String jsonKeyName = keyName(serviceAccount, jsonKeyId);
-    final String p12KeyName = keyName(serviceAccount, p12KeyId);
-
+                                                    @Nullable String p12KeyId, String creationTimestamp) {
     final ObjectMeta metadata = new ObjectMeta();
     metadata.setCreationTimestamp(creationTimestamp);
     metadata.setName("styx-wf-sa-keys-" + epoch + "-" + Hashing.sha256().hashString(serviceAccount, UTF_8));
-    metadata.setAnnotations(Map.of(
-        "styx-wf-sa", serviceAccount,
-        "styx-wf-sa-json-key-name", jsonKeyName,
-        "styx-wf-sa-p12-key-name", p12KeyName));
+
+    var annotations = ImmutableMap.<String, String>builder()
+        .put("styx-wf-sa", serviceAccount)
+        .put("styx-wf-sa-json-key-name", keyName(serviceAccount, jsonKeyId));
+    if (p12KeyId != null) {
+      annotations.put("styx-wf-sa-p12-key-name", keyName(serviceAccount, p12KeyId));
+    }
+    metadata.setAnnotations(annotations.build());
+
+    var data = ImmutableMap.<String, String>builder()
+        .put("styx-wf-sa.json", "json-private-key-data");
+    if (p12KeyId != null) {
+      data.put("styx-wf-sa.p12", "p12-private-key-data");
+    }
 
     return new SecretBuilder()
         .withMetadata(metadata)
-        .withData(Map.of(
-            "styx-wf-sa.json", "json-private-key-data",
-            "styx-wf-sa.p12", "p12-private-key-data"))
+        .withData(data.build())
         .build();
   }
 

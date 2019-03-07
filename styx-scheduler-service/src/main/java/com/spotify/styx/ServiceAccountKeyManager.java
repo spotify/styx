@@ -43,11 +43,6 @@ public class ServiceAccountKeyManager {
         .setPrivateKeyType("TYPE_GOOGLE_CREDENTIALS_FILE"));
   }
 
-  public ServiceAccountKey createP12Key(String serviceAccount) throws IOException {
-    return createKey(serviceAccount, new CreateServiceAccountKeyRequest()
-        .setPrivateKeyType("TYPE_PKCS12_FILE"));
-  }
-
   public boolean serviceAccountExists(String serviceAccount) throws IOException {
     try {
       iam.projects().serviceAccounts().get("projects/-/serviceAccounts/" + serviceAccount)

@@ -62,7 +62,6 @@ class KubernetesGCPServiceAccountSecretManager {
   private static final String STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION = "styx-wf-sa-p12-key-name";
   private static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
   private static final String STYX_WORKFLOW_SA_JSON_KEY = "styx-wf-sa.json";
-  private static final String STYX_WORKFLOW_SA_P12_KEY = "styx-wf-sa.p12";
 
   private static final Duration DEFAULT_SECRET_EPOCH_PERIOD = Duration.ofDays(7);
   private static final EpochProvider DEFAULT_SECRET_EPOCH_PROVIDER =
@@ -104,7 +103,7 @@ class KubernetesGCPServiceAccountSecretManager {
     final long epoch = epochProvider.epoch(clock.millis(), serviceAccount);
     final String secretName = buildSecretName(serviceAccount, epoch);
 
-    LOG.info("[AUDIT] Workflow {} refers to secret {} storing keys of {}",
+    LOG.info("[AUDIT] Workflow {} refers to secret {} storing key of {}",
         workflowId, secretName, serviceAccount);
 
     try {
@@ -116,11 +115,11 @@ class KubernetesGCPServiceAccountSecretManager {
         throw (InvalidExecutionException) cause;
       } else if (GcpUtil.isPermissionDenied(cause)) {
         throw new InvalidExecutionException(String.format(
-            "Permission denied when creating keys for service account: %s. Styx needs to be Service Account Key Admin.",
+            "Permission denied when creating key for service account: %s. Styx needs to be Service Account Key Admin.",
             serviceAccount));
       } else if (GcpUtil.isResourceExhausted(cause)) {
         throw new InvalidExecutionException(String.format(
-            "Maximum number of keys on service account reached: %s. Styx requires 4 keys to operate.",
+            "Maximum number of keys on service account reached: %s. Styx requires 2 keys to operate.",
             serviceAccount));
       } else {
         throw new RuntimeException(e);
@@ -144,51 +143,43 @@ class KubernetesGCPServiceAccountSecretManager {
       final String jsonKeyName = annotations.get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION);
       final String p12KeyName = annotations.get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION);
 
-      if (keyExists(jsonKeyName) && keyExists(p12KeyName)) {
+      if (keyExists(jsonKeyName)) {
         return secretName;
       }
 
-      LOG.info("[AUDIT] Service account keys have been deleted for {}, recreating", serviceAccount);
+      LOG.info("[AUDIT] Service account key has been deleted for {}, recreating", serviceAccount);
 
-      // Delete secret and any lingering key before creating new keys
+      // Delete secret and any lingering key before creating new key
       keyManager.deleteKey(jsonKeyName);
-      keyManager.deleteKey(p12KeyName);
+      // TODO: remove after all styx-created p12 keys have been deleted
+      if (p12KeyName != null) {
+        keyManager.deleteKey(p12KeyName);
+      }
       deleteSecret(existingSecret);
     }
 
-    // Create service account keys and secret
-    createKeysAndSecret(workflowId, serviceAccount, epoch, secretName);
+    // Create service account key and secret
+    createKeyAndSecret(workflowId, serviceAccount, epoch, secretName);
 
     return secretName;
   }
 
-  private void createKeysAndSecret(String workflowId, String serviceAccount, long epoch, String secretName)
+  private void createKeyAndSecret(String workflowId, String serviceAccount, long epoch, String secretName)
       throws IOException {
     final ServiceAccountKey jsonKey;
-    final ServiceAccountKey p12Key;
     try {
       jsonKey = keyManager.createJsonKey(serviceAccount);
-      try {
-        p12Key = keyManager.createP12Key(serviceAccount);
-      } catch (IOException e) {
-        // Best effort to rollback the creation of the first key to avoid lingering keys
-        keyManager.tryDeleteKey(jsonKey.getName());
-        throw e;
-      }
     } catch (IOException e) {
-      LOG.warn("[AUDIT] Failed to create keys for {} used by workflow {}",
+      LOG.warn("[AUDIT] Failed to create key for {} used by workflow {}",
           serviceAccount, workflowId, e);
       throw e;
     }
 
     final Map<String, String> keys = Map.of(
-        STYX_WORKFLOW_SA_JSON_KEY, jsonKey.getPrivateKeyData(),
-        STYX_WORKFLOW_SA_P12_KEY, p12Key.getPrivateKeyData()
-    );
+        STYX_WORKFLOW_SA_JSON_KEY, jsonKey.getPrivateKeyData());
 
     final Map<String, String> annotations = Map.of(
         STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION, jsonKey.getName(),
-        STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION, p12Key.getName(),
         STYX_WORKFLOW_SA_ID_ANNOTATION, serviceAccount,
         STYX_WORKFLOW_SA_EPOCH_ANNOTATION, Long.toString(epoch)
     );
@@ -204,14 +195,13 @@ class KubernetesGCPServiceAccountSecretManager {
     try {
       client.secrets().create(newSecret);
     } catch (KubernetesClientException e) {
-      // Best effort delete of the generated keys since another entity already created the secret
+      // Best effort delete of the generated key since another entity already created the secret
       keyManager.tryDeleteKey(jsonKey.getName());
-      keyManager.tryDeleteKey(p12Key.getName());
       return;
     }
 
-    LOG.info("[AUDIT] Secret {} created to store keys of {} referred by workflow {}, jsonKey: {}, p12Key: {}",
-        secretName, serviceAccount, workflowId, jsonKey.getName(), p12Key.getName());
+    LOG.info("[AUDIT] Secret {} created to store key of {} referred by workflow {}, jsonKey: {}",
+        secretName, serviceAccount, workflowId, jsonKey.getName());
   }
 
   private boolean keyExists(String jsonKeyName) {
@@ -252,10 +242,14 @@ class KubernetesGCPServiceAccountSecretManager {
       final Map<String, String> annotations = secret.getMetadata().getAnnotations();
       try {
         keyManager.deleteKey(annotations.get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION));
-        keyManager.deleteKey(annotations.get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION));
+        // TODO: remove after all styx-created p12 keys have been deleted
+        var p12KeyName = annotations.get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION);
+        if (p12KeyName != null) {
+          keyManager.deleteKey(p12KeyName);
+        }
         deleteSecret(secret);
       } catch (KubernetesClientException | IOException e) {
-        LOG.warn("Failed to cleanup secret or keys for service account {}",
+        LOG.warn("Failed to cleanup secret or key for service account {}",
             annotations.get(STYX_WORKFLOW_SA_ID_ANNOTATION), e);
       }
     }
