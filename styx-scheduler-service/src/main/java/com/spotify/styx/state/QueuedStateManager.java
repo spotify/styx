@@ -125,8 +125,8 @@ public class QueuedStateManager implements StateManager {
   @Override
   public void tick() {
     var states = getActiveStates();
-    for (final RunState runState : states.values()) {
-      outputHandler.transitionInto(runState);
+    for (var runState : states.values()) {
+      outputHandler.tryTransitionInto(runState);
     }
   }
 

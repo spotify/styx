@@ -34,6 +34,10 @@ public interface OutputHandler {
 
   void transitionInto(RunState state);
 
+  default void tryTransitionInto(RunState state) {
+    transitionInto(state);
+  }
+
   static OutputHandler fanOutput(OutputHandler... outputHandlers) {
     return new FanOutputHandler(ImmutableList.copyOf(outputHandlers));
   }

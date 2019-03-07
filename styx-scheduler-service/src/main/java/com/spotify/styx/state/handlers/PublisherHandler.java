@@ -26,23 +26,23 @@ import static com.spotify.styx.state.RunState.State.SUBMITTED;
 import com.cronutils.utils.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
+import com.spotify.styx.state.AtMostOnceOutputHandler;
+import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.Retrier;
 import com.spotify.styx.util.RunnableWithException;
 import java.time.Duration;
 import java.util.Objects;
-import java.util.function.BiConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * An event consumer that integrates {@link RunState.State} values with a {@link Publisher}.
+ * An {@link OutputHandler} that integrates {@link RunState.State} values with a {@link Publisher}.
  */
-public class PublisherHandler implements BiConsumer<SequenceEvent, RunState> {
+public class PublisherHandler implements AtMostOnceOutputHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(PublisherHandler.class);
 
@@ -72,7 +72,7 @@ public class PublisherHandler implements BiConsumer<SequenceEvent, RunState> {
   }
 
   @Override
-  public void accept(SequenceEvent sequenceEvent, RunState state) {
+  public void transitionInto(RunState state) {
     final WorkflowInstance workflowInstance = state.workflowInstance();
     switch (state.state()) {
       case SUBMITTED:
@@ -90,14 +90,13 @@ public class PublisherHandler implements BiConsumer<SequenceEvent, RunState> {
         break;
 
       case RUNNING:
-        final String type = "deployed";
         try {
           Preconditions.checkArgument(state.data().executionDescription().isPresent());
           final ExecutionDescription executionDescription = state.data().executionDescription().get();
 
           retrier.runWithRetries(
               meteredPublishing(() -> publisher.deployed(workflowInstance, executionDescription),
-                  stats, type, RUNNING.name()));
+                  stats, DEPLOYED, RUNNING.name()));
         } catch (Exception e) {
           stats.recordPublishingError(DEPLOYED, RUNNING.name());
           LOG.error("Failed to publish event for {} state", RUNNING.name(), e);

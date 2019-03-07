@@ -20,10 +20,13 @@
 
 package com.spotify.styx.state;
 
-import com.google.common.collect.Lists;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
+
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.testdata.TestData;
-import java.util.ArrayList;
+import java.util.List;
 import org.junit.Test;
 
 public class FanOutputHandlerTest {
@@ -36,10 +39,19 @@ public class FanOutputHandlerTest {
     OutputHandler failingOutputHandler = state -> {
       throw new FooException();
     };
-    ArrayList<OutputHandler> handlers = Lists.newArrayList();
-    handlers.add(failingOutputHandler);
-    FanOutputHandler fanOutputHandler = new FanOutputHandler(handlers);
+    FanOutputHandler fanOutputHandler = new FanOutputHandler(List.of(failingOutputHandler));
     fanOutputHandler.transitionInto(RunState.fresh(WORKFLOW_INSTANCE));
+  }
+
+  @Test
+  public void shouldSkipAtMostOnceOutputHandlers() {
+    AtMostOnceOutputHandler atMostOnceOutputHandler = mock(AtMostOnceOutputHandler.class);
+    OutputHandler outputHandler = mock(OutputHandler.class);
+    FanOutputHandler fanOutputHandler = new FanOutputHandler(List.of(atMostOnceOutputHandler, outputHandler));
+    final RunState state = RunState.fresh(WORKFLOW_INSTANCE);
+    fanOutputHandler.tryTransitionInto(state);
+    verify(outputHandler).transitionInto(state);
+    verifyZeroInteractions(atMostOnceOutputHandler);
   }
 
   private class FooException extends RuntimeException {

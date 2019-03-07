@@ -20,7 +20,12 @@
 
 package com.spotify.styx.state;
 
+import static java.util.function.Predicate.not;
+
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,8 +42,7 @@ class FanOutputHandler implements OutputHandler {
     this.outputHandlers = Objects.requireNonNull(outputHandlers);
   }
 
-  @Override
-  public void transitionInto(RunState state) {
+  private static void transitionInto(RunState state, Iterable<OutputHandler> outputHandlers) {
     for (OutputHandler handler : outputHandlers) {
       try {
         handler.transitionInto(state);
@@ -47,5 +51,18 @@ class FanOutputHandler implements OutputHandler {
         throw e;
       }
     }
+  }
+
+  @Override
+  public void transitionInto(RunState state) {
+    transitionInto(state, outputHandlers);
+  }
+
+  @Override
+  public void tryTransitionInto(RunState state) {
+    final List<OutputHandler> outputHandlers = StreamSupport.stream(this.outputHandlers.spliterator(), false)
+        .filter(not(outputHandler -> outputHandler instanceof AtMostOnceOutputHandler))
+        .collect(Collectors.toUnmodifiableList());
+    transitionInto(state, outputHandlers);
   }
 }

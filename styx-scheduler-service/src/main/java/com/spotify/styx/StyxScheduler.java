@@ -377,10 +377,8 @@ public class StyxScheduler implements AppInit {
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
     //       take StateManager as argument instead?
     final List<OutputHandler> outputHandlers = new ArrayList<>();
-    final BiConsumer<SequenceEvent, RunState> eventConsumer = eventConsumerFactory.apply(environment, stats);
-    final PublisherHandler publisherHandler = new PublisherHandler(publisher, stats);
     final QueuedStateManager queuedStateManager = closer.register(new QueuedStateManager(time, eventProcessingExecutor,
-        storage, fanoutEventConsumer(eventConsumer, publisherHandler), eventConsumerExecutor, fanOutput(outputHandlers),
+        storage, eventConsumerFactory.apply(environment, stats), eventConsumerExecutor, fanOutput(outputHandlers),
         shardedCounter));
     final StateManager stateManager = TracingProxy.instrument(StateManager.class, queuedStateManager);
 
@@ -406,6 +404,7 @@ public class StyxScheduler implements AppInit {
             dockerRunner, stateManager),
         new TerminationHandler(retryUtil, stateManager),
         new MonitoringHandler(stats),
+        new PublisherHandler(publisher, stats),
         new ExecutionDescriptionHandler(storage, stateManager, workflowValidator)));
 
     final TriggerListener trigger =
@@ -458,16 +457,6 @@ public class StyxScheduler implements AppInit {
     this.scheduler = scheduler;
     this.triggerManager = triggerManager;
     this.backfillTriggerManager = backfillTriggerManager;
-  }
-
-  @SafeVarargs
-  private BiConsumer<SequenceEvent, RunState> fanoutEventConsumer(
-      BiConsumer<SequenceEvent, RunState>... eventConsumers) {
-    return (event, runState) -> {
-      for (final BiConsumer<SequenceEvent, RunState> eventConsumer : eventConsumers) {
-        runGuarded(() -> eventConsumer.accept(event, runState));
-      }
-    };
   }
 
   @VisibleForTesting
