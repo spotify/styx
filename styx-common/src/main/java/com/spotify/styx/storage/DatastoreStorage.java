@@ -558,6 +558,7 @@ public class DatastoreStorage implements Closeable {
     long index = Long.remainderUnsigned(hash, ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS);
     // fixme: rollback this crap
     if (index == 1 || index == 108) {
+      LOG.debug("shifted to next shard for workflow instance {}", workflowInstanceKey);
       index++;
     }
     return activeWorkflowInstanceIndexShardName(index);
