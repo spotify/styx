@@ -20,15 +20,12 @@
 
 package com.spotify.styx.util;
 
-import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
-import java.io.IOException;
-import java.util.List;
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import javaslang.control.Try;
 
 public class FutureUtil {
 
@@ -43,27 +40,15 @@ public class FutureUtil {
   }
 
   /**
-   * Gathers results from futures that may fail with IOExceptions.
-   * @return The values of all futures, in the same order.
-   * @throws IOException if interrupted or any of the futures timed out or failed with an {@link IOException}.
+   * Gathers results from futures that may fail.
+   * @return The values or failures of all futures.
    */
-  public static <T> List<T> gatherIO(final List<Future<T>> futures, long timeout, TimeUnit timeUnit)
-      throws IOException {
-    final ImmutableList.Builder<T> values = ImmutableList.builder();
-    for (Future<T> future : futures) {
-      try {
-        values.add(future.get(timeout, timeUnit));
-      } catch (TimeoutException e) {
-        throw new IOException(e);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new IOException(e);
-      } catch (ExecutionException e) {
-        final Throwable cause = e.getCause();
-        Throwables.propagateIfPossible(cause, IOException.class);
-        throw new RuntimeException(cause);
-      }
+  public static <K, T> Map<K, Try<T>> gatherIO(
+      final Map<K, ? extends Future<T>> futures, long timeout, TimeUnit timeUnit) {
+    final ImmutableMap.Builder<K, Try<T>> results = ImmutableMap.builder();
+    for (Map.Entry<K, ? extends Future<T>> entry : futures.entrySet()) {
+      results.put(entry.getKey(), Try.of(() -> entry.getValue().get(timeout, timeUnit)));
     }
-    return values.build();
+    return results.build();
   }
 }

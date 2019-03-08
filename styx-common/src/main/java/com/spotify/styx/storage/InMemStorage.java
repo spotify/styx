@@ -46,8 +46,11 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javaslang.Tuple;
+import javaslang.Tuple2;
 
 /**
  * A Storage implementation with state stored in memory. For testing.
@@ -353,5 +356,15 @@ public class InMemStorage implements Storage {
   @Override
   public Optional<RunState> readActiveState(WorkflowInstance workflowInstance) {
     return Optional.ofNullable(activeStatesMap.get(workflowInstance));
+  }
+
+  @Override
+  public Tuple2<Predicate<WorkflowInstance>, Map<WorkflowInstance, RunState>> readActiveStatesPartial() {
+    try {
+      var activeStates = readActiveStates();
+      return Tuple.of(wfi -> false, activeStates);
+    } catch (IOException e) {
+      return Tuple.of(wfi -> true, Map.of());
+    }
   }
 }

@@ -33,6 +33,7 @@ import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_INDEX;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_VALUE;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
+import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -87,7 +88,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -98,12 +98,17 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import javaslang.Tuple;
+import javaslang.Tuple2;
+import javaslang.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -189,17 +194,17 @@ public class DatastoreStorage implements Closeable {
   private final Executor executor;
 
   DatastoreStorage(CheckedDatastore datastore, Duration retryBaseDelay) {
-    this(datastore, retryBaseDelay, DatastoreStorageTransaction::new);
+    this(datastore, retryBaseDelay, DatastoreStorageTransaction::new, new ForkJoinPool(REQUEST_CONCURRENCY));
   }
 
   @VisibleForTesting
   DatastoreStorage(CheckedDatastore datastore, Duration retryBaseDelay,
-      Function<CheckedDatastoreTransaction, DatastoreStorageTransaction> storageTransactionFactory) {
+      Function<CheckedDatastoreTransaction, DatastoreStorageTransaction> storageTransactionFactory,
+                   ExecutorService executor) {
     this.datastore = Objects.requireNonNull(datastore);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
     this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
-    final ForkJoinPool forkJoinPool = register(closer, new ForkJoinPool(REQUEST_CONCURRENCY), "datastore-storage");
-    this.executor = MDCUtil.withMDC(Context.currentContextExecutor(forkJoinPool));
+    this.executor = MDCUtil.withMDC(Context.currentContextExecutor(register(closer, executor, "datastore-storage")));
   }
 
   @Override
@@ -387,30 +392,78 @@ public class DatastoreStorage implements Closeable {
     return workflows;
   }
 
+  Map<WorkflowInstance, RunState> readActiveStates() {
+    return readActiveStatesPartial()._2;
+  }
+
   /**
    * Strongly consistently read all active states
    */
-  Map<WorkflowInstance, RunState> readActiveStates() throws IOException {
-    // Strongly read active state keys from index shards in parallel
-    final List<Key> keys = gatherIO(activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
-        .map(key -> asyncIO(() -> datastore.query(Query.newEntityQueryBuilder()
-            .setFilter(PropertyFilter.hasAncestor(key))
-            .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
-            .build())))
-        .collect(toList()), 30, TimeUnit.SECONDS)
-        .stream()
-        .flatMap(Collection::stream)
+  Tuple2<Predicate<WorkflowInstance>, Map<WorkflowInstance, RunState>> readActiveStatesPartial() {
+    // Read all index shards in parallel
+    final Map<String, CompletableFuture<List<Entity>>> shardFutures =
+        activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
+            .collect(toMap(Key::getName, key -> asyncIO(() -> datastore.query(Query.newEntityQueryBuilder()
+                .setFilter(PropertyFilter.hasAncestor(key))
+                .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
+                .build()))));
+
+    // Gather the index shard read results
+    final Map<String, Try<List<Entity>>> shardResults = gatherIO(shardFutures, 60, TimeUnit.SECONDS);
+
+    // List workflow instance keys from successfully read shards
+    final List<Key> keys = shardResults.values().stream()
+        .filter(Try::isSuccess)
+        .map(Try::get)
+        .flatMap(List::stream)
         .map(entity -> entity.getKey().getName())
         .map(name -> activeWorkflowInstanceKey(datastore.newKeyFactory(), name))
         .collect(toList());
 
-    // Strongly consistently read values for the above keys in parallel
-    return gatherIO(Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ).stream()
-        .map(batch -> asyncIO(() -> readRunStateBatch(batch)))
-        .collect(toList()), 30, TimeUnit.SECONDS)
-        .stream()
-        .flatMap(Collection::stream)
-        .collect(toMap(RunState::workflowInstance, Function.identity()));
+    // List "unavailable" shards (shard reads that failed)
+    final Set<String> unavailableShards = shardResults.entrySet().stream()
+        .filter(e -> e.getValue().isFailure())
+        .peek(e -> LOG.warn("Failed datastore read for {}: {}",
+            KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD, e.getKey(), e.getValue().getCause()))
+        .map(Map.Entry::getKey)
+        .collect(toSet());
+
+    // Read workflow instances in batches, in parallel
+    final List<List<Key>> batches = Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ);
+    final Map<Integer, CompletableFuture<List<RunState>>> batchFutures = new HashMap<>();
+    for (int i = 0; i < batches.size(); i++) {
+      final List<Key> batch = batches.get(i);
+      batchFutures.put(i, asyncIO(() -> readRunStateBatch(batch)));
+    }
+
+    // Gather workflow instance read results
+    final Map<Integer, Try<List<RunState>>> batchResults = gatherIO(batchFutures, 60, TimeUnit.SECONDS);
+
+    // List successfully read instances
+    final Map<WorkflowInstance, RunState> activeStates = batchResults.values().stream()
+        .filter(Try::isSuccess)
+        .flatMap(t -> t.get().stream())
+        .collect(toMap(RunState::workflowInstance, r -> r));
+
+    // List "unavailable" instances (instance reads that failed)
+    final Set<WorkflowInstance> unavailableInstances = batchResults.entrySet().stream()
+        .filter(e -> e.getValue().isFailure())
+        .peek(e -> LOG.warn("Failed datastore read for {}: {}",
+            KIND_ACTIVE_WORKFLOW_INSTANCE, e.getKey(), e.getValue().getCause()))
+        .map(Map.Entry::getKey)
+        .flatMap(i -> batches.get(i).stream())
+        .map(Key::getName)
+        .map(WorkflowInstance::parseKey)
+        .collect(toSet());
+
+    // Construct a predicate that can be used to detect if an workflow instance is unavailable and should be ignored
+    final Predicate<WorkflowInstance> unavailableInstance = wfi ->
+        // Did the workflow instance read fail?
+        unavailableInstances.contains(wfi) ||
+        // Did we fail to read the shard of the workflow instance?
+        unavailableShards.contains(activeWorkflowInstanceIndexShardName(wfi.toKey()));
+
+    return Tuple.of(unavailableInstance, activeStates);
   }
 
   /**
