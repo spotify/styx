@@ -409,7 +409,7 @@ public class DatastoreStorage implements Closeable {
                 .build()))));
 
     // Gather the index shard read results
-    final Map<String, Try<List<Entity>>> shardResults = gatherIO(shardFutures, 60, TimeUnit.SECONDS);
+    final Map<String, Try<List<Entity>>> shardResults = gatherIO(shardFutures, 30, TimeUnit.SECONDS);
 
     // List workflow instance keys from successfully read shards
     final List<Key> keys = shardResults.values().stream()
@@ -437,7 +437,7 @@ public class DatastoreStorage implements Closeable {
     }
 
     // Gather workflow instance read results
-    final Map<Integer, Try<List<RunState>>> batchResults = gatherIO(batchFutures, 60, TimeUnit.SECONDS);
+    final Map<Integer, Try<List<RunState>>> batchResults = gatherIO(batchFutures, 30, TimeUnit.SECONDS);
 
     // List successfully read instances
     final Map<WorkflowInstance, RunState> activeStates = batchResults.values().stream()
