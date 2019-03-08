@@ -166,6 +166,25 @@ public class QueuedStateManagerTest {
   }
 
   @Test
+  public void tickShouldTolerateOutputHandlerFailure() throws IOException {
+    var instance1 = WorkflowInstance.create(TestData.WORKFLOW_ID, "2016-05-01");
+    var instance2 = WorkflowInstance.create(TestData.WORKFLOW_ID, "2016-05-02");
+    var runState1 = RunState.create(instance1, State.SUBMITTING, StateData.zero(), NOW.minusMillis(2), 17);
+    var runState2 = RunState.create(instance2, State.TERMINATED, StateData.zero(), NOW.minusMillis(1), 4711);
+
+    when(storage.readActiveStates()).thenReturn(Map.of(
+        instance1, runState1,
+        instance2, runState2));
+
+    doThrow(new RuntimeException("fail!")).when(outputHandler).transitionInto(runState1);
+
+    stateManager.tick();
+
+    verify(outputHandler).transitionInto(runState1);
+    verify(outputHandler).transitionInto(runState2);
+  }
+
+  @Test
   public void shouldInitializeAndTriggerWFInstance() throws Exception {
     final RunState instanceStateFresh =
         RunState.create(INSTANCE, State.NEW, StateData.zero(), NOW, -1);
