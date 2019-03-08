@@ -39,10 +39,6 @@ public class FutureUtil {
     return future;
   }
 
-  public static <T> CompletableFuture<T> exceptionallyCompletedFuture(final Throwable t, final Class<T> cls) {
-    return exceptionallyCompletedFuture(t);
-  }
-
   /**
    * Gathers results from futures that may fail.
    * @return The values or failures of all futures.

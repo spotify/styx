@@ -69,7 +69,7 @@ public class FutureUtilTest {
     var cause = new Exception("foo");
     var futures = Map.of(
         "foo", completedFuture("foo"),
-        "bar", exceptionallyCompletedFuture(cause, String.class));
+        "bar", CompletableFuture.<String>failedFuture(cause));
     var results = FutureUtil.gatherIO(futures, 30, TimeUnit.SECONDS);
     assertThat(results.size(), is(2));
     assertThat(results, hasEntry("foo", Try.success("foo")));
