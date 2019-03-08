@@ -33,6 +33,7 @@ import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_INDEX;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_VALUE;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
+import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -87,7 +88,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -101,9 +101,13 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import javaslang.Tuple;
+import javaslang.Tuple2;
+import javaslang.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -390,27 +394,61 @@ public class DatastoreStorage implements Closeable {
   /**
    * Strongly consistently read all active states
    */
-  Map<WorkflowInstance, RunState> readActiveStates() throws IOException {
+  Tuple2<Predicate<WorkflowInstance>, Map<WorkflowInstance, RunState>> readActiveStates() throws IOException {
     // Strongly read active state keys from index shards in parallel
-    final List<Key> keys = gatherIO(activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
-        .map(key -> asyncIO(() -> datastore.query(Query.newEntityQueryBuilder()
-            .setFilter(PropertyFilter.hasAncestor(key))
-            .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
-            .build())))
-        .collect(toList()), 30, TimeUnit.SECONDS)
-        .stream()
-        .flatMap(Collection::stream)
+    final Map<String, CompletableFuture<List<Entity>>> shardFutures =
+        activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
+            .collect(toMap(Key::getName, key -> asyncIO(() -> datastore.query(Query.newEntityQueryBuilder()
+                .setFilter(PropertyFilter.hasAncestor(key))
+                .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
+                .build()))));
+
+    final Map<String, Try<List<Entity>>> shardResults = gatherIO(shardFutures, 60, TimeUnit.SECONDS);
+
+    final List<Entity> values = shardResults.values().stream()
+        .filter(Try::isSuccess)
+        .map(Try::get)
+        .flatMap(List::stream)
+        .collect(toList());
+
+    final Set<String> unavailableShards = shardResults.entrySet().stream()
+        .filter(e -> e.getValue().isFailure())
+        .map(Map.Entry::getKey)
+        .collect(toSet());
+
+    final List<Key> keys = values.stream()
         .map(entity -> entity.getKey().getName())
         .map(name -> activeWorkflowInstanceKey(datastore.newKeyFactory(), name))
         .collect(toList());
 
     // Strongly consistently read values for the above keys in parallel
-    return gatherIO(Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ).stream()
-        .map(batch -> asyncIO(() -> readRunStateBatch(batch)))
-        .collect(toList()), 30, TimeUnit.SECONDS)
-        .stream()
-        .flatMap(Collection::stream)
-        .collect(toMap(RunState::workflowInstance, Function.identity()));
+    final List<List<Key>> batches = Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ);
+    final Map<Integer, CompletableFuture<List<RunState>>> batchFutures = new HashMap<>();
+    for (int i = 0; i < batches.size(); i++) {
+      final List<Key> batch = batches.get(i);
+      batchFutures.put(i, asyncIO(() -> readRunStateBatch(batch)));
+    }
+
+    final Map<Integer, Try<List<RunState>>> batchResults = gatherIO(batchFutures, 60, TimeUnit.SECONDS);
+    final Map<WorkflowInstance, RunState> activeStates = batchResults.values().stream()
+        .filter(Try::isSuccess)
+        .flatMap(t -> t.get().stream())
+        .collect(toMap(RunState::workflowInstance, r -> r));
+
+    final Set<WorkflowInstance> unavailableInstances = batchResults.entrySet().stream()
+        .filter(e -> e.getValue().isFailure())
+        .map(Map.Entry::getKey)
+        .flatMap(i -> batches.get(i).stream())
+        .map(Key::getName)
+        .map(WorkflowInstance::parseKey)
+        .collect(toSet());
+
+    var keyFactory = datastore.newKeyFactory();
+    final Predicate<WorkflowInstance> unavailableInstance = wfi ->
+        unavailableInstances.contains(wfi) ||
+        unavailableShards.contains(activeWorkflowInstanceIndexShardName(wfi.toKey()));
+
+    return Tuple.of(unavailableInstance, activeStates);
   }
 
   /**
