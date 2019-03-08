@@ -36,7 +36,6 @@ import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
-import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Debug;
 import io.fabric8.kubernetes.api.model.ContainerState;
@@ -101,7 +100,6 @@ public class KubernetesDockerRunnerPodPollerTest {
 
   @Mock KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
   @Mock Debug debug;
-  @Mock Storage storage;
 
   KubernetesDockerRunner kdr;
 
@@ -112,12 +110,12 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(k8sClient.pods()).thenReturn(pods);
 
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT, storage);
+        debug, STYX_ENVIRONMENT);
     podList = new PodList();
     podList.setMetadata(new ListMeta());
     podList.getMetadata().setResourceVersion("4711");
 
-    when(storage.readActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of()));
+    when(stateManager.getActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of()));
   }
 
   @Test
@@ -153,9 +151,8 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.tryPollPods();
 
-    verify(storage).readActiveStatesPartial();
+    verify(stateManager).getActiveStatesPartial();
     verifyNoMoreInteractions(stateManager);
-    verifyNoMoreInteractions(storage);
   }
 
   @Test
@@ -180,9 +177,8 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.tryPollPods();
 
-    verify(storage).readActiveStatesPartial();
+    verify(stateManager).getActiveStatesPartial();
     verifyNoMoreInteractions(stateManager);
-    verifyNoMoreInteractions(storage);
   }
 
   @Test
@@ -287,7 +283,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     RunState runState2 = RunState.create(WORKFLOW_INSTANCE_2, state, stateData2);
     map.put(WORKFLOW_INSTANCE, runState);
     map.put(WORKFLOW_INSTANCE_2, runState2);
-    when(storage.readActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, map));
+    when(stateManager.getActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, map));
   }
 
   private void verifyPodNeverDeleted(PodResource<Pod, DoneablePod> pod) {

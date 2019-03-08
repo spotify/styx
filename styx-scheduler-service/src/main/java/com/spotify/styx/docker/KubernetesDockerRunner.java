@@ -53,7 +53,6 @@ import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
-import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
@@ -157,7 +156,6 @@ class KubernetesDockerRunner implements DockerRunner {
 
   private final KubernetesClient client;
   private final StateManager stateManager;
-  private final Storage storage;
   private final Stats stats;
   private final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
   private final Debug debug;
@@ -173,7 +171,7 @@ class KubernetesDockerRunner implements DockerRunner {
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
                          Debug debug, String styxEnvironment,
                          int pollPodsIntervalSeconds, int podDeletionDelaySeconds,
-                         Time time, ScheduledExecutorService executor, Storage storage) {
+                         Time time, ScheduledExecutorService executor) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client);
     this.stats = Objects.requireNonNull(stats);
@@ -184,17 +182,16 @@ class KubernetesDockerRunner implements DockerRunner {
     this.podDeletionDelaySeconds = podDeletionDelaySeconds;
     this.time = Objects.requireNonNull(time);
     this.executor = register(closer, Objects.requireNonNull(executor), "kubernetes-poll");
-    this.storage = Objects.requireNonNull(storage);
     this.eventExecutor = currentContextExecutorService(
         register(closer, new ForkJoinPool(K8S_EVENT_PROCESSING_THREADS), "kubernetes-event"));
   }
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
-                         Debug debug, String styxEnvironment, Storage storage) {
+                         Debug debug, String styxEnvironment) {
     this(client, stateManager, stats, serviceAccountSecretManager, debug, styxEnvironment,
         DEFAULT_POLL_PODS_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_TIME,
-        Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY), storage);
+        Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY));
   }
 
   @Override
@@ -590,7 +587,7 @@ class KubernetesDockerRunner implements DockerRunner {
   synchronized void tryPollPods() {
     // Fetch pods _before_ fetching all active states
     final PodList list = client.pods().list();
-    var activeStates = storage.readActiveStatesPartial();
+    var activeStates = stateManager.getActiveStatesPartial();
     var unavailableWorkflowInstance = activeStates._1;
     examineRunningWFISandAssociatedPods(activeStates._2, list);
 

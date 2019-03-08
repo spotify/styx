@@ -57,7 +57,6 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
-import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.Time;
@@ -173,7 +172,6 @@ public class KubernetesDockerRunnerTest {
   @Mock private Debug debug;
   @Mock private Time time;
   @Mock private StateManager stateManager;
-  @Mock private Storage storage;
 
   @Captor private ArgumentCaptor<Watcher<Pod>> watchCaptor;
   @Captor private ArgumentCaptor<Pod> podCaptor;
@@ -214,7 +212,7 @@ public class KubernetesDockerRunnerTest {
     when(time.get()).thenReturn(FIXED_INSTANT);
 
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT, POLL_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time, executor, storage);
+        debug, STYX_ENVIRONMENT, POLL_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time, executor);
     kdr.init();
 
     podWatcher = watchCaptor.getValue();
@@ -228,7 +226,7 @@ public class KubernetesDockerRunnerTest {
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
     RunState runState = RunState.create(WORKFLOW_INSTANCE, State.SUBMITTED, stateData);
 
-    when(storage.readActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of(WORKFLOW_INSTANCE, runState)));
+    when(stateManager.getActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of(WORKFLOW_INSTANCE, runState)));
     when(stateManager.getActiveState(WORKFLOW_INSTANCE)).thenReturn(Optional.of(runState));
   }
 
@@ -400,7 +398,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
 
-    when(storage.readActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of()));
+    when(stateManager.getActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of()));
 
     kdr.tryPollPods();
 
@@ -419,7 +417,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
 
-    when(storage.readActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of()));
+    when(stateManager.getActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of()));
 
     kdr.tryPollPods();
 
@@ -809,7 +807,7 @@ public class KubernetesDockerRunnerTest {
 
     // Start a new runner
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT, POLL_INTERVAL_SECONDS, 0, time, executor, storage);
+        debug, STYX_ENVIRONMENT, POLL_INTERVAL_SECONDS, 0, time, executor);
     kdr.init();
 
     // Make the runner poll states for all pods

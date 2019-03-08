@@ -204,8 +204,7 @@ public class StyxScheduler implements AppInit {
         StateManager stateManager,
         ScheduledExecutorService scheduler,
         Stats stats,
-        Debug debug,
-        Storage storage);
+        Debug debug);
   }
 
   @FunctionalInterface
@@ -385,7 +384,7 @@ public class StyxScheduler implements AppInit {
     final Supplier<String> dockerId = () -> styxConfig.get().globalDockerRunnerId();
     final Debug debug = () -> styxConfig.get().debugEnabled();
     final DockerRunner routingDockerRunner = DockerRunner.routing(
-        id -> dockerRunnerFactory.create(id, environment, stateManager, tickExecutor, stats, debug, storage),
+        id -> dockerRunnerFactory.create(id, environment, stateManager, tickExecutor, stats, debug),
         dockerId);
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
         TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
@@ -623,8 +622,7 @@ public class StyxScheduler implements AppInit {
       StateManager stateManager,
       ScheduledExecutorService scheduler,
       Stats stats,
-      Debug debug,
-      Storage storage) {
+      Debug debug) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
 
@@ -637,7 +635,7 @@ public class StyxScheduler implements AppInit {
           config, id, createGkeClient(), DefaultKubernetesClient::new));
       final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
       return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats,
-          serviceAccountKeyManager, debug, styxEnvironment, storage));
+          serviceAccountKeyManager, debug, styxEnvironment));
     }
   }
 
