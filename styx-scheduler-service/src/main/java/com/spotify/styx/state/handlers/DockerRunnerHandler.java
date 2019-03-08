@@ -80,8 +80,7 @@ public class DockerRunnerHandler implements OutputHandler {
             } else {
               LOG.error(msg, e);
             }
-            stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()),
-                state.counter() + 1);
+            stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()), state.counter());
           } catch (IsClosedException isClosedException) {
             LOG.warn("Failed to send 'runError' event", isClosedException);
           }

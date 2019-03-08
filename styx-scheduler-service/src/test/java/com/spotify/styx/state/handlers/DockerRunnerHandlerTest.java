@@ -35,7 +35,6 @@ import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.InvalidExecutionException;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -72,12 +71,9 @@ public class DockerRunnerHandlerTest {
 
   @Mock DockerRunner dockerRunner;
   @Mock StateManager stateManager;
-  @Mock EventVisitor<Void> eventVisitor;
 
   @Captor ArgumentCaptor<WorkflowInstance> instanceCaptor;
   @Captor ArgumentCaptor<RunSpec> runSpecCaptor;
-  @Captor ArgumentCaptor<Event> eventCaptor;
-  @Captor ArgumentCaptor<Long> counterCaptor;
 
   @Before
   public void setUp() {
@@ -158,19 +154,11 @@ public class DockerRunnerHandlerTest {
         StateData.newBuilder()
             .executionId(TEST_EXECUTION_ID)
             .executionDescription(EXECUTION_DESCRIPTION)
-            .build());
+            .build(), NOW, COUNTER);
 
     dockerRunnerHandler.transitionInto(runState);
 
-    verify(stateManager).receive(eventCaptor.capture(), counterCaptor.capture());
-
-    Event event = eventCaptor.getAllValues().get(0);
-    long counter = counterCaptor.getAllValues().get(0);
-
-    event.accept(eventVisitor);
-    verify(eventVisitor).runError(workflowInstance, throwable.getMessage());
-    assertThat(counter, is(runState.counter() + 1));
-
+    verify(stateManager).receive(Event.runError(workflowInstance, throwable.getMessage()), COUNTER);
     verifyNoMoreInteractions(stateManager);
   }
 
@@ -185,6 +173,7 @@ public class DockerRunnerHandlerTest {
     dockerRunnerHandler.transitionInto(runState);
 
     verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
+    verifyNoMoreInteractions(stateManager);
   }
 
   @Test
@@ -198,6 +187,7 @@ public class DockerRunnerHandlerTest {
     dockerRunnerHandler.transitionInto(runState);
 
     verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
+    verifyNoMoreInteractions(stateManager);
   }
 
   @Test
