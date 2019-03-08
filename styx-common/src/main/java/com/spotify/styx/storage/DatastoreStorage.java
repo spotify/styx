@@ -413,6 +413,8 @@ public class DatastoreStorage implements Closeable {
 
     final Set<String> unavailableShards = shardResults.entrySet().stream()
         .filter(e -> e.getValue().isFailure())
+        .peek(e -> LOG.warn("Failed datastore read for {}: {}",
+            KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD, e.getKey(), e.getValue().getCause()))
         .map(Map.Entry::getKey)
         .collect(toSet());
 
@@ -437,13 +439,14 @@ public class DatastoreStorage implements Closeable {
 
     final Set<WorkflowInstance> unavailableInstances = batchResults.entrySet().stream()
         .filter(e -> e.getValue().isFailure())
+        .peek(e -> LOG.warn("Failed datastore read for {}: {}",
+            KIND_ACTIVE_WORKFLOW_INSTANCE, e.getKey(), e.getValue().getCause()))
         .map(Map.Entry::getKey)
         .flatMap(i -> batches.get(i).stream())
         .map(Key::getName)
         .map(WorkflowInstance::parseKey)
         .collect(toSet());
 
-    var keyFactory = datastore.newKeyFactory();
     final Predicate<WorkflowInstance> unavailableInstance = wfi ->
         unavailableInstances.contains(wfi) ||
         unavailableShards.contains(activeWorkflowInstanceIndexShardName(wfi.toKey()));
