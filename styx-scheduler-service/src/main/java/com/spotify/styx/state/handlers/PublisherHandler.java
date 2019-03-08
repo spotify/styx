@@ -25,6 +25,7 @@ import static com.spotify.styx.state.RunState.State.SUBMITTED;
 
 import com.cronutils.utils.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.spotify.styx.model.EventVisitorAdapter;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
@@ -36,6 +37,7 @@ import com.spotify.styx.util.RunnableWithException;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.function.BiConsumer;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,9 +75,9 @@ public class PublisherHandler implements BiConsumer<SequenceEvent, RunState> {
 
   @Override
   public void accept(SequenceEvent sequenceEvent, RunState state) {
-    final WorkflowInstance workflowInstance = state.workflowInstance();
-    switch (state.state()) {
-      case SUBMITTED:
+    sequenceEvent.event().accept(new EventVisitorAdapter<Void>() {
+      @Override
+      public Void submitted(WorkflowInstance workflowInstance, @Nullable String executionId) {
         try {
           Preconditions.checkArgument(state.data().executionDescription().isPresent());
           final ExecutionDescription executionDescription = state.data().executionDescription().get();
@@ -87,9 +89,11 @@ public class PublisherHandler implements BiConsumer<SequenceEvent, RunState> {
           stats.recordPublishingError(DEPLOYING, SUBMITTED.name());
           LOG.error("Failed to publish event for {} state", SUBMITTED.name(), e);
         }
-        break;
+        return null;
+      }
 
-      case RUNNING:
+      @Override
+      public Void started(WorkflowInstance workflowInstance) {
         final String type = "deployed";
         try {
           Preconditions.checkArgument(state.data().executionDescription().isPresent());
@@ -102,11 +106,9 @@ public class PublisherHandler implements BiConsumer<SequenceEvent, RunState> {
           stats.recordPublishingError(DEPLOYED, RUNNING.name());
           LOG.error("Failed to publish event for {} state", RUNNING.name(), e);
         }
-        break;
-
-      default:
-        // do nothing
-    }
+        return null;
+      }
+    });
   }
 
   private RunnableWithException<Exception> meteredPublishing(RunnableWithException<Exception> runnable,
