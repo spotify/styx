@@ -38,10 +38,12 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_ENABLED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_JSON;
 import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceIndexShardEntryKey;
+import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceIndexShardEntryKeyShifted;
 import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceKey;
 import static com.spotify.styx.storage.DatastoreStorage.entityToBackfill;
 import static com.spotify.styx.storage.DatastoreStorage.entityToRunState;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
+import static com.spotify.styx.storage.DatastoreStorage.isBrokenShard;
 import static com.spotify.styx.storage.DatastoreStorage.runStateToEntity;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_SHARD;
@@ -54,6 +56,7 @@ import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.Entity.Builder;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.StringValue;
+import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Workflow;
@@ -68,8 +71,12 @@ import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DatastoreStorageTransaction implements StorageTransaction {
+
+  private static final Logger LOG = LoggerFactory.getLogger(DatastoreStorageTransaction.class);
 
   private final CheckedDatastoreTransaction tx;
 
@@ -260,6 +267,17 @@ public class DatastoreStorageTransaction implements StorageTransaction {
     return instance;
   }
 
+  @VisibleForTesting
+  WorkflowInstance writeActiveStateShifted(WorkflowInstance instance, RunState state)
+      throws IOException {
+    // Note: the parent entity need not actually exist
+    final Key indexEntryKey = activeWorkflowInstanceIndexShardEntryKeyShifted(tx.getDatastore().newKeyFactory(), instance);
+    final Entity indexEntry = Entity.newBuilder(indexEntryKey).build();
+    tx.add(indexEntry);
+    tx.add(runStateToEntity(tx.getDatastore().newKeyFactory(), instance, state));
+    return instance;
+  }
+
   @Override
   public WorkflowInstance updateActiveState(WorkflowInstance instance, RunState state)
       throws IOException {
@@ -269,7 +287,19 @@ public class DatastoreStorageTransaction implements StorageTransaction {
 
   @Override
   public WorkflowInstance deleteActiveState(WorkflowInstance instance) throws IOException {
-    tx.delete(activeWorkflowInstanceIndexShardEntryKey(tx.getDatastore().newKeyFactory(), instance));
+    final Key indexShardEntryKey = activeWorkflowInstanceIndexShardEntryKey(tx.getDatastore().newKeyFactory(), instance);
+    tx.delete(indexShardEntryKey);
+
+    final String name = indexShardEntryKey.getParent().getName();
+    if (isBrokenShard(name)) {
+      LOG.debug("workflow instance {} is mapped to shard {}, so deleting from shifted shard as well",
+          instance.toKey(), name);
+
+      final Key indexShardEntryKeyShifted = activeWorkflowInstanceIndexShardEntryKeyShifted(
+          tx.getDatastore().newKeyFactory(), instance);
+      tx.delete(indexShardEntryKeyShifted);
+    }
+
     tx.delete(activeWorkflowInstanceKey(tx.getDatastore().newKeyFactory(), instance));
     return instance;
   }

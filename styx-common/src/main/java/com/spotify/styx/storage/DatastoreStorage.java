@@ -555,13 +555,25 @@ public class DatastoreStorage implements Closeable {
 
   private static String activeWorkflowInstanceIndexShardName(String workflowInstanceKey) {
     final long hash = Hashing.murmur3_32().hashString(workflowInstanceKey, StandardCharsets.UTF_8).asInt();
+    final long index = Long.remainderUnsigned(hash, ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS);
+    return activeWorkflowInstanceIndexShardName(index);
+  }
+
+  private static String activeWorkflowInstanceIndexShardNameShifted(String workflowInstanceKey) {
+    final long hash = Hashing.murmur3_32().hashString(workflowInstanceKey, StandardCharsets.UTF_8).asInt();
     long index = Long.remainderUnsigned(hash, ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS);
-    // fixme: rollback this crap
-    if (index == 1 || index == 108) {
-      LOG.debug("shifted to next shard for workflow instance {}", workflowInstanceKey);
+    if (isBrokenShard(index)) {
       index++;
     }
     return activeWorkflowInstanceIndexShardName(index);
+  }
+
+  private static boolean isBrokenShard(long index) {
+    return index == 1 || index == 108;
+  }
+
+  static boolean isBrokenShard(String name) {
+    return "shard-1".equals(name) || "shard-108".equals(name);
   }
 
   private static String activeWorkflowInstanceIndexShardName(long index) {
@@ -573,10 +585,23 @@ public class DatastoreStorage implements Closeable {
     return activeWorkflowInstanceIndexShardEntryKey(keyFactory, workflowInstanceKey);
   }
 
+  static Key activeWorkflowInstanceIndexShardEntryKeyShifted(KeyFactory keyFactory, WorkflowInstance workflowInstance) {
+    final String workflowInstanceKey = workflowInstance.toKey();
+    return activeWorkflowInstanceIndexShardEntryKeyShifted(keyFactory, workflowInstanceKey);
+  }
+
   private static Key activeWorkflowInstanceIndexShardEntryKey(KeyFactory keyFactory, String workflowInstanceKey) {
     return keyFactory.setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
         .addAncestor(PathElement.of(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD,
             activeWorkflowInstanceIndexShardName(workflowInstanceKey)))
+        .newKey(workflowInstanceKey);
+  }
+
+  private static Key activeWorkflowInstanceIndexShardEntryKeyShifted(KeyFactory keyFactory,
+                                                                     String workflowInstanceKey) {
+    return keyFactory.setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
+        .addAncestor(PathElement.of(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD,
+            activeWorkflowInstanceIndexShardNameShifted(workflowInstanceKey)))
         .newKey(workflowInstanceKey);
   }
 

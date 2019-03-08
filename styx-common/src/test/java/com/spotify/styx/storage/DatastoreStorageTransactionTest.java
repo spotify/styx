@@ -43,6 +43,7 @@ import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
@@ -331,6 +332,19 @@ public class DatastoreStorageTransactionTest {
     tx.commit();
 
     assertThat(storage.readActiveState(WORKFLOW_INSTANCE), is(Optional.empty()));
+  }
+
+  @Test
+  public void shouldDeleteActiveStateIfIndexKeyWasShifted() throws Exception {
+    WorkflowInstance workflowInstance = WorkflowInstance.create(WorkflowId.create("songs", "Song"), "2019-03-07");
+    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx.writeActiveStateShifted(workflowInstance, RUN_STATE1);
+    tx.commit();
+    tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx.deleteActiveState(workflowInstance);
+    tx.commit();
+
+    assertThat(storage.readActiveState(workflowInstance), is(Optional.empty()));
   }
 
   @Test
