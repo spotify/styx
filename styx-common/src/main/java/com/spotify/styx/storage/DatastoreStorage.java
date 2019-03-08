@@ -399,7 +399,7 @@ public class DatastoreStorage implements Closeable {
    * Strongly consistently read all active states
    */
   Tuple2<Predicate<WorkflowInstance>, Map<WorkflowInstance, RunState>> readActiveStatesPartial() {
-    // Strongly read active state keys from index shards in parallel
+    // Read all index shards in parallel
     final Map<String, CompletableFuture<List<Entity>>> shardFutures =
         activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
             .collect(toMap(Key::getName, key -> asyncIO(() -> datastore.query(Query.newEntityQueryBuilder()
@@ -407,14 +407,19 @@ public class DatastoreStorage implements Closeable {
                 .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
                 .build()))));
 
+    // Gather the index shard read results
     final Map<String, Try<List<Entity>>> shardResults = gatherIO(shardFutures, 60, TimeUnit.SECONDS);
 
-    final List<Entity> values = shardResults.values().stream()
+    // List workflow instance keys from successfully read shards
+    final List<Key> keys = shardResults.values().stream()
         .filter(Try::isSuccess)
         .map(Try::get)
         .flatMap(List::stream)
+        .map(entity -> entity.getKey().getName())
+        .map(name -> activeWorkflowInstanceKey(datastore.newKeyFactory(), name))
         .collect(toList());
 
+    // List "unavailable" shards (shard reads that failed)
     final Set<String> unavailableShards = shardResults.entrySet().stream()
         .filter(e -> e.getValue().isFailure())
         .peek(e -> LOG.warn("Failed datastore read for {}: {}",
@@ -422,12 +427,7 @@ public class DatastoreStorage implements Closeable {
         .map(Map.Entry::getKey)
         .collect(toSet());
 
-    final List<Key> keys = values.stream()
-        .map(entity -> entity.getKey().getName())
-        .map(name -> activeWorkflowInstanceKey(datastore.newKeyFactory(), name))
-        .collect(toList());
-
-    // Strongly consistently read values for the above keys in parallel
+    // Read workflow instances in batches, in parallel
     final List<List<Key>> batches = Lists.partition(keys, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ);
     final Map<Integer, CompletableFuture<List<RunState>>> batchFutures = new HashMap<>();
     for (int i = 0; i < batches.size(); i++) {
@@ -435,12 +435,16 @@ public class DatastoreStorage implements Closeable {
       batchFutures.put(i, asyncIO(() -> readRunStateBatch(batch)));
     }
 
+    // Gather workflow instance read results
     final Map<Integer, Try<List<RunState>>> batchResults = gatherIO(batchFutures, 60, TimeUnit.SECONDS);
+
+    // List successfully read instances
     final Map<WorkflowInstance, RunState> activeStates = batchResults.values().stream()
         .filter(Try::isSuccess)
         .flatMap(t -> t.get().stream())
         .collect(toMap(RunState::workflowInstance, r -> r));
 
+    // List "unavailable" instances (instance reads that failed)
     final Set<WorkflowInstance> unavailableInstances = batchResults.entrySet().stream()
         .filter(e -> e.getValue().isFailure())
         .peek(e -> LOG.warn("Failed datastore read for {}: {}",
@@ -451,8 +455,11 @@ public class DatastoreStorage implements Closeable {
         .map(WorkflowInstance::parseKey)
         .collect(toSet());
 
+    // Construct a predicate that can be used to detect if an workflow instance is unavailable and should be ignored
     final Predicate<WorkflowInstance> unavailableInstance = wfi ->
+        // Did the workflow instance read fail?
         unavailableInstances.contains(wfi) ||
+        // Did we fail to read the shard of the workflow instance?
         unavailableShards.contains(activeWorkflowInstanceIndexShardName(wfi.toKey()));
 
     return Tuple.of(unavailableInstance, activeStates);
