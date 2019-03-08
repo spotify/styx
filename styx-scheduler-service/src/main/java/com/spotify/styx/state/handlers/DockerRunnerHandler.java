@@ -87,6 +87,7 @@ public class DockerRunnerHandler implements OutputHandler {
           return;
         }
 
+        // Emit `submitted` _after_ starting execution to ensure that we retry in case of failure.
         final Event submitted = Event.submitted(state.workflowInstance(), runSpec.executionId());
         try {
           stateManager.receive(submitted, state.counter());
