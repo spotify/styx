@@ -436,10 +436,9 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void readActiveStatesShouldPropagateIOException() throws Exception {
+  public void readActiveStatesShouldNotPropagateIOException() throws Exception {
     final IOException cause = new IOException("foobar");
     doThrow(cause).when(datastore).query(any());
-    exception.expect(is(cause));
     storage.readActiveStates();
   }
 
