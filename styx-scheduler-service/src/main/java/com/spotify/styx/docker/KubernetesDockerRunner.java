@@ -53,6 +53,7 @@ import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
@@ -156,6 +157,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
   private final KubernetesClient client;
   private final StateManager stateManager;
+  private final Storage storage;
   private final Stats stats;
   private final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
   private final Debug debug;
@@ -171,7 +173,7 @@ class KubernetesDockerRunner implements DockerRunner {
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
                          Debug debug, String styxEnvironment,
                          int pollPodsIntervalSeconds, int podDeletionDelaySeconds,
-                         Time time, ScheduledExecutorService executor) {
+                         Time time, ScheduledExecutorService executor, Storage storage) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client);
     this.stats = Objects.requireNonNull(stats);
@@ -182,16 +184,17 @@ class KubernetesDockerRunner implements DockerRunner {
     this.podDeletionDelaySeconds = podDeletionDelaySeconds;
     this.time = Objects.requireNonNull(time);
     this.executor = register(closer, Objects.requireNonNull(executor), "kubernetes-poll");
+    this.storage = Objects.requireNonNull(storage);
     this.eventExecutor = currentContextExecutorService(
         register(closer, new ForkJoinPool(K8S_EVENT_PROCESSING_THREADS), "kubernetes-event"));
   }
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
-                         Debug debug, String styxEnvironment) {
+                         Debug debug, String styxEnvironment, Storage storage) {
     this(client, stateManager, stats, serviceAccountSecretManager, debug, styxEnvironment,
         DEFAULT_POLL_PODS_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_TIME,
-        Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY));
+        Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY), storage);
   }
 
   @Override
@@ -532,8 +535,9 @@ class KubernetesDockerRunner implements DockerRunner {
     watch = client.pods().watch(watcher);
   }
 
-  private void examineRunningWFISandAssociatedPods(Map<WorkflowInstance, RunState> activeStates,
-                                                   PodList podList) {
+  private void examineRunningWFISandAssociatedPods(
+      Map<WorkflowInstance, RunState> activeStates,
+      PodList podList) {
 
     final Map<WorkflowInstance, RunState> runningWorkflowInstances = Maps.filterValues(activeStates, runState ->
         runState.state().equals(RUNNING) && runState.data().executionId().isPresent());
@@ -586,8 +590,9 @@ class KubernetesDockerRunner implements DockerRunner {
   synchronized void tryPollPods() {
     // Fetch pods _before_ fetching all active states
     final PodList list = client.pods().list();
-    final Map<WorkflowInstance, RunState> activeStates = stateManager.getActiveStates();
-    examineRunningWFISandAssociatedPods(activeStates, list);
+    var activeStates = storage.readActiveStatesPartial();
+    var unavailableWorkflowInstance = activeStates._1;
+    examineRunningWFISandAssociatedPods(activeStates._2, list);
 
     for (Pod pod : list.getItems()) {
       logEvent(Watcher.Action.MODIFIED, pod, list.getMetadata().getResourceVersion(), true);
@@ -596,7 +601,11 @@ class KubernetesDockerRunner implements DockerRunner {
         continue;
       }
 
-      final RunState runState = activeStates.get(workflowInstance.get());
+      if (unavailableWorkflowInstance.test(workflowInstance.get())) {
+        LOG.debug("Ignoring unavailable workflow instance: {}", workflowInstance.get());
+        continue;
+      }
+      final RunState runState = activeStates._2.get(workflowInstance.get());
       if (runState != null && isPodRunState(pod, runState)) {
         emitPodEvents(pod, runState);
         cleanupWithRunState(workflowInstance.get(), pod, runState);

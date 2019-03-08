@@ -22,33 +22,25 @@ package com.spotify.styx.util;
 
 import static com.spotify.styx.util.FutureUtil.exceptionallyCompletedFuture;
 import static java.util.concurrent.CompletableFuture.completedFuture;
-import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.hasEntry;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeThat;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import javaslang.control.Try;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
-import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class FutureUtilTest {
-
-  @Mock private Future<String> future;
 
   @Rule public final ExpectedException exception = ExpectedException.none();
 
@@ -62,61 +54,26 @@ public class FutureUtilTest {
   }
 
   @Test
-  public void gatherIOShouldReturnValues() throws IOException {
-    final List<Future<String>> futures = List.of(completedFuture("foo"), completedFuture("bar"));
-    assertThat(FutureUtil.gatherIO(futures, 30, TimeUnit.SECONDS), contains("foo", "bar"));
+  public void gatherIOShouldReturnValues() {
+    var futures = Map.of(
+        "foo", completedFuture("foo"),
+        "bar", completedFuture("bar"));
+    var results = FutureUtil.gatherIO(futures, 30, TimeUnit.SECONDS);
+    assertThat(results, is(Map.of(
+        "foo", Try.success("foo"),
+        "bar", Try.success("bar"))));
   }
 
   @Test
-  public void gatherIOShouldPropagateIOException() throws IOException {
-    final IOException cause = new IOException("foo");
-    final List<Future<String>> futures = List.of(completedFuture("foo"), exceptionallyCompletedFuture(cause));
-    exception.expect(is(cause));
-    FutureUtil.gatherIO(futures, 30, TimeUnit.SECONDS);
-  }
-
-  @Test
-  public void gatherIOShouldPropagateException() throws IOException {
-    final Exception cause = new Exception("foo");
-    final List<Future<String>> futures = List.of(completedFuture("foo"), exceptionallyCompletedFuture(cause));
-    exception.expect(RuntimeException.class);
-    exception.expectCause(is(cause));
-    FutureUtil.gatherIO(futures, 30, TimeUnit.SECONDS);
-  }
-
-  @Test
-  public void gatherIOShouldPropagateTimeoutAsIOException()
-      throws IOException, InterruptedException, ExecutionException, TimeoutException {
-    final TimeoutException cause = new TimeoutException();
-    when(future.get(anyLong(), any())).thenThrow(cause);
-    final List<Future<String>> futures = List.of(completedFuture("foo"), future);
-    exception.expect(IOException.class);
-    exception.expectCause(is(cause));
-    FutureUtil.gatherIO(futures, 30, TimeUnit.SECONDS);
-  }
-
-  @Test
-  public void gatherShouldPropagateInterruptedAsIOException()
-      throws InterruptedException, ExecutionException, TimeoutException {
-    assumeThat("should be Java 9+", isJava9OrGreater(), is(true));
-    final InterruptedException cause = new InterruptedException();
-    when(future.get(anyLong(), any())).thenThrow(cause);
-    final List<Future<String>> futures = List.of(completedFuture("foo"), future);
-    try {
-      FutureUtil.gatherIO(futures, 30, TimeUnit.SECONDS);
-      fail();
-    } catch (IOException e) {
-      assertThat(e.getCause(), is(cause));
-    }
-    assertThat(Thread.currentThread().isInterrupted(), is(true));
-  }
-
-  private static boolean isJava9OrGreater() {
-    try {
-      Class.forName("java.lang.ProcessHandle");
-      return true;
-    } catch (ClassNotFoundException e) {
-      return false;
-    }
+  public void gatherIOShouldPropagateException() {
+    var cause = new Exception("foo");
+    var futures = Map.of(
+        "foo", completedFuture("foo"),
+        "bar", exceptionallyCompletedFuture(cause, String.class));
+    var results = FutureUtil.gatherIO(futures, 30, TimeUnit.SECONDS);
+    assertThat(results.size(), is(2));
+    assertThat(results, hasEntry("foo", Try.success("foo")));
+    assertThat(results.get("bar").getCause(), instanceOf(ExecutionException.class));
+    assertThat(results.get("bar").getCause().getCause(), is(cause));
   }
 }

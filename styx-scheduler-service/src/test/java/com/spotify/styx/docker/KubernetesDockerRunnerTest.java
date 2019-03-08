@@ -57,6 +57,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.Time;
@@ -97,6 +98,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import javaslang.Tuple;
 import javaslang.control.Try;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -171,6 +173,7 @@ public class KubernetesDockerRunnerTest {
   @Mock private Debug debug;
   @Mock private Time time;
   @Mock private StateManager stateManager;
+  @Mock private Storage storage;
 
   @Captor private ArgumentCaptor<Watcher<Pod>> watchCaptor;
   @Captor private ArgumentCaptor<Pod> podCaptor;
@@ -211,7 +214,7 @@ public class KubernetesDockerRunnerTest {
     when(time.get()).thenReturn(FIXED_INSTANT);
 
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT, POLL_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time, executor);
+        debug, STYX_ENVIRONMENT, POLL_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time, executor, storage);
     kdr.init();
 
     podWatcher = watchCaptor.getValue();
@@ -225,7 +228,7 @@ public class KubernetesDockerRunnerTest {
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
     RunState runState = RunState.create(WORKFLOW_INSTANCE, State.SUBMITTED, stateData);
 
-    when(stateManager.getActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
+    when(storage.readActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of(WORKFLOW_INSTANCE, runState)));
     when(stateManager.getActiveState(WORKFLOW_INSTANCE)).thenReturn(Optional.of(runState));
   }
 
@@ -397,7 +400,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
 
-    when(stateManager.getActiveStates()).thenReturn(Collections.emptyMap());
+    when(storage.readActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of()));
 
     kdr.tryPollPods();
 
@@ -416,7 +419,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
 
-    when(stateManager.getActiveStates()).thenReturn(Collections.emptyMap());
+    when(storage.readActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of()));
 
     kdr.tryPollPods();
 
@@ -806,7 +809,7 @@ public class KubernetesDockerRunnerTest {
 
     // Start a new runner
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT, POLL_INTERVAL_SECONDS, 0, time, executor);
+        debug, STYX_ENVIRONMENT, POLL_INTERVAL_SECONDS, 0, time, executor, storage);
     kdr.init();
 
     // Make the runner poll states for all pods

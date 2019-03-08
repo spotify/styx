@@ -391,10 +391,14 @@ public class DatastoreStorage implements Closeable {
     return workflows;
   }
 
+  Map<WorkflowInstance, RunState> readActiveStates() {
+    return readActiveStatesPartial()._2;
+  }
+
   /**
    * Strongly consistently read all active states
    */
-  Tuple2<Predicate<WorkflowInstance>, Map<WorkflowInstance, RunState>> readActiveStates() throws IOException {
+  Tuple2<Predicate<WorkflowInstance>, Map<WorkflowInstance, RunState>> readActiveStatesPartial() {
     // Strongly read active state keys from index shards in parallel
     final Map<String, CompletableFuture<List<Entity>>> shardFutures =
         activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
