@@ -98,6 +98,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.logging.Level;
 import junitparams.JUnitParamsRunner;
@@ -207,6 +209,8 @@ public class DatastoreStorageTest {
   @Mock TransactionFunction<String, FooException> transactionFunction;
   @Mock Function<CheckedDatastoreTransaction, DatastoreStorageTransaction> storageTransactionFactory;
 
+  private ExecutorService executor = Executors.newSingleThreadExecutor();
+
   @BeforeClass
   public static void setUpClass() throws Exception {
     final java.util.logging.Logger datastoreEmulatorLogger =
@@ -233,7 +237,7 @@ public class DatastoreStorageTest {
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
     datastore = spy(new CheckedDatastore(helper.getOptions().getService()));
-    storage = new DatastoreStorage(datastore, Duration.ZERO);
+    storage = new DatastoreStorage(datastore, Duration.ZERO, DatastoreStorageTransaction::new, executor);
   }
 
   @After
@@ -441,6 +445,19 @@ public class DatastoreStorageTest {
     final IOException cause = new IOException("foobar");
     doThrow(cause).when(datastore).query(any());
     assertThat(storage.readActiveStates(), is(notNullValue()));
+  }
+
+  @Test
+  public void readActiveStatesPartialShouldIndicateUnavailableWorkflowInstance() throws Exception {
+    final IOException cause = new IOException("foobar");
+    doThrow(cause) // Fail first shard read
+        .doReturn(List.of()) // Succeed all other reads
+        .when(datastore).query(any());
+    var results = storage.readActiveStatesPartial();
+    // 80 maps to first shard
+    final WorkflowInstance unavailableInstance = WorkflowInstance.create(WorkflowId.create("foo", "bar"), "80");
+    assertThat(results._1.test(unavailableInstance), is(true));
+    assertThat(results._1.test(WORKFLOW_INSTANCE1), is(false));
   }
 
   @Test
@@ -731,7 +748,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndCommit() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, executor);
     final CheckedDatastoreTransaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
@@ -748,7 +765,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnFailure() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, executor);
     final CheckedDatastoreTransaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
@@ -772,7 +789,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnPreCommitConflict() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, executor);
     final CheckedDatastoreTransaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
@@ -794,7 +811,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldCallFunctionAndRollbackOnCommitConflict() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, executor);
     final CheckedDatastoreTransaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
@@ -817,7 +834,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionShouldThrowIfRollbackFailsAfterConflict() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, executor);
     final CheckedDatastoreTransaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
@@ -843,7 +860,7 @@ public class DatastoreStorageTest {
   @Test
   public void runInTransactionShouldThrowIfDatastoreNewTransactionFails() throws Exception {
     CheckedDatastore datastore = mock(CheckedDatastore.class);
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory);
+    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, executor);
     when(datastore.newTransaction()).thenThrow(new DatastoreIOException(new DatastoreException(1, "", "")));
 
     when(transactionFunction.apply(any())).thenReturn("");

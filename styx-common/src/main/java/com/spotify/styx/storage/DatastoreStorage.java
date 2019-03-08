@@ -98,6 +98,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -193,17 +194,17 @@ public class DatastoreStorage implements Closeable {
   private final Executor executor;
 
   DatastoreStorage(CheckedDatastore datastore, Duration retryBaseDelay) {
-    this(datastore, retryBaseDelay, DatastoreStorageTransaction::new);
+    this(datastore, retryBaseDelay, DatastoreStorageTransaction::new, new ForkJoinPool(REQUEST_CONCURRENCY));
   }
 
   @VisibleForTesting
   DatastoreStorage(CheckedDatastore datastore, Duration retryBaseDelay,
-      Function<CheckedDatastoreTransaction, DatastoreStorageTransaction> storageTransactionFactory) {
+      Function<CheckedDatastoreTransaction, DatastoreStorageTransaction> storageTransactionFactory,
+                   ExecutorService executor) {
     this.datastore = Objects.requireNonNull(datastore);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
     this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
-    final ForkJoinPool forkJoinPool = register(closer, new ForkJoinPool(REQUEST_CONCURRENCY), "datastore-storage");
-    this.executor = MDCUtil.withMDC(Context.currentContextExecutor(forkJoinPool));
+    this.executor = MDCUtil.withMDC(Context.currentContextExecutor(register(closer, executor, "datastore-storage")));
   }
 
   @Override
