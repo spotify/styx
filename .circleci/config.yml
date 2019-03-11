@@ -13,6 +13,7 @@ jobs:
           key: v3-deps-{{ checksum "pom.xml" }}
           paths:
             - ~/.m2
+      - run: echo "$GCLOUD_SERVICE_KEY" > credentials.json
       # Run tests without static analysis
       - run:
           name: Tests
@@ -21,6 +22,7 @@ jobs:
             JAVA: java -Xmx512m -Xms512m
             # Maven heap size
             MAVEN_OPTS: -Xmx256m -Xms256m
+            GOOGLE_APPLICATION_CREDENTIALS: credentials.json
           command: mvn -B verify -P disable-static-analysis
       - run: bash <(curl -s https://codecov.io/bash) -f '!**/jacoco-aggregate/**'
       - run: |
