@@ -39,7 +39,6 @@ import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.AlreadyInitializedException;
-import com.spotify.styx.util.FutureUtil;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
@@ -108,8 +107,7 @@ public class TriggerManagerTest {
   public void shouldNotUpdateNextNaturalTriggerIfTriggerExecutionFails() throws Exception {
     setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"));
     when(triggerListener.event(any(), any(), any(), any()))
-        .thenReturn(FutureUtil.exceptionallyCompletedFuture(
-            new RuntimeException("trigger execution failure!")));
+        .thenReturn(CompletableFuture.failedFuture(new RuntimeException("trigger execution failure!")));
     triggerManager.tick();
     verify(triggerListener).event(WORKFLOW_DAILY, NATURAL_TRIGGER, parse("2016-10-01T00:00:00Z"),
         TriggerParameters.zero());

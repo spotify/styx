@@ -20,7 +20,6 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.util.FutureUtil.exceptionallyCompletedFuture;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 
 import com.spotify.styx.model.TriggerParameters;
@@ -66,7 +65,7 @@ final class StateInitializingTrigger implements TriggerListener {
     } catch (IsClosedException isClosedException) {
       LOG.warn("State receiver is closed when processing workflow {} for trigger {} at {}",
                workflow, trigger, instant, isClosedException);
-      return exceptionallyCompletedFuture(isClosedException);
+      return CompletableFuture.failedFuture(isClosedException);
     }
   }
 }
