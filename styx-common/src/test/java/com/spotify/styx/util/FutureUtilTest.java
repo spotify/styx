@@ -21,17 +21,27 @@
 package com.spotify.styx.util;
 
 import static com.spotify.styx.util.FutureUtil.exceptionallyCompletedFuture;
+import static com.spotify.styx.util.FutureUtil.gatherIO;
 import static java.util.concurrent.CompletableFuture.completedFuture;
+import static java.util.concurrent.CompletableFuture.delayedExecutor;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.Collectors.toMap;
+import static org.hamcrest.Matchers.both;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.lessThan;
 import static org.junit.Assert.assertThat;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executors;
+import java.util.stream.IntStream;
 import javaslang.control.Try;
 import org.junit.Rule;
 import org.junit.Test;
@@ -55,10 +65,11 @@ public class FutureUtilTest {
 
   @Test
   public void gatherIOShouldReturnValues() {
+    var timeout = CompletableFuture.runAsync(() -> {}, delayedExecutor(30, SECONDS));
     var futures = Map.of(
         "foo", completedFuture("foo"),
         "bar", completedFuture("bar"));
-    var results = FutureUtil.gatherIO(futures, 30, TimeUnit.SECONDS);
+    var results = FutureUtil.gatherIO(futures, timeout);
     assertThat(results, is(Map.of(
         "foo", Try.success("foo"),
         "bar", Try.success("bar"))));
@@ -66,14 +77,48 @@ public class FutureUtilTest {
 
   @Test
   public void gatherIOShouldPropagateException() {
+    var timeout = CompletableFuture.runAsync(() -> {}, delayedExecutor(30, SECONDS));
     var cause = new Exception("foo");
     var futures = Map.of(
         "foo", completedFuture("foo"),
         "bar", CompletableFuture.<String>failedFuture(cause));
-    var results = FutureUtil.gatherIO(futures, 30, TimeUnit.SECONDS);
+    var results = FutureUtil.gatherIO(futures, timeout);
     assertThat(results.size(), is(2));
     assertThat(results, hasEntry("foo", Try.success("foo")));
     assertThat(results.get("bar").getCause(), instanceOf(ExecutionException.class));
     assertThat(results.get("bar").getCause().getCause(), is(cause));
+  }
+
+  @Test
+  public void gatherIOShouldApplyTimeouts() {
+    var executor = Executors.newSingleThreadExecutor();
+    // Total execution time for these futures running sequentially is 10 seconds
+    var futures = IntStream.range(0, 1000).boxed()
+        .collect(toMap(
+            i -> i,
+            i -> CompletableFuture.supplyAsync(() -> {
+              sleepMillis(10);
+              return i;
+            }, executor)));
+    var start = System.nanoTime();
+    // Give enough time for ~ 20 futures to complete
+    var timeout = CompletableFuture.runAsync(() -> {}, delayedExecutor(200, MILLISECONDS));
+    var results = gatherIO(futures, timeout);
+    var end = System.nanoTime();
+    var elapsed = Duration.ofNanos(end - start);
+    // Verify that the timeout of 200 ms was properly applied in a non-blocking fashion by checking that the execution
+    // duration is well below the expected total of 10 seconds.
+    assertThat(elapsed.getSeconds(), is(lessThan(1L)));
+    // Verify that the expected number of futures succeeded
+    var successCount = results.values().stream().filter(Try::isSuccess).count();
+    assertThat(successCount, is(both(greaterThan(10L)).and(lessThan(30L))));
+  }
+
+  private void sleepMillis(long millis) {
+    try {
+      Thread.sleep(millis);
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
   }
 }

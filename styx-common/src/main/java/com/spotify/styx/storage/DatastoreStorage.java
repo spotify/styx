@@ -31,6 +31,8 @@ import static com.spotify.styx.util.ShardedCounter.PROPERTY_COUNTER_ID;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_LIMIT;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_INDEX;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_VALUE;
+import static java.util.concurrent.CompletableFuture.delayedExecutor;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
@@ -100,7 +102,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
@@ -400,6 +401,8 @@ public class DatastoreStorage implements Closeable {
    * Strongly consistently read all active states
    */
   Tuple2<Predicate<WorkflowInstance>, Map<WorkflowInstance, RunState>> readActiveStatesPartial() {
+    var timeout = CompletableFuture.runAsync(() -> {}, delayedExecutor(30, SECONDS));
+
     // Read all index shards in parallel
     final Map<String, CompletableFuture<List<Entity>>> shardFutures =
         activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
@@ -409,7 +412,7 @@ public class DatastoreStorage implements Closeable {
                 .build()))));
 
     // Gather the index shard read results
-    final Map<String, Try<List<Entity>>> shardResults = gatherIO(shardFutures, 30, TimeUnit.SECONDS);
+    final Map<String, Try<List<Entity>>> shardResults = gatherIO(shardFutures, timeout);
 
     // List workflow instance keys from successfully read shards
     final List<Key> keys = shardResults.values().stream()
@@ -437,7 +440,7 @@ public class DatastoreStorage implements Closeable {
     }
 
     // Gather workflow instance read results
-    final Map<Integer, Try<List<RunState>>> batchResults = gatherIO(batchFutures, 30, TimeUnit.SECONDS);
+    final Map<Integer, Try<List<RunState>>> batchResults = gatherIO(batchFutures, timeout);
 
     // List successfully read instances
     final Map<WorkflowInstance, RunState> activeStates = batchResults.values().stream()
@@ -462,6 +465,8 @@ public class DatastoreStorage implements Closeable {
         unavailableInstances.contains(wfi) ||
         // Did we fail to read the shard of the workflow instance?
         unavailableShards.contains(activeWorkflowInstanceIndexShardName(wfi.toKey()));
+
+    timeout.cancel(true);
 
     return Tuple.of(unavailableInstance, activeStates);
   }
