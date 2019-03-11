@@ -139,11 +139,10 @@ public class QueuedStateManager implements StateManager {
           try {
             var state = storage.readActiveState(instance);
             state.ifPresent(outputHandler::transitionInto);
-            return state;
-          } catch (IOException e) {
+          } catch (Exception e) {
             LOG.error("Error ticking instance: {}", instance, e);
-            throw new RuntimeException(e);
           }
+          return null;
         }, instance, eventProcessingExecutor))
         .collect(toList());
 
