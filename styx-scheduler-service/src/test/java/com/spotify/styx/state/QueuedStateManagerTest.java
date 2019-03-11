@@ -155,9 +155,9 @@ public class QueuedStateManagerTest {
     var runState1 = RunState.create(instance1, State.SUBMITTING, StateData.zero(), NOW.minusMillis(2), 17);
     var runState2 = RunState.create(instance2, State.TERMINATED, StateData.zero(), NOW.minusMillis(1), 4711);
 
-    when(storage.readActiveStates()).thenReturn(Map.of(
-        instance1, runState1,
-        instance2, runState2));
+    when(storage.listActiveInstances()).thenReturn(Set.of(instance1, instance2));
+    when(storage.readActiveState(instance1)).thenReturn(Optional.of(runState1));
+    when(storage.readActiveState(instance2)).thenReturn(Optional.of(runState2));
 
     stateManager.tick();
 
@@ -172,9 +172,9 @@ public class QueuedStateManagerTest {
     var runState1 = RunState.create(instance1, State.SUBMITTING, StateData.zero(), NOW.minusMillis(2), 17);
     var runState2 = RunState.create(instance2, State.TERMINATED, StateData.zero(), NOW.minusMillis(1), 4711);
 
-    when(storage.readActiveStates()).thenReturn(Map.of(
-        instance1, runState1,
-        instance2, runState2));
+    when(storage.listActiveInstances()).thenReturn(Set.of(instance1, instance2));
+    when(storage.readActiveState(instance1)).thenReturn(Optional.of(runState1));
+    when(storage.readActiveState(instance2)).thenReturn(Optional.of(runState2));
 
     doThrow(new RuntimeException("fail!")).when(outputHandler).transitionInto(runState1);
 
