@@ -22,13 +22,9 @@ package com.spotify.styx;
 
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
-import static com.spotify.styx.state.StateUtil.getActiveInstanceStates;
-import static com.spotify.styx.state.StateUtil.getResourceUsage;
-import static com.spotify.styx.state.StateUtil.getTimedOutInstances;
+import static com.spotify.styx.state.StateUtil.hasTimedOut;
 import static com.spotify.styx.state.StateUtil.workflowResources;
 import static com.spotify.styx.storage.Storage.GLOBAL_RESOURCE_ID;
-import static java.util.Collections.emptySet;
-import static java.util.Comparator.comparingLong;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
@@ -37,18 +33,21 @@ import static java.util.stream.Collectors.toSet;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.AtomicLongMap;
 import com.google.common.util.concurrent.RateLimiter;
+import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.WorkflowExecutionGate.ExecutionBlocker;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
+import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
-import com.spotify.styx.state.InstanceState;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.StateUtil;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.ShardedCounter;
@@ -61,6 +60,8 @@ import io.opencensus.trace.samplers.Samplers;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -154,49 +155,17 @@ public class Scheduler {
             resources.put(GLOBAL_RESOURCE_ID,
                 Resource.create(GLOBAL_RESOURCE_ID, concurrency)));
 
-    final Map<WorkflowInstance, RunState> activeStatesMap = stateManager.getActiveStates();
-    final List<InstanceState> activeStates = getActiveInstanceStates(activeStatesMap);
-
-    final Map<WorkflowId, Workflow> workflows = getWorkflows(activeStates);
-
-    final Set<WorkflowInstance> timedOutInstances = getTimedOutInstances(workflows, activeStates, time.get(), ttls);
-
-    final Map<WorkflowId, Set<String>> workflowResourceReferences =
-        activeStates.parallelStream()
-            .map(InstanceState::workflowInstance)
-            .map(WorkflowInstance::workflowId)
-            .distinct()
-            .collect(toMap(
-                workflowId -> workflowId,
-                workflowId -> workflowResources(globalConcurrency.isPresent(),
-                    Optional.ofNullable(workflows.get(workflowId)))));
+    var activeInstances = stateManager.listActiveInstances();
+    var workflows = new ConcurrentHashMap<WorkflowId, Optional<Workflow>>();
 
     // Note: not a strongly consistent number, so the graphed value can be imprecise or show
     // exceeded limit even if the real usage never exceeded the limit.
-    final Map<String, Long> currentResourceUsage =
-        getResourceUsage(globalConcurrency.isPresent(), activeStates, timedOutInstances,
-            resourceDecorator, workflows);
-    final AtomicLongMap<String> currentResourceDemand = AtomicLongMap.create();
+    var currentResourceUsage = AtomicLongMap.<String>create();
+    var currentResourceDemand = AtomicLongMap.<String>create();
 
-    // this reflects resource usage since last tick, so a couple of minutes delay
+    processInstances(config, resources, workflows, activeInstances, currentResourceUsage, currentResourceDemand);
+
     updateResourceStats(resources, currentResourceUsage);
-
-    final List<InstanceState> eligibleInstances =
-        activeStates.parallelStream()
-            .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
-            .filter(entry -> shouldExecute(entry.runState()))
-            .sorted(comparingLong(i -> i.runState().timestamp()))
-            .collect(toList());
-
-    final String message = String.format("Instances: active=%d, eligible=%d, timedOut=%d",
-        activeStates.size(), eligibleInstances.size(), timedOutInstances.size());
-    LOG.info(message);
-    tracer.getCurrentSpan().addAnnotation(message);
-
-    timedOutInstances.forEach(wfi -> this.sendTimeout(wfi, activeStatesMap.get(wfi)));
-
-    dequeueInstances(config, resources, workflowResourceReferences,
-        workflows, eligibleInstances, currentResourceDemand);
 
     currentResourceDemand.asMap().forEach(stats::recordResourceDemanded);
 
@@ -205,90 +174,97 @@ public class Scheduler {
   }
 
   private void updateResourceStats(Map<String, Resource> resources,
-                                   Map<String, Long> currentResourceUsage) {
+                                   AtomicLongMap<String> currentResourceUsage) {
     resources.values().forEach(r -> stats.recordResourceConfigured(r.id(), r.concurrency()));
-    currentResourceUsage.forEach(stats::recordResourceUsed);
-    Sets.difference(resources.keySet(), currentResourceUsage.keySet())
+    currentResourceUsage.asMap().forEach(stats::recordResourceUsed);
+    Sets.difference(resources.keySet(), currentResourceUsage.asMap().keySet())
         .forEach(r -> stats.recordResourceUsed(r, 0));
   }
 
-  private Map<WorkflowId, Workflow> getWorkflows(final List<InstanceState> activeStates) {
-    final Set<WorkflowId> workflowIds = activeStates.stream()
-        .map(activeState -> activeState.workflowInstance().workflowId())
-        .collect(toSet());
-    return storage.workflows(workflowIds);
-  }
-
-  private void dequeueInstances(
-      StyxConfig config,
-      Map<String, Resource> resources,
-      Map<WorkflowId, Set<String>> workflowResourceReferences,
-      Map<WorkflowId, Workflow> workflows,
-      List<InstanceState> eligibleInstances,
-      AtomicLongMap<String> currentResourceDemand) {
-
-    final ConcurrentMap<String, Boolean> resourceExhaustedCache = new ConcurrentHashMap<>();
-
-    final Map<WorkflowInstance, CompletableFuture<Void>> futures = eligibleInstances.stream()
-        .collect(toMap(
-            InstanceState::workflowInstance,
-            instanceState -> CompletableFuture.runAsync(() ->
-                dequeueInstance(config, resources, workflowResourceReferences,
-                    Optional.ofNullable(workflows.get(instanceState.workflowInstance().workflowId())),
-                    instanceState, resourceExhaustedCache, currentResourceDemand), executor)));
-
-    futures.forEach((instance, future) -> {
-      try {
-        future.get();
-      } catch (InterruptedException e) {
-        LOG.warn("Interrupted", e);
-        Thread.currentThread().interrupt();
-        throw new RuntimeException(e);
-      } catch (ExecutionException e) {
-        LOG.error("Failed to process instance for dequeue: " + instance, e);
-      }
-    });
-  }
-
-  private void dequeueInstance(StyxConfig config, Map<String, Resource> resources,
-                               Map<WorkflowId, Set<String>> workflowResourceReferences,
-                               Optional<Workflow> workflowOpt, InstanceState instanceState,
-                               ConcurrentMap<String, Boolean> resourceExhaustedCache,
-                               AtomicLongMap<String> currentResourceDemand) {
-    tracer.spanBuilder("dequeueInstance").startSpanAndRun(() ->
-        dequeueInstance0(config, resources, workflowResourceReferences, workflowOpt, instanceState,
-            resourceExhaustedCache, currentResourceDemand));
-  }
-
-  private void dequeueInstance0(final StyxConfig config, Map<String, Resource> resources,
-                                Map<WorkflowId, Set<String>> workflowResourceReferences,
-                                Optional<Workflow> workflowOpt,
-                                InstanceState instanceState,
-                                ConcurrentMap<String, Boolean> resourceExhaustedCache,
+  private void processInstances(StyxConfig config, Map<String, Resource> resources,
+                                ConcurrentHashMap<WorkflowId, Optional<Workflow>> workflows,
+                                Set<WorkflowInstance> activeInstances,
+                                AtomicLongMap<String> currentResourceUsage,
                                 AtomicLongMap<String> currentResourceDemand) {
 
-    LOG.debug("Evaluating instance for dequeue: {}", instanceState.workflowInstance());
+    var resourceExhaustedCache = new ConcurrentHashMap<String, Boolean>();
 
-    final Set<String> workflowResourceRefs =
-        workflowResourceReferences.getOrDefault(instanceState.workflowInstance().workflowId(), emptySet());
+    // Shuffle the instances in order to process them in random order and reduce contention with other schedulers etc
+    var shuffledInstances = new ArrayList<>(activeInstances);
+    Collections.shuffle(shuffledInstances);
 
-    final Set<String> instanceResourceRefs = workflowOpt
-            .map(workflow -> resourceDecorator.decorateResources(
-                instanceState.runState(), workflow.configuration(), workflowResourceRefs))
-            .orElse(workflowResourceRefs);
+    // Process instances in parallel
+    var futures = shuffledInstances.stream()
+        .map(instance -> CompletableFuture.runAsync(() ->
+            tracer.spanBuilder("processInstance").startSpanAndRun(() ->
+                processInstance(config, resources, workflows, instance, resourceExhaustedCache,
+                    currentResourceUsage, currentResourceDemand))))
+        .collect(toList());
 
-    final Set<String> unknownResources = instanceResourceRefs.stream()
+    // Wait for processing to complete
+    CompletableFutures.allAsList(futures).join();
+  }
+
+  private void processInstance(StyxConfig config, Map<String, Resource> resources,
+                               ConcurrentMap<WorkflowId, Optional<Workflow>> workflows, WorkflowInstance instance,
+                               ConcurrentMap<String, Boolean> resourceExhaustedCache,
+                               AtomicLongMap<String> currentResourceUsage,
+                               AtomicLongMap<String> currentResourceDemand) {
+
+    LOG.debug("Processing instance: {}", instance);
+
+    // Get the run state or exit if it does not exist
+    var runStateOpt = stateManager.getActiveState(instance);
+    if (runStateOpt.isEmpty()) {
+      return;
+    }
+    var runState = runStateOpt.orElseThrow();
+
+    // Get the workflow configuration
+    var workflowOpt = workflows.computeIfAbsent(instance.workflowId(), this::readWorkflow);
+    var workflowConfig = workflowOpt
+        .map(Workflow::configuration)
+        // Dummy placeholder
+        .orElse(WorkflowConfiguration
+            .builder()
+            .id(instance.workflowId().id())
+            .schedule(Schedule.parse(""))
+            .build());
+
+    // Check if the instance has timed out
+    if (hasTimedOut(workflowOpt, runState, time.get(), ttls.ttlOf(runState.state()))) {
+      sendTimeout(instance, runState);
+      return;
+    }
+
+    // Look up the resources that are used by this workflow
+    var workflowResourceRefs = workflowResources(config.globalConcurrency().isPresent(), workflowOpt);
+    var instanceResourceRefs = resourceDecorator.decorateResources(
+        runState, workflowConfig, workflowResourceRefs);
+
+    // Account current resource usage
+    if (StateUtil.isConsumingResources(runState.state())) {
+      instanceResourceRefs.forEach(currentResourceUsage::incrementAndGet);
+    }
+
+    // Exit if this instance is not eligible for dequeue
+    if (!shouldExecute(runState)) {
+      return;
+    }
+
+    LOG.debug("Evaluating instance for dequeue: {}", instance);
+
+    var unknownResources = instanceResourceRefs.stream()
         .filter(resourceRef -> !resources.containsKey(resourceRef))
         .collect(toSet());
 
     if (!unknownResources.isEmpty()) {
-      stateManager.receiveIgnoreClosed(
-          Event.runError(instanceState.workflowInstance(),
-              String.format("Referenced resources not found: %s", unknownResources)),
-          instanceState.runState().counter());
+      var error = Event.runError(instance, "Referenced resources not found: " + unknownResources);
+      stateManager.receiveIgnoreClosed(error, runState.counter());
       return;
     }
 
+    // Account resource demand by instances that are queued
     instanceResourceRefs.forEach(currentResourceDemand::incrementAndGet);
 
     // Check resource limits. This is racy and can give false positives but the transactional
@@ -299,45 +275,53 @@ public class Scheduler {
         .collect(toList());
     if (!depletedResources.isEmpty()) {
       LOG.debug("Resource limit reached for instance, not dequeueing: {}: exhausted resources={}",
-          instanceState.workflowInstance(), depletedResources);
-      MessageUtil.emitResourceLimitReachedMessage(stateManager, instanceState.runState(), depletedResources);
+          instance, depletedResources);
+      MessageUtil.emitResourceLimitReachedMessage(stateManager, runState, depletedResources);
       return;
     }
 
     // Check for execution blocker
-    if (config.executionGatingEnabled()) {
-      Optional<ExecutionBlocker> blocker = Optional.empty();
-      try {
-        blocker = gate.executionBlocker(instanceState.workflowInstance())
-            .toCompletableFuture().get(10, TimeUnit.SECONDS);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new RuntimeException(e);
-      } catch (ExecutionException | TimeoutException e) {
-        LOG.warn("Failed to check execution blocker for {}, assuming there is no blocker",
-            instanceState.workflowInstance(), e);
-      }
-
-      if (blocker.isPresent()) {
-        stateManager.receiveIgnoreClosed(Event.retryAfter(instanceState.workflowInstance(),
-            blocker.get().delay().toMillis()),
-            instanceState.runState().counter());
-        LOG.debug("Dequeue rescheduled: {}: {}", instanceState.workflowInstance(), blocker.get());
-        return;
-      }
-    }
-
-    double sleepingTimeSeconds = dequeueRateLimiter.acquire();
-    if (sleepingTimeSeconds > 0.0001) {
-      final double sleepingTimeMillis = sleepingTimeSeconds * 1000;
-      final String message = "Dequeue rate limited and slept for " + sleepingTimeMillis + " ms";
-      LOG.debug(message, sleepingTimeMillis);
-      tracer.getCurrentSpan().addAnnotation(message);
+    if (executionIsBlocked(config, instance, runState)) {
+      return;
     }
 
     // Racy: some resources may have been removed (become unknown) by now; in that case the
     // counters code during dequeue will treat them as unlimited...
-    sendDequeue(instanceState, instanceResourceRefs);
+    sendDequeue(instance, runState, instanceResourceRefs);
+  }
+
+  private boolean executionIsBlocked(StyxConfig config, WorkflowInstance instance, RunState runState) {
+    if (!config.executionGatingEnabled()) {
+      return false;
+    }
+
+    Optional<ExecutionBlocker> blocker = Optional.empty();
+    try {
+      blocker = gate.executionBlocker(instance)
+          .toCompletableFuture().get(10, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    } catch (ExecutionException | TimeoutException e) {
+      LOG.warn("Failed to check execution blocker for {}, assuming there is no blocker", instance, e);
+    }
+
+    if (blocker.isEmpty()) {
+      return false;
+    }
+
+    var retry = Event.retryAfter(instance, blocker.get().delay().toMillis());
+    stateManager.receiveIgnoreClosed(retry, runState.counter());
+    LOG.debug("Dequeue rescheduled: {}: {}", instance, blocker.get());
+    return true;
+  }
+
+  private Optional<Workflow> readWorkflow(WorkflowId workflowId) {
+    try {
+      return storage.workflow(workflowId);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private boolean limitReached(final String resourceId, ConcurrentMap<String, Boolean> resourceExhaustedCache) {
@@ -364,17 +348,22 @@ public class Scheduler {
     return !deadline.isAfter(now);
   }
 
-  private void sendDequeue(InstanceState instanceState, Set<String> resourceIds) {
-    final WorkflowInstance workflowInstance = instanceState.workflowInstance();
-    final RunState state = instanceState.runState();
+  private void sendDequeue(WorkflowInstance workflowInstance, RunState state, Set<String> resourceIds) {
+    double sleepingTimeSeconds = dequeueRateLimiter.acquire();
+    if (sleepingTimeSeconds > 0.0001) {
+      final double sleepingTimeMillis = sleepingTimeSeconds * 1000;
+      final String message = "Dequeue rate limited and slept for " + sleepingTimeMillis + " ms";
+      LOG.debug(message, sleepingTimeMillis);
+      tracer.getCurrentSpan().addAnnotation(message);
+    }
 
     if (state.data().tries() == 0) {
       LOG.info("Executing {}", workflowInstance);
     } else {
       LOG.info("Executing {}, retry #{}", workflowInstance, state.data().tries());
     }
-    stateManager.receiveIgnoreClosed(Event.dequeue(workflowInstance, resourceIds),
-        instanceState.runState().counter());
+    var dequeue = Event.dequeue(workflowInstance, resourceIds);
+    stateManager.receiveIgnoreClosed(dequeue, state.counter());
   }
 
   private void sendTimeout(WorkflowInstance workflowInstance, RunState runState) {

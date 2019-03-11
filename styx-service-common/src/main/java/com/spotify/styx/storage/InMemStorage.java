@@ -330,6 +330,11 @@ public class InMemStorage implements Storage {
   }
 
   @Override
+  public Set<WorkflowInstance> listActiveInstances() {
+    return activeStatesMap.keySet();
+  }
+
+  @Override
   public Map<WorkflowInstance, RunState> readActiveStates() throws IOException {
     return activeStatesMap;
   }

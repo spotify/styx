@@ -25,6 +25,7 @@ import static java.time.Duration.ofSeconds;
 import static org.hamcrest.Matchers.either;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anySetOf;
@@ -145,10 +146,14 @@ public class SchedulerTest {
     when(storage.config()).thenReturn(config);
 
     when(resourceDecorator.decorateResources(
-        any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
+        any(RunState.class), any(WorkflowConfiguration.class), anySet()))
         .thenAnswer(a -> a.getArgument(2));
     
-    when(storage.workflows(anySetOf(WorkflowId.class))).thenReturn(workflows);
+    when(storage.workflow(any())).then(a -> Optional.ofNullable(workflows.get(a.<WorkflowId>getArgument(0))));
+
+    when(stateManager.listActiveInstances()).thenReturn(activeStates.keySet());
+    when(stateManager.getActiveState(any())).then(a ->
+        Optional.ofNullable(activeStates.get(a.<WorkflowInstance>getArgument(0))));
 
     scheduler = new Scheduler(time, timeoutConfig, stateManager, storage, resourceDecorator,
         stats, rateLimiter, gate, shardedCounter, executor);
@@ -167,7 +172,6 @@ public class SchedulerTest {
     for (RunState runState : runStates) {
       activeStates.put(runState.workflowInstance(), runState);
     }
-    when(stateManager.getActiveStates()).thenReturn(activeStates);
   }
 
   private Workflow workflowUsingResources(WorkflowId id, String... resources) {
@@ -320,7 +324,7 @@ public class SchedulerTest {
   public void shouldDequeueEvenWhenMissingWorkflows() throws Exception {
     setUp(20);
 
-    when(storage.workflows(anySetOf(WorkflowId.class))).thenReturn(Map.of());
+    workflows.clear();
 
     StateData stateData = StateData.newBuilder().tries(0).build();
 
@@ -385,11 +389,12 @@ public class SchedulerTest {
     StateData stateDataWithoutInfo = StateData.newBuilder()
         .build();
     RunState rsWithoutInfo = RunState.create(INSTANCE_1, State.QUEUED, stateDataWithoutInfo, time.get(), 17);
-    when(stateManager.getActiveStates()).thenReturn(Map.of(INSTANCE_1, rsWithoutInfo));
+    activeStates.put(INSTANCE_1, rsWithoutInfo);
 
     scheduler.tick();
 
-    inOrder.verify(stateManager).getActiveStates();
+    inOrder.verify(stateManager).listActiveInstances();
+    inOrder.verify(stateManager).getActiveState(INSTANCE_1);
     inOrder.verify(stateManager).receiveIgnoreClosed(
         Event.info(INSTANCE_1, Message.info("Resource limit reached for: [r1]")),
         rsWithoutInfo.counter());
@@ -397,12 +402,12 @@ public class SchedulerTest {
     StateData stateDataWithInfo = StateData.newBuilder()
         .addMessage(Message.info("Resource limit reached for: [r1]"))
         .build();
-    when(stateManager.getActiveStates()).thenReturn(
-        Map.of(INSTANCE_1, RunState.create(INSTANCE_1, State.QUEUED, stateDataWithInfo, time.get())));
+    activeStates.put(INSTANCE_1, RunState.create(INSTANCE_1, State.QUEUED, stateDataWithInfo, time.get()));
 
     scheduler.tick();
 
-    inOrder.verify(stateManager).getActiveStates();
+    inOrder.verify(stateManager).listActiveInstances();
+    inOrder.verify(stateManager).getActiveState(INSTANCE_1);
     inOrder.verifyNoMoreInteractions();
   }
 
@@ -462,7 +467,7 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    verify(stateManager, times(2)).getActiveStates();
+    verify(stateManager, times(2)).listActiveInstances();
     verify(shardedCounter, times(2)).counterHasSpareCapacity("r1");
     assertThat(eventCaptor.getAllValues().stream()
         .anyMatch(e -> EventUtil.name(e).equals("dequeue")), is(false));
@@ -561,8 +566,8 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    // 2 invocations to count current resource usage + 2 invocations to calculate future usage for queued states
-    verify(resourceDecorator, times(2 + 2)).decorateResources(any(RunState.class), eq(workflow.configuration()),
+    // TODO: verify that decorateResources was called for the expected instances
+    verify(resourceDecorator, times(5)).decorateResources(any(RunState.class), eq(workflow.configuration()),
         eq(ImmutableSet.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
 
     verify(stateManager, times(2)).receiveIgnoreClosed(argThat(

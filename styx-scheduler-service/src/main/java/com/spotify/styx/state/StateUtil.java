@@ -109,7 +109,7 @@ public final class StateUtil {
     return builder.build();
   }
 
-  private static boolean hasTimedOut(Optional<Workflow> workflowOpt, RunState runState, Instant instant,
+  public static boolean hasTimedOut(Optional<Workflow> workflowOpt, RunState runState, Instant instant,
                                      Duration timeout) {
     if (runState.state().isTerminal()) {
       return false;
@@ -129,7 +129,7 @@ public final class StateUtil {
     return !deadline.isAfter(instant);
   }
 
-  static boolean isConsumingResources(RunState.State state) {
+  public static boolean isConsumingResources(RunState.State state) {
     return List.of(
         RunState.State.PREPARE,
         RunState.State.SUBMITTING,

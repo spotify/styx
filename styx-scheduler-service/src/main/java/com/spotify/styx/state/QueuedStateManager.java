@@ -21,13 +21,13 @@
 package com.spotify.styx.state;
 
 import static com.spotify.styx.state.StateUtil.isConsumingResources;
-import static com.spotify.styx.util.GuardedRunnable.runGuarded;
 import static com.spotify.styx.util.MDCUtil.withMDC;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
+import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.MessageUtil;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
@@ -39,6 +39,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.storage.TransactionException;
 import com.spotify.styx.util.AlreadyInitializedException;
+import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
@@ -46,6 +47,9 @@ import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -90,6 +94,8 @@ public class QueuedStateManager implements StateManager {
   private final OutputHandler outputHandler;
   private final ShardedCounter shardedCounter;
 
+  private final CachedSupplier<Set<WorkflowInstance>> activeInstances;
+
   private volatile boolean running = true;
 
   public QueuedStateManager(
@@ -121,14 +127,27 @@ public class QueuedStateManager implements StateManager {
     this.outputHandler = Objects.requireNonNull(outputHandler);
     this.shardedCounter = Objects.requireNonNull(shardedCounter);
     this.log = Objects.requireNonNull(logger, "logger");
+    this.activeInstances = new CachedSupplier<>(storage::listActiveInstances, Instant::now);
   }
 
   @Override
   public void tick() {
-    var states = getActiveStates();
-    for (var runState : states.values()) {
-      runGuarded(() -> outputHandler.transitionInto(runState));
-    }
+    var shuffledInstances = new ArrayList<>(activeInstances.get());
+    Collections.shuffle(shuffledInstances);
+    var futures = shuffledInstances.stream()
+        .map(instance -> Striping.supplyAsyncStriped(() -> {
+          try {
+            var state = storage.readActiveState(instance);
+            state.ifPresent(outputHandler::transitionInto);
+            return state;
+          } catch (IOException e) {
+            LOG.error("Error ticking instance: {}", instance, e);
+            throw new RuntimeException(e);
+          }
+        }, instance, eventProcessingExecutor))
+        .collect(toList());
+
+    CompletableFutures.allAsList(futures).join();
   }
 
   @Override
@@ -371,6 +390,11 @@ public class QueuedStateManager implements StateManager {
 
     // Execute output handler(s)
     outputHandler.transitionInto(runState);
+  }
+
+  @Override
+  public Set<WorkflowInstance> listActiveInstances() {
+    return activeInstances.get();
   }
 
   @Override
