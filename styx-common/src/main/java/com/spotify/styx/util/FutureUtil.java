@@ -20,11 +20,12 @@
 
 package com.spotify.styx.util;
 
-import com.google.common.collect.ImmutableMap;
+import static java.util.stream.Collectors.toMap;
+
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeoutException;
 import javaslang.control.Try;
 
 public class FutureUtil {
@@ -33,22 +34,18 @@ public class FutureUtil {
     throw new UnsupportedOperationException();
   }
 
-  public static <T> CompletableFuture<T> exceptionallyCompletedFuture(final Throwable t) {
-    CompletableFuture<T> future = new CompletableFuture<>();
-    future.completeExceptionally(t);
-    return future;
-  }
-
   /**
-   * Gathers results from futures that may fail.
+   * Gathers results from futures that may fail or time out.
+   * @param timeout A global timeout. All futures must have completed before this future completes. Any future
+   *                not yet completed will be cancelled.
    * @return The values or failures of all futures.
    */
   public static <K, T> Map<K, Try<T>> gatherIO(
-      final Map<K, ? extends Future<T>> futures, long timeout, TimeUnit timeUnit) {
-    final ImmutableMap.Builder<K, Try<T>> results = ImmutableMap.builder();
-    for (Map.Entry<K, ? extends Future<T>> entry : futures.entrySet()) {
-      results.put(entry.getKey(), Try.of(() -> entry.getValue().get(timeout, timeUnit)));
-    }
-    return results.build();
+      final Map<K, ? extends CompletableFuture<T>> futures, CompletionStage<Void> timeout) {
+    return futures.entrySet().stream()
+        // Apply timeout
+        .peek(e -> timeout.thenRun(() -> e.getValue().completeExceptionally(new TimeoutException())))
+        // Collect results
+        .collect(toMap(Map.Entry::getKey, e -> Try.of(() -> e.getValue().get())));
   }
 }
