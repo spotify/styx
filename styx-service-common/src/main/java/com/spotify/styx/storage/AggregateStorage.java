@@ -92,6 +92,11 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
+  public Set<WorkflowInstance> listActiveInstances() {
+    return datastoreStorage.listActiveInstances();
+  }
+
+  @Override
   public Map<WorkflowInstance, RunState> readActiveStates(String componentId)
       throws IOException {
     return datastoreStorage.readActiveStates(componentId);

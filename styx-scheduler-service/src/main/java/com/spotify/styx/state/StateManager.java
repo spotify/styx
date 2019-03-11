@@ -27,6 +27,7 @@ import com.spotify.styx.util.IsClosedException;
 import java.io.Closeable;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -102,6 +103,11 @@ public interface StateManager extends Closeable {
       LOG.info("Ignored event, state receiver closed", isClosedException);
     }
   }
+
+  /**
+   * Get a list of all active {@link WorkflowInstance}s.
+   */
+  Set<WorkflowInstance> listActiveInstances();
 
   /**
    * Get a map of all active {@link WorkflowInstance} states.

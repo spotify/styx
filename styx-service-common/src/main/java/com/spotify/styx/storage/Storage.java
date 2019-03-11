@@ -151,7 +151,7 @@ public interface Storage extends Closeable {
   void deleteActiveState(WorkflowInstance workflowInstance) throws IOException;
 
   /**
-   * Return a map of all active {@link WorkflowInstance}s to their last consumed sequence count.
+   * Return a map of all active {@link WorkflowInstance}s with their current run state.
    *
    * <p>A {@link WorkflowInstance} is active if there has been at least one call to
    * {@link #writeActiveState(WorkflowInstance, RunState)} and no calls to
@@ -160,6 +160,11 @@ public interface Storage extends Closeable {
    * @return The map of workflow instances to sequence counts
    */
   Map<WorkflowInstance, RunState> readActiveStates() throws IOException;
+
+  /**
+   * Return a set of all active {@link WorkflowInstance} IDs.
+   */
+  Set<WorkflowInstance> listActiveInstances();
 
   /**
    * Return a map of all active {@link WorkflowInstance}s to their {@link RunState},
