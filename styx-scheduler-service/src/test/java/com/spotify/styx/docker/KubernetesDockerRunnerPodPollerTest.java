@@ -36,6 +36,7 @@ import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.storage.InstancesReadResult;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Debug;
 import io.fabric8.kubernetes.api.model.ContainerState;
@@ -54,7 +55,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javaslang.Tuple;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -115,7 +115,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     podList.setMetadata(new ListMeta());
     podList.getMetadata().setResourceVersion("4711");
 
-    when(stateManager.getActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of()));
+    when(stateManager.getActiveStatesPartial()).thenReturn(InstancesReadResult.ofSuccess(Map.of()));
   }
 
   @Test
@@ -283,7 +283,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     RunState runState2 = RunState.create(WORKFLOW_INSTANCE_2, state, stateData2);
     map.put(WORKFLOW_INSTANCE, runState);
     map.put(WORKFLOW_INSTANCE_2, runState2);
-    when(stateManager.getActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, map));
+    when(stateManager.getActiveStatesPartial()).thenReturn(InstancesReadResult.ofSuccess(map));
   }
 
   private void verifyPodNeverDeleted(PodResource<Pod, DoneablePod> pod) {

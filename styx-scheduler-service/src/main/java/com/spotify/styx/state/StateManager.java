@@ -23,13 +23,12 @@ package com.spotify.styx.state;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.storage.InstancesReadResult;
 import com.spotify.styx.util.IsClosedException;
 import java.io.Closeable;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
-import java.util.function.Predicate;
-import javaslang.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,7 +107,7 @@ public interface StateManager extends Closeable {
    * Get a partial map of all active {@link WorkflowInstance} states with a predicate that indicates if a workflow
    * instance is unavailable.
    */
-  Tuple2<Predicate<WorkflowInstance>, Map<WorkflowInstance, RunState>> getActiveStatesPartial();
+  InstancesReadResult getActiveStatesPartial();
 
   /**
    * Get the current {@link RunState} of a {@link WorkflowInstance}.

@@ -57,6 +57,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.storage.InstancesReadResult;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.Time;
@@ -97,7 +98,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import javaslang.Tuple;
 import javaslang.control.Try;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -226,7 +226,8 @@ public class KubernetesDockerRunnerTest {
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
     RunState runState = RunState.create(WORKFLOW_INSTANCE, State.SUBMITTED, stateData);
 
-    when(stateManager.getActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of(WORKFLOW_INSTANCE, runState)));
+    when(stateManager.getActiveStatesPartial()).thenReturn(
+        InstancesReadResult.ofSuccess(Map.of(WORKFLOW_INSTANCE, runState)));
     when(stateManager.getActiveState(WORKFLOW_INSTANCE)).thenReturn(Optional.of(runState));
   }
 
@@ -398,7 +399,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
 
-    when(stateManager.getActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of()));
+    when(stateManager.getActiveStatesPartial()).thenReturn(InstancesReadResult.ofSuccess(Map.of()));
 
     kdr.tryPollPods();
 
@@ -417,7 +418,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
 
-    when(stateManager.getActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of()));
+    when(stateManager.getActiveStatesPartial()).thenReturn(InstancesReadResult.ofSuccess(Map.of()));
 
     kdr.tryPollPods();
 

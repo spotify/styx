@@ -34,6 +34,7 @@ import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState.State;
+import com.spotify.styx.storage.InstancesReadResult;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.storage.TransactionException;
@@ -55,7 +56,6 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
-import java.util.function.Predicate;
 import javaslang.Tuple;
 import javaslang.Tuple2;
 import javaslang.control.Try;
@@ -375,7 +375,7 @@ public class QueuedStateManager implements StateManager {
   }
 
   @Override
-  public Tuple2<Predicate<WorkflowInstance>, Map<WorkflowInstance, RunState>> getActiveStatesPartial() {
+  public InstancesReadResult getActiveStatesPartial() {
     return storage.readActiveStatesPartial();
   }
 

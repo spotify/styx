@@ -453,11 +453,11 @@ public class DatastoreStorageTest {
     doThrow(cause) // Fail first shard read
         .doReturn(List.of()) // Succeed all other reads
         .when(datastore).query(any());
-    var results = storage.readActiveStatesPartial();
+    var result = storage.readActiveStatesPartial();
     // 80 maps to first shard
     final WorkflowInstance unavailableInstance = WorkflowInstance.create(WorkflowId.create("foo", "bar"), "80");
-    assertThat(results._1.test(unavailableInstance), is(true));
-    assertThat(results._1.test(WORKFLOW_INSTANCE1), is(false));
+    assertThat(result.instanceUnavailable(unavailableInstance), is(true));
+    assertThat(result.instanceUnavailable(WORKFLOW_INSTANCE1), is(false));
   }
 
   @Test

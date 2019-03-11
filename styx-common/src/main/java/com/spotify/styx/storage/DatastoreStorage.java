@@ -77,6 +77,7 @@ import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
+import com.spotify.styx.storage.InstancesReadResult.DatastoreReadInfo;
 import com.spotify.styx.util.FnWithException;
 import com.spotify.styx.util.MDCUtil;
 import com.spotify.styx.util.ResourceNotFoundException;
@@ -103,12 +104,9 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import javaslang.Tuple;
-import javaslang.Tuple2;
 import javaslang.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -394,13 +392,13 @@ public class DatastoreStorage implements Closeable {
   }
 
   Map<WorkflowInstance, RunState> readActiveStates() {
-    return readActiveStatesPartial()._2;
+    return readActiveStatesPartial().instances();
   }
 
   /**
    * Strongly consistently read all active states
    */
-  Tuple2<Predicate<WorkflowInstance>, Map<WorkflowInstance, RunState>> readActiveStatesPartial() {
+  InstancesReadResult readActiveStatesPartial() {
     var timeout = CompletableFuture.runAsync(() -> {}, delayedExecutor(30, SECONDS));
 
     // Read all index shards in parallel
@@ -459,16 +457,17 @@ public class DatastoreStorage implements Closeable {
         .map(WorkflowInstance::parseKey)
         .collect(toSet());
 
-    // Construct a predicate that can be used to detect if an workflow instance is unavailable and should be ignored
-    final Predicate<WorkflowInstance> unavailableInstance = wfi ->
-        // Did the workflow instance read fail?
-        unavailableInstances.contains(wfi) ||
-        // Did we fail to read the shard of the workflow instance?
-        unavailableShards.contains(activeWorkflowInstanceIndexShardName(wfi.toKey()));
-
     timeout.cancel(true);
 
-    return Tuple.of(unavailableInstance, activeStates);
+    return InstancesReadResult.builder()
+        .instances(activeStates)
+        .readInfo(DatastoreReadInfo.builder()
+            .shardCount(shardFutures.size())
+            .unavailableShards(unavailableShards)
+            .instanceCount(keys.size())
+            .unavailableInstances(unavailableInstances)
+            .build())
+        .build();
   }
 
   /**
@@ -558,7 +557,7 @@ public class DatastoreStorage implements Closeable {
         .collect(toList());
   }
 
-  private static String activeWorkflowInstanceIndexShardName(String workflowInstanceKey) {
+  static String activeWorkflowInstanceIndexShardName(String workflowInstanceKey) {
     final long hash = Hashing.murmur3_32().hashString(workflowInstanceKey, StandardCharsets.UTF_8).asInt();
     final long index = Long.remainderUnsigned(hash, ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS);
     return activeWorkflowInstanceIndexShardName(index);

@@ -40,8 +40,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
-import java.util.function.Predicate;
-import javaslang.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
 
 /**
@@ -94,7 +92,7 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public Tuple2<Predicate<WorkflowInstance>, Map<WorkflowInstance, RunState>> readActiveStatesPartial() {
+  public InstancesReadResult readActiveStatesPartial() {
     return datastoreStorage.readActiveStatesPartial();
   }
 

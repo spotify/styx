@@ -588,8 +588,7 @@ class KubernetesDockerRunner implements DockerRunner {
     // Fetch pods _before_ fetching all active states
     final PodList list = client.pods().list();
     var activeStates = stateManager.getActiveStatesPartial();
-    var unavailableWorkflowInstance = activeStates._1;
-    examineRunningWFISandAssociatedPods(activeStates._2, list);
+    examineRunningWFISandAssociatedPods(activeStates.instances(), list);
 
     for (Pod pod : list.getItems()) {
       logEvent(Watcher.Action.MODIFIED, pod, list.getMetadata().getResourceVersion(), true);
@@ -598,11 +597,11 @@ class KubernetesDockerRunner implements DockerRunner {
         continue;
       }
 
-      if (unavailableWorkflowInstance.test(workflowInstance.get())) {
+      if (activeStates.instanceUnavailable(workflowInstance.get())) {
         LOG.debug("Ignoring unavailable workflow instance: {}", workflowInstance.get());
         continue;
       }
-      final RunState runState = activeStates._2.get(workflowInstance.get());
+      final RunState runState = activeStates.instances().get(workflowInstance.get());
       if (runState != null && isPodRunState(pod, runState)) {
         emitPodEvents(pod, runState);
         cleanupWithRunState(workflowInstance.get(), pod, runState);
