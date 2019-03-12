@@ -27,6 +27,7 @@ import static java.util.stream.Collectors.toSet;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
+import com.google.common.collect.Sets;
 import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.MessageUtil;
 import com.spotify.styx.model.Event;
@@ -39,7 +40,6 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.storage.TransactionException;
 import com.spotify.styx.util.AlreadyInitializedException;
-import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
@@ -47,7 +47,6 @@ import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
 import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -57,6 +56,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
@@ -94,7 +94,7 @@ public class QueuedStateManager implements StateManager {
   private final OutputHandler outputHandler;
   private final ShardedCounter shardedCounter;
 
-  private final CachedSupplier<Set<WorkflowInstance>> activeInstances;
+  private final Set<WorkflowInstance> activeInstances = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
   private volatile boolean running = true;
 
@@ -127,12 +127,19 @@ public class QueuedStateManager implements StateManager {
     this.outputHandler = Objects.requireNonNull(outputHandler);
     this.shardedCounter = Objects.requireNonNull(shardedCounter);
     this.log = Objects.requireNonNull(logger, "logger");
-    this.activeInstances = new CachedSupplier<>(storage::listActiveInstances, Instant::now);
   }
 
   @Override
   public void tick() {
-    var shuffledInstances = new ArrayList<>(activeInstances.get());
+    var oldActiveInstances = Set.copyOf(activeInstances);
+    var newActiveInstances = Try.of(storage::listActiveInstances).get();
+
+    // TODO: handle partial failure here and do not remove unavailable instances
+    var removedInstances = Sets.difference(oldActiveInstances, newActiveInstances);
+    activeInstances.removeAll(removedInstances);
+    activeInstances.addAll(newActiveInstances);
+
+    var shuffledInstances = new ArrayList<>(activeInstances);
     Collections.shuffle(shuffledInstances);
     var futures = shuffledInstances.stream()
         .map(instance -> Striping.supplyAsyncStriped(() -> {
@@ -211,6 +218,8 @@ public class QueuedStateManager implements StateManager {
         }
         return tx.writeActiveState(workflowInstance, runState);
       });
+      // Add new instance to cache
+      activeInstances.add(workflowInstance);
     } catch (TransactionException e) {
       if (e.isAlreadyExists()) {
         throw new AlreadyInitializedException("Workflow instance is already triggered: " + workflowInstance);
@@ -233,7 +242,7 @@ public class QueuedStateManager implements StateManager {
   private Tuple2<SequenceEvent, RunState> transition(Event event, long expectedCounter) {
     queuedEvents.decrement();
     try {
-      return storage.runInTransaction(tx -> {
+      var newState = storage.runInTransaction(tx -> {
 
         // Read active state from datastore
         final Optional<RunState> currentRunState =
@@ -273,6 +282,13 @@ public class QueuedStateManager implements StateManager {
 
         return Tuple.of(sequenceEvent, nextRunState);
       });
+
+      // Remove instance from cache if the new state is terminal
+      if (newState._2.state().isTerminal()) {
+        activeInstances.remove(newState._2.workflowInstance());
+      }
+
+      return newState;
     } catch (TransactionException e) {
       if (e.isConflict()) {
         log.debug("Transaction conflict during workflow instance transition. Aborted: {}, counter={}",
@@ -393,7 +409,7 @@ public class QueuedStateManager implements StateManager {
 
   @Override
   public Set<WorkflowInstance> listActiveInstances() {
-    return activeInstances.get();
+    return Set.copyOf(activeInstances);
   }
 
   @Override
