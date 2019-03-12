@@ -33,17 +33,47 @@ import static com.spotify.styx.state.handlers.TransitionLogger.stateInfo;
 import static java.lang.String.format;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Mockito.verify;
 
+import com.spotify.styx.model.Event;
+import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
+import com.spotify.styx.util.EventUtil;
+import java.time.Instant;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.junit.MockitoJUnitRunner;
+import org.slf4j.Logger;
 
+@RunWith(MockitoJUnitRunner.class)
 public class TransitionLoggerTest {
 
   private static final WorkflowInstance WORKFLOW_INSTANCE =
       WorkflowInstance.create(WorkflowId.create("foo", "bar"), "2018-04-17");
+
+  @Mock private Logger log;
+
+  @Test
+  public void shouldLogTransition() {
+    var now = Instant.now();
+    var sut = new TransitionLogger(log);
+    var event = Event.started(WORKFLOW_INSTANCE);
+    var counter = 17L;
+    var sequenceEvent = SequenceEvent.create(event, counter, now.toEpochMilli());
+    var runState = RunState.create(WORKFLOW_INSTANCE, SUBMITTING, StateData.zero(), now, counter);
+    sut.accept(sequenceEvent, runState);
+    verify(log).info("{} transition #{} {}({}) -> {} {}",
+        WORKFLOW_INSTANCE,
+        counter,
+        EventUtil.name(event),
+        EventUtil.info(event),
+        "submitting",
+        stateInfo(runState));
+  }
 
   @Test
   public void shouldReturnTries() {
