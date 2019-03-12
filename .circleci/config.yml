@@ -13,6 +13,11 @@ jobs:
           key: v3-deps-{{ checksum "pom.xml" }}
           paths:
             - ~/.m2
+      - run:
+          name: "Set up GCP credentials"
+          command: |
+            echo "$GCLOUD_SERVICE_KEY" > credentials.json
+            echo "export GOOGLE_APPLICATION_CREDENTIALS=\"$(realpath credentials.json)\"" >> $BASH_ENV
       # Run tests without static analysis
       - run:
           name: Tests
