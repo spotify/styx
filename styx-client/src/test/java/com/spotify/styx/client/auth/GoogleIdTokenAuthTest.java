@@ -75,10 +75,14 @@ public class GoogleIdTokenAuthTest {
   @Rule public final EnvironmentVariables environmentVariables = new EnvironmentVariables();
 
   @Before
-  public void setUp() {
+  public void setUp() throws IOException {
     try {
       credentials = GoogleCredentials.getApplicationDefault();
     } catch (IOException e) {
+      // Require credentials to be available in CI environment
+      if (System.getenv("CI") != null) {
+        throw e;
+      }
       credentials = null;
     }
   }
