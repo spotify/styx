@@ -25,6 +25,7 @@ import static com.spotify.styx.client.FutureOkHttpClient.forUri;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.spotify.styx.api.Api;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
@@ -102,8 +103,20 @@ class StyxOkHttpClient implements StyxClient {
     return create(apiHost, FutureOkHttpClient.createDefault(), GoogleIdTokenAuth.ofDefaultCredential());
   }
 
+  public static StyxClient create(String apiHost, GoogleCredentials credentials) {
+    return create(apiHost, FutureOkHttpClient.createDefault(), GoogleIdTokenAuth.of(credentials));
+  }
+
   public static StyxClient create(String apiHost, OkHttpClient client) {
     return create(apiHost, FutureOkHttpClient.create(client), GoogleIdTokenAuth.ofDefaultCredential());
+  }
+
+  public static StyxClient create(String apiHost, OkHttpClient client, GoogleCredentials credentials) {
+    return create(apiHost, FutureOkHttpClient.create(client), GoogleIdTokenAuth.of(credentials));
+  }
+
+  static StyxClient create(String apiHost, FutureOkHttpClient client, GoogleCredentials credentials) {
+    return new StyxOkHttpClient(apiHost, client, GoogleIdTokenAuth.of(credentials));
   }
 
   static StyxClient create(String apiHost, FutureOkHttpClient client, GoogleIdTokenAuth auth) {

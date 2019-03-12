@@ -312,6 +312,11 @@
         <version>v1-rev20181015-${google.client.lib.version}</version>
       </dependency>
       <dependency>
+        <groupId>com.google.apis</groupId>
+        <artifactId>google-api-services-oauth2</artifactId>
+        <version>v2-rev20190129-${google.client.lib.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-datastore</artifactId>
         <version>1.61.0</version>
@@ -330,6 +335,11 @@
         <groupId>com.google.api</groupId>
         <artifactId>api-common</artifactId>
         <version>1.7.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>google-cloud-nio</artifactId>
+        <version>0.79.0-alpha</version>
       </dependency>
 
       <!-- test libs -->
