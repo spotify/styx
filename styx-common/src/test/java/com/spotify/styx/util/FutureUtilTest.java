@@ -20,8 +20,6 @@
 
 package com.spotify.styx.util;
 
-import static com.spotify.styx.util.FutureUtil.exceptionallyCompletedFuture;
-import static com.spotify.styx.util.FutureUtil.gatherIO;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.CompletableFuture.delayedExecutor;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -57,7 +55,7 @@ public class FutureUtilTest {
   @Test
   public void testExceptionallyCompletedFuture() throws ExecutionException, InterruptedException {
     final IOException cause = new IOException("foo");
-    final CompletableFuture<Object> future = exceptionallyCompletedFuture(cause);
+    final CompletableFuture<Object> future = CompletableFuture.failedFuture(cause);
     exception.expect(ExecutionException.class);
     exception.expectCause(is(cause));
     future.get();
@@ -103,7 +101,7 @@ public class FutureUtilTest {
     var start = System.nanoTime();
     // Give enough time for ~ 20 futures to complete
     var timeout = CompletableFuture.runAsync(() -> {}, delayedExecutor(200, MILLISECONDS));
-    var results = gatherIO(futures, timeout);
+    var results = FutureUtil.gatherIO(futures, timeout);
     var end = System.nanoTime();
     var elapsed = Duration.ofNanos(end - start);
     // Verify that the timeout of 200 ms was properly applied in a non-blocking fashion by checking that the execution

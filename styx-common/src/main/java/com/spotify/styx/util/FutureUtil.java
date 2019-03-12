@@ -34,12 +34,6 @@ public class FutureUtil {
     throw new UnsupportedOperationException();
   }
 
-  public static <T> CompletableFuture<T> exceptionallyCompletedFuture(final Throwable t) {
-    CompletableFuture<T> future = new CompletableFuture<>();
-    future.completeExceptionally(t);
-    return future;
-  }
-
   /**
    * Gathers results from futures that may fail or time out.
    * @param timeout A global timeout. All futures must have completed before this future completes. Any future
