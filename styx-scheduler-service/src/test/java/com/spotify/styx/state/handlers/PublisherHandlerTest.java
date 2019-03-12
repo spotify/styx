@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
@@ -45,6 +46,9 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class PublisherHandlerTest {
 
+  private static final String EXECUTION_ID = "foobar";
+  private static final long COUNTER = 17;
+  private static final long NOW = 4711;
   private static final String COMMIT_SHA = "cc9f6ca490e106ca9324bd34de5e3ad935b91bd6";
   private static final String DOCKER_IMAGE = "busybox:1.1";
 
@@ -52,7 +56,6 @@ public class PublisherHandlerTest {
   private PublisherHandler publisherHandler;
 
   @Mock private Stats stats;
-  @Mock private SequenceEvent sequenceEvent;
 
   @Before
   public void setUp() throws Exception {
@@ -62,11 +65,13 @@ public class PublisherHandlerTest {
 
   @Test
   public void testPublishesRollingOutStateOnSubmitted() throws Exception {
-    ExecutionDescription executionDescription = ExecutionDescription.builder()
+    var event = Event.submitted(WORKFLOW_INSTANCE, EXECUTION_ID);
+    var sequenceEvent = SequenceEvent.create(event, COUNTER, NOW);
+    var executionDescription = ExecutionDescription.builder()
         .dockerImage(DOCKER_IMAGE)
         .commitSha(COMMIT_SHA)
         .build();
-    RunState runState = RunState.create(
+    var runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.SUBMITTED,
         StateData.newBuilder()
@@ -81,12 +86,15 @@ public class PublisherHandlerTest {
 
   @Test
   public void testPublishesDoneStateOnRunning() throws Exception {
-    ExecutionDescription executionDescription = ExecutionDescription.builder()
+    var event = Event.started(WORKFLOW_INSTANCE);
+    var sequenceEvent = SequenceEvent.create(event, COUNTER, NOW);
+
+    var executionDescription = ExecutionDescription.builder()
         .dockerImage(DOCKER_IMAGE)
         .commitSha(COMMIT_SHA)
         .build();
 
-    RunState runState = RunState.create(
+    var runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.RUNNING,
         StateData.newBuilder()
@@ -101,13 +109,16 @@ public class PublisherHandlerTest {
 
   @Test
   public void shouldRetryPublishesOnSubmitted() throws Exception {
+    var event = Event.submitted(WORKFLOW_INSTANCE, EXECUTION_ID);
+    var sequenceEvent = SequenceEvent.create(event, COUNTER, NOW);
+
     publisherHandler = new PublisherHandler(new FailingPublisher(publisher, 2), stats);
 
-    ExecutionDescription executionDescription = ExecutionDescription.builder()
+    var executionDescription = ExecutionDescription.builder()
         .dockerImage(DOCKER_IMAGE)
         .commitSha(COMMIT_SHA)
         .build();
-    RunState runState = RunState.create(
+    var runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.SUBMITTED,
         StateData.newBuilder()
@@ -123,6 +134,9 @@ public class PublisherHandlerTest {
 
   @Test
   public void shouldFailEventuallyOnSubmitted() throws Exception {
+    var event = Event.submitted(WORKFLOW_INSTANCE, EXECUTION_ID);
+    var sequenceEvent = SequenceEvent.create(event, COUNTER, NOW);
+
     doThrow(new IOException()).when(publisher).deploying(any(), any());
     publisherHandler = new PublisherHandler(
         publisher, stats,
@@ -130,11 +144,11 @@ public class PublisherHandlerTest {
             .maxRetries(1)
             .build());
 
-    ExecutionDescription executionDescription = ExecutionDescription.builder()
+    var executionDescription = ExecutionDescription.builder()
         .dockerImage(DOCKER_IMAGE)
         .commitSha(COMMIT_SHA)
         .build();
-    RunState runState = RunState.create(
+    var runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.SUBMITTED,
         StateData.newBuilder()
@@ -149,13 +163,16 @@ public class PublisherHandlerTest {
 
   @Test
   public void shouldRetryPublishesOnRunning() throws Exception {
+    var event = Event.started(WORKFLOW_INSTANCE);
+    var sequenceEvent = SequenceEvent.create(event, COUNTER, NOW);
+
     publisherHandler = new PublisherHandler(new FailingPublisher(publisher, 2), stats);
 
-    ExecutionDescription executionDescription = ExecutionDescription.builder()
+    var executionDescription = ExecutionDescription.builder()
         .dockerImage(DOCKER_IMAGE)
         .commitSha(COMMIT_SHA)
         .build();
-    RunState runState = RunState.create(
+    var runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.RUNNING,
         StateData.newBuilder()
@@ -171,6 +188,9 @@ public class PublisherHandlerTest {
 
   @Test
   public void shouldFailEventuallyOnRunning() throws Exception {
+    var event = Event.started(WORKFLOW_INSTANCE);
+    var sequenceEvent = SequenceEvent.create(event, COUNTER, NOW);
+
     doThrow(new IOException()).when(publisher).deployed(any(), any());
     publisherHandler = new PublisherHandler(
         publisher, stats,
@@ -178,11 +198,11 @@ public class PublisherHandlerTest {
             .maxRetries(1)
             .build());
 
-    ExecutionDescription executionDescription = ExecutionDescription.builder()
+    var executionDescription = ExecutionDescription.builder()
         .dockerImage(DOCKER_IMAGE)
         .commitSha(COMMIT_SHA)
         .build();
-    RunState runState = RunState.create(
+    var runState = RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.RUNNING,
         StateData.newBuilder()
