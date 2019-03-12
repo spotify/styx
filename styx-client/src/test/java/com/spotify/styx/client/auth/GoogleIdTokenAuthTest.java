@@ -275,7 +275,7 @@ public class GoogleIdTokenAuthTest {
     if (credentials == null) {
       assertThat(token, is(Optional.empty()));
     } else {
-      final GoogleIdToken verifiedToken = VERIFIER.verify(token.orElseThrow());
+      final GoogleIdToken verifiedToken = VERIFIER.verify(token.orElseThrow(AssertionError::new));
       assertThat(verifiedToken, is(notNullValue()));
     }
   }
@@ -292,7 +292,7 @@ public class GoogleIdTokenAuthTest {
     final GoogleIdTokenAuth idTokenAuth = GoogleIdTokenAuth.of(credentials);
     final String targetAudience = "http://styx.foo.bar";
     final Optional<String> token = idTokenAuth.getToken(targetAudience);
-    final GoogleIdToken verifiedToken = VERIFIER.verify(token.orElseThrow());
+    final GoogleIdToken verifiedToken = VERIFIER.verify(token.orElseThrow(AssertionError::new));
     assertThat(verifiedToken, is(notNullValue()));
     if (!(credentials instanceof UserCredentials)) {
       // TODO: can we procure user id tokens with the styx service audience?
