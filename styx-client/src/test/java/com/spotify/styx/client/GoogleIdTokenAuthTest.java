@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.client.auth;
+package com.spotify.styx.client;
 
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
