@@ -23,26 +23,37 @@ package com.spotify.styx.state.handlers;
 import static java.lang.String.format;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.spotify.styx.state.OutputHandler;
+import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.util.EventUtil;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TransitionLogger implements OutputHandler {
+public class TransitionLogger implements BiConsumer<SequenceEvent, RunState> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TransitionLogger.class);
+  private final Logger log;
 
-  private final String prefix;
+  public TransitionLogger() {
+    this(LoggerFactory.getLogger(TransitionLogger.class));
+  }
 
-  public TransitionLogger(String prefix) {
-    this.prefix = Objects.requireNonNull(prefix);
+  TransitionLogger(Logger log) {
+    this.log = Objects.requireNonNull(log, "log");
   }
 
   @Override
-  public void transitionInto(RunState state) {
-    final String name = state.state().name().toLowerCase();
-    LOG.info("{}{} transition -> {} {}", prefix, state.workflowInstance(), name, stateInfo(state));
+  public void accept(SequenceEvent sequenceEvent, RunState state) {
+    var stateName = state.state().name().toLowerCase(Locale.ROOT);
+    log.info("{} transition #{} {}({}) -> {} {}",
+        state.workflowInstance(),
+        sequenceEvent.counter(),
+        EventUtil.name(sequenceEvent.event()),
+        EventUtil.info(sequenceEvent.event()),
+        stateName,
+        stateInfo(state));
   }
 
   @VisibleForTesting

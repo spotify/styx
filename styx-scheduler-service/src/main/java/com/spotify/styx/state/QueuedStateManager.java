@@ -21,6 +21,7 @@
 package com.spotify.styx.state;
 
 import static com.spotify.styx.state.StateUtil.isConsumingResources;
+import static com.spotify.styx.util.GuardedRunnable.runGuarded;
 import static com.spotify.styx.util.MDCUtil.withMDC;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
@@ -121,6 +122,14 @@ public class QueuedStateManager implements StateManager {
     this.outputHandler = Objects.requireNonNull(outputHandler);
     this.shardedCounter = Objects.requireNonNull(shardedCounter);
     this.log = Objects.requireNonNull(logger, "logger");
+  }
+
+  @Override
+  public void tick() {
+    var states = getActiveStates();
+    for (var runState : states.values()) {
+      runGuarded(() -> outputHandler.transitionInto(runState));
+    }
   }
 
   @Override
