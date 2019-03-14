@@ -38,6 +38,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -77,6 +78,8 @@ public class Authenticator {
       .maximumSize(VALIDATED_EMAIL_CACHE_SIZE)
       .build();
 
+  private final Collection<String> allowedAudiences;
+
   Authenticator(GoogleIdTokenVerifier googleIdTokenVerifier,
       CloudResourceManager cloudResourceManager,
       Iam iam,
@@ -88,6 +91,7 @@ public class Authenticator {
     this.iam = Objects.requireNonNull(iam, "iam");
     this.domainWhitelist = configuration.domainWhitelist();
     this.resourceWhitelist = configuration.resourceWhitelist();
+    this.allowedAudiences = configuration.allowedAudiences();
   }
 
   void cacheResources() throws IOException {
@@ -151,6 +155,15 @@ public class Authenticator {
     // Is this a GCP service account?
     if (!SERVICE_ACCOUNT_PATTERN.matcher(email).matches()) {
       return null;
+    }
+
+    // TODO: Also verify audience for user tokens. Currently this would require changing the auth flow in styx
+    //  clients and make users explicitly "log in" to Styx via the OAuth consent screen.
+    // Verify that this ID token was intended for Styx.
+    if (!allowedAudiences.isEmpty()) {
+      if (!googleIdToken.verifyAudience(allowedAudiences)) {
+        return null;
+      }
     }
 
     final String projectId;

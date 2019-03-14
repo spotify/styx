@@ -25,6 +25,7 @@ import static com.spotify.styx.util.ConfigUtil.get;
 import com.google.api.services.cloudresourcemanager.model.ResourceId;
 import com.typesafe.config.Config;
 import io.norberg.automatter.AutoMatter;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -34,6 +35,7 @@ public interface AuthenticatorConfiguration {
   Set<String> domainWhitelist();
   Set<ResourceId> resourceWhitelist();
   String service();
+  Set<String> allowedAudiences();
 
   static AuthenticatorConfigurationBuilder builder() {
     return new AuthenticatorConfigurationBuilder();
@@ -43,6 +45,7 @@ public interface AuthenticatorConfiguration {
 
     final String domainWhitelistKey = "styx.authentication.domain-whitelist";
     final String resourceWhitelistKey = "styx.authentication.resource-whitelist";
+    final String allowedAudiencesKey = "styx.authentication.allowed-audiences";
 
     final AuthenticatorConfigurationBuilder builder = AuthenticatorConfiguration.builder()
         .service(serviceName);
@@ -55,6 +58,8 @@ public interface AuthenticatorConfiguration {
                 .setType(item.getString("type"))
                 .setId(item.getString("id")))
             .collect(Collectors.toSet())));
+
+    builder.allowedAudiences(get(config, config::getStringList, allowedAudiencesKey).orElse(List.of()));
 
     return builder.build();
   }
