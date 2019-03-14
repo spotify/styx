@@ -27,7 +27,6 @@ import static java.util.stream.Collectors.toSet;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
-import com.google.common.collect.Sets;
 import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.MessageUtil;
 import com.spotify.styx.model.Event;
@@ -56,7 +55,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
@@ -94,8 +92,6 @@ public class QueuedStateManager implements StateManager {
   private final OutputHandler outputHandler;
   private final ShardedCounter shardedCounter;
 
-  private final Set<WorkflowInstance> activeInstances = Collections.newSetFromMap(new ConcurrentHashMap<>());
-
   private volatile boolean running = true;
 
   public QueuedStateManager(
@@ -131,15 +127,7 @@ public class QueuedStateManager implements StateManager {
 
   @Override
   public void tick() {
-    var oldActiveInstances = Set.copyOf(activeInstances);
-    var newActiveInstances = Try.of(storage::listActiveInstances).get();
-
-    // TODO: handle partial failure here and do not remove unavailable instances
-    var removedInstances = Sets.difference(oldActiveInstances, newActiveInstances);
-    activeInstances.removeAll(removedInstances);
-    activeInstances.addAll(newActiveInstances);
-
-    var shuffledInstances = new ArrayList<>(activeInstances);
+    var shuffledInstances = new ArrayList<>(storage.listActiveInstances());
     Collections.shuffle(shuffledInstances);
     var futures = shuffledInstances.stream()
         .map(instance -> Striping.supplyAsyncStriped(() -> {
@@ -218,8 +206,6 @@ public class QueuedStateManager implements StateManager {
         }
         return tx.writeActiveState(workflowInstance, runState);
       });
-      // Add new instance to cache
-      activeInstances.add(workflowInstance);
     } catch (TransactionException e) {
       if (e.isAlreadyExists()) {
         throw new AlreadyInitializedException("Workflow instance is already triggered: " + workflowInstance);
@@ -242,7 +228,7 @@ public class QueuedStateManager implements StateManager {
   private Tuple2<SequenceEvent, RunState> transition(Event event, long expectedCounter) {
     queuedEvents.decrement();
     try {
-      var newState = storage.runInTransaction(tx -> {
+      return storage.runInTransaction(tx -> {
 
         // Read active state from datastore
         final Optional<RunState> currentRunState =
@@ -282,13 +268,6 @@ public class QueuedStateManager implements StateManager {
 
         return Tuple.of(sequenceEvent, nextRunState);
       });
-
-      // Remove instance from cache if the new state is terminal
-      if (newState._2.state().isTerminal()) {
-        activeInstances.remove(newState._2.workflowInstance());
-      }
-
-      return newState;
     } catch (TransactionException e) {
       if (e.isConflict()) {
         log.debug("Transaction conflict during workflow instance transition. Aborted: {}, counter={}",
@@ -409,7 +388,7 @@ public class QueuedStateManager implements StateManager {
 
   @Override
   public Set<WorkflowInstance> listActiveInstances() {
-    return Set.copyOf(activeInstances);
+    return storage.listActiveInstances();
   }
 
   @Override
