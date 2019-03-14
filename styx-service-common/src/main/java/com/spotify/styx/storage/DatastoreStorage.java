@@ -397,14 +397,14 @@ public class DatastoreStorage implements Closeable {
     private Set<WorkflowInstance> listActiveInstances0(CompletionStage<Void> timeout) throws IOException {
         // Strongly read active state keys from index shards in parallel
         return gatherIO(activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
-                        .map(key -> asyncIO(() -> datastore.query(Query.newEntityQueryBuilder()
+                        .map(key -> asyncIO(() -> datastore.query(Query.newKeyQueryBuilder()
                                                                   .setFilter(PropertyFilter.hasAncestor(key))
                                                                   .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
                                                                   .build())))
                         .collect(toList()), timeout)
         .stream()
         .flatMap(Collection::stream)
-        .map(entity -> entity.getKey().getName())
+        .map(Key::getName)
         .map(WorkflowInstance::parseKey)
         .collect(toSet());
     }
