@@ -21,6 +21,7 @@
 package com.spotify.styx;
 
 import static com.spotify.apollo.environment.ConfigUtil.optionalInt;
+import static com.spotify.styx.ScheduledExecutionUtil.scheduleWithJitter;
 import static com.spotify.styx.state.OutputHandler.fanOutput;
 import static com.spotify.styx.util.CloserUtil.closeable;
 import static com.spotify.styx.util.ConfigUtil.get;
@@ -28,7 +29,6 @@ import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
 import static com.spotify.styx.util.GuardedRunnable.runGuarded;
 import static java.util.Objects.requireNonNull;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
@@ -123,7 +123,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -541,15 +540,6 @@ public class StyxScheduler implements AppInit {
       LOG.warn("Failed to fetch the submission rate config from storage, "
           + "skipping RateLimiter update", e);
     }
-  }
-
-  private static void scheduleWithJitter(Runnable runnable, ScheduledExecutorService exec, Duration tickInterval) {
-    final double jitter = ThreadLocalRandom.current().nextDouble(0.5, 1.5);
-    final long delayMillis = (long) (jitter * tickInterval.toMillis());
-    exec.schedule(() -> {
-      runGuarded(runnable);
-      scheduleWithJitter(runnable, exec, tickInterval);
-    }, delayMillis, MILLISECONDS);
   }
 
   @VisibleForTesting
