@@ -160,7 +160,9 @@ public class Authenticator {
     // TODO: Also verify audience for user tokens. Currently this would require changing the auth flow in styx
     //  clients and make users explicitly "log in" to Styx via the OAuth consent screen.
     // Verify that this ID token was intended for Styx.
-    if (!allowedAudiences.isEmpty()) {
+    if (!allowedAudiences.isEmpty()
+        // TODO: Remove this null check and require tokens to have a target audience
+        && googleIdToken.getPayload().getAudience() != null) {
       if (!googleIdToken.verifyAudience(allowedAudiences)) {
         return null;
       }
