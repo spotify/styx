@@ -24,6 +24,7 @@ import static java.lang.String.format;
 
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -41,8 +42,15 @@ public class DockerImageValidator {
   private static final Pattern NAME_COMPONENT_PATTERN = Pattern.compile("^([a-z0-9._-]+)$");
   private static final int REPO_NAME_MAX_LENGTH = 255;
 
-  // taken from https://github.com/docker/distribution/blob/3150937b9f2b1b5b096b2634d0e7c44d4a0f89fb/reference/regexp.go#L36-L37
+  // https://github.com/docker/distribution/blob/95daa793b83a21656fe6c13e6d5cf1c3999108c7/reference/regexp.go#L37
   private static final Pattern TAG_PATTERN = Pattern.compile("[\\w][\\w.-]{0,127}");
+
+  // https://github.com/docker/distribution/blob/95daa793b83a21656fe6c13e6d5cf1c3999108c7/reference/regexp.go#L44
+  private static final Pattern DIGEST_PATTERN = Pattern.compile(
+      "(?<algorithm>[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*)[:](?<identifier>[\\p{XDigit}]{32,})");
+
+  // https://github.com/docker/distribution/blob/95daa793b83a21656fe6c13e6d5cf1c3999108c7/reference/regexp.go#L75
+  private static final Pattern SHA256_IDENTIFIER_PATTERN = Pattern.compile("[a-f0-9]{64}");
 
   private static final Pattern DIGIT_PERIOD = Pattern.compile("^[0-9.]+$");
 
@@ -131,12 +139,20 @@ public class DockerImageValidator {
       return false;
     }
 
-    final int firstColon = digest.indexOf(':');
-    final int lastColon = digest.lastIndexOf(':');
-
-    if ((firstColon <= 0) || (firstColon != lastColon) || (firstColon == digest.length() - 1)) {
+    final Matcher matcher = DIGEST_PATTERN.matcher(digest);
+    if (!matcher.matches()) {
       errors.add(format("Illegal digest: \"%s\"", digest));
       return false;
+    }
+
+    final String algorithm = matcher.group("algorithm");
+    final String identifier = matcher.group("identifier");
+
+    if ("sha256".equals(algorithm)) {
+      if (!SHA256_IDENTIFIER_PATTERN.matcher(identifier).matches()) {
+        errors.add(format("Illegal digest: \"%s\"", digest));
+        return false;
+      }
     }
 
     return true;
