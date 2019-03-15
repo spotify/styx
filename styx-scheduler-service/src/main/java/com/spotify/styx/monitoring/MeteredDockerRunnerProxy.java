@@ -28,7 +28,7 @@ import com.spotify.styx.util.Time;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.KubernetesClientTimeoutException;
 import java.lang.reflect.Proxy;
-import javaslang.control.Try;
+import io.vavr.control.Try;
 
 /**
  * A proxy for instrumenting an instance of {@link DockerRunner} using {@link Proxy#newProxyInstance}.

@@ -27,7 +27,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
-import javaslang.control.Try.CheckedFunction;
+import javaslang.control.Try;
 import org.junit.Test;
 
 public class JsonTest {
@@ -60,7 +60,7 @@ public class JsonTest {
     assertIgnoresUnknownProperties(EVENT, node -> Json.deserialize(Json.serialize(node), Event.class));
   }
 
-  private <T> void assertIgnoresUnknownProperties(T value, CheckedFunction<ObjectNode, T> deserialize)
+  private <T> void assertIgnoresUnknownProperties(T value, Try.CheckedFunction<ObjectNode, T> deserialize)
       throws Throwable {
     final ObjectNode node = Json.OBJECT_MAPPER.convertValue(value, ObjectNode.class);
     node.put("non_existent_field", "foobar");

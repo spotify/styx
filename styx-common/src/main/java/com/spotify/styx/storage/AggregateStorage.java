@@ -41,7 +41,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.function.Predicate;
-import javaslang.Tuple2;
+import io.vavr.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
 
 /**

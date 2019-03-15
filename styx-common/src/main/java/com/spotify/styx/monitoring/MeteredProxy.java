@@ -28,7 +28,7 @@ import java.lang.reflect.Proxy;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
-import javaslang.control.Try;
+import io.vavr.control.Try;
 
 /**
  * A proxy for instrumenting an instance using {@link Proxy#newProxyInstance}.

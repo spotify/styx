@@ -32,7 +32,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import javaslang.control.Try;
+import io.vavr.control.Try;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;

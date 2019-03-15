@@ -23,7 +23,7 @@ package com.spotify.styx.monitoring;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
 import java.lang.reflect.Proxy;
-import javaslang.control.Try;
+import io.vavr.control.Try;
 
 /**
  * A proxy for instrumenting an instance of {@link Storage} {@link Proxy#newProxyInstance}.

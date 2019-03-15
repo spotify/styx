@@ -42,8 +42,8 @@
       <artifactId>completable-futures</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.javaslang</groupId>
-      <artifactId>javaslang</artifactId>
+      <groupId>io.vavr</groupId>
+      <artifactId>vavr</artifactId>
     </dependency>
     <dependency>
       <groupId>com.github.kabutz</groupId>

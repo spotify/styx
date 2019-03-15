@@ -31,7 +31,7 @@ import io.opencensus.exporter.trace.stackdriver.StackdriverTraceConfiguration;
 import io.opencensus.exporter.trace.stackdriver.StackdriverTraceExporter;
 import java.io.IOException;
 import java.time.Instant;
-import javaslang.Function1;
+import io.vavr.Function1;
 
 public class StyxService {
 

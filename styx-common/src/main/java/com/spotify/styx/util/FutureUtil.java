@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import javaslang.control.Try;
+import io.vavr.control.Try;
 
 public class FutureUtil {
 

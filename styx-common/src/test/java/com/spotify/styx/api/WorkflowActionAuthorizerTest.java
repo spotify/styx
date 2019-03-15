@@ -36,7 +36,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
 import java.io.IOException;
 import java.util.Optional;
-import javaslang.control.Try;
+import io.vavr.control.Try;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
