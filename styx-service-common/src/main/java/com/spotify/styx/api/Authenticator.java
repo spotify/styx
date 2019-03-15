@@ -128,6 +128,7 @@ public class Authenticator {
     }
 
     if (googleIdToken == null) {
+      logger.debug("Invalid id token: verifyIdToken returned null");
       return null;
     }
 
@@ -138,22 +139,22 @@ public class Authenticator {
     }
 
     final String domain = getDomain(email);
-    if (domain != null) {
-      if (domainWhitelist.contains(domain)) {
-        logger.debug("Domain {} in whitelist", domain);
-        return googleIdToken;
-      }
-    } else {
+    if (domain == null) {
       logger.warn("Invalid email address {}", email);
       return null;
+    } else if (domainWhitelist.contains(domain)) {
+      logger.debug("Domain {} in whitelist", domain);
+      return googleIdToken;
     }
 
     if (validatedEmailCache.getIfPresent(email) != null) {
+      logger.debug("Cache hit for {}", email);
       return googleIdToken;
     }
 
     // Is this a GCP service account?
     if (!SERVICE_ACCOUNT_PATTERN.matcher(email).matches()) {
+      logger.debug("Not a service account: {}", email);
       return null;
     }
 
@@ -164,6 +165,7 @@ public class Authenticator {
         // TODO: Remove this null check and require tokens to have a target audience
         && googleIdToken.getPayload().getAudience() != null) {
       if (!googleIdToken.verifyAudience(allowedAudiences)) {
+        logger.warn("ID token wasn't intended for Styx");
         return null;
       }
     }
