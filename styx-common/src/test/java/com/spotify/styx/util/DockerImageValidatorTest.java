@@ -94,6 +94,9 @@ public class DockerImageValidatorTest {
     assertEquals(newHashSet("Illegal digest: \"sha256:\""),
         validator.validateImageReference("foo:4711/baz:bar@sha256:"));
 
+    assertEquals(newHashSet("Illegal digest: \"sha256:de253bbb8bb165d7f69ad2204e9d362c8005ce15\""),
+        validator.validateImageReference("gcr.io/foo-bar/baz-quux@sha256:de253bbb8bb165d7f69ad2204e9d362c8005ce15"));
+
     assertFalse(validator.validateImageReference("repo:/").isEmpty());
 
     assertEquals(newHashSet("Invalid domain name: \"1.2.3.4.\""),
