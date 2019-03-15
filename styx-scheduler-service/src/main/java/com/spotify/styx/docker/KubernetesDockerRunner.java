@@ -20,7 +20,7 @@
 
 package com.spotify.styx.docker;
 
-import static com.spotify.styx.docker.KubernetesPodEventTranslator.hasPullImageError;
+import static com.spotify.styx.docker.KubernetesPodEventTranslator.imageError;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.isTerminated;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
@@ -402,8 +402,9 @@ class KubernetesDockerRunner implements DockerRunner {
     }
     if (isTerminated(containerStatus.get())) {
       deletePodIfNonDeletePeriodExpired(workflowInstance, pod);
-    } else if (hasPullImageError(containerStatus.get())) {
-      deletePod(workflowInstance, pod, "Pull image error");
+    } else {
+      imageError(containerStatus.get()).ifPresent(msg ->
+          deletePod(workflowInstance, pod, "Pull image error: " + msg));
     }
   }
 

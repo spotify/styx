@@ -46,8 +46,12 @@ import io.fabric8.kubernetes.api.model.PodStatusBuilder;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import junitparams.JUnitParamsRunner;
+import junitparams.Parameters;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 
+@RunWith(JUnitParamsRunner.class)
 public class KubernetesPodEventTranslatorTest {
 
   private static final WorkflowInstance WFI =
@@ -97,13 +101,22 @@ public class KubernetesPodEventTranslatorTest {
         Event.started(WFI));
   }
 
+  @Parameters({ "ImageInspectError  , One or more containers failed to pull their image",
+                "PullImageError     , One or more containers failed to pull their image",
+                "ErrImagePull       , One or more containers failed to pull their image",
+                "ErrImageNeverPull  , One or more containers failed to pull their image",
+                "ImagePullBackOff   , One or more containers failed to pull their image",
+                "RegistryUnavailable, One or more containers failed to pull their image",
+                "InvalidImageName   , One or more container image names were invalid"
+  })
   @Test
-  public void runErrorOnErrImagePull() {
-    setWaiting(pod, "Pending", "ErrImagePull");
+  public void runErrorOnImageError(String reason, String errorMessage) {
+    var message = "foobar!";
+    setWaiting(pod, "Pending", reason, message);
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
-        Event.runError(WFI, "One or more containers failed to pull their image"));
+        Event.runError(WFI, errorMessage + ": " + reason + ": " + message));
   }
 
   @Test
@@ -350,12 +363,24 @@ public class KubernetesPodEventTranslatorTest {
     pod.setStatus(waiting(phase, reason));
   }
 
+  static void setWaiting(Pod pod, String phase, String reason, String message) {
+    pod.setStatus(waiting(phase, reason, message));
+  }
+
   static PodStatus waiting(String phase, String reason) {
     return podStatus(phase, true, waitingContainerState(reason));
   }
 
+  static PodStatus waiting(String phase, String reason, String message) {
+    return podStatus(phase, true, waitingContainerState(reason, message));
+  }
+
   private static ContainerState waitingContainerState(String reason) {
-    return new ContainerState(null, null, new ContainerStateWaiting("", reason));
+    return waitingContainerState(reason, "");
+  }
+
+  private static ContainerState waitingContainerState(String reason, String message) {
+    return new ContainerState(null, null, new ContainerStateWaiting(message, reason));
   }
 
   static PodStatus podStatus(String phase, boolean ready, ContainerState containerState) {
