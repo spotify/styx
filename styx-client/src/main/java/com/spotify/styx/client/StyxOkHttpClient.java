@@ -26,7 +26,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.auth.oauth2.GoogleCredentials;
-import com.spotify.styx.api.Api;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.api.ResourcesPayload;
@@ -79,7 +78,7 @@ class StyxOkHttpClient implements StyxClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxOkHttpClient.class);
 
-  static final String STYX_API_VERSION = Api.Version.V3.name().toLowerCase();
+  static final String STYX_API_VERSION = "v3";
 
   private static final String STYX_CLIENT_VERSION =
       "Styx Client " + StyxOkHttpClient.class.getPackage().getImplementationVersion();

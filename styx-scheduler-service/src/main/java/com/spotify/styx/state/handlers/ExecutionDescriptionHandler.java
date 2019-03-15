@@ -35,7 +35,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.IsClosedException;
-import com.spotify.styx.util.MissingRequiredPropertyException;
+import com.spotify.styx.MissingRequiredPropertyException;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;

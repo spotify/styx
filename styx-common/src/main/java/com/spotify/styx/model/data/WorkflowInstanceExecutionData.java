@@ -23,7 +23,6 @@ package com.spotify.styx.model.data;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
 import java.util.Comparator;
 import java.util.List;
@@ -50,7 +49,4 @@ public abstract class WorkflowInstanceExecutionData {
     return new AutoValue_WorkflowInstanceExecutionData(workflowInstance, triggers);
   }
 
-  public static WorkflowInstanceExecutionData fromEvents(Iterable<SequenceEvent> events) {
-    return new WFIExecutionBuilder().executionInfo(events);
-  }
 }

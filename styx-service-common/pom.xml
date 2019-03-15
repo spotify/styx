@@ -7,21 +7,35 @@
     <version>2.1.16-SNAPSHOT</version>
   </parent>
 
-  <name>Spotify Styx Scheduler Service</name>
-  <artifactId>styx-scheduler-service</artifactId>
+  <name>Spotify Styx Service Common</name>
+  <artifactId>styx-service-common</artifactId>
 
   <dependencies>
     <dependency>
       <groupId>com.spotify</groupId>
-      <artifactId>styx-service-common</artifactId>
+      <artifactId>styx-common</artifactId>
       <version>${project.version}</version>
     </dependency>
-
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>apollo-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>apollo-metrics</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>apollo-entity</artifactId>
     </dependency>
-
+    <dependency>
+      <groupId>io.dropwizard.metrics</groupId>
+      <artifactId>metrics-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.dropwizard.metrics</groupId>
+      <artifactId>metrics-jvm</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.google.auto.value</groupId>
       <artifactId>auto-value</artifactId>
@@ -32,35 +46,18 @@
       <artifactId>auto-matter</artifactId>
       <scope>provided</scope>
     </dependency>
-
-    <dependency>
-      <groupId>com.github.sviperll</groupId>
-      <artifactId>adt4j</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.spotify</groupId>
-      <artifactId>completable-futures</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.javaslang</groupId>
-      <artifactId>javaslang</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.github.kabutz</groupId>
-      <artifactId>javaspecialists</artifactId>
-    </dependency>
     <dependency>
       <groupId>com.typesafe</groupId>
       <artifactId>config</artifactId>
     </dependency>
-
     <dependency>
-      <groupId>com.spotify</groupId>
-      <artifactId>docker-client</artifactId>
+      <groupId>com.github.sviperll</groupId>
+      <artifactId>adt4j</artifactId>
+      <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>io.fabric8</groupId>
-      <artifactId>kubernetes-client</artifactId>
+      <groupId>com.google.apis</groupId>
+      <artifactId>google-api-services-cloudresourcemanager</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.apis</groupId>
@@ -68,13 +65,35 @@
     </dependency>
     <dependency>
       <groupId>com.google.apis</groupId>
-      <artifactId>google-api-services-container</artifactId>
+      <artifactId>google-api-services-admin-directory</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-datastore</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud.bigtable</groupId>
+      <artifactId>bigtable-hbase-1.x</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-tcnative-boringssl-static</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.opencensus</groupId>
+      <artifactId>opencensus-api</artifactId>
     </dependency>
 
+    <!-- test deps -->
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-test</artifactId>
       <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>apollo-test</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -98,28 +117,28 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.jmock</groupId>
-      <artifactId>jmock</artifactId>
+      <groupId>com.jayway.jsonpath</groupId>
+      <artifactId>json-path-assert</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.jcabi</groupId>
-      <artifactId>jcabi-matchers</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.spotify</groupId>
-      <artifactId>apollo-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.awaitility</groupId>
-      <artifactId>awaitility</artifactId>
+      <groupId>io.opencensus</groupId>
+      <artifactId>opencensus-impl</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>pl.pragmatists</groupId>
       <artifactId>JUnitParams</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.github.stefanbirkner</groupId>
+      <artifactId>system-rules</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.github.cbismuth</groupId>
+      <artifactId>junit-repeat-rule</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

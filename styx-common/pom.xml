@@ -12,26 +12,6 @@
   
   <dependencies>
     <dependency>
-      <groupId>com.spotify</groupId>
-      <artifactId>apollo-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.spotify</groupId>
-      <artifactId>apollo-metrics</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.spotify</groupId>
-      <artifactId>apollo-entity</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
-      <artifactId>metrics-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
-      <artifactId>metrics-jvm</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.google.auto.value</groupId>
       <artifactId>auto-value</artifactId>
       <scope>provided</scope>
@@ -42,18 +22,13 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>com.typesafe</groupId>
-      <artifactId>config</artifactId>
-    </dependency>
-
-    <dependency>
       <groupId>com.github.sviperll</groupId>
       <artifactId>adt4j</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>com.squareup.okio</groupId>
-      <artifactId>okio</artifactId>
+      <groupId>javax.annotation</groupId>
+      <artifactId>javax.annotation-api</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
@@ -64,26 +39,13 @@
       <artifactId>guava-retrying</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.javaslang</groupId>
+      <groupId>io.javaslang</groupId>
       <artifactId>javaslang</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.cronutils</groupId>
-      <artifactId>cron-utils</artifactId>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.google.apis</groupId>
-      <artifactId>google-api-services-cloudresourcemanager</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.apis</groupId>
-      <artifactId>google-api-services-iam</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.apis</groupId>
-      <artifactId>google-api-services-admin-directory</artifactId>
-    </dependency>
-
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
@@ -109,35 +71,19 @@
       <artifactId>auto-matter-jackson</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.google.cloud</groupId>
-      <artifactId>google-cloud-datastore</artifactId>
+      <groupId>com.cronutils</groupId>
+      <artifactId>cron-utils</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.google.cloud.bigtable</groupId>
-      <artifactId>bigtable-hbase-1.x</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-tcnative-boringssl-static</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>javax.annotation</groupId>
-      <artifactId>javax.annotation-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.opencensus</groupId>
-      <artifactId>opencensus-api</artifactId>
+      <groupId>com.squareup.okio</groupId>
+      <artifactId>okio</artifactId>
     </dependency>
 
+    <!-- test deps -->
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-test</artifactId>
       <version>${project.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.spotify</groupId>
-      <artifactId>apollo-test</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -166,22 +112,14 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.opencensus</groupId>
-      <artifactId>opencensus-impl</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>pl.pragmatists</groupId>
       <artifactId>JUnitParams</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.github.cbismuth</groupId>
-      <artifactId>junit-repeat-rule</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.github.stefanbirkner</groupId>
       <artifactId>system-rules</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 </project>

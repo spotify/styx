@@ -190,7 +190,7 @@ public class BigtableStorage {
       throw new ResourceNotFoundException("Workflow instance not found");
     }
 
-    return WorkflowInstanceExecutionData.fromEvents(events);
+    return new WFIExecutionBuilder().executionInfo(events);
   }
 
   private List<WorkflowInstanceExecutionData> executionData(

@@ -546,7 +546,7 @@ public class ServiceAccountUsageAuthorizerTest {
   public void shouldCreateAllAuthorizationPolicy() {
     final Config config = ConfigFactory.parseMap(Map.of(AUTHORIZATION_REQUIRE_ALL_CONFIG, "true"));
     final AuthorizationPolicy policy = AuthorizationPolicy.fromConfig(config);
-    assertThat(policy, is(instanceOf(ServiceAccountUsageAuthorizer.AllAuthorizationPolicy.class)));
+    assertThat(policy, is(instanceOf(AllAuthorizationPolicy.class)));
   }
 
   @Test
@@ -554,7 +554,7 @@ public class ServiceAccountUsageAuthorizerTest {
     final Config config = ConfigFactory.parseMap(Map.of(AUTHORIZATION_REQUIRE_WORKFLOWS,
         List.of("foo#bar", "baz#quux")));
     final AuthorizationPolicy policy = AuthorizationPolicy.fromConfig(config);
-    assertThat(policy, is(instanceOf(ServiceAccountUsageAuthorizer.WhitelistAuthorizationPolicy.class)));
+    assertThat(policy, is(instanceOf(WhitelistAuthorizationPolicy.class)));
   }
 
   private void assertCachedSuccess(Runnable r) {

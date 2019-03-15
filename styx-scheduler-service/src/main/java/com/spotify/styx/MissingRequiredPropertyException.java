@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.util;
+package com.spotify.styx;
 
 /**
  * An exception thrown when a required property is missing in a resource.

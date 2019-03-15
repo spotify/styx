@@ -17,7 +17,7 @@
   <dependencies>
     <dependency>
       <groupId>com.spotify</groupId>
-      <artifactId>styx-common</artifactId>
+      <artifactId>styx-service-common</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
@@ -43,7 +43,7 @@
       <artifactId>completable-futures</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.javaslang</groupId>
+      <groupId>io.javaslang</groupId>
       <artifactId>javaslang</artifactId>
     </dependency>
     <dependency>
