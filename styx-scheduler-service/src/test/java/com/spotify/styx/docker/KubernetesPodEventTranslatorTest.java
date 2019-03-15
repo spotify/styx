@@ -107,7 +107,7 @@ public class KubernetesPodEventTranslatorTest {
                 "ErrImageNeverPull  , One or more containers failed to pull their image",
                 "ImagePullBackOff   , One or more containers failed to pull their image",
                 "RegistryUnavailable, One or more containers failed to pull their image",
-                "InvalidImageName   , One or more container image names were invalid"
+                "InvalidImageName   , One or more container image names were invalid",
   })
   @Test
   public void runErrorOnImageError(String reason, String errorMessage) {
@@ -117,6 +117,12 @@ public class KubernetesPodEventTranslatorTest {
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
         Event.runError(WFI, errorMessage + ": " + reason + ": " + message));
+  }
+
+  @Test
+  public void noRunErrorWhenPendingAndNoError() {
+    setWaiting(pod, "Pending", "ContainerCreating");
+    assertGeneratesNoEvents(RunState.State.SUBMITTED, pod);
   }
 
   @Test
