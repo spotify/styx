@@ -73,7 +73,7 @@ import com.spotify.styx.monitoring.StatsFactory;
 import com.spotify.styx.monitoring.TracingProxy;
 import com.spotify.styx.publisher.Publisher;
 import com.spotify.styx.state.OutputHandler;
-import com.spotify.styx.state.QueuedStateManager;
+import com.spotify.styx.state.PersistentStateManager;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
@@ -378,7 +378,7 @@ public class StyxScheduler implements AppInit {
         eventConsumerFactory.apply(environment, stats),
         new PublisherHandler(publisher, stats),
         new TransitionLogger());
-    var queuedStateManager = closer.register(new QueuedStateManager(time, stateProcessingExecutor,
+    var queuedStateManager = closer.register(new PersistentStateManager(time, stateProcessingExecutor,
         storage, eventConsumer, eventConsumerExecutor, fanOutput(outputHandlers),
         shardedCounter));
     final StateManager stateManager = TracingProxy.instrument(StateManager.class, queuedStateManager);
@@ -542,7 +542,7 @@ public class StyxScheduler implements AppInit {
 
   @VisibleForTesting
   static void setupMetrics(
-      QueuedStateManager stateManager,
+      PersistentStateManager stateManager,
       Supplier<Map<WorkflowId, Workflow>> workflowCache,
       Storage storage,
       RateLimiter submissionRateLimiter,
