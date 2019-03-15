@@ -20,22 +20,28 @@
 
 package com.spotify.styx.state.handlers;
 
+import static com.github.rholder.retry.StopStrategies.stopAfterDelay;
+import static com.github.rholder.retry.WaitStrategies.exponentialWait;
 import static com.spotify.styx.state.RunState.State.RUNNING;
 import static com.spotify.styx.state.RunState.State.SUBMITTED;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.cronutils.utils.VisibleForTesting;
+import com.github.rholder.retry.Attempt;
+import com.github.rholder.retry.Retryer;
+import com.github.rholder.retry.RetryerBuilder;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.util.Retrier;
-import com.spotify.styx.util.RunnableWithException;
-import java.time.Duration;
 import java.util.Objects;
+import java.util.concurrent.Callable;
 import java.util.function.BiConsumer;
+import javaslang.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,29 +52,34 @@ public class PublisherHandler implements BiConsumer<SequenceEvent, RunState> {
 
   private static final Logger LOG = LoggerFactory.getLogger(PublisherHandler.class);
 
-  private static final int MAX_RETRIES = 420;
-
   private static final String DEPLOYING = "deploying";
   private static final String DEPLOYED = "deployed";
 
-  private final Retrier retrier;
+  private final Retryer<Void> retryer;
   private final Publisher publisher;
   private final Stats stats;
 
   public PublisherHandler(Publisher publisher, Stats stats) {
     this(publisher, stats,
-        Retrier.builder()
-            .errorMessage("publish deploy event")
-            .retryDelay(Duration.ofSeconds(1))
-            .maxRetries(MAX_RETRIES)
+        RetryerBuilder.<Void>newBuilder()
+            .retryIfException()
+            .withRetryListener(PublisherHandler::onPublishAttempt)
+            .withWaitStrategy(exponentialWait())
+            .withStopStrategy(stopAfterDelay(30, SECONDS))
             .build());
   }
 
+  private static <V> void onPublishAttempt(Attempt<V> attempt) {
+    if (attempt.hasException()) {
+      LOG.warn("Failed to publish deploy event (attempt #{})", attempt.getAttemptNumber());
+    }
+  }
+
   @VisibleForTesting
-  PublisherHandler(Publisher publisher, Stats stats, Retrier retrier) {
+  PublisherHandler(Publisher publisher, Stats stats, Retryer<Void> retryer) {
     this.publisher = Objects.requireNonNull(publisher);
     this.stats = Objects.requireNonNull(stats);
-    this.retrier = Objects.requireNonNull(retrier);
+    this.retryer = Objects.requireNonNull(retryer);
   }
 
   @Override
@@ -80,7 +91,7 @@ public class PublisherHandler implements BiConsumer<SequenceEvent, RunState> {
           Preconditions.checkArgument(state.data().executionDescription().isPresent());
           final ExecutionDescription executionDescription = state.data().executionDescription().get();
 
-          retrier.runWithRetries(
+          retryer.call(
               meteredPublishing(() -> publisher.deploying(workflowInstance, executionDescription),
                   stats, DEPLOYING, SUBMITTED.name()));
         } catch (Exception e) {
@@ -95,7 +106,7 @@ public class PublisherHandler implements BiConsumer<SequenceEvent, RunState> {
           Preconditions.checkArgument(state.data().executionDescription().isPresent());
           final ExecutionDescription executionDescription = state.data().executionDescription().get();
 
-          retrier.runWithRetries(
+          retryer.call(
               meteredPublishing(() -> publisher.deployed(workflowInstance, executionDescription),
                   stats, type, RUNNING.name()));
         } catch (Exception e) {
@@ -109,17 +120,17 @@ public class PublisherHandler implements BiConsumer<SequenceEvent, RunState> {
     }
   }
 
-  private RunnableWithException<Exception> meteredPublishing(RunnableWithException<Exception> runnable,
-                                                             Stats stats, String type, String state) {
+  private Callable<Void> meteredPublishing(Try.CheckedRunnable f, Stats stats, String type, String state) {
     return () -> {
       try {
-        runnable.run();
+        f.run();
         stats.recordPublishing(type, state);
-      } catch (Exception e) {
+        return null;
+      } catch (Throwable e) {
         stats.recordPublishingError(type, state);
         LOG.warn("Failed to publish event for {} state", state, e);
-
-        throw e;
+        Throwables.throwIfUnchecked(e);
+        throw new RuntimeException(e);
       }
     };
   }

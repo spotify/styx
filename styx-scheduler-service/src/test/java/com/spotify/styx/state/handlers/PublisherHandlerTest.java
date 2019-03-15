@@ -27,6 +27,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.github.rholder.retry.Retryer;
+import com.github.rholder.retry.RetryerBuilder;
+import com.github.rholder.retry.StopStrategies;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
@@ -34,7 +37,6 @@ import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
-import com.spotify.styx.util.Retrier;
 import java.io.IOException;
 import org.junit.Before;
 import org.junit.Test;
@@ -47,6 +49,10 @@ public class PublisherHandlerTest {
 
   private static final String COMMIT_SHA = "cc9f6ca490e106ca9324bd34de5e3ad935b91bd6";
   private static final String DOCKER_IMAGE = "busybox:1.1";
+
+  public static final Retryer<Void> NO_RETRIES = RetryerBuilder.<Void>newBuilder()
+      .withStopStrategy(StopStrategies.stopAfterAttempt(1))
+      .build();
 
   private Publisher publisher;
   private PublisherHandler publisherHandler;
@@ -126,9 +132,7 @@ public class PublisherHandlerTest {
     doThrow(new IOException()).when(publisher).deploying(any(), any());
     publisherHandler = new PublisherHandler(
         publisher, stats,
-        Retrier.builder()
-            .maxRetries(1)
-            .build());
+        NO_RETRIES);
 
     ExecutionDescription executionDescription = ExecutionDescription.builder()
         .dockerImage(DOCKER_IMAGE)
@@ -172,11 +176,7 @@ public class PublisherHandlerTest {
   @Test
   public void shouldFailEventuallyOnRunning() throws Exception {
     doThrow(new IOException()).when(publisher).deployed(any(), any());
-    publisherHandler = new PublisherHandler(
-        publisher, stats,
-        Retrier.builder()
-            .maxRetries(1)
-            .build());
+    publisherHandler = new PublisherHandler(publisher, stats, NO_RETRIES);
 
     ExecutionDescription executionDescription = ExecutionDescription.builder()
         .dockerImage(DOCKER_IMAGE)

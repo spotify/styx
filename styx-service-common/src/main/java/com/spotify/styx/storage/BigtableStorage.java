@@ -33,7 +33,6 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.util.ResourceNotFoundException;
-import com.spotify.styx.util.RunnableWithException;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
@@ -43,6 +42,7 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+import javaslang.control.Try;
 import okio.ByteString;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
@@ -215,7 +215,7 @@ public class BigtableStorage {
     return SequenceEvent.parseKey(key, event, timestamp);
   }
 
-  private void storeWithRetries(RunnableWithException<IOException> storingOperation) throws IOException {
+  private void storeWithRetries(Try.CheckedRunnable storingOperation) throws IOException {
     int storeRetries = 0;
     boolean succeeded = false;
 
@@ -236,6 +236,9 @@ public class BigtableStorage {
         } catch (InterruptedException e1) {
           throw Throwables.propagate(e1);
         }
+      } catch (Throwable e) {
+        Throwables.throwIfUnchecked(e);
+        throw new RuntimeException(e);
       }
     }
   }
