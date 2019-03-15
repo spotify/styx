@@ -379,4 +379,11 @@ public class AuthenticatorTest {
     idTokenPayload.setEmail("foo@foo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(idToken));
   }
+
+  @Test
+  public void shouldAllowNoAudience() {
+    idTokenPayload.setAudience(null);
+    idTokenPayload.setEmail("foo@foo.iam.gserviceaccount.com");
+    assertThat(validator.authenticate("token"), is(idToken));
+  }
 }
