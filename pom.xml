@@ -45,6 +45,7 @@
     <module>styx-cli</module>
     <module>styx-client</module>
     <module>styx-common</module>
+    <module>styx-service-common</module>
     <module>styx-test</module>
     <module>styx-standalone-service</module>
     <module>styx-report</module>

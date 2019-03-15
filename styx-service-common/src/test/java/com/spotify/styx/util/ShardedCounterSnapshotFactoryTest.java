@@ -67,7 +67,7 @@ public class ShardedCounterSnapshotFactoryTest {
     helper.start();
     datastore = helper.getOptions().getService();
     connection = Mockito.mock(Connection.class);
-    storage = spy(new AggregateStorage(connection, datastore, Duration.ZERO));
+    storage = Mockito.spy(new AggregateStorage(connection, datastore, Duration.ZERO));
   }
 
   @AfterClass

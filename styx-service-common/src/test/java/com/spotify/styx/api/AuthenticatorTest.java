@@ -118,7 +118,7 @@ public class AuthenticatorTest {
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private CloudResourceManager cloudResourceManager;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Iam iam;
   @Mock private CloudResourceManager.Projects.List projectsList;
-  @Mock private CloudResourceManager.Projects.GetAncestry projectsGetAncestry;
+  @Mock private GetAncestry projectsGetAncestry;
   @Mock private Iam.Projects.ServiceAccounts.Get serviceAccountsGet;
 
   @Before

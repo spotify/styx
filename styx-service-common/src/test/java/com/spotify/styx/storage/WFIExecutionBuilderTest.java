@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.model.data;
+package com.spotify.styx.storage;
 
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
@@ -30,6 +30,10 @@ import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.model.data.ExecStatus;
+import com.spotify.styx.model.data.Execution;
+import com.spotify.styx.model.data.Trigger;
+import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.EventUtil;

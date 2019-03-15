@@ -589,14 +589,14 @@ public interface ServiceAccountUsageAuthorizer {
     static AuthorizationPolicy fromConfig(Config config) {
       final AuthorizationPolicy authorizationPolicy;
       if (get(config, config::getBoolean, AUTHORIZATION_REQUIRE_ALL_CONFIG).orElse(false)) {
-        authorizationPolicy = new ServiceAccountUsageAuthorizer.AllAuthorizationPolicy();
+        authorizationPolicy = new AllAuthorizationPolicy();
       } else {
         final List<WorkflowId> ids = get(config, config::getStringList, AUTHORIZATION_REQUIRE_WORKFLOWS)
             .orElse(Collections.emptyList())
             .stream()
             .map(WorkflowId::parseKey)
             .collect(Collectors.toList());
-        authorizationPolicy = new ServiceAccountUsageAuthorizer.WhitelistAuthorizationPolicy(ids);
+        authorizationPolicy = new WhitelistAuthorizationPolicy(ids);
       }
       return authorizationPolicy;
     }
