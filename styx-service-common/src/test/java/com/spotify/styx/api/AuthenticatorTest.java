@@ -43,7 +43,6 @@ import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpResponseException;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
-import com.google.api.services.cloudresourcemanager.CloudResourceManager.Projects.GetAncestry;
 import com.google.api.services.cloudresourcemanager.model.Ancestor;
 import com.google.api.services.cloudresourcemanager.model.GetAncestryResponse;
 import com.google.api.services.cloudresourcemanager.model.ListProjectsResponse;
@@ -118,7 +117,7 @@ public class AuthenticatorTest {
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private CloudResourceManager cloudResourceManager;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Iam iam;
   @Mock private CloudResourceManager.Projects.List projectsList;
-  @Mock private GetAncestry projectsGetAncestry;
+  @Mock private CloudResourceManager.Projects.GetAncestry projectsGetAncestry;
   @Mock private Iam.Projects.ServiceAccounts.Get serviceAccountsGet;
 
   @Before
@@ -150,7 +149,7 @@ public class AuthenticatorTest {
   }
 
   private void mockAncestryResponse(Project project, ResourceId... ancestors) throws IOException {
-    final GetAncestry ancestry = mock(GetAncestry.class);
+    final CloudResourceManager.Projects.GetAncestry ancestry = mock(CloudResourceManager.Projects.GetAncestry.class);
     doReturn(ancestryResponse(ancestors)).when(ancestry).execute();
     when(cloudResourceManager.projects().getAncestry(eq(project.getProjectId()), any()))
         .thenReturn(ancestry);
