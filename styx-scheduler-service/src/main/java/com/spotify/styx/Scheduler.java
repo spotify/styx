@@ -198,7 +198,7 @@ public class Scheduler {
         .map(instance -> CompletableFuture.runAsync(() ->
             tracer.spanBuilder("processInstance").startSpanAndRun(() ->
                 processInstance(config, resources, workflows, instance, resourceExhaustedCache,
-                    currentResourceUsage, currentResourceDemand))))
+                    currentResourceUsage, currentResourceDemand)), executor))
         .collect(toList());
 
     // Wait for processing to complete
