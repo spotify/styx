@@ -620,7 +620,7 @@ class KubernetesDockerRunner implements DockerRunner {
       }
     }
 
-    // Do blocking pod deletion after emitting events in order to avoid run states going stale.
+    // Do blocking pod deletion after emitting events in order to avoid run states going stale. See note above.
     podsToDelete.forEach(name -> runGuarded(() -> client.pods().withName(name).delete()));
   }
 
