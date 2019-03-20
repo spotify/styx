@@ -36,6 +36,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -842,13 +843,13 @@ public class KubernetesDockerRunnerTest {
     when(podList.getItems()).thenReturn(List.of(terminatedPod));
 
     // Make time pass so the runner polls
-    executor.tick((long) (POLL_INTERVAL_SECONDS * 1.5), TimeUnit.SECONDS);
+    executor.tick((long) (POLL_INTERVAL_SECONDS * 2), TimeUnit.SECONDS);
 
     // Verify that the runner eventually polled and found out that the pod is terminated
-    verify(stateManager).receive(
+    verify(stateManager, atLeastOnce()).receive(
         Event.started(WORKFLOW_INSTANCE),
         -1);
-    verify(stateManager).receive(
+    verify(stateManager, atLeastOnce()).receive(
         Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)),
         0);
   }
