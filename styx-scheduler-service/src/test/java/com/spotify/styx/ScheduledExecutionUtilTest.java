@@ -20,6 +20,7 @@
 
 package com.spotify.styx;
 
+import static com.spotify.styx.ScheduledExecutionUtil.JITTER;
 import static com.spotify.styx.ScheduledExecutionUtil.scheduleWithJitter;
 import static com.spotify.styx.util.ClassEnforcer.assertNotInstantiable;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -42,6 +43,8 @@ public class ScheduledExecutionUtilTest {
 
   private static final DeterministicScheduler SCHEDULER = new DeterministicScheduler();
 
+  private static final Duration INTERVAL = Duration.ofSeconds(10);
+
   @Test
   public void shouldNotBeConstructable() throws ReflectiveOperationException {
     assertTrue(assertNotInstantiable(ScheduledExecutionUtil.class));
@@ -55,7 +58,7 @@ public class ScheduledExecutionUtilTest {
     Runnable runnable = () -> executionTimes.add(time.get());
 
     // Schedule the runnable on an executor we can control
-    scheduleWithJitter(runnable, SCHEDULER, Duration.ofSeconds(10));
+    scheduleWithJitter(runnable, SCHEDULER, INTERVAL);
 
     // Simulate running it for 10k seconds
     for (int i = 0; i < 10000; i++) {
@@ -68,8 +71,12 @@ public class ScheduledExecutionUtilTest {
         .map(i -> executionTimes.get(i + 1) - executionTimes.get(i))
         .summaryStatistics();
 
-    assertThat(statistics.getAverage(), is(closeTo(10, 3)));
-    assertThat(statistics.getMin(), is(both(greaterThanOrEqualTo(5)).and(lessThanOrEqualTo(10))));
-    assertThat(statistics.getMax(), is(both(greaterThanOrEqualTo(10)).and(lessThanOrEqualTo(15))));
+    assertThat(statistics.getAverage(), is(closeTo(INTERVAL.getSeconds(), 3)));
+    assertThat((double) statistics.getMin(), is(
+        both(greaterThanOrEqualTo(INTERVAL.getSeconds() * (1.0 - JITTER)))
+            .and(lessThanOrEqualTo(INTERVAL.getSeconds() * 1.0))));
+    assertThat((double) statistics.getMax(), is(
+        both(greaterThanOrEqualTo(INTERVAL.getSeconds() * 1.0))
+            .and(lessThanOrEqualTo(INTERVAL.getSeconds() * (1.0 + JITTER)))));
   }
 }

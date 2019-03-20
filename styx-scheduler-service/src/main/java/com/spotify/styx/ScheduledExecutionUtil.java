@@ -29,16 +29,26 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class ScheduledExecutionUtil {
 
+  static final double JITTER = 0.5;
+
   private ScheduledExecutionUtil() {
     throw new UnsupportedOperationException();
   }
 
-  public static void scheduleWithJitter(Runnable runnable, ScheduledExecutorService exec, Duration tickInterval) {
-    final double jitter = ThreadLocalRandom.current().nextDouble(0.5, 1.5);
-    final long delayMillis = (long) (jitter * tickInterval.toMillis());
+  /**
+   * Schedule a runnable to execute at randomized intervals with a mean value of {@param interval}.
+   * The random intervals are values from the uniform distribution interval * [1.0 - JITTER, 1.0 + JITTER].
+   *
+   * @param runnable The {@link Runnable} to schedule.
+   * @param exec     The {@link ScheduledExecutorService} to schedule the runnable on.
+   * @param interval The mean scheduled execution interval.
+   */
+  public static void scheduleWithJitter(Runnable runnable, ScheduledExecutorService exec, Duration interval) {
+    final double jitter = ThreadLocalRandom.current().nextDouble(1.0 - JITTER, 1.0 + JITTER);
+    final long delayMillis = (long) (jitter * interval.toMillis());
     exec.schedule(() -> {
       runGuarded(runnable);
-      scheduleWithJitter(runnable, exec, tickInterval);
+      scheduleWithJitter(runnable, exec, interval);
     }, delayMillis, MILLISECONDS);
   }
 }
