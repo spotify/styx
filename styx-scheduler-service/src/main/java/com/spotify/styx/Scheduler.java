@@ -281,7 +281,11 @@ public class Scheduler {
     }
 
     // Check for execution blocker
-    if (executionIsBlocked(config, instance, runState)) {
+    var blocker = executionBlocker(config, instance);
+    if (blocker.isPresent()) {
+      var retry = Event.retryAfter(instance, blocker.get().delay().toMillis());
+      stateManager.receiveIgnoreClosed(retry, runState.counter());
+      LOG.debug("Dequeue rescheduled: {}: {}", instance, blocker.get());
       return;
     }
 
@@ -290,30 +294,21 @@ public class Scheduler {
     sendDequeue(instance, runState, instanceResourceRefs);
   }
 
-  private boolean executionIsBlocked(StyxConfig config, WorkflowInstance instance, RunState runState) {
+  private Optional<ExecutionBlocker> executionBlocker(StyxConfig config, WorkflowInstance instance) {
     if (!config.executionGatingEnabled()) {
-      return false;
+      return Optional.empty();
     }
 
-    Optional<ExecutionBlocker> blocker = Optional.empty();
     try {
-      blocker = gate.executionBlocker(instance)
+      return gate.executionBlocker(instance)
           .toCompletableFuture().get(10, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
     } catch (ExecutionException | TimeoutException e) {
       LOG.warn("Failed to check execution blocker for {}, assuming there is no blocker", instance, e);
+      return Optional.empty();
     }
-
-    if (blocker.isEmpty()) {
-      return false;
-    }
-
-    var retry = Event.retryAfter(instance, blocker.get().delay().toMillis());
-    stateManager.receiveIgnoreClosed(retry, runState.counter());
-    LOG.debug("Dequeue rescheduled: {}: {}", instance, blocker.get());
-    return true;
   }
 
   private Optional<Workflow> readWorkflow(WorkflowId workflowId) {
